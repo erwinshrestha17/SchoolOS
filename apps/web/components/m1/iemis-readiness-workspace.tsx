@@ -47,7 +47,7 @@ const MAX_ADMISSION_IMPORT_FILE_BYTES = 1_000_000;
 
 export function IemisReadinessWorkspace() {
   const queryClient = useQueryClient();
-  const { hasPermissions } = useSession();
+  const { hasPermissions, session } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<"all" | "ready" | "has_issues">(
     "has_issues",
@@ -71,6 +71,9 @@ export function IemisReadinessWorkspace() {
     "students:create",
     "guardians:create",
   ]);
+  const canPrepareReportingCsv =
+    session?.user.isSupportOverride !== true &&
+    hasPermissions(["students:manage_lifecycle", "reports:export"]);
 
   const readinessQuery = useQuery({
     queryKey: ["student-iemis-readiness-list", "workspace", status],
@@ -90,9 +93,12 @@ export function IemisReadinessWorkspace() {
     onSuccess: (result) => {
       setExportResult(result);
       setToast({
-        title: "iEMIS export prepared",
-        description: `${result.validRecords} of ${result.totalRecords} records are ready.`,
-        tone: "success",
+        title: "Reporting-readiness CSV prepared",
+        description:
+          result.artifactStatus === "BLOCKED_CONFIGURATION"
+            ? `${result.validRecords} of ${result.totalRecords} student records passed, but school configuration still blocks government handoff.`
+            : `${result.validRecords} of ${result.totalRecords} student records passed the SchoolOS checks. Authorized review is still required.`,
+        tone: "info",
       });
     },
     onError: (error) =>
@@ -564,20 +570,24 @@ export function IemisReadinessWorkspace() {
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-base font-black text-slate-950">
-              Import & Export
+              Import & reporting handoff
             </h2>
+            <p className="mt-2 text-xs font-medium leading-5 text-slate-600">
+              SchoolOS prepares an internal reporting-readiness CSV. It does not
+              certify the official iEMIS format or submit records directly.
+            </p>
             <div className="mt-4 grid gap-2">
               <Button
                 type="button"
                 onClick={() => exportMutation.mutate()}
-                disabled={exportMutation.isPending}
+                disabled={!canPrepareReportingCsv || exportMutation.isPending}
               >
                 {exportMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Download className="h-4 w-4" />
                 )}{" "}
-                Export iEMIS CSV
+                Prepare reporting-readiness CSV
               </Button>
               <Button
                 type="button"
@@ -611,7 +621,7 @@ export function IemisReadinessWorkspace() {
                 fileName={exportResult?.fileName}
                 disabled={!exportResult}
               >
-                Download latest protected export
+                Download latest protected readiness CSV
               </ProtectedFileButton>
             </div>
             {!canImportAdmissions ? (
@@ -637,6 +647,12 @@ export function IemisReadinessWorkspace() {
                 </Button>
               </div>
             ) : null}
+            {!canPrepareReportingCsv ? (
+              <p className="mt-3 text-xs font-semibold text-slate-500">
+                Preparing a reporting CSV requires student lifecycle and report
+                export permissions and is unavailable during support access.
+              </p>
+            ) : null}
             {exportResult ? (
               <dl className="mt-4 space-y-2 border-t border-slate-100 pt-4 text-xs">
                 <div className="flex justify-between gap-3">
@@ -649,6 +665,14 @@ export function IemisReadinessWorkspace() {
                   <dt className="text-slate-500">Records</dt>
                   <dd className="font-bold">{exportResult.totalRecords}</dd>
                 </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-slate-500">Government handoff</dt>
+                  <dd className="text-right font-bold">
+                    {exportResult.artifactStatus === "BLOCKED_CONFIGURATION"
+                      ? "Blocked by configuration"
+                      : "Authorized review required"}
+                  </dd>
+                </div>
                 <div className="flex justify-between">
                   <dt className="text-slate-500">Export ID</dt>
                   <dd className="max-w-[160px] truncate font-semibold">
@@ -657,6 +681,14 @@ export function IemisReadinessWorkspace() {
                 </div>
               </dl>
             ) : null}
+            {exportResult?.configurationIssues.map((issue) => (
+              <p
+                key={issue.field}
+                className="mt-3 rounded-lg border border-warning-200 bg-warning-50 p-3 text-xs font-semibold leading-5 text-warning-900"
+              >
+                {issue.message}
+              </p>
+            ))}
           </div>
         </aside>
       </div>

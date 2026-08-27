@@ -127,8 +127,10 @@ export function StudentIemisReadinessPage({
             Government reporting readiness
           </h1>
           <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-600">
-            Complete the required student information before including this
-            record in the next iEMIS export.
+            Complete the student information checked by the current SchoolOS
+            internal rule set. Final government format and submission still
+            require authorized review; SchoolOS does not submit this record
+            directly to iEMIS.
           </p>
         </div>
         <button

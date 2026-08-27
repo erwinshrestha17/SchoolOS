@@ -160,13 +160,13 @@ export default function StudentsPage() {
     try {
       const result = await api.exportIemisStudents();
       setPdfError(
-        `iEMIS export prepared: ${result.validRecords}/${result.totalRecords} valid records (${result.fileName}).`,
+        `Reporting-readiness CSV prepared: ${result.validRecords}/${result.totalRecords} student records passed the SchoolOS checks (${result.fileName}). Authorized review is still required before government handoff.`,
       );
     } catch (error) {
       setPdfError(
         schoolFacingErrorMessage(error, {
           fallback:
-            'The iEMIS export could not be prepared. Student records were not changed.',
+            'The reporting-readiness CSV could not be prepared. Student records were not changed.',
           invalid:
             'Some export filters or student readiness rules were not accepted. Refresh and try again.',
           forbidden:
@@ -250,8 +250,8 @@ export default function StudentsPage() {
                   ? [
                       {
                         label: isExportingIemis
-                          ? 'Preparing iEMIS export'
-                          : 'Export iEMIS',
+                          ? 'Preparing reporting CSV'
+                          : 'Prepare reporting CSV',
                         icon: <Download size={16} />,
                         disabled: !canReadStudents || isExportingIemis,
                         onClick: () => void handleExportIemis(),

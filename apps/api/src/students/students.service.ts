@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import {
@@ -3753,6 +3754,7 @@ export class StudentsService {
   }
 
   async exportIemis(actor: AuthContext) {
+    this.assertSensitiveStudentReadAllowed(actor, 'iEMIS reporting export');
     const students = await this.prisma.student.findMany({
       where: { tenantId: actor.tenantId },
       include: {
@@ -3795,11 +3797,11 @@ export class StudentsService {
     });
     const iemisCodeValue = iemisCodeSetting?.value;
     const iemisSchoolCode =
-      typeof iemisCodeValue === 'string' ||
-      typeof iemisCodeValue === 'number' ||
-      typeof iemisCodeValue === 'boolean'
-        ? String(iemisCodeValue)
-        : '';
+      typeof iemisCodeValue === 'string'
+        ? iemisCodeValue.trim()
+        : typeof iemisCodeValue === 'number' && Number.isFinite(iemisCodeValue)
+          ? String(iemisCodeValue)
+          : '';
 
     const headers = buildIemisHeaders();
     const rows = validationResults
@@ -3807,95 +3809,231 @@ export class StudentsService {
       .map(({ student }) => buildIemisRow(student, iemisSchoolCode));
 
     const csv = buildCsv(headers, rows);
+    const checksumSha256 = createHash('sha256').update(csv).digest('hex');
     const exportedAt = new Date();
     const fileName = buildIemisExportFileName(actor, exportedAt);
-    const stored = await this.storageService.saveBufferObject({
-      tenantId: actor.tenantId,
-      prefix: 'exports/iemis',
-      fileName,
-      contentType: 'text/csv',
-      content: Buffer.from(csv, 'utf8'),
-    });
-    const fileAsset = await this.fileRegistryService.registerFile({
-      tenantId: actor.tenantId,
-      uploadedByUserId: actor.userId,
-      originalFilename: fileName,
-      objectKey: stored.objectKey,
-      mimeType: 'text/csv',
-      sizeBytes: stored.sizeBytes,
-      provider: stored.provider,
-      bucket: stored.bucket,
-      checksumSha256: stored.checksumSha256,
-      module: 'students',
-      entityId: actor.tenantId,
-      metadata: {
-        kind: 'IEMIS_EXPORT',
-        reportKey: 'iemis_student_export',
-        totalStudents: students.length,
-        validStudents: rows.length,
-      },
-    });
-    await this.fileRegistryService.markUploaded(
-      actor.tenantId,
-      fileAsset.id,
-      actor.userId,
+    const blockingIssues = validationResults.flatMap((result) =>
+      result.issues
+        .filter((issue) => issue.blocking)
+        .map((issue) => ({
+          studentId: result.student.id,
+          studentSystemId: result.student.studentSystemId,
+          field: issue.field,
+          message: issue.message,
+        })),
     );
-
+    const invalidRecords = validationResults.filter((result) =>
+      result.issues.some((issue) => issue.blocking),
+    ).length;
+    const configurationIssues = iemisSchoolCode
+      ? []
+      : [
+          {
+            field: 'iemisSchoolCode',
+            message:
+              'The school iEMIS code is not configured. This CSV is blocked from government handoff until authorized staff verify and add it.',
+            blocking: true,
+          },
+        ];
+    const artifactStatus = iemisSchoolCode
+      ? ('REQUIRES_AUTHORIZED_REVIEW' as const)
+      : ('BLOCKED_CONFIGURATION' as const);
     const exportRecord = await this.prisma.reportExport.create({
       data: {
         tenantId: actor.tenantId,
         reportKey: 'iemis_student_export',
         format: 'csv',
-        fileAssetId: fileAsset.id,
         filters: {
           totalStudents: students.length,
           validStudents: rows.length,
           fileName,
+          artifactPurpose: IEMIS_ARTIFACT_PURPOSE,
+          schemaAuthority: IEMIS_SCHEMA_AUTHORITY,
+          officialFormatVerified: false,
+          directSubmissionSupported: false,
+          requiresAuthorizedReview: true,
+          artifactStatus,
+          configurationIssueCount: configurationIssues.length,
         },
+        normalizedParameters: {},
+        rowCount: rows.length,
+        displayedTotals: {
+          totalRecords: students.length,
+          validRecords: rows.length,
+          invalidRecords,
+          issueCount: blockingIssues.length,
+        },
+        definitionVersion: IEMIS_REQUIREMENT_VERSION,
+        checksum: checksumSha256,
+        classification: 'CONFIDENTIAL',
+        watermark: 'INTERNAL REPORTING READINESS - AUTHORIZED REVIEW REQUIRED',
         requestedBy: actor.userId,
-        status: 'COMPLETED',
-        completedAt: exportedAt,
+        status: 'RUNNING',
       },
     });
 
-    await this.auditService.record({
-      action: 'export',
-      resource: 'iemis_export',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: exportRecord.id,
-      after: {
-        totalRecords: students.length,
-        validRecords: rows.length,
-        exportId: exportRecord.id,
-        fileAssetId: fileAsset.id,
+    let storedObjectKey: string | null = null;
+    let fileAssetId: string | null = null;
+    try {
+      const stored = await this.storageService.saveBufferObject({
+        tenantId: actor.tenantId,
+        prefix: 'exports/iemis',
         fileName,
-      },
-    });
+        contentType: 'text/csv',
+        content: Buffer.from(csv, 'utf8'),
+      });
+      storedObjectKey = stored.objectKey;
+      const fileAsset = await this.fileRegistryService.registerFile({
+        tenantId: actor.tenantId,
+        uploadedByUserId: actor.userId,
+        originalFilename: fileName,
+        objectKey: stored.objectKey,
+        mimeType: 'text/csv',
+        sizeBytes: stored.sizeBytes,
+        provider: stored.provider,
+        bucket: stored.bucket,
+        checksumSha256: stored.checksumSha256 ?? checksumSha256,
+        module: 'reports',
+        entityId: exportRecord.id,
+        metadata: {
+          kind: 'IEMIS_REPORTING_READINESS_EXPORT',
+          reportKey: 'iemis_student_export',
+          artifactPurpose: IEMIS_ARTIFACT_PURPOSE,
+          schemaAuthority: IEMIS_SCHEMA_AUTHORITY,
+          officialFormatVerified: false,
+          directSubmissionSupported: false,
+          requiresAuthorizedReview: true,
+          artifactStatus,
+          totalStudents: students.length,
+          validStudents: rows.length,
+        },
+      });
+      fileAssetId = fileAsset.id;
+      await this.fileRegistryService.markUploaded(
+        actor.tenantId,
+        fileAsset.id,
+        actor.userId,
+      );
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.reportExport.update({
+          where: { id: exportRecord.id },
+          data: {
+            fileAssetId: fileAsset.id,
+            status: 'COMPLETED',
+            completedAt: exportedAt,
+          },
+        });
+        await this.auditService.record(
+          {
+            action: 'export',
+            resource: 'iemis_export',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: exportRecord.id,
+            after: {
+              totalRecords: students.length,
+              validRecords: rows.length,
+              issueCount: blockingIssues.length,
+              issuesTruncated: blockingIssues.length > IEMIS_EXPORT_ISSUE_LIMIT,
+              exportId: exportRecord.id,
+              fileAssetId: fileAsset.id,
+              fileName,
+              artifactPurpose: IEMIS_ARTIFACT_PURPOSE,
+              schemaAuthority: IEMIS_SCHEMA_AUTHORITY,
+              officialFormatVerified: false,
+              directSubmissionSupported: false,
+              requiresAuthorizedReview: true,
+              artifactStatus,
+            },
+          },
+          tx,
+        );
+      });
+    } catch {
+      let canDeleteStoredObject = fileAssetId === null;
+      if (fileAssetId) {
+        try {
+          await this.fileRegistryService.softDeleteFile(
+            actor.tenantId,
+            fileAssetId,
+            actor.userId,
+          );
+          canDeleteStoredObject = true;
+        } catch {
+          canDeleteStoredObject = false;
+        }
+      }
+      let storedObjectRemoved = false;
+      if (storedObjectKey && canDeleteStoredObject) {
+        try {
+          await this.storageService.deleteObject(storedObjectKey);
+          storedObjectRemoved = true;
+        } catch {
+          storedObjectRemoved = false;
+        }
+      }
+
+      await this.prisma.reportExport
+        .update({
+          where: { id: exportRecord.id },
+          data: {
+            status: 'FAILED',
+            fileAssetId,
+            errorSummary:
+              'The reporting-readiness artifact could not be prepared.',
+            failureDetail:
+              'Artifact generation or protected-file registration failed. Review the File Registry and audit trail before retrying.',
+          },
+        })
+        .catch(() => undefined);
+      try {
+        await this.auditService.record({
+          action: 'export_failed',
+          resource: 'iemis_export',
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          resourceId: exportRecord.id,
+          after: {
+            fileAssetId,
+            storedObjectRemoved,
+            artifactPurpose: IEMIS_ARTIFACT_PURPOSE,
+          },
+        });
+      } catch {
+        // The user-facing failure remains bounded even if audit persistence is
+        // temporarily unavailable; the FAILED export row retains diagnostics.
+      }
+
+      throw new ServiceUnavailableException(
+        'The reporting-readiness CSV could not be prepared. No student records were changed.',
+      );
+    }
+    if (!fileAssetId) {
+      throw new ServiceUnavailableException(
+        'The reporting-readiness CSV was not linked to a protected file.',
+      );
+    }
 
     return {
       formatVersion: IEMIS_REQUIREMENT_VERSION,
+      artifactPurpose: IEMIS_ARTIFACT_PURPOSE,
+      schemaAuthority: IEMIS_SCHEMA_AUTHORITY,
+      officialFormatVerified: false,
+      directSubmissionSupported: false,
+      requiresAuthorizedReview: true,
+      artifactStatus,
       exportedAt: exportedAt.toISOString(),
       exportId: exportRecord.id,
-      fileAssetId: fileAsset.id,
+      fileAssetId,
       fileName,
       totalRecords: students.length,
       validRecords: rows.length,
-      invalidRecords: validationResults.filter((result) =>
-        result.issues.some((issue) => issue.blocking),
-      ).length,
-      issues: validationResults
-        .filter((result) => result.issues.some((issue) => issue.blocking))
-        .flatMap((result) =>
-          result.issues
-            .filter((issue) => issue.blocking)
-            .map((issue) => ({
-              studentId: result.student.id,
-              studentSystemId: result.student.studentSystemId,
-              field: issue.field,
-              message: issue.message,
-            })),
-        ),
+      invalidRecords,
+      issueCount: blockingIssues.length,
+      issuesTruncated: blockingIssues.length > IEMIS_EXPORT_ISSUE_LIMIT,
+      configurationIssues,
+      issues: blockingIssues.slice(0, IEMIS_EXPORT_ISSUE_LIMIT),
     };
   }
 
@@ -6333,12 +6471,13 @@ function escapeCsvValue(value: unknown) {
             typeof value === 'bigint'
           ? String(value)
           : JSON.stringify(value);
+  const safeText = /^[\t\r\n ]*[=+\-@]/.test(text) ? `'${text}` : text;
 
-  if (/[",\n\r]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
+  if (/[",\n\r]/.test(safeText)) {
+    return `"${safeText.replace(/"/g, '""')}"`;
   }
 
-  return text;
+  return safeText;
 }
 
 function buildIemisExportFileName(actor: AuthContext, exportedAt: Date) {
@@ -6862,6 +7001,9 @@ function resolveDocumentRetentionUntil(
 }
 
 const IEMIS_REQUIREMENT_VERSION = 'SCHOLOS-IEMIS-1.0';
+const IEMIS_ARTIFACT_PURPOSE = 'REPORTING_READINESS_HANDOFF' as const;
+const IEMIS_SCHEMA_AUTHORITY = 'SCHOOL_OS_INTERNAL_RULE_SET' as const;
+const IEMIS_EXPORT_ISSUE_LIMIT = 500;
 
 const IEMIS_REQUIRED_RULE_CODES = [
   'STUDENT_SYSTEM_ID_REQUIRED',

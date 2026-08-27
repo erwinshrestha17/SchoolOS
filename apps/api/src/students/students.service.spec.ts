@@ -4214,6 +4214,7 @@ function buildService(
         sizeBytes: 512,
       }),
     ),
+    deleteObject: jest.fn().mockResolvedValue(undefined),
   };
   const fileRegistryService = {
     registerFile: jest.fn().mockResolvedValue({ id: 'generated-file-asset' }),
@@ -4431,6 +4432,9 @@ function buildPrisma(options: {
     },
     studentDuplicateReview: {
       findUnique: jest.fn().mockResolvedValue(null),
+    },
+    reportExport: {
+      update: jest.fn().mockResolvedValue({ id: 'export-1' }),
     },
     guardianIdentityVerification: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -4689,6 +4693,7 @@ function buildPrisma(options: {
     },
     reportExport: {
       create: jest.fn().mockResolvedValue({ id: 'export-1' }),
+      update: jest.fn().mockResolvedValue({ id: 'export-1' }),
     },
     tenantSetting: {
       findUnique: jest.fn().mockResolvedValue(null),

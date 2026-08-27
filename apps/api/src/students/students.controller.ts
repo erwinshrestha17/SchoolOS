@@ -33,6 +33,7 @@ import {
 } from './dto/list-student-options.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
+import { IemisExportResponseDto } from './dto/iemis-export-response.dto';
 import { ListDuplicateStudentCandidatesDto } from './dto/list-duplicate-student-candidates.dto';
 import { MarkDuplicateStudentPairNotDuplicateDto } from './dto/mark-duplicate-student-pair-not-duplicate.dto';
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
@@ -315,6 +316,12 @@ export class StudentsController {
 
   @Get('iemis/export')
   @Permissions('students:manage_lifecycle', 'reports:export')
+  @ApiOperation({
+    summary: 'Prepare a protected iEMIS reporting-readiness CSV',
+    description:
+      'Uses the SchoolOS internal rule set. The result is not certification of the current official iEMIS format, does not submit records directly, and requires authorized review before government handoff.',
+  })
+  @ApiOkResponse({ type: IemisExportResponseDto })
   exportIemis(@CurrentAuth() auth: AuthContext) {
     return this.studentsService.exportIemis(auth);
   }

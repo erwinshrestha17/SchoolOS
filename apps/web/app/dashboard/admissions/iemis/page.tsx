@@ -5,7 +5,10 @@ import { M1PageHeader } from '../../../../components/m1/m1-page-header';
 export default function IemisReadinessPage() {
   return (
     <DashboardPageShell>
-      <M1PageHeader title="iEMIS Readiness" description="Validate student data against iEMIS readiness rules and manage protected imports and exports." />
+      <M1PageHeader
+        title="iEMIS Readiness"
+        description="Validate student data against the current SchoolOS internal reporting rules. Exports require authorized review and are not submitted directly to iEMIS."
+      />
       <IemisReadinessWorkspace />
     </DashboardPageShell>
   );

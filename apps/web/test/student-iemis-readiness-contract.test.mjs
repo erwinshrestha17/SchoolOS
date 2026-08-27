@@ -125,6 +125,11 @@ describe('Student iEMIS readiness contract', () => {
 
     assert.match(route, /StudentIemisReadinessPage/);
     assert.match(workspace, /Government reporting readiness/);
+    assert.match(workspace, /current SchoolOS[\s\S]*internal rule set/);
+    assert.match(
+      workspace,
+      /does not submit this record[\s\S]*directly to iEMIS/,
+    );
     assert.match(workspace, /sm:grid-cols-2/);
     assert.match(workspace, /xl:grid-cols/);
     assert.match(workspace, /Readiness details are incomplete/);

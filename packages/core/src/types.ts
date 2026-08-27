@@ -6274,10 +6274,21 @@ export type IemisExportRow = {
   primaryGuardianEmail: string;
   wardNumber: string;
   guardianCount: number;
+  iemisSchoolCode: string;
+  fatherName: string;
+  motherName: string;
+  stream: string;
+  dobBs: string;
 };
 
 export type IemisExportResult = {
   formatVersion: "SCHOLOS-IEMIS-1.0";
+  artifactPurpose: "REPORTING_READINESS_HANDOFF";
+  schemaAuthority: "SCHOOL_OS_INTERNAL_RULE_SET";
+  officialFormatVerified: boolean;
+  directSubmissionSupported: boolean;
+  requiresAuthorizedReview: boolean;
+  artifactStatus: "BLOCKED_CONFIGURATION" | "REQUIRES_AUTHORIZED_REVIEW";
   exportedAt: string;
   exportId: string;
   fileAssetId: string;
@@ -6285,6 +6296,13 @@ export type IemisExportResult = {
   totalRecords: number;
   validRecords: number;
   invalidRecords: number;
+  issueCount: number;
+  issuesTruncated: boolean;
+  configurationIssues: Array<{
+    field: string;
+    message: string;
+    blocking: boolean;
+  }>;
   issues: IemisValidationIssue[];
 };
 

@@ -471,10 +471,16 @@ test("M1 high-risk workflows remain server controlled and protected", () => {
   assert.match(iemis, /CSV Import History/);
   assert.match(iemis, /Import Review Queue/);
   assert.match(iemis, /Validate admission CSV/);
+  assert.match(iemis, /internal reporting-readiness CSV/);
+  assert.match(iemis, /does[\s\S]*not[\s\S]*certify the official iEMIS format/);
+  assert.match(iemis, /Authorized review required/);
   assert.match(iemis, /dryRun: true/);
   assert.match(iemis, /validationBatchId: pending\.preview\.batchId/);
   assert.match(iemis, /ConfirmDialog/);
   assert.match(iemis, /canImportAdmissions/);
+  assert.match(iemis, /canPrepareReportingCsv/);
+  assert.match(iemis, /students:manage_lifecycle/);
+  assert.match(iemis, /reports:export/);
   assert.match(iemis, /No student records were created/);
   assert.match(iemis, /transferFailureMessage/);
   assert.match(iemis, /ApiRequestError/);

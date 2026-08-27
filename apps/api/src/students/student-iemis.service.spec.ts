@@ -21,11 +21,16 @@ import {
 describe('StudentsService (iEMIS Export)', () => {
   let service: StudentsService;
   let prisma: PrismaService;
-  let storageService: { saveBufferObject: jest.Mock };
+  let storageService: {
+    saveBufferObject: jest.Mock;
+    deleteObject: jest.Mock;
+  };
   let fileRegistryService: {
     registerFile: jest.Mock;
     markUploaded: jest.Mock;
+    softDeleteFile: jest.Mock;
   };
+  let transactionReportExportUpdate: jest.Mock;
   let teacherScopeService: {
     requireActorAccess: jest.Mock;
     resolveReadableScope: jest.Mock;
@@ -42,6 +47,9 @@ describe('StudentsService (iEMIS Export)', () => {
   };
 
   beforeEach(async () => {
+    transactionReportExportUpdate = jest
+      .fn()
+      .mockResolvedValue({ id: 'export-1' });
     teacherScopeService = {
       requireActorAccess: jest.fn().mockResolvedValue({
         source: 'ASSIGNMENT',
@@ -68,6 +76,7 @@ describe('StudentsService (iEMIS Export)', () => {
             },
             reportExport: {
               create: jest.fn(),
+              update: jest.fn(),
             },
             tenantSetting: {
               findUnique: jest.fn(),
@@ -81,6 +90,13 @@ describe('StudentsService (iEMIS Export)', () => {
             section: {
               findFirst: jest.fn(),
             },
+            $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
+              callback({
+                reportExport: {
+                  update: transactionReportExportUpdate,
+                },
+              }),
+            ),
           },
         },
         { provide: AuditService, useValue: { record: jest.fn() } },
@@ -98,6 +114,7 @@ describe('StudentsService (iEMIS Export)', () => {
           provide: StorageService,
           useValue: {
             saveBufferObject: jest.fn(),
+            deleteObject: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -105,6 +122,7 @@ describe('StudentsService (iEMIS Export)', () => {
           useValue: {
             registerFile: jest.fn(),
             markUploaded: jest.fn(),
+            softDeleteFile: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -130,6 +148,9 @@ describe('StudentsService (iEMIS Export)', () => {
       id: 'file-asset-1',
     });
     (prisma.tenantSetting.findUnique as jest.Mock).mockResolvedValue(null);
+    (prisma.reportExport.update as jest.Mock).mockResolvedValue({
+      id: 'export-1',
+    });
   });
 
   it('should export valid students to iEMIS CSV format', async () => {
@@ -188,6 +209,13 @@ describe('StudentsService (iEMIS Export)', () => {
     expect(result.validRecords).toBe(1);
     expect(result.exportId).toBe('export-1');
     expect(result.fileAssetId).toBe('file-asset-1');
+    expect(result.artifactPurpose).toBe('REPORTING_READINESS_HANDOFF');
+    expect(result.schemaAuthority).toBe('SCHOOL_OS_INTERNAL_RULE_SET');
+    expect(result.officialFormatVerified).toBe(false);
+    expect(result.directSubmissionSupported).toBe(false);
+    expect(result.requiresAuthorizedReview).toBe(true);
+    expect(result.artifactStatus).toBe('REQUIRES_AUTHORIZED_REVIEW');
+    expect(result.configurationIssues).toEqual([]);
     expect(result.fileName).toMatch(
       /^iemis-students-school-1-\d{4}-\d{2}-\d{2}\.csv$/,
     );
@@ -213,20 +241,48 @@ describe('StudentsService (iEMIS Export)', () => {
     expect(fileRegistryService.registerFile).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: mockAuth.tenantId,
-        module: 'students',
-        entityId: mockAuth.tenantId,
+        module: 'reports',
+        entityId: 'export-1',
         mimeType: 'text/csv',
+        metadata: expect.objectContaining({
+          artifactPurpose: 'REPORTING_READINESS_HANDOFF',
+          schemaAuthority: 'SCHOOL_OS_INTERNAL_RULE_SET',
+          officialFormatVerified: false,
+          directSubmissionSupported: false,
+          requiresAuthorizedReview: true,
+        }),
       }),
     );
     expect(prisma.reportExport.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           reportKey: 'iemis_student_export',
-          status: 'COMPLETED',
-          fileAssetId: 'file-asset-1',
+          status: 'RUNNING',
         }),
       }),
     );
+    expect(
+      (prisma.reportExport.create as jest.Mock).mock.calls[0][0].data,
+    ).not.toHaveProperty('fileAssetId');
+    expect(transactionReportExportUpdate).toHaveBeenCalledWith({
+      where: { id: 'export-1' },
+      data: {
+        fileAssetId: 'file-asset-1',
+        status: 'COMPLETED',
+        completedAt: expect.any(Date),
+      },
+    });
+  });
+
+  it('denies reporting exports during a support override before reading students', async () => {
+    await expect(
+      service.exportIemis({ ...mockAuth, isSupportOverride: true }),
+    ).rejects.toThrow(
+      'iEMIS reporting export is unavailable during read-only support access',
+    );
+
+    expect(prisma.student.findMany).not.toHaveBeenCalled();
+    expect(storageService.saveBufferObject).not.toHaveBeenCalled();
   });
 
   it('should flag students with missing required iEMIS fields', async () => {
@@ -261,11 +317,123 @@ describe('StudentsService (iEMIS Export)', () => {
 
     expect(result.validRecords).toBe(0);
     expect(result.invalidRecords).toBe(1);
+    expect(result.artifactStatus).toBe('BLOCKED_CONFIGURATION');
+    expect(result.configurationIssues).toEqual([
+      expect.objectContaining({
+        field: 'iemisSchoolCode',
+        blocking: true,
+      }),
+    ]);
     expect(result.issues.length).toBeGreaterThanOrEqual(2);
     expect(result.issues.some((i) => i.field === 'fullNameNp')).toBe(true);
     expect(result.issues.some((i) => i.field === 'guardianContact')).toBe(true);
     expect(result).not.toHaveProperty('rows');
     expect(result).not.toHaveProperty('csv');
+  });
+
+  it('neutralizes spreadsheet formulas in reporting-readiness CSV values', async () => {
+    (prisma.student.findMany as jest.Mock).mockResolvedValue([
+      buildReadinessStudent({
+        id: 'student-formula',
+        firstNameEn: '=1+1',
+      }),
+    ]);
+    (prisma.tenantSetting.findUnique as jest.Mock).mockResolvedValue({
+      key: 'iemis_school_code',
+      value: 'school-code-123',
+    });
+    (prisma.reportExport.create as jest.Mock).mockResolvedValue({
+      id: 'export-1',
+    });
+
+    await service.exportIemis(mockAuth);
+
+    const csv = (
+      storageService.saveBufferObject.mock.calls[0][0].content as Buffer
+    ).toString('utf8');
+    expect(csv).toContain("'=1+1");
+    expect(csv).not.toContain(',=1+1,');
+  });
+
+  it('bounds returned validation diagnostics while retaining exact counts', async () => {
+    const invalidStudents = Array.from({ length: 120 }, (_, index) =>
+      buildReadinessStudent({
+        id: `student-invalid-${String(index)}`,
+        studentSystemId: `SCH-INVALID-${String(index)}`,
+        firstNameNp: null,
+        lastNameNp: null,
+        guardianLinks: [],
+        enrollments: [],
+        lifecycleStatus: StudentLifecycleStatus.DELETED,
+      }),
+    );
+    (prisma.student.findMany as jest.Mock).mockResolvedValue(invalidStudents);
+    (prisma.reportExport.create as jest.Mock).mockResolvedValue({
+      id: 'export-1',
+    });
+
+    const result = await service.exportIemis(mockAuth);
+
+    expect(result.issueCount).toBeGreaterThan(500);
+    expect(result.issues).toHaveLength(500);
+    expect(result.issuesTruncated).toBe(true);
+    expect(result.invalidRecords).toBe(120);
+  });
+
+  it('records a failed export and removes an unregistered stored object', async () => {
+    (prisma.student.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.reportExport.create as jest.Mock).mockResolvedValue({
+      id: 'export-failed',
+    });
+    fileRegistryService.registerFile.mockRejectedValueOnce(
+      new Error('provider unavailable'),
+    );
+
+    await expect(service.exportIemis(mockAuth)).rejects.toThrow(
+      'The reporting-readiness CSV could not be prepared',
+    );
+
+    expect(storageService.deleteObject).toHaveBeenCalledWith(
+      'tenant-1/exports/iemis/iemis-students-school-1.csv',
+    );
+    expect(fileRegistryService.softDeleteFile).not.toHaveBeenCalled();
+    expect(prisma.reportExport.update).toHaveBeenCalledWith({
+      where: { id: 'export-failed' },
+      data: expect.objectContaining({
+        status: 'FAILED',
+        fileAssetId: null,
+      }),
+    });
+  });
+
+  it('retires a registered file when final export persistence fails', async () => {
+    (prisma.student.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.reportExport.create as jest.Mock).mockResolvedValue({
+      id: 'export-transaction-failed',
+    });
+    transactionReportExportUpdate.mockRejectedValueOnce(
+      new Error('database unavailable'),
+    );
+
+    await expect(service.exportIemis(mockAuth)).rejects.toThrow(
+      'The reporting-readiness CSV could not be prepared',
+    );
+
+    expect(fileRegistryService.softDeleteFile).toHaveBeenCalledWith(
+      mockAuth.tenantId,
+      'file-asset-1',
+      mockAuth.userId,
+    );
+    expect(storageService.deleteObject).toHaveBeenCalledWith(
+      'tenant-1/exports/iemis/iemis-students-school-1.csv',
+    );
+    expect(prisma.reportExport.update).toHaveBeenCalledWith({
+      where: { id: 'export-transaction-failed' },
+      data: expect.objectContaining({
+        status: 'FAILED',
+        fileAssetId: 'file-asset-1',
+      }),
+    });
   });
 
   describe('getIemisReadiness', () => {
