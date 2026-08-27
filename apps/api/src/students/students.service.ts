@@ -4118,6 +4118,13 @@ export class StudentsService {
     dto: { reason: string },
     actor: AuthContext,
   ) {
+    this.assertSensitiveStudentReadAllowed(actor, 'Student documents');
+    const reason = dto.reason.trim();
+    if (!reason || reason.length < 5) {
+      throw new BadRequestException(
+        'A reason of at least 5 characters is required to archive a student document.',
+      );
+    }
     const document = await this.prisma.studentDocument.findFirst({
       where: {
         id: documentId,
@@ -4129,39 +4136,73 @@ export class StudentsService {
     if (!document) {
       throw new NotFoundException('Document not found');
     }
+    if (document.status === 'ARCHIVED') {
+      return {
+        success: true,
+        status: 'ARCHIVED' as const,
+        disposition: 'REPLAYED' as const,
+      };
+    }
+    if (document.status === 'REPLACED') {
+      throw new ConflictException(
+        'Replaced student documents cannot be archived again.',
+      );
+    }
 
     await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.studentDocument.updateMany({
+        where: {
+          id: document.id,
+          tenantId: actor.tenantId,
+          studentId,
+          updatedAt: document.updatedAt,
+          status: { notIn: ['ARCHIVED', 'REPLACED'] },
+        },
+        data: { status: 'ARCHIVED' },
+      });
+      if (updated.count !== 1) {
+        throw new ConflictException(
+          'Student document changed while it was being archived. Refresh and retry.',
+        );
+      }
+
       await tx.studentDocumentHistory.create({
         data: {
           tenantId: actor.tenantId,
           documentId: document.id,
-          action: 'DELETE',
+          action: 'ARCHIVE',
           documentTitle: document.title,
           documentKind: document.kind,
           performedBy: actor.userId,
-          reason: dto.reason,
+          reason,
+          metadata: { source: 'students_service_legacy', fileRetained: true },
         },
       });
 
-      await tx.studentDocument.delete({
-        where: { id: documentId },
-      });
+      await this.auditService.record(
+        {
+          action: 'archive',
+          resource: 'student_document',
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          resourceId: document.id,
+          before: {
+            status: document.status,
+            studentId,
+            kind: document.kind,
+            title: document.title,
+          },
+          after: { status: 'ARCHIVED', reason, fileRetained: true },
+        },
+        tx,
+      );
     });
 
-    await this.auditService.record({
-      action: 'delete_document',
-      resource: 'student_document',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: studentId,
-      before: {
-        documentId: document.id,
-        kind: document.kind,
-        title: document.title,
-      },
-    });
-
-    return { success: true };
+    return {
+      success: true,
+      status: 'ARCHIVED' as const,
+      disposition: 'UPDATED' as const,
+    };
   }
 
   async generateStudentQrCode(studentId: string, actor: AuthContext) {

@@ -76,6 +76,9 @@ describe('FileRegistryService tenant scoping', () => {
       student: {
         findFirst: jest.fn(),
       },
+      studentDocument: {
+        findFirst: jest.fn(),
+      },
       guardian: {
         findFirst: jest.fn(),
       },
@@ -615,6 +618,94 @@ describe('FileRegistryService tenant scoping', () => {
         'file-1',
       ),
     ).rejects.toThrow('You can only view files for your linked child');
+  });
+
+  it('rejects generic file access for archived student documents', async () => {
+    prisma.studentDocument.findFirst.mockResolvedValue({
+      studentId: 'student-1',
+      status: 'ARCHIVED',
+    });
+
+    await expect(
+      service.assertFileAccessForAuth(
+        asset as any,
+        {
+          tenantId: 'tenant-1',
+          userId: 'admin-1',
+          roles: ['admin'],
+          permissions: ['student_documents:manage'],
+        } as any,
+      ),
+    ).rejects.toThrow('Student document is not active');
+
+    expect(prisma.studentDocument.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        OR: [
+          { fileId: 'file-1' },
+          { objectKey: 'tenant-1/students/student-photo.png' },
+        ],
+      },
+      select: { studentId: true, status: true },
+    });
+  });
+
+  it('rejects generic file access when the student-document binding mismatches', async () => {
+    prisma.studentDocument.findFirst.mockResolvedValue({
+      studentId: 'student-2',
+      status: 'ACTIVE',
+    });
+
+    await expect(
+      service.assertFileAccessForAuth(
+        asset as any,
+        {
+          tenantId: 'tenant-1',
+          userId: 'admin-1',
+          roles: ['admin'],
+          permissions: ['student_documents:manage'],
+        } as any,
+      ),
+    ).rejects.toThrow(
+      'Student document file binding does not match its student',
+    );
+  });
+
+  it('fails closed for unregistered student-document module files', async () => {
+    prisma.studentDocument.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.assertFileAccessForAuth(
+        { ...asset, module: 'student-documents' } as any,
+        {
+          tenantId: 'tenant-1',
+          userId: 'admin-1',
+          roles: ['admin'],
+          permissions: ['student_documents:manage'],
+        } as any,
+      ),
+    ).rejects.toThrow(
+      'Student document file is not linked to an active document',
+    );
+  });
+
+  it('allows tenant-authorized generic access to an active bound student document', async () => {
+    prisma.studentDocument.findFirst.mockResolvedValue({
+      studentId: 'student-1',
+      status: 'VERIFIED',
+    });
+
+    await expect(
+      service.assertFileAccessForAuth(
+        { ...asset, module: 'student-documents' } as any,
+        {
+          tenantId: 'tenant-1',
+          userId: 'admin-1',
+          roles: ['admin'],
+          permissions: ['student_documents:manage'],
+        } as any,
+      ),
+    ).resolves.toBeUndefined();
   });
 
   it('allows protected student files inside teacher assignment scope', async () => {

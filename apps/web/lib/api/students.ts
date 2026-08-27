@@ -583,8 +583,11 @@ export const studentsApi = {
     }>(
       `/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(documentId)}/download-url`,
     ),
-  deleteStudentDocument: (id: string) =>
-    request(`/student-documents/${id}`, { method: "DELETE" }),
+  deleteStudentDocument: (id: string, body: { reason: string }) =>
+    request(`/student-documents/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      json: body,
+    }),
   verifyStudentDocument: (
     documentId: string,
     body: { status: "VERIFIED" | "REJECTED"; notes: string },

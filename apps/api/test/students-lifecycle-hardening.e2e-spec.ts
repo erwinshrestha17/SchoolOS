@@ -347,14 +347,20 @@ describe('Student Lifecycle Hardening (E2E)', () => {
     });
 
     expect(historyAfter).toHaveLength(2);
-    expect(historyAfter[0].action).toBe('DELETE');
-    expect(historyAfter[0].documentId).toBeNull();
+    expect(historyAfter[0].action).toBe('ARCHIVE');
+    expect(historyAfter[0].documentId).toBe(doc.id);
     expect(historyAfter[0].documentTitle).toBe('Birth Cert');
     expect(historyAfter[0].reason).toBe('Correction');
 
     expect(historyAfter[1].action).toBe('UPLOAD');
-    expect(historyAfter[1].documentId).toBeNull(); // Was set to null by cascade
+    expect(historyAfter[1].documentId).toBe(doc.id);
     expect(historyAfter[1].documentTitle).toBe('Birth Cert');
+    const archivedDocument = await prisma.studentDocument.findFirst({
+      where: { id: doc.id, tenantId },
+    });
+    expect(archivedDocument).toEqual(
+      expect.objectContaining({ id: doc.id, status: 'ARCHIVED' }),
+    );
   });
 
   it('should handle duplicate student merge and move document history', async () => {

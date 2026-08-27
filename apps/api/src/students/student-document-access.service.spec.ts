@@ -1,5 +1,4 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { StudentDocumentAccessService } from './student-document-access.service';
 import type { AuthContext } from '../auth/auth.types';
 
@@ -134,6 +133,36 @@ describe('StudentDocumentAccessService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(fileRegistryService.auditAccess).not.toHaveBeenCalled();
+  });
+
+  it('rejects a file asset without an explicit student-document binding', async () => {
+    const { service, prisma, fileRegistryService } = createServiceMocks();
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        id: 'document-1',
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        status: 'ACTIVE',
+        documentFileId: 'file-1',
+        fileName: 'birth.pdf',
+        kind: 'BIRTH_CERTIFICATE',
+      },
+    ]);
+    fileRegistryService.getFileMetadata.mockResolvedValue({
+      id: 'file-1',
+      status: 'UPLOADED',
+      module: null,
+      entityId: null,
+      originalFilename: 'birth.pdf',
+    });
+
+    await expect(
+      service.getDocumentAccessUrl(actor, 'student-1', 'document-1', 'preview'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(fileRegistryService.auditAccess).not.toHaveBeenCalled();
+    expect(fileRegistryService.getSignedUrl).not.toHaveBeenCalled();
   });
 
   it('returns signed/API URL payload for active tenant-owned student documents', async () => {

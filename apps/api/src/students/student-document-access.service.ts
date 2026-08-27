@@ -75,15 +75,11 @@ export class StudentDocumentAccessService {
       throw new NotFoundException('Student document file is not available');
     }
 
-    if (
-      asset.module &&
-      asset.module !== 'students' &&
-      asset.module !== 'student-documents'
-    ) {
+    if (!['students', 'student-documents'].includes(asset.module ?? '')) {
       throw new ForbiddenException('Student document file module is invalid');
     }
 
-    if (asset.entityId && asset.entityId !== studentId) {
+    if (asset.entityId !== studentId) {
       throw new ForbiddenException(
         'Student document file is not linked to this student',
       );
@@ -141,7 +137,7 @@ export class StudentDocumentAccessService {
       `,
     );
 
-    const document = rows[0];
+    const document = rows.at(0);
 
     if (!document) {
       throw new NotFoundException('Student document not found in this tenant');

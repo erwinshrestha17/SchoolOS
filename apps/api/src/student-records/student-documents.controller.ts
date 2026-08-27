@@ -16,6 +16,10 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { UploadStudentDocumentDto } from './dto/upload-student-document.dto';
+import {
+  ArchiveStudentDocumentDto,
+  ReviewStudentDocumentDto,
+} from './dto/student-document-action.dto';
 import { StudentRecordsService } from './student-records.service';
 
 @Controller('student-documents')
@@ -87,35 +91,43 @@ export class StudentDocumentsController {
   @Delete(':id')
   @Permissions('student_documents:manage')
   async deleteDocument(
-    @Param('id') assetId: string,
+    @Param('id') documentId: string,
+    @Body() dto: ArchiveStudentDocumentDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.studentRecordsService.deleteDocument(auth, assetId);
+    return this.studentRecordsService.deleteDocument(
+      auth,
+      documentId,
+      dto.reason,
+    );
   }
 
   @Post(':id/archive')
   @Permissions('student_documents:manage')
   async archiveDocument(
     @Param('id') documentId: string,
-    @Body('reason') reason: string,
+    @Body() dto: ArchiveStudentDocumentDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.studentRecordsService.archiveDocument(auth, documentId, reason);
+    return this.studentRecordsService.archiveDocument(
+      auth,
+      documentId,
+      dto.reason,
+    );
   }
 
   @Post(':id/verify')
   @Permissions('student_documents:manage')
   async verifyDocument(
     @Param('id') documentId: string,
-    @Body('status') status: 'VERIFIED' | 'REJECTED',
-    @Body('notes') notes: string,
+    @Body() dto: ReviewStudentDocumentDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.studentRecordsService.verifyDocument(
       auth,
       documentId,
-      status,
-      notes,
+      dto.status,
+      dto.notes,
     );
   }
 }

@@ -457,7 +457,8 @@ export class FileRegistryService {
       return;
     }
 
-    if (asset.module === 'students') {
+    if (asset.module === 'students' || asset.module === 'student-documents') {
+      await this.assertActiveStudentDocumentFile(asset, auth);
       await this.assertStudentFileAccess(asset.entityId, auth);
       return;
     }
@@ -763,6 +764,36 @@ export class FileRegistryService {
     throw new ForbiddenException(
       'You do not have permission to view student files',
     );
+  }
+
+  private async assertActiveStudentDocumentFile(
+    asset: Awaited<ReturnType<FileRegistryService['getFileMetadata']>>,
+    auth: AuthContext,
+  ) {
+    const document = await this.prisma.studentDocument.findFirst({
+      where: {
+        tenantId: auth.tenantId,
+        OR: [{ fileId: asset.id }, { objectKey: asset.objectKey }],
+      },
+      select: { studentId: true, status: true },
+    });
+
+    if (!document) {
+      if (asset.module === 'student-documents') {
+        throw new ForbiddenException(
+          'Student document file is not linked to an active document',
+        );
+      }
+      return;
+    }
+    if (document.studentId !== asset.entityId) {
+      throw new ForbiddenException(
+        'Student document file binding does not match its student',
+      );
+    }
+    if (document.status === 'ARCHIVED' || document.status === 'REPLACED') {
+      throw new ForbiddenException('Student document is not active');
+    }
   }
 
   private async assertHomeworkFileAccess(

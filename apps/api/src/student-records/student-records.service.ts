@@ -487,10 +487,12 @@ export class StudentRecordsService {
       where: {
         id: assetId,
         tenantId: actor.tenantId,
+        softDeletedAt: null,
+        deletedAt: null,
       },
     });
 
-    if (!asset) {
+    if (asset?.status !== FileStatus.UPLOADED) {
       throw new NotFoundException('File not found');
     }
 
@@ -503,6 +505,17 @@ export class StudentRecordsService {
 
     if (!doc) {
       throw new NotFoundException('Student document not found in this tenant');
+    }
+    if (doc.status === 'ARCHIVED' || doc.status === 'REPLACED') {
+      throw new ForbiddenException('Student document is not active');
+    }
+    if (!['students', 'student-documents'].includes(asset.module ?? '')) {
+      throw new ForbiddenException('Student document file module is invalid');
+    }
+    if (asset.entityId !== doc.studentId) {
+      throw new ForbiddenException(
+        'Student document file is not linked to this student',
+      );
     }
 
     await this.fileRegistryService.auditAccess(
@@ -543,68 +556,56 @@ export class StudentRecordsService {
     return { url };
   }
 
-  async deleteDocument(actor: AuthContext, assetId: string, reason?: string) {
-    const asset = await this.prisma.fileAsset.findFirst({
-      where: {
-        id: assetId,
-        tenantId: actor.tenantId,
-      },
-    });
-
-    if (!asset) {
-      throw new NotFoundException('File asset not found');
-    }
-
-    const document = await this.prisma.studentDocument.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        objectKey: asset.objectKey,
-      },
-    });
-
-    await this.prisma.$transaction(async (tx) => {
-      if (document) {
-        await tx.studentDocumentHistory.create({
-          data: {
-            tenantId: actor.tenantId,
-            documentId: document.id,
-            action: 'DELETE',
-            documentTitle: document.title,
-            documentKind: document.kind,
-            performedBy: actor.userId,
-            reason: reason ?? 'Manual deletion',
-          },
-        });
-      }
-
-      await this.fileRegistryService.softDeleteFile(
-        actor.tenantId,
-        assetId,
-        actor.userId,
-      );
-    });
-
-    return { success: true };
+  async deleteDocument(actor: AuthContext, documentId: string, reason: string) {
+    return this.archiveDocument(actor, documentId, reason, 'legacy_delete');
   }
 
   async archiveDocument(
     actor: AuthContext,
-    documentId: string,
-    reason?: string,
+    documentOrAssetId: string,
+    reason: string,
+    source: 'archive' | 'legacy_delete' = 'archive',
   ) {
+    assertProtectedFileAccessAllowed(actor);
+    const normalizedReason = requireDocumentActionReason(reason);
     const document = await this.prisma.studentDocument.findFirst({
-      where: { id: documentId, tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        OR: [{ id: documentOrAssetId }, { fileId: documentOrAssetId }],
+      },
     });
 
     if (!document) {
       throw new NotFoundException('Document not found');
     }
+    if (document.status === 'ARCHIVED') {
+      return {
+        success: true,
+        status: 'ARCHIVED' as const,
+        disposition: 'REPLAYED' as const,
+      };
+    }
+    if (document.status === 'REPLACED') {
+      throw new ConflictException(
+        'Replaced student documents cannot be archived again.',
+      );
+    }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.studentDocument.update({
-        where: { id: documentId },
+      const updated = await tx.studentDocument.updateMany({
+        where: {
+          id: document.id,
+          tenantId: actor.tenantId,
+          updatedAt: document.updatedAt,
+          status: { notIn: ['ARCHIVED', 'REPLACED'] },
+        },
         data: { status: 'ARCHIVED' },
       });
+      if (updated.count !== 1) {
+        throw new ConflictException(
+          'Student document changed while it was being archived. Refresh and retry.',
+        );
+      }
 
       await tx.studentDocumentHistory.create({
         data: {
@@ -614,12 +615,35 @@ export class StudentRecordsService {
           documentTitle: document.title,
           documentKind: document.kind,
           performedBy: actor.userId,
-          reason: reason ?? 'Archived for record keeping',
+          reason: normalizedReason,
+          metadata: { source, fileRetained: true },
         },
       });
+
+      await this.auditService.record(
+        {
+          action: 'archive',
+          resource: 'student_document',
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          resourceId: document.id,
+          before: { status: document.status },
+          after: {
+            status: 'ARCHIVED',
+            reason: normalizedReason,
+            source,
+            fileRetained: true,
+          },
+        },
+        tx,
+      );
     });
 
-    return { success: true };
+    return {
+      success: true,
+      status: 'ARCHIVED' as const,
+      disposition: 'UPDATED' as const,
+    };
   }
 
   async verifyDocument(
@@ -628,6 +652,7 @@ export class StudentRecordsService {
     status: 'VERIFIED' | 'REJECTED',
     notes?: string,
   ) {
+    assertProtectedFileAccessAllowed(actor);
     const document = await this.prisma.studentDocument.findFirst({
       where: { id: documentId, tenantId: actor.tenantId },
     });
@@ -635,23 +660,46 @@ export class StudentRecordsService {
     if (!document) {
       throw new NotFoundException('Document not found');
     }
-    if (status === 'REJECTED' && !notes?.trim()) {
+    if (document.status === 'ARCHIVED' || document.status === 'REPLACED') {
+      throw new ConflictException(
+        'Inactive student documents cannot be reviewed.',
+      );
+    }
+    const normalizedNotes = notes?.trim();
+    if (status === 'REJECTED' && !normalizedNotes) {
       throw new BadRequestException('Rejection reason is required.');
+    }
+    if (document.status === status) {
+      return {
+        success: true,
+        status,
+        disposition: 'REPLAYED' as const,
+      };
     }
     const reviewedAt = new Date();
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.studentDocument.update({
-        where: { id: documentId },
+      const updated = await tx.studentDocument.updateMany({
+        where: {
+          id: document.id,
+          tenantId: actor.tenantId,
+          updatedAt: document.updatedAt,
+          status: { notIn: ['ARCHIVED', 'REPLACED'] },
+        },
         data: {
           status,
           verifiedAt: status === 'VERIFIED' ? reviewedAt : null,
           verifiedById: actor.userId,
-          notes: notes
-            ? `${document.notes ?? ''}\nVerification Note: ${notes}`.trim()
+          notes: normalizedNotes
+            ? `${document.notes ?? ''}\nVerification Note: ${normalizedNotes}`.trim()
             : document.notes,
         },
       });
+      if (updated.count !== 1) {
+        throw new ConflictException(
+          'Student document changed while it was being reviewed. Refresh and retry.',
+        );
+      }
 
       await tx.studentDocumentHistory.create({
         data: {
@@ -661,7 +709,7 @@ export class StudentRecordsService {
           documentTitle: document.title,
           documentKind: document.kind,
           performedBy: actor.userId,
-          reason: notes,
+          reason: normalizedNotes ?? null,
           metadata: {
             reviewedById: actor.userId,
             reviewedAt: reviewedAt.toISOString(),
@@ -669,9 +717,26 @@ export class StudentRecordsService {
           },
         },
       });
+
+      await this.auditService.record(
+        {
+          action: 'review',
+          resource: 'student_document',
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          resourceId: document.id,
+          before: { status: document.status },
+          after: {
+            status,
+            reviewedAt,
+            notesRecorded: Boolean(normalizedNotes),
+          },
+        },
+        tx,
+      );
     });
 
-    return { success: true };
+    return { success: true, status, disposition: 'UPDATED' as const };
   }
 
   async getExpiringDocuments(
@@ -768,6 +833,16 @@ function parseOptionalDocumentExpiryDate(value?: string) {
   }
 
   return parsed;
+}
+
+function requireDocumentActionReason(reason?: string) {
+  const normalized = reason?.trim();
+  if (!normalized || normalized.length < 5) {
+    throw new BadRequestException(
+      'A reason of at least 5 characters is required for this document action.',
+    );
+  }
+  return normalized;
 }
 
 function isPrismaUniqueConstraintError(error: unknown) {

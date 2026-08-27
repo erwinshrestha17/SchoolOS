@@ -1384,10 +1384,12 @@ export function createPrismaMock() {
     studentDocument: {
       create: jest.fn((q: PrismaQuery) => {
         const data = q.data ?? {};
+        const now = new Date();
         const item = {
           id: nextId('student-doc'),
           ...data,
-          createdAt: new Date(),
+          createdAt: now,
+          updatedAt: now,
         };
         state.studentDocuments.push(item as Record<string, unknown>);
         return Promise.resolve(item);
@@ -1403,12 +1405,24 @@ export function createPrismaMock() {
       ),
       findFirst: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
-          state.studentDocuments.find(
-            (item) =>
+          state.studentDocuments.find((item) => {
+            const alternatives = q.where?.OR as
+              | Record<string, unknown>[]
+              | undefined;
+            const matchesAlternative =
+              !alternatives ||
+              alternatives.some(
+                (alternative) =>
+                  (!alternative.id || item.id === alternative.id) &&
+                  (!alternative.fileId || item.fileId === alternative.fileId),
+              );
+            return (
               (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
               (!q.where?.id || item.id === q.where.id) &&
-              (!q.where?.studentId || item.studentId === q.where.studentId),
-          ),
+              (!q.where?.studentId || item.studentId === q.where.studentId) &&
+              matchesAlternative
+            );
+          }),
         ),
       ),
       update: jest.fn((q: PrismaQuery) => {
@@ -1455,13 +1469,26 @@ export function createPrismaMock() {
       }),
       updateMany: jest.fn((q: PrismaQuery) => {
         let count = 0;
+        const statusFilter = q.where?.status as
+          | { notIn?: unknown[] }
+          | undefined;
         for (const doc of state.studentDocuments) {
           const matchTenant =
             !q.where?.tenantId || doc.tenantId === q.where.tenantId;
           const matchStudent =
             !q.where?.studentId || doc.studentId === q.where.studentId;
-          if (matchTenant && matchStudent) {
-            Object.assign(doc, q.data ?? {});
+          const matchId = !q.where?.id || doc.id === q.where.id;
+          const matchUpdatedAt =
+            !q.where?.updatedAt || doc.updatedAt === q.where.updatedAt;
+          const matchStatus = !statusFilter?.notIn?.includes(doc.status);
+          if (
+            matchTenant &&
+            matchStudent &&
+            matchId &&
+            matchUpdatedAt &&
+            matchStatus
+          ) {
+            Object.assign(doc, q.data ?? {}, { updatedAt: new Date() });
             count += 1;
           }
         }

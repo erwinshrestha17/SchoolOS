@@ -136,13 +136,23 @@ describe('Student Documents Registry Integration (E2E)', () => {
       studentRecordsService.getSignedUrl(actorB, assetId, 'preview'),
     ).rejects.toBeInstanceOf(NotFoundException);
 
-    await studentRecordsService.deleteDocument(actorA, assetId);
+    await studentRecordsService.deleteDocument(
+      actorA,
+      assetId,
+      'Archived after registrar review',
+    );
     const registryFilesAfter = await fileRegistryService.listFilesByEntity(
       tenantAId,
       'students',
       studentAId,
     );
-    expect(registryFilesAfter).toHaveLength(0);
+    expect(registryFilesAfter).toHaveLength(1);
+    expect(prisma.__state.studentDocuments).toContainEqual(
+      expect.objectContaining({
+        fileId: assetId,
+        status: 'ARCHIVED',
+      }),
+    );
 
     expect(prisma.__state.auditLogs).toContainEqual(
       expect.objectContaining({
@@ -154,11 +164,14 @@ describe('Student Documents Registry Integration (E2E)', () => {
     );
     expect(prisma.__state.auditLogs).toContainEqual(
       expect.objectContaining({
-        action: 'file_deleted',
+        action: 'archive',
         tenantId: tenantAId,
         userId: userAId,
-        resourceId: assetId,
+        resource: 'student_document',
       }),
+    );
+    expect(prisma.__state.auditLogs).not.toContainEqual(
+      expect.objectContaining({ action: 'file_deleted' }),
     );
   });
 });

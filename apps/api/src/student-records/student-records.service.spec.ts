@@ -31,6 +31,7 @@ describe('StudentRecordsService', () => {
       studentDocument: {
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findUnique: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -588,9 +589,16 @@ describe('StudentRecordsService', () => {
       tenantId: actor.tenantId,
       objectKey: 'tenant-1/students/student-1/documents/birth.pdf',
       originalFilename: 'birth.pdf',
+      status: FileStatus.UPLOADED,
+      module: 'students',
+      entityId: 'student-1',
+      softDeletedAt: null,
+      deletedAt: null,
     });
     prisma.studentDocument.findFirst.mockResolvedValue({
       id: 'document-1',
+      studentId: 'student-1',
+      status: 'ACTIVE',
       title: 'Birth certificate',
       kind: StudentDocumentKind.BIRTH_CERTIFICATE,
     });
@@ -614,6 +622,242 @@ describe('StudentRecordsService', () => {
       }),
     });
     expect(result).toEqual({ url: 'https://signed.example/birth.pdf' });
+  });
+
+  it('denies the legacy signed-URL route for archived documents', async () => {
+    prisma.fileAsset.findFirst.mockResolvedValue({
+      id: 'asset-1',
+      tenantId: actor.tenantId,
+      objectKey: 'tenant-1/students/student-1/documents/birth.pdf',
+      originalFilename: 'birth.pdf',
+      status: FileStatus.UPLOADED,
+      module: 'students',
+      entityId: 'student-1',
+      softDeletedAt: null,
+      deletedAt: null,
+    });
+    prisma.studentDocument.findFirst.mockResolvedValue({
+      id: 'document-1',
+      studentId: 'student-1',
+      status: 'ARCHIVED',
+      title: 'Birth certificate',
+      kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+    });
+
+    await expect(
+      service.getSignedUrl(actor, 'asset-1', 'preview'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(fileRegistryService.auditAccess).not.toHaveBeenCalled();
+    expect(fileRegistryService.getSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it('denies the legacy signed-URL route when the file binding is incomplete', async () => {
+    prisma.fileAsset.findFirst.mockResolvedValue({
+      id: 'asset-1',
+      tenantId: actor.tenantId,
+      objectKey: 'tenant-1/students/student-1/documents/birth.pdf',
+      originalFilename: 'birth.pdf',
+      status: FileStatus.UPLOADED,
+      module: null,
+      entityId: null,
+      softDeletedAt: null,
+      deletedAt: null,
+    });
+    prisma.studentDocument.findFirst.mockResolvedValue({
+      id: 'document-1',
+      studentId: 'student-1',
+      status: 'ACTIVE',
+      title: 'Birth certificate',
+      kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+    });
+
+    await expect(
+      service.getSignedUrl(actor, 'asset-1', 'preview'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(fileRegistryService.auditAccess).not.toHaveBeenCalled();
+    expect(fileRegistryService.getSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it('denies document archival during a support override before reading records', async () => {
+    await expect(
+      service.archiveDocument(
+        { ...actor, isSupportOverride: true },
+        'document-1',
+        'Archive after registrar review',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.studentDocument.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('denies document review during a support override before reading records', async () => {
+    await expect(
+      service.verifyDocument(
+        { ...actor, isSupportOverride: true },
+        'document-1',
+        'VERIFIED',
+        'Reviewed',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.studentDocument.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('archives a student document atomically while retaining its protected file', async () => {
+    const document = buildStudentDocument({
+      status: 'VERIFIED',
+      updatedAt: new Date('2026-05-25T08:00:00.000Z'),
+    });
+    prisma.studentDocument.findFirst.mockResolvedValue(document);
+
+    const result = await service.archiveDocument(
+      actor,
+      document.id,
+      'Superseded by a corrected certificate',
+    );
+
+    expect(prisma.studentDocument.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: document.id,
+        tenantId: actor.tenantId,
+        updatedAt: document.updatedAt,
+        status: { notIn: ['ARCHIVED', 'REPLACED'] },
+      },
+      data: { status: 'ARCHIVED' },
+    });
+    expect(prisma.studentDocumentHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'ARCHIVE',
+        reason: 'Superseded by a corrected certificate',
+        metadata: { source: 'archive', fileRetained: true },
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'archive',
+        after: expect.objectContaining({ fileRetained: true }),
+      }),
+      prisma,
+    );
+    expect(fileRegistryService.softDeleteFile).not.toHaveBeenCalled();
+    expect(storageService.deleteObject).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      success: true,
+      status: 'ARCHIVED',
+      disposition: 'UPDATED',
+    });
+  });
+
+  it('treats the legacy delete route as reasoned archival without deleting the file', async () => {
+    const document = buildStudentDocument({ status: 'ACTIVE' });
+    const fileId = document.fileId;
+    expect(fileId).toBeTruthy();
+    prisma.studentDocument.findFirst.mockResolvedValue(document);
+
+    const result = await service.deleteDocument(
+      actor,
+      fileId ?? 'missing-file-id',
+      'Record withdrawn after registrar review',
+    );
+
+    expect(prisma.studentDocument.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        OR: [{ id: fileId }, { fileId }],
+      },
+    });
+    expect(prisma.studentDocumentHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'ARCHIVE',
+        metadata: { source: 'legacy_delete', fileRetained: true },
+      }),
+    });
+    expect(fileRegistryService.softDeleteFile).not.toHaveBeenCalled();
+    expect(result.status).toBe('ARCHIVED');
+  });
+
+  it('replays an already archived document action without duplicating history', async () => {
+    const document = buildStudentDocument({ status: 'ARCHIVED' });
+    prisma.studentDocument.findFirst.mockResolvedValue(document);
+
+    const result = await service.archiveDocument(
+      actor,
+      document.id,
+      'Repeat archive request',
+    );
+
+    expect(result.disposition).toBe('REPLAYED');
+    expect(prisma.studentDocument.updateMany).not.toHaveBeenCalled();
+    expect(prisma.studentDocumentHistory.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing archive reasons before mutating document state', async () => {
+    await expect(
+      service.archiveDocument(actor, 'document-1', '  '),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prisma.studentDocument.findFirst).not.toHaveBeenCalled();
+    expect(prisma.studentDocument.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale concurrent document archive', async () => {
+    prisma.studentDocument.findFirst.mockResolvedValue(buildStudentDocument());
+    prisma.studentDocument.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      service.archiveDocument(
+        actor,
+        'document-1',
+        'Archive after record review',
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.studentDocumentHistory.create).not.toHaveBeenCalled();
+  });
+
+  it('reviews active documents with optimistic concurrency and audit evidence', async () => {
+    const document = buildStudentDocument({ status: 'ACTIVE', notes: null });
+    prisma.studentDocument.findFirst.mockResolvedValue(document);
+
+    const result = await service.verifyDocument(
+      actor,
+      document.id,
+      'VERIFIED',
+      'Matched the original school record',
+    );
+
+    expect(prisma.studentDocument.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: document.id,
+        tenantId: actor.tenantId,
+        updatedAt: document.updatedAt,
+        status: { notIn: ['ARCHIVED', 'REPLACED'] },
+      },
+      data: expect.objectContaining({
+        status: 'VERIFIED',
+        verifiedById: actor.userId,
+        notes: 'Verification Note: Matched the original school record',
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'review' }),
+      prisma,
+    );
+    expect(result.disposition).toBe('UPDATED');
+  });
+
+  it('rejects review of archived documents before writing', async () => {
+    prisma.studentDocument.findFirst.mockResolvedValue(
+      buildStudentDocument({ status: 'ARCHIVED' }),
+    );
+
+    await expect(
+      service.verifyDocument(actor, 'document-1', 'VERIFIED', 'Late review'),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.studentDocument.updateMany).not.toHaveBeenCalled();
   });
 
   it('lists expiring and expired documents with correct metadata', async () => {
