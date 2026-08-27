@@ -17,6 +17,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { encryptSensitiveField } from '../common/security/field-encryption';
+import { validateImageUpload } from '../common/files/image-upload-validation';
 import { ConfigService } from '../config/config.service';
 import { FinanceService } from '../finance/finance.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -48,6 +49,7 @@ import { ListAdmissionImportBatchesDto } from './dto/list-admission-import-batch
 import { ListAdmissionsDto } from './dto/list-admissions.dto';
 import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
+import { CreateDirectAdmissionDto } from './dto/create-direct-admission.dto';
 import { TransferStudentDto } from './dto/transfer-student.dto';
 import {
   optionalNepalPhone,
@@ -65,6 +67,7 @@ interface AdmissionReferenceContext {
 }
 
 const ADMISSION_IMPORT_VALIDATION_TTL_MS = 30 * 60 * 1000;
+const MAX_ADMISSION_PHOTO_BYTES = 2 * 1024 * 1024;
 
 type AdmissionGuardianInput = CreateAdmissionDto['guardians'][number];
 type AdmissionPersistenceClient = Prisma.TransactionClient | PrismaService;
@@ -92,6 +95,11 @@ interface AdmissionCoreWrite {
       primaryPhone: string;
     };
   }>;
+}
+
+interface DirectAdmissionOperation {
+  operationId: string;
+  requestFingerprint: string;
 }
 
 @Injectable()
@@ -224,47 +232,62 @@ export class AdmissionsService {
     };
   }
 
-  async createAdmission(dto: CreateAdmissionDto, actor: AuthContext) {
-    const context = await this.validateAdmissionForCreate(dto, actor);
-
-    let linkedUserId: string | null = null;
-
-    if (dto.createLogin) {
-      const studentRole = await this.prisma.role.findUnique({
-        where: {
-          tenantId_name: {
-            tenantId: actor.tenantId,
-            name: 'student',
-          },
-        },
-      });
-
-      if (!studentRole) {
-        throw new NotFoundException('Student role not found for this tenant');
-      }
-      if (!dto.email || !dto.password) {
-        throw new BadRequestException(
-          'Email and password are required when creating a student login',
-        );
-      }
-
-      const managedUser = await this.usersService.createManagedUser({
-        tenantId: actor.tenantId,
-        email: dto.email,
-        password: dto.password,
-        phone: dto.phone,
-        roleIds: [studentRole.id],
-        assignedById: actor.userId,
-      });
-      linkedUserId = managedUser.id;
+  async createAdmission(dto: CreateDirectAdmissionDto, actor: AuthContext) {
+    const requestFingerprint = buildAdmissionConversionFingerprint(dto);
+    const existing = await this.findDirectAdmissionOperation(
+      dto.clientOperationId,
+      actor,
+    );
+    if (existing) {
+      return this.finalizeDirectAdmission(existing, dto, actor);
     }
 
-    const core = await this.prisma.$transaction(
-      (tx) => this.createAdmissionCore(dto, actor, context, linkedUserId, tx),
-      { isolationLevel: 'Serializable' },
-    );
+    const context = await this.validateAdmissionForCreate(dto, actor);
+    let core: AdmissionCoreWrite;
+    try {
+      core = await this.prisma.$transaction(
+        async (tx) => {
+          let linkedUserId: string | null = null;
+          if (dto.createLogin) {
+            linkedUserId = await this.createAdmissionLogin(dto, actor, tx);
+          }
+          return this.createAdmissionCore(
+            dto,
+            actor,
+            context,
+            linkedUserId,
+            tx,
+            {
+              operationId: dto.clientOperationId,
+              requestFingerprint,
+            },
+          );
+        },
+        { isolationLevel: 'Serializable' },
+      );
+    } catch (error) {
+      if (!isPrismaUniqueConstraintError(error)) {
+        throw error;
+      }
+      const concurrent = await this.findDirectAdmissionOperation(
+        dto.clientOperationId,
+        actor,
+      );
+      if (!concurrent) {
+        throw new ConflictException(
+          'Admission identity was claimed concurrently. Review existing student and login records before retrying.',
+        );
+      }
+      return this.finalizeDirectAdmission(concurrent, dto, actor);
+    }
 
-    return this.completeAdmissionSideEffects(core, dto, actor, 'CREATED');
+    const admission = await this.completeAdmissionSideEffects(
+      core,
+      dto,
+      actor,
+      'CREATED',
+    );
+    return { ...admission, disposition: 'CREATED' as const };
   }
 
   async checkDuplicateAdmissions(
@@ -822,10 +845,24 @@ export class AdmissionsService {
       );
     }
 
+    return this.loadAdmissionCore(
+      application.convertedStudentId,
+      dto,
+      actor,
+      'The linked student enrollment does not match this admission conversion request.',
+    );
+  }
+
+  private async loadAdmissionCore(
+    studentId: string,
+    dto: CreateAdmissionDto,
+    actor: AuthContext,
+    mismatchMessage: string,
+  ): Promise<AdmissionCoreWrite> {
     const enrollment = await this.prisma.enrollment.findFirst({
       where: {
         tenantId: actor.tenantId,
-        studentId: application.convertedStudentId,
+        studentId,
         academicYearId: dto.academicYearId,
         classId: dto.classId,
         sectionId: dto.sectionId ?? null,
@@ -842,9 +879,7 @@ export class AdmissionsService {
       orderBy: [{ createdAt: 'desc' }],
     });
     if (!enrollment) {
-      throw new ConflictException(
-        'The linked student enrollment does not match this admission conversion request.',
-      );
+      throw new ConflictException(mismatchMessage);
     }
 
     return {
@@ -872,6 +907,84 @@ export class AdmissionsService {
         },
       })),
     };
+  }
+
+  private async createAdmissionLogin(
+    dto: CreateAdmissionDto,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient,
+  ) {
+    const studentRole = await tx.role.findUnique({
+      where: {
+        tenantId_name: {
+          tenantId: actor.tenantId,
+          name: 'student',
+        },
+      },
+    });
+    if (!studentRole) {
+      throw new NotFoundException('Student role not found for this tenant');
+    }
+    if (!dto.email || !dto.password) {
+      throw new BadRequestException(
+        'Email and password are required when creating a student login',
+      );
+    }
+
+    const managedUser = await this.usersService.createManagedUser(
+      {
+        tenantId: actor.tenantId,
+        email: dto.email,
+        password: dto.password,
+        phone: dto.phone,
+        roleIds: [studentRole.id],
+        assignedById: actor.userId,
+      },
+      tx,
+    );
+    return managedUser.id;
+  }
+
+  private async findDirectAdmissionOperation(
+    operationId: string,
+    actor: AuthContext,
+  ) {
+    return this.prisma.student.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        admissionOperationId: operationId,
+      },
+      select: {
+        id: true,
+        admissionRequestFingerprint: true,
+      },
+    });
+  }
+
+  private async finalizeDirectAdmission(
+    student: { id: string; admissionRequestFingerprint: string | null },
+    dto: CreateDirectAdmissionDto,
+    actor: AuthContext,
+  ) {
+    const requestFingerprint = buildAdmissionConversionFingerprint(dto);
+    if (student.admissionRequestFingerprint !== requestFingerprint) {
+      throw new ConflictException(
+        'This direct-admission operation ID was already used with a different request.',
+      );
+    }
+    const core = await this.loadAdmissionCore(
+      student.id,
+      dto,
+      actor,
+      'The existing direct admission does not match this retry request.',
+    );
+    const admission = await this.completeAdmissionSideEffects(
+      core,
+      dto,
+      actor,
+      'REPLAYED',
+    );
+    return { ...admission, disposition: 'REPLAYED' as const };
   }
 
   getBulkImportTemplate() {
@@ -978,7 +1091,14 @@ export class AdmissionsService {
       }
 
       try {
-        const created = await this.createAdmission(parsed.dto, actor);
+        const directDto = Object.assign(
+          new CreateDirectAdmissionDto(),
+          parsed.dto,
+          {
+            clientOperationId: `bulk:${batch.id}:row:${row.rowNumber}`,
+          },
+        );
+        const created = await this.createAdmission(directDto, actor);
         results.push({
           rowNumber: row.rowNumber,
           status: 'created',
@@ -1217,6 +1337,7 @@ export class AdmissionsService {
     context: AdmissionReferenceContext,
     linkedUserId: string | null,
     tx: Prisma.TransactionClient,
+    directOperation?: DirectAdmissionOperation,
   ): Promise<AdmissionCoreWrite> {
     const studentSystemId =
       dto.studentSystemId ??
@@ -1230,6 +1351,9 @@ export class AdmissionsService {
       data: {
         tenantId: actor.tenantId,
         userId: linkedUserId,
+        admissionOperationId: directOperation?.operationId ?? null,
+        admissionRequestFingerprint:
+          directOperation?.requestFingerprint ?? null,
         studentSystemId,
         firstNameEn: requirePersonName(dto.firstNameEn, 'firstNameEn'),
         lastNameEn: requirePersonName(dto.lastNameEn, 'lastNameEn'),
@@ -1304,36 +1428,6 @@ export class AdmissionsService {
         },
       },
     });
-
-    if (dto.photo && dto.photoFileName) {
-      const stored = await this.storageService.saveBase64Object({
-        tenantId: actor.tenantId,
-        prefix: `students/${student.id}/photo`,
-        fileName: dto.photoFileName,
-        contentType: 'image/jpeg',
-        base64Content: dto.photo,
-      });
-
-      const asset = await this.fileRegistryService.registerFile({
-        tenantId: actor.tenantId,
-        uploadedByUserId: actor.userId,
-        originalFilename: dto.photoFileName,
-        objectKey: stored.objectKey,
-        mimeType: 'image/jpeg',
-        sizeBytes: stored.sizeBytes,
-        provider: stored.provider,
-        bucket: stored.bucket,
-        checksumSha256: stored.checksumSha256,
-        module: 'students',
-        entityId: student.id,
-        metadata: { kind: 'PHOTO', title: 'Student Photo' },
-      });
-
-      await tx.student.update({
-        where: { id: student.id },
-        data: { photoUrl: asset.id },
-      });
-    }
 
     if (dto.siblingStudentSystemId) {
       const sibling = await tx.student.findFirst({
@@ -1484,6 +1578,8 @@ export class AdmissionsService {
     actor: AuthContext,
     disposition: 'CREATED' | 'REPLAYED',
   ) {
+    const photo = await this.completeAdmissionPhoto(core, dto, actor);
+
     await this.financeService.assignFeePlansForEnrollment({
       tenantId: actor.tenantId,
       studentId: core.student.id,
@@ -1543,6 +1639,7 @@ export class AdmissionsService {
       after: {
         studentId: core.student.id,
         invoiceId: initialInvoice?.id ?? null,
+        photoFileId: photo?.photoFileId ?? null,
         documentCount: documents.length,
         guardianInviteCount: core.guardians.length,
         disposition,
@@ -1578,6 +1675,7 @@ export class AdmissionsService {
         relation: link.relation,
       })),
       documents,
+      photo,
       invoice: initialInvoice
         ? {
             id: initialInvoice.id,
@@ -1586,6 +1684,153 @@ export class AdmissionsService {
           }
         : null,
     };
+  }
+
+  private async completeAdmissionPhoto(
+    core: AdmissionCoreWrite,
+    dto: CreateAdmissionDto,
+    actor: AuthContext,
+  ) {
+    if (!dto.photo || !dto.photoFileName) {
+      return null;
+    }
+
+    const image = validateImageUpload({
+      base64Content: dto.photo,
+      fileName: dto.photoFileName,
+      mimeType: 'image/jpeg',
+      maxBytes: MAX_ADMISSION_PHOTO_BYTES,
+      label: 'Student photo',
+    });
+    const expectedChecksum = createHash('sha256')
+      .update(image.content)
+      .digest('hex');
+    const currentStudent = await this.prisma.student.findFirst({
+      where: { id: core.student.id, tenantId: actor.tenantId },
+      select: { id: true, photoFileId: true },
+    });
+    if (!currentStudent) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+    if (currentStudent.photoFileId) {
+      return this.resolveAdmissionPhotoReplay(
+        currentStudent.photoFileId,
+        core.student.id,
+        expectedChecksum,
+        actor,
+      );
+    }
+
+    const stored = await this.storageService.saveBufferObject({
+      tenantId: actor.tenantId,
+      prefix: `students/${core.student.id}/photo`,
+      fileName: image.safeFileName,
+      contentType: image.mimeType,
+      content: image.content,
+    });
+    let assetId: string | null = null;
+    let attached = false;
+    try {
+      const asset = await this.fileRegistryService.registerFile({
+        tenantId: actor.tenantId,
+        uploadedByUserId: actor.userId,
+        originalFilename: image.safeFileName,
+        objectKey: stored.objectKey,
+        mimeType: image.mimeType,
+        sizeBytes: stored.sizeBytes,
+        provider: stored.provider,
+        bucket: stored.bucket,
+        checksumSha256: stored.checksumSha256 ?? expectedChecksum,
+        module: 'students',
+        entityId: core.student.id,
+        metadata: {
+          kind: 'PHOTO',
+          title: 'Student Photo',
+          source: 'admission',
+        },
+      });
+      assetId = asset.id;
+      await this.fileRegistryService.markUploaded(
+        actor.tenantId,
+        asset.id,
+        actor.userId,
+      );
+
+      const claimed = await this.prisma.student.updateMany({
+        where: {
+          id: core.student.id,
+          tenantId: actor.tenantId,
+          photoFileId: null,
+        },
+        data: { photoFileId: asset.id, photoUrl: asset.id },
+      });
+      if (claimed.count !== 1) {
+        const concurrent = await this.prisma.student.findFirst({
+          where: { id: core.student.id, tenantId: actor.tenantId },
+          select: { id: true, photoFileId: true },
+        });
+        if (!concurrent?.photoFileId) {
+          throw new ConflictException(
+            'Student photo state changed while completing admission.',
+          );
+        }
+        return await this.resolveAdmissionPhotoReplay(
+          concurrent.photoFileId,
+          core.student.id,
+          expectedChecksum,
+          actor,
+        );
+      }
+
+      attached = true;
+      await this.auditService.record({
+        action: 'admission_photo_uploaded',
+        resource: 'student',
+        resourceId: core.student.id,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        after: {
+          photoFileId: asset.id,
+          fileName: image.safeFileName,
+          mimeType: image.mimeType,
+          sizeBytes: stored.sizeBytes,
+        },
+      });
+      return toAdmissionPhotoSummary(asset);
+    } finally {
+      if (!attached) {
+        if (assetId) {
+          await this.fileRegistryService
+            .softDeleteFile(actor.tenantId, assetId, actor.userId)
+            .catch(() => undefined);
+        }
+        await this.storageService
+          .deleteObject(stored.objectKey)
+          .catch(() => undefined);
+      }
+    }
+  }
+
+  private async resolveAdmissionPhotoReplay(
+    photoFileId: string,
+    studentId: string,
+    expectedChecksum: string,
+    actor: AuthContext,
+  ) {
+    const asset = await this.fileRegistryService.getFileMetadata(
+      actor.tenantId,
+      photoFileId,
+    );
+    if (
+      asset.module !== 'students' ||
+      asset.entityId !== studentId ||
+      asset.checksumSha256 !== expectedChecksum
+    ) {
+      throw new ConflictException(
+        'The student already has a different photo. Review the admission before retrying.',
+      );
+    }
+    return toAdmissionPhotoSummary(asset);
   }
 
   private async validateAdmissionForCreate(
@@ -1973,6 +2218,7 @@ export function buildAdmissionConversionFingerprint(dto: CreateAdmissionDto) {
     Object.entries(dto).filter(
       ([key]) =>
         key !== 'password' &&
+        key !== 'clientOperationId' &&
         key !== 'confirmDuplicate' &&
         key !== 'photo' &&
         key !== 'documents',
@@ -2180,5 +2426,28 @@ function isErrorResponse(
     response !== null &&
     'message' in response &&
     (typeof response.message === 'string' || Array.isArray(response.message))
+  );
+}
+
+function toAdmissionPhotoSummary(asset: {
+  id: string;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: bigint | number;
+}) {
+  return {
+    photoFileId: asset.id,
+    fileName: asset.originalFilename,
+    mimeType: asset.mimeType,
+    sizeBytes: Number(asset.sizeBytes),
+  };
+}
+
+function isPrismaUniqueConstraintError(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'P2002'
   );
 }

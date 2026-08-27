@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { createHash } from 'node:crypto';
 import {
   AuthMethod,
   EnrollmentStatus,
@@ -27,6 +28,7 @@ import {
   buildAdmissionConversionFingerprint,
 } from './admissions.service';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
+import { CreateDirectAdmissionDto } from './dto/create-direct-admission.dto';
 
 const actor = {
   tenantId: 'tenant-1',
@@ -220,6 +222,232 @@ describe('AdmissionsService production hardening', () => {
     );
 
     expect(result.student.studentSystemId).toBe('SCH-2026-0001');
+    expect(result.disposition).toBe('CREATED');
+  });
+
+  it('replays a completed direct admission without running create validation or another transaction', async () => {
+    const dto = buildAdmissionDto();
+    const prisma = buildPrisma({
+      studentFindFirstResult: {
+        id: 'student-1',
+        admissionRequestFingerprint: buildAdmissionConversionFingerprint(dto),
+      },
+      enrollmentFindFirstResult: buildConvertedEnrollment(),
+    });
+    const { service, financeService } = buildService(prisma);
+
+    const result = await service.createAdmission(dto, actor);
+
+    expect(result.disposition).toBe('REPLAYED');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.academicYear.findFirst).not.toHaveBeenCalled();
+    expect(financeService.createInitialInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ enrollmentId: 'enrollment-1' }),
+    );
+  });
+
+  it('rejects reuse of a direct-admission operation ID with changed input', async () => {
+    const prisma = buildPrisma({
+      studentFindFirstResult: {
+        id: 'student-1',
+        admissionRequestFingerprint: 'different-request',
+      },
+    });
+    const { service, financeService } = buildService(prisma);
+
+    await expect(
+      service.createAdmission(buildAdmissionDto(), actor),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(financeService.createInitialInvoice).not.toHaveBeenCalled();
+  });
+
+  it('recovers the authoritative direct admission after a concurrent operation-key race', async () => {
+    const dto = buildAdmissionDto();
+    const prisma = buildPrisma();
+    prisma.student.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: 'student-1',
+      admissionRequestFingerprint: buildAdmissionConversionFingerprint(dto),
+    });
+    prisma.enrollment.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(buildConvertedEnrollment());
+    prisma.$transaction.mockRejectedValueOnce({ code: 'P2002' });
+    const { service } = buildService(prisma);
+
+    const result = await service.createAdmission(dto, actor);
+
+    expect(result.disposition).toBe('REPLAYED');
+    expect(prisma.student.findFirst).toHaveBeenNthCalledWith(2, {
+      where: {
+        tenantId: actor.tenantId,
+        admissionOperationId: dto.clientOperationId,
+      },
+      select: { id: true, admissionRequestFingerprint: true },
+    });
+  });
+
+  it('creates a requested student login inside the core admission transaction', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    const { service, usersService } = buildService(prisma);
+    const dto = Object.assign(buildAdmissionDto(), {
+      createLogin: true,
+      email: 'asha@example.test',
+      password: 'Strong-password-123',
+      phone: '9800000000',
+    });
+
+    await service.createAdmission(dto, actor);
+
+    expect(usersService.createManagedUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        email: 'asha@example.test',
+        roleIds: ['student-role'],
+      }),
+      tx,
+    );
+    expect(tx.student.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ userId: 'student-user-1' }),
+    });
+  });
+
+  it('attaches an admission photo after the core commit and returns only safe metadata', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    prisma.student.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'student-1', photoFileId: null });
+    const { service, storageService, fileRegistryService } =
+      buildService(prisma);
+    const photo = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+    storageService.saveBufferObject.mockResolvedValue({
+      objectKey: 'tenant-1/students/student-1/photo/photo.jpg',
+      sizeBytes: photo.byteLength,
+      checksumSha256: 'stored-checksum',
+    });
+    fileRegistryService.registerFile.mockResolvedValue({
+      id: 'photo-file-1',
+      originalFilename: 'photo.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: BigInt(photo.byteLength),
+    });
+    const dto = Object.assign(buildAdmissionDto(), {
+      photo: photo.toString('base64'),
+      photoFileName: 'photo.jpg',
+    });
+
+    const result = await service.createAdmission(dto, actor);
+
+    expect(prisma.student.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'student-1',
+        tenantId: actor.tenantId,
+        photoFileId: null,
+      },
+      data: { photoFileId: 'photo-file-1', photoUrl: 'photo-file-1' },
+    });
+    expect(result.photo).toEqual({
+      photoFileId: 'photo-file-1',
+      fileName: 'photo.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: photo.byteLength,
+    });
+    expect(result.photo).not.toHaveProperty('objectKey');
+  });
+
+  it('reuses an already attached matching admission photo without another upload', async () => {
+    const dto = buildAdmissionDto();
+    const photo = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+    Object.assign(dto, {
+      photo: photo.toString('base64'),
+      photoFileName: 'photo.jpg',
+    });
+    const prisma = buildPrisma({
+      enrollmentFindFirstResult: buildConvertedEnrollment(),
+    });
+    prisma.student.findFirst
+      .mockResolvedValueOnce({
+        id: 'student-1',
+        admissionRequestFingerprint: buildAdmissionConversionFingerprint(dto),
+      })
+      .mockResolvedValueOnce({ id: 'student-1', photoFileId: 'photo-file-1' });
+    const { service, storageService, fileRegistryService } =
+      buildService(prisma);
+    fileRegistryService.getFileMetadata.mockResolvedValue({
+      id: 'photo-file-1',
+      originalFilename: 'photo.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: BigInt(photo.byteLength),
+      module: 'students',
+      entityId: 'student-1',
+      checksumSha256: createHash('sha256').update(photo).digest('hex'),
+    });
+
+    const result = await service.createAdmission(dto, actor);
+
+    expect(result.disposition).toBe('REPLAYED');
+    expect(result.photo?.photoFileId).toBe('photo-file-1');
+    expect(storageService.saveBufferObject).not.toHaveBeenCalled();
+    expect(fileRegistryService.registerFile).not.toHaveBeenCalled();
+  });
+
+  it('cleans up a losing photo upload when another retry attaches the same photo first', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    prisma.student.updateMany.mockResolvedValueOnce({ count: 0 });
+    prisma.student.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'student-1', photoFileId: null })
+      .mockResolvedValueOnce({
+        id: 'student-1',
+        photoFileId: 'winning-photo-file',
+      });
+    const { service, storageService, fileRegistryService } =
+      buildService(prisma);
+    const photo = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+    const checksum = createHash('sha256').update(photo).digest('hex');
+    storageService.saveBufferObject.mockResolvedValue({
+      objectKey: 'tenant-1/students/student-1/photo/loser.jpg',
+      sizeBytes: photo.byteLength,
+      checksumSha256: checksum,
+    });
+    fileRegistryService.registerFile.mockResolvedValue({
+      id: 'losing-photo-file',
+      originalFilename: 'photo.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: BigInt(photo.byteLength),
+    });
+    fileRegistryService.getFileMetadata.mockResolvedValue({
+      id: 'winning-photo-file',
+      originalFilename: 'photo.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: BigInt(photo.byteLength),
+      module: 'students',
+      entityId: 'student-1',
+      checksumSha256: checksum,
+    });
+    const dto = Object.assign(buildAdmissionDto(), {
+      photo: photo.toString('base64'),
+      photoFileName: 'photo.jpg',
+    });
+
+    const result = await service.createAdmission(dto, actor);
+
+    expect(result.photo?.photoFileId).toBe('winning-photo-file');
+    expect(fileRegistryService.softDeleteFile).toHaveBeenCalledWith(
+      actor.tenantId,
+      'losing-photo-file',
+      actor.userId,
+    );
+    expect(storageService.deleteObject).toHaveBeenCalledWith(
+      'tenant-1/students/student-1/photo/loser.jpg',
+    );
   });
 
   it('uses a stable enrollment-scoped key for admission document retries', async () => {
@@ -1057,6 +1285,7 @@ describe('AdmissionsService production hardening', () => {
     });
     const second = Object.assign(new CreateAdmissionDto(), first, {
       password: 'rotated-secret',
+      clientOperationId: 'another-operation',
     });
     const changedDocument = Object.assign(new CreateAdmissionDto(), second, {
       documents: [
@@ -1184,8 +1413,9 @@ describe('AdmissionsService production hardening', () => {
   });
 });
 
-function buildAdmissionDto(): CreateAdmissionDto {
+function buildAdmissionDto(): CreateDirectAdmissionDto {
   return {
+    clientOperationId: 'operation-1',
     firstNameEn: 'Asha',
     lastNameEn: 'Tamang',
     dateOfBirth: '2020-01-02',
@@ -1298,7 +1528,9 @@ function buildAdmissionListStudent() {
 }
 
 function buildService(prisma = buildPrisma()) {
-  const usersService = { createManagedUser: jest.fn() };
+  const usersService = {
+    createManagedUser: jest.fn().mockResolvedValue({ id: 'student-user-1' }),
+  };
 
   const financeService = {
     assignFeePlansForEnrollment: jest.fn().mockResolvedValue(undefined),
@@ -1332,10 +1564,14 @@ function buildService(prisma = buildPrisma()) {
   const storageService = {
     saveBase64Object: jest.fn(),
     saveBufferObject: jest.fn(),
+    deleteObject: jest.fn().mockResolvedValue(undefined),
   };
 
   const fileRegistryService = {
     registerFile: jest.fn(),
+    markUploaded: jest.fn().mockResolvedValue(undefined),
+    softDeleteFile: jest.fn().mockResolvedValue(undefined),
+    getFileMetadata: jest.fn(),
     getSignedUrl: jest.fn(),
   };
 
@@ -1361,12 +1597,15 @@ function buildService(prisma = buildPrisma()) {
 
   return {
     service,
+    usersService,
     financeService,
     notificationsService,
     auditService,
     eventEmitter,
     studentRecordsService,
     studentsService,
+    storageService,
+    fileRegistryService,
     usageService,
   };
 }
@@ -1411,6 +1650,7 @@ function buildPrisma(overrides: Partial<PrismaMockOptions> = {}) {
       findFirst: jest
         .fn()
         .mockResolvedValue(overrides.studentFindFirstResult ?? null),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     enrollment: {
       findFirst: jest
@@ -1479,6 +1719,9 @@ function buildTransaction() {
         classId: 'class-1',
       }),
       findFirst: jest.fn().mockResolvedValue(null),
+    },
+    role: {
+      findUnique: jest.fn().mockResolvedValue({ id: 'student-role' }),
     },
     siblingGroup: {
       create: jest.fn(),

@@ -27,6 +27,7 @@ import { ListAdmissionImportBatchesDto } from './dto/list-admission-import-batch
 import { BulkAdmissionImportDto } from './dto/bulk-admission-import.dto';
 import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
+import { CreateDirectAdmissionDto } from './dto/create-direct-admission.dto';
 import { TransferStudentDto } from './dto/transfer-student.dto';
 
 @Controller('admissions')
@@ -47,7 +48,7 @@ export class AdmissionsController {
   @Post()
   @Permissions('enrollments:create', 'students:create', 'guardians:create')
   createAdmission(
-    @Body() dto: CreateAdmissionDto,
+    @Body() dto: CreateDirectAdmissionDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.admissionsService.createAdmission(dto, auth);

@@ -333,7 +333,7 @@ export const studentsApi = {
       method: "POST",
       json: body,
     }),
-  createAdmission: (body: JsonBody) =>
+  createAdmission: (body: JsonBody & { clientOperationId: string }) =>
     request<AdmissionCreationResult>("/admissions", {
       method: "POST",
       json: body,

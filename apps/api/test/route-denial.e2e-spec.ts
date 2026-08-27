@@ -636,6 +636,7 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
     await expect(
       studentsController.createAdmission(
         {
+          clientOperationId: 'operation-limit-test',
           firstNameEn: 'New',
           lastNameEn: 'Student',
           gender: 'MALE',

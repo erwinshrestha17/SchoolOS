@@ -7533,6 +7533,8 @@ model Student {
   citizenshipNo             String?
   photoUrl                  String?
   photoFileId               String?                @unique
+  admissionOperationId      String?
+  admissionRequestFingerprint String?
   admissionDate             DateTime
   admissionNumber           String?
   previousSchool            String?
@@ -7625,7 +7627,9 @@ model Student {
   parentLearningGuidance       ParentLearningGuidance[]
 
   @@unique([tenantId, studentSystemId])
+  @@unique([tenantId, admissionOperationId])
   @@index([tenantId, classId, sectionId])
+  @@index([tenantId, admissionRequestFingerprint])
   @@index([tenantId, admissionNumber])
   @@index([tenantId, lifecycleStatus])
   @@index([tenantId, lifecycleStatus, dateOfBirth])
