@@ -37,7 +37,11 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
 
   const tenantId = 'tenant-student-lifecycle-depth';
   const otherTenantId = 'tenant-student-lifecycle-other';
-  const actor = createAuthContextMock({ tenantId, userId: 'student-admin' });
+  const actor = createAuthContextMock({
+    tenantId,
+    userId: 'student-admin',
+    permissions: ['fees:adjust'],
+  });
   const otherActor = createAuthContextMock({
     tenantId: otherTenantId,
     userId: 'other-student-admin',

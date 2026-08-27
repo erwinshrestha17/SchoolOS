@@ -809,6 +809,7 @@ describe('students lifecycle hardening', () => {
         resource: 'student',
         resourceId: student.id,
       }),
+      prisma.transaction,
     );
     expect(result.lifecycleStatus).toBe(StudentLifecycleStatus.TRANSFERRED);
   });
@@ -895,6 +896,7 @@ describe('students lifecycle hardening', () => {
           lifecycleStatus: StudentLifecycleStatus.ALUMNI,
         }),
       }),
+      prisma.transaction,
     );
     expect(result.lifecycleStatus).toBe(StudentLifecycleStatus.ALUMNI);
   });
@@ -3708,6 +3710,28 @@ describe('students lifecycle hardening', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('requires finance-adjust authority before accepting a fee-clearance waiver', async () => {
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [
+        buildStudent({ lifecycleStatus: StudentLifecycleStatus.ACTIVE }),
+      ],
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.requestTransfer(
+        'student-1',
+        { reason: 'Principal-approved exception', waiveFeeClearance: true },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Waiving fee clearance requires the fees:adjust permission',
+    );
+
+    expect(prisma.student.findFirst).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('requires fee clearance before exiting or archiving an active student', async () => {
     const student = buildStudent({
       lifecycleStatus: StudentLifecycleStatus.ACTIVE,
@@ -3735,6 +3759,68 @@ describe('students lifecycle hardening', () => {
     ).rejects.toThrow(BadRequestException);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('requires fee clearance before moving a student into alumni history', async () => {
+    const student = buildStudent({
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      invoiceFindManyQueue: [
+        [
+          {
+            id: 'invoice-alumni-1',
+            invoiceNumber: 'INV-ALUMNI-1',
+            status: 'ISSUED',
+            totalAmount: new Prisma.Decimal(1000),
+            dueDate: new Date('2026-05-01T00:00:00.000Z'),
+            payments: [],
+          },
+        ],
+      ],
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.archiveAlumni(
+        student.id,
+        { reason: 'Graduation completed' },
+        actor,
+      ),
+    ).rejects.toThrow('Fee clearance is required before alumni archival');
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not complete a lifecycle exit when its audit append fails', async () => {
+    const student = buildStudent({
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      invoiceFindManyQueue: [[]],
+    });
+    const { service, auditService } = buildService(prisma);
+    auditService.record.mockRejectedValueOnce(
+      new Error('audit persistence unavailable'),
+    );
+
+    await expect(
+      service.archiveStudent(
+        student.id,
+        { reason: 'Guardian-requested withdrawal' },
+        actor,
+      ),
+    ).rejects.toThrow('audit persistence unavailable');
+
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'exit',
+        resourceId: student.id,
+      }),
+      prisma.transaction,
+    );
   });
 
   it('rejects missing students in tenant-scoped operations', async () => {

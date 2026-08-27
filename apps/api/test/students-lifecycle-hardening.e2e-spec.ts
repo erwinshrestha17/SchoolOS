@@ -41,6 +41,7 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       'students:qr:resolve_all',
       'students:qr:read',
       'students:qr:generate',
+      'fees:adjust',
     ],
   });
 

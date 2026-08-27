@@ -2756,6 +2756,14 @@ export class StudentsService {
     dto: RequestStudentTransferDto,
     actor: AuthContext,
   ) {
+    if (
+      dto.waiveFeeClearance &&
+      !actor.permissions.includes('fees:adjust')
+    ) {
+      throw new ForbiddenException(
+        'Waiving fee clearance requires the fees:adjust permission.',
+      );
+    }
     const student = await this.findTenantStudent(studentId, actor);
     ensureAllowedLifecycleTransition(
       student.lifecycleStatus,
@@ -2772,7 +2780,8 @@ export class StudentsService {
     }
 
     const exitedAt = dto.exitedAt ? new Date(dto.exitedAt) : new Date();
-    const feeClearanceWaivedAt = dto.waiveFeeClearance ? new Date() : null;
+    const feeClearanceWaivedAt =
+      dto.waiveFeeClearance && !clearance.cleared ? new Date() : null;
     await this.commitStudentLifecycleTransition({
       student,
       toStatus: StudentLifecycleStatus.TRANSFERRED,
@@ -2797,8 +2806,20 @@ export class StudentsService {
         destinationSchool: dto.destinationSchool ?? null,
         conductRemark: dto.conductRemark ?? null,
         exitedAt: exitedAt.toISOString(),
+        feeClearanceWaived: Boolean(feeClearanceWaivedAt),
+        outstandingAmountAtDecision: clearance.outstandingAmount,
       },
-      feeClearanceWaived: dto.waiveFeeClearance ?? false,
+      feeClearanceWaived: Boolean(feeClearanceWaivedAt),
+      auditAction: feeClearanceWaivedAt
+        ? 'transfer_with_fee_waiver'
+        : 'transfer',
+      auditAfter: {
+        lifecycleStatus: StudentLifecycleStatus.TRANSFERRED,
+        destinationSchool: dto.destinationSchool ?? null,
+        exitedAt: exitedAt.toISOString(),
+        feeClearanceWaived: Boolean(feeClearanceWaivedAt),
+        outstandingAmountAtDecision: clearance.outstandingAmount,
+      },
     });
     const updated = {
       ...student,
@@ -2814,19 +2835,6 @@ export class StudentsService {
           }
         : {}),
     };
-
-    await this.auditService.record({
-      action: dto.waiveFeeClearance ? 'transfer_with_fee_waiver' : 'transfer',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: student.id,
-      after: {
-        lifecycleStatus: updated.lifecycleStatus,
-        destinationSchool: updated.destinationSchool,
-        exitedAt: updated.exitedAt,
-      },
-    });
 
     return {
       id: updated.id,
@@ -2873,6 +2881,11 @@ export class StudentsService {
       metadata: {
         exitedAt: exitedAt.toISOString(),
       },
+      auditAction: 'exit',
+      auditAfter: {
+        lifecycleStatus: StudentLifecycleStatus.EXITED,
+        exitedAt: exitedAt.toISOString(),
+      },
     });
     const updated = {
       ...student,
@@ -2880,18 +2893,6 @@ export class StudentsService {
       exitReason: dto.reason,
       exitedAt,
     };
-
-    await this.auditService.record({
-      action: 'exit',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: student.id,
-      after: {
-        lifecycleStatus: updated.lifecycleStatus,
-        exitedAt: updated.exitedAt,
-      },
-    });
 
     return {
       id: updated.id,
@@ -2914,6 +2915,13 @@ export class StudentsService {
       student.lifecycleStatus,
       StudentLifecycleStatus.ALUMNI,
     );
+    const clearance = await this.getFeeClearance(studentId, actor);
+    if (!clearance.cleared) {
+      throw new BadRequestException({
+        message: 'Fee clearance is required before alumni archival.',
+        clearance,
+      });
+    }
     const exitedAt = dto.exitedAt ? new Date(dto.exitedAt) : new Date();
     await this.commitStudentLifecycleTransition({
       student,
@@ -2930,6 +2938,11 @@ export class StudentsService {
       metadata: {
         exitedAt: exitedAt.toISOString(),
       },
+      auditAction: options.auditAction ?? 'archive_alumni',
+      auditAfter: {
+        lifecycleStatus: StudentLifecycleStatus.ALUMNI,
+        exitedAt: exitedAt.toISOString(),
+      },
     });
     const updated = {
       ...student,
@@ -2937,19 +2950,6 @@ export class StudentsService {
       exitReason: dto.reason,
       exitedAt,
     };
-
-    await this.auditService.record({
-      action: options.auditAction ?? 'archive_alumni',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: student.id,
-      before: { lifecycleStatus: student.lifecycleStatus },
-      after: {
-        lifecycleStatus: updated.lifecycleStatus,
-        exitedAt: updated.exitedAt,
-      },
-    });
 
     return {
       id: updated.id,
@@ -3011,6 +3011,11 @@ export class StudentsService {
       metadata: {
         deletedAt: deletedAt.toISOString(),
       },
+      auditAction: 'delete',
+      auditAfter: {
+        lifecycleStatus: StudentLifecycleStatus.DELETED,
+        exitedAt: deletedAt.toISOString(),
+      },
     });
     const updated = {
       ...student,
@@ -3018,18 +3023,6 @@ export class StudentsService {
       exitReason: dto.reason,
       exitedAt: deletedAt,
     };
-
-    await this.auditService.record({
-      action: 'delete',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: student.id,
-      after: {
-        lifecycleStatus: updated.lifecycleStatus,
-        exitedAt: updated.exitedAt,
-      },
-    });
 
     return {
       id: updated.id,
@@ -5493,6 +5486,8 @@ export class StudentsService {
     studentData: Prisma.StudentUpdateManyMutationInput;
     metadata: Record<string, unknown>;
     feeClearanceWaived?: boolean;
+    auditAction: string;
+    auditAfter: Record<string, unknown>;
   }) {
     await this.prisma.$transaction(async (tx) => {
       const claim = await tx.student.updateMany({
@@ -5533,6 +5528,19 @@ export class StudentsService {
           metadata: input.metadata as Prisma.InputJsonValue,
         },
       });
+
+      await this.auditService.record(
+        {
+          action: input.auditAction,
+          resource: 'student',
+          tenantId: input.actor.tenantId,
+          userId: input.actor.userId,
+          resourceId: input.student.id,
+          before: { lifecycleStatus: input.student.lifecycleStatus },
+          after: input.auditAfter,
+        },
+        tx,
+      );
     });
   }
 
