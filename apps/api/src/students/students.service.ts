@@ -2625,102 +2625,151 @@ export class StudentsService {
     dto: ProvisionGuardianAccountDto,
     actor: AuthContext,
   ) {
-    const link = await this.findGuardianAdministrationRelationship(
-      studentId,
-      guardianId,
-      actor,
-    );
-    if (link.guardian.user) {
-      throw new ConflictException(
-        'This guardian already has a linked app account.',
-      );
-    }
-    await this.assertGuardianRecoveryMethod(link, dto, actor);
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const now = new Date();
+          const link = await tx.studentGuardian.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              studentId,
+              guardianId,
+              ...buildActiveGuardianRelationshipWhere(now),
+            },
+            include: {
+              guardian: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          });
+          if (!link) {
+            throw new NotFoundException(
+              'An active, verified, and approved guardian relationship was not found for this student in this tenant.',
+            );
+          }
+          if (link.guardian.user) {
+            throw new ConflictException(
+              'This guardian already has a linked app account.',
+            );
+          }
 
-    const parentRole = await this.prisma.role.findUnique({
-      where: {
-        tenantId_name: {
-          tenantId: actor.tenantId,
-          name: 'parent',
-        },
-      },
-      select: { id: true },
-    });
-    if (!parentRole) {
-      throw new NotFoundException(
-        'The parent role is not configured for this school.',
-      );
-    }
+          await this.assertGuardianRecoveryMethod(link, dto, actor, tx);
 
-    return this.prisma.$transaction(async (tx) => {
-      const user = await this.usersService.createManagedUser(
-        {
-          tenantId: actor.tenantId,
-          email: dto.email,
-          phone: link.guardian.primaryPhone,
-          password: dto.temporaryPassword,
-          roleIds: [parentRole.id],
-          assignedById: actor.userId,
-          mustChangePassword: true,
+          const parentRole = await tx.role.findUnique({
+            where: {
+              tenantId_name: {
+                tenantId: actor.tenantId,
+                name: 'parent',
+              },
+            },
+            select: { id: true },
+          });
+          if (!parentRole) {
+            throw new NotFoundException(
+              'The parent role is not configured for this school.',
+            );
+          }
+
+          const user = await this.usersService.createManagedUser(
+            {
+              tenantId: actor.tenantId,
+              email: dto.email,
+              phone: link.guardian.primaryPhone,
+              password: dto.temporaryPassword,
+              roleIds: [parentRole.id],
+              assignedById: actor.userId,
+              mustChangePassword: true,
+            },
+            tx,
+          );
+          const linked = await tx.guardian.updateMany({
+            where: {
+              id: guardianId,
+              tenantId: actor.tenantId,
+              userId: null,
+            },
+            data: { userId: user.id },
+          });
+          if (linked.count !== 1) {
+            throw new ConflictException(
+              'Guardian account provisioning changed while this request was in progress.',
+            );
+          }
+
+          const relationshipClaim = await tx.studentGuardian.updateMany({
+            where: {
+              id: link.id,
+              tenantId: actor.tenantId,
+              studentId,
+              guardianId,
+              updatedAt: link.updatedAt,
+              ...buildActiveGuardianRelationshipWhere(now),
+            },
+            data: { appLoginLinked: true },
+          });
+          if (relationshipClaim.count !== 1) {
+            throw new ConflictException(
+              'Guardian relationship changed while account provisioning was being finalized. Refresh and retry.',
+            );
+          }
+          await tx.studentGuardian.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              guardianId,
+              id: { not: link.id },
+              ...buildActiveGuardianRelationshipWhere(now),
+            },
+            data: { appLoginLinked: true },
+          });
+
+          await this.auditService.record(
+            {
+              action: 'provision_account',
+              resource: 'guardian_access',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: link.id,
+              before: {
+                accountLinked: false,
+              },
+              after: {
+                studentId,
+                guardianId,
+                accountLinked: true,
+                accountStatus: user.status,
+                email: user.email,
+                verificationMethod: dto.verificationMethod,
+                reason: dto.reason.trim(),
+                evidenceReference: dto.evidenceReference.trim(),
+                coGuardianId: dto.coGuardianId ?? null,
+                mustChangePassword: true,
+              },
+            },
+            tx,
+          );
+
+          return {
+            success: true as const,
+            account: {
+              linked: true as const,
+              status: user.status,
+              email: user.email,
+              mustChangePassword: true as const,
+            },
+          };
         },
-        tx,
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
-      const linked = await tx.guardian.updateMany({
-        where: {
-          id: guardianId,
-          tenantId: actor.tenantId,
-          userId: null,
-        },
-        data: { userId: user.id },
-      });
-      if (linked.count !== 1) {
+    } catch (error) {
+      if (isPrismaTransactionConflictError(error)) {
         throw new ConflictException(
-          'Guardian account provisioning changed while this request was in progress.',
+          'Guardian relationship changed while account provisioning was being finalized. Refresh and retry.',
         );
       }
-      await tx.studentGuardian.updateMany({
-        where: {
-          tenantId: actor.tenantId,
-          guardianId,
-        },
-        data: { appLoginLinked: true },
-      });
-      await this.auditService.record(
-        {
-          action: 'provision_account',
-          resource: 'guardian_access',
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-          resourceId: link.id,
-          before: {
-            accountLinked: false,
-          },
-          after: {
-            studentId,
-            guardianId,
-            accountLinked: true,
-            accountStatus: user.status,
-            email: user.email,
-            verificationMethod: dto.verificationMethod,
-            reason: dto.reason.trim(),
-            evidenceReference: dto.evidenceReference.trim(),
-            coGuardianId: dto.coGuardianId ?? null,
-            mustChangePassword: true,
-          },
-        },
-        tx,
-      );
-
-      return {
-        success: true as const,
-        account: {
-          linked: true as const,
-          status: user.status,
-          email: user.email,
-          mustChangePassword: true as const,
-        },
-      };
-    });
+      throw error;
+    }
   }
 
   async revokeGuardianSession(
@@ -5997,6 +6046,7 @@ export class StudentsService {
     link: GuardianAdministrationRelationship,
     dto: Pick<GuardianRecoveryActionDto, 'verificationMethod' | 'coGuardianId'>,
     actor: AuthContext,
+    prisma: Prisma.TransactionClient = this.prisma,
   ) {
     const userId = link.guardian.user?.id ?? null;
 
@@ -6007,7 +6057,7 @@ export class StudentsService {
             'No guardian app account is linked for trusted-session recovery.',
           );
         }
-        const trustedSession = await this.prisma.refreshToken.findFirst({
+        const trustedSession = await prisma.refreshToken.findFirst({
           where: {
             userId,
             revokedAt: null,
@@ -6028,7 +6078,7 @@ export class StudentsService {
             'No linked guardian account with an email address is available.',
           );
         }
-        const completedEmailProof = await this.prisma.otpCode.findFirst({
+        const completedEmailProof = await prisma.otpCode.findFirst({
           where: {
             userId,
             purpose: { in: [OtpPurpose.RESET, OtpPurpose.VERIFY] },
@@ -6050,7 +6100,7 @@ export class StudentsService {
             'Choose another approved guardian for co-guardian verification.',
           );
         }
-        const coGuardian = await this.prisma.studentGuardian.findFirst({
+        const coGuardian = await prisma.studentGuardian.findFirst({
           where: {
             tenantId: actor.tenantId,
             studentId: link.studentId,
@@ -6068,7 +6118,7 @@ export class StudentsService {
       }
       case 'SCHOOL_IDENTITY_REVIEW': {
         const verification =
-          await this.prisma.guardianIdentityVerification.findFirst({
+          await prisma.guardianIdentityVerification.findFirst({
             where: {
               tenantId: actor.tenantId,
               guardianId: link.guardianId,

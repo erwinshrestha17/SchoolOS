@@ -2585,6 +2585,31 @@ describe('students lifecycle hardening', () => {
       actor,
     );
 
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
+    expect(prisma.studentGuardian.findFirst).not.toHaveBeenCalled();
+    expect(prisma.transaction.studentGuardian.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        tenantId: actor.tenantId,
+        studentId: link.studentId,
+        guardianId: link.guardianId,
+        status: GuardianRelationshipStatus.ACTIVE,
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+      }),
+      include: { guardian: { include: { user: true } } },
+    });
+    expect(prisma.role.findUnique).not.toHaveBeenCalled();
+    expect(prisma.transaction.role.findUnique).toHaveBeenCalledWith({
+      where: {
+        tenantId_name: {
+          tenantId: actor.tenantId,
+          name: 'parent',
+        },
+      },
+      select: { id: true },
+    });
     expect(usersService.createManagedUser).toHaveBeenCalledWith(
       {
         tenantId: actor.tenantId,
@@ -2606,10 +2631,27 @@ describe('students lifecycle hardening', () => {
       data: { userId: 'guardian-user-provisioned' },
     });
     expect(prisma.transaction.studentGuardian.updateMany).toHaveBeenCalledWith({
-      where: {
+      where: expect.objectContaining({
+        id: link.id,
+        tenantId: actor.tenantId,
+        studentId: link.studentId,
+        guardianId: link.guardianId,
+        updatedAt: link.updatedAt,
+        status: GuardianRelationshipStatus.ACTIVE,
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+      }),
+      data: { appLoginLinked: true },
+    });
+    expect(prisma.transaction.studentGuardian.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
         tenantId: actor.tenantId,
         guardianId: link.guardianId,
-      },
+        id: { not: link.id },
+        status: GuardianRelationshipStatus.ACTIVE,
+        verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+      }),
       data: { appLoginLinked: true },
     });
     expect(auditService.record).toHaveBeenCalledWith(
@@ -2636,6 +2678,136 @@ describe('students lifecycle hardening', () => {
         mustChangePassword: true,
       },
     });
+  });
+
+  it('fails closed when account provisioning has no current authorized relationship', async () => {
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: null,
+      guardianIdentityVerificationFindFirstQueue: [{ id: 'identity-proof-1' }],
+    });
+    const { service, usersService, auditService } = buildService(prisma);
+
+    await expect(
+      service.provisionGuardianAccount(
+        'student-1',
+        'guardian-1',
+        {
+          email: 'maya@example.com',
+          temporaryPassword: 'Temporary!Parent2026',
+          verificationMethod: 'SCHOOL_IDENTITY_REVIEW',
+          reason: 'Guardian app access approved after in-person review',
+          evidenceReference: 'front-office-register-15',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'An active, verified, and approved guardian relationship was not found',
+    );
+
+    expect(usersService.createManagedUser).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rolls back account provisioning when the target relationship claim is stale', async () => {
+    const baseLink = buildGuardianAdministrationLink();
+    const link = {
+      ...baseLink,
+      appLoginLinked: false,
+      guardian: {
+        ...baseLink.guardian,
+        userId: null,
+        user: null,
+      },
+    };
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      guardianIdentityVerificationFindFirstQueue: [{ id: 'identity-proof-1' }],
+      transactionStudentGuardianUpdateManyCount: 0,
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.provisionGuardianAccount(
+        link.studentId,
+        link.guardianId,
+        {
+          email: 'maya@example.com',
+          temporaryPassword: 'Temporary!Parent2026',
+          verificationMethod: 'SCHOOL_IDENTITY_REVIEW',
+          reason: 'Guardian app access approved after in-person review',
+          evidenceReference: 'front-office-register-15',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Guardian relationship changed while account provisioning was being finalized',
+    );
+
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rolls back guardian account provisioning when audit append fails', async () => {
+    const baseLink = buildGuardianAdministrationLink();
+    const link = {
+      ...baseLink,
+      appLoginLinked: false,
+      guardian: {
+        ...baseLink.guardian,
+        userId: null,
+        user: null,
+      },
+    };
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      guardianIdentityVerificationFindFirstQueue: [{ id: 'identity-proof-1' }],
+    });
+    const { service, auditService } = buildService(prisma);
+    auditService.record.mockRejectedValueOnce(
+      new Error('guardian provisioning audit unavailable'),
+    );
+
+    await expect(
+      service.provisionGuardianAccount(
+        link.studentId,
+        link.guardianId,
+        {
+          email: 'maya@example.com',
+          temporaryPassword: 'Temporary!Parent2026',
+          verificationMethod: 'SCHOOL_IDENTITY_REVIEW',
+          reason: 'Guardian app access approved after in-person review',
+          evidenceReference: 'front-office-register-15',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('guardian provisioning audit unavailable');
+
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceId: link.id }),
+      prisma.transaction,
+    );
+  });
+
+  it('maps guardian account provisioning serialization conflicts to a bounded retry response', async () => {
+    const prisma = buildPrisma({});
+    prisma.$transaction.mockRejectedValueOnce({ code: 'P2034' });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.provisionGuardianAccount(
+        'student-1',
+        'guardian-1',
+        {
+          email: 'maya@example.com',
+          temporaryPassword: 'Temporary!Parent2026',
+          verificationMethod: 'SCHOOL_IDENTITY_REVIEW',
+          reason: 'Guardian app access approved after in-person review',
+          evidenceReference: 'front-office-register-15',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Guardian relationship changed while account provisioning was being finalized',
+    );
   });
 
   it('revokes only the selected active guardian session and records the decision evidence', async () => {
@@ -5080,6 +5252,7 @@ function buildPrisma(options: {
   sectionFindManyResult?: unknown[];
   transactionRefreshTokenUpdateManyCount?: number;
   transactionStudentGuardianUpdateManyCount?: number;
+  transactionGuardianUpdateManyCount?: number;
 }) {
   const transaction = {
     enrollment: {
@@ -5134,13 +5307,18 @@ function buildPrisma(options: {
       }),
       create: jest.fn(),
       update: jest.fn().mockResolvedValue({ id: 'guardian-updated' }),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      updateMany: jest.fn().mockResolvedValue({
+        count: options.transactionGuardianUpdateManyCount ?? 1,
+      }),
     },
     user: {
       update: jest.fn().mockImplementation(async ({ data }) => ({
         id: 'guardian-user-1',
         ...data,
       })),
+    },
+    role: {
+      findUnique: jest.fn().mockResolvedValue({ id: 'parent-role-1' }),
     },
     refreshToken: {
       updateMany: jest.fn().mockResolvedValue({
