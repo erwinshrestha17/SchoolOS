@@ -1301,6 +1301,7 @@ function overrideFileAssetCount(prisma: PrismaMock) {
 }
 
 function overrideAdmissionConversionWrites(prisma: PrismaMock) {
+  prisma.invoice.findUnique = jest.fn(() => Promise.resolve(null));
   prisma.feePlan = {
     findMany: jest.fn(() => Promise.resolve([])),
   };
