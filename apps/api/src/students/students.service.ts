@@ -54,6 +54,7 @@ import {
   PdfImage,
 } from '../common/pdf/simple-pdf';
 import { FileRegistryService } from '../file-registry/file-registry.service';
+import { sumInvoiceAllocationAmount } from '../finance/payment-allocation-totals';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -2699,56 +2700,7 @@ export class StudentsService {
   async getFeeClearance(studentId: string, actor: AuthContext) {
     this.assertSensitiveStudentReadAllowed(actor, 'Financial clearance');
     const student = await this.findTenantStudent(studentId, actor);
-    const invoices = await this.prisma.invoice.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        studentId,
-        status: { not: 'VOID' },
-      },
-      include: {
-        payments: {
-          include: { refunds: true },
-        },
-      },
-      orderBy: [{ issuedAt: 'desc' }],
-    });
-
-    const invoiceSummaries = invoices.map((invoice) => {
-      const paidAmount = invoice.payments.reduce((sum, payment) => {
-        const refundedAmount = payment.refunds.reduce(
-          (refundSum, refund) => refundSum.add(refund.amount),
-          new Prisma.Decimal(0),
-        );
-
-        return sum.add(payment.amount).sub(refundedAmount);
-      }, new Prisma.Decimal(0));
-      const outstandingAmount = invoice.totalAmount.sub(paidAmount);
-
-      return {
-        id: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        status: invoice.status,
-        totalAmount: Number(invoice.totalAmount),
-        paidAmount: Number(paidAmount),
-        outstandingAmount: Number(
-          outstandingAmount.gt(0) ? outstandingAmount : new Prisma.Decimal(0),
-        ),
-        dueDate: invoice.dueDate,
-      };
-    });
-    const outstandingAmount = invoiceSummaries.reduce(
-      (sum, invoice) => sum + invoice.outstandingAmount,
-      0,
-    );
-
-    return {
-      studentId: student.id,
-      studentSystemId: student.studentSystemId,
-      cleared: outstandingAmount <= 0 || Boolean(student.feeClearanceWaivedAt),
-      outstandingAmount,
-      waivedAt: student.feeClearanceWaivedAt,
-      invoices: invoiceSummaries,
-    };
+    return this.calculateFeeClearance(student, actor.tenantId, this.prisma);
   }
 
   async requestTransfer(
@@ -2756,10 +2708,7 @@ export class StudentsService {
     dto: RequestStudentTransferDto,
     actor: AuthContext,
   ) {
-    if (
-      dto.waiveFeeClearance &&
-      !actor.permissions.includes('fees:adjust')
-    ) {
+    if (dto.waiveFeeClearance && !actor.permissions.includes('fees:adjust')) {
       throw new ForbiddenException(
         'Waiving fee clearance requires the fees:adjust permission.',
       );
@@ -2780,8 +2729,6 @@ export class StudentsService {
     }
 
     const exitedAt = dto.exitedAt ? new Date(dto.exitedAt) : new Date();
-    const feeClearanceWaivedAt =
-      dto.waiveFeeClearance && !clearance.cleared ? new Date() : null;
     await this.commitStudentLifecycleTransition({
       student,
       toStatus: StudentLifecycleStatus.TRANSFERRED,
@@ -2795,30 +2742,21 @@ export class StudentsService {
         exitedAt,
         destinationSchool: dto.destinationSchool ?? null,
         conductRemark: dto.conductRemark ?? null,
-        ...(feeClearanceWaivedAt
-          ? {
-              feeClearanceWaivedAt,
-              feeClearanceWaivedById: actor.userId,
-            }
-          : {}),
       },
       metadata: {
         destinationSchool: dto.destinationSchool ?? null,
         conductRemark: dto.conductRemark ?? null,
         exitedAt: exitedAt.toISOString(),
-        feeClearanceWaived: Boolean(feeClearanceWaivedAt),
-        outstandingAmountAtDecision: clearance.outstandingAmount,
       },
-      feeClearanceWaived: Boolean(feeClearanceWaivedAt),
-      auditAction: feeClearanceWaivedAt
-        ? 'transfer_with_fee_waiver'
-        : 'transfer',
+      feeClearanceFailureMessage:
+        'Fee clearance is required before transfer or certificate issuance.',
+      feeClearanceWaiverRequested: dto.waiveFeeClearance ?? false,
+      auditAction: 'transfer',
+      feeClearanceWaiverAuditAction: 'transfer_with_fee_waiver',
       auditAfter: {
         lifecycleStatus: StudentLifecycleStatus.TRANSFERRED,
         destinationSchool: dto.destinationSchool ?? null,
         exitedAt: exitedAt.toISOString(),
-        feeClearanceWaived: Boolean(feeClearanceWaivedAt),
-        outstandingAmountAtDecision: clearance.outstandingAmount,
       },
     });
     const updated = {
@@ -2828,12 +2766,6 @@ export class StudentsService {
       exitedAt,
       destinationSchool: dto.destinationSchool ?? null,
       conductRemark: dto.conductRemark ?? null,
-      ...(feeClearanceWaivedAt
-        ? {
-            feeClearanceWaivedAt,
-            feeClearanceWaivedById: actor.userId,
-          }
-        : {}),
     };
 
     return {
@@ -2881,6 +2813,8 @@ export class StudentsService {
       metadata: {
         exitedAt: exitedAt.toISOString(),
       },
+      feeClearanceFailureMessage:
+        'Fee clearance is required before student exit or archive.',
       auditAction: 'exit',
       auditAfter: {
         lifecycleStatus: StudentLifecycleStatus.EXITED,
@@ -2938,6 +2872,8 @@ export class StudentsService {
       metadata: {
         exitedAt: exitedAt.toISOString(),
       },
+      feeClearanceFailureMessage:
+        'Fee clearance is required before alumni archival.',
       auditAction: options.auditAction ?? 'archive_alumni',
       auditAfter: {
         lifecycleStatus: StudentLifecycleStatus.ALUMNI,
@@ -3011,6 +2947,8 @@ export class StudentsService {
       metadata: {
         deletedAt: deletedAt.toISOString(),
       },
+      feeClearanceFailureMessage:
+        'Fee clearance is required before student deletion or withdrawal.',
       auditAction: 'delete',
       auditAfter: {
         lifecycleStatus: StudentLifecycleStatus.DELETED,
@@ -5485,63 +5423,199 @@ export class StudentsService {
     actor: AuthContext;
     studentData: Prisma.StudentUpdateManyMutationInput;
     metadata: Record<string, unknown>;
-    feeClearanceWaived?: boolean;
+    feeClearanceFailureMessage: string;
+    feeClearanceWaiverRequested?: boolean;
     auditAction: string;
+    feeClearanceWaiverAuditAction?: string;
     auditAfter: Record<string, unknown>;
   }) {
-    await this.prisma.$transaction(async (tx) => {
-      const claim = await tx.student.updateMany({
-        where: {
-          id: input.student.id,
-          tenantId: input.actor.tenantId,
-          lifecycleStatus: input.student.lifecycleStatus,
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          const transactionalStudent = await tx.student.findFirst({
+            where: {
+              id: input.student.id,
+              tenantId: input.actor.tenantId,
+            },
+            select: {
+              id: true,
+              studentSystemId: true,
+              lifecycleStatus: true,
+              feeClearanceWaivedAt: true,
+            },
+          });
+          if (
+            transactionalStudent?.lifecycleStatus !==
+            input.student.lifecycleStatus
+          ) {
+            throw new ConflictException(
+              'Student lifecycle changed while this action was being finalized. Refresh and retry.',
+            );
+          }
+
+          const clearance = await this.calculateFeeClearance(
+            transactionalStudent,
+            input.actor.tenantId,
+            tx,
+          );
+          const feeClearanceWaived = Boolean(
+            !clearance.cleared && input.feeClearanceWaiverRequested,
+          );
+          if (!clearance.cleared && !feeClearanceWaived) {
+            throw new BadRequestException({
+              message: input.feeClearanceFailureMessage,
+              clearance,
+            });
+          }
+
+          const feeClearanceWaivedAt = feeClearanceWaived ? new Date() : null;
+          const claim = await tx.student.updateMany({
+            where: {
+              id: input.student.id,
+              tenantId: input.actor.tenantId,
+              lifecycleStatus: input.student.lifecycleStatus,
+            },
+            data: {
+              ...input.studentData,
+              ...(feeClearanceWaivedAt
+                ? {
+                    feeClearanceWaivedAt,
+                    feeClearanceWaivedById: input.actor.userId,
+                  }
+                : {}),
+            },
+          });
+          if (claim.count !== 1) {
+            throw new ConflictException(
+              'Student lifecycle changed while this action was being finalized. Refresh and retry.',
+            );
+          }
+
+          await tx.enrollment.updateMany({
+            where: {
+              tenantId: input.actor.tenantId,
+              studentId: input.student.id,
+              status: EnrollmentStatus.ACTIVE,
+            },
+            data: {
+              status: input.enrollmentStatus,
+              effectiveUntil: input.effectiveUntil,
+            },
+          });
+
+          const clearanceEvidence = {
+            clearedBeforeDecision: clearance.cleared,
+            outstandingAmountAtDecision: clearance.outstandingAmount,
+            priorWaiverAt: clearance.waivedAt?.toISOString() ?? null,
+            waiverGranted: feeClearanceWaived,
+          };
+          await tx.studentLifecycleTransition.create({
+            data: {
+              tenantId: input.actor.tenantId,
+              studentId: input.student.id,
+              fromStatus: input.student.lifecycleStatus,
+              toStatus: input.toStatus,
+              reason: input.reason,
+              changedById: input.actor.userId,
+              feeClearanceWaived,
+              metadata: {
+                ...input.metadata,
+                feeClearance: clearanceEvidence,
+              },
+            },
+          });
+
+          await this.auditService.record(
+            {
+              action:
+                feeClearanceWaived && input.feeClearanceWaiverAuditAction
+                  ? input.feeClearanceWaiverAuditAction
+                  : input.auditAction,
+              resource: 'student',
+              tenantId: input.actor.tenantId,
+              userId: input.actor.userId,
+              resourceId: input.student.id,
+              before: { lifecycleStatus: input.student.lifecycleStatus },
+              after: {
+                ...input.auditAfter,
+                feeClearance: clearanceEvidence,
+              },
+            },
+            tx,
+          );
         },
-        data: input.studentData,
-      });
-      if (claim.count !== 1) {
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        },
+      );
+    } catch (error) {
+      if (isPrismaTransactionConflictError(error)) {
         throw new ConflictException(
-          'Student lifecycle changed while this action was being finalized. Refresh and retry.',
+          'Student or fee-clearance state changed while this action was being finalized. Refresh and retry.',
         );
       }
+      throw error;
+    }
+  }
 
-      await tx.enrollment.updateMany({
-        where: {
-          tenantId: input.actor.tenantId,
-          studentId: input.student.id,
-          status: EnrollmentStatus.ACTIVE,
+  private async calculateFeeClearance(
+    student: {
+      id: string;
+      studentSystemId: string;
+      feeClearanceWaivedAt: Date | null;
+    },
+    tenantId: string,
+    client:
+      | Pick<PrismaService, 'invoice'>
+      | Pick<Prisma.TransactionClient, 'invoice'>,
+  ) {
+    const invoices = await client.invoice.findMany({
+      where: {
+        tenantId,
+        studentId: student.id,
+        status: { not: 'VOID' },
+      },
+      include: {
+        paymentAllocations: true,
+        payments: {
+          include: { refunds: true },
         },
-        data: {
-          status: input.enrollmentStatus,
-          effectiveUntil: input.effectiveUntil,
-        },
-      });
-
-      await tx.studentLifecycleTransition.create({
-        data: {
-          tenantId: input.actor.tenantId,
-          studentId: input.student.id,
-          fromStatus: input.student.lifecycleStatus,
-          toStatus: input.toStatus,
-          reason: input.reason,
-          changedById: input.actor.userId,
-          feeClearanceWaived: input.feeClearanceWaived ?? false,
-          metadata: input.metadata as Prisma.InputJsonValue,
-        },
-      });
-
-      await this.auditService.record(
-        {
-          action: input.auditAction,
-          resource: 'student',
-          tenantId: input.actor.tenantId,
-          userId: input.actor.userId,
-          resourceId: input.student.id,
-          before: { lifecycleStatus: input.student.lifecycleStatus },
-          after: input.auditAfter,
-        },
-        tx,
-      );
+      },
+      orderBy: [{ issuedAt: 'desc' }],
     });
+
+    const invoiceSummaries = invoices.map((invoice) => {
+      const paidAmount = sumInvoiceAllocationAmount(
+        invoice.paymentAllocations,
+        invoice.payments,
+      );
+      const outstandingAmount = invoice.totalAmount.sub(paidAmount);
+
+      return {
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        status: invoice.status,
+        totalAmount: Number(invoice.totalAmount),
+        paidAmount: Number(paidAmount),
+        outstandingAmount: Number(
+          outstandingAmount.gt(0) ? outstandingAmount : new Prisma.Decimal(0),
+        ),
+        dueDate: invoice.dueDate,
+      };
+    });
+    const outstandingAmount = invoiceSummaries.reduce(
+      (sum, invoice) => sum + invoice.outstandingAmount,
+      0,
+    );
+
+    return {
+      studentId: student.id,
+      studentSystemId: student.studentSystemId,
+      cleared: outstandingAmount <= 0 || Boolean(student.feeClearanceWaivedAt),
+      outstandingAmount,
+      waivedAt: student.feeClearanceWaivedAt,
+      invoices: invoiceSummaries,
+    };
   }
 
   private async generateStudentSystemId(actor: AuthContext) {
@@ -7339,6 +7413,15 @@ function isPrismaUniqueConstraintError(error: unknown) {
     typeof error === 'object' &&
     'code' in error &&
     error.code === 'P2002'
+  );
+}
+
+function isPrismaTransactionConflictError(error: unknown) {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === 'P2034'
   );
 }
 

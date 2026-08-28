@@ -91,6 +91,11 @@ import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
 import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
 import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { resolveCashAccountCode } from './finance.defaults';
+import {
+  sumInvoiceAllocationAmount,
+  sumNetPaidAmount,
+  sumRefundedAmount,
+} from './payment-allocation-totals';
 import { ReprintReceiptDto } from './dto/reprint-receipt.dto';
 import { ReversePaymentDto } from './dto/reverse-payment.dto';
 import { ReallocatePaymentDto } from './dto/reallocate-payment.dto';
@@ -12212,52 +12217,6 @@ function serializeFinanceApprovalRequest<
         }
       : {}),
   };
-}
-
-function sumRefundedAmount(refunds: Array<{ amount: Prisma.Decimal }>) {
-  return refunds.reduce(
-    (sum, refund) => sum.add(refund.amount),
-    new Prisma.Decimal(0),
-  );
-}
-
-function sumNetPaidAmount(
-  payments: Array<{
-    amount: Prisma.Decimal;
-    status?: PaymentStatus;
-    refunds?: Array<{ amount: Prisma.Decimal }>;
-  }>,
-) {
-  return payments.reduce((sum, p) => {
-    if (p.status === PaymentStatus.REVERSED) return sum;
-    return sum.add(p.amount).sub(sumRefundedAmount(p.refunds ?? []));
-  }, new Prisma.Decimal(0));
-}
-
-function sumInvoiceAllocationAmount(
-  allocations:
-    | Array<{
-        amount: Prisma.Decimal;
-        reversedAt?: Date | null;
-      }>
-    | undefined,
-  legacyPayments: Array<{
-    amount: Prisma.Decimal;
-    status?: PaymentStatus;
-    refunds?: Array<{ amount: Prisma.Decimal }>;
-  }>,
-) {
-  if (
-    allocations !== undefined &&
-    (allocations.length > 0 || legacyPayments.length === 0)
-  ) {
-    return allocations.reduce(
-      (sum, allocation) =>
-        allocation.reversedAt ? sum : sum.add(allocation.amount),
-      new Prisma.Decimal(0),
-    );
-  }
-  return sumNetPaidAmount(legacyPayments);
 }
 
 function allocateCorrectionAcrossPaymentAllocations(

@@ -763,7 +763,30 @@ describe('students lifecycle hardening', () => {
       actor,
     );
 
-    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
+    expect(prisma.transaction.student.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: student.id,
+        tenantId: actor.tenantId,
+      },
+      select: {
+        id: true,
+        studentSystemId: true,
+        lifecycleStatus: true,
+        feeClearanceWaivedAt: true,
+      },
+    });
+    expect(prisma.transaction.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: actor.tenantId,
+          studentId: student.id,
+          status: { not: 'VOID' },
+        },
+      }),
+    );
     expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith({
       where: {
         id: student.id,
@@ -800,6 +823,13 @@ describe('students lifecycle hardening', () => {
         reason: 'Family relocation',
         changedById: actor.userId,
         feeClearanceWaived: false,
+        metadata: expect.objectContaining({
+          feeClearance: expect.objectContaining({
+            clearedBeforeDecision: true,
+            outstandingAmountAtDecision: 0,
+            waiverGranted: false,
+          }),
+        }),
       }),
     });
     expect(prisma.studentLifecycleTransition.create).not.toHaveBeenCalled();
@@ -3710,6 +3740,54 @@ describe('students lifecycle hardening', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('uses active payment allocations instead of legacy invoice links for clearance', async () => {
+    const student = buildStudent({
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      invoiceFindManyQueue: [
+        [
+          {
+            id: 'invoice-allocated-1',
+            invoiceNumber: 'INV-ALLOCATED-1',
+            status: 'ISSUED',
+            totalAmount: new Prisma.Decimal(1000),
+            dueDate: new Date('2026-05-01T00:00:00.000Z'),
+            paymentAllocations: [
+              { amount: new Prisma.Decimal(600), reversedAt: null },
+              {
+                amount: new Prisma.Decimal(400),
+                reversedAt: new Date('2026-08-28T00:00:00.000Z'),
+              },
+            ],
+            payments: [
+              {
+                amount: new Prisma.Decimal(1000),
+                status: 'SUCCESS',
+                refunds: [],
+              },
+            ],
+          },
+        ],
+      ],
+    });
+    const { service } = buildService(prisma);
+
+    const clearance = await service.getFeeClearance(student.id, actor);
+
+    expect(clearance.cleared).toBe(false);
+    expect(clearance.outstandingAmount).toBe(400);
+    expect(prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: {
+          paymentAllocations: true,
+          payments: { include: { refunds: true } },
+        },
+      }),
+    );
+  });
+
   it('requires finance-adjust authority before accepting a fee-clearance waiver', async () => {
     const prisma = buildPrisma({
       studentFindFirstQueue: [
@@ -3730,6 +3808,124 @@ describe('students lifecycle hardening', () => {
 
     expect(prisma.student.findFirst).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('grants a finance-authorized clearance waiver from transactional fee truth', async () => {
+    const student = buildStudent({
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+    });
+    const invoice = {
+      id: 'invoice-waiver-1',
+      invoiceNumber: 'INV-WAIVER-1',
+      status: 'ISSUED',
+      totalAmount: new Prisma.Decimal(1500),
+      dueDate: new Date('2026-05-01T00:00:00.000Z'),
+      payments: [],
+    };
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      invoiceFindManyQueue: [[invoice], []],
+      transactionInvoiceFindManyResult: [invoice],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await service.requestTransfer(
+      student.id,
+      { reason: 'Approved relocation exception', waiveFeeClearance: true },
+      { ...actor, permissions: [...actor.permissions, 'fees:adjust'] },
+    );
+
+    expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          feeClearanceWaivedAt: expect.any(Date),
+          feeClearanceWaivedById: actor.userId,
+        }),
+      }),
+    );
+    expect(
+      prisma.transaction.studentLifecycleTransition.create,
+    ).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        feeClearanceWaived: true,
+        metadata: expect.objectContaining({
+          feeClearance: expect.objectContaining({
+            clearedBeforeDecision: false,
+            outstandingAmountAtDecision: 1500,
+            waiverGranted: true,
+          }),
+        }),
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'transfer_with_fee_waiver',
+        after: expect.objectContaining({
+          feeClearance: expect.objectContaining({
+            outstandingAmountAtDecision: 1500,
+            waiverGranted: true,
+          }),
+        }),
+      }),
+      prisma.transaction,
+    );
+  });
+
+  it('rejects an exit when transactional revalidation finds new debt', async () => {
+    const student = buildStudent({
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      invoiceFindManyQueue: [[]],
+      transactionInvoiceFindManyResult: [
+        {
+          id: 'invoice-concurrent-1',
+          invoiceNumber: 'INV-CONCURRENT-1',
+          status: 'ISSUED',
+          totalAmount: new Prisma.Decimal(750),
+          dueDate: new Date('2026-05-01T00:00:00.000Z'),
+          payments: [],
+        },
+      ],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.archiveStudent(
+        student.id,
+        { reason: 'Guardian-requested withdrawal' },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Fee clearance is required before student exit or archive',
+    );
+
+    expect(prisma.transaction.student.updateMany).not.toHaveBeenCalled();
+    expect(prisma.transaction.enrollment.updateMany).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('maps serializable lifecycle conflicts to a bounded retry response', async () => {
+    const student = buildStudent({
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      invoiceFindManyQueue: [[]],
+    });
+    prisma.$transaction.mockRejectedValueOnce({ code: 'P2034' });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.archiveStudent(
+        student.id,
+        { reason: 'Guardian-requested withdrawal' },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Student or fee-clearance state changed while this action was being finalized',
+    );
   });
 
   it('requires fee clearance before exiting or archiving an active student', async () => {
@@ -4383,6 +4579,7 @@ function buildPrisma(options: {
   studentGuardianFindManyResult?: unknown[];
   studentDocumentFindFirstQueue?: unknown[];
   invoiceFindManyQueue?: unknown[];
+  transactionInvoiceFindManyResult?: unknown[];
   classFindFirstResult?: unknown;
   sectionFindFirstResult?: unknown;
   enrollmentFindFirstResult?: unknown;
@@ -4475,6 +4672,9 @@ function buildPrisma(options: {
       create: jest.fn().mockResolvedValue({ id: 'doc-created' }),
     },
     invoice: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.transactionInvoiceFindManyResult ?? []),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     payment: {
