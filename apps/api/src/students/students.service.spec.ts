@@ -3881,6 +3881,7 @@ describe('students lifecycle hardening', () => {
       documentNumber: '12-34-56',
       evidenceDocumentId: evidenceDocument.id,
       createdAt: new Date('2026-04-27T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-27T00:00:00.000Z'),
       reviewedAt: null,
     };
     const reviewedVerification = {
@@ -3891,11 +3892,9 @@ describe('students lifecycle hardening', () => {
       reviewNote: 'Document matches guardian profile',
     };
     const prisma = buildPrisma({
-      guardianFindFirstQueue: [guardian, guardian],
       studentDocumentFindFirstQueue: [evidenceDocument],
       guardianIdentityVerificationCreateResult: createdVerification,
       guardianIdentityVerificationFindFirstQueue: [createdVerification],
-      transactionGuardianIdentityVerificationUpdateResult: reviewedVerification,
     });
     const { service, auditService } = buildService(prisma);
 
@@ -3927,7 +3926,20 @@ describe('students lifecycle hardening', () => {
     );
     expect(created).not.toHaveProperty('documentNumber');
     expect(created).not.toHaveProperty('evidenceDocumentId');
-    expect(prisma.guardianIdentityVerification.create).toHaveBeenCalledWith({
+    expect(prisma.$transaction).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Function),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+    expect(prisma.$transaction).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Function),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+    expect(prisma.guardianIdentityVerification.create).not.toHaveBeenCalled();
+    expect(
+      prisma.transaction.guardianIdentityVerification.create,
+    ).toHaveBeenCalledWith({
       data: {
         tenantId: actor.tenantId,
         guardianId: guardian.id,
@@ -3937,6 +3949,39 @@ describe('students lifecycle hardening', () => {
         evidenceDocumentId: evidenceDocument.id,
         notes: null,
         submittedById: actor.userId,
+      },
+    });
+    expect(prisma.transaction.studentDocument.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: evidenceDocument.id,
+        tenantId: actor.tenantId,
+        status: { in: ['ACTIVE', 'VERIFIED'] },
+        student: {
+          guardianLinks: {
+            some: {
+              tenantId: actor.tenantId,
+              guardianId: guardian.id,
+            },
+          },
+        },
+      },
+      select: { id: true },
+    });
+    expect(
+      prisma.transaction.guardianIdentityVerification.updateMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: createdVerification.id,
+        tenantId: actor.tenantId,
+        guardianId: guardian.id,
+        status: 'PENDING',
+        updatedAt: createdVerification.updatedAt,
+      },
+      data: {
+        status: 'VERIFIED',
+        reviewedById: actor.userId,
+        reviewedAt: expect.any(Date),
+        reviewNote: 'Document matches guardian profile',
       },
     });
     expect(
@@ -3962,8 +4007,189 @@ describe('students lifecycle hardening', () => {
         resource: 'guardian_identity_verification',
         resourceId: reviewedVerification.id,
       }),
+      prisma.transaction,
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'create',
+        resource: 'guardian_identity_verification',
+        resourceId: createdVerification.id,
+      }),
+      prisma.transaction,
     );
   });
+
+  it('rejects identity evidence that is not attached to a linked student', async () => {
+    const prisma = buildPrisma({
+      studentDocumentFindFirstQueue: [null],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.createGuardianIdentityVerification(
+        'guardian-1',
+        {
+          documentType: 'citizenship',
+          evidenceDocumentId: 'unrelated-document-1',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Evidence document was not found for a student linked to this guardian',
+    );
+
+    expect(
+      prisma.transaction.guardianIdentityVerification.create,
+    ).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rolls back guardian identity verification creation when audit append fails', async () => {
+    const createdVerification = {
+      id: 'verification-1',
+      tenantId: actor.tenantId,
+      guardianId: 'guardian-1',
+      status: 'PENDING',
+      documentType: 'citizenship',
+      documentNumber: '12-34-56',
+      evidenceDocumentId: null,
+      createdAt: new Date('2026-04-27T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-27T00:00:00.000Z'),
+      reviewedAt: null,
+    };
+    const prisma = buildPrisma({
+      guardianIdentityVerificationCreateResult: createdVerification,
+    });
+    const { service, auditService } = buildService(prisma);
+    auditService.record.mockRejectedValueOnce(
+      new Error('identity audit unavailable'),
+    );
+
+    await expect(
+      service.createGuardianIdentityVerification(
+        'guardian-1',
+        {
+          documentType: 'citizenship',
+          documentNumber: '12-34-56',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('identity audit unavailable');
+
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceId: createdVerification.id }),
+      prisma.transaction,
+    );
+  });
+
+  it('rejects a stale guardian identity review before audit', async () => {
+    const verification = {
+      id: 'verification-1',
+      tenantId: actor.tenantId,
+      guardianId: 'guardian-1',
+      status: 'PENDING',
+      documentType: 'citizenship',
+      documentNumber: '12-34-56',
+      evidenceDocumentId: null,
+      createdAt: new Date('2026-04-27T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-27T00:00:00.000Z'),
+      reviewedAt: null,
+    };
+    const prisma = buildPrisma({
+      guardianIdentityVerificationFindFirstQueue: [verification],
+      transactionGuardianIdentityVerificationUpdateManyCount: 0,
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.reviewGuardianIdentityVerification(
+        verification.guardianId,
+        verification.id,
+        {
+          status: 'VERIFIED',
+          reviewNote: 'Document matches guardian profile',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Guardian identity verification changed before this review was finalized',
+    );
+
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rolls back a guardian identity review when audit append fails', async () => {
+    const verification = {
+      id: 'verification-1',
+      tenantId: actor.tenantId,
+      guardianId: 'guardian-1',
+      status: 'PENDING',
+      documentType: 'citizenship',
+      documentNumber: '12-34-56',
+      evidenceDocumentId: null,
+      createdAt: new Date('2026-04-27T00:00:00.000Z'),
+      updatedAt: new Date('2026-04-27T00:00:00.000Z'),
+      reviewedAt: null,
+    };
+    const prisma = buildPrisma({
+      guardianIdentityVerificationFindFirstQueue: [verification],
+    });
+    const { service, auditService } = buildService(prisma);
+    auditService.record.mockRejectedValueOnce(
+      new Error('identity review audit unavailable'),
+    );
+
+    await expect(
+      service.reviewGuardianIdentityVerification(
+        verification.guardianId,
+        verification.id,
+        {
+          status: 'VERIFIED',
+          reviewNote: 'Document matches guardian profile',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('identity review audit unavailable');
+
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceId: verification.id }),
+      prisma.transaction,
+    );
+  });
+
+  it.each([
+    ['create', 'Guardian identity evidence changed'],
+    ['review', 'Guardian identity verification changed'],
+  ])(
+    'maps identity %s serialization conflicts to a bounded retry response',
+    async (operation, message) => {
+      const prisma = buildPrisma({});
+      prisma.$transaction.mockRejectedValueOnce({ code: 'P2034' });
+      const { service } = buildService(prisma);
+
+      const action =
+        operation === 'create'
+          ? service.createGuardianIdentityVerification(
+              'guardian-1',
+              {
+                documentType: 'citizenship',
+                documentNumber: '12-34-56',
+              },
+              actor,
+            )
+          : service.reviewGuardianIdentityVerification(
+              'guardian-1',
+              'verification-1',
+              {
+                status: 'VERIFIED',
+                reviewNote: 'Document matches guardian profile',
+              },
+              actor,
+            );
+
+      await expect(action).rejects.toThrow(message);
+    },
+  );
 
   it('requires fee clearance before transfer when no waiver is provided', async () => {
     const student = buildStudent({
@@ -4842,7 +5068,7 @@ function buildPrisma(options: {
   guardianIdentityVerificationFindManyResult?: unknown[];
   guardianIdentityVerificationFindFirstQueue?: unknown[];
   activityPostFindManyResult?: unknown[];
-  transactionGuardianIdentityVerificationUpdateResult?: unknown;
+  transactionGuardianIdentityVerificationUpdateManyCount?: number;
   transactionStudentUpdateResult?: unknown;
   transactionStudentUpdateManyCount?: number;
   attendanceRecordFindManyResult?: unknown[];
@@ -4922,6 +5148,19 @@ function buildPrisma(options: {
       }),
     },
     studentDocument: {
+      findFirst: jest.fn().mockImplementation(async () => {
+        const queue = options.studentDocumentFindFirstQueue ?? [];
+
+        if (queue.length === 0) {
+          return null;
+        }
+
+        if (queue.length === 1) {
+          return queue[0];
+        }
+
+        return queue.shift();
+      }),
       findMany: jest.fn().mockResolvedValue([]),
       updateMany: jest.fn().mockResolvedValue({ count: 2 }),
     },
@@ -4981,12 +5220,26 @@ function buildPrisma(options: {
       update: jest.fn().mockResolvedValue({ id: 'export-1' }),
     },
     guardianIdentityVerification: {
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      update: jest
+      create: jest
         .fn()
-        .mockResolvedValue(
-          options.transactionGuardianIdentityVerificationUpdateResult ?? null,
-        ),
+        .mockResolvedValue(options.guardianIdentityVerificationCreateResult),
+      findFirst: jest.fn().mockImplementation(async () => {
+        const queue = options.guardianIdentityVerificationFindFirstQueue ?? [];
+
+        if (queue.length === 0) {
+          return null;
+        }
+
+        if (queue.length === 1) {
+          return queue[0];
+        }
+
+        return queue.shift();
+      }),
+      updateMany: jest.fn().mockResolvedValue({
+        count:
+          options.transactionGuardianIdentityVerificationUpdateManyCount ?? 1,
+      }),
     },
     attendanceCorrectionRequest: {
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),

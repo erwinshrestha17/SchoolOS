@@ -3653,41 +3653,94 @@ export class StudentsService {
     dto: CreateGuardianIdentityVerificationDto,
     actor: AuthContext,
   ) {
-    await this.findTenantGuardian(guardianId, actor);
-    await this.ensureGuardianEvidenceDocument(dto.evidenceDocumentId, actor);
-
     if (!dto.documentNumber && !dto.evidenceDocumentId) {
       throw new BadRequestException(
         'Guardian identity verification requires a document number or evidence document',
       );
     }
 
-    const verification = await this.prisma.guardianIdentityVerification.create({
-      data: {
-        tenantId: actor.tenantId,
-        guardianId,
-        status: 'PENDING',
-        documentType: dto.documentType,
-        documentNumber: dto.documentNumber ?? null,
-        evidenceDocumentId: dto.evidenceDocumentId ?? null,
-        notes: dto.notes ?? null,
-        submittedById: actor.userId,
-      },
-    });
+    let verification: Awaited<
+      ReturnType<
+        Prisma.TransactionClient['guardianIdentityVerification']['create']
+      >
+    >;
+    try {
+      verification = await this.prisma.$transaction(
+        async (tx) => {
+          const guardian = await tx.guardian.findFirst({
+            where: { id: guardianId, tenantId: actor.tenantId },
+            select: { id: true },
+          });
+          if (!guardian) {
+            throw new NotFoundException('Guardian not found in this tenant');
+          }
 
-    await this.auditService.record({
-      action: 'create',
-      resource: 'guardian_identity_verification',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: verification.id,
-      after: {
-        guardianId,
-        status: verification.status,
-        documentType: verification.documentType,
-        evidenceDocumentId: verification.evidenceDocumentId,
-      },
-    });
+          if (dto.evidenceDocumentId) {
+            const evidenceDocument = await tx.studentDocument.findFirst({
+              where: {
+                id: dto.evidenceDocumentId,
+                tenantId: actor.tenantId,
+                status: { in: ['ACTIVE', 'VERIFIED'] },
+                student: {
+                  guardianLinks: {
+                    some: {
+                      tenantId: actor.tenantId,
+                      guardianId,
+                    },
+                  },
+                },
+              },
+              select: { id: true },
+            });
+            if (!evidenceDocument) {
+              throw new NotFoundException(
+                'Evidence document was not found for a student linked to this guardian in this tenant',
+              );
+            }
+          }
+
+          const created = await tx.guardianIdentityVerification.create({
+            data: {
+              tenantId: actor.tenantId,
+              guardianId,
+              status: 'PENDING',
+              documentType: dto.documentType,
+              documentNumber: dto.documentNumber ?? null,
+              evidenceDocumentId: dto.evidenceDocumentId ?? null,
+              notes: dto.notes ?? null,
+              submittedById: actor.userId,
+            },
+          });
+
+          await this.auditService.record(
+            {
+              action: 'create',
+              resource: 'guardian_identity_verification',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: created.id,
+              after: {
+                guardianId,
+                status: created.status,
+                documentType: created.documentType,
+                evidenceDocumentId: created.evidenceDocumentId,
+              },
+            },
+            tx,
+          );
+
+          return created;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (isPrismaTransactionConflictError(error)) {
+        throw new ConflictException(
+          'Guardian identity evidence changed while this verification was being created. Refresh and retry.',
+        );
+      }
+      throw error;
+    }
 
     return guardianIdentityVerificationSummary(verification);
   }
@@ -3698,75 +3751,119 @@ export class StudentsService {
     dto: ReviewGuardianIdentityVerificationDto,
     actor: AuthContext,
   ) {
-    await this.findTenantGuardian(guardianId, actor);
-    const verification =
-      await this.prisma.guardianIdentityVerification.findFirst({
-        where: {
-          id: verificationId,
-          tenantId: actor.tenantId,
-          guardianId,
-        },
-      });
-
-    if (!verification) {
-      throw new NotFoundException(
-        'Guardian identity verification not found in this tenant',
-      );
-    }
-
-    if (verification.status !== 'PENDING') {
-      throw new ConflictException(
-        'Only pending guardian identity verifications can be reviewed',
-      );
-    }
-
     const reviewedAt = new Date();
-    const updated = await this.prisma.$transaction(async (tx) => {
-      if (dto.status === 'VERIFIED') {
-        await tx.guardianIdentityVerification.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            guardianId,
-            status: 'VERIFIED',
-            id: { not: verification.id },
-          },
-          data: {
-            status: 'REVOKED',
+    let updated: Awaited<
+      ReturnType<
+        Prisma.TransactionClient['guardianIdentityVerification']['findFirstOrThrow']
+      >
+    >;
+    try {
+      updated = await this.prisma.$transaction(
+        async (tx) => {
+          const guardian = await tx.guardian.findFirst({
+            where: { id: guardianId, tenantId: actor.tenantId },
+            select: { id: true },
+          });
+          if (!guardian) {
+            throw new NotFoundException('Guardian not found in this tenant');
+          }
+
+          const verification = await tx.guardianIdentityVerification.findFirst({
+            where: {
+              id: verificationId,
+              tenantId: actor.tenantId,
+              guardianId,
+            },
+          });
+          if (!verification) {
+            throw new NotFoundException(
+              'Guardian identity verification not found in this tenant',
+            );
+          }
+          if (verification.status !== 'PENDING') {
+            throw new ConflictException(
+              'Only pending guardian identity verifications can be reviewed',
+            );
+          }
+
+          const claimed = await tx.guardianIdentityVerification.updateMany({
+            where: {
+              id: verification.id,
+              tenantId: actor.tenantId,
+              guardianId,
+              status: 'PENDING',
+              updatedAt: verification.updatedAt,
+            },
+            data: {
+              status: dto.status,
+              reviewedById: actor.userId,
+              reviewedAt,
+              reviewNote: dto.reviewNote ?? null,
+            },
+          });
+          if (claimed.count !== 1) {
+            throw new ConflictException(
+              'Guardian identity verification changed before this review was finalized. Refresh and retry.',
+            );
+          }
+
+          if (dto.status === 'VERIFIED') {
+            await tx.guardianIdentityVerification.updateMany({
+              where: {
+                tenantId: actor.tenantId,
+                guardianId,
+                status: 'VERIFIED',
+                id: { not: verification.id },
+              },
+              data: {
+                status: 'REVOKED',
+                reviewedById: actor.userId,
+                reviewedAt,
+                reviewNote:
+                  'Automatically revoked because a newer verification was approved.',
+              },
+            });
+          }
+
+          const reviewed = {
+            ...verification,
+            status: dto.status,
             reviewedById: actor.userId,
             reviewedAt,
-            reviewNote:
-              'Automatically revoked because a newer verification was approved.',
-          },
-        });
-      }
+            reviewNote: dto.reviewNote ?? null,
+          };
+          await this.auditService.record(
+            {
+              action: 'review',
+              resource: 'guardian_identity_verification',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: reviewed.id,
+              before: {
+                status: verification.status,
+              },
+              after: {
+                guardianId,
+                status: reviewed.status,
+                reviewedAt: reviewed.reviewedAt,
+                reviewNote: reviewed.reviewNote,
+              },
+            },
+            tx,
+          );
 
-      return tx.guardianIdentityVerification.update({
-        where: { id: verification.id },
-        data: {
-          status: dto.status,
-          reviewedById: actor.userId,
-          reviewedAt,
-          reviewNote: dto.reviewNote ?? null,
+          return reviewed;
         },
-      });
-    });
-
-    await this.auditService.record({
-      action: 'review',
-      resource: 'guardian_identity_verification',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      before: {
-        status: verification.status,
-      },
-      after: {
-        guardianId,
-        status: updated.status,
-        reviewedAt: updated.reviewedAt,
-        reviewNote: updated.reviewNote,
-      },
-    });
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (isPrismaTransactionConflictError(error)) {
+        throw new ConflictException(
+          'Guardian identity verification changed before this review was finalized. Refresh and retry.',
+        );
+      }
+      throw error;
+    }
 
     return guardianIdentityVerificationSummary(updated);
   }
@@ -5987,30 +6084,6 @@ export class StudentsService {
         }
       }
     }
-  }
-
-  private async ensureGuardianEvidenceDocument(
-    evidenceDocumentId: string | undefined,
-    actor: AuthContext,
-  ) {
-    if (!evidenceDocumentId) {
-      return null;
-    }
-
-    const document = await this.prisma.studentDocument.findFirst({
-      where: {
-        id: evidenceDocumentId,
-        tenantId: actor.tenantId,
-      },
-    });
-
-    if (!document) {
-      throw new NotFoundException(
-        'Evidence document was not found in this tenant',
-      );
-    }
-
-    return document;
   }
 
   private assertSensitiveStudentReadAllowed(
