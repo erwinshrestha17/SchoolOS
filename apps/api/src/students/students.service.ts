@@ -4646,7 +4646,7 @@ export class StudentsService {
 
   async getStudentIdentity(studentId: string, actor: AuthContext) {
     this.assertSensitiveStudentReadAllowed(actor, 'Student credentials');
-    const student = await this.findTenantStudent(studentId, actor);
+    const student = await this.findActiveTenantStudent(studentId, actor);
 
     let identity = await this.prisma.studentIdentity.findFirst({
       where: {
@@ -4670,52 +4670,82 @@ export class StudentsService {
   }
 
   async generateStudentIdentity(studentId: string, actor: AuthContext) {
-    const student = await this.findTenantStudent(studentId, actor);
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const student = await this.findActiveTenantStudent(
+            studentId,
+            actor,
+            tx,
+          );
+          const issuedAt = new Date();
+          await tx.studentIdentity.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: student.id,
+              status: 'ACTIVE',
+            },
+            data: {
+              status: 'REVOKED',
+              revokedAt: issuedAt,
+              revokedById: actor.userId,
+            },
+          });
 
-    // Revoke old identities
-    await this.prisma.studentIdentity.updateMany({
-      where: {
-        tenantId: actor.tenantId,
-        studentId: student.id,
-        status: 'ACTIVE',
-      },
-      data: {
-        status: 'REVOKED',
-        revokedAt: new Date(),
-        revokedById: actor.userId,
-      },
-    });
+          const identityCode =
+            `ST-${actor.tenantId.slice(0, 4)}-${student.studentSystemId}-${createHash('sha256').update(`${student.id}-${issuedAt.getTime()}`).digest('hex').slice(0, 8)}`.toUpperCase();
+          const identity = await tx.studentIdentity.create({
+            data: {
+              tenantId: actor.tenantId,
+              studentId: student.id,
+              identityCode,
+              status: 'ACTIVE',
+            },
+          });
+          const claimed = await tx.student.updateMany({
+            where: {
+              id: student.id,
+              tenantId: actor.tenantId,
+              lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+            },
+            data: { studentIdentityCode: identityCode },
+          });
+          if (claimed.count !== 1) {
+            throw new ConflictException(
+              'Student lifecycle changed while the identity was being issued. Refresh and retry.',
+            );
+          }
 
-    const identityCode =
-      `ST-${actor.tenantId.slice(0, 4)}-${student.studentSystemId}-${createHash('sha256').update(`${student.id}-${Date.now()}`).digest('hex').slice(0, 8)}`.toUpperCase();
+          await this.auditService.record(
+            {
+              action: 'generate_identity',
+              resource: 'student_identity',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: identity.id,
+              after: {
+                studentId: student.id,
+                identityCode,
+              },
+            },
+            tx,
+          );
 
-    const identity = await this.prisma.studentIdentity.create({
-      data: {
-        tenantId: actor.tenantId,
-        studentId: student.id,
-        identityCode,
-        status: 'ACTIVE',
-      },
-    });
-
-    await this.prisma.student.update({
-      where: { id: student.id },
-      data: { studentIdentityCode: identityCode },
-    });
-
-    await this.auditService.record({
-      action: 'generate_identity',
-      resource: 'student_identity',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: identity.id,
-      after: {
-        studentId: student.id,
-        identityCode,
-      },
-    });
-
-    return identity;
+          return identity;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        isPrismaUniqueConstraintError(error) ||
+        isPrismaTransactionConflictError(error)
+      ) {
+        throw new ConflictException(
+          'Student identity issuance conflicted with another update. Refresh and retry.',
+        );
+      }
+      throw error;
+    }
   }
 
   async revokeStudentIdentity(
@@ -4846,25 +4876,59 @@ export class StudentsService {
   }
 
   async generateStudentQrCode(studentId: string, actor: AuthContext) {
-    const student = await this.findTenantStudent(studentId, actor);
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const student = await this.findActiveTenantStudent(
+            studentId,
+            actor,
+            tx,
+          );
+          const qrData = `schoolos:std:${actor.tenantId}:${student.studentSystemId}:${Date.now()}`;
+          const updated = await tx.student.updateMany({
+            where: {
+              id: student.id,
+              tenantId: actor.tenantId,
+              lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+            },
+            data: { qrCode: qrData },
+          });
+          if (updated.count !== 1) {
+            throw new ConflictException(
+              'Student lifecycle changed while the QR code was being issued. Refresh and retry.',
+            );
+          }
 
-    const qrData = `schoolos:std:${actor.tenantId}:${student.studentSystemId}:${Date.now()}`;
+          await this.auditService.record(
+            {
+              action: 'generate_qr',
+              resource: 'student',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: student.id,
+              after: {
+                studentId: student.id,
+                credentialGenerated: true,
+              },
+            },
+            tx,
+          );
 
-    const updated = await this.prisma.student.update({
-      where: { id: student.id },
-      data: { qrCode: qrData },
-    });
-
-    await this.auditService.record({
-      action: 'generate_qr',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: student.id,
-      after: { qrCode: qrData },
-    });
-
-    return { qrCode: updated.qrCode };
+          return { qrCode: qrData };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        isPrismaUniqueConstraintError(error) ||
+        isPrismaTransactionConflictError(error)
+      ) {
+        throw new ConflictException(
+          'Student QR issuance conflicted with another update. Refresh and retry.',
+        );
+      }
+      throw error;
+    }
   }
 
   async verifyStudentQrCode(qrCode: string, actor: AuthContext) {
@@ -4872,6 +4936,7 @@ export class StudentsService {
       where: {
         tenantId: actor.tenantId,
         qrCode,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
       },
       include: {
         class: true,
@@ -6283,6 +6348,27 @@ export class StudentsService {
 
     if (!student) {
       throw new NotFoundException('Student not found in this tenant');
+    }
+
+    return student;
+  }
+
+  private async findActiveTenantStudent(
+    studentId: string,
+    actor: AuthContext,
+    client: Pick<PrismaService, 'student'> | Prisma.TransactionClient = this
+      .prisma,
+  ) {
+    const student = await client.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Active student not found in this tenant');
     }
 
     return student;

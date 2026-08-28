@@ -4234,6 +4234,183 @@ describe('students lifecycle hardening', () => {
     expect(prisma.student.findFirst).not.toHaveBeenCalled();
   });
 
+  it('issues a student identity only for an active tenant student and audits atomically', async () => {
+    const student = buildStudent();
+    const prisma = buildPrisma({ studentFindFirstQueue: [student] });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.generateStudentIdentity(student.id, actor),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'student-identity-created',
+        status: 'ACTIVE',
+      }),
+    );
+
+    expect(prisma.transaction.student.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: student.id,
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+    });
+    expect(prisma.transaction.studentIdentity.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        status: 'ACTIVE',
+      },
+      data: {
+        status: 'REVOKED',
+        revokedAt: expect.any(Date) as Date,
+        revokedById: actor.userId,
+      },
+    });
+    const identityCodePattern = /^ST-TENA-SCH-2026-0001-[A-F0-9]{8}$/;
+    expect(prisma.transaction.studentIdentity.create).toHaveBeenCalledWith({
+      data: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        identityCode: expect.stringMatching(identityCodePattern) as string,
+        status: 'ACTIVE',
+      },
+    });
+    expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: student.id,
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+      data: {
+        studentIdentityCode: expect.stringMatching(
+          identityCodePattern,
+        ) as string,
+      },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'generate_identity',
+        resourceId: 'student-identity-created',
+      }),
+      prisma.transaction,
+    );
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
+  });
+
+  it('does not issue identity or legacy QR credentials for an inactive student', async () => {
+    const prisma = buildPrisma({ studentFindFirstQueue: [null] });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.generateStudentIdentity('merged-student', actor),
+    ).rejects.toThrow('Active student not found in this tenant');
+    expect(
+      prisma.transaction.studentIdentity.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(prisma.transaction.studentIdentity.create).not.toHaveBeenCalled();
+
+    await expect(
+      service.generateStudentQrCode('merged-student', actor),
+    ).rejects.toThrow('Active student not found in this tenant');
+    expect(prisma.transaction.student.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('issues a legacy QR credential with active lifecycle revalidation and atomic audit', async () => {
+    const student = buildStudent();
+    const prisma = buildPrisma({ studentFindFirstQueue: [student] });
+    const { service, auditService } = buildService(prisma);
+
+    const result = await service.generateStudentQrCode(student.id, actor);
+
+    expect(result.qrCode).toMatch(/^schoolos:std:tenant-1:SCH-2026-0001:\d+$/);
+    expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: student.id,
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+      data: { qrCode: result.qrCode },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'generate_qr',
+        resource: 'student',
+        resourceId: student.id,
+        after: {
+          studentId: student.id,
+          credentialGenerated: true,
+        },
+      }),
+      prisma.transaction,
+    );
+  });
+
+  it('keeps identity issuance and its audit append in one rollback boundary', async () => {
+    const student = buildStudent();
+    const prisma = buildPrisma({ studentFindFirstQueue: [student] });
+    const { service, auditService } = buildService(prisma);
+    auditService.record.mockRejectedValueOnce(
+      new Error('student identity audit unavailable'),
+    );
+
+    await expect(
+      service.generateStudentIdentity(student.id, actor),
+    ).rejects.toThrow('student identity audit unavailable');
+
+    expect(prisma.transaction.studentIdentity.create).toHaveBeenCalled();
+    expect(prisma.transaction.student.updateMany).toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'generate_identity' }),
+      prisma.transaction,
+    );
+  });
+
+  it('maps credential issuance serialization conflicts to bounded retry responses', async () => {
+    const prisma = buildPrisma({});
+    prisma.$transaction
+      .mockRejectedValueOnce({ code: 'P2034' })
+      .mockRejectedValueOnce({ code: 'P2034' });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.generateStudentIdentity('student-1', actor),
+    ).rejects.toThrow(
+      'Student identity issuance conflicted with another update',
+    );
+    await expect(
+      service.generateStudentQrCode('student-1', actor),
+    ).rejects.toThrow('Student QR issuance conflicted with another update');
+  });
+
+  it('resolves only active students through the legacy QR verifier', async () => {
+    const student = buildStudent();
+    const prisma = buildPrisma({ studentFindFirstQueue: [student] });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.verifyStudentQrCode('legacy-qr-code', actor),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: student.id,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      }),
+    );
+    expect(prisma.student.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        qrCode: 'legacy-qr-code',
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+      include: {
+        class: true,
+        sectionRef: true,
+      },
+    });
+  });
+
   it('blocks revoking generated documents before retention expiry', async () => {
     const student = buildStudent();
     const prisma = buildPrisma({
@@ -5828,6 +6005,8 @@ function buildPrisma(options: {
   transactionUserUpdateManyCount?: number;
   studentFeeAssignmentFindManyQueue?: unknown[][];
   transactionStudentFeeAssignmentUpdateManyCountQueue?: number[];
+  studentIdentityFindFirstResult?: unknown;
+  transactionStudentIdentityCreateResult?: unknown;
 }) {
   const transaction = {
     enrollment: {
@@ -5891,6 +6070,19 @@ function buildPrisma(options: {
     },
     studentIdentity: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      create: jest.fn().mockResolvedValue(
+        options.transactionStudentIdentityCreateResult ?? {
+          id: 'student-identity-created',
+          tenantId: actor.tenantId,
+          studentId: 'student-1',
+          identityCode: 'ST-TENA-SCH-2026-0001-CREATED',
+          status: 'ACTIVE',
+          createdAt: new Date('2026-08-28T00:00:00.000Z'),
+          updatedAt: new Date('2026-08-28T00:00:00.000Z'),
+          revokedAt: null,
+          revokedById: null,
+        },
+      ),
     },
     studentQrCredential: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -6079,6 +6271,11 @@ function buildPrisma(options: {
       count: jest
         .fn()
         .mockResolvedValue(options.studentQrCredentialCountResult ?? 0),
+    },
+    studentIdentity: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.studentIdentityFindFirstResult ?? null),
     },
     subjectTeacherAssignment: {
       findFirst: jest
