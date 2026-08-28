@@ -4368,9 +4368,156 @@ describe('students lifecycle hardening', () => {
     );
   });
 
-  it('maps credential issuance serialization conflicts to bounded retry responses', async () => {
+  it('revokes the current student identity atomically and clears only its current code', async () => {
+    const identityCode = 'ST-TENA-SCH-2026-0001-CURRENT';
+    const student = buildStudent({ studentIdentityCode: identityCode });
+    const identity = {
+      id: 'identity-current',
+      tenantId: actor.tenantId,
+      studentId: student.id,
+      identityCode,
+      status: 'ACTIVE',
+      updatedAt: new Date('2026-08-27T00:00:00.000Z'),
+    };
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      transactionStudentIdentityFindFirstResult: identity,
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.revokeStudentIdentity(student.id, identityCode, actor),
+    ).resolves.toEqual({ success: true });
+
+    expect(prisma.transaction.studentIdentity.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: identity.id,
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        status: 'ACTIVE',
+        updatedAt: identity.updatedAt,
+      },
+      data: {
+        status: 'REVOKED',
+        revokedAt: expect.any(Date) as Date,
+        revokedById: actor.userId,
+      },
+    });
+    expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: student.id,
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        updatedAt: student.updatedAt,
+      },
+      data: { studentIdentityCode: null },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'revoke_identity',
+        resourceId: identity.id,
+        after: {
+          studentId: student.id,
+          status: 'REVOKED',
+          currentIdentityCleared: true,
+        },
+      }),
+      prisma.transaction,
+    );
+  });
+
+  it('does not clear a newer current identity when revoking another active code', async () => {
+    const student = buildStudent({
+      studentIdentityCode: 'ST-TENA-SCH-2026-0001-NEWER',
+    });
+    const identity = {
+      id: 'identity-older-active',
+      tenantId: actor.tenantId,
+      studentId: student.id,
+      identityCode: 'ST-TENA-SCH-2026-0001-OLDER',
+      status: 'ACTIVE',
+      updatedAt: new Date('2026-08-27T00:00:00.000Z'),
+    };
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      transactionStudentIdentityFindFirstResult: identity,
+    });
+    const { service } = buildService(prisma);
+
+    await service.revokeStudentIdentity(
+      student.id,
+      identity.identityCode,
+      actor,
+    );
+
+    expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { studentIdentityCode: student.studentIdentityCode },
+      }),
+    );
+  });
+
+  it('replays an already revoked identity without rewriting student or audit history', async () => {
+    const student = buildStudent({ studentIdentityCode: null });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      transactionStudentIdentityFindFirstResult: {
+        id: 'identity-revoked',
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        identityCode: 'ST-TENA-SCH-2026-0001-REVOKED',
+        status: 'REVOKED',
+        updatedAt: new Date('2026-08-27T00:00:00.000Z'),
+      },
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.revokeStudentIdentity(
+        student.id,
+        'ST-TENA-SCH-2026-0001-REVOKED',
+        actor,
+      ),
+    ).resolves.toEqual({ success: true });
+
+    expect(
+      prisma.transaction.studentIdentity.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(prisma.transaction.student.updateMany).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale identity revocation claim before student mutation or audit', async () => {
+    const identityCode = 'ST-TENA-SCH-2026-0001-STALE';
+    const student = buildStudent({ studentIdentityCode: identityCode });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      transactionStudentIdentityFindFirstResult: {
+        id: 'identity-stale',
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        identityCode,
+        status: 'ACTIVE',
+        updatedAt: new Date('2026-08-27T00:00:00.000Z'),
+      },
+      transactionStudentIdentityUpdateManyCount: 0,
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.revokeStudentIdentity(student.id, identityCode, actor),
+    ).rejects.toThrow(
+      'Student identity changed while revocation was being finalized',
+    );
+
+    expect(prisma.transaction.student.updateMany).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('maps credential mutation serialization conflicts to bounded retry responses', async () => {
     const prisma = buildPrisma({});
     prisma.$transaction
+      .mockRejectedValueOnce({ code: 'P2034' })
       .mockRejectedValueOnce({ code: 'P2034' })
       .mockRejectedValueOnce({ code: 'P2034' });
     const { service } = buildService(prisma);
@@ -4383,6 +4530,15 @@ describe('students lifecycle hardening', () => {
     await expect(
       service.generateStudentQrCode('student-1', actor),
     ).rejects.toThrow('Student QR issuance conflicted with another update');
+    await expect(
+      service.revokeStudentIdentity(
+        'student-1',
+        'ST-TENA-SCH-2026-0001-CONFLICT',
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Student identity changed while revocation was being finalized',
+    );
   });
 
   it('resolves only active students through the legacy QR verifier', async () => {
@@ -5760,6 +5916,8 @@ function buildStudent(
     admissionDate: Date;
     admissionNumber: string | null;
     lifecycleStatus: StudentLifecycleStatus;
+    studentIdentityCode: string | null;
+    updatedAt: Date;
     classId: string;
     class: { id: string; name: string };
     section: string | null;
@@ -5832,6 +5990,8 @@ function buildStudent(
       overrides.admissionDate ?? new Date('2026-04-01T00:00:00.000Z'),
     admissionNumber: overrides.admissionNumber ?? 'ADM-1',
     lifecycleStatus: overrides.lifecycleStatus ?? StudentLifecycleStatus.ACTIVE,
+    studentIdentityCode: overrides.studentIdentityCode ?? null,
+    updatedAt: overrides.updatedAt ?? new Date('2026-08-28T00:00:00.000Z'),
     classId: overrides.classId ?? 'class-1',
     class: overrides.class ?? { id: 'class-1', name: 'Grade 1' },
     section: 'section' in overrides ? overrides.section : 'A',
@@ -6007,6 +6167,8 @@ function buildPrisma(options: {
   transactionStudentFeeAssignmentUpdateManyCountQueue?: number[];
   studentIdentityFindFirstResult?: unknown;
   transactionStudentIdentityCreateResult?: unknown;
+  transactionStudentIdentityFindFirstResult?: unknown;
+  transactionStudentIdentityUpdateManyCount?: number;
 }) {
   const transaction = {
     enrollment: {
@@ -6069,7 +6231,14 @@ function buildPrisma(options: {
       ),
     },
     studentIdentity: {
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(
+          options.transactionStudentIdentityFindFirstResult ?? null,
+        ),
+      updateMany: jest.fn().mockResolvedValue({
+        count: options.transactionStudentIdentityUpdateManyCount ?? 1,
+      }),
       create: jest.fn().mockResolvedValue(
         options.transactionStudentIdentityCreateResult ?? {
           id: 'student-identity-created',

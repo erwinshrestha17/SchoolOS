@@ -4753,33 +4753,109 @@ export class StudentsService {
     identityCode: string,
     actor: AuthContext,
   ) {
-    const identity = await this.prisma.studentIdentity.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        studentId,
-        identityCode,
-      },
-    });
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const student = await this.findActiveTenantStudent(
+            studentId,
+            actor,
+            tx,
+          );
+          const identity = await tx.studentIdentity.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: student.id,
+              identityCode,
+            },
+          });
+          if (!identity) {
+            throw new NotFoundException(
+              'Identity code not found for this student',
+            );
+          }
+          if (identity.status === 'REVOKED') {
+            return { success: true as const };
+          }
+          if (identity.status !== 'ACTIVE') {
+            throw new ConflictException(
+              'Only an active student identity can be revoked.',
+            );
+          }
 
-    if (!identity) {
-      throw new NotFoundException('Identity code not found for this student');
+          const revokedAt = new Date();
+          const revoked = await tx.studentIdentity.updateMany({
+            where: {
+              id: identity.id,
+              tenantId: actor.tenantId,
+              studentId: student.id,
+              status: 'ACTIVE',
+              updatedAt: identity.updatedAt,
+            },
+            data: {
+              status: 'REVOKED',
+              revokedAt,
+              revokedById: actor.userId,
+            },
+          });
+          if (revoked.count !== 1) {
+            throw new ConflictException(
+              'Student identity changed while revocation was being finalized. Refresh and retry.',
+            );
+          }
+
+          const currentIdentityCleared =
+            student.studentIdentityCode === identityCode;
+          const studentClaim = await tx.student.updateMany({
+            where: {
+              id: student.id,
+              tenantId: actor.tenantId,
+              lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+              updatedAt: student.updatedAt,
+            },
+            data: {
+              studentIdentityCode: currentIdentityCleared
+                ? null
+                : student.studentIdentityCode,
+            },
+          });
+          if (studentClaim.count !== 1) {
+            throw new ConflictException(
+              'Student lifecycle changed while identity revocation was being finalized. Refresh and retry.',
+            );
+          }
+
+          await this.auditService.record(
+            {
+              action: 'revoke_identity',
+              resource: 'student_identity',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: identity.id,
+              before: {
+                status: identity.status,
+                currentIdentity: currentIdentityCleared,
+              },
+              after: {
+                studentId: student.id,
+                status: 'REVOKED',
+                currentIdentityCleared,
+              },
+            },
+            tx,
+          );
+
+          return { success: true as const };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (isPrismaTransactionConflictError(error)) {
+        throw new ConflictException(
+          'Student identity changed while revocation was being finalized. Refresh and retry.',
+        );
+      }
+      throw error;
     }
-
-    await this.prisma.studentIdentity.update({
-      where: { id: identity.id },
-      data: {
-        status: 'REVOKED',
-        revokedAt: new Date(),
-        revokedById: actor.userId,
-      },
-    });
-
-    await this.prisma.student.update({
-      where: { id: studentId },
-      data: { studentIdentityCode: null },
-    });
-
-    return { success: true };
   }
 
   async deleteStudentDocument(
