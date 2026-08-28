@@ -2285,7 +2285,7 @@ describe('students lifecycle hardening', () => {
         userId: link.guardian.user.id,
         purpose: { in: [OtpPurpose.RESET, OtpPurpose.VERIFY] },
         usedAt: { not: null },
-        expiresAt: { gt: expect.any(Date) },
+        expiresAt: { gt: expect.any(Date) as Date },
       },
       select: { id: true },
       orderBy: { usedAt: 'desc' },
@@ -2424,7 +2424,7 @@ describe('students lifecycle hardening', () => {
       expect(
         prisma.transaction.studentGuardian.updateMany,
       ).toHaveBeenCalledWith({
-        where: expect.objectContaining({
+        where: {
           id: link.id,
           tenantId: actor.tenantId,
           studentId: link.studentId,
@@ -2436,7 +2436,7 @@ describe('students lifecycle hardening', () => {
             ],
           },
           updatedAt: link.updatedAt,
-        }),
+        },
         data: expect.objectContaining({
           status,
           isPrimary: false,
@@ -2529,7 +2529,7 @@ describe('students lifecycle hardening', () => {
     );
 
     expect(prisma.transaction.studentGuardian.updateMany).toHaveBeenCalledWith({
-      where: expect.objectContaining({
+      where: {
         id: link.id,
         tenantId: actor.tenantId,
         studentId: link.studentId,
@@ -2537,8 +2537,17 @@ describe('students lifecycle hardening', () => {
         status: GuardianRelationshipStatus.SUSPENDED,
         verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
         approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+        effectiveFrom: { lte: expect.any(Date) as Date },
+        AND: [
+          {
+            OR: [
+              { effectiveUntil: null },
+              { effectiveUntil: { gt: expect.any(Date) as Date } },
+            ],
+          },
+        ],
         updatedAt: link.updatedAt,
-      }),
+      },
       data: { status: GuardianRelationshipStatus.ACTIVE },
     });
     expect(prisma.transaction.user.updateMany).toHaveBeenCalledWith({

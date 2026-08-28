@@ -2567,13 +2567,18 @@ export class StudentsService {
               break;
             }
             case 'APPROVE_PHONE_CHANGE': {
+              if (nextPhone === null) {
+                throw new BadRequestException(
+                  'A valid Nepal phone number is required for an approved phone change.',
+                );
+              }
               const guardianChanged = await tx.guardian.updateMany({
                 where: {
                   id: guardianId,
                   tenantId: actor.tenantId,
                   updatedAt: link.guardian.updatedAt,
                 },
-                data: { primaryPhone: nextPhone! },
+                data: { primaryPhone: nextPhone },
               });
               if (guardianChanged.count !== 1) {
                 throw new ConflictException(
@@ -2581,7 +2586,7 @@ export class StudentsService {
                 );
               }
               if (userId) {
-                await updateLinkedUser({ phone: nextPhone! });
+                await updateLinkedUser({ phone: nextPhone });
               }
               sessionsRevoked = await revokeSessions(
                 'guardian_phone_change_approved',
