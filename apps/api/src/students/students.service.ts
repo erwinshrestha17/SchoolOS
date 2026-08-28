@@ -1842,159 +1842,212 @@ export class StudentsService {
     dto: UpdateStudentGuardianDto,
     actor: AuthContext,
   ) {
-    const link = await this.prisma.studentGuardian.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        studentId,
-        guardianId,
-      },
-      include: {
-        guardian: true,
-      },
-    });
-
-    if (!link) {
-      throw new NotFoundException(
-        'Guardian link not found for this student in this tenant',
-      );
-    }
-
     this.assertGuardianAccessWriteAllowed(dto, actor);
-    if (
-      dto.primaryPhone !== undefined &&
-      dto.primaryPhone !== link.guardian.primaryPhone &&
-      (link.guardian.userId || link.appLoginLinked)
-    ) {
-      throw new BadRequestException(
-        'Use the guardian access recovery action to approve a phone-number change for an app-linked guardian.',
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          const link = await tx.studentGuardian.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              studentId,
+              guardianId,
+            },
+            include: {
+              guardian: true,
+            },
+          });
+          if (!link) {
+            throw new NotFoundException(
+              'Guardian link not found for this student in this tenant',
+            );
+          }
+
+          if (
+            dto.primaryPhone !== undefined &&
+            dto.primaryPhone !== link.guardian.primaryPhone &&
+            (link.guardian.userId || link.appLoginLinked)
+          ) {
+            throw new BadRequestException(
+              'Use the guardian access recovery action to approve a phone-number change for an app-linked guardian.',
+            );
+          }
+
+          const siblingLinks = await tx.studentGuardian.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId,
+            },
+            select: { id: true, guardianId: true, isPrimary: true },
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          });
+          if (dto.isPrimary === false && link.isPrimary) {
+            throw new BadRequestException(
+              'Choose another primary guardian before removing this one.',
+            );
+          }
+
+          const relationshipData = buildGuardianRelationshipUpdate(
+            dto,
+            actor,
+            link,
+          );
+          const nextRelationshipStatus = dto.status ?? link.status;
+          const nextEffectiveFrom =
+            relationshipData.effectiveFrom ?? link.effectiveFrom;
+          const nextEffectiveUntil =
+            relationshipData.effectiveUntil === undefined
+              ? link.effectiveUntil
+              : relationshipData.effectiveUntil;
+          const nextIsPrimary =
+            dto.isPrimary === undefined
+              ? link.isPrimary
+              : dto.isPrimary || siblingLinks.length === 1;
+          const now = new Date();
+          if (
+            nextIsPrimary &&
+            (nextRelationshipStatus !== GuardianRelationshipStatus.ACTIVE ||
+              nextEffectiveFrom > now ||
+              (nextEffectiveUntil !== null && nextEffectiveUntil <= now))
+          ) {
+            throw new BadRequestException(
+              'Only a currently active guardian relationship can be primary.',
+            );
+          }
+
+          const guardianData: Prisma.GuardianUpdateManyMutationInput = {
+            ...(dto.fullName !== undefined
+              ? { fullName: requirePersonName(dto.fullName, 'fullName') }
+              : {}),
+            ...(dto.primaryPhone !== undefined
+              ? { primaryPhone: requireNepalPhone(dto.primaryPhone) }
+              : {}),
+            ...(dto.secondaryPhone !== undefined
+              ? { secondaryPhone: optionalNepalPhone(dto.secondaryPhone) }
+              : {}),
+            ...(dto.email !== undefined
+              ? { email: optionalProfileEmail(dto.email) }
+              : {}),
+            ...(dto.occupation !== undefined
+              ? { occupation: normalizeNullableString(dto.occupation) }
+              : {}),
+            ...(dto.homeAddress !== undefined
+              ? { homeAddress: normalizeNullableString(dto.homeAddress) }
+              : {}),
+            ...(dto.wardNumber !== undefined
+              ? { wardNumber: normalizeNullableString(dto.wardNumber) }
+              : {}),
+          };
+          if (Object.keys(guardianData).length > 0) {
+            const guardianUpdate = await tx.guardian.updateMany({
+              where: { id: guardianId, tenantId: actor.tenantId },
+              data: guardianData,
+            });
+            if (guardianUpdate.count !== 1) {
+              throw new ConflictException(
+                'Guardian profile changed while this relationship was being updated. Refresh and retry.',
+              );
+            }
+          }
+
+          const relationshipUpdate = await tx.studentGuardian.updateMany({
+            where: {
+              id: link.id,
+              tenantId: actor.tenantId,
+              studentId,
+              guardianId,
+              updatedAt: link.updatedAt,
+            },
+            data: {
+              ...(dto.relation !== undefined
+                ? { relation: assertNonEmpty(dto.relation, 'relation') }
+                : {}),
+              ...(dto.isPrimary !== undefined
+                ? { isPrimary: nextIsPrimary }
+                : {}),
+              ...relationshipData,
+            },
+          });
+          if (relationshipUpdate.count !== 1) {
+            throw new ConflictException(
+              'Guardian relationship changed while this update was being finalized. Refresh and retry.',
+            );
+          }
+
+          if (dto.isPrimary === true) {
+            await tx.studentGuardian.updateMany({
+              where: {
+                tenantId: actor.tenantId,
+                studentId,
+                id: { not: link.id },
+              },
+              data: { isPrimary: false },
+            });
+          }
+
+          await this.auditService.record(
+            {
+              action: 'update',
+              resource: 'student_guardian',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: link.id,
+              before: {
+                guardianId,
+                fullName: link.guardian.fullName,
+                relation: link.relation || link.guardian.relation,
+                primaryPhone: link.guardian.primaryPhone,
+                isPrimary: link.isPrimary,
+                capabilities: link.capabilities,
+                verificationStatus: link.verificationStatus,
+                status: link.status,
+                effectiveFrom: link.effectiveFrom,
+                effectiveUntil: link.effectiveUntil,
+                emergencyContactPriority: link.emergencyContactPriority,
+                approvalStatus: link.approvalStatus,
+                restrictionReasonRef: link.restrictionReasonRef,
+              },
+              after: {
+                guardianId,
+                fullName: dto.fullName ?? link.guardian.fullName,
+                relation:
+                  dto.relation ?? link.relation ?? link.guardian.relation,
+                primaryPhone: dto.primaryPhone ?? link.guardian.primaryPhone,
+                isPrimary: nextIsPrimary,
+                capabilities:
+                  relationshipData.capabilities ?? link.capabilities,
+                verificationStatus:
+                  relationshipData.verificationStatus ??
+                  link.verificationStatus,
+                status: nextRelationshipStatus,
+                effectiveFrom: nextEffectiveFrom,
+                effectiveUntil: nextEffectiveUntil,
+                emergencyContactPriority:
+                  relationshipData.emergencyContactPriority === undefined
+                    ? link.emergencyContactPriority
+                    : relationshipData.emergencyContactPriority,
+                approvalStatus:
+                  relationshipData.approvalStatus ?? link.approvalStatus,
+                restrictionReasonRef:
+                  relationshipData.restrictionReasonRef === undefined
+                    ? link.restrictionReasonRef
+                    : relationshipData.restrictionReasonRef,
+              },
+            },
+            tx,
+          );
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        },
       );
-    }
-
-    const siblingLinks = await this.prisma.studentGuardian.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        studentId,
-      },
-      select: { id: true, guardianId: true, isPrimary: true },
-      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-    });
-
-    if (dto.isPrimary === false && link.isPrimary) {
-      throw new BadRequestException(
-        'Choose another primary guardian before removing this one.',
-      );
-    }
-
-    const relationshipData = buildGuardianRelationshipUpdate(dto, actor, link);
-    const nextRelationshipStatus = dto.status ?? link.status;
-    if (
-      link.isPrimary &&
-      nextRelationshipStatus !== GuardianRelationshipStatus.ACTIVE
-    ) {
-      throw new BadRequestException(
-        'Choose another primary guardian before suspending, revoking, or expiring this relationship.',
-      );
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      if (dto.isPrimary === true) {
-        await tx.studentGuardian.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId,
-            id: { not: link.id },
-          },
-          data: { isPrimary: false },
-        });
+    } catch (error) {
+      if (isPrismaTransactionConflictError(error)) {
+        throw new ConflictException(
+          'Guardian relationship changed while this update was being finalized. Refresh and retry.',
+        );
       }
-
-      await tx.guardian.update({
-        where: { id: guardianId },
-        data: {
-          ...(dto.fullName !== undefined
-            ? { fullName: requirePersonName(dto.fullName, 'fullName') }
-            : {}),
-          ...(dto.primaryPhone !== undefined
-            ? { primaryPhone: requireNepalPhone(dto.primaryPhone) }
-            : {}),
-          ...(dto.secondaryPhone !== undefined
-            ? { secondaryPhone: optionalNepalPhone(dto.secondaryPhone) }
-            : {}),
-          ...(dto.email !== undefined
-            ? { email: optionalProfileEmail(dto.email) }
-            : {}),
-          ...(dto.occupation !== undefined
-            ? { occupation: normalizeNullableString(dto.occupation) }
-            : {}),
-          ...(dto.homeAddress !== undefined
-            ? { homeAddress: normalizeNullableString(dto.homeAddress) }
-            : {}),
-          ...(dto.wardNumber !== undefined
-            ? { wardNumber: normalizeNullableString(dto.wardNumber) }
-            : {}),
-        },
-      });
-
-      await tx.studentGuardian.update({
-        where: { id: link.id },
-        data: {
-          ...(dto.relation !== undefined
-            ? { relation: assertNonEmpty(dto.relation, 'relation') }
-            : {}),
-          ...(dto.isPrimary !== undefined
-            ? { isPrimary: dto.isPrimary || siblingLinks.length === 1 }
-            : {}),
-          ...relationshipData,
-        },
-      });
-    });
-
-    await this.auditService.record({
-      action: 'update',
-      resource: 'student_guardian',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: link.id,
-      before: {
-        guardianId,
-        fullName: link.guardian.fullName,
-        relation: link.relation || link.guardian.relation,
-        primaryPhone: link.guardian.primaryPhone,
-        isPrimary: link.isPrimary,
-        capabilities: link.capabilities,
-        verificationStatus: link.verificationStatus,
-        status: link.status,
-        effectiveFrom: link.effectiveFrom,
-        effectiveUntil: link.effectiveUntil,
-        emergencyContactPriority: link.emergencyContactPriority,
-        approvalStatus: link.approvalStatus,
-        restrictionReasonRef: link.restrictionReasonRef,
-      },
-      after: {
-        guardianId,
-        fullName: dto.fullName ?? link.guardian.fullName,
-        relation: dto.relation ?? link.relation ?? link.guardian.relation,
-        primaryPhone: dto.primaryPhone ?? link.guardian.primaryPhone,
-        isPrimary: dto.isPrimary ?? link.isPrimary,
-        capabilities: dto.capabilities ?? link.capabilities,
-        verificationStatus: dto.verificationStatus ?? link.verificationStatus,
-        status: nextRelationshipStatus,
-        effectiveFrom: dto.effectiveFrom ?? link.effectiveFrom,
-        effectiveUntil:
-          dto.effectiveUntil === undefined
-            ? link.effectiveUntil
-            : dto.effectiveUntil,
-        emergencyContactPriority:
-          dto.emergencyContactPriority === undefined
-            ? link.emergencyContactPriority
-            : dto.emergencyContactPriority,
-        approvalStatus: dto.approvalStatus ?? link.approvalStatus,
-        restrictionReasonRef:
-          dto.restrictionReasonRef === undefined
-            ? link.restrictionReasonRef
-            : dto.restrictionReasonRef,
-      },
-    });
+      throw error;
+    }
 
     return this.getStudentProfile(studentId, actor);
   }
