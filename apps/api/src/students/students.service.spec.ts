@@ -1074,6 +1074,19 @@ describe('students lifecycle hardening', () => {
           relation: 'mother',
           isPrimary: true,
           appLoginLinked: false,
+          capabilities: [
+            GuardianCapability.ACADEMICS_VIEW,
+            GuardianCapability.ATTENDANCE_VIEW,
+          ],
+          verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+          status: GuardianRelationshipStatus.ACTIVE,
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+          effectiveUntil: null,
+          emergencyContactPriority: 1,
+          approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+          restrictionReasonRef: null,
+          approvedById: actor.userId,
+          approvedAt: new Date('2026-01-02T00:00:00.000Z'),
         },
       ],
     });
@@ -1105,9 +1118,34 @@ describe('students lifecycle hardening', () => {
           relation: 'mother',
           isPrimary: true,
           appLoginLinked: false,
+          capabilities: [
+            GuardianCapability.ACADEMICS_VIEW,
+            GuardianCapability.ATTENDANCE_VIEW,
+          ],
+          verificationStatus: GuardianRelationshipVerificationStatus.VERIFIED,
+          status: GuardianRelationshipStatus.ACTIVE,
+          effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+          effectiveUntil: null,
+          emergencyContactPriority: 1,
+          approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+          restrictionReasonRef: null,
+          approvedById: actor.userId,
+          approvedAt: new Date('2026-01-02T00:00:00.000Z'),
         },
       ],
       skipDuplicates: true,
+    });
+    expect(prisma.transaction.studentGuardian.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: sourceStudent.id,
+        status: GuardianRelationshipStatus.ACTIVE,
+      },
+      data: {
+        status: GuardianRelationshipStatus.EXPIRED,
+        isPrimary: false,
+        appLoginLinked: false,
+      },
     });
     expect(prisma.transaction.invoice.updateMany).toHaveBeenCalledWith({
       where: {
@@ -1169,6 +1207,7 @@ describe('students lifecycle hardening', () => {
     expect(result.sourceStudent.lifecycleStatus).toBe(
       StudentLifecycleStatus.MERGED,
     );
+    expect(result.mergeCounts.sourceGuardianLinksExpired).toBe(1);
   });
 
   it('rejects duplicate merge when the canonical target lifecycle changes before claim', async () => {
@@ -5347,6 +5386,8 @@ function buildStudent(
       emergencyContactPriority?: number | null;
       approvalStatus?: GuardianRelationshipApprovalStatus;
       restrictionReasonRef?: string | null;
+      approvedById?: string | null;
+      approvedAt?: Date | null;
     }[];
     enrollments: {
       id?: string;

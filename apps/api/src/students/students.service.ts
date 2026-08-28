@@ -3411,6 +3411,9 @@ export class StudentsService {
         );
 
         const mergedAt = new Date();
+        let copiedPrimaryGuardian = targetStudent.guardianLinks.some(
+          (link) => link.isPrimary,
+        );
         const missingGuardianLinks = sourceStudent.guardianLinks
           .filter(
             (sourceLink) =>
@@ -3418,16 +3421,29 @@ export class StudentsService {
                 (targetLink) => targetLink.guardianId === sourceLink.guardianId,
               ),
           )
-          .map((sourceLink) => ({
-            tenantId: actor.tenantId,
-            studentId: targetStudent.id,
-            guardianId: sourceLink.guardianId,
-            relation: sourceLink.relation,
-            isPrimary:
-              !targetStudent.guardianLinks.some((link) => link.isPrimary) &&
-              sourceLink.isPrimary,
-            appLoginLinked: sourceLink.appLoginLinked,
-          }));
+          .map((sourceLink) => {
+            const isPrimary = sourceLink.isPrimary && !copiedPrimaryGuardian;
+            copiedPrimaryGuardian ||= isPrimary;
+
+            return {
+              tenantId: actor.tenantId,
+              studentId: targetStudent.id,
+              guardianId: sourceLink.guardianId,
+              relation: sourceLink.relation,
+              isPrimary,
+              appLoginLinked: sourceLink.appLoginLinked,
+              capabilities: sourceLink.capabilities,
+              verificationStatus: sourceLink.verificationStatus,
+              status: sourceLink.status,
+              effectiveFrom: sourceLink.effectiveFrom,
+              effectiveUntil: sourceLink.effectiveUntil,
+              emergencyContactPriority: sourceLink.emergencyContactPriority,
+              approvalStatus: sourceLink.approvalStatus,
+              restrictionReasonRef: sourceLink.restrictionReasonRef,
+              approvedById: sourceLink.approvedById,
+              approvedAt: sourceLink.approvedAt,
+            };
+          });
 
         const duplicateReview = await tx.studentDuplicateReview.findUnique({
           where: {
@@ -3460,6 +3476,19 @@ export class StudentsService {
             'The canonical target record changed before the merge could be completed. Refresh and try again.',
           );
         }
+
+        const sourceGuardianLinksExpired = await tx.studentGuardian.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+            status: GuardianRelationshipStatus.ACTIVE,
+          },
+          data: {
+            status: GuardianRelationshipStatus.EXPIRED,
+            isPrimary: false,
+            appLoginLinked: false,
+          },
+        });
 
         const sourceDocs = await tx.studentDocument.findMany({
           where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
@@ -3686,6 +3715,7 @@ export class StudentsService {
               targetStudentSystemId: targetStudent.studentSystemId,
               counts: {
                 guardianLinks: guardianLinks.count,
+                sourceGuardianLinksExpired: sourceGuardianLinksExpired.count,
                 documents: documents.count,
                 invoices: invoices.count,
                 payments: payments.count,
@@ -3733,6 +3763,7 @@ export class StudentsService {
           canteenEnrollments: canteenEnrollments.count,
           canteenMealServings: canteenMealServings.count,
           canteenWalletTransactions: canteenWalletTransactions.count,
+          sourceGuardianLinksExpired: sourceGuardianLinksExpired.count,
         };
 
         await this.auditService.record(

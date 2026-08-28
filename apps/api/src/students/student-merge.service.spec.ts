@@ -52,6 +52,7 @@ describe('StudentsService (Duplicate Merge)', () => {
             },
             studentGuardian: {
               createMany: jest.fn(),
+              updateMany: jest.fn(),
             },
             studentDocument: {
               findMany: jest.fn(),
