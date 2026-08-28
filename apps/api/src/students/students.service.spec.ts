@@ -3004,15 +3004,31 @@ describe('students lifecycle hardening', () => {
       ),
     ).resolves.toEqual({ success: true, sessionId: 'session-2' });
 
+    expect(prisma.studentGuardian.findFirst).not.toHaveBeenCalled();
+    expect(prisma.transaction.studentGuardian.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: link.studentId,
+        guardianId: link.guardianId,
+      },
+      include: {
+        guardian: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
     expect(prisma.transaction.refreshToken.updateMany).toHaveBeenCalledWith({
       where: {
         id: 'session-2',
         userId: link.guardian.user.id,
+        user: { tenantId: actor.tenantId },
         revokedAt: null,
-        expiresAt: { gt: expect.any(Date) },
+        expiresAt: { gt: expect.any(Date) as Date },
       },
       data: {
-        revokedAt: expect.any(Date),
+        revokedAt: expect.any(Date) as Date,
         revokedReason: 'guardian_admin_device_revocation',
       },
     });
@@ -3026,6 +3042,60 @@ describe('students lifecycle hardening', () => {
         }),
       }),
       prisma.transaction,
+    );
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
+  });
+
+  it('rolls back a guardian session revocation when audit append fails', async () => {
+    const link = buildGuardianAdministrationLink();
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+    });
+    const { service, auditService } = buildService(prisma);
+    auditService.record.mockRejectedValueOnce(
+      new Error('guardian session audit unavailable'),
+    );
+
+    await expect(
+      service.revokeGuardianSession(
+        link.studentId,
+        link.guardianId,
+        'session-2',
+        {
+          reason: 'Guardian no longer recognizes this device',
+          evidenceReference: 'support-case-104',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('guardian session audit unavailable');
+
+    expect(prisma.transaction.refreshToken.updateMany).toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceId: link.id }),
+      prisma.transaction,
+    );
+  });
+
+  it('maps guardian session revocation serialization conflicts to a bounded retry response', async () => {
+    const prisma = buildPrisma({});
+    prisma.$transaction.mockRejectedValueOnce({ code: 'P2034' });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.revokeGuardianSession(
+        'student-1',
+        'guardian-1',
+        'session-2',
+        {
+          reason: 'Guardian no longer recognizes this device',
+          evidenceReference: 'support-case-105',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Guardian access changed while the session revocation was being finalized',
     );
   });
 

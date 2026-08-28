@@ -2917,58 +2917,72 @@ export class StudentsService {
     dto: RevokeGuardianSessionDto,
     actor: AuthContext,
   ) {
-    const link = await this.findGuardianAdministrationRelationship(
-      studentId,
-      guardianId,
-      actor,
-    );
-    const userId = link.guardian.user?.id;
-    if (!userId) {
-      throw new BadRequestException(
-        'This guardian does not have a linked app account.',
-      );
-    }
-    const now = new Date();
-
-    return this.prisma.$transaction(async (tx) => {
-      const revoked = await tx.refreshToken.updateMany({
-        where: {
-          id: sessionId,
-          userId,
-          revokedAt: null,
-          expiresAt: { gt: now },
-        },
-        data: {
-          revokedAt: now,
-          revokedReason: 'guardian_admin_device_revocation',
-        },
-      });
-      if (revoked.count !== 1) {
-        throw new ConflictException(
-          'This guardian session is already revoked, expired, or unavailable.',
-        );
-      }
-
-      await this.auditService.record(
-        {
-          action: 'revoke_session',
-          resource: 'guardian_access',
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-          resourceId: link.id,
-          after: {
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const link = await this.findGuardianAdministrationRelationship(
             studentId,
             guardianId,
-            sessionId,
-            reason: dto.reason.trim(),
-            evidenceReference: dto.evidenceReference.trim(),
-          },
-        },
-        tx,
-      );
+            actor,
+            tx,
+          );
+          const userId = link.guardian.user?.id;
+          if (!userId) {
+            throw new BadRequestException(
+              'This guardian does not have a linked app account.',
+            );
+          }
+          const now = new Date();
 
-      return { success: true as const, sessionId };
-    });
+          const revoked = await tx.refreshToken.updateMany({
+            where: {
+              id: sessionId,
+              userId,
+              user: { tenantId: actor.tenantId },
+              revokedAt: null,
+              expiresAt: { gt: now },
+            },
+            data: {
+              revokedAt: now,
+              revokedReason: 'guardian_admin_device_revocation',
+            },
+          });
+          if (revoked.count !== 1) {
+            throw new ConflictException(
+              'This guardian session is already revoked, expired, or unavailable.',
+            );
+          }
+
+          await this.auditService.record(
+            {
+              action: 'revoke_session',
+              resource: 'guardian_access',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: link.id,
+              after: {
+                studentId,
+                guardianId,
+                sessionId,
+                reason: dto.reason.trim(),
+                evidenceReference: dto.evidenceReference.trim(),
+              },
+            },
+            tx,
+          );
+
+          return { success: true as const, sessionId };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (isPrismaTransactionConflictError(error)) {
+        throw new ConflictException(
+          'Guardian access changed while the session revocation was being finalized. Refresh and retry.',
+        );
+      }
+      throw error;
+    }
   }
 
   async getFeeClearance(studentId: string, actor: AuthContext) {
@@ -6155,8 +6169,9 @@ export class StudentsService {
     studentId: string,
     guardianId: string,
     actor: AuthContext,
+    prisma: Prisma.TransactionClient = this.prisma,
   ): Promise<GuardianAdministrationRelationship> {
-    const link = await this.prisma.studentGuardian.findFirst({
+    const link = await prisma.studentGuardian.findFirst({
       where: {
         tenantId: actor.tenantId,
         studentId,
