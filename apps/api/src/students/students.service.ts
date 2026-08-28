@@ -2288,6 +2288,7 @@ export class StudentsService {
               userId,
               purpose: { in: [OtpPurpose.RESET, OtpPurpose.VERIFY] },
               usedAt: { not: null },
+              expiresAt: { gt: now },
             },
             select: { id: true },
             orderBy: { usedAt: 'desc' },
@@ -2397,226 +2398,358 @@ export class StudentsService {
     dto: GuardianRecoveryActionDto,
     actor: AuthContext,
   ) {
-    const link = await this.findGuardianAdministrationRelationship(
-      studentId,
-      guardianId,
-      actor,
-    );
-    await this.assertGuardianRecoveryMethod(link, dto, actor);
-    if (
-      dto.action === 'RESTORE_ACCOUNT' &&
-      link.status !== GuardianRelationshipStatus.SUSPENDED
-    ) {
-      throw new ConflictException(
-        'Only a suspended guardian relationship can be restored. Revoked and expired relationships require a new reviewed relationship.',
-      );
-    }
-
     const reason = dto.reason.trim();
     const evidenceReference = dto.evidenceReference.trim();
-    const now = new Date();
-    const userId = link.guardian.user?.id ?? null;
     const nextPhone =
       dto.action === 'APPROVE_PHONE_CHANGE'
         ? requireNepalPhone(dto.newPrimaryPhone ?? '')
         : null;
 
-    return this.prisma.$transaction(async (tx) => {
-      let sessionsRevoked = 0;
-      let relationshipsChanged = 0;
-      let relationshipStatus = link.status;
-      let accountStatus = link.guardian.user?.status ?? null;
-
-      const revokeSessions = async (revokedReason: string) => {
-        if (!userId) return 0;
-        const revoked = await tx.refreshToken.updateMany({
-          where: { userId, revokedAt: null },
-          data: { revokedAt: now, revokedReason },
-        });
-        return revoked.count;
-      };
-
-      switch (dto.action) {
-        case 'REVOKE_ALL_SESSIONS':
-          sessionsRevoked = await revokeSessions('guardian_admin_revocation');
-          break;
-        case 'SUSPEND_COMPROMISED_ACCOUNT': {
-          const changed = await tx.studentGuardian.updateMany({
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const now = new Date();
+          const link = await tx.studentGuardian.findFirst({
             where: {
-              tenantId: actor.tenantId,
-              guardianId,
-              status: GuardianRelationshipStatus.ACTIVE,
-            },
-            data: {
-              status: GuardianRelationshipStatus.SUSPENDED,
-              isPrimary: false,
-              restrictionReasonRef: evidenceReference,
-            },
-          });
-          relationshipsChanged = changed.count;
-          relationshipStatus = GuardianRelationshipStatus.SUSPENDED;
-          if (userId) {
-            await tx.user.update({
-              where: { id: userId },
-              data: { status: UserStatus.SUSPENDED },
-            });
-            accountStatus = UserStatus.SUSPENDED;
-          }
-          sessionsRevoked = await revokeSessions(
-            'guardian_account_compromise_hold',
-          );
-          break;
-        }
-        case 'RESTORE_ACCOUNT': {
-          const changed = await tx.studentGuardian.updateMany({
-            where: {
-              id: link.id,
               tenantId: actor.tenantId,
               studentId,
               guardianId,
             },
-            data: { status: GuardianRelationshipStatus.ACTIVE },
+            include: {
+              guardian: {
+                include: {
+                  user: true,
+                },
+              },
+            },
           });
-          relationshipsChanged = changed.count;
-          relationshipStatus = GuardianRelationshipStatus.ACTIVE;
-          if (userId) {
-            await tx.user.update({
-              where: { id: userId },
-              data: { status: UserStatus.ACTIVE },
-            });
-            accountStatus = UserStatus.ACTIVE;
+          if (!link) {
+            throw new NotFoundException(
+              'Guardian relationship not found for this student in this tenant.',
+            );
           }
-          sessionsRevoked = await revokeSessions(
-            'guardian_account_recovery_complete',
-          );
-          break;
-        }
-        case 'APPROVE_PHONE_CHANGE':
-          await tx.guardian.update({
-            where: { id: guardianId },
-            data: { primaryPhone: nextPhone! },
-          });
-          if (userId) {
-            await tx.user.update({
-              where: { id: userId },
-              data: { phone: nextPhone! },
-            });
+          if (
+            dto.action === 'RESTORE_ACCOUNT' &&
+            (link.status !== GuardianRelationshipStatus.SUSPENDED ||
+              link.verificationStatus !==
+                GuardianRelationshipVerificationStatus.VERIFIED ||
+              link.approvalStatus !==
+                GuardianRelationshipApprovalStatus.APPROVED ||
+              link.effectiveFrom > now ||
+              (link.effectiveUntil !== null && link.effectiveUntil <= now))
+          ) {
+            throw new ConflictException(
+              'Only a current suspended, verified, and approved guardian relationship can be restored. Revoked and expired relationships require a new reviewed relationship.',
+            );
           }
-          sessionsRevoked = await revokeSessions(
-            'guardian_phone_change_approved',
-          );
-          break;
-        case 'EXPIRE_RELATIONSHIP': {
-          const changed = await tx.studentGuardian.updateMany({
-            where: {
-              id: link.id,
-              tenantId: actor.tenantId,
-              studentId,
-              guardianId,
-            },
-            data: {
-              status: GuardianRelationshipStatus.EXPIRED,
-              isPrimary: false,
-              restrictionReasonRef: evidenceReference,
-              effectiveUntil:
-                link.effectiveUntil && link.effectiveUntil < now
-                  ? link.effectiveUntil
-                  : now,
-            },
-          });
-          relationshipsChanged = changed.count;
-          relationshipStatus = GuardianRelationshipStatus.EXPIRED;
-          sessionsRevoked = await revokeSessions(
-            'guardian_relationship_expired',
-          );
-          break;
-        }
-        case 'REVOKE_RELATIONSHIP': {
-          const changed = await tx.studentGuardian.updateMany({
-            where: {
-              id: link.id,
-              tenantId: actor.tenantId,
-              studentId,
-              guardianId,
-            },
-            data: {
-              status: GuardianRelationshipStatus.REVOKED,
-              isPrimary: false,
-              restrictionReasonRef: evidenceReference,
-            },
-          });
-          relationshipsChanged = changed.count;
-          relationshipStatus = GuardianRelationshipStatus.REVOKED;
-          sessionsRevoked = await revokeSessions(
-            'guardian_relationship_revoked',
-          );
-          break;
-        }
-        case 'MARK_DECEASED': {
-          const changed = await tx.studentGuardian.updateMany({
-            where: { tenantId: actor.tenantId, guardianId },
-            data: {
-              status: GuardianRelationshipStatus.REVOKED,
-              isPrimary: false,
-              restrictionReasonRef: evidenceReference,
-            },
-          });
-          relationshipsChanged = changed.count;
-          relationshipStatus = GuardianRelationshipStatus.REVOKED;
-          if (userId) {
-            await tx.user.update({
-              where: { id: userId },
-              data: { status: UserStatus.SUSPENDED },
-            });
-            accountStatus = UserStatus.SUSPENDED;
+          if (
+            (dto.action === 'EXPIRE_RELATIONSHIP' ||
+              dto.action === 'REVOKE_RELATIONSHIP' ||
+              dto.action === 'APPROVE_PHONE_CHANGE') &&
+            link.status !== GuardianRelationshipStatus.ACTIVE &&
+            link.status !== GuardianRelationshipStatus.SUSPENDED
+          ) {
+            throw new ConflictException(
+              'Only an active or suspended guardian relationship can be changed through recovery.',
+            );
           }
-          sessionsRevoked = await revokeSessions(
-            'guardian_relationship_ended_deceased',
-          );
-          break;
-        }
-      }
 
-      await this.auditService.record(
-        {
-          action: dto.action.toLowerCase(),
-          resource: 'guardian_access',
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-          resourceId: link.id,
-          before: {
-            relationshipStatus: link.status,
-            accountStatus: link.guardian.user?.status ?? null,
-            phone: maskPhone(link.guardian.primaryPhone),
-          },
-          after: {
-            studentId,
-            guardianId,
+          await this.assertGuardianRecoveryMethod(link, dto, actor, tx);
+          const userId = link.guardian.user?.id ?? null;
+          let sessionsRevoked = 0;
+          let relationshipsChanged = 0;
+          let relationshipStatus = link.status;
+          let accountStatus = link.guardian.user?.status ?? null;
+
+          const revokeSessions = async (revokedReason: string) => {
+            if (!userId) return 0;
+            const revoked = await tx.refreshToken.updateMany({
+              where: { userId, revokedAt: null },
+              data: { revokedAt: now, revokedReason },
+            });
+            return revoked.count;
+          };
+          const updateLinkedUser = async (data: {
+            status?: UserStatus;
+            phone?: string;
+          }) => {
+            if (!userId) return;
+            const changed = await tx.user.updateMany({
+              where: {
+                id: userId,
+                tenantId: actor.tenantId,
+              },
+              data,
+            });
+            if (changed.count !== 1) {
+              throw new ConflictException(
+                'Guardian account changed while recovery was being finalized. Refresh and retry.',
+              );
+            }
+          };
+
+          switch (dto.action) {
+            case 'REVOKE_ALL_SESSIONS':
+              sessionsRevoked = await revokeSessions(
+                'guardian_admin_revocation',
+              );
+              break;
+            case 'SUSPEND_COMPROMISED_ACCOUNT': {
+              const changed = await tx.studentGuardian.updateMany({
+                where: {
+                  tenantId: actor.tenantId,
+                  guardianId,
+                  status: GuardianRelationshipStatus.ACTIVE,
+                },
+                data: {
+                  status: GuardianRelationshipStatus.SUSPENDED,
+                  isPrimary: false,
+                  restrictionReasonRef: evidenceReference,
+                },
+              });
+              relationshipsChanged = changed.count;
+              if (
+                link.status === GuardianRelationshipStatus.ACTIVE &&
+                changed.count === 0
+              ) {
+                throw new ConflictException(
+                  'Guardian relationships changed while account suspension was being finalized. Refresh and retry.',
+                );
+              }
+              relationshipStatus = GuardianRelationshipStatus.SUSPENDED;
+              if (userId) {
+                await updateLinkedUser({ status: UserStatus.SUSPENDED });
+                accountStatus = UserStatus.SUSPENDED;
+              }
+              sessionsRevoked = await revokeSessions(
+                'guardian_account_compromise_hold',
+              );
+              break;
+            }
+            case 'RESTORE_ACCOUNT': {
+              const changed = await tx.studentGuardian.updateMany({
+                where: {
+                  id: link.id,
+                  tenantId: actor.tenantId,
+                  studentId,
+                  guardianId,
+                  status: GuardianRelationshipStatus.SUSPENDED,
+                  verificationStatus:
+                    GuardianRelationshipVerificationStatus.VERIFIED,
+                  approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+                  effectiveFrom: { lte: now },
+                  AND: [
+                    {
+                      OR: [
+                        { effectiveUntil: null },
+                        { effectiveUntil: { gt: now } },
+                      ],
+                    },
+                  ],
+                  updatedAt: link.updatedAt,
+                },
+                data: { status: GuardianRelationshipStatus.ACTIVE },
+              });
+              relationshipsChanged = changed.count;
+              if (changed.count !== 1) {
+                throw new ConflictException(
+                  'Guardian relationship changed while account restoration was being finalized. Refresh and retry.',
+                );
+              }
+              relationshipStatus = GuardianRelationshipStatus.ACTIVE;
+              if (userId) {
+                await updateLinkedUser({ status: UserStatus.ACTIVE });
+                accountStatus = UserStatus.ACTIVE;
+              }
+              sessionsRevoked = await revokeSessions(
+                'guardian_account_recovery_complete',
+              );
+              break;
+            }
+            case 'APPROVE_PHONE_CHANGE': {
+              const guardianChanged = await tx.guardian.updateMany({
+                where: {
+                  id: guardianId,
+                  tenantId: actor.tenantId,
+                  updatedAt: link.guardian.updatedAt,
+                },
+                data: { primaryPhone: nextPhone! },
+              });
+              if (guardianChanged.count !== 1) {
+                throw new ConflictException(
+                  'Guardian profile changed while the phone update was being finalized. Refresh and retry.',
+                );
+              }
+              if (userId) {
+                await updateLinkedUser({ phone: nextPhone! });
+              }
+              sessionsRevoked = await revokeSessions(
+                'guardian_phone_change_approved',
+              );
+              break;
+            }
+            case 'EXPIRE_RELATIONSHIP': {
+              const changed = await tx.studentGuardian.updateMany({
+                where: {
+                  id: link.id,
+                  tenantId: actor.tenantId,
+                  studentId,
+                  guardianId,
+                  status: {
+                    in: [
+                      GuardianRelationshipStatus.ACTIVE,
+                      GuardianRelationshipStatus.SUSPENDED,
+                    ],
+                  },
+                  updatedAt: link.updatedAt,
+                },
+                data: {
+                  status: GuardianRelationshipStatus.EXPIRED,
+                  isPrimary: false,
+                  restrictionReasonRef: evidenceReference,
+                  effectiveUntil:
+                    link.effectiveUntil && link.effectiveUntil < now
+                      ? link.effectiveUntil
+                      : now,
+                },
+              });
+              relationshipsChanged = changed.count;
+              if (changed.count !== 1) {
+                throw new ConflictException(
+                  'Guardian relationship changed while expiration was being finalized. Refresh and retry.',
+                );
+              }
+              relationshipStatus = GuardianRelationshipStatus.EXPIRED;
+              sessionsRevoked = await revokeSessions(
+                'guardian_relationship_expired',
+              );
+              break;
+            }
+            case 'REVOKE_RELATIONSHIP': {
+              const changed = await tx.studentGuardian.updateMany({
+                where: {
+                  id: link.id,
+                  tenantId: actor.tenantId,
+                  studentId,
+                  guardianId,
+                  status: {
+                    in: [
+                      GuardianRelationshipStatus.ACTIVE,
+                      GuardianRelationshipStatus.SUSPENDED,
+                    ],
+                  },
+                  updatedAt: link.updatedAt,
+                },
+                data: {
+                  status: GuardianRelationshipStatus.REVOKED,
+                  isPrimary: false,
+                  restrictionReasonRef: evidenceReference,
+                },
+              });
+              relationshipsChanged = changed.count;
+              if (changed.count !== 1) {
+                throw new ConflictException(
+                  'Guardian relationship changed while revocation was being finalized. Refresh and retry.',
+                );
+              }
+              relationshipStatus = GuardianRelationshipStatus.REVOKED;
+              sessionsRevoked = await revokeSessions(
+                'guardian_relationship_revoked',
+              );
+              break;
+            }
+            case 'MARK_DECEASED': {
+              const changed = await tx.studentGuardian.updateMany({
+                where: {
+                  tenantId: actor.tenantId,
+                  guardianId,
+                  status: {
+                    in: [
+                      GuardianRelationshipStatus.ACTIVE,
+                      GuardianRelationshipStatus.SUSPENDED,
+                    ],
+                  },
+                },
+                data: {
+                  status: GuardianRelationshipStatus.REVOKED,
+                  isPrimary: false,
+                  restrictionReasonRef: evidenceReference,
+                },
+              });
+              relationshipsChanged = changed.count;
+              if (
+                (link.status === GuardianRelationshipStatus.ACTIVE ||
+                  link.status === GuardianRelationshipStatus.SUSPENDED) &&
+                changed.count === 0
+              ) {
+                throw new ConflictException(
+                  'Guardian relationships changed while the deceased status was being finalized. Refresh and retry.',
+                );
+              }
+              relationshipStatus = GuardianRelationshipStatus.REVOKED;
+              if (userId) {
+                await updateLinkedUser({ status: UserStatus.SUSPENDED });
+                accountStatus = UserStatus.SUSPENDED;
+              }
+              sessionsRevoked = await revokeSessions(
+                'guardian_relationship_ended_deceased',
+              );
+              break;
+            }
+          }
+
+          await this.auditService.record(
+            {
+              action: dto.action.toLowerCase(),
+              resource: 'guardian_access',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: link.id,
+              before: {
+                relationshipStatus: link.status,
+                accountStatus: link.guardian.user?.status ?? null,
+                phone: maskPhone(link.guardian.primaryPhone),
+              },
+              after: {
+                studentId,
+                guardianId,
+                action: dto.action,
+                verificationMethod: dto.verificationMethod,
+                reason,
+                evidenceReference,
+                coGuardianId: dto.coGuardianId ?? null,
+                phoneChanged: Boolean(nextPhone),
+                nextPhone: nextPhone ? maskPhone(nextPhone) : null,
+                sessionsRevoked,
+                relationshipsChanged,
+                relationshipStatus,
+                accountStatus,
+              },
+            },
+            tx,
+          );
+
+          return {
+            success: true as const,
             action: dto.action,
-            verificationMethod: dto.verificationMethod,
-            reason,
-            evidenceReference,
-            coGuardianId: dto.coGuardianId ?? null,
-            phoneChanged: Boolean(nextPhone),
-            nextPhone: nextPhone ? maskPhone(nextPhone) : null,
             sessionsRevoked,
             relationshipsChanged,
             relationshipStatus,
             accountStatus,
-          },
+          };
         },
-        tx,
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        },
       );
-
-      return {
-        success: true as const,
-        action: dto.action,
-        sessionsRevoked,
-        relationshipsChanged,
-        relationshipStatus,
-        accountStatus,
-      };
-    });
+    } catch (error) {
+      if (isPrismaTransactionConflictError(error)) {
+        throw new ConflictException(
+          'Guardian access changed while recovery was being finalized. Refresh and retry.',
+        );
+      }
+      throw error;
+    }
   }
 
   async provisionGuardianAccount(
@@ -6083,6 +6216,7 @@ export class StudentsService {
             userId,
             purpose: { in: [OtpPurpose.RESET, OtpPurpose.VERIFY] },
             usedAt: { not: null },
+            expiresAt: { gt: new Date() },
           },
           select: { id: true },
           orderBy: { usedAt: 'desc' },
