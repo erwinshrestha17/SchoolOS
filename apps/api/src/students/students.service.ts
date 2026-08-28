@@ -3489,6 +3489,34 @@ export class StudentsService {
             appLoginLinked: false,
           },
         });
+        const [sourceIdentitiesRevoked, sourceQrCredentialsRevoked] =
+          await Promise.all([
+            tx.studentIdentity.updateMany({
+              where: {
+                tenantId: actor.tenantId,
+                studentId: sourceStudent.id,
+                status: 'ACTIVE',
+              },
+              data: {
+                status: 'REVOKED',
+                revokedAt: mergedAt,
+                revokedById: actor.userId,
+              },
+            }),
+            tx.studentQrCredential.updateMany({
+              where: {
+                tenantId: actor.tenantId,
+                studentId: sourceStudent.id,
+                status: StudentQrStatus.ACTIVE,
+              },
+              data: {
+                status: StudentQrStatus.REVOKED,
+                revokedAt: mergedAt,
+                updatedById: actor.userId,
+                revokeReason: `Student merged into ${targetStudent.studentSystemId}`,
+              },
+            }),
+          ]);
 
         const [sourceFeeAssignments, targetFeeAssignments] = await Promise.all([
           tx.studentFeeAssignment.findMany({
@@ -3781,6 +3809,8 @@ export class StudentsService {
             lifecycleStatus: StudentLifecycleStatus.MERGED,
             exitReason: `Merged into ${targetStudent.studentSystemId}: ${dto.reason}`,
             exitedAt: mergedAt,
+            studentIdentityCode: null,
+            qrCode: null,
           },
         });
 
@@ -3803,6 +3833,8 @@ export class StudentsService {
               counts: {
                 guardianLinks: guardianLinks.count,
                 sourceGuardianLinksExpired: sourceGuardianLinksExpired.count,
+                sourceIdentitiesRevoked: sourceIdentitiesRevoked.count,
+                sourceQrCredentialsRevoked: sourceQrCredentialsRevoked.count,
                 studentFeeAssignmentsMoved: studentFeeAssignmentsMoved.count,
                 duplicateFeeAssignmentsDeactivated:
                   duplicateFeeAssignmentsDeactivated.count,
@@ -3854,6 +3886,8 @@ export class StudentsService {
           canteenMealServings: canteenMealServings.count,
           canteenWalletTransactions: canteenWalletTransactions.count,
           sourceGuardianLinksExpired: sourceGuardianLinksExpired.count,
+          sourceIdentitiesRevoked: sourceIdentitiesRevoked.count,
+          sourceQrCredentialsRevoked: sourceQrCredentialsRevoked.count,
           studentFeeAssignmentsMoved: studentFeeAssignmentsMoved.count,
           duplicateFeeAssignmentsDeactivated:
             duplicateFeeAssignmentsDeactivated.count,

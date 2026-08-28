@@ -16,6 +16,7 @@ import {
   OtpPurpose,
   Prisma,
   StudentLifecycleStatus,
+  StudentQrStatus,
 } from '@prisma/client';
 import sharp from 'sharp';
 import { StudentsService } from './students.service';
@@ -1147,6 +1148,33 @@ describe('students lifecycle hardening', () => {
         appLoginLinked: false,
       },
     });
+    expect(prisma.transaction.studentIdentity.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: sourceStudent.id,
+        status: 'ACTIVE',
+      },
+      data: {
+        status: 'REVOKED',
+        revokedAt: expect.any(Date) as Date,
+        revokedById: actor.userId,
+      },
+    });
+    expect(
+      prisma.transaction.studentQrCredential.updateMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: sourceStudent.id,
+        status: StudentQrStatus.ACTIVE,
+      },
+      data: {
+        status: StudentQrStatus.REVOKED,
+        revokedAt: expect.any(Date) as Date,
+        updatedById: actor.userId,
+        revokeReason: `Student merged into ${targetStudent.studentSystemId}`,
+      },
+    });
     expect(prisma.transaction.invoice.updateMany).toHaveBeenCalledWith({
       where: {
         tenantId: actor.tenantId,
@@ -1177,6 +1205,8 @@ describe('students lifecycle hardening', () => {
         data: expect.objectContaining({
           lifecycleStatus: StudentLifecycleStatus.MERGED,
           exitReason: `Merged into ${targetStudent.studentSystemId}: Duplicate record confirmed by registrar`,
+          studentIdentityCode: null,
+          qrCode: null,
         }),
       }),
     );
@@ -1208,6 +1238,8 @@ describe('students lifecycle hardening', () => {
       StudentLifecycleStatus.MERGED,
     );
     expect(result.mergeCounts.sourceGuardianLinksExpired).toBe(1);
+    expect(result.mergeCounts.sourceIdentitiesRevoked).toBe(1);
+    expect(result.mergeCounts.sourceQrCredentialsRevoked).toBe(1);
   });
 
   it('rejects duplicate merge when the canonical target lifecycle changes before claim', async () => {
@@ -5856,6 +5888,12 @@ function buildPrisma(options: {
             1,
         }),
       ),
+    },
+    studentIdentity: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    studentQrCredential: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     guardian: {
       findFirst: jest.fn().mockResolvedValue({

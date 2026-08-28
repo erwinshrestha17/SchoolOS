@@ -41,6 +41,7 @@ export interface MockState {
   payments: Record<string, unknown>[];
   invoices: Record<string, unknown>[];
   studentFeeAssignments: Record<string, unknown>[];
+  studentIdentities: Record<string, unknown>[];
   studentDocumentHistory: Record<string, unknown>[];
   cashierCloses: Record<string, unknown>[];
   receipts: Record<string, unknown>[];
@@ -303,6 +304,7 @@ export function createPrismaMock() {
     payments: [] as Record<string, unknown>[],
     invoices: [] as Record<string, unknown>[],
     studentFeeAssignments: [] as Record<string, unknown>[],
+    studentIdentities: [] as Record<string, unknown>[],
     studentDocumentHistory: [] as Record<string, unknown>[],
     cashierCloses: [] as Record<string, unknown>[],
     receipts: [] as Record<string, unknown>[],
@@ -2563,6 +2565,7 @@ export function createPrismaMock() {
     'reportExport',
     'studentGuardian',
     'studentFeeAssignment',
+    'studentIdentity',
     'guardian',
     'attendanceCorrectionRequest',
     'section',

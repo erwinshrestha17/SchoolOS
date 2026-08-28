@@ -58,6 +58,8 @@ describe('StudentsService (Duplicate Merge)', () => {
               findMany: jest.fn(),
               updateMany: jest.fn(),
             },
+            studentIdentity: { updateMany: jest.fn() },
+            studentQrCredential: { updateMany: jest.fn() },
             studentDocument: {
               findMany: jest.fn(),
               updateMany: jest.fn(),
@@ -135,6 +137,8 @@ describe('StudentsService (Duplicate Merge)', () => {
     const delegates = [
       prisma.studentGuardian,
       prisma.studentFeeAssignment,
+      prisma.studentIdentity,
+      prisma.studentQrCredential,
       prisma.studentDocument,
       prisma.generatedStudentDocument,
       prisma.invoice,

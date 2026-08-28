@@ -5,7 +5,11 @@ import {
 } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
-import { StudentDocumentKind, StudentLifecycleStatus } from '@prisma/client';
+import {
+  StudentDocumentKind,
+  StudentLifecycleStatus,
+  StudentQrStatus,
+} from '@prisma/client';
 import { ActivityMediaProcessor } from '../src/activity-feed/processors/activity-media.processor';
 import { AppModule } from '../src/app.module';
 import { FinanceProcessor } from '../src/finance/finance.processor';
@@ -281,6 +285,30 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
   it('preserves document history and audits duplicate merge into canonical student', async () => {
     const source = await createStudent('Duplicate', 'Student');
     const target = await createStudent('Duplicate', 'Student');
+    await prisma.student.update({
+      where: { id: source.id },
+      data: {
+        studentIdentityCode: 'SOURCE-IDENTITY-CODE',
+        qrCode: 'SOURCE-LEGACY-QR',
+      },
+    });
+    await prisma.studentIdentity.create({
+      data: {
+        tenantId,
+        studentId: source.id,
+        identityCode: 'SOURCE-IDENTITY-CODE',
+        status: 'ACTIVE',
+      },
+    });
+    await prisma.studentQrCredential.create({
+      data: {
+        tenantId,
+        studentId: source.id,
+        tokenHash: 'source-credential-token-hash',
+        status: StudentQrStatus.ACTIVE,
+        createdById: actor.userId,
+      },
+    });
 
     const document = await studentsService.uploadStudentDocument(
       source.id,
@@ -307,6 +335,32 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
       where: { id: source.id },
     });
     expect(sourceAfter?.lifecycleStatus).toBe(StudentLifecycleStatus.MERGED);
+    expect(sourceAfter?.studentIdentityCode).toBeNull();
+    expect(sourceAfter?.qrCode).toBeNull();
+
+    const [sourceIdentities, sourceQrCredentials] = await Promise.all([
+      prisma.studentIdentity.findMany({
+        where: { tenantId, studentId: source.id },
+      }),
+      prisma.studentQrCredential.findMany({
+        where: { tenantId, studentId: source.id },
+      }),
+    ]);
+    expect(sourceIdentities).toEqual([
+      expect.objectContaining({
+        status: 'REVOKED',
+        revokedById: actor.userId,
+        revokedAt: expect.any(Date) as Date,
+      }),
+    ]);
+    expect(sourceQrCredentials).toEqual([
+      expect.objectContaining({
+        status: StudentQrStatus.REVOKED,
+        updatedById: actor.userId,
+        revokedAt: expect.any(Date) as Date,
+        revokeReason: `Student merged into ${target.studentSystemId}`,
+      }),
+    ]);
 
     const targetDocuments = await prisma.studentDocument.findMany({
       where: { tenantId, studentId: target.id },
