@@ -274,7 +274,9 @@ describe('StudentsService (Duplicate Merge)', () => {
     (prisma.student.findFirst as jest.Mock)
       .mockResolvedValueOnce(sourceStudent)
       .mockResolvedValueOnce(targetStudent);
-    (prisma.student.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+    (prisma.student.updateMany as jest.Mock)
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
 
     await expect(
       service.mergeDuplicateStudent(

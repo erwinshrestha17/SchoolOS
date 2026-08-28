@@ -1116,6 +1116,14 @@ describe('students lifecycle hardening', () => {
       },
       data: { studentId: targetStudent.id },
     });
+    expect(prisma.transaction.student.updateMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        id: targetStudent.id,
+        tenantId: actor.tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+      data: { lifecycleStatus: StudentLifecycleStatus.ACTIVE },
+    });
     expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -1160,6 +1168,62 @@ describe('students lifecycle hardening', () => {
     );
     expect(result.sourceStudent.lifecycleStatus).toBe(
       StudentLifecycleStatus.MERGED,
+    );
+  });
+
+  it('rejects duplicate merge when the canonical target lifecycle changes before claim', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      studentSystemId: 'SCH-2026-0002',
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      studentSystemId: 'SCH-2026-0001',
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+    });
+    prisma.transaction.student.updateMany.mockResolvedValueOnce({ count: 0 });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: sourceStudent.id,
+          targetStudentId: targetStudent.id,
+          reason: 'Duplicate record confirmed by registrar',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'The canonical target record changed before the merge could be completed',
+    );
+
+    expect(
+      prisma.transaction.studentDocument.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(
+      prisma.transaction.studentMergeHistory.create,
+    ).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('maps duplicate merge serialization conflicts to a bounded retry response', async () => {
+    const prisma = buildPrisma({});
+    prisma.$transaction.mockRejectedValueOnce({ code: 'P2034' });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: 'student-source',
+          targetStudentId: 'student-target',
+          reason: 'Duplicate record confirmed by registrar',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Student records changed while the duplicate merge was being finalized',
     );
   });
 

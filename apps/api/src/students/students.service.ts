@@ -3365,7 +3365,7 @@ export class StudentsService {
       );
     }
 
-    return this.prisma.$transaction(
+    const mergeTransaction = this.prisma.$transaction(
       async (tx) => {
         const [sourceStudent, targetStudent] = await Promise.all([
           this.findTenantStudentForDuplicateMerge(
@@ -3444,6 +3444,20 @@ export class StudentsService {
         ) {
           throw new ConflictException(
             'These records were marked as not duplicates. Reopen the review before merging.',
+          );
+        }
+
+        const targetLifecycleClaim = await tx.student.updateMany({
+          where: {
+            id: targetStudent.id,
+            tenantId: actor.tenantId,
+            lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+          },
+          data: { lifecycleStatus: StudentLifecycleStatus.ACTIVE },
+        });
+        if (targetLifecycleClaim.count !== 1) {
+          throw new ConflictException(
+            'The canonical target record changed before the merge could be completed. Refresh and try again.',
           );
         }
 
@@ -3761,6 +3775,15 @@ export class StudentsService {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       },
     );
+
+    return mergeTransaction.catch((error: unknown) => {
+      if (isPrismaTransactionConflictError(error)) {
+        throw new ConflictException(
+          'Student records changed while the duplicate merge was being finalized. Refresh and retry.',
+        );
+      }
+      throw error;
+    });
   }
 
   async inviteGuardians(
