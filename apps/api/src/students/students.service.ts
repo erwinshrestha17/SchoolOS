@@ -1905,9 +1905,14 @@ export class StudentsService {
           const now = new Date();
           if (
             nextIsPrimary &&
-            (nextRelationshipStatus !== GuardianRelationshipStatus.ACTIVE ||
-              nextEffectiveFrom > now ||
-              (nextEffectiveUntil !== null && nextEffectiveUntil <= now))
+            !isGuardianRelationshipCurrentlyActive(
+              {
+                status: nextRelationshipStatus,
+                effectiveFrom: nextEffectiveFrom,
+                effectiveUntil: nextEffectiveUntil,
+              },
+              now,
+            )
           ) {
             throw new BadRequestException(
               'Only a currently active guardian relationship can be primary.',
@@ -2058,122 +2063,151 @@ export class StudentsService {
     actor: AuthContext,
   ) {
     this.assertGuardianAccessWriteAllowed(dto, actor);
-    const student = await this.prisma.student.findFirst({
-      where: { id: studentId, tenantId: actor.tenantId },
-      select: { id: true },
-    });
-    if (!student) {
-      throw new NotFoundException('Student not found in this tenant');
-    }
-
-    const existingLinks = await this.prisma.studentGuardian.findMany({
-      where: { tenantId: actor.tenantId, studentId },
-      select: { id: true, guardianId: true, isPrimary: true },
-      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-    });
     const relation = assertNonEmpty(dto.relation, 'relation');
-    const shouldBePrimary =
-      existingLinks.length === 0 || dto.isPrimary === true;
     const relationshipData = buildGuardianRelationshipCreate(dto, actor);
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      let guardian: {
-        id: string;
-        fullName: string;
-        primaryPhone: string;
-        relation: string;
-      } | null = null;
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          const student = await tx.student.findFirst({
+            where: { id: studentId, tenantId: actor.tenantId },
+            select: { id: true },
+          });
+          if (!student) {
+            throw new NotFoundException('Student not found in this tenant');
+          }
 
-      if (dto.guardianId) {
-        guardian = await tx.guardian.findFirst({
-          where: { id: dto.guardianId, tenantId: actor.tenantId },
-          select: {
-            id: true,
-            fullName: true,
-            primaryPhone: true,
-            relation: true,
-          },
-        });
-        if (!guardian) {
-          throw new NotFoundException('Guardian not found in this tenant');
-        }
-      }
+          const existingLinks = await tx.studentGuardian.findMany({
+            where: { tenantId: actor.tenantId, studentId },
+            select: { id: true, guardianId: true, isPrimary: true },
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          });
+          const shouldBePrimary =
+            existingLinks.length === 0 || dto.isPrimary === true;
+          if (
+            shouldBePrimary &&
+            !isGuardianRelationshipCurrentlyActive(relationshipData, new Date())
+          ) {
+            throw new BadRequestException(
+              'Only a currently active guardian relationship can be primary.',
+            );
+          }
 
-      if (!guardian) {
-        if (!dto.fullName || !dto.primaryPhone) {
-          throw new BadRequestException(
-            'Guardian full name and primary phone are required.',
+          let guardian: {
+            id: string;
+            fullName: string;
+            primaryPhone: string;
+            relation: string;
+          } | null = null;
+
+          if (dto.guardianId) {
+            guardian = await tx.guardian.findFirst({
+              where: { id: dto.guardianId, tenantId: actor.tenantId },
+              select: {
+                id: true,
+                fullName: true,
+                primaryPhone: true,
+                relation: true,
+              },
+            });
+            if (!guardian) {
+              throw new NotFoundException('Guardian not found in this tenant');
+            }
+          }
+
+          if (!guardian) {
+            if (!dto.fullName || !dto.primaryPhone) {
+              throw new BadRequestException(
+                'Guardian full name and primary phone are required.',
+              );
+            }
+            guardian = await tx.guardian.create({
+              data: {
+                tenantId: actor.tenantId,
+                fullName: requirePersonName(dto.fullName, 'fullName'),
+                relation,
+                primaryPhone: requireNepalPhone(dto.primaryPhone),
+                secondaryPhone: optionalNepalPhone(dto.secondaryPhone),
+                email: optionalProfileEmail(dto.email),
+                occupation: normalizeNullableString(dto.occupation),
+                homeAddress: normalizeNullableString(dto.homeAddress),
+                wardNumber: normalizeNullableString(dto.wardNumber),
+              },
+              select: {
+                id: true,
+                fullName: true,
+                primaryPhone: true,
+                relation: true,
+              },
+            });
+          }
+
+          if (existingLinks.some((link) => link.guardianId === guardian.id)) {
+            throw new ConflictException(
+              'This guardian is already linked to the student.',
+            );
+          }
+
+          if (shouldBePrimary) {
+            await tx.studentGuardian.updateMany({
+              where: { tenantId: actor.tenantId, studentId },
+              data: { isPrimary: false },
+            });
+          }
+
+          const link = await tx.studentGuardian.create({
+            data: {
+              tenantId: actor.tenantId,
+              studentId,
+              guardianId: guardian.id,
+              relation,
+              isPrimary: shouldBePrimary,
+              ...relationshipData,
+            },
+          });
+
+          await this.auditService.record(
+            {
+              action: 'create',
+              resource: 'student_guardian',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: link.id,
+              after: {
+                studentId,
+                guardianId: guardian.id,
+                relation,
+                isPrimary: link.isPrimary,
+                capabilities: link.capabilities,
+                verificationStatus: link.verificationStatus,
+                status: link.status,
+                effectiveFrom: link.effectiveFrom,
+                effectiveUntil: link.effectiveUntil,
+                emergencyContactPriority: link.emergencyContactPriority,
+                approvalStatus: link.approvalStatus,
+                restrictionReasonRef: link.restrictionReasonRef,
+              },
+            },
+            tx,
           );
-        }
-        guardian = await tx.guardian.create({
-          data: {
-            tenantId: actor.tenantId,
-            fullName: requirePersonName(dto.fullName, 'fullName'),
-            relation,
-            primaryPhone: requireNepalPhone(dto.primaryPhone),
-            secondaryPhone: optionalNepalPhone(dto.secondaryPhone),
-            email: optionalProfileEmail(dto.email),
-            occupation: normalizeNullableString(dto.occupation),
-            homeAddress: normalizeNullableString(dto.homeAddress),
-            wardNumber: normalizeNullableString(dto.wardNumber),
-          },
-          select: {
-            id: true,
-            fullName: true,
-            primaryPhone: true,
-            relation: true,
-          },
-        });
-      }
-
-      if (existingLinks.some((link) => link.guardianId === guardian.id)) {
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        },
+      );
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
         throw new ConflictException(
           'This guardian is already linked to the student.',
         );
       }
-
-      if (shouldBePrimary) {
-        await tx.studentGuardian.updateMany({
-          where: { tenantId: actor.tenantId, studentId },
-          data: { isPrimary: false },
-        });
+      if (isPrismaTransactionConflictError(error)) {
+        throw new ConflictException(
+          'Guardian relationships changed while this link was being finalized. Refresh and retry.',
+        );
       }
-
-      const link = await tx.studentGuardian.create({
-        data: {
-          tenantId: actor.tenantId,
-          studentId,
-          guardianId: guardian.id,
-          relation,
-          isPrimary: shouldBePrimary,
-          ...relationshipData,
-        },
-      });
-
-      return { guardian, link };
-    });
-
-    await this.auditService.record({
-      action: 'create',
-      resource: 'student_guardian',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: result.link.id,
-      after: {
-        studentId,
-        guardianId: result.guardian.id,
-        relation,
-        isPrimary: result.link.isPrimary,
-        capabilities: result.link.capabilities,
-        verificationStatus: result.link.verificationStatus,
-        status: result.link.status,
-        effectiveFrom: result.link.effectiveFrom,
-        effectiveUntil: result.link.effectiveUntil,
-        emergencyContactPriority: result.link.emergencyContactPriority,
-        approvalStatus: result.link.approvalStatus,
-        restrictionReasonRef: result.link.restrictionReasonRef,
-      },
-    });
+      throw error;
+    }
 
     return this.getStudentProfile(studentId, actor);
   }
@@ -6785,6 +6819,21 @@ function validateGuardianRelationshipWindow(
       'Guardian relationship end date must be after its start date.',
     );
   }
+}
+
+function isGuardianRelationshipCurrentlyActive(
+  relationship: {
+    status: GuardianRelationshipStatus;
+    effectiveFrom: Date;
+    effectiveUntil: Date | null;
+  },
+  at: Date,
+) {
+  return (
+    relationship.status === GuardianRelationshipStatus.ACTIVE &&
+    relationship.effectiveFrom <= at &&
+    (relationship.effectiveUntil === null || relationship.effectiveUntil > at)
+  );
 }
 
 function requireGuardianRestrictionReference(

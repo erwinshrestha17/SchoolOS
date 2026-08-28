@@ -1980,7 +1980,7 @@ describe('students lifecycle hardening', () => {
         { id: 'link-2', guardianId: 'guardian-2', isPrimary: false },
       ],
     });
-    const { service } = buildService(prisma);
+    const { service, auditService } = buildService(prisma);
     jest.spyOn(service, 'getStudentProfile').mockResolvedValue({} as never);
 
     await service.addStudentGuardian(
@@ -1998,6 +1998,15 @@ describe('students lifecycle hardening', () => {
       actor,
     );
 
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
+    expect(prisma.student.findFirst).not.toHaveBeenCalled();
+    expect(prisma.studentGuardian.findMany).not.toHaveBeenCalled();
+    expect(prisma.transaction.student.findFirst).toHaveBeenCalledWith({
+      where: { id: 'student-1', tenantId: actor.tenantId },
+      select: { id: true },
+    });
     expect(prisma.transaction.studentGuardian.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         tenantId: actor.tenantId,
@@ -2011,7 +2020,98 @@ describe('students lifecycle hardening', () => {
         approvedById: actor.userId,
       }),
     });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'create',
+        resource: 'student_guardian',
+        tenantId: actor.tenantId,
+        resourceId: 'student-guardian-created',
+      }),
+      prisma.transaction,
+    );
   });
+
+  it('rejects an inactive first guardian instead of making it primary', async () => {
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [{ id: 'student-1' }],
+      studentGuardianFindManyResult: [],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.addStudentGuardian(
+        'student-1',
+        {
+          guardianId: 'guardian-3',
+          relation: 'LOCAL_GUARDIAN',
+          status: GuardianRelationshipStatus.REVOKED,
+          restrictionReasonRef: 'court-order-24',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Only a currently active guardian relationship can be primary',
+    );
+
+    expect(prisma.transaction.guardian.findFirst).not.toHaveBeenCalled();
+    expect(prisma.transaction.studentGuardian.create).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rolls back guardian creation when the audit append fails', async () => {
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [{ id: 'student-1' }],
+      studentGuardianFindManyResult: [
+        { id: 'link-1', guardianId: 'guardian-1', isPrimary: true },
+      ],
+    });
+    const { service, auditService } = buildService(prisma);
+    auditService.record.mockRejectedValueOnce(
+      new Error('guardian audit unavailable'),
+    );
+
+    await expect(
+      service.addStudentGuardian(
+        'student-1',
+        {
+          guardianId: 'guardian-3',
+          relation: 'LOCAL_GUARDIAN',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('guardian audit unavailable');
+
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceId: 'student-guardian-created' }),
+      prisma.transaction,
+    );
+  });
+
+  it.each([
+    ['P2002', 'This guardian is already linked to the student.'],
+    [
+      'P2034',
+      'Guardian relationships changed while this link was being finalized.',
+    ],
+  ])(
+    'maps guardian creation database conflict %s to a bounded response',
+    async (code, message) => {
+      const prisma = buildPrisma({});
+      prisma.$transaction.mockRejectedValueOnce({ code });
+      const { service } = buildService(prisma);
+
+      await expect(
+        service.addStudentGuardian(
+          'student-1',
+          {
+            guardianId: 'guardian-3',
+            relation: 'LOCAL_GUARDIAN',
+          },
+          actor,
+        ),
+      ).rejects.toThrow(message);
+    },
+  );
 
   it('returns a tenant-scoped guardian administration view without raw session secrets', async () => {
     const link = buildGuardianAdministrationLink();
