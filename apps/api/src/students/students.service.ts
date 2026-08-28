@@ -3490,6 +3490,93 @@ export class StudentsService {
           },
         });
 
+        const [sourceFeeAssignments, targetFeeAssignments] = await Promise.all([
+          tx.studentFeeAssignment.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            select: {
+              id: true,
+              feePlanId: true,
+              academicYearId: true,
+              isActive: true,
+            },
+          }),
+          tx.studentFeeAssignment.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: targetStudent.id,
+            },
+            select: {
+              id: true,
+              feePlanId: true,
+              academicYearId: true,
+              isActive: true,
+            },
+          }),
+        ]);
+        const targetFeeAssignmentsByKey = new Map(
+          targetFeeAssignments.map((assignment) => [
+            feeAssignmentMergeKey(assignment),
+            assignment,
+          ]),
+        );
+        const feeAssignmentIdsToMove: string[] = [];
+        const duplicateActiveFeeAssignmentIds: string[] = [];
+
+        for (const sourceAssignment of sourceFeeAssignments) {
+          const targetAssignment = targetFeeAssignmentsByKey.get(
+            feeAssignmentMergeKey(sourceAssignment),
+          );
+          if (!targetAssignment) {
+            feeAssignmentIdsToMove.push(sourceAssignment.id);
+            continue;
+          }
+          if (sourceAssignment.isActive !== targetAssignment.isActive) {
+            throw new ConflictException(
+              'Source and canonical student fee assignments have different active states. Reconcile the fee plans before merging.',
+            );
+          }
+          if (sourceAssignment.isActive) {
+            duplicateActiveFeeAssignmentIds.push(sourceAssignment.id);
+          }
+        }
+
+        const [studentFeeAssignmentsMoved, duplicateFeeAssignmentsDeactivated] =
+          await Promise.all([
+            feeAssignmentIdsToMove.length > 0
+              ? tx.studentFeeAssignment.updateMany({
+                  where: {
+                    id: { in: feeAssignmentIdsToMove },
+                    tenantId: actor.tenantId,
+                    studentId: sourceStudent.id,
+                  },
+                  data: { studentId: targetStudent.id },
+                })
+              : Promise.resolve({ count: 0 }),
+            duplicateActiveFeeAssignmentIds.length > 0
+              ? tx.studentFeeAssignment.updateMany({
+                  where: {
+                    id: { in: duplicateActiveFeeAssignmentIds },
+                    tenantId: actor.tenantId,
+                    studentId: sourceStudent.id,
+                    isActive: true,
+                  },
+                  data: { isActive: false },
+                })
+              : Promise.resolve({ count: 0 }),
+          ]);
+        if (
+          studentFeeAssignmentsMoved.count !== feeAssignmentIdsToMove.length ||
+          duplicateFeeAssignmentsDeactivated.count !==
+            duplicateActiveFeeAssignmentIds.length
+        ) {
+          throw new ConflictException(
+            'Student fee assignments changed while the duplicate merge was being finalized. Refresh and retry.',
+          );
+        }
+
         const sourceDocs = await tx.studentDocument.findMany({
           where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
         });
@@ -3716,6 +3803,9 @@ export class StudentsService {
               counts: {
                 guardianLinks: guardianLinks.count,
                 sourceGuardianLinksExpired: sourceGuardianLinksExpired.count,
+                studentFeeAssignmentsMoved: studentFeeAssignmentsMoved.count,
+                duplicateFeeAssignmentsDeactivated:
+                  duplicateFeeAssignmentsDeactivated.count,
                 documents: documents.count,
                 invoices: invoices.count,
                 payments: payments.count,
@@ -3764,6 +3854,9 @@ export class StudentsService {
           canteenMealServings: canteenMealServings.count,
           canteenWalletTransactions: canteenWalletTransactions.count,
           sourceGuardianLinksExpired: sourceGuardianLinksExpired.count,
+          studentFeeAssignmentsMoved: studentFeeAssignmentsMoved.count,
+          duplicateFeeAssignmentsDeactivated:
+            duplicateFeeAssignmentsDeactivated.count,
         };
 
         await this.auditService.record(
@@ -3808,6 +3901,11 @@ export class StudentsService {
     );
 
     return mergeTransaction.catch((error: unknown) => {
+      if (isPrismaUniqueConstraintError(error)) {
+        throw new ConflictException(
+          'A canonical student record now conflicts with source data being merged. Refresh, reconcile the conflicting record, and retry.',
+        );
+      }
       if (isPrismaTransactionConflictError(error)) {
         throw new ConflictException(
           'Student records changed while the duplicate merge was being finalized. Refresh and retry.',
@@ -6995,6 +7093,13 @@ function normalizeNullableString(value: string | null | undefined) {
   const trimmed = value?.trim();
 
   return trimmed ? trimmed : null;
+}
+
+function feeAssignmentMergeKey(assignment: {
+  feePlanId: string;
+  academicYearId: string;
+}) {
+  return `${assignment.feePlanId}\u0000${assignment.academicYearId}`;
 }
 
 type GuardianRelationshipWriteInput = Pick<

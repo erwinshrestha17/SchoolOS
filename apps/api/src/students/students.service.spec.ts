@@ -1247,6 +1247,178 @@ describe('students lifecycle hardening', () => {
     expect(auditService.record).not.toHaveBeenCalled();
   });
 
+  it('moves unique fee assignments and deactivates redundant active source assignments during merge', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      studentSystemId: 'SCH-2026-0002',
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      studentSystemId: 'SCH-2026-0001',
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+      studentFeeAssignmentFindManyQueue: [
+        [
+          {
+            id: 'assignment-to-move',
+            feePlanId: 'fee-plan-a',
+            academicYearId: 'academic-year-1',
+            isActive: true,
+          },
+          {
+            id: 'assignment-to-deactivate',
+            feePlanId: 'fee-plan-b',
+            academicYearId: 'academic-year-1',
+            isActive: true,
+          },
+        ],
+        [
+          {
+            id: 'canonical-assignment',
+            feePlanId: 'fee-plan-b',
+            academicYearId: 'academic-year-1',
+            isActive: true,
+          },
+        ],
+      ],
+      transactionStudentFeeAssignmentUpdateManyCountQueue: [1, 1],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.mergeDuplicateStudent(
+      {
+        sourceStudentId: sourceStudent.id,
+        targetStudentId: targetStudent.id,
+        reason: 'Duplicate record confirmed by registrar',
+      },
+      actor,
+    );
+
+    expect(
+      prisma.transaction.studentFeeAssignment.updateMany,
+    ).toHaveBeenNthCalledWith(1, {
+      where: {
+        id: { in: ['assignment-to-move'] },
+        tenantId: actor.tenantId,
+        studentId: sourceStudent.id,
+      },
+      data: { studentId: targetStudent.id },
+    });
+    expect(
+      prisma.transaction.studentFeeAssignment.updateMany,
+    ).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: { in: ['assignment-to-deactivate'] },
+        tenantId: actor.tenantId,
+        studentId: sourceStudent.id,
+        isActive: true,
+      },
+      data: { isActive: false },
+    });
+    expect(result.mergeCounts.studentFeeAssignmentsMoved).toBe(1);
+    expect(result.mergeCounts.duplicateFeeAssignmentsDeactivated).toBe(1);
+  });
+
+  it('requires accountant reconciliation when duplicate fee assignment states differ', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      studentSystemId: 'SCH-2026-0002',
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      studentSystemId: 'SCH-2026-0001',
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+      studentFeeAssignmentFindManyQueue: [
+        [
+          {
+            id: 'source-assignment',
+            feePlanId: 'fee-plan-a',
+            academicYearId: 'academic-year-1',
+            isActive: true,
+          },
+        ],
+        [
+          {
+            id: 'canonical-assignment',
+            feePlanId: 'fee-plan-a',
+            academicYearId: 'academic-year-1',
+            isActive: false,
+          },
+        ],
+      ],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: sourceStudent.id,
+          targetStudentId: targetStudent.id,
+          reason: 'Duplicate record confirmed by registrar',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Source and canonical student fee assignments have different active states',
+    );
+
+    expect(
+      prisma.transaction.studentFeeAssignment.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(
+      prisma.transaction.studentDocument.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate merge when a fee assignment changes before reassignment', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      studentSystemId: 'SCH-2026-0002',
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      studentSystemId: 'SCH-2026-0001',
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+      studentFeeAssignmentFindManyQueue: [
+        [
+          {
+            id: 'source-assignment',
+            feePlanId: 'fee-plan-a',
+            academicYearId: 'academic-year-1',
+            isActive: true,
+          },
+        ],
+        [],
+      ],
+      transactionStudentFeeAssignmentUpdateManyCountQueue: [0],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: sourceStudent.id,
+          targetStudentId: targetStudent.id,
+          reason: 'Duplicate record confirmed by registrar',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Student fee assignments changed while the duplicate merge was being finalized',
+    );
+
+    expect(
+      prisma.transaction.studentDocument.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
   it('maps duplicate merge serialization conflicts to a bounded retry response', async () => {
     const prisma = buildPrisma({});
     prisma.$transaction.mockRejectedValueOnce({ code: 'P2034' });
@@ -1263,6 +1435,25 @@ describe('students lifecycle hardening', () => {
       ),
     ).rejects.toThrow(
       'Student records changed while the duplicate merge was being finalized',
+    );
+  });
+
+  it('maps concurrent duplicate merge constraints to a bounded reconciliation response', async () => {
+    const prisma = buildPrisma({});
+    prisma.$transaction.mockRejectedValueOnce({ code: 'P2002' });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: 'student-source',
+          targetStudentId: 'student-target',
+          reason: 'Duplicate record confirmed by registrar',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'A canonical student record now conflicts with source data being merged',
     );
   });
 
@@ -5603,6 +5794,8 @@ function buildPrisma(options: {
   transactionStudentGuardianUpdateManyCount?: number;
   transactionGuardianUpdateManyCount?: number;
   transactionUserUpdateManyCount?: number;
+  studentFeeAssignmentFindManyQueue?: unknown[][];
+  transactionStudentFeeAssignmentUpdateManyCountQueue?: number[];
 }) {
   const transaction = {
     enrollment: {
@@ -5647,6 +5840,22 @@ function buildPrisma(options: {
       updateMany: jest.fn().mockResolvedValue({
         count: options.transactionStudentGuardianUpdateManyCount ?? 1,
       }),
+    },
+    studentFeeAssignment: {
+      findMany: jest
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve(
+            options.studentFeeAssignmentFindManyQueue?.shift() ?? [],
+          ),
+        ),
+      updateMany: jest.fn().mockImplementation(() =>
+        Promise.resolve({
+          count:
+            options.transactionStudentFeeAssignmentUpdateManyCountQueue?.shift() ??
+            1,
+        }),
+      ),
     },
     guardian: {
       findFirst: jest.fn().mockResolvedValue({

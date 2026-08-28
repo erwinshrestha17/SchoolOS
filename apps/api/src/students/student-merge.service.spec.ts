@@ -54,6 +54,10 @@ describe('StudentsService (Duplicate Merge)', () => {
               createMany: jest.fn(),
               updateMany: jest.fn(),
             },
+            studentFeeAssignment: {
+              findMany: jest.fn(),
+              updateMany: jest.fn(),
+            },
             studentDocument: {
               findMany: jest.fn(),
               updateMany: jest.fn(),
@@ -130,6 +134,7 @@ describe('StudentsService (Duplicate Merge)', () => {
     auditService = module.get<AuditService>(AuditService);
     const delegates = [
       prisma.studentGuardian,
+      prisma.studentFeeAssignment,
       prisma.studentDocument,
       prisma.generatedStudentDocument,
       prisma.invoice,
@@ -156,6 +161,7 @@ describe('StudentsService (Duplicate Merge)', () => {
       delegate.createMany?.mockResolvedValue({ count: 0 });
     }
     (prisma.studentDocument.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.studentFeeAssignment.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.student.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
     (auditService.record as jest.Mock).mockResolvedValue(undefined);
   });
