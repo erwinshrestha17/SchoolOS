@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -482,154 +483,41 @@ export class M1AdmissionsHardeningService {
       );
     }
 
-    const link = await this.prisma.studentGuardian.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        studentId,
-        guardianId,
-        status: GuardianRelationshipStatus.ACTIVE,
-      },
-      include: { guardian: true, student: true },
-    });
-    if (!link) {
-      throw new NotFoundException('Guardian link not found in this tenant');
-    }
-
-    const activeLinks = await this.prisma.studentGuardian.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        studentId,
-        status: GuardianRelationshipStatus.ACTIVE,
-      },
-      select: { id: true, guardianId: true, isPrimary: true },
-      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-    });
-    if (activeLinks.length <= 1) {
-      throw new BadRequestException(
-        'A student must have at least one guardian.',
-      );
-    }
-    if (link.isPrimary) {
-      const replacement = dto.newPrimaryGuardianId
-        ? activeLinks.find(
-            (candidate) =>
-              candidate.guardianId === dto.newPrimaryGuardianId &&
-              candidate.guardianId !== guardianId,
-          )
-        : null;
-      if (!replacement) {
-        throw new BadRequestException(
-          'Choose another primary guardian before removing this one.',
-        );
-      }
-    }
-
-    const [documents, generatedDocuments, registryFiles] = await Promise.all([
-      this.prisma.studentDocument.findMany({
-        where: { tenantId: actor.tenantId, studentId },
-        select: { id: true, title: true, kind: true },
-      }),
-      this.prisma.generatedStudentDocument.count({
-        where: { tenantId: actor.tenantId, studentId },
-      }),
-      this.prisma.fileAsset.count({
-        where: {
-          tenantId: actor.tenantId,
-          module: 'students',
-          entityId: studentId,
-          deletedAt: null,
-        },
-      }),
-    ]);
-
-    await this.prisma.$transaction(async (tx) => {
-      if (link.isPrimary && dto.newPrimaryGuardianId) {
-        await tx.studentGuardian.updateMany({
-          where: { tenantId: actor.tenantId, studentId },
-          data: { isPrimary: false },
-        });
-        await tx.studentGuardian.updateMany({
-          where: {
-            tenantId: actor.tenantId,
+    let result: Awaited<ReturnType<typeof removeGuardianAccessTransaction>>;
+    try {
+      result = await this.prisma.$transaction(
+        async (tx) =>
+          removeGuardianAccessTransaction({
+            tx,
+            auditService: this.auditService,
             studentId,
-            guardianId: dto.newPrimaryGuardianId,
-          },
-          data: { isPrimary: true },
-        });
-      }
-      const revoked = await tx.studentGuardian.updateMany({
-        where: {
-          id: link.id,
-          tenantId: actor.tenantId,
-          studentId,
-          guardianId,
-          status: GuardianRelationshipStatus.ACTIVE,
-        },
-        data: {
-          status: GuardianRelationshipStatus.REVOKED,
-          isPrimary: false,
-          effectiveUntil: new Date(),
-          restrictionReasonRef: dto.evidenceReference,
-        },
-      });
-      if (revoked.count !== 1) {
-        throw new NotFoundException(
-          'Guardian link was already revoked or no longer belongs to this tenant',
+            guardianId,
+            dto,
+            actor,
+          }),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (isPrismaTransactionConflictError(error)) {
+        throw new ConflictException(
+          'Guardian access changed while removal was being finalized. Refresh and retry.',
         );
       }
-      if (documents.length > 0) {
-        await tx.studentDocumentHistory.createMany({
-          data: documents.map((document) => ({
-            tenantId: actor.tenantId,
-            documentId: document.id,
-            action: 'GUARDIAN_ACCESS_REVIEW',
-            documentTitle: document.title,
-            documentKind: document.kind,
-            performedBy: actor.userId,
-            reason: dto.reason,
-            metadata: {
-              guardianId,
-              studentId,
-              relationshipRevoked: true,
-              evidenceReference: dto.evidenceReference,
-            },
-          })),
-        });
-      }
-    });
-
-    await this.auditService.record({
-      action: 'guardian_revoked_file_access_review',
-      resource: 'student_guardian',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: link.id,
-      before: {
-        studentId,
-        guardianId,
-        guardianName: link.guardian.fullName,
-      },
-      after: {
-        reason: dto.reason,
-        evidenceReference: dto.evidenceReference,
-        documentsReviewed: documents.length,
-        generatedDocumentsReviewed: generatedDocuments,
-        registryFilesReviewed: registryFiles,
-      },
-    });
+      throw error;
+    }
 
     return {
       removed: true,
-      student: formatStudentSummary(link.student),
+      student: formatStudentSummary(result.link.student),
       guardian: {
-        id: link.guardian.id,
-        fullName: link.guardian.fullName,
-        primaryPhone: link.guardian.primaryPhone,
+        id: result.link.guardian.id,
+        fullName: result.link.guardian.fullName,
+        primaryPhone: result.link.guardian.primaryPhone,
       },
       accessReview: {
-        documentsReviewed: documents.length,
-        generatedDocumentsReviewed: generatedDocuments,
-        registryFilesReviewed: registryFiles,
+        documentsReviewed: result.documents.length,
+        generatedDocumentsReviewed: result.generatedDocuments,
+        registryFilesReviewed: result.registryFiles,
         canAccessStudentFiles: false,
         policy:
           'After guardian removal, guardian file access must fail unless a fresh active StudentGuardian link exists.',
@@ -944,6 +832,207 @@ export class M1AdmissionsHardeningService {
       );
     }
   }
+}
+
+async function removeGuardianAccessTransaction(input: {
+  tx: Prisma.TransactionClient;
+  auditService: AuditService;
+  studentId: string;
+  guardianId: string;
+  dto: RemoveStudentGuardianAccessDto;
+  actor: AuthContext;
+}) {
+  const { tx, auditService, studentId, guardianId, dto, actor } = input;
+  const now = new Date();
+  const activeWindow = buildCurrentGuardianRelationshipWhere(now);
+  const link = await tx.studentGuardian.findFirst({
+    where: {
+      tenantId: actor.tenantId,
+      studentId,
+      guardianId,
+      ...activeWindow,
+    },
+    include: { guardian: true, student: true },
+  });
+  if (!link) {
+    throw new NotFoundException(
+      'Current guardian link not found in this tenant',
+    );
+  }
+
+  const activeLinks = await tx.studentGuardian.findMany({
+    where: {
+      tenantId: actor.tenantId,
+      studentId,
+      ...activeWindow,
+    },
+    select: {
+      id: true,
+      guardianId: true,
+      isPrimary: true,
+      updatedAt: true,
+    },
+    orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+  });
+  if (activeLinks.length <= 1) {
+    throw new BadRequestException('A student must have at least one guardian.');
+  }
+
+  const replacement = link.isPrimary
+    ? dto.newPrimaryGuardianId
+      ? activeLinks.find(
+          (candidate) =>
+            candidate.guardianId === dto.newPrimaryGuardianId &&
+            candidate.guardianId !== guardianId,
+        )
+      : null
+    : null;
+  if (link.isPrimary && !replacement) {
+    throw new BadRequestException(
+      'Choose another primary guardian before removing this one.',
+    );
+  }
+
+  const [documents, generatedDocuments, registryFiles] = await Promise.all([
+    tx.studentDocument.findMany({
+      where: { tenantId: actor.tenantId, studentId },
+      select: { id: true, title: true, kind: true },
+    }),
+    tx.generatedStudentDocument.count({
+      where: { tenantId: actor.tenantId, studentId },
+    }),
+    tx.fileAsset.count({
+      where: {
+        tenantId: actor.tenantId,
+        module: 'students',
+        entityId: studentId,
+        deletedAt: null,
+      },
+    }),
+  ]);
+
+  if (replacement) {
+    const promoted = await tx.studentGuardian.updateMany({
+      where: {
+        id: replacement.id,
+        tenantId: actor.tenantId,
+        studentId,
+        guardianId: replacement.guardianId,
+        updatedAt: replacement.updatedAt,
+        ...activeWindow,
+      },
+      data: { isPrimary: true },
+    });
+    if (promoted.count !== 1) {
+      throw new ConflictException(
+        'The replacement guardian changed while removal was being finalized. Refresh and retry.',
+      );
+    }
+  }
+
+  const revoked = await tx.studentGuardian.updateMany({
+    where: {
+      id: link.id,
+      tenantId: actor.tenantId,
+      studentId,
+      guardianId,
+      updatedAt: link.updatedAt,
+      ...activeWindow,
+    },
+    data: {
+      status: GuardianRelationshipStatus.REVOKED,
+      isPrimary: false,
+      effectiveUntil: now,
+      restrictionReasonRef: dto.evidenceReference,
+    },
+  });
+  if (revoked.count !== 1) {
+    throw new ConflictException(
+      'Guardian access changed while removal was being finalized. Refresh and retry.',
+    );
+  }
+
+  if (replacement) {
+    await tx.studentGuardian.updateMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+        id: { notIn: [replacement.id, link.id] },
+        isPrimary: true,
+      },
+      data: { isPrimary: false },
+    });
+  }
+
+  if (documents.length > 0) {
+    await tx.studentDocumentHistory.createMany({
+      data: documents.map((document) => ({
+        tenantId: actor.tenantId,
+        documentId: document.id,
+        action: 'GUARDIAN_ACCESS_REVIEW',
+        documentTitle: document.title,
+        documentKind: document.kind,
+        performedBy: actor.userId,
+        reason: dto.reason,
+        metadata: {
+          guardianId,
+          studentId,
+          relationshipRevoked: true,
+          evidenceReference: dto.evidenceReference,
+        },
+      })),
+    });
+  }
+
+  await auditService.record(
+    {
+      action: 'guardian_revoked_file_access_review',
+      resource: 'student_guardian',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: link.id,
+      before: {
+        studentId,
+        guardianId,
+        guardianName: link.guardian.fullName,
+        isPrimary: link.isPrimary,
+      },
+      after: {
+        reason: dto.reason,
+        evidenceReference: dto.evidenceReference,
+        replacementGuardianId: replacement?.guardianId ?? null,
+        documentsReviewed: documents.length,
+        generatedDocumentsReviewed: generatedDocuments,
+        registryFilesReviewed: registryFiles,
+      },
+    },
+    tx,
+  );
+
+  return { link, documents, generatedDocuments, registryFiles };
+}
+
+function buildCurrentGuardianRelationshipWhere(
+  at: Date,
+): Prisma.StudentGuardianWhereInput {
+  return {
+    status: GuardianRelationshipStatus.ACTIVE,
+    effectiveFrom: { lte: at },
+    AND: [
+      {
+        OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: at } }],
+      },
+    ],
+  };
+}
+
+function isPrismaTransactionConflictError(error: unknown) {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === 'P2034'
+  );
 }
 
 function buildDuplicateSearchConditions(

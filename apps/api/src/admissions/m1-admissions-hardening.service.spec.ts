@@ -6,6 +6,7 @@ import {
 import {
   AuthMethod,
   EnrollmentStatus,
+  Prisma,
   StudentLifecycleStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -302,23 +303,30 @@ describe('M1AdmissionsHardeningService', () => {
       actor,
     );
 
-    expect(prisma.studentGuardian.findFirst).toHaveBeenCalledWith({
-      where: {
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
+    expect(prisma.studentGuardian.findFirst).not.toHaveBeenCalled();
+    expect(tx.studentGuardian.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
         tenantId: actor.tenantId,
         studentId: 'student-1',
         guardianId: 'guardian-1',
         status: 'ACTIVE',
-      },
+        effectiveFrom: { lte: expect.any(Date) },
+        AND: expect.any(Array),
+      }),
       include: { guardian: true, student: true },
     });
     expect(tx.studentGuardian.updateMany).toHaveBeenCalledWith({
-      where: {
+      where: expect.objectContaining({
         id: 'student-guardian-1',
         tenantId: actor.tenantId,
         studentId: 'student-1',
         guardianId: 'guardian-1',
         status: 'ACTIVE',
-      },
+        updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+      }),
       data: {
         status: 'REVOKED',
         isPrimary: false,
@@ -327,16 +335,20 @@ describe('M1AdmissionsHardeningService', () => {
       },
     });
     expect(tx.studentGuardian.updateMany).toHaveBeenCalledWith({
-      where: { tenantId: actor.tenantId, studentId: 'student-1' },
-      data: { isPrimary: false },
-    });
-    expect(tx.studentGuardian.updateMany).toHaveBeenCalledWith({
-      where: {
+      where: expect.objectContaining({
+        id: 'student-guardian-2',
         tenantId: actor.tenantId,
         studentId: 'student-1',
         guardianId: 'guardian-2',
-      },
+        status: 'ACTIVE',
+        updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+      }),
       data: { isPrimary: true },
+    });
+    expect(prisma.studentDocument.findMany).not.toHaveBeenCalled();
+    expect(tx.studentDocument.findMany).toHaveBeenCalledWith({
+      where: { tenantId: actor.tenantId, studentId: 'student-1' },
+      select: { id: true, title: true, kind: true },
     });
     expect(tx.studentDocumentHistory.createMany).toHaveBeenCalledWith({
       data: [
@@ -368,8 +380,121 @@ describe('M1AdmissionsHardeningService', () => {
         after: expect.objectContaining({
           reason: 'Guardian changed after admission review',
           evidenceReference: 'front-office-register-12',
+          replacementGuardianId: 'guardian-2',
         }),
       }),
+      tx,
+    );
+  });
+
+  it('rejects removal of the last currently active guardian inside the transaction', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    tx.studentGuardian.findMany.mockResolvedValueOnce([
+      {
+        id: 'student-guardian-1',
+        guardianId: 'guardian-1',
+        isPrimary: true,
+        updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+      },
+    ]);
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.removeGuardianAccess(
+        'student-1',
+        'guardian-1',
+        {
+          confirmFileAccessReview: true,
+          reason: 'Guardian changed after admission review',
+          evidenceReference: 'front-office-register-12',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('A student must have at least one guardian.');
+
+    expect(tx.studentDocument.findMany).not.toHaveBeenCalled();
+    expect(tx.studentGuardian.updateMany).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale replacement guardian before revoking the current primary', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    tx.studentGuardian.updateMany.mockResolvedValueOnce({ count: 0 });
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.removeGuardianAccess(
+        'student-1',
+        'guardian-1',
+        {
+          confirmFileAccessReview: true,
+          reason: 'Guardian changed after admission review',
+          evidenceReference: 'front-office-register-12',
+          newPrimaryGuardianId: 'guardian-2',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'The replacement guardian changed while removal was being finalized',
+    );
+
+    expect(tx.studentGuardian.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.studentDocumentHistory.createMany).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rolls back guardian removal when the audit append fails', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    const { service, auditService } = buildService(prisma);
+    auditService.record.mockRejectedValueOnce(
+      new Error('guardian removal audit unavailable'),
+    );
+
+    await expect(
+      service.removeGuardianAccess(
+        'student-1',
+        'guardian-1',
+        {
+          confirmFileAccessReview: true,
+          reason: 'Guardian changed after admission review',
+          evidenceReference: 'front-office-register-12',
+          newPrimaryGuardianId: 'guardian-2',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('guardian removal audit unavailable');
+
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceId: 'student-guardian-1' }),
+      tx,
+    );
+  });
+
+  it('maps guardian removal serialization conflicts to a bounded retry response', async () => {
+    const prisma = buildPrisma();
+    prisma.$transaction.mockRejectedValueOnce({ code: 'P2034' });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.removeGuardianAccess(
+        'student-1',
+        'guardian-1',
+        {
+          confirmFileAccessReview: true,
+          reason: 'Guardian changed after admission review',
+          evidenceReference: 'front-office-register-12',
+          newPrimaryGuardianId: 'guardian-2',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Guardian access changed while removal was being finalized',
     );
   });
 
@@ -679,8 +804,51 @@ function hasOverride(object: object, key: string): boolean {
 function buildTransaction() {
   return {
     studentGuardian: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'student-guardian-1',
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        guardianId: 'guardian-1',
+        relation: 'mother',
+        isPrimary: true,
+        status: 'ACTIVE',
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        effectiveUntil: null,
+        updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+        guardian: buildGuardian(),
+        student: buildStudent(),
+      }),
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: 'student-guardian-1',
+          guardianId: 'guardian-1',
+          isPrimary: true,
+          updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+        },
+        {
+          id: 'student-guardian-2',
+          guardianId: 'guardian-2',
+          isPrimary: false,
+          updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+        },
+      ]),
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    studentDocument: {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: 'document-1',
+          title: 'Birth certificate',
+          kind: 'BIRTH_CERTIFICATE',
+        },
+      ]),
+    },
+    generatedStudentDocument: {
+      count: jest.fn().mockResolvedValue(2),
+    },
+    fileAsset: {
+      count: jest.fn().mockResolvedValue(3),
     },
     studentDocumentHistory: {
       createMany: jest.fn().mockResolvedValue({ count: 1 }),
