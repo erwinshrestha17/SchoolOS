@@ -1324,6 +1324,85 @@ describe('students lifecycle hardening', () => {
     );
   });
 
+  it('moves non-overlapping sibling memberships to the canonical student', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      studentSystemId: 'SCH-2026-0002',
+      siblingMemberships: [
+        { id: 'source-membership', siblingGroupId: 'source-family' },
+      ],
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      studentSystemId: 'SCH-2026-0001',
+      siblingMemberships: [
+        { id: 'target-membership', siblingGroupId: 'target-family' },
+      ],
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+      transactionSiblingGroupMemberUpdateManyCount: 1,
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.mergeDuplicateStudent(
+      {
+        sourceStudentId: sourceStudent.id,
+        targetStudentId: targetStudent.id,
+        reason: 'Duplicate record confirmed by registrar',
+      },
+      actor,
+    );
+
+    expect(
+      prisma.transaction.siblingGroupMember.updateMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['source-membership'] },
+        tenantId: actor.tenantId,
+        studentId: sourceStudent.id,
+      },
+      data: { studentId: targetStudent.id },
+    });
+    expect(result.mergeCounts.siblingMemberships).toBe(1);
+  });
+
+  it('rejects duplicate merge when sibling membership changes before reassignment', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      studentSystemId: 'SCH-2026-0002',
+      siblingMemberships: [
+        { id: 'source-membership', siblingGroupId: 'source-family' },
+      ],
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      studentSystemId: 'SCH-2026-0001',
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+      transactionSiblingGroupMemberUpdateManyCount: 0,
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: sourceStudent.id,
+          targetStudentId: targetStudent.id,
+          reason: 'Duplicate record confirmed by registrar',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Sibling relationships changed while the duplicate merge was being finalized',
+    );
+    expect(
+      prisma.transaction.studentDocument.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
   it('rejects duplicate merge when the canonical target lifecycle changes before claim', async () => {
     const sourceStudent = buildStudent({
       id: 'student-source',
@@ -6029,6 +6108,7 @@ function buildStudent(
       approvedById?: string | null;
       approvedAt?: Date | null;
     }[];
+    siblingMemberships: { id: string; siblingGroupId: string }[];
     enrollments: {
       id?: string;
       academicYearId?: string;
@@ -6088,6 +6168,7 @@ function buildStudent(
     exitReason: null,
     feeClearanceWaivedAt: null,
     guardianLinks: overrides.guardianLinks ?? [],
+    siblingMemberships: overrides.siblingMemberships ?? [],
     enrollments: overrides.enrollments ?? [],
     documents: overrides.documents ?? [],
     generatedDocuments: overrides.generatedDocuments ?? [],
@@ -6247,6 +6328,7 @@ function buildPrisma(options: {
   transactionUserUpdateManyCount?: number;
   studentFeeAssignmentFindManyQueue?: unknown[][];
   transactionStudentFeeAssignmentUpdateManyCountQueue?: number[];
+  transactionSiblingGroupMemberUpdateManyCount?: number;
   studentIdentityFindFirstResult?: unknown;
   transactionStudentIdentityCreateResult?: unknown;
   transactionStudentIdentityFindFirstResult?: unknown;
@@ -6311,6 +6393,11 @@ function buildPrisma(options: {
             1,
         }),
       ),
+    },
+    siblingGroupMember: {
+      updateMany: jest.fn().mockResolvedValue({
+        count: options.transactionSiblingGroupMemberUpdateManyCount ?? 0,
+      }),
     },
     studentIdentity: {
       findFirst: jest

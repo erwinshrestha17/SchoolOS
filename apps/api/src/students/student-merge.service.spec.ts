@@ -58,6 +58,7 @@ describe('StudentsService (Duplicate Merge)', () => {
               findMany: jest.fn(),
               updateMany: jest.fn(),
             },
+            siblingGroupMember: { updateMany: jest.fn() },
             studentIdentity: { updateMany: jest.fn() },
             studentQrCredential: { updateMany: jest.fn() },
             studentDocument: {
@@ -146,6 +147,7 @@ describe('StudentsService (Duplicate Merge)', () => {
     const delegates = [
       prisma.studentGuardian,
       prisma.studentFeeAssignment,
+      prisma.siblingGroupMember,
       prisma.studentIdentity,
       prisma.studentQrCredential,
       prisma.studentDocument,
@@ -197,6 +199,7 @@ describe('StudentsService (Duplicate Merge)', () => {
     dateOfBirth: new Date('2015-01-01'),
     lifecycleStatus: StudentLifecycleStatus.ACTIVE,
     guardianLinks: [],
+    siblingMemberships: [],
   };
 
   const targetStudent = {
@@ -208,6 +211,7 @@ describe('StudentsService (Duplicate Merge)', () => {
     dateOfBirth: new Date('2015-01-01'),
     lifecycleStatus: StudentLifecycleStatus.ACTIVE,
     guardianLinks: [],
+    siblingMemberships: [],
   };
 
   it('should preview merge correctly', async () => {
@@ -230,6 +234,7 @@ describe('StudentsService (Duplicate Merge)', () => {
         transportLogs: 0,
         attendanceRecords: 0,
         attendanceCorrectionRequests: 0,
+        siblingMemberships: 0,
         studentLeaveRequests: 1,
         markEntries: 2,
         casRecords: 1,
@@ -280,6 +285,7 @@ describe('StudentsService (Duplicate Merge)', () => {
             transportLogs: true,
             attendanceRecords: true,
             attendanceCorrectionRequests: true,
+            siblingMemberships: true,
             studentLeaveRequests: true,
             markEntries: true,
             casRecords: true,
@@ -296,6 +302,65 @@ describe('StudentsService (Duplicate Merge)', () => {
         },
       },
     });
+  });
+
+  it('marks students in the same sibling group unsafe for merge preview', async () => {
+    (prisma.student.findFirst as jest.Mock)
+      .mockResolvedValueOnce({
+        ...sourceStudent,
+        siblingMemberships: [
+          { id: 'source-sibling', siblingGroupId: 'sibling-group-1' },
+        ],
+      })
+      .mockResolvedValueOnce({
+        ...targetStudent,
+        siblingMemberships: [
+          { id: 'target-sibling', siblingGroupId: 'sibling-group-1' },
+        ],
+      });
+    (prisma.student.findUnique as jest.Mock).mockResolvedValue({
+      _count: {},
+    });
+    (prisma.feeWaiver.count as jest.Mock).mockResolvedValue(0);
+    (prisma.conversation.count as jest.Mock).mockResolvedValue(0);
+    (prisma.conversationParticipant.count as jest.Mock).mockResolvedValue(0);
+
+    const result = await service.previewMergeDuplicateStudent(
+      { sourceStudentId: sourceStudent.id, targetStudentId: targetStudent.id },
+      mockAuth,
+    );
+
+    expect(result.isProbableDuplicate).toBe(false);
+  });
+
+  it('rejects direct merge for students recorded in the same sibling group', async () => {
+    (prisma.student.findFirst as jest.Mock)
+      .mockResolvedValueOnce({
+        ...sourceStudent,
+        siblingMemberships: [
+          { id: 'source-sibling', siblingGroupId: 'sibling-group-1' },
+        ],
+      })
+      .mockResolvedValueOnce({
+        ...targetStudent,
+        siblingMemberships: [
+          { id: 'target-sibling', siblingGroupId: 'sibling-group-1' },
+        ],
+      });
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: sourceStudent.id,
+          targetStudentId: targetStudent.id,
+          reason: 'Mistaken sibling merge',
+        },
+        mockAuth,
+      ),
+    ).rejects.toThrow(
+      'Students recorded in the same sibling group cannot be merged',
+    );
+    expect(prisma.student.updateMany).not.toHaveBeenCalled();
   });
 
   it('should execute merge transactionally', async () => {

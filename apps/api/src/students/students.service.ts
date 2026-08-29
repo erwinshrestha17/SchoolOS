@@ -3292,6 +3292,7 @@ export class StudentsService {
             transportLogs: true,
             attendanceRecords: true,
             attendanceCorrectionRequests: true,
+            siblingMemberships: true,
             studentLeaveRequests: true,
             markEntries: true,
             casRecords: true,
@@ -3337,6 +3338,7 @@ export class StudentsService {
       attendanceRecords: financialSummary?._count.attendanceRecords ?? 0,
       attendanceCorrectionRequests:
         financialSummary?._count.attendanceCorrectionRequests ?? 0,
+      siblingMemberships: financialSummary?._count.siblingMemberships ?? 0,
       studentLeaveRequests: financialSummary?._count.studentLeaveRequests ?? 0,
       markEntries: financialSummary?._count.markEntries ?? 0,
       casRecords: financialSummary?._count.casRecords ?? 0,
@@ -3367,10 +3369,9 @@ export class StudentsService {
         lifecycleStatus: targetStudent.lifecycleStatus,
       },
       mergeCounts,
-      isProbableDuplicate: isProbableDuplicateStudent(
-        sourceStudent,
-        targetStudent,
-      ),
+      isProbableDuplicate:
+        !studentsShareSiblingGroup(sourceStudent, targetStudent) &&
+        isProbableDuplicateStudent(sourceStudent, targetStudent),
     };
   }
 
@@ -3415,6 +3416,12 @@ export class StudentsService {
         if (targetStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
           throw new ConflictException(
             'Duplicate records can only be merged into an active canonical student',
+          );
+        }
+
+        if (studentsShareSiblingGroup(sourceStudent, targetStudent)) {
+          throw new BadRequestException(
+            'Students recorded in the same sibling group cannot be merged as duplicate records',
           );
         }
 
@@ -3493,6 +3500,26 @@ export class StudentsService {
         if (targetLifecycleClaim.count !== 1) {
           throw new ConflictException(
             'The canonical target record changed before the merge could be completed. Refresh and try again.',
+          );
+        }
+
+        const sourceSiblingMembershipIds = sourceStudent.siblingMemberships.map(
+          (membership) => membership.id,
+        );
+        const siblingMemberships =
+          sourceSiblingMembershipIds.length > 0
+            ? await tx.siblingGroupMember.updateMany({
+                where: {
+                  id: { in: sourceSiblingMembershipIds },
+                  tenantId: actor.tenantId,
+                  studentId: sourceStudent.id,
+                },
+                data: { studentId: targetStudent.id },
+              })
+            : { count: 0 };
+        if (siblingMemberships.count !== sourceSiblingMembershipIds.length) {
+          throw new ConflictException(
+            'Sibling relationships changed while the duplicate merge was being finalized. Refresh and retry.',
           );
         }
 
@@ -3928,6 +3955,7 @@ export class StudentsService {
           conversationParticipants: conversationParticipants.count,
           attendanceRecords: attendanceRecords.count,
           attendanceCorrectionRequests: attendanceCorrectionRequests.count,
+          siblingMemberships: siblingMemberships.count,
           studentLeaveRequests: studentLeaveRequests.count,
           markEntries: markEntries.count,
           casRecords: casRecords.count,
@@ -6551,6 +6579,7 @@ export class StudentsService {
       },
       include: {
         guardianLinks: true,
+        siblingMemberships: true,
       },
     });
 
@@ -7647,6 +7676,24 @@ function isProbableDuplicateStudent(
       targetStudent.admissionNumber?.trim().toLowerCase();
 
   return nameDobMatch || admissionMatch;
+}
+
+function studentsShareSiblingGroup(
+  sourceStudent: {
+    siblingMemberships: Array<{ siblingGroupId: string }>;
+  },
+  targetStudent: {
+    siblingMemberships: Array<{ siblingGroupId: string }>;
+  },
+) {
+  const sourceGroupIds = new Set(
+    sourceStudent.siblingMemberships.map(
+      (membership) => membership.siblingGroupId,
+    ),
+  );
+  return targetStudent.siblingMemberships.some((membership) =>
+    sourceGroupIds.has(membership.siblingGroupId),
+  );
 }
 
 export interface DuplicateCandidateStudent {

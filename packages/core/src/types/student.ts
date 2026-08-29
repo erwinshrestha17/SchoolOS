@@ -558,6 +558,26 @@ export type DuplicateStudentMergeCounts = {
   transportLogs: number;
   conversations: number;
   conversationParticipants: number;
+  attendanceRecords: number;
+  attendanceCorrectionRequests: number;
+  siblingMemberships: number;
+  studentLeaveRequests: number;
+  markEntries: number;
+  casRecords: number;
+  reportCards: number;
+  reportCardHistories: number;
+  assessmentRetakes: number;
+  promotionRecords: number;
+  homeworkSubmissions: number;
+  schoolServiceRequests: number;
+  canteenEnrollments: number;
+  canteenMealServings: number;
+  canteenWalletTransactions: number;
+  sourceGuardianLinksExpired: number;
+  sourceIdentitiesRevoked: number;
+  sourceQrCredentialsRevoked: number;
+  studentFeeAssignmentsMoved: number;
+  duplicateFeeAssignmentsDeactivated: number;
 };
 
 export type DuplicateStudentMergeResult = {
