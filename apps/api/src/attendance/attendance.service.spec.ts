@@ -4776,6 +4776,57 @@ describe('staff-attendance and leave confirmed-gap fixes (2026-07-19)', () => {
     expect(prisma.attendanceRecord.findMany).toHaveBeenCalledTimes(1);
   });
 
+  it('requires an active student profile for student-self attendance history', async () => {
+    const studentActor = {
+      ...adminActor,
+      userId: 'student-user-1',
+      roles: ['student'],
+      permissions: ['attendance:read'],
+    };
+    const { service, prisma } = buildService({
+      studentFindFirst: {
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      },
+      attendanceRecords: [],
+    });
+
+    await expect(
+      service.getStudentHistory('student-1', {}, studentActor),
+    ).resolves.toEqual([]);
+    expect(prisma.student.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: studentActor.tenantId,
+        userId: studentActor.userId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+  });
+
+  it('denies student-self attendance history when no active profile remains', async () => {
+    const studentActor = {
+      ...adminActor,
+      userId: 'merged-student-user',
+      roles: ['student'],
+      permissions: ['attendance:read'],
+    };
+    const { service, prisma } = buildService({ attendanceRecords: [] });
+    prisma.student.findFirst
+      .mockResolvedValueOnce({
+        id: 'student-source',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      })
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      service.getStudentHistory('student-source', {}, studentActor),
+    ).rejects.toThrow('Access denied to this student attendance.');
+    expect(prisma.attendanceRecord.findMany).not.toHaveBeenCalled();
+  });
+
   it('keeps a teacher and librarian dual role assignment-scoped for attendance reads', async () => {
     const { service, prisma } = buildService({
       canonicalAssignments: [],

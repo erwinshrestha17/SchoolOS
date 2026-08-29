@@ -2784,12 +2784,14 @@ export class HomeworkService {
   ) {
     if (actor.roles.includes('student')) {
       const student = await this.prisma.student.findFirst({
-        where: { tenantId: actor.tenantId, userId: actor.userId },
-        select: { id: true, lifecycleStatus: true },
+        where: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
+        select: { id: true },
       });
-      return student?.lifecycleStatus === StudentLifecycleStatus.ACTIVE
-        ? student.id
-        : null;
+      return student?.id ?? null;
     }
 
     if (actor.roles.includes('parent')) {
@@ -2832,12 +2834,14 @@ export class HomeworkService {
   private async resolveVisibleStudentIdsForRead(actor: AuthContext) {
     if (actor.roles.includes('student')) {
       const student = await this.prisma.student.findFirst({
-        where: { tenantId: actor.tenantId, userId: actor.userId },
-        select: { id: true, lifecycleStatus: true },
+        where: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
+        select: { id: true },
       });
-      return student?.lifecycleStatus === StudentLifecycleStatus.ACTIVE
-        ? [student.id]
-        : [];
+      return student ? [student.id] : [];
     }
 
     if (actor.roles.includes('parent')) {

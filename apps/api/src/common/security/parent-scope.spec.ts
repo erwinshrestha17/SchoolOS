@@ -6,6 +6,7 @@ import {
   buildActiveGuardianRelationshipWhere,
   GUARDIAN_CAPABILITY_DENIED_CODE,
   getParentStudentIds,
+  getStudentOwnId,
   requireGuardianCapability,
 } from './parent-scope';
 
@@ -205,5 +206,45 @@ describe('guardian-child capability scope', () => {
         { capabilities: { has: GuardianCapability.FEES_VIEW } },
       ],
     });
+  });
+
+  it('resolves student self scope only from an active tenant profile', async () => {
+    const studentActor: AuthContext = {
+      ...actor,
+      userId: 'student-user-1',
+      roles: ['student'],
+    };
+    const prisma = {
+      student: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'student-1' }),
+      },
+    };
+
+    await expect(getStudentOwnId(prisma as never, studentActor)).resolves.toBe(
+      'student-1',
+    );
+    expect(prisma.student.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        userId: studentActor.userId,
+        lifecycleStatus: 'ACTIVE',
+      },
+      select: { id: true },
+    });
+  });
+
+  it('denies student self scope when no active profile remains linked', async () => {
+    const studentActor: AuthContext = {
+      ...actor,
+      userId: 'merged-student-user',
+      roles: ['student'],
+    };
+    const prisma = {
+      student: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
+
+    await expect(
+      getStudentOwnId(prisma as never, studentActor),
+    ).rejects.toThrow('No student profile linked to this account');
   });
 });

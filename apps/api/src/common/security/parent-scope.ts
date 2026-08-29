@@ -219,7 +219,9 @@ export async function getStudentOwnId(
     where: {
       tenantId: actor.tenantId,
       userId: actor.userId,
+      lifecycleStatus: 'ACTIVE',
     },
+    select: { id: true },
   });
 
   if (!student) {

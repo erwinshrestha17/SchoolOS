@@ -6144,6 +6144,7 @@ export class AttendanceService {
         where: {
           tenantId: actor.tenantId,
           userId: actor.userId,
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
         },
         select: { id: true },
       });

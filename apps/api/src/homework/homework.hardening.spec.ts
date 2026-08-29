@@ -8,6 +8,7 @@ import {
   AuthMethod,
   HomeworkAssignmentStatus,
   HomeworkSubmissionStatus,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import { HomeworkService } from './homework.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -1046,6 +1047,9 @@ describe('Homework Hardening', () => {
 
     it('blocks student submission detail reads for another student', async () => {
       const p = prisma as any;
+      const studentFindFirst = (
+        prisma as unknown as { student: { findFirst: jest.Mock } }
+      ).student.findFirst;
       const studentActor: AuthContext = {
         ...actor,
         userId: 'student-user-1',
@@ -1062,6 +1066,14 @@ describe('Homework Hardening', () => {
         homeworkService.getSubmission(studentActor, 'submission-other'),
       ).rejects.toThrow(NotFoundException);
 
+      expect(studentFindFirst).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-a',
+          userId: 'student-user-1',
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
+        select: { id: true },
+      });
       expect(p.homeworkSubmission.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -1071,6 +1083,38 @@ describe('Homework Hardening', () => {
           }),
         }),
       );
+    });
+
+    it('blocks homework submission creation without an active student profile', async () => {
+      const delegates = prisma as unknown as {
+        student: { findFirst: jest.Mock };
+        homeworkAssignment: { findFirst: jest.Mock };
+      };
+      const studentActor: AuthContext = {
+        ...actor,
+        userId: 'merged-student-user',
+        roles: ['student'],
+        permissions: ['homework:submit'],
+      };
+      delegates.student.findFirst.mockResolvedValue(null);
+
+      await expect(
+        homeworkService.createSubmission(
+          'hw-1',
+          { studentId: 'student-source', submissionText: 'My answer' },
+          studentActor,
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(delegates.student.findFirst).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-a',
+          userId: 'merged-student-user',
+          lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+        },
+        select: { id: true },
+      });
+      expect(delegates.homeworkAssignment.findFirst).not.toHaveBeenCalled();
     });
 
     it('blocks direct student homework detail reads outside the active class scope', async () => {
