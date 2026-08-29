@@ -203,6 +203,11 @@ export function StudentEditCard({
       );
       return;
     }
+    const placementChanged =
+      activeEnrollment !== null &&
+      (classId !== activeEnrollment.classId ||
+        (sectionId || null) !== (activeEnrollment.sectionId ?? null) ||
+        parsedRollNumber !== (activeEnrollment.rollNumber ?? null));
     onSave({
       firstNameEn: normalizePersonName(firstNameEn),
       lastNameEn: normalizePersonName(lastNameEn),
@@ -212,7 +217,7 @@ export function StudentEditCard({
       ...(gender ? { gender } : {}),
       nationality: nationality.trim(),
       nationalStudentId: nationalStudentId.trim() || null,
-      ...(activeEnrollment
+      ...(placementChanged
         ? {
             classId,
             sectionId: sectionId || null,

@@ -33,6 +33,23 @@ describe('Student profile edit controls', () => {
     assert.doesNotMatch(edit, /type="radio"/);
   });
 
+  it('only submits authoritative enrollment placement when the operator changes it', () => {
+    const edit = read('components/students/profile/student-edit-card.tsx');
+
+    assert.match(edit, /const placementChanged =/);
+    assert.match(edit, /classId !== activeEnrollment\.classId/);
+    assert.match(
+      edit,
+      /\(sectionId \|\| null\) !== \(activeEnrollment\.sectionId \?\? null\)/,
+    );
+    assert.match(
+      edit,
+      /parsedRollNumber !== \(activeEnrollment\.rollNumber \?\? null\)/,
+    );
+    assert.match(edit, /\.\.\.\(placementChanged/);
+    assert.doesNotMatch(edit, /\.\.\.\(activeEnrollment\s*\?\s*\{\s*classId/);
+  });
+
   it('provides purpose-limited guardian authority, recovery, and revocation administration', () => {
     const detail = read('components/students/student-detail-page.tsx');
     const guardians = read('components/students/profile/tabs/guardians-tab.tsx');
