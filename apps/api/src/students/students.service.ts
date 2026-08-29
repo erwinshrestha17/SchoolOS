@@ -3292,6 +3292,7 @@ export class StudentsService {
             transportLogs: true,
             attendanceRecords: true,
             attendanceCorrectionRequests: true,
+            enrollments: true,
             siblingMemberships: true,
             activityTags: true,
             activityReactions: true,
@@ -3340,6 +3341,7 @@ export class StudentsService {
       attendanceRecords: financialSummary?._count.attendanceRecords ?? 0,
       attendanceCorrectionRequests:
         financialSummary?._count.attendanceCorrectionRequests ?? 0,
+      enrollments: financialSummary?._count.enrollments ?? 0,
       siblingMemberships: financialSummary?._count.siblingMemberships ?? 0,
       activityTags: financialSummary?._count.activityTags ?? 0,
       activityReactions: financialSummary?._count.activityReactions ?? 0,
@@ -3813,6 +3815,58 @@ export class StudentsService {
           );
         }
 
+        const sourceEnrollments = await tx.enrollment.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          select: { id: true, status: true },
+        });
+        const sourceEnrollmentIds = sourceEnrollments.map(
+          (enrollment) => enrollment.id,
+        );
+        const sourceActiveEnrollmentIds = sourceEnrollments
+          .filter((enrollment) => enrollment.status === EnrollmentStatus.ACTIVE)
+          .map((enrollment) => enrollment.id);
+        const activeEnrollmentsExited =
+          sourceActiveEnrollmentIds.length > 0
+            ? await tx.enrollment.updateMany({
+                where: {
+                  id: { in: sourceActiveEnrollmentIds },
+                  tenantId: actor.tenantId,
+                  studentId: sourceStudent.id,
+                  status: EnrollmentStatus.ACTIVE,
+                },
+                data: {
+                  status: EnrollmentStatus.EXITED,
+                  effectiveUntil: mergedAt,
+                },
+              })
+            : { count: 0 };
+        if (
+          activeEnrollmentsExited.count !== sourceActiveEnrollmentIds.length
+        ) {
+          throw new ConflictException(
+            'Student enrollment state changed while the duplicate merge was being finalized. Refresh and retry.',
+          );
+        }
+        const enrollmentsMoved =
+          sourceEnrollmentIds.length > 0
+            ? await tx.enrollment.updateMany({
+                where: {
+                  id: { in: sourceEnrollmentIds },
+                  tenantId: actor.tenantId,
+                  studentId: sourceStudent.id,
+                },
+                data: { studentId: targetStudent.id },
+              })
+            : { count: 0 };
+        if (enrollmentsMoved.count !== sourceEnrollmentIds.length) {
+          throw new ConflictException(
+            'Student enrollment history changed while the duplicate merge was being finalized. Refresh and retry.',
+          );
+        }
+
         const sourceDocs = await tx.studentDocument.findMany({
           where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
         });
@@ -4062,18 +4116,6 @@ export class StudentsService {
           });
         }
 
-        await tx.enrollment.updateMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: sourceStudent.id,
-            status: EnrollmentStatus.ACTIVE,
-          },
-          data: {
-            status: EnrollmentStatus.EXITED,
-            effectiveUntil: new Date(),
-          },
-        });
-
         const sourceLifecycleUpdate = await tx.student.updateMany({
           where: {
             id: sourceStudent.id,
@@ -4117,6 +4159,8 @@ export class StudentsService {
           conversationParticipants: conversationParticipants.count,
           attendanceRecords: attendanceRecords.count,
           attendanceCorrectionRequests: attendanceCorrectionRequests.count,
+          enrollmentsMoved: enrollmentsMoved.count,
+          activeEnrollmentsExited: activeEnrollmentsExited.count,
           siblingMemberships: siblingMemberships.count,
           activityTagsMoved: activityTagsMoved.count,
           duplicateActivityTagsRemoved: duplicateActivityTagsRemoved.count,

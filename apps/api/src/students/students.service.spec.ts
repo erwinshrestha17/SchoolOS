@@ -1545,6 +1545,104 @@ describe('students lifecycle hardening', () => {
     expect(auditService.record).not.toHaveBeenCalled();
   });
 
+  it('exits active enrollment and moves complete enrollment history to the canonical student', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      studentSystemId: 'SCH-2026-0002',
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      studentSystemId: 'SCH-2026-0001',
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+      enrollmentFindManyResult: [
+        { id: 'enrollment-active', status: EnrollmentStatus.ACTIVE },
+        { id: 'enrollment-historical', status: EnrollmentStatus.EXITED },
+      ],
+      transactionEnrollmentUpdateManyCountQueue: [1, 2],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.mergeDuplicateStudent(
+      {
+        sourceStudentId: sourceStudent.id,
+        targetStudentId: targetStudent.id,
+        reason: 'Duplicate record confirmed by registrar',
+      },
+      actor,
+    );
+
+    expect(prisma.transaction.enrollment.updateMany).toHaveBeenNthCalledWith(
+      1,
+      {
+        where: {
+          id: { in: ['enrollment-active'] },
+          tenantId: actor.tenantId,
+          studentId: sourceStudent.id,
+          status: EnrollmentStatus.ACTIVE,
+        },
+        data: {
+          status: EnrollmentStatus.EXITED,
+          effectiveUntil: expect.any(Date) as Date,
+        },
+      },
+    );
+    expect(prisma.transaction.enrollment.updateMany).toHaveBeenNthCalledWith(
+      2,
+      {
+        where: {
+          id: { in: ['enrollment-active', 'enrollment-historical'] },
+          tenantId: actor.tenantId,
+          studentId: sourceStudent.id,
+        },
+        data: { studentId: targetStudent.id },
+      },
+    );
+    expect(result.mergeCounts).toEqual(
+      expect.objectContaining({
+        activeEnrollmentsExited: 1,
+        enrollmentsMoved: 2,
+      }),
+    );
+  });
+
+  it('rejects duplicate merge when active enrollment state changes before exit', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      studentSystemId: 'SCH-2026-0002',
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      studentSystemId: 'SCH-2026-0001',
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+      enrollmentFindManyResult: [
+        { id: 'enrollment-active', status: EnrollmentStatus.ACTIVE },
+      ],
+      transactionEnrollmentUpdateManyCountQueue: [0],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: sourceStudent.id,
+          targetStudentId: targetStudent.id,
+          reason: 'Duplicate record confirmed by registrar',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Student enrollment state changed while the duplicate merge was being finalized',
+    );
+    expect(
+      prisma.transaction.studentDocument.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
   it('rejects duplicate merge when the canonical target lifecycle changes before claim', async () => {
     const sourceStudent = buildStudent({
       id: 'student-source',
@@ -6447,6 +6545,8 @@ function buildPrisma(options: {
   classFindFirstResult?: unknown;
   sectionFindFirstResult?: unknown;
   enrollmentFindFirstResult?: unknown;
+  enrollmentFindManyResult?: unknown[];
+  transactionEnrollmentUpdateManyCountQueue?: number[];
   generatedStudentDocumentFindFirstQueue?: unknown[];
   generatedStudentDocumentFindUniqueResult?: unknown;
   generatedStudentDocumentFindManyResult?: unknown[];
@@ -6484,9 +6584,17 @@ function buildPrisma(options: {
 }) {
   const transaction = {
     enrollment: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.enrollmentFindManyResult ?? []),
       create: jest.fn().mockResolvedValue({ id: 'enrollment-created' }),
       update: jest.fn().mockResolvedValue({ id: 'enrollment-updated' }),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      updateMany: jest.fn().mockImplementation(() =>
+        Promise.resolve({
+          count:
+            options.transactionEnrollmentUpdateManyCountQueue?.shift() ?? 1,
+        }),
+      ),
     },
     student: {
       findFirst: jest.fn().mockImplementation(async () => {

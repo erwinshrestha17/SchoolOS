@@ -89,6 +89,7 @@ describe('StudentsService (Duplicate Merge)', () => {
               count: jest.fn(),
             },
             enrollment: {
+              findMany: jest.fn(),
               updateMany: jest.fn(),
             },
             attendanceRecord: {
@@ -253,6 +254,7 @@ describe('StudentsService (Duplicate Merge)', () => {
         transportLogs: 0,
         attendanceRecords: 0,
         attendanceCorrectionRequests: 0,
+        enrollments: 0,
         siblingMemberships: 0,
         activityTags: 0,
         activityReactions: 0,
@@ -306,6 +308,7 @@ describe('StudentsService (Duplicate Merge)', () => {
             transportLogs: true,
             attendanceRecords: true,
             attendanceCorrectionRequests: true,
+            enrollments: true,
             siblingMemberships: true,
             activityTags: true,
             activityReactions: true,

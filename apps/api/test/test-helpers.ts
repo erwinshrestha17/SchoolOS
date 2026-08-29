@@ -2469,14 +2469,15 @@ export function createPrismaMock() {
 
   prisma.enrollment = {
     findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),
-    findMany: jest.fn((q: PrismaQuery) => Promise.resolve([])),
+    findMany: jest.fn((q: PrismaQuery) =>
+      Promise.resolve(
+        state.enrollments.filter((item) => matchesWhere(item, q.where)),
+      ),
+    ),
     updateMany: jest.fn((q: PrismaQuery) => {
       let count = 0;
       for (const item of state.enrollments) {
-        if (
-          (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
-          (!q.where?.studentId || item.studentId === q.where.studentId)
-        ) {
+        if (matchesWhere(item, q.where)) {
           Object.assign(item, q.data ?? {});
           count += 1;
         }

@@ -285,6 +285,22 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
   it('preserves document history and audits duplicate merge into canonical student', async () => {
     const source = await createStudent('Duplicate', 'Student');
     const target = await createStudent('Duplicate', 'Student');
+    getMockState().enrollments.push(
+      {
+        id: 'source-active-enrollment',
+        tenantId,
+        studentId: source.id,
+        status: 'ACTIVE',
+        effectiveUntil: null,
+      },
+      {
+        id: 'source-historical-enrollment',
+        tenantId,
+        studentId: source.id,
+        status: 'EXITED',
+        effectiveUntil: new Date('2024-03-31T00:00:00.000Z'),
+      },
+    );
     await prisma.student.update({
       where: { id: source.id },
       data: {
@@ -337,6 +353,28 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
     expect(sourceAfter?.lifecycleStatus).toBe(StudentLifecycleStatus.MERGED);
     expect(sourceAfter?.studentIdentityCode).toBeNull();
     expect(sourceAfter?.qrCode).toBeNull();
+
+    const mergedEnrollments = getMockState().enrollments.filter(
+      (enrollment) =>
+        enrollment.id === 'source-active-enrollment' ||
+        enrollment.id === 'source-historical-enrollment',
+    );
+    expect(mergedEnrollments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'source-active-enrollment',
+          studentId: target.id,
+          status: 'EXITED',
+          effectiveUntil: expect.any(Date) as Date,
+        }),
+        expect.objectContaining({
+          id: 'source-historical-enrollment',
+          studentId: target.id,
+          status: 'EXITED',
+          effectiveUntil: new Date('2024-03-31T00:00:00.000Z'),
+        }),
+      ]),
+    );
 
     const [sourceIdentities, sourceQrCredentials] = await Promise.all([
       prisma.studentIdentity.findMany({
