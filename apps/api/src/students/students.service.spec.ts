@@ -702,7 +702,7 @@ describe('students lifecycle hardening', () => {
         tenantId: actor.tenantId,
         academicYearId: 'academic-year-1',
         classId: 'class-1',
-      }),
+      }) as unknown,
     });
     expect(result).toEqual(
       expect.objectContaining({
@@ -2199,6 +2199,133 @@ describe('students lifecycle hardening', () => {
     expect(prisma.student.findFirst).not.toHaveBeenCalled();
   });
 
+  it('fails closed when placement editing encounters multiple active enrollments', async () => {
+    const student = buildStudent({
+      disabilityFlag: 'No known disability',
+      enrollments: [
+        buildActiveEnrollment({ id: 'enrollment-1' }),
+        buildActiveEnrollment({ id: 'enrollment-2' }),
+      ],
+    });
+    const prisma = buildPrisma({ studentFindFirstQueue: [student] });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.updateStudent(student.id, { rollNumber: 8 }, actor),
+    ).rejects.toThrow(
+      'Student has multiple active enrollments. Resolve the enrollment conflict before editing placement.',
+    );
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when placement editing has no active enrollment', async () => {
+    const student = buildStudent({
+      disabilityFlag: 'No known disability',
+      enrollments: [],
+    });
+    const prisma = buildPrisma({ studentFindFirstQueue: [student] });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.updateStudent(student.id, { classId: 'class-2' }, actor),
+    ).rejects.toThrow(
+      'Student has no active enrollment. Create or restore an enrollment before editing placement.',
+    );
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale active-enrollment snapshot before student or audit writes', async () => {
+    const student = buildStudent({
+      disabilityFlag: 'No known disability',
+      enrollments: [buildActiveEnrollment()],
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      classFindFirstResult: { id: 'class-1', tenantId: actor.tenantId },
+      sectionFindFirstResult: {
+        id: 'section-1',
+        tenantId: actor.tenantId,
+        classId: 'class-1',
+        name: 'A',
+      },
+      transactionEnrollmentFindManyResult: [{ id: 'replacement-enrollment' }],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.updateStudent(student.id, { rollNumber: 8 }, actor),
+    ).rejects.toThrow(
+      'Active enrollment changed while this update was being finalized. Refresh and retry.',
+    );
+
+    expect(prisma.transaction.student.updateMany).not.toHaveBeenCalled();
+    expect(prisma.transaction.enrollment.updateMany).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects a concurrent student update before changing enrollment or audit evidence', async () => {
+    const student = buildStudent({
+      disabilityFlag: 'No known disability',
+      enrollments: [buildActiveEnrollment()],
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      classFindFirstResult: { id: 'class-1', tenantId: actor.tenantId },
+      sectionFindFirstResult: {
+        id: 'section-1',
+        tenantId: actor.tenantId,
+        classId: 'class-1',
+        name: 'A',
+      },
+      transactionEnrollmentFindManyResult: [{ id: 'enrollment-1' }],
+      transactionStudentUpdateManyCount: 0,
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.updateStudent(student.id, { rollNumber: 8 }, actor),
+    ).rejects.toThrow(
+      'Student changed while this update was being finalized. Refresh and retry.',
+    );
+
+    expect(prisma.transaction.enrollment.updateMany).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale enrollment claim before creating a replacement or audit evidence', async () => {
+    const student = buildStudent({
+      disabilityFlag: 'No known disability',
+      enrollments: [buildActiveEnrollment()],
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      classFindFirstResult: { id: 'class-2', tenantId: actor.tenantId },
+      sectionFindFirstResult: null,
+      transactionEnrollmentFindManyResult: [{ id: 'enrollment-1' }],
+      transactionEnrollmentUpdateManyCountQueue: [0],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.updateStudent(
+        student.id,
+        {
+          classId: 'class-2',
+          sectionId: null,
+          confirmNoDisability: true,
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Active enrollment changed while this update was being finalized. Refresh and retry.',
+    );
+
+    expect(prisma.transaction.enrollment.create).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
   it('updates mutable student fields with tenant-scoped placement checks and audit logging', async () => {
     const student = buildStudent({
       disabilityFlag: null,
@@ -2213,7 +2340,10 @@ describe('students lifecycle hardening', () => {
           section: { name: 'A' },
           status: EnrollmentStatus.ACTIVE,
           rollNumber: 7,
+          admissionNumber: 'ADM-1',
           admissionDate: new Date('2026-04-01T00:00:00.000Z'),
+          mediumOfInstruction: 'English',
+          updatedAt: new Date('2026-08-28T00:00:00.000Z'),
         } as any,
       ],
     });
@@ -2232,6 +2362,7 @@ describe('students lifecycle hardening', () => {
         name: 'A',
       },
       enrollmentFindFirstResult: null,
+      transactionEnrollmentFindManyResult: [{ id: 'enrollment-1' }],
       activityPostFindManyResult: [],
     });
     const { service, auditService } = buildService(prisma);
@@ -2273,8 +2404,12 @@ describe('students lifecycle hardening', () => {
         }),
       }),
     );
-    expect(prisma.transaction.student.update).toHaveBeenCalledWith({
-      where: { id: student.id },
+    expect(prisma.transaction.student.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: student.id,
+        tenantId: actor.tenantId,
+        updatedAt: student.updatedAt,
+      },
       data: expect.objectContaining({
         firstNameEn: 'Aarav',
         disabilityFlag: 'No known disability',
@@ -2283,8 +2418,14 @@ describe('students lifecycle hardening', () => {
         rollNumber: 8,
       }),
     });
-    expect(prisma.transaction.enrollment.update).toHaveBeenCalledWith({
-      where: { id: 'enrollment-1' },
+    expect(prisma.transaction.enrollment.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: 'enrollment-1',
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        status: EnrollmentStatus.ACTIVE,
+        updatedAt: new Date('2026-08-28T00:00:00.000Z'),
+      }) as unknown,
       data: expect.objectContaining({
         rollNumber: 8,
       }),
@@ -2296,7 +2437,11 @@ describe('students lifecycle hardening', () => {
         tenantId: actor.tenantId,
         resourceId: student.id,
       }),
+      prisma.transaction,
     );
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
   });
 
   it('closes the prior enrollment segment when class or section changes', async () => {
@@ -2316,6 +2461,7 @@ describe('students lifecycle hardening', () => {
           admissionDate: new Date('2026-04-01T00:00:00.000Z'),
           admissionNumber: 'ADM-1',
           mediumOfInstruction: 'English',
+          updatedAt: new Date('2026-08-28T00:00:00.000Z'),
         } as any,
       ],
     });
@@ -2335,6 +2481,7 @@ describe('students lifecycle hardening', () => {
         name: 'B',
       },
       enrollmentFindFirstResult: null,
+      transactionEnrollmentFindManyResult: [{ id: 'enrollment-1' }],
       activityPostFindManyResult: [],
     });
     const { service } = buildService(prisma);
@@ -2349,8 +2496,14 @@ describe('students lifecycle hardening', () => {
       actor,
     );
 
-    expect(prisma.transaction.enrollment.update).toHaveBeenCalledWith({
-      where: { id: 'enrollment-1' },
+    expect(prisma.transaction.enrollment.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: 'enrollment-1',
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        status: EnrollmentStatus.ACTIVE,
+        updatedAt: new Date('2026-08-28T00:00:00.000Z'),
+      }) as unknown,
       data: expect.objectContaining({
         status: EnrollmentStatus.TRANSFERRED,
         effectiveUntil: expect.any(Date),
@@ -6485,6 +6638,37 @@ function buildGuardianAdministrationLink() {
   };
 }
 
+function buildActiveEnrollment(
+  overrides: Partial<{
+    id: string;
+    academicYearId: string;
+    classId: string;
+    sectionId: string | null;
+    rollNumber: number | null;
+    admissionNumber: string | null;
+    admissionDate: Date;
+    mediumOfInstruction: string;
+    updatedAt: Date;
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? 'enrollment-1',
+    academicYearId: overrides.academicYearId ?? 'year-1',
+    academicYear: { name: '2083' },
+    classId: overrides.classId ?? 'class-1',
+    class: { name: 'Grade 1' },
+    sectionId: 'sectionId' in overrides ? overrides.sectionId : 'section-1',
+    section: { name: 'A' },
+    rollNumber: 'rollNumber' in overrides ? overrides.rollNumber : 7,
+    admissionNumber: overrides.admissionNumber ?? 'ADM-1',
+    admissionDate:
+      overrides.admissionDate ?? new Date('2026-04-01T00:00:00.000Z'),
+    mediumOfInstruction: overrides.mediumOfInstruction ?? 'English',
+    status: EnrollmentStatus.ACTIVE,
+    updatedAt: overrides.updatedAt ?? new Date('2026-08-28T00:00:00.000Z'),
+  };
+}
+
 function buildStudent(
   overrides: Partial<{
     id: string;
@@ -6506,6 +6690,7 @@ function buildStudent(
     updatedAt: Date;
     classId: string;
     class: { id: string; name: string };
+    sectionId: string | null;
     section: string | null;
     sectionRef: { id: string; name: string } | null;
     rollNumber: number | null;
@@ -6542,6 +6727,9 @@ function buildStudent(
       sectionId?: string | null;
       rollNumber?: number | null;
       admissionDate?: Date;
+      admissionNumber?: string | null;
+      mediumOfInstruction?: string;
+      updatedAt?: Date;
       class?: { name: string };
       section: { name: string } | null;
       status: EnrollmentStatus;
@@ -6581,6 +6769,7 @@ function buildStudent(
     updatedAt: overrides.updatedAt ?? new Date('2026-08-28T00:00:00.000Z'),
     classId: overrides.classId ?? 'class-1',
     class: overrides.class ?? { id: 'class-1', name: 'Grade 1' },
+    sectionId: 'sectionId' in overrides ? overrides.sectionId : 'section-1',
     section: 'section' in overrides ? overrides.section : 'A',
     sectionRef:
       'sectionRef' in overrides
@@ -6736,6 +6925,7 @@ function buildPrisma(options: {
   enrollmentFindManyResult?: unknown[];
   transactionEnrollmentUpdateManyCountQueue?: number[];
   transactionEnrollmentFindFirstResult?: unknown;
+  transactionEnrollmentFindManyResult?: unknown[];
   transactionEnrollmentCreateResult?: unknown;
   transactionStudentCreateResult?: unknown;
   generatedStudentDocumentFindFirstQueue?: unknown[];
@@ -6775,6 +6965,16 @@ function buildPrisma(options: {
   transactionStudentIdentityUpdateManyCount?: number;
 }) {
   const transaction = {
+    class: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.classFindFirstResult ?? { id: 'class-1' }),
+    },
+    section: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.sectionFindFirstResult ?? null),
+    },
     enrollment: {
       findFirst: jest
         .fn()
@@ -6783,7 +6983,11 @@ function buildPrisma(options: {
         ),
       findMany: jest
         .fn()
-        .mockResolvedValue(options.enrollmentFindManyResult ?? []),
+        .mockResolvedValue(
+          options.transactionEnrollmentFindManyResult ??
+            options.enrollmentFindManyResult ??
+            [],
+        ),
       create: jest.fn().mockResolvedValue(
         options.transactionEnrollmentCreateResult ?? {
           id: 'enrollment-created',

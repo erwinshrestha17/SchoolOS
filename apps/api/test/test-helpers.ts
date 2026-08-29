@@ -1207,11 +1207,31 @@ export function createPrismaMock() {
         // 3. Populate enrollments (kept in sync with the separate
         // state.enrollments array so relational where-clauses such as
         // `enrollments: { some: { status: 'ACTIVE' } }` can match).
-        if (!Array.isArray(item.enrollments)) {
-          enriched.enrollments = state.enrollments.filter(
-            (e) => e.studentId === item.id,
-          );
-        }
+        const itemRecord = item as Record<string, unknown>;
+        const enrichedRecord = enriched as Record<string, unknown>;
+        const persistedEnrollments = state.enrollments.filter(
+          (enrollment) => enrollment.studentId === itemRecord.id,
+        );
+        const fixtureEnrollments = Array.isArray(itemRecord.enrollments)
+          ? (itemRecord.enrollments as Record<string, unknown>[])
+          : [];
+        const enrollments =
+          persistedEnrollments.length > 0
+            ? persistedEnrollments
+            : fixtureEnrollments;
+        enrichedRecord.enrollments = enrollments.map((enrollment) => ({
+          ...enrollment,
+          academicYear: state.academicYears.find(
+            (year) => year.id === enrollment.academicYearId,
+          ),
+          class: state.classes.find(
+            (classroom) => classroom.id === enrollment.classId,
+          ),
+          section:
+            state.sections.find(
+              (section) => section.id === enrollment.sectionId,
+            ) ?? null,
+        }));
 
         return enriched;
       };

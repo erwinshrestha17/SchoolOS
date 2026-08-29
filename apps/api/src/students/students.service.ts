@@ -1685,7 +1685,7 @@ export class StudentsService {
         enrollments: {
           where: { status: EnrollmentStatus.ACTIVE },
           orderBy: [{ createdAt: 'desc' }],
-          take: 1,
+          take: 2,
         },
       },
     });
@@ -1694,12 +1694,32 @@ export class StudentsService {
       throw new NotFoundException('Student not found in this tenant');
     }
 
-    const latestEnrollment = student.enrollments[0] ?? null;
+    if (student.enrollments.length > 1) {
+      throw new ConflictException(
+        'Student has multiple active enrollments. Resolve the enrollment conflict before editing placement.',
+      );
+    }
+
+    const updatesSection = dto.sectionId !== undefined;
+    const updatesRollNumber = dto.rollNumber !== undefined;
+    const updatesEnrollment =
+      dto.classId !== undefined ||
+      updatesSection ||
+      updatesRollNumber ||
+      dto.mediumOfInstruction !== undefined;
+    if (updatesEnrollment && student.enrollments.length === 0) {
+      throw new ConflictException(
+        'Student has no active enrollment. Create or restore an enrollment before editing placement.',
+      );
+    }
+    const latestEnrollment = student.enrollments[0];
     const nextClassId = dto.classId ?? student.classId;
-    const nextSectionId =
-      'sectionId' in dto ? dto.sectionId?.trim() || null : student.sectionId;
-    const nextRollNumber =
-      'rollNumber' in dto ? (dto.rollNumber ?? null) : student.rollNumber;
+    const nextSectionId = updatesSection
+      ? normalizeNullableString(dto.sectionId)
+      : student.sectionId;
+    const nextRollNumber = updatesRollNumber
+      ? (dto.rollNumber ?? null)
+      : student.rollNumber;
     const nextDisabilityFlag =
       'disabilityFlag' in dto
         ? normalizeNullableString(dto.disabilityFlag)
@@ -1711,13 +1731,15 @@ export class StudentsService {
       );
     }
 
-    const placement = await this.assertStudentPlacementForUpdate(
+    await this.assertStudentPlacementForUpdate(
       {
         studentId,
         classId: nextClassId,
         sectionId: nextSectionId,
         rollNumber: nextRollNumber,
-        academicYearId: latestEnrollment?.academicYearId ?? null,
+        academicYearId: updatesEnrollment
+          ? latestEnrollment.academicYearId
+          : null,
       },
       actor,
     );
@@ -1758,13 +1780,12 @@ export class StudentsService {
         ? { admissionNumber: normalizeNullableString(dto.admissionNumber) }
         : {}),
       ...(dto.classId !== undefined ? { classId: nextClassId } : {}),
-      ...('sectionId' in dto
+      ...(updatesSection
         ? {
             sectionId: nextSectionId,
-            section: placement.section?.name ?? null,
           }
         : {}),
-      ...('rollNumber' in dto ? { rollNumber: nextRollNumber } : {}),
+      ...(updatesRollNumber ? { rollNumber: nextRollNumber } : {}),
       ...(dto.mediumOfInstruction !== undefined
         ? {
             mediumOfInstruct: assertNonEmpty(
@@ -1835,124 +1856,192 @@ export class StudentsService {
       studentData.photoUrl = asset.id; // Keep legacy for now
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.student.update({
-        where: { id: student.id },
-        data: studentData,
-      });
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          const transactionalPlacement =
+            await this.assertStudentPlacementForUpdate(
+              {
+                studentId,
+                classId: nextClassId,
+                sectionId: nextSectionId,
+                rollNumber: nextRollNumber,
+                academicYearId: updatesEnrollment
+                  ? latestEnrollment.academicYearId
+                  : null,
+              },
+              actor,
+              tx,
+            );
 
-      if (
-        latestEnrollment &&
-        (dto.classId !== undefined ||
-          'sectionId' in dto ||
-          'rollNumber' in dto ||
-          dto.mediumOfInstruction !== undefined)
-      ) {
-        const placementChanged =
-          latestEnrollment.classId !== nextClassId ||
-          (latestEnrollment.sectionId ?? null) !== nextSectionId;
-        const mediumOfInstruction =
-          dto.mediumOfInstruction !== undefined
-            ? assertNonEmpty(dto.mediumOfInstruction, 'mediumOfInstruction')
-            : latestEnrollment.mediumOfInstruction;
+          if (updatesEnrollment) {
+            const activeEnrollments = await tx.enrollment.findMany({
+              where: {
+                tenantId: actor.tenantId,
+                studentId: student.id,
+                status: EnrollmentStatus.ACTIVE,
+              },
+              select: { id: true },
+              orderBy: [{ createdAt: 'desc' }],
+              take: 2,
+            });
+            if (
+              activeEnrollments.length !== 1 ||
+              activeEnrollments[0]?.id !== latestEnrollment.id
+            ) {
+              throw new ConflictException(
+                'Active enrollment changed while this update was being finalized. Refresh and retry.',
+              );
+            }
+          }
 
-        if (placementChanged) {
-          const cutover = new Date();
-          await tx.enrollment.update({
-            where: { id: latestEnrollment.id },
-            data: {
-              status: EnrollmentStatus.TRANSFERRED,
-              effectiveUntil: cutover,
-            },
-          });
-          await tx.enrollment.create({
-            data: {
+          const claimed = await tx.student.updateMany({
+            where: {
+              id: student.id,
               tenantId: actor.tenantId,
-              studentId: student.id,
-              academicYearId: latestEnrollment.academicYearId,
-              classId: nextClassId,
-              sectionId: nextSectionId,
-              rollNumber: nextRollNumber,
-              admissionNumber: latestEnrollment.admissionNumber,
-              admissionDate: latestEnrollment.admissionDate,
-              mediumOfInstruction,
-              status: EnrollmentStatus.ACTIVE,
-              effectiveFrom: cutover,
-              effectiveUntil: null,
+              updatedAt: student.updatedAt,
             },
+            data: updatesSection
+              ? {
+                  ...studentData,
+                  section: transactionalPlacement.section?.name ?? null,
+                }
+              : studentData,
           });
-        } else {
-          await tx.enrollment.update({
-            where: { id: latestEnrollment.id },
-            data: {
-              rollNumber: nextRollNumber,
-              mediumOfInstruction,
-            },
-          });
-        }
-      }
+          if (claimed.count !== 1) {
+            throw new ConflictException(
+              'Student changed while this update was being finalized. Refresh and retry.',
+            );
+          }
 
-      if (dto.classId !== undefined && dto.classId !== student.classId) {
-        await tx.studentLifecycleTransition.create({
-          data: {
-            tenantId: actor.tenantId,
-            studentId: student.id,
-            fromStatus: student.lifecycleStatus,
-            toStatus: student.lifecycleStatus,
-            reason: 'Class placement updated',
-            changedById: actor.userId,
-            metadata: {
-              classChange: true,
-              fromClassId: student.classId,
-              toClassId: dto.classId,
-            },
-          },
-        });
-      }
+          if (updatesEnrollment) {
+            const placementChanged =
+              latestEnrollment.classId !== nextClassId ||
+              (latestEnrollment.sectionId ?? null) !== nextSectionId;
+            const mediumOfInstruction =
+              dto.mediumOfInstruction !== undefined
+                ? assertNonEmpty(dto.mediumOfInstruction, 'mediumOfInstruction')
+                : latestEnrollment.mediumOfInstruction;
 
-      if ('sectionId' in dto && nextSectionId !== student.sectionId) {
-        await tx.studentLifecycleTransition.create({
-          data: {
-            tenantId: actor.tenantId,
-            studentId: student.id,
-            fromStatus: student.lifecycleStatus,
-            toStatus: student.lifecycleStatus,
-            reason: 'Section placement updated',
-            changedById: actor.userId,
-            metadata: {
-              sectionChange: true,
-              fromSectionId: student.sectionId,
-              toSectionId: nextSectionId,
-              effectiveAt: new Date().toISOString(),
-            },
-          },
-        });
-      }
-    });
+            const cutover = new Date();
+            const enrollmentClaim = await tx.enrollment.updateMany({
+              where: {
+                id: latestEnrollment.id,
+                tenantId: actor.tenantId,
+                studentId: student.id,
+                status: EnrollmentStatus.ACTIVE,
+                updatedAt: latestEnrollment.updatedAt,
+              },
+              data: placementChanged
+                ? {
+                    status: EnrollmentStatus.TRANSFERRED,
+                    effectiveUntil: cutover,
+                  }
+                : {
+                    rollNumber: nextRollNumber,
+                    mediumOfInstruction,
+                  },
+            });
+            if (enrollmentClaim.count !== 1) {
+              throw new ConflictException(
+                'Active enrollment changed while this update was being finalized. Refresh and retry.',
+              );
+            }
 
-    await this.auditService.record({
-      action: 'update',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: student.id,
-      before: {
-        firstNameEn: student.firstNameEn,
-        lastNameEn: student.lastNameEn,
-        classId: student.classId,
-        sectionId: student.sectionId,
-        rollNumber: student.rollNumber,
-        disabilityFlag: student.disabilityFlag,
-      },
-      after: {
-        firstNameEn: dto.firstNameEn ?? student.firstNameEn,
-        lastNameEn: dto.lastNameEn ?? student.lastNameEn,
-        classId: nextClassId,
-        sectionId: nextSectionId,
-        rollNumber: nextRollNumber,
-        disabilityFlag: nextDisabilityFlag,
-      },
-    });
+            if (placementChanged) {
+              await tx.enrollment.create({
+                data: {
+                  tenantId: actor.tenantId,
+                  studentId: student.id,
+                  academicYearId: latestEnrollment.academicYearId,
+                  classId: nextClassId,
+                  sectionId: nextSectionId,
+                  rollNumber: nextRollNumber,
+                  admissionNumber: latestEnrollment.admissionNumber,
+                  admissionDate: latestEnrollment.admissionDate,
+                  mediumOfInstruction,
+                  status: EnrollmentStatus.ACTIVE,
+                  effectiveFrom: cutover,
+                  effectiveUntil: null,
+                },
+              });
+            }
+          }
+
+          if (dto.classId !== undefined && dto.classId !== student.classId) {
+            await tx.studentLifecycleTransition.create({
+              data: {
+                tenantId: actor.tenantId,
+                studentId: student.id,
+                fromStatus: student.lifecycleStatus,
+                toStatus: student.lifecycleStatus,
+                reason: 'Class placement updated',
+                changedById: actor.userId,
+                metadata: {
+                  classChange: true,
+                  fromClassId: student.classId,
+                  toClassId: dto.classId,
+                },
+              },
+            });
+          }
+
+          if (updatesSection && nextSectionId !== student.sectionId) {
+            await tx.studentLifecycleTransition.create({
+              data: {
+                tenantId: actor.tenantId,
+                studentId: student.id,
+                fromStatus: student.lifecycleStatus,
+                toStatus: student.lifecycleStatus,
+                reason: 'Section placement updated',
+                changedById: actor.userId,
+                metadata: {
+                  sectionChange: true,
+                  fromSectionId: student.sectionId,
+                  toSectionId: nextSectionId,
+                  effectiveAt: new Date().toISOString(),
+                },
+              },
+            });
+          }
+
+          await this.auditService.record(
+            {
+              action: 'update',
+              resource: 'student',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: student.id,
+              before: {
+                firstNameEn: student.firstNameEn,
+                lastNameEn: student.lastNameEn,
+                classId: student.classId,
+                sectionId: student.sectionId,
+                rollNumber: student.rollNumber,
+                disabilityFlag: student.disabilityFlag,
+              },
+              after: {
+                firstNameEn: dto.firstNameEn ?? student.firstNameEn,
+                lastNameEn: dto.lastNameEn ?? student.lastNameEn,
+                classId: nextClassId,
+                sectionId: nextSectionId,
+                rollNumber: nextRollNumber,
+                disabilityFlag: nextDisabilityFlag,
+              },
+            },
+            tx,
+          );
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (isPrismaTransactionConflictError(error)) {
+        throw new ConflictException(
+          'Student or enrollment changed while this update was being finalized. Refresh and retry.',
+        );
+      }
+      throw error;
+    }
 
     return this.getStudentProfile(student.id, actor);
   }
@@ -6781,8 +6870,10 @@ export class StudentsService {
       academicYearId: string | null;
     },
     actor: AuthContext,
+    client: Pick<PrismaService, 'class' | 'section' | 'enrollment'> = this
+      .prisma,
   ) {
-    const classroom = await this.prisma.class.findFirst({
+    const classroom = await client.class.findFirst({
       where: {
         id: input.classId,
         tenantId: actor.tenantId,
@@ -6794,7 +6885,7 @@ export class StudentsService {
     }
 
     const section = input.sectionId
-      ? await this.prisma.section.findFirst({
+      ? await client.section.findFirst({
           where: {
             id: input.sectionId,
             tenantId: actor.tenantId,
@@ -6810,7 +6901,7 @@ export class StudentsService {
     }
 
     if (input.rollNumber && input.academicYearId) {
-      const rollConflict = await this.prisma.enrollment.findFirst({
+      const rollConflict = await client.enrollment.findFirst({
         where: {
           tenantId: actor.tenantId,
           academicYearId: input.academicYearId,

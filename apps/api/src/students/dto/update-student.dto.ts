@@ -82,12 +82,12 @@ export class UpdateStudentDto {
 
   @IsOptional()
   @IsString()
-  sectionId?: string;
+  sectionId?: string | null;
 
   @IsOptional()
   @IsInt()
   @Min(1)
-  rollNumber?: number;
+  rollNumber?: number | null;
 
   @IsOptional()
   @IsString()

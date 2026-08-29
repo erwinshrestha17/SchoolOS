@@ -469,6 +469,46 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       actor,
     );
 
+    const enrollments = await prisma.enrollment.findMany({
+      where: { tenantId, studentId: student.id },
+    });
+    const priorEnrollment = enrollments.find(
+      (enrollment) => enrollment.status === EnrollmentStatus.TRANSFERRED,
+    );
+    const currentEnrollment = enrollments.find(
+      (enrollment) => enrollment.status === EnrollmentStatus.ACTIVE,
+    );
+    expect(enrollments).toHaveLength(2);
+    expect(priorEnrollment).toEqual(
+      expect.objectContaining({
+        classId,
+        effectiveUntil: expect.any(Date) as unknown,
+      }),
+    );
+    expect(currentEnrollment).toEqual(
+      expect.objectContaining({
+        academicYearId,
+        classId: otherClass.id,
+        effectiveFrom: priorEnrollment?.effectiveUntil,
+        effectiveUntil: null,
+      }),
+    );
+
+    const updateAudit = await prisma.auditLog.findFirst({
+      where: {
+        tenantId,
+        action: 'update',
+        resource: 'student',
+        resourceId: student.id,
+      },
+    });
+    expect(updateAudit).toEqual(
+      expect.objectContaining({
+        before: expect.objectContaining({ classId }) as unknown,
+        after: expect.objectContaining({ classId: otherClass.id }) as unknown,
+      }),
+    );
+
     const timeline = await studentsService.getStudentLifecycleTimeline(
       student.id,
       actor,
