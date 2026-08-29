@@ -6106,6 +6106,10 @@ export type DuplicateStudentMergeCounts = {
   attendanceRecords: number;
   attendanceCorrectionRequests: number;
   siblingMemberships: number;
+  activityTagsMoved: number;
+  duplicateActivityTagsRemoved: number;
+  activityReactionsMoved: number;
+  duplicateActivityReactionsRemoved: number;
   studentLeaveRequests: number;
   markEntries: number;
   casRecords: number;

@@ -59,6 +59,16 @@ describe('StudentsService (Duplicate Merge)', () => {
               updateMany: jest.fn(),
             },
             siblingGroupMember: { updateMany: jest.fn() },
+            activityPostStudent: {
+              findMany: jest.fn(),
+              updateMany: jest.fn(),
+              deleteMany: jest.fn(),
+            },
+            activityReaction: {
+              findMany: jest.fn(),
+              updateMany: jest.fn(),
+              deleteMany: jest.fn(),
+            },
             studentIdentity: { updateMany: jest.fn() },
             studentQrCredential: { updateMany: jest.fn() },
             studentDocument: {
@@ -148,6 +158,8 @@ describe('StudentsService (Duplicate Merge)', () => {
       prisma.studentGuardian,
       prisma.studentFeeAssignment,
       prisma.siblingGroupMember,
+      prisma.activityPostStudent,
+      prisma.activityReaction,
       prisma.studentIdentity,
       prisma.studentQrCredential,
       prisma.studentDocument,
@@ -178,11 +190,18 @@ describe('StudentsService (Duplicate Merge)', () => {
       prisma.canteenStudentEnrollment,
       prisma.canteenMealServing,
       prisma.canteenWalletTransaction,
-    ] as unknown as { updateMany?: jest.Mock; createMany?: jest.Mock }[];
+    ] as unknown as {
+      findMany?: jest.Mock;
+      updateMany?: jest.Mock;
+      createMany?: jest.Mock;
+      deleteMany?: jest.Mock;
+    }[];
 
     for (const delegate of delegates) {
+      delegate.findMany?.mockResolvedValue([]);
       delegate.updateMany?.mockResolvedValue({ count: 0 });
       delegate.createMany?.mockResolvedValue({ count: 0 });
+      delegate.deleteMany?.mockResolvedValue({ count: 0 });
     }
     (prisma.studentDocument.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.studentFeeAssignment.findMany as jest.Mock).mockResolvedValue([]);
@@ -235,6 +254,8 @@ describe('StudentsService (Duplicate Merge)', () => {
         attendanceRecords: 0,
         attendanceCorrectionRequests: 0,
         siblingMemberships: 0,
+        activityTags: 0,
+        activityReactions: 0,
         studentLeaveRequests: 1,
         markEntries: 2,
         casRecords: 1,
@@ -286,6 +307,8 @@ describe('StudentsService (Duplicate Merge)', () => {
             attendanceRecords: true,
             attendanceCorrectionRequests: true,
             siblingMemberships: true,
+            activityTags: true,
+            activityReactions: true,
             studentLeaveRequests: true,
             markEntries: true,
             casRecords: true,

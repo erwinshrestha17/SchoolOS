@@ -3293,6 +3293,8 @@ export class StudentsService {
             attendanceRecords: true,
             attendanceCorrectionRequests: true,
             siblingMemberships: true,
+            activityTags: true,
+            activityReactions: true,
             studentLeaveRequests: true,
             markEntries: true,
             casRecords: true,
@@ -3339,6 +3341,8 @@ export class StudentsService {
       attendanceCorrectionRequests:
         financialSummary?._count.attendanceCorrectionRequests ?? 0,
       siblingMemberships: financialSummary?._count.siblingMemberships ?? 0,
+      activityTags: financialSummary?._count.activityTags ?? 0,
+      activityReactions: financialSummary?._count.activityReactions ?? 0,
       studentLeaveRequests: financialSummary?._count.studentLeaveRequests ?? 0,
       markEntries: financialSummary?._count.markEntries ?? 0,
       casRecords: financialSummary?._count.casRecords ?? 0,
@@ -3651,6 +3655,164 @@ export class StudentsService {
           );
         }
 
+        const [
+          sourceActivityTags,
+          targetActivityTags,
+          sourceActivityReactions,
+          targetActivityReactions,
+        ] = await Promise.all([
+          tx.activityPostStudent.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            select: { id: true, activityPostId: true },
+          }),
+          tx.activityPostStudent.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: targetStudent.id,
+            },
+            select: { id: true, activityPostId: true },
+          }),
+          tx.activityReaction.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            select: { id: true, activityPostId: true, reaction: true },
+          }),
+          tx.activityReaction.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: targetStudent.id,
+            },
+            select: { id: true, activityPostId: true, reaction: true },
+          }),
+        ]);
+        const targetActivityTagByPostId = new Map(
+          targetActivityTags.map((tag) => [tag.activityPostId, tag.id]),
+        );
+        const activityTagIdsToMove: string[] = [];
+        const duplicateActivityTagIds: string[] = [];
+        const targetActivityTagIdsToClaim: string[] = [];
+        for (const sourceTag of sourceActivityTags) {
+          const targetTagId = targetActivityTagByPostId.get(
+            sourceTag.activityPostId,
+          );
+          if (targetTagId) {
+            duplicateActivityTagIds.push(sourceTag.id);
+            targetActivityTagIdsToClaim.push(targetTagId);
+          } else {
+            activityTagIdsToMove.push(sourceTag.id);
+          }
+        }
+
+        const targetActivityReactionByKey = new Map(
+          targetActivityReactions.map((reaction) => [
+            activityReactionMergeKey(reaction),
+            reaction.id,
+          ]),
+        );
+        const activityReactionIdsToMove: string[] = [];
+        const duplicateActivityReactionIds: string[] = [];
+        const targetActivityReactionIdsToClaim: string[] = [];
+        for (const sourceReaction of sourceActivityReactions) {
+          const targetReactionId = targetActivityReactionByKey.get(
+            activityReactionMergeKey(sourceReaction),
+          );
+          if (targetReactionId) {
+            duplicateActivityReactionIds.push(sourceReaction.id);
+            targetActivityReactionIdsToClaim.push(targetReactionId);
+          } else {
+            activityReactionIdsToMove.push(sourceReaction.id);
+          }
+        }
+
+        const [
+          targetActivityTagsClaimed,
+          activityTagsMoved,
+          duplicateActivityTagsRemoved,
+          targetActivityReactionsClaimed,
+          activityReactionsMoved,
+          duplicateActivityReactionsRemoved,
+        ] = await Promise.all([
+          targetActivityTagIdsToClaim.length > 0
+            ? tx.activityPostStudent.updateMany({
+                where: {
+                  id: { in: targetActivityTagIdsToClaim },
+                  tenantId: actor.tenantId,
+                  studentId: targetStudent.id,
+                },
+                data: { studentId: targetStudent.id },
+              })
+            : Promise.resolve({ count: 0 }),
+          activityTagIdsToMove.length > 0
+            ? tx.activityPostStudent.updateMany({
+                where: {
+                  id: { in: activityTagIdsToMove },
+                  tenantId: actor.tenantId,
+                  studentId: sourceStudent.id,
+                },
+                data: { studentId: targetStudent.id },
+              })
+            : Promise.resolve({ count: 0 }),
+          duplicateActivityTagIds.length > 0
+            ? tx.activityPostStudent.deleteMany({
+                where: {
+                  id: { in: duplicateActivityTagIds },
+                  tenantId: actor.tenantId,
+                  studentId: sourceStudent.id,
+                },
+              })
+            : Promise.resolve({ count: 0 }),
+          targetActivityReactionIdsToClaim.length > 0
+            ? tx.activityReaction.updateMany({
+                where: {
+                  id: { in: targetActivityReactionIdsToClaim },
+                  tenantId: actor.tenantId,
+                  studentId: targetStudent.id,
+                },
+                data: { studentId: targetStudent.id },
+              })
+            : Promise.resolve({ count: 0 }),
+          activityReactionIdsToMove.length > 0
+            ? tx.activityReaction.updateMany({
+                where: {
+                  id: { in: activityReactionIdsToMove },
+                  tenantId: actor.tenantId,
+                  studentId: sourceStudent.id,
+                },
+                data: { studentId: targetStudent.id },
+              })
+            : Promise.resolve({ count: 0 }),
+          duplicateActivityReactionIds.length > 0
+            ? tx.activityReaction.deleteMany({
+                where: {
+                  id: { in: duplicateActivityReactionIds },
+                  tenantId: actor.tenantId,
+                  studentId: sourceStudent.id,
+                },
+              })
+            : Promise.resolve({ count: 0 }),
+        ]);
+        if (
+          targetActivityTagsClaimed.count !==
+            targetActivityTagIdsToClaim.length ||
+          activityTagsMoved.count !== activityTagIdsToMove.length ||
+          duplicateActivityTagsRemoved.count !==
+            duplicateActivityTagIds.length ||
+          targetActivityReactionsClaimed.count !==
+            targetActivityReactionIdsToClaim.length ||
+          activityReactionsMoved.count !== activityReactionIdsToMove.length ||
+          duplicateActivityReactionsRemoved.count !==
+            duplicateActivityReactionIds.length
+        ) {
+          throw new ConflictException(
+            'Activity associations changed while the duplicate merge was being finalized. Refresh and retry.',
+          );
+        }
+
         const sourceDocs = await tx.studentDocument.findMany({
           where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
         });
@@ -3956,6 +4118,11 @@ export class StudentsService {
           attendanceRecords: attendanceRecords.count,
           attendanceCorrectionRequests: attendanceCorrectionRequests.count,
           siblingMemberships: siblingMemberships.count,
+          activityTagsMoved: activityTagsMoved.count,
+          duplicateActivityTagsRemoved: duplicateActivityTagsRemoved.count,
+          activityReactionsMoved: activityReactionsMoved.count,
+          duplicateActivityReactionsRemoved:
+            duplicateActivityReactionsRemoved.count,
           studentLeaveRequests: studentLeaveRequests.count,
           markEntries: markEntries.count,
           casRecords: casRecords.count,
@@ -7413,6 +7580,13 @@ function feeAssignmentMergeKey(assignment: {
   academicYearId: string;
 }) {
   return `${assignment.feePlanId}\u0000${assignment.academicYearId}`;
+}
+
+function activityReactionMergeKey(reaction: {
+  activityPostId: string;
+  reaction: string;
+}) {
+  return `${reaction.activityPostId}\u0000${reaction.reaction}`;
 }
 
 type GuardianRelationshipWriteInput = Pick<

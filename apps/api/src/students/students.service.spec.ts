@@ -1403,6 +1403,148 @@ describe('students lifecycle hardening', () => {
     expect(auditService.record).not.toHaveBeenCalled();
   });
 
+  it('reconciles duplicate activity associations onto the canonical student', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      studentSystemId: 'SCH-2026-0002',
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      studentSystemId: 'SCH-2026-0001',
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+      activityPostStudentFindManyQueue: [
+        [
+          { id: 'tag-move', activityPostId: 'post-source' },
+          { id: 'tag-duplicate', activityPostId: 'post-shared' },
+        ],
+        [{ id: 'tag-canonical', activityPostId: 'post-shared' }],
+      ],
+      activityReactionFindManyQueue: [
+        [
+          {
+            id: 'reaction-move',
+            activityPostId: 'post-source',
+            reaction: 'LIKE',
+          },
+          {
+            id: 'reaction-duplicate',
+            activityPostId: 'post-shared',
+            reaction: 'LOVE',
+          },
+        ],
+        [
+          {
+            id: 'reaction-canonical',
+            activityPostId: 'post-shared',
+            reaction: 'LOVE',
+          },
+        ],
+      ],
+      transactionActivityPostStudentUpdateManyCountQueue: [1, 1],
+      transactionActivityPostStudentDeleteManyCount: 1,
+      transactionActivityReactionUpdateManyCountQueue: [1, 1],
+      transactionActivityReactionDeleteManyCount: 1,
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.mergeDuplicateStudent(
+      {
+        sourceStudentId: sourceStudent.id,
+        targetStudentId: targetStudent.id,
+        reason: 'Duplicate record confirmed by registrar',
+      },
+      actor,
+    );
+
+    expect(
+      prisma.transaction.activityPostStudent.updateMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['tag-move'] },
+        tenantId: actor.tenantId,
+        studentId: sourceStudent.id,
+      },
+      data: { studentId: targetStudent.id },
+    });
+    expect(
+      prisma.transaction.activityPostStudent.deleteMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['tag-duplicate'] },
+        tenantId: actor.tenantId,
+        studentId: sourceStudent.id,
+      },
+    });
+    expect(prisma.transaction.activityReaction.updateMany).toHaveBeenCalledWith(
+      {
+        where: {
+          id: { in: ['reaction-move'] },
+          tenantId: actor.tenantId,
+          studentId: sourceStudent.id,
+        },
+        data: { studentId: targetStudent.id },
+      },
+    );
+    expect(prisma.transaction.activityReaction.deleteMany).toHaveBeenCalledWith(
+      {
+        where: {
+          id: { in: ['reaction-duplicate'] },
+          tenantId: actor.tenantId,
+          studentId: sourceStudent.id,
+        },
+      },
+    );
+    expect(result.mergeCounts).toEqual(
+      expect.objectContaining({
+        activityTagsMoved: 1,
+        duplicateActivityTagsRemoved: 1,
+        activityReactionsMoved: 1,
+        duplicateActivityReactionsRemoved: 1,
+      }),
+    );
+  });
+
+  it('rejects duplicate merge when canonical activity associations change', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      studentSystemId: 'SCH-2026-0002',
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      studentSystemId: 'SCH-2026-0001',
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+      activityPostStudentFindManyQueue: [
+        [{ id: 'tag-duplicate', activityPostId: 'post-shared' }],
+        [{ id: 'tag-canonical', activityPostId: 'post-shared' }],
+      ],
+      activityReactionFindManyQueue: [[], []],
+      transactionActivityPostStudentUpdateManyCountQueue: [0],
+      transactionActivityPostStudentDeleteManyCount: 1,
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: sourceStudent.id,
+          targetStudentId: targetStudent.id,
+          reason: 'Duplicate record confirmed by registrar',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Activity associations changed while the duplicate merge was being finalized',
+    );
+    expect(
+      prisma.transaction.studentDocument.updateMany,
+    ).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
   it('rejects duplicate merge when the canonical target lifecycle changes before claim', async () => {
     const sourceStudent = buildStudent({
       id: 'student-source',
@@ -6329,6 +6471,12 @@ function buildPrisma(options: {
   studentFeeAssignmentFindManyQueue?: unknown[][];
   transactionStudentFeeAssignmentUpdateManyCountQueue?: number[];
   transactionSiblingGroupMemberUpdateManyCount?: number;
+  activityPostStudentFindManyQueue?: unknown[][];
+  activityReactionFindManyQueue?: unknown[][];
+  transactionActivityPostStudentUpdateManyCountQueue?: number[];
+  transactionActivityPostStudentDeleteManyCount?: number;
+  transactionActivityReactionUpdateManyCountQueue?: number[];
+  transactionActivityReactionDeleteManyCount?: number;
   studentIdentityFindFirstResult?: unknown;
   transactionStudentIdentityCreateResult?: unknown;
   transactionStudentIdentityFindFirstResult?: unknown;
@@ -6397,6 +6545,42 @@ function buildPrisma(options: {
     siblingGroupMember: {
       updateMany: jest.fn().mockResolvedValue({
         count: options.transactionSiblingGroupMemberUpdateManyCount ?? 0,
+      }),
+    },
+    activityPostStudent: {
+      findMany: jest
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve(
+            options.activityPostStudentFindManyQueue?.shift() ?? [],
+          ),
+        ),
+      updateMany: jest.fn().mockImplementation(() =>
+        Promise.resolve({
+          count:
+            options.transactionActivityPostStudentUpdateManyCountQueue?.shift() ??
+            0,
+        }),
+      ),
+      deleteMany: jest.fn().mockResolvedValue({
+        count: options.transactionActivityPostStudentDeleteManyCount ?? 0,
+      }),
+    },
+    activityReaction: {
+      findMany: jest
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve(options.activityReactionFindManyQueue?.shift() ?? []),
+        ),
+      updateMany: jest.fn().mockImplementation(() =>
+        Promise.resolve({
+          count:
+            options.transactionActivityReactionUpdateManyCountQueue?.shift() ??
+            0,
+        }),
+      ),
+      deleteMany: jest.fn().mockResolvedValue({
+        count: options.transactionActivityReactionDeleteManyCount ?? 0,
       }),
     },
     studentIdentity: {
