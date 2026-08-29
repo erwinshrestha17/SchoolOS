@@ -1197,6 +1197,36 @@ describe('students lifecycle hardening', () => {
     expect(result.lifecycleStatus).toBe(StudentLifecycleStatus.EXITED);
   });
 
+  it.each([0, 2])(
+    'rejects a lifecycle exit when the active enrollment claim updates %i rows',
+    async (activeEnrollmentCount) => {
+      const student = buildStudent({
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      });
+      const prisma = buildPrisma({
+        studentFindFirstQueue: [student],
+        invoiceFindManyQueue: [[]],
+        transactionEnrollmentUpdateManyCountQueue: [activeEnrollmentCount],
+      });
+      const { service, auditService } = buildService(prisma);
+
+      await expect(
+        service.archiveStudent(
+          student.id,
+          { reason: 'Guardian-requested withdrawal' },
+          actor,
+        ),
+      ).rejects.toThrow(
+        'Student must have exactly one active enrollment before this lifecycle action',
+      );
+
+      expect(
+        prisma.transaction.studentLifecycleTransition.create,
+      ).not.toHaveBeenCalled();
+      expect(auditService.record).not.toHaveBeenCalled();
+    },
+  );
+
   it('soft deletes students without removing finance or document history', async () => {
     const student = buildStudent({
       lifecycleStatus: StudentLifecycleStatus.ACTIVE,

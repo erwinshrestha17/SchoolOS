@@ -6717,7 +6717,7 @@ export class StudentsService {
             );
           }
 
-          await tx.enrollment.updateMany({
+          const enrollmentClaim = await tx.enrollment.updateMany({
             where: {
               tenantId: input.actor.tenantId,
               studentId: input.student.id,
@@ -6728,6 +6728,11 @@ export class StudentsService {
               effectiveUntil: input.effectiveUntil,
             },
           });
+          if (enrollmentClaim.count !== 1) {
+            throw new ConflictException(
+              'Student must have exactly one active enrollment before this lifecycle action. Resolve the enrollment record and retry.',
+            );
+          }
 
           const clearanceEvidence = {
             clearedBeforeDecision: clearance.cleared,
