@@ -53,6 +53,7 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
 
   let classId: string;
   let academicYearId: string;
+  let otherAcademicYearId: string;
   let otherClassId: string;
 
   beforeAll(async () => {
@@ -118,6 +119,17 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
       },
     });
     academicYearId = academicYear.id;
+
+    const otherAcademicYear = await prisma.academicYear.create({
+      data: {
+        tenantId: otherTenantId,
+        name: '2081-2082',
+        startsOn: new Date('2024-04-14'),
+        endsOn: new Date('2025-04-13'),
+        isCurrent: true,
+      },
+    });
+    otherAcademicYearId = otherAcademicYear.id;
 
     const classroom = await prisma.class.create({
       data: {
@@ -515,6 +527,10 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
         dateOfBirth: '2012-01-01',
         gender: 'OTHER',
         admissionDate: '2024-04-20',
+        academicYearId:
+          auth.tenantId === otherTenantId
+            ? otherAcademicYearId
+            : academicYearId,
         classId: targetClassId,
       },
       auth,

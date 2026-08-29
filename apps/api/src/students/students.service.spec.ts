@@ -45,6 +45,191 @@ const actor = {
 };
 
 describe('students lifecycle hardening', () => {
+  it('creates the student, login, enrollment, lifecycle evidence, and audit atomically', async () => {
+    const admissionDate = new Date('2026-04-20T00:00:00.000Z');
+    const prisma = buildPrisma({
+      studentCountQueue: [3, 3],
+      academicYearFindFirstResult: {
+        id: 'academic-year-1',
+        startsOn: new Date('2026-04-14T00:00:00.000Z'),
+      },
+      classFindFirstResult: { id: 'class-1', name: 'Grade 1' },
+      sectionFindFirstResult: {
+        id: 'section-1',
+        name: 'A',
+        classId: 'class-1',
+      },
+      roleFindUniqueResult: { id: 'student-role-1' },
+      transactionStudentCreateResult: {
+        id: 'student-created',
+        studentSystemId: 'SCH-2026-0004',
+        admissionDate,
+        classId: 'class-1',
+        class: { id: 'class-1', name: 'Grade 1' },
+        userId: 'guardian-user-provisioned',
+        user: { email: 'student@example.com' },
+      },
+      transactionEnrollmentCreateResult: {
+        id: 'enrollment-created',
+        academicYearId: 'academic-year-1',
+        sectionId: 'section-1',
+      },
+    });
+    const { service, auditService, usersService, usageService } =
+      buildService(prisma);
+
+    const result = await service.createStudent(
+      {
+        firstNameEn: 'Asha',
+        lastNameEn: 'Shrestha',
+        dateOfBirth: '2015-03-01',
+        gender: 'FEMALE',
+        admissionDate: '2026-04-20',
+        academicYearId: 'academic-year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        rollNumber: 7,
+        createLogin: true,
+        email: 'student@example.com',
+        password: 'StudentAccess1!',
+      },
+      actor,
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
+    expect(usersService.createManagedUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        email: 'student@example.com',
+        roleIds: ['student-role-1'],
+      }),
+      prisma.transaction,
+    );
+    expect(prisma.transaction.student.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        userId: 'guardian-user-provisioned',
+        studentSystemId: 'SCH-2026-0004',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        section: 'A',
+      }) as unknown,
+      include: {
+        class: true,
+        user: { select: { email: true } },
+      },
+    });
+    expect(prisma.transaction.enrollment.create).toHaveBeenCalledWith({
+      data: {
+        tenantId: actor.tenantId,
+        studentId: 'student-created',
+        academicYearId: 'academic-year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        rollNumber: 7,
+        admissionNumber: null,
+        admissionDate,
+        mediumOfInstruction: 'English',
+        status: EnrollmentStatus.ACTIVE,
+        effectiveFrom: admissionDate,
+        effectiveUntil: null,
+      },
+    });
+    expect(
+      prisma.transaction.studentLifecycleTransition.create,
+    ).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        studentId: 'student-created',
+        toStatus: StudentLifecycleStatus.ACTIVE,
+        metadata: expect.objectContaining({
+          academicYearId: 'academic-year-1',
+          enrollmentId: 'enrollment-created',
+        }) as unknown,
+      }) as unknown,
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'create',
+        resourceId: 'student-created',
+        after: expect.objectContaining({
+          enrollmentId: 'enrollment-created',
+          hasLogin: true,
+        }) as unknown,
+      }),
+      prisma.transaction,
+    );
+    expect(usageService.incrementUsage).toHaveBeenCalledWith(
+      actor.tenantId,
+      'students.count',
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'student-created',
+        enrollmentId: 'enrollment-created',
+        academicYearId: 'academic-year-1',
+        sectionId: 'section-1',
+        hasLogin: true,
+      }),
+    );
+  });
+
+  it('fails closed before writes when no current academic year is configured', async () => {
+    const prisma = buildPrisma({ academicYearFindFirstResult: null });
+    const { service, usersService } = buildService(prisma);
+
+    await expect(
+      service.createStudent(
+        {
+          firstNameEn: 'Asha',
+          lastNameEn: 'Shrestha',
+          dateOfBirth: '2015-03-01',
+          gender: 'FEMALE',
+          admissionDate: '2026-04-20',
+          classId: 'class-1',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('No current academic year is configured for this school');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(usersService.createManagedUser).not.toHaveBeenCalled();
+  });
+
+  it('rejects a conflicting active roll before provisioning a student login', async () => {
+    const prisma = buildPrisma({
+      studentCountQueue: [3],
+      transactionEnrollmentFindFirstResult: {
+        id: 'existing-enrollment',
+        studentId: 'existing-student',
+      },
+    });
+    const { service, usersService, auditService } = buildService(prisma);
+
+    await expect(
+      service.createStudent(
+        {
+          firstNameEn: 'Asha',
+          lastNameEn: 'Shrestha',
+          dateOfBirth: '2015-03-01',
+          gender: 'FEMALE',
+          admissionDate: '2026-04-20',
+          classId: 'class-1',
+          rollNumber: 7,
+          createLogin: true,
+          email: 'student@example.com',
+          password: 'StudentAccess1!',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Roll number is already assigned in this academic year, class, and section.',
+    );
+    expect(usersService.createManagedUser).not.toHaveBeenCalled();
+    expect(prisma.transaction.student.create).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
   it('returns actor-scoped paginated student options without guardian data', async () => {
     const prisma = buildPrisma({
       studentFindManyResult: [
@@ -6479,6 +6664,7 @@ function buildService(
   const usageService = {
     verifyLimit: jest.fn(),
     checkLimit: jest.fn(),
+    incrementUsage: jest.fn(),
   };
   const studentPhotoService = {
     getPhotoContent: jest
@@ -6520,6 +6706,7 @@ function buildService(
     studentPhotoService,
     teacherScopeService,
     usersService,
+    usageService,
   };
 }
 
@@ -6543,10 +6730,14 @@ function buildPrisma(options: {
   invoiceFindManyQueue?: unknown[];
   transactionInvoiceFindManyResult?: unknown[];
   classFindFirstResult?: unknown;
+  academicYearFindFirstResult?: unknown;
   sectionFindFirstResult?: unknown;
   enrollmentFindFirstResult?: unknown;
   enrollmentFindManyResult?: unknown[];
   transactionEnrollmentUpdateManyCountQueue?: number[];
+  transactionEnrollmentFindFirstResult?: unknown;
+  transactionEnrollmentCreateResult?: unknown;
+  transactionStudentCreateResult?: unknown;
   generatedStudentDocumentFindFirstQueue?: unknown[];
   generatedStudentDocumentFindUniqueResult?: unknown;
   generatedStudentDocumentFindManyResult?: unknown[];
@@ -6564,6 +6755,7 @@ function buildPrisma(options: {
   staffFindFirstResult?: unknown;
   subjectTeacherAssignmentFindManyResult?: unknown[];
   sectionFindManyResult?: unknown[];
+  roleFindUniqueResult?: unknown;
   transactionRefreshTokenUpdateManyCount?: number;
   transactionStudentGuardianUpdateManyCount?: number;
   transactionGuardianUpdateManyCount?: number;
@@ -6584,10 +6776,21 @@ function buildPrisma(options: {
 }) {
   const transaction = {
     enrollment: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(
+          options.transactionEnrollmentFindFirstResult ?? null,
+        ),
       findMany: jest
         .fn()
         .mockResolvedValue(options.enrollmentFindManyResult ?? []),
-      create: jest.fn().mockResolvedValue({ id: 'enrollment-created' }),
+      create: jest.fn().mockResolvedValue(
+        options.transactionEnrollmentCreateResult ?? {
+          id: 'enrollment-created',
+          academicYearId: 'academic-year-1',
+          sectionId: null,
+        },
+      ),
       update: jest.fn().mockResolvedValue({ id: 'enrollment-updated' }),
       updateMany: jest.fn().mockImplementation(() =>
         Promise.resolve({
@@ -6597,6 +6800,20 @@ function buildPrisma(options: {
       ),
     },
     student: {
+      count: jest
+        .fn()
+        .mockImplementation(() => options.studentCountQueue?.shift() ?? 0),
+      create: jest.fn().mockResolvedValue(
+        options.transactionStudentCreateResult ?? {
+          id: 'student-created',
+          studentSystemId: 'SCH-2026-0001',
+          admissionDate: new Date('2026-04-01T00:00:00.000Z'),
+          classId: 'class-1',
+          class: { id: 'class-1', name: 'Grade 1' },
+          userId: null,
+          user: null,
+        },
+      ),
       findFirst: jest.fn().mockImplementation(async () => {
         const queue = options.studentFindFirstQueue ?? [];
 
@@ -6740,7 +6957,11 @@ function buildPrisma(options: {
       }),
     },
     role: {
-      findUnique: jest.fn().mockResolvedValue({ id: 'parent-role-1' }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue(
+          options.roleFindUniqueResult ?? { id: 'parent-role-1' },
+        ),
     },
     refreshToken: {
       findFirst: jest
@@ -6959,6 +7180,19 @@ function buildPrisma(options: {
         .fn()
         .mockResolvedValue({ id: 'class-1', name: 'Grade 1' }),
     },
+    academicYear: {
+      findFirst: jest.fn().mockResolvedValue(
+        Object.prototype.hasOwnProperty.call(
+          options,
+          'academicYearFindFirstResult',
+        )
+          ? options.academicYearFindFirstResult
+          : {
+              id: 'academic-year-1',
+              startsOn: new Date('2026-04-14T00:00:00.000Z'),
+            },
+      ),
+    },
     section: {
       findFirst: jest
         .fn()
@@ -6972,7 +7206,11 @@ function buildPrisma(options: {
       findUnique: jest.fn().mockResolvedValue({ name: 'Everest Academy' }),
     },
     role: {
-      findUnique: jest.fn().mockResolvedValue({ id: 'parent-role-1' }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue(
+          options.roleFindUniqueResult ?? { id: 'parent-role-1' },
+        ),
     },
     enrollment: {
       findFirst: jest

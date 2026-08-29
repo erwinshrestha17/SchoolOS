@@ -187,6 +187,7 @@ describe('Student Lifecycle Hardening (E2E)', () => {
     await prisma.studentLifecycleTransition.deleteMany({ where: { tenantId } });
     await prisma.studentDocumentHistory.deleteMany({ where: { tenantId } });
     await prisma.studentDocument.deleteMany({ where: { tenantId } });
+    await prisma.enrollment.deleteMany({ where: { tenantId } });
     await prisma.student.deleteMany({ where: { tenantId } });
     await prisma.class.deleteMany({ where: { tenantId } });
     await prisma.academicYear.deleteMany({ where: { tenantId } });
@@ -209,11 +210,25 @@ describe('Student Lifecycle Hardening (E2E)', () => {
     const transitions = await prisma.studentLifecycleTransition.findMany({
       where: { studentId: student.id },
     });
+    const enrollments = await prisma.enrollment.findMany({
+      where: { tenantId, studentId: student.id },
+    });
 
     expect(transitions).toHaveLength(1);
     expect(transitions[0].toStatus).toBe(StudentLifecycleStatus.ACTIVE);
     expect(transitions[0].fromStatus).toBeNull();
     expect(transitions[0].reason).toBe('Initial enrollment');
+    expect(enrollments).toEqual([
+      expect.objectContaining({
+        id: student.enrollmentId,
+        tenantId,
+        studentId: student.id,
+        academicYearId,
+        classId,
+        status: EnrollmentStatus.ACTIVE,
+        effectiveFrom: new Date('2024-04-15'),
+      }),
+    ]);
   });
 
   it('should enforce fee clearance for transfer and record transition', async () => {

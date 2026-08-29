@@ -520,6 +520,19 @@ export function createPrismaMock() {
         }
         return fieldValue.includes(needle);
       }
+      if (
+        value &&
+        typeof value === 'object' &&
+        'startsWith' in value &&
+        typeof (value as Record<string, unknown>).startsWith === 'string'
+      ) {
+        const filter = value as { startsWith: string };
+        const fieldValue = (item as Record<string, unknown> | undefined)?.[key];
+        return (
+          typeof fieldValue === 'string' &&
+          fieldValue.startsWith(filter.startsWith)
+        );
+      }
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         return matchesWhere(item?.[key], value);
       }
@@ -2474,6 +2487,17 @@ export function createPrismaMock() {
         state.enrollments.filter((item) => matchesWhere(item, q.where)),
       ),
     ),
+    create: jest.fn((q: PrismaQuery) => {
+      const item = {
+        id: nextId('enrollment'),
+        status: 'ACTIVE',
+        ...q.data,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      state.enrollments.push(item as Record<string, unknown>);
+      return Promise.resolve(item);
+    }),
     updateMany: jest.fn((q: PrismaQuery) => {
       let count = 0;
       for (const item of state.enrollments) {
@@ -2483,6 +2507,13 @@ export function createPrismaMock() {
         }
       }
       return Promise.resolve({ count });
+    }),
+    deleteMany: jest.fn((q: PrismaQuery) => {
+      const before = state.enrollments.length;
+      state.enrollments = state.enrollments.filter(
+        (item) => !matchesWhere(item, q.where),
+      );
+      return Promise.resolve({ count: before - state.enrollments.length });
     }),
   };
 

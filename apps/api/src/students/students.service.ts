@@ -128,15 +128,52 @@ export class StudentsService {
     const firstNameEn = requirePersonName(dto.firstNameEn, 'firstNameEn');
     const lastNameEn = requirePersonName(dto.lastNameEn, 'lastNameEn');
     const dateOfBirth = parseDateOfBirth(dto.dateOfBirth);
-    const classroom = await this.prisma.class.findFirst({
-      where: {
-        id: dto.classId,
-        tenantId: actor.tenantId,
-      },
-    });
+    const admissionDate = new Date(dto.admissionDate);
+    const [academicYear, classroom, section] = await Promise.all([
+      this.prisma.academicYear.findFirst({
+        where: dto.academicYearId
+          ? { id: dto.academicYearId, tenantId: actor.tenantId }
+          : { tenantId: actor.tenantId, isCurrent: true },
+        select: { id: true, startsOn: true },
+        orderBy: { startsOn: 'desc' },
+      }),
+      this.prisma.class.findFirst({
+        where: {
+          id: dto.classId,
+          tenantId: actor.tenantId,
+        },
+      }),
+      dto.sectionId || dto.section
+        ? this.prisma.section.findFirst({
+            where: {
+              ...(dto.sectionId
+                ? { id: dto.sectionId }
+                : { name: dto.section }),
+              tenantId: actor.tenantId,
+              classId: dto.classId,
+            },
+            select: { id: true, name: true, classId: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    if (!academicYear) {
+      if (dto.academicYearId) {
+        throw new NotFoundException('Academic year not found in this tenant');
+      }
+      throw new ConflictException(
+        'No current academic year is configured for this school',
+      );
+    }
 
     if (!classroom) {
       throw new NotFoundException('Class not found in this tenant');
+    }
+
+    if ((dto.sectionId || dto.section) && !section) {
+      throw new NotFoundException(
+        'Section not found for this class in this tenant',
+      );
     }
 
     const currentCount = await this.prisma.student.count({
@@ -148,7 +185,7 @@ export class StudentsService {
       currentCount,
     );
 
-    let linkedUserId: string | null = null;
+    let studentRoleId: string | null = null;
 
     if (dto.createLogin) {
       const studentRole = await this.prisma.role.findUnique({
@@ -170,71 +207,152 @@ export class StudentsService {
         );
       }
 
-      const managedUser = await this.usersService.createManagedUser({
-        tenantId: actor.tenantId,
-        email: dto.email,
-        password: dto.password,
-        phone: dto.phone,
-        roleIds: [studentRole.id],
-        assignedById: actor.userId,
-      });
-      linkedUserId = managedUser.id;
+      studentRoleId = studentRole.id;
     }
 
-    const student = await this.prisma.student.create({
-      data: {
-        tenantId: actor.tenantId,
-        userId: linkedUserId,
-        studentSystemId:
-          dto.studentSystemId ?? (await this.generateStudentSystemId(actor)),
-        firstNameEn,
-        lastNameEn,
-        firstNameNp: optionalPersonName(dto.firstNameNp, 'firstNameNp'),
-        lastNameNp: optionalPersonName(dto.lastNameNp, 'lastNameNp'),
-        dateOfBirth,
-        gender: dto.gender,
-        admissionDate: new Date(dto.admissionDate),
-        classId: dto.classId,
-        section: dto.section ?? null,
-        rollNumber: dto.rollNumber ?? null,
-        admissionNumber: dto.admissionNumber ?? null,
-        nationality: dto.nationality ?? 'Nepali',
-        mediumOfInstruct: dto.mediumOfInstruct ?? 'English',
-        emergencyName: optionalPersonName(dto.emergencyName, 'emergencyName'),
-        emergencyPhone: optionalNepalPhone(dto.emergencyPhone),
-      },
-      include: {
-        class: true,
-        user: { select: { email: true } },
-      },
-    });
-
-    await this.recordLifecycleTransition(
-      student.id,
-      null, // Initial state
-      StudentLifecycleStatus.ACTIVE,
-      'Initial enrollment',
-      actor,
-      {
-        admissionDate: student.admissionDate.toISOString(),
-        classId: student.classId,
-      },
-    );
-
-    await this.auditService.record({
-      action: 'create',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: student.id,
-      after: {
-        studentSystemId: student.studentSystemId,
-        classId: student.classId,
-        hasLogin: Boolean(student.userId),
-      },
-    });
+    const creation = await this.prisma
+      .$transaction(
+        async (tx) => {
+          const rollConflict = dto.rollNumber
+            ? await tx.enrollment.findFirst({
+                where: {
+                  tenantId: actor.tenantId,
+                  academicYearId: academicYear.id,
+                  classId: dto.classId,
+                  sectionId: section?.id ?? null,
+                  rollNumber: dto.rollNumber,
+                  status: EnrollmentStatus.ACTIVE,
+                },
+                select: { id: true, studentId: true },
+              })
+            : null;
+          if (rollConflict) {
+            throw new ConflictException(
+              'Roll number is already assigned in this academic year, class, and section.',
+            );
+          }
+          const managedUser =
+            dto.createLogin && studentRoleId && dto.email && dto.password
+              ? await this.usersService.createManagedUser(
+                  {
+                    tenantId: actor.tenantId,
+                    email: dto.email,
+                    password: dto.password,
+                    phone: dto.phone,
+                    roleIds: [studentRoleId],
+                    assignedById: actor.userId,
+                  },
+                  tx,
+                )
+              : null;
+          const studentSystemId =
+            dto.studentSystemId ??
+            (await this.generateStudentSystemId(
+              actor,
+              academicYear.startsOn,
+              tx,
+            ));
+          const student = await tx.student.create({
+            data: {
+              tenantId: actor.tenantId,
+              userId: managedUser?.id ?? null,
+              studentSystemId,
+              firstNameEn,
+              lastNameEn,
+              firstNameNp: optionalPersonName(dto.firstNameNp, 'firstNameNp'),
+              lastNameNp: optionalPersonName(dto.lastNameNp, 'lastNameNp'),
+              dateOfBirth,
+              gender: dto.gender,
+              admissionDate,
+              classId: dto.classId,
+              sectionId: section?.id ?? null,
+              section: section?.name ?? null,
+              rollNumber: dto.rollNumber ?? null,
+              admissionNumber: dto.admissionNumber ?? null,
+              nationality: dto.nationality ?? 'Nepali',
+              mediumOfInstruct: dto.mediumOfInstruct ?? 'English',
+              emergencyName: optionalPersonName(
+                dto.emergencyName,
+                'emergencyName',
+              ),
+              emergencyPhone: optionalNepalPhone(dto.emergencyPhone),
+            },
+            include: {
+              class: true,
+              user: { select: { email: true } },
+            },
+          });
+          const enrollment = await tx.enrollment.create({
+            data: {
+              tenantId: actor.tenantId,
+              studentId: student.id,
+              academicYearId: academicYear.id,
+              classId: dto.classId,
+              sectionId: section?.id ?? null,
+              rollNumber: dto.rollNumber ?? null,
+              admissionNumber: dto.admissionNumber ?? null,
+              admissionDate,
+              mediumOfInstruction: dto.mediumOfInstruct ?? 'English',
+              status: EnrollmentStatus.ACTIVE,
+              effectiveFrom: admissionDate,
+              effectiveUntil: null,
+            },
+          });
+          await tx.studentLifecycleTransition.create({
+            data: {
+              tenantId: actor.tenantId,
+              studentId: student.id,
+              fromStatus: null,
+              toStatus: StudentLifecycleStatus.ACTIVE,
+              reason: 'Initial enrollment',
+              changedById: actor.userId,
+              feeClearanceWaived: false,
+              metadata: {
+                admissionDate: admissionDate.toISOString(),
+                academicYearId: academicYear.id,
+                classId: student.classId,
+                sectionId: section?.id ?? null,
+                enrollmentId: enrollment.id,
+              },
+            },
+          });
+          await this.auditService.record(
+            {
+              action: 'create',
+              resource: 'student',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: student.id,
+              after: {
+                studentSystemId: student.studentSystemId,
+                academicYearId: academicYear.id,
+                classId: student.classId,
+                sectionId: section?.id ?? null,
+                enrollmentId: enrollment.id,
+                hasLogin: Boolean(student.userId),
+              },
+            },
+            tx,
+          );
+          return { student, enrollment };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      )
+      .catch((error: unknown) => {
+        if (
+          isPrismaUniqueConstraintError(error) ||
+          isPrismaTransactionConflictError(error)
+        ) {
+          throw new ConflictException(
+            'Student creation conflicted with another request. Refresh and retry.',
+          );
+        }
+        throw error;
+      });
 
     await this.usageService.incrementUsage(actor.tenantId, 'students.count');
+
+    const { student, enrollment } = creation;
 
     return {
       id: student.id,
@@ -245,6 +363,9 @@ export class StudentsService {
         id: student.class.id,
         name: student.class.name,
       },
+      enrollmentId: enrollment.id,
+      academicYearId: enrollment.academicYearId,
+      sectionId: enrollment.sectionId,
       email: student.user?.email ?? null,
       hasLogin: Boolean(student.userId),
     };
@@ -6427,29 +6548,6 @@ export class StudentsService {
     };
   }
 
-  private async recordLifecycleTransition(
-    studentId: string,
-    fromStatus: StudentLifecycleStatus | null,
-    toStatus: StudentLifecycleStatus,
-    reason: string,
-    actor: AuthContext,
-    metadata: Record<string, unknown>,
-    feeClearanceWaived = false,
-  ) {
-    await this.prisma.studentLifecycleTransition.create({
-      data: {
-        tenantId: actor.tenantId,
-        studentId,
-        fromStatus,
-        toStatus,
-        reason,
-        changedById: actor.userId,
-        feeClearanceWaived,
-        metadata: metadata as Prisma.InputJsonValue,
-      },
-    });
-  }
-
   private async commitStudentLifecycleTransition(input: {
     student: {
       id: string;
@@ -6657,12 +6755,21 @@ export class StudentsService {
     };
   }
 
-  private async generateStudentSystemId(actor: AuthContext) {
-    const count = await this.prisma.student.count({
-      where: { tenantId: actor.tenantId },
+  private async generateStudentSystemId(
+    actor: AuthContext,
+    academicYearStartsOn: Date,
+    client: Pick<PrismaService, 'student'> | Prisma.TransactionClient = this
+      .prisma,
+  ) {
+    const prefix = `SCH-${academicYearStartsOn.getUTCFullYear()}-`;
+    const count = await client.student.count({
+      where: {
+        tenantId: actor.tenantId,
+        studentSystemId: { startsWith: prefix },
+      },
     });
 
-    return `SCH-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    return `${prefix}${String(count + 1).padStart(4, '0')}`;
   }
 
   private async assertStudentPlacementForUpdate(

@@ -56,8 +56,16 @@ export class CreateStudentDto {
   @IsDateString()
   admissionDate!: string;
 
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
+
   @IsString()
   classId!: string;
+
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
 
   @IsOptional()
   @IsString()
