@@ -105,6 +105,15 @@ describe('StudentsService (Duplicate Merge)', () => {
               count: jest.fn(),
             },
             attendanceCorrectionRequest: { updateMany: jest.fn() },
+            studentLeaveRequest: { updateMany: jest.fn() },
+            markEntry: { updateMany: jest.fn() },
+            casRecord: { updateMany: jest.fn() },
+            reportCard: { updateMany: jest.fn() },
+            reportCardHistory: { updateMany: jest.fn() },
+            assessmentRetake: { updateMany: jest.fn() },
+            promotionRecord: { updateMany: jest.fn() },
+            homeworkSubmission: { updateMany: jest.fn() },
+            schoolServiceRequest: { updateMany: jest.fn() },
             canteenStudentEnrollment: { updateMany: jest.fn() },
             canteenMealServing: { updateMany: jest.fn() },
             canteenWalletTransaction: { updateMany: jest.fn() },
@@ -155,6 +164,15 @@ describe('StudentsService (Duplicate Merge)', () => {
       prisma.enrollment,
       prisma.attendanceRecord,
       prisma.attendanceCorrectionRequest,
+      prisma.studentLeaveRequest,
+      prisma.markEntry,
+      prisma.casRecord,
+      prisma.reportCard,
+      prisma.reportCardHistory,
+      prisma.assessmentRetake,
+      prisma.promotionRecord,
+      prisma.homeworkSubmission,
+      prisma.schoolServiceRequest,
       prisma.canteenStudentEnrollment,
       prisma.canteenMealServing,
       prisma.canteenWalletTransaction,
@@ -210,6 +228,20 @@ describe('StudentsService (Duplicate Merge)', () => {
         libraryIssues: 0,
         transportEnrollments: 0,
         transportLogs: 0,
+        attendanceRecords: 0,
+        attendanceCorrectionRequests: 0,
+        studentLeaveRequests: 1,
+        markEntries: 2,
+        casRecords: 1,
+        reportCards: 1,
+        reportCardHistories: 2,
+        assessmentRetakes: 1,
+        promotionRecords: 1,
+        homeworkSubmissions: 3,
+        schoolServiceRequests: 1,
+        canteenEnrollments: 0,
+        canteenMealServings: 0,
+        canteenWalletTransactions: 0,
       },
     });
     (prisma.feeWaiver.count as jest.Mock).mockResolvedValue(0);
@@ -225,7 +257,45 @@ describe('StudentsService (Duplicate Merge)', () => {
     );
 
     expect(result.mergeCounts.invoices).toBe(2);
+    expect(result.mergeCounts.markEntries).toBe(2);
+    expect(result.mergeCounts.homeworkSubmissions).toBe(3);
+    expect(result.mergeCounts.schoolServiceRequests).toBe(1);
     expect(result.isProbableDuplicate).toBe(true);
+    expect(prisma.student.findUnique).toHaveBeenCalledWith({
+      where: { id: sourceStudent.id },
+      select: {
+        _count: {
+          select: {
+            invoices: true,
+            payments: true,
+            studentFeeAssignments: true,
+            guardianLinks: true,
+            documents: true,
+            generatedDocuments: true,
+            notificationDeliveries: true,
+            developmentalMilestones: true,
+            moodLogs: true,
+            libraryIssues: true,
+            transportEnrollments: true,
+            transportLogs: true,
+            attendanceRecords: true,
+            attendanceCorrectionRequests: true,
+            studentLeaveRequests: true,
+            markEntries: true,
+            casRecords: true,
+            reportCards: true,
+            reportCardHistories: true,
+            assessmentRetakes: true,
+            promotionRecords: true,
+            homeworkSubmissions: true,
+            schoolServiceRequests: true,
+            canteenEnrollments: true,
+            canteenMealServings: true,
+            canteenWalletTransactions: true,
+          },
+        },
+      },
+    });
   });
 
   it('should execute merge transactionally', async () => {

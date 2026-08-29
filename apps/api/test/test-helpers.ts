@@ -1791,6 +1791,7 @@ export function createPrismaMock() {
       findFirst: jest.fn(() => Promise.resolve(null)),
       findMany: jest.fn(() => Promise.resolve([])),
       upsert: jest.fn((q: any) => Promise.resolve(q.create || {})),
+      updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
     },
     examTerm: {
       findFirst: jest.fn(() => Promise.resolve(null)),
@@ -1801,6 +1802,7 @@ export function createPrismaMock() {
       count: jest.fn(() => Promise.resolve(0)),
       create: jest.fn((q: any) => Promise.resolve(q.data || {})),
       update: jest.fn((q: any) => Promise.resolve(q.data || {})),
+      updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
     },
     invoice: {
       count: jest.fn((q: PrismaQuery) =>
@@ -2378,6 +2380,16 @@ export function createPrismaMock() {
         if (item) Object.assign(item, q.data);
         return Promise.resolve(item);
       }),
+      updateMany: jest.fn((q: PrismaQuery) => {
+        let count = 0;
+        for (const item of state.homeworkSubmissions) {
+          if (matchesWhere(item, q.where)) {
+            Object.assign(item, q.data ?? {});
+            count += 1;
+          }
+        }
+        return Promise.resolve({ count });
+      }),
       upsert: jest.fn((q: PrismaQuery) => {
         const item = state.homeworkSubmissions.find(
           (i) => i.id === q.where?.id,
@@ -2547,6 +2559,11 @@ export function createPrismaMock() {
     'attendanceRecord',
     'examResult',
     'reportCard',
+    'casRecord',
+    'reportCardHistory',
+    'promotionRecord',
+    'studentLeaveRequest',
+    'schoolServiceRequest',
     'markEntry',
     'healthRecord',
     'incidentReport',

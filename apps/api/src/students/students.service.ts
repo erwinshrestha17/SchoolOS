@@ -3292,6 +3292,15 @@ export class StudentsService {
             transportLogs: true,
             attendanceRecords: true,
             attendanceCorrectionRequests: true,
+            studentLeaveRequests: true,
+            markEntries: true,
+            casRecords: true,
+            reportCards: true,
+            reportCardHistories: true,
+            assessmentRetakes: true,
+            promotionRecords: true,
+            homeworkSubmissions: true,
+            schoolServiceRequests: true,
             canteenEnrollments: true,
             canteenMealServings: true,
             canteenWalletTransactions: true,
@@ -3328,6 +3337,16 @@ export class StudentsService {
       attendanceRecords: financialSummary?._count.attendanceRecords ?? 0,
       attendanceCorrectionRequests:
         financialSummary?._count.attendanceCorrectionRequests ?? 0,
+      studentLeaveRequests: financialSummary?._count.studentLeaveRequests ?? 0,
+      markEntries: financialSummary?._count.markEntries ?? 0,
+      casRecords: financialSummary?._count.casRecords ?? 0,
+      reportCards: financialSummary?._count.reportCards ?? 0,
+      reportCardHistories: financialSummary?._count.reportCardHistories ?? 0,
+      assessmentRetakes: financialSummary?._count.assessmentRetakes ?? 0,
+      promotionRecords: financialSummary?._count.promotionRecords ?? 0,
+      homeworkSubmissions: financialSummary?._count.homeworkSubmissions ?? 0,
+      schoolServiceRequests:
+        financialSummary?._count.schoolServiceRequests ?? 0,
       canteenEnrollments: financialSummary?._count.canteenEnrollments ?? 0,
       canteenMealServings: financialSummary?._count.canteenMealServings ?? 0,
       canteenWalletTransactions:
@@ -3626,6 +3645,15 @@ export class StudentsService {
           conversationParticipants,
           attendanceRecords,
           attendanceCorrectionRequests,
+          studentLeaveRequests,
+          markEntries,
+          casRecords,
+          reportCards,
+          reportCardHistories,
+          assessmentRetakes,
+          promotionRecords,
+          homeworkSubmissions,
+          schoolServiceRequests,
           canteenEnrollments,
           canteenMealServings,
           canteenWalletTransactions,
@@ -3741,6 +3769,69 @@ export class StudentsService {
             },
             data: { studentId: targetStudent.id },
           }),
+          tx.studentLeaveRequest.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.markEntry.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.casRecord.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.reportCard.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.reportCardHistory.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.assessmentRetake.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.promotionRecord.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.homeworkSubmission.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
+          tx.schoolServiceRequest.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: sourceStudent.id,
+            },
+            data: { studentId: targetStudent.id },
+          }),
           tx.canteenStudentEnrollment.updateMany({
             where: {
               tenantId: actor.tenantId,
@@ -3820,6 +3911,43 @@ export class StudentsService {
           );
         }
 
+        const mergeCounts = {
+          guardianLinks: guardianLinks.count,
+          documents: documents.count,
+          generatedDocuments: generatedDocuments.count,
+          invoices: invoices.count,
+          payments: payments.count,
+          feeWaivers: feeWaivers.count,
+          notificationDeliveries: notificationDeliveries.count,
+          developmentalMilestones: developmentalMilestones.count,
+          moodLogs: moodLogs.count,
+          libraryIssues: libraryIssues.count,
+          transportEnrollments: transportEnrollments.count,
+          transportLogs: transportLogs.count,
+          conversations: conversations.count,
+          conversationParticipants: conversationParticipants.count,
+          attendanceRecords: attendanceRecords.count,
+          attendanceCorrectionRequests: attendanceCorrectionRequests.count,
+          studentLeaveRequests: studentLeaveRequests.count,
+          markEntries: markEntries.count,
+          casRecords: casRecords.count,
+          reportCards: reportCards.count,
+          reportCardHistories: reportCardHistories.count,
+          assessmentRetakes: assessmentRetakes.count,
+          promotionRecords: promotionRecords.count,
+          homeworkSubmissions: homeworkSubmissions.count,
+          schoolServiceRequests: schoolServiceRequests.count,
+          canteenEnrollments: canteenEnrollments.count,
+          canteenMealServings: canteenMealServings.count,
+          canteenWalletTransactions: canteenWalletTransactions.count,
+          sourceGuardianLinksExpired: sourceGuardianLinksExpired.count,
+          sourceIdentitiesRevoked: sourceIdentitiesRevoked.count,
+          sourceQrCredentialsRevoked: sourceQrCredentialsRevoked.count,
+          studentFeeAssignmentsMoved: studentFeeAssignmentsMoved.count,
+          duplicateFeeAssignmentsDeactivated:
+            duplicateFeeAssignmentsDeactivated.count,
+        };
+
         await tx.studentMergeHistory.create({
           data: {
             tenantId: actor.tenantId,
@@ -3830,19 +3958,7 @@ export class StudentsService {
             metadata: {
               sourceStudentSystemId: sourceStudent.studentSystemId,
               targetStudentSystemId: targetStudent.studentSystemId,
-              counts: {
-                guardianLinks: guardianLinks.count,
-                sourceGuardianLinksExpired: sourceGuardianLinksExpired.count,
-                sourceIdentitiesRevoked: sourceIdentitiesRevoked.count,
-                sourceQrCredentialsRevoked: sourceQrCredentialsRevoked.count,
-                studentFeeAssignmentsMoved: studentFeeAssignmentsMoved.count,
-                duplicateFeeAssignmentsDeactivated:
-                  duplicateFeeAssignmentsDeactivated.count,
-                documents: documents.count,
-                invoices: invoices.count,
-                payments: payments.count,
-                attendanceRecords: attendanceRecords.count,
-              },
+              counts: mergeCounts,
             },
           },
         });
@@ -3864,34 +3980,6 @@ export class StudentsService {
             },
           },
         });
-
-        const mergeCounts = {
-          guardianLinks: guardianLinks.count,
-          documents: documents.count,
-          generatedDocuments: generatedDocuments.count,
-          invoices: invoices.count,
-          payments: payments.count,
-          feeWaivers: feeWaivers.count,
-          notificationDeliveries: notificationDeliveries.count,
-          developmentalMilestones: developmentalMilestones.count,
-          moodLogs: moodLogs.count,
-          libraryIssues: libraryIssues.count,
-          transportEnrollments: transportEnrollments.count,
-          transportLogs: transportLogs.count,
-          conversations: conversations.count,
-          conversationParticipants: conversationParticipants.count,
-          attendanceRecords: attendanceRecords.count,
-          attendanceCorrectionRequests: attendanceCorrectionRequests.count,
-          canteenEnrollments: canteenEnrollments.count,
-          canteenMealServings: canteenMealServings.count,
-          canteenWalletTransactions: canteenWalletTransactions.count,
-          sourceGuardianLinksExpired: sourceGuardianLinksExpired.count,
-          sourceIdentitiesRevoked: sourceIdentitiesRevoked.count,
-          sourceQrCredentialsRevoked: sourceQrCredentialsRevoked.count,
-          studentFeeAssignmentsMoved: studentFeeAssignmentsMoved.count,
-          duplicateFeeAssignmentsDeactivated:
-            duplicateFeeAssignmentsDeactivated.count,
-        };
 
         await this.auditService.record(
           {

@@ -1242,6 +1242,88 @@ describe('students lifecycle hardening', () => {
     expect(result.mergeCounts.sourceQrCredentialsRevoked).toBe(1);
   });
 
+  it('moves active P0 academic and operational history to the canonical student', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      studentSystemId: 'SCH-2026-0002',
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      studentSystemId: 'SCH-2026-0001',
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.mergeDuplicateStudent(
+      {
+        sourceStudentId: sourceStudent.id,
+        targetStudentId: targetStudent.id,
+        reason: 'Duplicate record confirmed by registrar',
+      },
+      actor,
+    );
+
+    const activeP0Delegates = [
+      prisma.transaction.studentLeaveRequest,
+      prisma.transaction.markEntry,
+      prisma.transaction.casRecord,
+      prisma.transaction.reportCard,
+      prisma.transaction.reportCardHistory,
+      prisma.transaction.assessmentRetake,
+      prisma.transaction.promotionRecord,
+      prisma.transaction.homeworkSubmission,
+      prisma.transaction.schoolServiceRequest,
+    ];
+    for (const delegate of activeP0Delegates) {
+      expect(delegate.updateMany).toHaveBeenCalledWith({
+        where: {
+          tenantId: actor.tenantId,
+          studentId: sourceStudent.id,
+        },
+        data: { studentId: targetStudent.id },
+      });
+    }
+    expect(result.mergeCounts).toEqual(
+      expect.objectContaining({
+        studentLeaveRequests: 0,
+        markEntries: 0,
+        casRecords: 0,
+        reportCards: 0,
+        reportCardHistories: 0,
+        assessmentRetakes: 0,
+        promotionRecords: 0,
+        homeworkSubmissions: 0,
+        schoolServiceRequests: 0,
+      }),
+    );
+    const mergeHistoryCreate = prisma.transaction.studentMergeHistory
+      .create as unknown as {
+      mock: {
+        calls: { data: { metadata: { counts: Record<string, number> } } }[][];
+      };
+    };
+    const mergeHistoryCall = mergeHistoryCreate.mock.calls[0]?.[0];
+    expect(mergeHistoryCall).toBeDefined();
+    if (!mergeHistoryCall) {
+      throw new Error('Expected duplicate merge history to be recorded');
+    }
+    expect(mergeHistoryCall.data.metadata.counts).toEqual(
+      expect.objectContaining({
+        studentLeaveRequests: 0,
+        markEntries: 0,
+        casRecords: 0,
+        reportCards: 0,
+        reportCardHistories: 0,
+        assessmentRetakes: 0,
+        promotionRecords: 0,
+        homeworkSubmissions: 0,
+        schoolServiceRequests: 0,
+      }),
+    );
+  });
+
   it('rejects duplicate merge when the canonical target lifecycle changes before claim', async () => {
     const sourceStudent = buildStudent({
       id: 'student-source',
@@ -6389,6 +6471,33 @@ function buildPrisma(options: {
       }),
     },
     attendanceCorrectionRequest: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    studentLeaveRequest: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    markEntry: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    casRecord: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    reportCard: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    reportCardHistory: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    assessmentRetake: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    promotionRecord: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    homeworkSubmission: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    schoolServiceRequest: {
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     canteenStudentEnrollment: {
