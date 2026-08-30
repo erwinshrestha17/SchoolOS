@@ -2261,6 +2261,105 @@ describe('attendance production hardening', () => {
     );
   });
 
+  it('returns the recorded roster-mismatch receipt when an offline replay sees a changed roster', async () => {
+    const expectedRosterVersion = 'f'.repeat(64);
+    const storedDto = {
+      academicYearId: 'ay-1',
+      classId: 'class-1',
+      attendanceDate: '2026-04-28',
+      exceptions: [],
+      expectedRosterVersion,
+    };
+    const existingSync = buildSyncSubmission({
+      attendanceSessionId: null,
+      syncStatus: AttendanceSyncStatus.REJECTED,
+      rejectionReason: AttendanceSyncRejectionReason.ROSTER_MISMATCH,
+      payload: { dto: storedDto },
+    });
+    const updatedSync = buildSyncSubmission({
+      attendanceSessionId: null,
+      syncStatus: AttendanceSyncStatus.REJECTED,
+      syncAttemptCount: 2,
+      rejectionReason: AttendanceSyncRejectionReason.ROSTER_MISMATCH,
+      payload: { dto: storedDto },
+    });
+    const { service, prisma, tx } = buildService({
+      attendanceSyncFindUnique: existingSync,
+      attendanceSyncUpdated: updatedSync,
+      students: [buildStudent({ id: 'new-roster-student' })],
+    });
+
+    await expect(
+      service.syncAttendance(
+        {
+          ...storedDto,
+          clientSubmissionId: 'sync-1',
+          deviceTimestamp: '2026-04-28T08:05:00.000Z',
+        },
+        adminActor,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        replayed: true,
+        syncAttemptCount: 2,
+        syncStatus: AttendanceSyncStatus.REJECTED,
+        rejectionReason: AttendanceSyncRejectionReason.ROSTER_MISMATCH,
+      }),
+    );
+
+    expect(prisma.student.findMany).not.toHaveBeenCalled();
+    expect(prisma.attendanceSession.findFirst).not.toHaveBeenCalled();
+    expect(tx.attendanceConflict.create).not.toHaveBeenCalled();
+  });
+
+  it('returns the recorded conflict when an already submitted attendance sync is retried', async () => {
+    const storedDto = {
+      academicYearId: 'ay-1',
+      classId: 'class-1',
+      attendanceDate: '2026-04-28',
+      exceptions: [],
+      expectedRosterVersion: 'a'.repeat(64),
+    };
+    const existingSync = buildSyncSubmission({
+      conflictId: 'conflict-1',
+      syncStatus: AttendanceSyncStatus.CONFLICTED,
+      payload: { dto: storedDto },
+    });
+    const updatedSync = buildSyncSubmission({
+      conflictId: 'conflict-1',
+      syncStatus: AttendanceSyncStatus.CONFLICTED,
+      syncAttemptCount: 2,
+      payload: { dto: storedDto },
+    });
+    const { service, prisma, tx } = buildService({
+      attendanceSyncFindUnique: existingSync,
+      attendanceSyncUpdated: updatedSync,
+      attendanceSession: buildAttendanceSession(),
+    });
+
+    await expect(
+      service.syncAttendance(
+        {
+          ...storedDto,
+          clientSubmissionId: 'sync-1',
+          deviceTimestamp: '2026-04-28T08:05:00.000Z',
+        },
+        adminActor,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        attendanceSessionId: 'session-1',
+        conflictId: 'conflict-1',
+        replayed: true,
+        syncAttemptCount: 2,
+        syncStatus: AttendanceSyncStatus.CONFLICTED,
+      }),
+    );
+
+    expect(prisma.attendanceSession.findFirst).not.toHaveBeenCalled();
+    expect(tx.attendanceConflict.create).not.toHaveBeenCalled();
+  });
+
   it('treats omitted and empty attendance exception arrays as the same replay payload', async () => {
     const existingSync = buildSyncSubmission({
       payload: {
