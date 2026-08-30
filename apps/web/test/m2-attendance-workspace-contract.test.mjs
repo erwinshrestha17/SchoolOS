@@ -130,8 +130,8 @@ describe("M2 attendance workspace contract", () => {
     assert.match(form, /Conflict found\. Review before syncing/);
     assert.match(form, /SchoolOS did not accept this attendance/);
     assert.match(form, /SchoolOS has not confirmed this attendance/);
-    assert.match(form, /Final submission queued on this browser/);
-    assert.match(form, /It is not submitted yet/);
+    assert.match(form, /Queued on this browser — not submitted/);
+    assert.match(form, /Keep this class and date open for automatic retry/);
     assert.match(form, /Attendance accepted by SchoolOS at/);
     assert.match(form, /The official record was not overwritten/);
     assert.match(form, /No authoritative attendance was accepted/);

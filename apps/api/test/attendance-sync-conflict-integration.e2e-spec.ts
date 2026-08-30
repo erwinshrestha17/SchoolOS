@@ -336,6 +336,13 @@ function makeRejectedSyncPrisma() {
 
   return {
     __state: state,
+    tenantAuthorityFence: {
+      findUnique: jest.fn(async () => ({
+        tenantId: 'tenant-attendance-sync',
+        authorityNodeId: 'cloud',
+        authorityEpoch: 1,
+      })),
+    },
     attendanceSyncSubmission: {
       findUnique: jest.fn(async ({ where }) => {
         const key = where.tenantId_clientSubmissionId;

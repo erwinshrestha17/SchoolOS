@@ -770,6 +770,12 @@ export class AttendanceService {
       );
     }
 
+    // Deterministic conflict precedence for a new attendance operation:
+    // assignment/tenant scope -> date/calendar -> session lock -> roster
+    // snapshot -> exception membership -> submitted-session immutability ->
+    // unique-write race. A stale timestamp or different prior submitter never
+    // permits overwriting an official submission; after the roster fence passes
+    // either condition is preserved as a review conflict instead.
     const isSyncSubmission =
       Boolean(submissionContext) || 'deviceTimestamp' in dto;
     if (

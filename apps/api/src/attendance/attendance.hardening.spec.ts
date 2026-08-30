@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { AttendanceStatus, AuthMethod, Prisma } from '@prisma/client';
 import { AttendanceService } from './attendance.service';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -23,6 +24,29 @@ function daysAgo(count: number): Date {
   const date = new Date();
   date.setDate(date.getDate() - count);
   return date;
+}
+
+function buildTestRosterVersion(input: {
+  tenantId: string;
+  academicYearId: string;
+  classId: string;
+  sectionId?: string;
+  attendanceDate: string;
+  studentIds: string[];
+}) {
+  return createHash('sha256')
+    .update(
+      [
+        'attendance-roster:v1',
+        input.tenantId,
+        input.academicYearId,
+        input.classId,
+        input.sectionId ?? '<none>',
+        input.attendanceDate,
+        ...input.studentIds.slice().sort(),
+      ].join('\n'),
+    )
+    .digest('hex');
 }
 
 describe('Attendance Hardening', () => {
@@ -426,10 +450,17 @@ describe('Attendance Hardening', () => {
     });
 
     describe('Deterministic Sync Conflict & Owner Check', () => {
-      it('should prevent overwrite if deviceTimestamp is older than server submittedAt', async () => {
-        const yesterday = new Date('2026-06-05T10:00:00.000Z');
-        const deviceTime = '2026-06-05T09:00:00.000Z'; // older
+      const submittedAt = new Date('2026-06-05T10:00:00.000Z');
+      const currentRosterVersion = buildTestRosterVersion({
+        tenantId: 'tenant-1',
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        attendanceDate: '2026-06-05',
+        studentIds: ['student-1'],
+      });
 
+      function configureSubmittedSession(submittedById: string) {
         (prisma.academicYear.findFirst as jest.Mock).mockResolvedValue({
           id: 'year-1',
         });
@@ -445,7 +476,7 @@ describe('Attendance Hardening', () => {
           id: 'staff-1',
         });
         (prisma.schoolCalendarDay.findFirst as jest.Mock).mockResolvedValue({
-          calendarDate: yesterday,
+          calendarDate: submittedAt,
           isWorkingDay: true,
         });
         (prisma.student.findMany as jest.Mock).mockResolvedValue([
@@ -454,8 +485,8 @@ describe('Attendance Hardening', () => {
 
         (prisma.attendanceSession.findFirst as jest.Mock).mockResolvedValue({
           id: 'session-1',
-          submittedAt: yesterday,
-          submittedById: 'user-1', // same owner, but device timestamp is older
+          submittedAt,
+          submittedById,
           lockAt: new Date('2099-01-01'),
           records: [
             { studentId: 'student-1', status: AttendanceStatus.PRESENT },
@@ -464,7 +495,7 @@ describe('Attendance Hardening', () => {
 
         (prisma.attendanceSession.update as jest.Mock).mockResolvedValue({
           id: 'session-1',
-          submittedAt: yesterday,
+          submittedAt,
           conflictStatus: 'FLAGGED',
         });
 
@@ -472,98 +503,112 @@ describe('Attendance Hardening', () => {
           prisma.attendanceSession.findUniqueOrThrow as jest.Mock
         ).mockResolvedValue({
           id: 'session-1',
-          attendanceDate: yesterday,
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          attendanceDate: submittedAt,
+          submittedAt,
+          submittedById,
+          lockAt: new Date('2099-01-01'),
           conflictStatus: 'FLAGGED',
           class: { name: 'Class 1' },
+          section: { name: 'A' },
           records: [
             { studentId: 'student-1', status: AttendanceStatus.PRESENT },
           ],
         });
+      }
 
-        const dto = {
+      function buildSyncDto(input: {
+        deviceTimestamp: string;
+        expectedRosterVersion: string;
+      }) {
+        return {
           academicYearId: 'year-1',
           classId: 'class-1',
           sectionId: 'section-1',
           attendanceDate: '2026-06-05',
-          deviceTimestamp: deviceTime,
+          deviceTimestamp: input.deviceTimestamp,
+          expectedRosterVersion: input.expectedRosterVersion,
           exceptions: [
             { studentId: 'student-1', status: AttendanceStatus.ABSENT },
           ],
         };
+      }
 
-        const result = await service.submitAttendance(dto as any, mockActor);
-        // Overwrite should not occur, so conflictStatus is FLAGGED
+      it('gives roster change precedence over a stale device timestamp', async () => {
+        configureSubmittedSession(mockActor.userId);
+
+        const failure = await service
+          .submitAttendance(
+            buildSyncDto({
+              deviceTimestamp: '2026-06-05T09:00:00.000Z',
+              expectedRosterVersion: 'f'.repeat(64),
+            }) as any,
+            mockActor,
+          )
+          .then(() => null)
+          .catch((error: unknown) => error);
+
+        expect(failure).toBeInstanceOf(ConflictException);
+        expect((failure as ConflictException).getResponse()).toMatchObject({
+          code: 'ATTENDANCE_ROSTER_CHANGED',
+        });
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.attendanceConflict.create).not.toHaveBeenCalled();
+      });
+
+      it('gives roster change precedence over submission ownership conflict', async () => {
+        configureSubmittedSession('other-user');
+
+        const failure = await service
+          .submitAttendance(
+            buildSyncDto({
+              deviceTimestamp: '2026-06-05T11:00:00.000Z',
+              expectedRosterVersion: 'f'.repeat(64),
+            }) as any,
+            mockActor,
+          )
+          .then(() => null)
+          .catch((error: unknown) => error);
+
+        expect(failure).toBeInstanceOf(ConflictException);
+        expect((failure as ConflictException).getResponse()).toMatchObject({
+          code: 'ATTENDANCE_ROSTER_CHANGED',
+        });
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.attendanceConflict.create).not.toHaveBeenCalled();
+      });
+
+      it('flags a stale device timestamp without overwriting official attendance', async () => {
+        configureSubmittedSession(mockActor.userId);
+
+        const result = await service.submitAttendance(
+          buildSyncDto({
+            deviceTimestamp: '2026-06-05T09:00:00.000Z',
+            expectedRosterVersion: currentRosterVersion,
+          }) as any,
+          mockActor,
+        );
+
         expect(result.conflictStatus).toBe('FLAGGED');
+        expect(prisma.attendanceConflict.create).toHaveBeenCalledTimes(1);
         expect(prisma.attendanceRecord.createMany).not.toHaveBeenCalled();
       });
 
-      it('should prevent overwrite if submitting teacher is not the owner', async () => {
-        const yesterday = new Date('2026-06-05T10:00:00.000Z');
-        const deviceTime = '2026-06-05T11:00:00.000Z'; // newer, but owner mismatch
+      it('flags a different submission owner without overwriting official attendance', async () => {
+        configureSubmittedSession('other-user');
 
-        (prisma.academicYear.findFirst as jest.Mock).mockResolvedValue({
-          id: 'year-1',
-        });
-        (prisma.class.findFirst as jest.Mock).mockResolvedValue({
-          id: 'class-1',
-        });
-        (prisma.section.findFirst as jest.Mock).mockResolvedValue({
-          id: 'section-1',
-          classId: 'class-1',
-          classTeacherId: 'staff-1',
-        });
-        (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
-          id: 'staff-1',
-        });
-        (prisma.schoolCalendarDay.findFirst as jest.Mock).mockResolvedValue({
-          calendarDate: yesterday,
-          isWorkingDay: true,
-        });
-        (prisma.student.findMany as jest.Mock).mockResolvedValue([
-          { id: 'student-1' },
-        ]);
+        const result = await service.submitAttendance(
+          buildSyncDto({
+            deviceTimestamp: '2026-06-05T11:00:00.000Z',
+            expectedRosterVersion: currentRosterVersion,
+          }) as any,
+          mockActor,
+        );
 
-        (prisma.attendanceSession.findFirst as jest.Mock).mockResolvedValue({
-          id: 'session-1',
-          submittedAt: yesterday,
-          submittedById: 'other-user', // different owner
-          lockAt: new Date('2099-01-01'),
-          records: [
-            { studentId: 'student-1', status: AttendanceStatus.PRESENT },
-          ],
-        });
-
-        (prisma.attendanceSession.update as jest.Mock).mockResolvedValue({
-          id: 'session-1',
-          submittedAt: yesterday,
-          conflictStatus: 'FLAGGED',
-        });
-
-        (
-          prisma.attendanceSession.findUniqueOrThrow as jest.Mock
-        ).mockResolvedValue({
-          id: 'session-1',
-          attendanceDate: yesterday,
-          conflictStatus: 'FLAGGED',
-          class: { name: 'Class 1' },
-          records: [
-            { studentId: 'student-1', status: AttendanceStatus.PRESENT },
-          ],
-        });
-
-        const dto = {
-          academicYearId: 'year-1',
-          classId: 'class-1',
-          sectionId: 'section-1',
-          attendanceDate: '2026-06-05',
-          deviceTimestamp: deviceTime,
-          exceptions: [
-            { studentId: 'student-1', status: AttendanceStatus.ABSENT },
-          ],
-        };
-
-        const result = await service.submitAttendance(dto as any, mockActor);
         expect(result.conflictStatus).toBe('FLAGGED');
+        expect(prisma.attendanceConflict.create).toHaveBeenCalledTimes(1);
         expect(prisma.attendanceRecord.createMany).not.toHaveBeenCalled();
       });
     });

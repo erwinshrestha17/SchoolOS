@@ -1,0 +1,526 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - banner [ref=e4]:
+        - generic [ref=e5]:
+          - generic [ref=e6]:
+            - generic [ref=e7]: S
+            - generic [ref=e8]:
+              - generic [ref=e9]: SchoolOS
+              - generic [ref=e10]: School operating system for Nepal
+          - navigation [ref=e11]:
+            - link "Product" [ref=e12] [cursor=pointer]:
+              - /url: "#product"
+            - link "Modules" [ref=e13] [cursor=pointer]:
+              - /url: "#modules"
+            - link "For Schools" [ref=e14] [cursor=pointer]:
+              - /url: "#for-schools"
+            - link "Onboarding" [ref=e15] [cursor=pointer]:
+              - /url: "#onboarding"
+            - link "Security" [ref=e16] [cursor=pointer]:
+              - /url: "#security"
+            - link "Plans" [ref=e17] [cursor=pointer]:
+              - /url: "#plans"
+          - generic [ref=e18]:
+            - link "Sign in" [ref=e19] [cursor=pointer]:
+              - /url: /login
+            - link "Request Demo" [ref=e20] [cursor=pointer]:
+              - /url: /request-demo
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e26]: 🇳🇵 Built for Nepal schools · Grade 1 to Grade 12
+          - heading "Run your school from one connected operating system." [level=1] [ref=e27]
+          - paragraph [ref=e28]: SchoolOS brings admissions, attendance, fees, academics, notices, staff, accounting, transport, library, canteen, and parent communication into one tenant-scoped system for Nepal-based schools.
+          - generic [ref=e29]:
+            - link "Request Demo" [ref=e30] [cursor=pointer]:
+              - /url: /request-demo
+            - link "View Modules" [ref=e31] [cursor=pointer]:
+              - /url: "#modules"
+          - paragraph [ref=e32]: School workspaces are created after verification and guided onboarding.
+        - generic [ref=e35]:
+          - generic [ref=e36]: Illustrative product preview
+          - generic [ref=e43]:
+            - generic [ref=e44]:
+              - generic [ref=e45]:
+                - generic [ref=e46]: Core
+                - generic [ref=e47]: Console
+                - generic [ref=e50]: Students
+                - generic [ref=e51]: Attendance
+              - generic [ref=e52]:
+                - generic [ref=e53]: Finance
+                - generic [ref=e54]: Fees Desk
+                - generic [ref=e55]: Ledger
+            - generic [ref=e56]:
+              - generic [ref=e57]:
+                - generic [ref=e58]:
+                  - generic [ref=e59]: Example Secondary School
+                  - generic [ref=e62]: Example district, Nepal
+                - generic [ref=e67]: Example data
+              - generic [ref=e71]:
+                - generic [ref=e72]:
+                  - generic [ref=e73]: Students
+                  - generic [ref=e74]: "27"
+                - generic [ref=e76]:
+                  - generic [ref=e77]: Attendance
+                  - generic [ref=e78]: 2.1%
+                - generic [ref=e80]:
+                  - generic [ref=e81]: Fee Collected
+                  - generic [ref=e82]:
+                    - text: NPR
+                    - generic [ref=e83]: 71,438
+                - generic [ref=e84]:
+                  - generic [ref=e85]: Outstanding
+                  - generic [ref=e86]:
+                    - text: NPR
+                    - generic [ref=e87]: 16,351
+              - generic [ref=e88]:
+                - generic [ref=e89]:
+                  - generic [ref=e90]: Monthly Fee Inflow
+                  - generic [ref=e97]:
+                    - generic [ref=e98]: Poush
+                    - generic [ref=e99]: Magh
+                    - generic [ref=e100]: Falgun
+                    - generic [ref=e101]: Chaitra
+                - generic [ref=e102]:
+                  - generic [ref=e103]: Workspace Feed
+                  - generic [ref=e104]:
+                    - generic [ref=e105]:
+                      - generic [ref=e106]: Admission approved (Class 5)
+                      - generic [ref=e109]: Just now
+                    - generic [ref=e110]:
+                      - generic [ref=e111]: Attendance marked (Class 10B)
+                      - generic [ref=e114]: 4m ago
+                    - generic [ref=e115]:
+                      - generic [ref=e116]: Receipt posted (#1245)
+                      - generic [ref=e119]: 12m ago
+                    - generic [ref=e120]:
+                      - generic [ref=e121]: PTM notice published
+                      - generic [ref=e124]: 1h ago
+      - generic [ref=e125]:
+        - generic [ref=e127]:
+          - generic [ref=e128]: Workspace Customization
+          - heading "Every role gets the right workspace." [level=2] [ref=e129]
+          - paragraph [ref=e130]: SchoolOS maps features directly to user roles. Staff and guardians see only the controls they need.
+        - generic [ref=e132]:
+          - tablist [ref=e134]:
+            - tab "Admin" [selected] [ref=e135] [cursor=pointer]
+            - tab "Teacher" [ref=e136] [cursor=pointer]
+            - tab "Accountant" [ref=e137] [cursor=pointer]
+            - tab "Parent" [ref=e138] [cursor=pointer]
+            - tab "Operations" [ref=e139] [cursor=pointer]
+          - tabpanel "Admin" [ref=e140]:
+            - generic [ref=e141]:
+              - generic [ref=e142]:
+                - heading "Admin Command Center" [level=3] [ref=e143]
+                - paragraph [ref=e144]: Role-scoped oversight of institutional structure, student files, notice boards, and staff assignments.
+              - generic [ref=e145]:
+                - heading "Core Focus Areas" [level=4] [ref=e146]
+                - list [ref=e147]:
+                  - listitem [ref=e148]:
+                    - generic [ref=e152]: Student lifecycle tracking & documentation
+                  - listitem [ref=e153]:
+                    - generic [ref=e157]: School-wide notice publication & broadcast
+                  - listitem [ref=e158]:
+                    - generic [ref=e162]: Time-bound reports, exceptions, & audit history
+            - generic [ref=e163]:
+              - generic [ref=e165]:
+                - generic [ref=e166]: Illustrative preview · Example data
+                - generic [ref=e167]: Admin role
+              - generic [ref=e168]:
+                - generic [ref=e169]:
+                  - generic [ref=e170]: Total Students
+                  - generic [ref=e171]: "27"
+                - generic [ref=e173]:
+                  - generic [ref=e174]: Active Staff
+                  - generic [ref=e175]: "2"
+                - generic [ref=e177]:
+                  - generic [ref=e178]: Open Requests
+                  - generic [ref=e179]: "0"
+              - generic [ref=e181]:
+                - generic [ref=e182]: Recent Registrations
+                - generic [ref=e183]:
+                  - generic [ref=e184]:
+                    - generic [ref=e185]: Example Student A (Class 3A)
+                    - generic [ref=e186]: Pending Approval
+                  - generic [ref=e187]:
+                    - generic [ref=e188]: Example Student B (Class 8B)
+                    - generic [ref=e189]: Approved
+      - generic [ref=e190]:
+        - generic [ref=e192]:
+          - generic [ref=e193]: Operation Scoping
+          - heading "Schools need more than separate tools." [level=2] [ref=e194]
+          - paragraph [ref=e195]: SchoolOS connects daily operations, academic records, finance, and parent communication so administrators can run the school from one place.
+        - generic [ref=e196]:
+          - generic [ref=e198]:
+            - generic [ref=e199]:
+              - generic [ref=e204]:
+                - generic [ref=e205]: The Problem
+                - paragraph [ref=e206]: Attendance scattered in registers
+              - generic [ref=e213]:
+                - generic [ref=e214]: SchoolOS Solution
+                - paragraph [ref=e215]: Digital daily attendance with reports and parent alerts
+            - paragraph [ref=e216]: Traditional paper logs are prone to errors and leave parents in the dark. SchoolOS digitizes daily check-ins instantly.
+          - generic [ref=e218]:
+            - generic [ref=e219]:
+              - generic [ref=e224]:
+                - generic [ref=e225]: The Problem
+                - paragraph [ref=e226]: Fees tracked manually
+              - generic [ref=e233]:
+                - generic [ref=e234]: SchoolOS Solution
+                - paragraph [ref=e235]: Fee dues, receipts, collections, cashier close, and ledger-ready records
+            - paragraph [ref=e236]: SchoolOS keeps fee records, receipts, cashier controls, and reviewed accounting handoffs connected without making the browser the source of financial truth.
+          - generic [ref=e238]:
+            - generic [ref=e239]:
+              - generic [ref=e244]:
+                - generic [ref=e245]: The Problem
+                - paragraph [ref=e246]: Parents miss updates
+              - generic [ref=e252]:
+                - generic [ref=e253]: SchoolOS Solution
+                - paragraph [ref=e254]: Official notices, personal alerts, delivery status, and parent mobile access
+            - paragraph [ref=e255]: SchoolOS keeps formal school notices separate from personal notification and delivery status.
+          - generic [ref=e257]:
+            - generic [ref=e258]:
+              - generic [ref=e263]:
+                - generic [ref=e264]: The Problem
+                - paragraph [ref=e265]: Student records are fragmented
+              - generic [ref=e272]:
+                - generic [ref=e273]: SchoolOS Solution
+                - paragraph [ref=e274]: One student profile with guardians, documents, attendance, fees, academics, and activity
+            - paragraph [ref=e275]: Academic, financial, and administrative records live in separate silos. SchoolOS aggregates everything under a single unified ID.
+      - generic [ref=e277]:
+        - generic [ref=e279]:
+          - generic [ref=e280]: System Blueprint
+          - heading "One SchoolOS, four operating layers." [level=2] [ref=e281]
+          - paragraph [ref=e282]: SchoolOS groups daily work into role-scoped operational areas with role-based access and module controls.
+        - generic [ref=e283]:
+          - generic [ref=e285]:
+            - generic [ref=e286]:
+              - heading "Admin Command Center" [level=3] [ref=e292]
+              - paragraph [ref=e293]: A role-scoped hub for administrative oversight, student lifecycle work, and guided school operations.
+              - generic [ref=e294]:
+                - generic [ref=e295]: Interactive school stats feed
+                - generic [ref=e298]: Unified student lifecycle & approvals
+                - generic [ref=e301]: Institution-wide notices & alerts
+            - generic [ref=e306]:
+              - generic [ref=e307]: Illustrative service state
+              - generic [ref=e308]: Available
+          - generic [ref=e335]:
+            - generic [ref=e336]:
+              - heading "Finance & Accounts" [level=3] [ref=e343]
+              - paragraph [ref=e344]: A robust financial system designed specifically for tuition fees, ledger entries, and audit-ready bookkeeping.
+              - generic [ref=e345]:
+                - generic [ref=e346]: NPR fee billing customisation
+                - generic [ref=e349]: Cashier day-end closing audits
+                - generic [ref=e352]: Controlled accounting postings
+            - generic [ref=e357]:
+              - generic [ref=e358]: Example collection view
+              - generic [ref=e359]: 81.4%
+          - generic [ref=e363]:
+            - generic [ref=e364]:
+              - heading "Academics & Attendance" [level=3] [ref=e370]
+              - paragraph [ref=e371]: Tools designed for teachers to map schedules, mark attendance, and manage continuous assessment grading.
+              - generic [ref=e372]:
+                - generic [ref=e373]: Clear attendance register workflow
+                - generic [ref=e376]: Timetables & substitution tracking
+                - generic [ref=e379]: CAS and terminal report cards
+            - generic [ref=e383]:
+              - generic [ref=e384]: Class 10-B
+              - generic [ref=e385]: Class 9-A
+              - generic [ref=e386]: Class 8-C
+          - generic [ref=e388]:
+            - generic [ref=e389]:
+              - heading "Family & Campus Services" [level=3] [ref=e396]
+              - paragraph [ref=e397]: Enabled services connect linked guardians with school notices, transport status, library records, and canteen activity.
+              - generic [ref=e398]:
+                - generic [ref=e399]: Linked-child parent mobile access
+                - generic [ref=e402]: Timestamped transport updates
+                - generic [ref=e405]: Canteen meal planning & wallets where enabled
+            - generic [ref=e410]:
+              - generic [ref=e411]: Primary Bus Route
+              - generic [ref=e412]: On Schedule
+      - generic [ref=e413]:
+        - generic [ref=e415]:
+          - generic [ref=e416]: Integrated Capabilities
+          - heading "Modules built around real school workflows." [level=2] [ref=e417]
+          - paragraph [ref=e418]: Enabled modules are selected during guided onboarding and remain permission- and entitlement-gated for each role.
+        - generic [ref=e419]:
+          - generic [ref=e422]:
+            - generic [ref=e423]:
+              - generic [ref=e424]: AD
+              - generic [ref=e425]: Core
+            - heading "Admissions" [level=3] [ref=e426]
+            - paragraph [ref=e427]: Applicant intake, documentation, and enrollment workflows.
+          - generic [ref=e430]:
+            - generic [ref=e431]:
+              - generic [ref=e432]: SD
+              - generic [ref=e433]: Core
+            - heading "Students" [level=3] [ref=e434]
+            - paragraph [ref=e435]: Centralized profile database, sibling linking, and active files.
+          - generic [ref=e438]:
+            - generic [ref=e439]:
+              - generic [ref=e440]: AT
+              - generic [ref=e441]: Core
+            - heading "Smart Attendance" [level=3] [ref=e442]
+            - paragraph [ref=e443]: Assigned-roster attendance, corrections, registers, and time-bound summaries.
+          - generic [ref=e446]:
+            - generic [ref=e447]:
+              - generic [ref=e448]: FR
+              - generic [ref=e449]: Finance
+            - heading "Fees & Receipts" [level=3] [ref=e450]
+            - paragraph [ref=e451]: Invoices, automated receipts, waivers, and dues tracking.
+          - generic [ref=e454]:
+            - generic [ref=e455]:
+              - generic [ref=e456]: NA
+              - generic [ref=e457]: Core
+            - heading "Notices & Announcements" [level=3] [ref=e458]
+            - paragraph [ref=e459]: Official drafts, audience preview, review, publication, and read follow-up.
+          - generic [ref=e462]:
+            - generic [ref=e463]:
+              - generic [ref=e464]: ND
+              - generic [ref=e465]: Core
+            - heading "Notifications & Delivery" [level=3] [ref=e466]
+            - paragraph [ref=e467]: Personal inboxes and honest channel status when delivery providers are enabled.
+          - generic [ref=e470]:
+            - generic [ref=e471]:
+              - generic [ref=e472]: AC
+              - generic [ref=e473]: Academic
+            - heading "Academics" [level=3] [ref=e474]
+            - paragraph [ref=e475]: Exam configurations, marks cards, and continuous grading.
+          - generic [ref=e478]:
+            - generic [ref=e479]:
+              - generic [ref=e480]: TT
+              - generic [ref=e481]: Academic
+            - heading "Timetable" [level=3] [ref=e482]
+            - paragraph [ref=e483]: Class schedules, teacher allotments, and substitution views.
+          - generic [ref=e486]:
+            - generic [ref=e487]:
+              - generic [ref=e488]: HP
+              - generic [ref=e489]: Finance
+            - heading "HR & Payroll" [level=3] [ref=e490]
+            - paragraph [ref=e491]: Staff directory, salary processing, and expense records.
+          - generic [ref=e494]:
+            - generic [ref=e495]:
+              - generic [ref=e496]: GL
+              - generic [ref=e497]: Finance
+            - heading "Accounting" [level=3] [ref=e498]
+            - paragraph [ref=e499]: Double-entry books, charts of accounts, and audit reports.
+          - generic [ref=e502]:
+            - generic [ref=e503]:
+              - generic [ref=e504]: TR
+              - generic [ref=e505]: Operations
+            - heading "Transport" [level=3] [ref=e506]
+            - paragraph [ref=e507]: Route configurations, vehicles, and student logs.
+          - generic [ref=e510]:
+            - generic [ref=e511]:
+              - generic [ref=e512]: LB
+              - generic [ref=e513]: Operations
+            - heading "Library" [level=3] [ref=e514]
+            - paragraph [ref=e515]: Catalog system, barcode scans, and overdue fees tracking.
+          - generic [ref=e518]:
+            - generic [ref=e519]:
+              - generic [ref=e520]: CN
+              - generic [ref=e521]: Operations
+            - heading "Canteen" [level=3] [ref=e522]
+            - paragraph [ref=e523]: Menu setups, student wallet cards, and inventory levels.
+          - generic [ref=e526]:
+            - generic [ref=e527]:
+              - generic [ref=e528]: RP
+              - generic [ref=e529]: Core
+            - heading "Reports" [level=3] [ref=e530]
+            - paragraph [ref=e531]: Financial collections, enrollment graphs, and marks summaries.
+          - generic [ref=e534]:
+            - generic [ref=e535]:
+              - generic [ref=e536]: PM
+              - generic [ref=e537]: Companion
+            - heading "Parent Mobile Companion" [level=3] [ref=e538]
+            - paragraph [ref=e539]: Linked-child visibility through the SchoolOS mobile app.
+      - generic [ref=e541]:
+        - generic [ref=e543]:
+          - generic [ref=e544]: Local Integration
+          - heading "Designed for Nepal-school operations." [level=2] [ref=e545]
+          - paragraph [ref=e546]: SchoolOS supports Nepal school context, NPR records, BS-date presentation, and Grade 1–12 operational workflows.
+        - generic [ref=e547]:
+          - generic [ref=e549]:
+            - heading "NPR fee workflows" [level=3] [ref=e550]
+            - paragraph [ref=e552]: Tailored specifically for local currency billing, cash collection receipts, and custom tax headers.
+          - generic [ref=e554]:
+            - heading "Nepali calendar readiness" [level=3] [ref=e555]
+            - paragraph [ref=e557]: Supports both BS (Bikram Sambat) and AD calendars for class schedules, exams, and attendance.
+          - generic [ref=e559]:
+            - heading "Configurable delivery channels" [level=3] [ref=e560]
+            - paragraph [ref=e562]: Supports in-app delivery and channel-ready SMS, email, or push modes when providers are configured and verified.
+          - generic [ref=e564]:
+            - heading "Local school roles" [level=3] [ref=e565]
+            - paragraph [ref=e567]: Pre-configured roles matching Nepalese schools, including Principal, Accountant, and Section Coordinator.
+          - generic [ref=e569]:
+            - heading "Guided school setup" [level=3] [ref=e570]
+            - paragraph [ref=e572]: School structure, roles, enabled modules, and data-import needs are reviewed during onboarding.
+          - generic [ref=e574]:
+            - heading "Parent-first communication" [level=3] [ref=e575]
+            - paragraph [ref=e577]: Linked guardians use the mobile companion for school notices, alerts, and enabled child records.
+          - generic [ref=e579]:
+            - heading "School-level data separation" [level=3] [ref=e580]
+            - paragraph [ref=e582]: Ensures each institution operates in a distinct, protected workspace safeguarding student privacy.
+          - generic [ref=e584]:
+            - heading "Audit trail design" [level=3] [ref=e585]
+            - paragraph [ref=e587]: Built-in audit logging tracks every financial edit, invoice override, and grade change for accountability.
+      - generic [ref=e589]:
+        - generic [ref=e591]:
+          - generic [ref=e592]: Key Distinctions
+          - heading "What makes SchoolOS different?" [level=2] [ref=e593]
+          - paragraph [ref=e594]: SchoolOS connects role-scoped operations, protected records, controlled finance workflows, and audit evidence in one system.
+        - generic [ref=e595]:
+          - generic [ref=e598]:
+            - heading "School-level data separation" [level=3] [ref=e599]
+            - paragraph [ref=e600]: School data is handled through tenant-scoped queries, role checks, module entitlements, and protected-file access.
+          - generic [ref=e603]:
+            - heading "Finance-connected operations" [level=3] [ref=e604]
+            - paragraph [ref=e605]: Approved source records can create controlled accounting entries. Reconciliation remains a reviewed school-finance workflow, and salary settlement occurs outside SchoolOS.
+          - generic [ref=e608]:
+            - heading "Role-aware access" [level=3] [ref=e609]
+            - paragraph [ref=e610]: Staff use role-scoped web workspaces, linked guardians use the mobile companion, and students only enter controlled Learning sessions when that module is enabled.
+          - generic [ref=e613]:
+            - heading "Guided onboarding" [level=3] [ref=e614]
+            - paragraph [ref=e615]: No public school self-registration. Each workspace receives reviewed setup, role mapping, and an agreed data-import plan.
+          - generic [ref=e618]:
+            - heading "Full student lifecycle" [level=3] [ref=e619]
+            - paragraph [ref=e620]: From primary admission interviews to graduation certificates, student files gather fees, grades, and attendance logs under one profile.
+      - generic [ref=e622]:
+        - generic [ref=e624]:
+          - generic [ref=e625]: Deployment Roadmap
+          - heading "From demo to controlled-pilot planning." [level=2] [ref=e626]
+          - paragraph [ref=e627]: We review setup, data-import needs, role mapping, and required readiness checks before agreeing a pilot scope.
+        - generic [ref=e628]:
+          - generic [ref=e631]:
+            - generic [ref=e632]: "01"
+            - heading "Request Demo" [level=3] [ref=e638]
+            - paragraph [ref=e639]: Tell us about your school, student count, and priority modules. We review the intake parameters.
+          - generic [ref=e642]:
+            - generic [ref=e643]: "02"
+            - heading "Verification & Planning" [level=3] [ref=e648]
+            - paragraph [ref=e649]: Our team verifies school details and coordinates a custom product demo, mapping out the rollout scope.
+          - generic [ref=e652]:
+            - generic [ref=e653]: "03"
+            - heading "School Workspace Setup" [level=3] [ref=e659]
+            - paragraph [ref=e660]: We configure academic year, classes, sections, roles, and local fee structures.
+          - generic [ref=e663]:
+            - generic [ref=e664]: "04"
+            - heading "Readiness Review" [level=3] [ref=e670]
+            - paragraph [ref=e671]: We agree the controlled-pilot scope only after the required configuration, data, access, and workflow checks.
+        - link "Request Demo" [ref=e673] [cursor=pointer]:
+          - /url: /request-demo
+      - generic [ref=e678]:
+        - generic [ref=e680]:
+          - generic [ref=e681]: Guided Scope
+          - heading "Configure the right operational scope." [level=2] [ref=e682]
+          - paragraph [ref=e683]: Module availability is confirmed during onboarding and depends on entitlements, permissions, and release readiness.
+        - generic [ref=e684]:
+          - generic [ref=e686]:
+            - generic [ref=e687]:
+              - generic [ref=e688]:
+                - heading "Foundation scope" [level=3] [ref=e689]
+                - paragraph [ref=e690]: For a controlled rollout focused on essential student, attendance, notice, and fee workflows.
+              - list [ref=e691]:
+                - listitem [ref=e692]:
+                  - generic [ref=e696]: Student database & files
+                - listitem [ref=e697]:
+                  - generic [ref=e701]: Admissions pipeline
+                - listitem [ref=e702]:
+                  - generic [ref=e706]: Daily attendance logs
+                - listitem [ref=e707]:
+                  - generic [ref=e711]: School notices & announcements
+                - listitem [ref=e712]:
+                  - generic [ref=e716]: Core fee invoicing & collections
+            - link "Discuss this scope" [ref=e718] [cursor=pointer]:
+              - /url: /request-demo
+          - generic [ref=e720]:
+            - generic [ref=e721]:
+              - generic [ref=e722]:
+                - heading "Extended operations" [level=3] [ref=e723]
+                - paragraph [ref=e724]: Additional academic, HR, payroll, accounting, and reporting modules after their readiness gates are met.
+              - list [ref=e725]:
+                - listitem [ref=e726]:
+                  - generic [ref=e730]: Foundation workflows where enabled
+                - listitem [ref=e731]:
+                  - generic [ref=e735]: Terminal exam builder & marks cards
+                - listitem [ref=e736]:
+                  - generic [ref=e740]: Subject timetables & substitutions
+                - listitem [ref=e741]:
+                  - generic [ref=e745]: HR profiles & payroll calculations
+                - listitem [ref=e746]:
+                  - generic [ref=e750]: Double-entry accounting ledger
+                - listitem [ref=e751]:
+                  - generic [ref=e755]: Detailed billing & collections reports
+            - link "Discuss this scope" [ref=e757] [cursor=pointer]:
+              - /url: /request-demo
+          - generic [ref=e759]:
+            - generic [ref=e760]:
+              - generic [ref=e761]:
+                - heading "Enabled campus services" [level=3] [ref=e762]
+                - paragraph [ref=e763]: Optional parent mobile, transport, library, and canteen workflows selected during onboarding.
+              - list [ref=e764]:
+                - listitem [ref=e765]:
+                  - generic [ref=e769]: Approved operational modules
+                - listitem [ref=e770]:
+                  - generic [ref=e774]: Linked-child parent mobile access
+                - listitem [ref=e775]:
+                  - generic [ref=e779]: Library cataloguing & QR issue logs
+                - listitem [ref=e780]:
+                  - generic [ref=e784]: Transport routes & student mapping
+                - listitem [ref=e785]:
+                  - generic [ref=e789]: Canteen menus & prepaid student wallets
+                - listitem [ref=e790]:
+                  - generic [ref=e794]: Custom role-based permissions & audit feeds
+            - link "Discuss this scope" [ref=e796] [cursor=pointer]:
+              - /url: /request-demo
+      - generic [ref=e798]:
+        - generic [ref=e799]:
+          - text: Security Parameters
+          - heading "Built with school data boundaries in mind." [level=2] [ref=e800]
+          - paragraph [ref=e801]: SchoolOS uses tenant-scoped access controls, role-aware staff authentication, and protected-file paths for school records.
+        - generic [ref=e802]:
+          - generic [ref=e804]:
+            - heading "Staff authentication" [level=3] [ref=e805]
+            - paragraph [ref=e809]: Uses role-scoped sessions, password controls, and access checks.
+          - generic [ref=e811]:
+            - heading "Role-based access" [level=3] [ref=e812]
+            - paragraph [ref=e816]: Allows coordinators, accountants, and teachers to see only data assigned to their roles.
+          - generic [ref=e818]:
+            - heading "School-level data separation" [level=3] [ref=e819]
+            - paragraph [ref=e823]: School records use tenant-scoped query, job, file, and cache boundaries.
+          - generic [ref=e825]:
+            - heading "Audit trail design" [level=3] [ref=e826]
+            - paragraph [ref=e830]: Sensitive workflows retain actor, time, state, and reason evidence where the workflow requires it.
+          - generic [ref=e832]:
+            - heading "Protected documents" [level=3] [ref=e833]
+            - paragraph [ref=e837]: Private school files use authenticated, role-scoped access paths.
+          - generic [ref=e839]:
+            - heading "Controlled onboarding" [level=3] [ref=e840]
+            - paragraph [ref=e844]: School workspaces are set up through guided onboarding; public self-service setup is not available.
+      - generic [ref=e846]:
+        - heading "Ready to bring SchoolOS to your school?" [level=2] [ref=e847]
+        - paragraph [ref=e848]: Request a demo and the SchoolOS team will help assess fit, setup needs, and the checks required before a controlled pilot.
+        - generic [ref=e849]:
+          - link "Request Demo" [ref=e850] [cursor=pointer]:
+            - /url: /request-demo
+          - link "Sign in" [ref=e851] [cursor=pointer]:
+            - /url: /login
+      - contentinfo [ref=e852]:
+        - generic [ref=e853]:
+          - generic [ref=e854]:
+            - generic [ref=e855]: S
+            - generic [ref=e856]: SchoolOS
+            - generic [ref=e857]: · School operating system for Nepal
+          - generic [ref=e858]:
+            - link "Product" [ref=e859] [cursor=pointer]:
+              - /url: "#product"
+            - link "Modules" [ref=e860] [cursor=pointer]:
+              - /url: "#modules"
+            - link "Request Demo" [ref=e861] [cursor=pointer]:
+              - /url: /request-demo
+            - link "Login" [ref=e862] [cursor=pointer]:
+              - /url: /login
+            - link "Contact" [ref=e863] [cursor=pointer]:
+              - /url: mailto:support@schoolos.com.np
+    - region "Notifications alt+T"
+  - alert [ref=e864]
