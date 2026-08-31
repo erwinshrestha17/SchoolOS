@@ -8,8 +8,10 @@ import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
 import 'package:schoolos_mobile/core/storage/token_storage_service.dart';
+import 'package:schoolos_mobile/features/parent/application/parent_providers.dart';
 import 'package:schoolos_mobile/features/parent/application/parent_portal_providers.dart';
 import 'package:schoolos_mobile/features/parent/data/parent_portal_repository.dart';
+import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_portal_models.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_portal_detail_screens.dart';
 
@@ -53,6 +55,59 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('admission date is localized instead of exposing raw ISO', (
+    tester,
+  ) async {
+    final sharedPrefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPreferencesServiceProvider.overrideWithValue(
+            AppPreferencesService(sharedPrefs),
+          ),
+          tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authProvider.overrideWith((ref) {
+            return _FakeParentAuthNotifier(
+              ref.watch(tokenStorageServiceProvider),
+              ref.watch(authRepositoryProvider),
+              ref.watch(appPreferencesServiceProvider),
+            );
+          }),
+          parentPortalRepositoryProvider.overrideWithValue(repository),
+          parentChildProfileProvider.overrideWith((ref, childId) async {
+            return const ChildProfile(
+              child: GuardianChild(
+                id: 'child-a',
+                name: 'Asha Rai',
+                classSection: 'Grade 4 - A',
+                rollNumber: '12',
+                academicYear: '2083',
+                relationship: 'Guardian',
+              ),
+              classTeacher: 'Ramesh Gurung',
+              guardianSummary: '',
+              canViewGuardianSummary: false,
+              attendanceSummary: '',
+              homeworkSummary: '',
+              feesSummary: '',
+              qrLabel: '',
+              admissionDate: '2026-04-10T00:00:00.000Z',
+            );
+          }),
+        ],
+        child: const MaterialApp(
+          home: ParentPortalChildDetailScreen(childId: 'child-a'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Admission date'), findsOneWidget);
+    expect(find.textContaining('BS'), findsOneWidget);
+    expect(find.text('2026-04-10T00:00:00.000Z'), findsNothing);
+  });
 
   testWidgets('an unlinked child id is denied, not swapped for a linked one', (
     tester,

@@ -492,7 +492,7 @@ class _EnrollmentStatusCard extends StatelessWidget {
       if ((profile.admissionNumber ?? '').trim().isNotEmpty)
         MapEntry('Admission no.', profile.admissionNumber!.trim()),
       if ((profile.admissionDate ?? '').trim().isNotEmpty)
-        MapEntry('Admission date', profile.admissionDate!.trim()),
+        MapEntry('Admission date', _profileDate(profile.admissionDate!)),
       if ((profile.studentSystemId ?? '').trim().isNotEmpty)
         MapEntry('Student ID', profile.studentSystemId!.trim()),
       if (profile.child.classSection.trim().isNotEmpty)
@@ -552,6 +552,12 @@ class _EnrollmentStatusCard extends StatelessWidget {
         )
         .join(' ');
   }
+}
+
+String _profileDate(String value) {
+  final parsed = DateTime.tryParse(value.trim());
+  if (parsed == null) return 'Date unavailable';
+  return '${NepaliBsCalendar.formatBsDate(parsed)} BS';
 }
 
 class _AttendanceStatus {

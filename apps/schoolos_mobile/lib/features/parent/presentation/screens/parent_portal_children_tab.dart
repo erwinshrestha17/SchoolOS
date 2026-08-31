@@ -93,6 +93,7 @@ class ParentPortalChildrenTab extends StatelessWidget {
               childId: child.id,
               now: now,
             ),
+            now: now,
             onTap: () => context.push(AppRoutes.parentChildDetail(child.id)),
           ),
           const SizedBox(height: 14),

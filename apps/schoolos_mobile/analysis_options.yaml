@@ -9,6 +9,13 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    # Flutter/Xcode may materialize third-party Swift Package sources here.
+    # They are build artifacts, not SchoolOS Dart source, and some packages
+    # include standalone examples/tests with dependencies our app does not use.
+    - build/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

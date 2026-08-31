@@ -48,7 +48,12 @@ class ProfileScreen extends ConsumerWidget {
         title: const Text('Profile'),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          MediaQuery.viewPaddingOf(context).bottom + AppSpacing.lg,
+        ),
         children: [
           AppCard(
             padding: const EdgeInsets.symmetric(

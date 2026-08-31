@@ -1358,6 +1358,12 @@ void main() {
   testWidgets('teacher homework create mode preselects selected class scope', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = const FakeViewPadding(bottom: 24);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPadding);
     final snapshot = TeacherHomeworkSnapshot(
       items: const [],
       scopes: const [
@@ -1399,6 +1405,12 @@ void main() {
     );
     expect(find.text('Create homework draft'), findsOneWidget);
     expect(find.text('Grade 3 • A • Mathematics'), findsWidgets);
+    await tester.ensureVisible(find.text('Save draft'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getBottomRight(find.text('Save draft')).dy,
+      lessThanOrEqualTo(676),
+    );
     expect(tester.takeException(), isNull);
   });
 

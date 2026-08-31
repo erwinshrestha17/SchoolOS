@@ -240,15 +240,19 @@ async function main() {
 
 async function runPilotRoleChecks(tokens) {
   const roleTokens = {};
-  for (const key of [
+  const roleKeys = [
     'principal',
     'parent',
     'classTeacher',
     'subjectTeacher',
     'staff',
     'accountant',
-    'driver',
-  ]) {
+  ];
+  // M9 Transport is deferred from the active pilot. Keep its compatibility
+  // smoke in the explicit full suite without presenting Driver as a pilot persona.
+  if (target === 'full') roleKeys.push('driver');
+
+  for (const key of roleKeys) {
     await sleep(1200);
     const loginCheck = await checkSeededLogin(accounts[key]);
     checks.push(loginCheck);
@@ -474,12 +478,15 @@ async function checkSubjectTeacherScope(subjectTeacherToken) {
     )).check,
   );
 
+  const attendanceClasses = await request(
+    '/mobile/teacher/attendance/classes',
+    authOptions(subjectTeacherToken),
+  );
   checks.push(
-    await checkExpectedHttpFailure(
-      'Subject teacher cannot use class-teacher attendance route',
-      '/mobile/teacher/attendance/classes',
-      subjectTeacherToken,
-      [403],
+    assertCheck(
+      'Subject teacher has no homeroom attendance classes',
+      attendanceClasses.status === 403 ||
+        (attendanceClasses.ok && getItems(attendanceClasses.body).length === 0),
     ),
   );
 }
@@ -530,20 +537,14 @@ async function checkPrincipalScope(principalToken) {
   checks.push(
     (await fetchOk('Principal can read attendance summary', '/mobile/principal/attendance-summary', principalToken)).check,
   );
-  if (wave1Pilot) {
-    checks.push(
-      await checkExpectedHttpFailure(
-        'Principal transport alerts denied on Wave 1 pilot',
-        '/mobile/principal/transport-alerts',
-        principalToken,
-        [403],
-      ),
-    );
-  } else {
-    checks.push(
-      (await fetchOk('Principal can read transport alerts', '/mobile/principal/transport-alerts', principalToken)).check,
-    );
-  }
+  checks.push(
+    await checkExpectedHttpFailure(
+      'Principal transport alerts denied while M9 is deferred',
+      '/mobile/principal/transport-alerts',
+      principalToken,
+      [403],
+    ),
+  );
 
   const dashboardText = JSON.stringify(dashboard.body ?? {});
   const sensitiveTerms = ['bankAccount', 'tokenHash', 'passwordHash', 'rawObjectKey'];

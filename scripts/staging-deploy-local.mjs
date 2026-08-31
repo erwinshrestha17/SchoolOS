@@ -80,13 +80,10 @@ async function main() {
   run('pnpm', ['--filter', '@schoolos/api', 'db:backfill:guardian-capabilities'], {
     env: process.env,
   });
-  run('pnpm', ['--filter', '@schoolos/api', 'db:enable:staging-learning'], {
-    env: process.env,
-  });
-
   const finishedAt = new Date().toISOString();
   mkdirSync(evidenceDir, { recursive: true });
-  const evidencePath = join(evidenceDir, 'staging-deploy-2026-07-29-local.md');
+  const evidenceStamp = finishedAt.replace(/[:.]/g, '-');
+  const evidencePath = join(evidenceDir, `staging-deploy-${evidenceStamp}-local.md`);
   writeFileSync(
     evidencePath,
     `# Staging Deploy Evidence (Local Simulation)
@@ -108,10 +105,13 @@ docker compose -f docker-compose.staging.yml -p schoolos-staging up -d postgres 
 pnpm db:generate
 pnpm --filter @schoolos/api exec prisma migrate deploy
 pnpm db:seed
+pnpm --filter @schoolos/api db:backfill:teacher-assignments
+pnpm --filter @schoolos/api db:backfill:guardian-capabilities
 \`\`\`
 
 ## Notes
 
+- M13 Learning remains disabled by the canonical seed for pilot tenants; this staging helper does not override frozen module entitlements.
 - Full TLS staging preflight (\`pnpm verify:env:staging\`) requires HTTPS origins on the target host.
 - Containerized API/web deploy: \`docker compose -f docker-compose.staging.yml --profile app up -d --build\`
 - Optional controlled-pilot rehearsal tenant: \`pnpm provision:pilot-rehearsal\` (separate from \`default-school\` smoke tenant)

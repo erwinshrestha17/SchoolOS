@@ -170,7 +170,7 @@ class _PrincipalApprovalsScreenState
     return PrincipalShell(
       selectedIndex: 2,
       title: 'Approvals',
-      subtitle: 'Review pending requests that need your decision',
+      subtitle: 'Review approval workflows and related records',
       child: asyncData.when(
         loading: () => const _PrincipalLoading(),
         error: (error, _) => AppExceptionView(
@@ -220,7 +220,8 @@ class _PrincipalApprovalsScreenState
               actionBuilder: (item) => SizedBox(
                 width: 136,
                 child: OutlinedButton.icon(
-                  onPressed: () => _showReviewSheet(context, ref, item, tab),
+                  onPressed: () =>
+                      unawaited(_showReviewSheet(context, ref, item, tab)),
                   icon: const Icon(Icons.visibility_rounded, size: 18),
                   label: const Text('Review'),
                 ),
@@ -3829,15 +3830,49 @@ class _SummaryValue {
   final IconData icon;
 }
 
-void _showReviewSheet(
+Future<void> _showReviewSheet(
   BuildContext context,
   WidgetRef ref,
   Map<String, dynamic> item,
   String activeTab,
-) {
+) async {
   final parentContext = context;
   final approvalRequestId = _approvalRequestIdFromItem(item);
-  final canDecide = activeTab == 'pending' && approvalRequestId.isNotEmpty;
+  Map<String, dynamic> approvalDetail = const {};
+  if (approvalRequestId.isNotEmpty) {
+    try {
+      approvalDetail = await ref
+          .read(principalRepositoryProvider)
+          .getApprovalDetail(approvalRequestId);
+    } catch (_) {
+      if (parentContext.mounted) {
+        _showPrincipalSnack(
+          parentContext,
+          'Current approval authority could not be verified. Please retry.',
+        );
+      }
+      return;
+    }
+    if (!parentContext.mounted) return;
+  }
+
+  final actions = _record(approvalDetail['actions']);
+  final detailFromCache = approvalDetail['_mobileFromCache'] == true;
+  final isPending = activeTab == 'pending';
+  final canApprove =
+      isPending && !detailFromCache && actions['approve'] == true;
+  final canReject = isPending && !detailFromCache && actions['reject'] == true;
+  final canDelegate =
+      isPending && !detailFromCache && actions['delegate'] == true;
+  final requiresApprovalReason = actions['requiresApprovalReason'] == true;
+  final unavailableReason = detailFromCache
+      ? 'Connect to SchoolOS authority to verify the current approval state before deciding.'
+      : _string(
+          actions['unavailableReason'],
+          fallback: approvalRequestId.isEmpty
+              ? 'This record is read-only on mobile because it is not backed by the principal approval-decision contract.'
+              : 'No permitted approval action is currently available.',
+        );
   final reasonController = TextEditingController();
   // One key per opened decision sheet. Retrying after a failed or ambiguous
   // attempt must replay the same key so the backend can recognise the retry
@@ -3846,7 +3881,7 @@ void _showReviewSheet(
   var saving = false;
   String? validationMessage;
 
-  showModalBottomSheet<void>(
+  await showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
@@ -3864,7 +3899,7 @@ void _showReviewSheet(
               return;
             }
             if (decision == 'APPROVE' &&
-                _string(item['severity']).toLowerCase() == 'critical' &&
+                requiresApprovalReason &&
                 reason.isEmpty) {
               setSheetState(
                 () => validationMessage =
@@ -3914,7 +3949,9 @@ void _showReviewSheet(
               AppSpacing.lg,
               AppSpacing.lg,
               AppSpacing.lg,
-              MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+              MediaQuery.viewInsetsOf(context).bottom +
+                  MediaQuery.viewPaddingOf(context).bottom +
+                  AppSpacing.lg,
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -3937,23 +3974,32 @@ void _showReviewSheet(
                     _PlainCard(title: 'Context', body: _string(item['detail'])),
                   ],
                   const SizedBox(height: AppSpacing.lg),
-                  if (!canDecide)
-                    const _Callout(
+                  if (!canApprove && !canReject && !canDelegate)
+                    _Callout(
                       icon: Icons.lock_rounded,
                       title: 'Decision unavailable here',
-                      message:
-                          'This item is read-only on mobile because it is not backed by the principal approval-decision contract.',
+                      message: unavailableReason,
                       color: AppColors.info,
                     )
                   else ...[
+                    if (!canApprove && unavailableReason.isNotEmpty) ...[
+                      _Callout(
+                        icon: Icons.info_outline_rounded,
+                        title: 'Approval unavailable',
+                        message: unavailableReason,
+                        color: AppColors.info,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
                     TextField(
                       controller: reasonController,
                       minLines: 2,
                       maxLines: 4,
                       decoration: InputDecoration(
                         labelText: 'Decision reason',
-                        helperText:
-                            'Required for rejections and high-impact approvals.',
+                        helperText: requiresApprovalReason
+                            ? 'Required for approval and rejection.'
+                            : 'Required for rejection; optional for approval.',
                         errorText: validationMessage,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -3965,53 +4011,56 @@ void _showReviewSheet(
                       spacing: AppSpacing.sm,
                       runSpacing: AppSpacing.sm,
                       children: [
-                        OutlinedButton.icon(
-                          onPressed: saving ? null : () => submit('REJECT'),
-                          icon: const Icon(Icons.close_rounded),
-                          label: const Text('Reject'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: saving
-                              ? null
-                              : () async {
-                                  setSheetState(() => saving = true);
-                                  final delegated =
-                                      await _showApprovalDelegationDialog(
-                                        sheetContext,
-                                        ref,
-                                        approvalRequestId,
-                                        activeTab,
-                                      );
-                                  if (!sheetContext.mounted) return;
-                                  if (delegated) {
-                                    Navigator.pop(sheetContext);
-                                    if (parentContext.mounted) {
-                                      _showPrincipalSnack(
-                                        parentContext,
-                                        'Approval delegated.',
-                                      );
+                        if (canReject)
+                          OutlinedButton.icon(
+                            onPressed: saving ? null : () => submit('REJECT'),
+                            icon: const Icon(Icons.close_rounded),
+                            label: const Text('Reject'),
+                          ),
+                        if (canDelegate)
+                          OutlinedButton.icon(
+                            onPressed: saving
+                                ? null
+                                : () async {
+                                    setSheetState(() => saving = true);
+                                    final delegated =
+                                        await _showApprovalDelegationDialog(
+                                          sheetContext,
+                                          ref,
+                                          approvalRequestId,
+                                          activeTab,
+                                        );
+                                    if (!sheetContext.mounted) return;
+                                    if (delegated) {
+                                      Navigator.pop(sheetContext);
+                                      if (parentContext.mounted) {
+                                        _showPrincipalSnack(
+                                          parentContext,
+                                          'Approval delegated.',
+                                        );
+                                      }
+                                      return;
                                     }
-                                    return;
-                                  }
-                                  setSheetState(() => saving = false);
-                                },
-                          icon: const Icon(Icons.forward_to_inbox_rounded),
-                          label: const Text('Delegate'),
-                        ),
-                        FilledButton.icon(
-                          onPressed: saving ? null : () => submit('APPROVE'),
-                          icon: saving
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.check_rounded),
-                          label: Text(saving ? 'Submitting...' : 'Approve'),
-                        ),
+                                    setSheetState(() => saving = false);
+                                  },
+                            icon: const Icon(Icons.forward_to_inbox_rounded),
+                            label: const Text('Delegate'),
+                          ),
+                        if (canApprove)
+                          FilledButton.icon(
+                            onPressed: saving ? null : () => submit('APPROVE'),
+                            icon: saving
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.check_rounded),
+                            label: Text(saving ? 'Submitting...' : 'Approve'),
+                          ),
                       ],
                     ),
                   ],

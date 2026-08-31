@@ -406,7 +406,9 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
               AppSpacing.lg,
               AppSpacing.lg,
               AppSpacing.lg,
-              MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+              MediaQuery.viewInsetsOf(context).bottom +
+                  MediaQuery.viewPaddingOf(context).bottom +
+                  AppSpacing.lg,
             ),
             child: SingleChildScrollView(
               child: Form(
@@ -782,7 +784,9 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
               AppSpacing.lg,
               AppSpacing.lg,
               AppSpacing.lg,
-              MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+              MediaQuery.viewInsetsOf(context).bottom +
+                  MediaQuery.viewPaddingOf(context).bottom +
+                  AppSpacing.lg,
             ),
             child: SingleChildScrollView(
               child: Form(

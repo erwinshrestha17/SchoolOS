@@ -15,11 +15,11 @@ Future<bool?> showSignOutConfirmationSheet(
     useSafeArea: true,
     showDragHandle: true,
     builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.lg,
         AppSpacing.sm,
         AppSpacing.lg,
-        AppSpacing.xl,
+        MediaQuery.viewPaddingOf(sheetContext).bottom + AppSpacing.xl,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

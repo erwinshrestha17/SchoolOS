@@ -358,6 +358,7 @@ class ParentChildCard extends StatelessWidget {
     this.actionCount = 0,
     this.overdueHomeworkCount = 0,
     this.nextHomeworkDueAt,
+    this.now,
   });
 
   final ParentPortalChild child;
@@ -367,6 +368,7 @@ class ParentChildCard extends StatelessWidget {
   final int actionCount;
   final int overdueHomeworkCount;
   final DateTime? nextHomeworkDueAt;
+  final DateTime? now;
 
   @override
   Widget build(BuildContext context) {
@@ -472,6 +474,7 @@ class ParentChildCard extends StatelessWidget {
                     child,
                     overdueCount: overdueHomeworkCount,
                     nextDueAt: nextHomeworkDueAt,
+                    now: now,
                   ),
           ),
           const SizedBox(height: 12),

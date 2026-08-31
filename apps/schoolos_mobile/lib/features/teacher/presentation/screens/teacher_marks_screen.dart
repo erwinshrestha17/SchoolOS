@@ -20,18 +20,6 @@ import '../../../../shared/widgets/status_chip.dart';
 import '../../application/teacher_marks_providers.dart';
 import '../../data/teacher_marks_repository.dart';
 
-import '../../../../app/constants/app_routes.dart';
-import '../../../../app/design_system/app_spacing.dart';
-import '../../../../app/theme/app_colors.dart';
-import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/app_empty_state.dart';
-import '../../../../shared/widgets/app_exception_view.dart';
-import '../../../../shared/widgets/app_loading.dart';
-import '../../../../shared/widgets/role_shell_scaffold.dart';
-import '../../../../shared/widgets/status_chip.dart';
-import '../../application/teacher_marks_providers.dart';
-import '../../data/teacher_marks_repository.dart';
-
 class TeacherMarksScreen extends ConsumerWidget {
   const TeacherMarksScreen({super.key});
 

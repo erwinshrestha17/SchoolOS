@@ -79,6 +79,18 @@ void main() {
 
     final keys = <String>[];
     var attempt = 0;
+    when(() => repository.getApprovalDetail('approval-1')).thenAnswer(
+      (_) async => <String, dynamic>{
+        'status': 'PENDING',
+        'actions': {
+          'approve': true,
+          'reject': true,
+          'delegate': true,
+          'requiresApprovalReason': false,
+          'unavailableReason': null,
+        },
+      },
+    );
     when(
       () => repository.decideApproval(
         approvalRequestId: any(named: 'approvalRequestId'),
@@ -126,6 +138,76 @@ void main() {
           'the same decision instead of recording a second one.',
     );
     expect(keys.first, isNotEmpty);
+  });
+
+  testWidgets('approval sheet obeys backend action availability', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(420, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    when(() => repository.getApprovalDetail('approval-1')).thenAnswer(
+      (_) async => <String, dynamic>{
+        'status': 'PENDING',
+        'actions': {
+          'approve': false,
+          'reject': true,
+          'delegate': true,
+          'requiresApprovalReason': false,
+          'unavailableReason':
+              'Approval is unavailable until the module final action is registered.',
+        },
+      },
+    );
+
+    await tester.pumpWidget(await harness(const PrincipalApprovalsScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Review'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Approval unavailable'), findsOneWidget);
+    expect(find.text('Reject'), findsOneWidget);
+    expect(find.text('Delegate'), findsOneWidget);
+    expect(find.text('Approve'), findsNothing);
+  });
+
+  testWidgets('cached approval detail never enables a decision', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(420, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    when(() => repository.getApprovalDetail('approval-1')).thenAnswer(
+      (_) async => <String, dynamic>{
+        '_mobileFromCache': true,
+        'status': 'PENDING',
+        'actions': {
+          'approve': true,
+          'reject': true,
+          'delegate': true,
+          'requiresApprovalReason': false,
+          'unavailableReason': null,
+        },
+      },
+    );
+
+    await tester.pumpWidget(await harness(const PrincipalApprovalsScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Review'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Decision unavailable here'), findsOneWidget);
+    expect(
+      find.textContaining('Connect to SchoolOS authority'),
+      findsOneWidget,
+    );
+    expect(find.text('Reject'), findsNothing);
+    expect(find.text('Delegate'), findsNothing);
+    expect(find.text('Approve'), findsNothing);
   });
 
   testWidgets('retrying an emergency notice replays the same idempotency key', (
