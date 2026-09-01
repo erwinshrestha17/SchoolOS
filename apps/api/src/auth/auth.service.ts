@@ -666,13 +666,17 @@ export class AuthService {
     if (session?.user) {
       let revokedPushTokenCount = 0;
       if (dto.installationId) {
-        const result = await this.prisma.mobilePushToken.deleteMany({
-          where: {
-            tenantId: session.user.tenantId,
-            userId: session.userId,
-            installationId: dto.installationId,
-          },
-        });
+        const result = await this.prisma.runWithTenantScope(
+          session.user.tenantId,
+          () =>
+            this.prisma.mobilePushToken.deleteMany({
+              where: {
+                tenantId: session.user.tenantId,
+                userId: session.userId,
+                installationId: dto.installationId,
+              },
+            }),
+        );
         revokedPushTokenCount = result.count;
       }
 

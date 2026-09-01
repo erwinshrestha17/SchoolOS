@@ -11,7 +11,6 @@ import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/status_chip.dart';
 import '../../../../shared/widgets/user_avatar.dart';
-import '../../../attendance/application/attendance_providers.dart';
 import '../../../profile/presentation/widgets/sign_out_confirmation_sheet.dart';
 import '../../application/teacher_providers.dart';
 import '../widgets/teacher_app_widgets.dart';
@@ -23,8 +22,8 @@ class TeacherProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
     final user = auth.user;
-    final attendance = ref.watch(teacherAttendanceControllerProvider);
     final noticeSummary = ref.watch(teacherNoticeSummaryProvider);
+    final assignmentScopeCount = ref.watch(teacherAssignmentScopeCountProvider);
 
     return RoleShellScaffold(
       role: 'TEACHER',
@@ -83,10 +82,16 @@ class TeacherProfileScreen extends ConsumerWidget {
             builder: (context, constraints) {
               final assignedCard = TeacherTaskCard(
                 title: 'Assigned',
-                subtitle: 'Class/subject scopes',
+                subtitle: assignmentScopeCount.hasError
+                    ? 'Scope count unavailable'
+                    : 'Class/subject scopes',
                 icon: Icons.school_rounded,
                 iconColor: AppColors.success,
-                value: '${attendance.classes.length}',
+                value: assignmentScopeCount.when(
+                  data: (count) => '$count',
+                  loading: () => '—',
+                  error: (_, _) => '—',
+                ),
               );
               final noticesCard = TeacherTaskCard(
                 title: 'Notices',
@@ -129,7 +134,7 @@ class TeacherProfileScreen extends ConsumerWidget {
                 _MenuTile(
                   icon: Icons.calendar_month_rounded,
                   label: 'My Timetable',
-                  subtitle: 'Needs mobile timetable DTO',
+                  subtitle: 'Assigned classes and substitutions',
                   onTap: () => context.go(AppRoutes.teacherTimetable),
                 ),
                 const Divider(height: 1),

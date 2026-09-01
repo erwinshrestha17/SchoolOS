@@ -9,12 +9,14 @@ import {
   AssessmentType,
   MarkEntryStatus,
   Prisma,
+  TeacherAssignmentComponentScope,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { BulkUpsertMarksDto } from './dto/bulk-upsert-marks.dto';
 import { ListMarksDto } from './dto/list-marks.dto';
+import { ListAssessmentComponentsDto } from './dto/list-assessment-components.dto';
 import { UpdateMarkDto } from './dto/update-mark.dto';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
@@ -469,6 +471,94 @@ export class MarksService {
         take: limit,
       }),
       this.prisma.markEntry.count({ where }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Returns only assessment components for which the current Teacher actor
+   * has an active MARKS_ENTER assignment or delegation. AssessmentComponent
+   * is class-level while authorization is section-level, so a component is
+   * eligible when at least one active section assignment matches the exact
+   * academic year, class, subject, and component type.
+   *
+   * This projection deliberately does not reuse the administrative component
+   * catalog: exposing an out-of-scope component lets a Teacher enumerate
+   * another class or subject even though the eventual write is denied.
+   */
+  async listAssignedComponents(
+    actor: AuthContext,
+    dto: ListAssessmentComponentsDto = {},
+  ) {
+    const page = dto.page ?? 1;
+    const limit = dto.limit ?? 100;
+    const skip = (page - 1) * limit;
+    const assignments = (
+      await this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.MARKS_ENTER,
+      )
+    ).filter(
+      (assignment): assignment is typeof assignment & { subjectId: string } =>
+        Boolean(assignment.subjectId),
+    );
+
+    if (assignments.length === 0) {
+      return {
+        items: [],
+        meta: { total: 0, page, limit, totalPages: 0 },
+      };
+    }
+
+    const assignedScopes: Prisma.AssessmentComponentWhereInput[] =
+      assignments.map((assignment) => {
+        const componentType =
+          assignment.componentScope &&
+          assignment.componentScope !==
+            TeacherAssignmentComponentScope.ALL_COMPONENTS
+            ? (assignment.componentScope as unknown as AssessmentType)
+            : null;
+        return {
+          subjectId: assignment.subjectId,
+          subject: { classId: assignment.classId },
+          examTerm: { academicYearId: assignment.academicYearId },
+          ...(componentType ? { type: componentType } : {}),
+        };
+      });
+
+    const where: Prisma.AssessmentComponentWhereInput = {
+      tenantId: actor.tenantId,
+      ...(dto.examTermId ? { examTermId: dto.examTermId } : {}),
+      ...(dto.subjectId ? { subjectId: dto.subjectId } : {}),
+      ...(dto.type ? { type: dto.type } : {}),
+      ...(dto.search
+        ? { name: { contains: dto.search, mode: 'insensitive' } }
+        : {}),
+      ...(dto.classId ? { subject: { classId: dto.classId } } : {}),
+      AND: [{ OR: assignedScopes }],
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.assessmentComponent.findMany({
+        where,
+        include: {
+          subject: { include: { class: true } },
+          examTerm: true,
+        },
+        orderBy: [{ subject: { code: 'asc' } }, { name: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.assessmentComponent.count({ where }),
     ]);
 
     return {

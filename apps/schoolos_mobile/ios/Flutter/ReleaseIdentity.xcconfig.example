@@ -1,0 +1,4 @@
+// Copy to ReleaseIdentity.xcconfig and keep the real file untracked.
+SCHOOL_OS_IOS_BUNDLE_IDENTIFIER = np.owner.schoolos
+DEVELOPMENT_TEAM = OWNERTEAM1
+CODE_SIGN_STYLE = Automatic

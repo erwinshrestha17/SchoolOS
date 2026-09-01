@@ -14,6 +14,32 @@ class TeacherRepository {
   final PrivateReadCache? cache;
   final SchoolAuthorityDiscovery? authorityDiscovery;
 
+  Future<int> getAssignmentScopeCount() async {
+    final response = await _client.get('/teacher-workspace/assignments');
+    final data = response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final assignmentIds = <String>{};
+    var anonymousScopeCount = 0;
+
+    for (final scope in [
+      ..._asList(data['subjectAssignments']),
+      ..._asList(data['homerooms']),
+    ]) {
+      if (scope is! Map) continue;
+      final id = scope['assignmentId'];
+      if (id is String && id.trim().isNotEmpty) {
+        assignmentIds.add(id);
+      } else {
+        // A malformed/legacy display row still represents one backend-owned
+        // scope; do not collapse it into a fabricated zero.
+        anonymousScopeCount += 1;
+      }
+    }
+
+    return assignmentIds.length + anonymousScopeCount;
+  }
+
   Future<TeacherNoticeSummary> getNoticeSummary() async {
     final response = await _client.get('/mobile/me/notifications/unread-count');
     final data = response.data is Map<String, dynamic>

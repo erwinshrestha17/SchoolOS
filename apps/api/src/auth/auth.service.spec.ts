@@ -772,6 +772,10 @@ describe('AuthService', () => {
         installationId: '3b53ee2c-f356-477d-8b2c-7a35918590ab',
       },
     });
+    expect(prisma.runWithTenantScope).toHaveBeenCalledWith(
+      'tenant-1',
+      expect.any(Function),
+    );
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'logout',

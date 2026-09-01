@@ -240,6 +240,7 @@ async function main() {
 
 async function runPilotRoleChecks(tokens) {
   const roleTokens = {};
+  const roleRefreshTokens = {};
   const roleKeys = [
     'principal',
     'parent',
@@ -256,7 +257,12 @@ async function runPilotRoleChecks(tokens) {
     await sleep(1200);
     const loginCheck = await checkSeededLogin(accounts[key]);
     checks.push(loginCheck);
-    if (loginCheck.status === 'ok') roleTokens[key] = loginCheck.token;
+    if (loginCheck.status === 'ok') {
+      roleTokens[key] = loginCheck.token;
+      if (loginCheck.refreshToken) {
+        roleRefreshTokens[key] = loginCheck.refreshToken;
+      }
+    }
   }
 
   const adminStudents = await fetchOk(
@@ -316,6 +322,39 @@ async function runPilotRoleChecks(tokens) {
   if (tokens.admin) {
     await checkAdminEmptyState(tokens.admin);
   }
+  if (roleRefreshTokens.parent) {
+    checks.push(
+      await checkMobileLogout(
+        roleRefreshTokens.parent,
+        roleTokens.parent,
+      ),
+    );
+  }
+}
+
+async function checkMobileLogout(refreshToken, accessToken) {
+  const result = await request('/auth/logout', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'flutter',
+    },
+    body: JSON.stringify({
+      refreshToken,
+      installationId: '3b53ee2c-f356-477d-8b2c-7a35918590ab',
+    }),
+  });
+  return result.ok
+    ? {
+        name: 'Mobile logout revokes its tenant-scoped installation',
+        status: 'ok',
+      }
+    : {
+        name: 'Mobile logout revokes its tenant-scoped installation',
+        status: 'error',
+        message: `HTTP ${result.status}: ${trimBody(result.bodyText)}`,
+      };
 }
 
 async function checkParentScope(parentToken, seededStudents) {
@@ -476,6 +515,56 @@ async function checkSubjectTeacherScope(subjectTeacherToken) {
       '/mobile/teacher/timetable?days=7',
       subjectTeacherToken,
     )).check,
+  );
+
+  const assignmentContext = await fetchOk(
+    'Subject teacher can read active assignment context',
+    '/teacher-workspace/assignments',
+    subjectTeacherToken,
+  );
+  checks.push(assignmentContext.check);
+  const assignmentData =
+    assignmentContext.body?.data ?? assignmentContext.body ?? {};
+  const assignedComponentScopes = new Set(
+    (Array.isArray(assignmentData.subjectAssignments)
+      ? assignmentData.subjectAssignments
+      : []
+    )
+      .filter(
+        (assignment) =>
+          assignment?.academicYearId &&
+          assignment?.classId &&
+          assignment?.subjectId,
+      )
+      .map(
+        (assignment) =>
+          `${assignment.academicYearId}:${assignment.classId}:${assignment.subjectId}`,
+      ),
+  );
+  const marksComponents = await fetchOk(
+    'Subject teacher can list assigned marks components',
+    '/mobile/teacher/marks/components?limit=50',
+    subjectTeacherToken,
+  );
+  checks.push(marksComponents.check);
+  const componentItems = getItems(marksComponents.body);
+  checks.push(
+    assertCheck(
+      'Subject teacher marks components stay within active assignments',
+      componentItems.every((component) => {
+        const academicYearId = component?.examTerm?.academicYearId;
+        const classId = component?.subject?.classId;
+        const subjectId = component?.subjectId ?? component?.subject?.id;
+        return (
+          academicYearId &&
+          classId &&
+          subjectId &&
+          assignedComponentScopes.has(
+            `${academicYearId}:${classId}:${subjectId}`,
+          )
+        );
+      }),
+    ),
   );
 
   const attendanceClasses = await request(
@@ -844,11 +933,18 @@ async function checkSeededLogin(account) {
     }
 
     const token = result.body?.data?.accessToken ?? result.body?.accessToken;
+    const refreshToken =
+      result.body?.data?.refreshToken ?? result.body?.refreshToken;
     if (!token) {
       throw new Error('Response did not contain accessToken');
     }
 
-    return { name: `Seeded ${account.label} login`, status: 'ok', token };
+    return {
+      name: `Seeded ${account.label} login`,
+      status: 'ok',
+      token,
+      refreshToken,
+    };
   } catch (error) {
     return {
       name: `Seeded ${account.label} login`,

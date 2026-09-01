@@ -2008,13 +2008,6 @@ class _MoreBody extends StatelessWidget {
               enabled: modules['exams'] == true,
             ),
             _MenuItem(
-              'Learning Support',
-              Icons.volunteer_activism_rounded,
-              AppColors.teacherAccent,
-              AppRoutes.principalLearningSupport,
-              enabled: modules['learning'] == true,
-            ),
-            _MenuItem(
               'Fees Snapshot',
               Icons.account_balance_wallet_rounded,
               AppColors.success,
@@ -2024,33 +2017,7 @@ class _MoreBody extends StatelessWidget {
           ],
         ),
         _MenuGroup(
-          title: '2. Operations',
-          items: [
-            _MenuItem(
-              'Transport',
-              Icons.directions_bus_rounded,
-              AppColors.primary,
-              AppRoutes.principalTransport,
-              enabled: modules['transport'] == true,
-            ),
-            _MenuItem(
-              'Canteen Snapshot',
-              Icons.restaurant_rounded,
-              AppColors.warning,
-              AppRoutes.principalCanteen,
-              enabled: modules['canteen'] == true,
-            ),
-            _MenuItem(
-              'Library Snapshot',
-              Icons.local_library_rounded,
-              AppColors.info,
-              AppRoutes.principalLibrary,
-              enabled: modules['library'] == true,
-            ),
-          ],
-        ),
-        _MenuGroup(
-          title: '3. Leadership',
+          title: '2. Leadership',
           items: [
             _MenuItem(
               'Tasks',
@@ -2075,7 +2042,7 @@ class _MoreBody extends StatelessWidget {
           ],
         ),
         _MenuGroup(
-          title: '4. Notices and alerts',
+          title: '3. Notices and alerts',
           items: [
             _MenuItem(
               'Notice Archive',
@@ -2086,7 +2053,7 @@ class _MoreBody extends StatelessWidget {
           ],
         ),
         _MenuGroup(
-          title: '5. Account',
+          title: '4. Account',
           items: [
             _MenuItem(
               'Profile',

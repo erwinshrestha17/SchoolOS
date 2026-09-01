@@ -21,6 +21,12 @@ final teacherNoticeSummaryProvider =
       return ref.watch(teacherRepositoryProvider).getNoticeSummary();
     });
 
+final teacherAssignmentScopeCountProvider = FutureProvider.autoDispose<int>((
+  ref,
+) async {
+  return ref.watch(teacherRepositoryProvider).getAssignmentScopeCount();
+});
+
 class TeacherLearningSupportQuery {
   const TeacherLearningSupportQuery({
     required this.studentId,

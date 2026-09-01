@@ -1,10 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuthMethod, MarkEntryStatus, Prisma } from '@prisma/client';
+import {
+  AssessmentType,
+  AuthMethod,
+  MarkEntryStatus,
+  Prisma,
+  TeacherAssignmentComponentScope,
+  TeacherAssignmentType,
+} from '@prisma/client';
 import { ForbiddenException, ConflictException } from '@nestjs/common';
 import { MarksService } from './marks.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import type { AuthContext } from '../auth/auth.types';
 import {
   createTeacherScopeServiceForTests,
@@ -49,6 +57,117 @@ describe('MarksService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('mobile Teacher component projection', () => {
+    const actor: AuthContext = {
+      tenantId: 'tenant-1',
+      tenantSlug: 'tenant-one',
+      userId: 'subject-teacher-1',
+      email: 'subject-teacher@schoolos.test',
+      authMethod: AuthMethod.PASSWORD,
+      roles: ['subject_teacher'],
+      permissions: ['academics:enter_marks'],
+    };
+
+    it('limits component options to active marks-entry assignment scopes', async () => {
+      const items = [{ id: 'assigned-component' }];
+      const prisma = {
+        assessmentComponent: {
+          findMany: jest.fn().mockResolvedValue(items),
+          count: jest.fn().mockResolvedValue(1),
+        },
+      };
+      const teacherScopeService = {
+        listActiveAssignmentsForCapability: jest.fn().mockResolvedValue([
+          {
+            assignmentId: 'assignment-1',
+            assignmentType: TeacherAssignmentType.SUBJECT_TEACHER,
+            academicYearId: 'year-2083',
+            classId: 'class-10',
+            sectionId: 'section-a',
+            subjectId: 'mathematics-10',
+            componentScope: TeacherAssignmentComponentScope.PRACTICAL,
+            isPrimary: true,
+            effectiveFrom: new Date('2026-04-01T00:00:00.000Z'),
+            effectiveUntil: null,
+            source: 'ASSIGNMENT',
+          },
+        ]),
+      };
+      const marksService = new MarksService(
+        prisma as unknown as PrismaService,
+        { record: jest.fn() } as unknown as AuditService,
+        teacherScopeService as unknown as TeacherScopeService,
+      );
+
+      const result = await marksService.listAssignedComponents(actor, {
+        classId: 'class-10',
+        search: 'Practical',
+        page: 2,
+        limit: 25,
+      });
+
+      expect(
+        teacherScopeService.listActiveAssignmentsForCapability,
+      ).toHaveBeenCalledWith(actor, TeacherCapability.MARKS_ENTER);
+      expect(prisma.assessmentComponent.findMany).toHaveBeenCalledWith({
+        where: {
+          tenantId: actor.tenantId,
+          name: { contains: 'Practical', mode: 'insensitive' },
+          subject: { classId: 'class-10' },
+          AND: [
+            {
+              OR: [
+                {
+                  subjectId: 'mathematics-10',
+                  subject: { classId: 'class-10' },
+                  examTerm: { academicYearId: 'year-2083' },
+                  type: AssessmentType.PRACTICAL,
+                },
+              ],
+            },
+          ],
+        },
+        include: {
+          subject: { include: { class: true } },
+          examTerm: true,
+        },
+        orderBy: [{ subject: { code: 'asc' } }, { name: 'asc' }],
+        skip: 25,
+        take: 25,
+      });
+      expect(result).toEqual({
+        items,
+        meta: { total: 1, page: 2, limit: 25, totalPages: 1 },
+      });
+    });
+
+    it('returns no component metadata when MARKS_ENTER scope is absent', async () => {
+      const prisma = {
+        assessmentComponent: {
+          findMany: jest.fn(),
+          count: jest.fn(),
+        },
+      };
+      const teacherScopeService = {
+        listActiveAssignmentsForCapability: jest.fn().mockResolvedValue([]),
+      };
+      const marksService = new MarksService(
+        prisma as unknown as PrismaService,
+        { record: jest.fn() } as unknown as AuditService,
+        teacherScopeService as unknown as TeacherScopeService,
+      );
+
+      await expect(
+        marksService.listAssignedComponents(actor, { page: 1, limit: 50 }),
+      ).resolves.toEqual({
+        items: [],
+        meta: { total: 0, page: 1, limit: 50, totalPages: 0 },
+      });
+      expect(prisma.assessmentComponent.findMany).not.toHaveBeenCalled();
+      expect(prisma.assessmentComponent.count).not.toHaveBeenCalled();
+    });
   });
 
   it('persists draft, absent, and withheld states through tenant-scoped bulk upsert', async () => {
@@ -386,7 +505,7 @@ describe('MarksService', () => {
       permissions: ['academics:enter_marks'],
     };
 
-    let teacherAssignments: Array<Record<string, unknown>>;
+    let teacherAssignments: Record<string, unknown>[];
 
     function buildMarksService(prisma: Record<string, unknown>) {
       const deps = createTeacherScopeServiceForTests({

@@ -1,0 +1,7 @@
+# Copy to android/key.properties and keep the real file untracked.
+# Relative storeFile paths are resolved from apps/schoolos_mobile/android.
+applicationId=np.owner.schoolos
+storeFile=upload-keystore.jks
+storePassword=replace-with-secret
+keyAlias=upload
+keyPassword=replace-with-secret

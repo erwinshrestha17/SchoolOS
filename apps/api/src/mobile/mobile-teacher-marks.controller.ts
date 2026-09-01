@@ -7,7 +7,6 @@ import type { AuthContext } from '../auth/auth.types';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
-import { AssessmentComponentsService } from '../academics/assessment-components.service';
 import { MarksService } from '../academics/marks.service';
 import { BulkUpsertMarksDto } from '../academics/dto/bulk-upsert-marks.dto';
 import { ListMarksDto } from '../academics/dto/list-marks.dto';
@@ -22,10 +21,7 @@ import { ListAssessmentComponentsDto } from '../academics/dto/list-assessment-co
 @Entitlement('module.exams')
 @Roles('teacher', 'subject_teacher')
 export class MobileTeacherMarksController {
-  constructor(
-    private readonly marksService: MarksService,
-    private readonly assessmentComponentsService: AssessmentComponentsService,
-  ) {}
+  constructor(private readonly marksService: MarksService) {}
 
   @Get('components')
   @Permissions(
@@ -37,7 +33,7 @@ export class MobileTeacherMarksController {
     @CurrentAuth() auth: AuthContext,
     @Query() query: ListAssessmentComponentsDto,
   ) {
-    return this.assessmentComponentsService.list(auth, query);
+    return this.marksService.listAssignedComponents(auth, query);
   }
 
   @Get()

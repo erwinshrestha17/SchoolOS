@@ -238,6 +238,58 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('principal more exposes only active P0 module families', (
+    tester,
+  ) async {
+    final sharedPrefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPreferencesServiceProvider.overrideWithValue(
+            AppPreferencesService(sharedPrefs),
+          ),
+          tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+          authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+          authProvider.overrideWith((ref) {
+            return _FakeAuthNotifier(
+              ref.watch(tokenStorageServiceProvider),
+              ref.watch(authRepositoryProvider),
+              ref.watch(appPreferencesServiceProvider),
+            );
+          }),
+          principalDashboardProvider.overrideWith((ref) async {
+            return {
+              'school': {'name': 'Pilot School'},
+              'academicYear': {'name': '2083/84'},
+              'modules': {
+                'students': true,
+                'fees': true,
+                'exams': true,
+                'learning': true,
+                'transport': true,
+                'canteen': true,
+                'library': true,
+                'tasks': true,
+                'reports': true,
+              },
+            };
+          }),
+        ],
+        child: const MaterialApp(home: PrincipalMoreScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Students'), findsOneWidget);
+    expect(find.text('Fees Snapshot'), findsOneWidget);
+    expect(find.text('2. Leadership'), findsOneWidget);
+    expect(find.text('Learning Support'), findsNothing);
+    expect(find.text('Transport'), findsNothing);
+    expect(find.text('Canteen Snapshot'), findsNothing);
+    expect(find.text('Library Snapshot'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'principal today quick actions grid stays overflow-free at max text scale',
     (tester) async {
@@ -1850,6 +1902,9 @@ void main() {
                 lastUpdated: DateTime(2026, 6, 19, 8),
               ),
             ),
+            teacherAssignmentScopeCountProvider.overrideWith(
+              (ref) async => 999,
+            ),
           ],
           child: MaterialApp(
             home: MediaQuery(
@@ -1868,6 +1923,7 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(find.text('Assigned'), findsOneWidget);
+      expect(find.text('999'), findsWidgets);
       expect(find.text('Notices'), findsWidgets);
       expect(tester.takeException(), isNull);
     },

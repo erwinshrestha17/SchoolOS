@@ -1,1 +1,3 @@
+SCHOOL_OS_IOS_BUNDLE_IDENTIFIER = com.example.schoolosMobile
+#include? "ReleaseIdentity.xcconfig"
 #include "Generated.xcconfig"
