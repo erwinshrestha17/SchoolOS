@@ -31,6 +31,7 @@ packages/core/src/*.js
 packages/core/src/*.js.map
 
 # Flutter mobile app local artifacts
+apps/schoolos_mobile/.release/
 apps/schoolos_mobile/.dart_tool/
 apps/schoolos_mobile/.flutter-plugins
 apps/schoolos_mobile/.flutter-plugins-dependencies

@@ -46,56 +46,60 @@ void main() {
       },
     );
 
-    test('keeps principal dashboard network-only when offline without cache',
-        () async {
-      when(
-        () => apiClient.get<dynamic>('/mobile/principal/dashboard'),
-      ).thenThrow(const NetworkException());
+    test(
+      'keeps principal dashboard network-only when offline without cache',
+      () async {
+        when(
+          () => apiClient.get<dynamic>('/mobile/principal/dashboard'),
+        ).thenThrow(const NetworkException());
 
-      final repository = PrincipalRepository(apiClient);
+        final repository = PrincipalRepository(apiClient);
 
-      await expectLater(
-        repository.getDashboard(),
-        throwsA(isA<NetworkException>()),
-      );
-    });
+        await expectLater(
+          repository.getDashboard(),
+          throwsA(isA<NetworkException>()),
+        );
+      },
+    );
 
-    test('returns cached principal dashboard after a successful fetch',
-        () async {
-      when(
-        () => apiClient.get<dynamic>('/mobile/principal/dashboard'),
-      ).thenAnswer(
-        (_) async => Response(
-          requestOptions: RequestOptions(path: '/mobile/principal/dashboard'),
-          data: {
-            'attentionCount': 2,
-            'cards': [
-              {'key': 'approvals', 'label': 'Approvals', 'value': 2},
-            ],
-          },
-        ),
-      );
+    test(
+      'returns cached principal dashboard after a successful fetch',
+      () async {
+        when(
+          () => apiClient.get<dynamic>('/mobile/principal/dashboard'),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(path: '/mobile/principal/dashboard'),
+            data: {
+              'attentionCount': 2,
+              'cards': [
+                {'key': 'approvals', 'label': 'Approvals', 'value': 2},
+              ],
+            },
+          ),
+        );
 
-      final cache = PrivateReadCache(
-        _MemorySecureStore(),
-        scope: PrivateReadCacheScope(
-          tenantId: 'tenant-1',
-          userId: 'principal-1',
-          role: 'PRINCIPAL',
-        ),
-      );
-      final repository = PrincipalRepository(apiClient, cache: cache);
-      final online = await repository.getDashboard();
-      expect(online['_mobileFromCache'], isFalse);
+        final cache = PrivateReadCache(
+          _MemorySecureStore(),
+          scope: PrivateReadCacheScope(
+            tenantId: 'tenant-1',
+            userId: 'principal-1',
+            role: 'PRINCIPAL',
+          ),
+        );
+        final repository = PrincipalRepository(apiClient, cache: cache);
+        final online = await repository.getDashboard();
+        expect(online['_mobileFromCache'], isFalse);
 
-      when(
-        () => apiClient.get<dynamic>('/mobile/principal/dashboard'),
-      ).thenThrow(const NetworkException());
+        when(
+          () => apiClient.get<dynamic>('/mobile/principal/dashboard'),
+        ).thenThrow(const NetworkException());
 
-      final offline = await repository.getDashboard();
-      expect(offline['attentionCount'], 2);
-      expect(offline['_mobileFromCache'], isTrue);
-    });
+        final offline = await repository.getDashboard();
+        expect(offline['attentionCount'], 2);
+        expect(offline['_mobileFromCache'], isTrue);
+      },
+    );
 
     test('loads the purpose-limited admissions snapshot', () async {
       when(

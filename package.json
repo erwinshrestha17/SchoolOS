@@ -57,6 +57,7 @@
     "verify:env:staging": "DEPLOY_ENV=staging NODE_ENV=production node scripts/check-deploy-env.mjs",
     "verify:env:production": "DEPLOY_ENV=production NODE_ENV=production node scripts/check-deploy-env.mjs",
     "verify:tracked-artifacts": "node scripts/check-tracked-artifacts.mjs",
+    "verify:mobile-release": "node scripts/check-mobile-release-config.mjs",
     "verify:openapi": "node scripts/check-openapi-gate.mjs",
     "verify:deploy:core": "pnpm compile:artifacts && pnpm verify:env:deploy && pnpm verify:tracked-artifacts && pnpm db:generate && pnpm db:validate && pnpm verify:openapi && pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build",
     "verify:deploy": "pnpm verify:deploy:core && pnpm test:web:e2e",

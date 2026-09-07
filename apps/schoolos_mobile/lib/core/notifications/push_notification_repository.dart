@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_provider.dart';
@@ -16,9 +17,11 @@ class PushNotificationRepository {
     required String token,
     required String installationId,
     required String platform,
+    CancelToken? cancelToken,
   }) async {
     final response = await _client.post(
       '/mobile/push-tokens',
+      cancelToken: cancelToken,
       data: {
         'token': token,
         'installationId': installationId,

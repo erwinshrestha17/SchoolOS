@@ -9,6 +9,7 @@ import 'package:schoolos_mobile/core/auth/models/login_request.dart';
 import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/core/network/interceptors/token_refresh_interceptor.dart';
+import 'package:schoolos_mobile/core/network/session_request_context.dart';
 import 'package:schoolos_mobile/core/storage/token_storage_service.dart';
 import 'package:schoolos_mobile/core/storage/secure_storage_service.dart';
 
@@ -443,7 +444,13 @@ void main() {
       test(
         'calls onSessionExpired and passes exception when refresh token is empty',
         () async {
-          final requestOptions = RequestOptions(path: '/some-endpoint');
+          final requestOptions = RequestOptions(
+            path: '/some-endpoint',
+            extra: {
+              sessionRequestContextKey: SessionRequestContext(0)
+                ..accessToken = 'synthetic-access',
+            },
+          );
           final response = Response(
             requestOptions: requestOptions,
             statusCode: 401,
@@ -456,6 +463,9 @@ void main() {
           when(
             () => mockTokenStorage.getRefreshToken(),
           ).thenAnswer((_) async => null);
+          when(
+            () => mockTokenStorage.getAccessToken(),
+          ).thenAnswer((_) async => 'synthetic-access');
           when(() => mockHandler.next(any())).thenAnswer((_) {});
 
           await interceptor.onError(dioException, mockHandler);

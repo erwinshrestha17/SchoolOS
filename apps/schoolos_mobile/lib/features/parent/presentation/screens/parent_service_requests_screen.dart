@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -14,6 +15,10 @@ import '../../domain/parent_models.dart';
 import '../../domain/parent_service_request_models.dart';
 import '../widgets/parent_detail_widgets.dart';
 import '../widgets/parent_portal_widgets.dart';
+
+final parentEvidencePickerProvider = Provider<ImagePicker>(
+  (ref) => ImagePicker(),
+);
 
 class ParentServiceRequestsScreen extends ConsumerStatefulWidget {
   const ParentServiceRequestsScreen({super.key});
@@ -259,32 +264,42 @@ class _ParentServiceRequestsScreenState
     ParentServiceRequest request,
     String childId,
   ) async {
-    final image = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 88,
-    );
-    if (image == null || !mounted) return;
-    final contentType = _imageContentType(image.name);
-    if (contentType == null) {
-      _showMessage('Choose a JPG, PNG, or WebP image.');
-      return;
-    }
-    final bytes = await image.readAsBytes();
-    if (bytes.isEmpty || bytes.length > 5 * 1024 * 1024) {
-      _showMessage('Choose an image up to 5 MB.');
-      return;
-    }
-    await _runAction(request.id, childId, () {
-      return ref
-          .read(parentRepositoryProvider)
-          .uploadServiceRequestEvidence(
-            requestId: request.id,
-            fileName: image.name,
-            contentType: contentType,
-            content: bytes,
-            label: 'Parent evidence',
+    try {
+      final image = await ref
+          .read(parentEvidencePickerProvider)
+          .pickImage(
+            source: ImageSource.gallery,
+            maxWidth: 1600,
+            maxHeight: 1600,
+            imageQuality: 88,
+            requestFullMetadata: false,
           );
-    });
+      if (image == null || !mounted) return;
+      final contentType = _imageContentType(image.name);
+      if (contentType == null) {
+        _showMessage('Choose a JPG, PNG, or WebP image.');
+        return;
+      }
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+      if (bytes.isEmpty || bytes.length > 5 * 1024 * 1024) {
+        _showMessage('Choose an image up to 5 MB.');
+        return;
+      }
+      await _runAction(request.id, childId, () {
+        return ref
+            .read(parentRepositoryProvider)
+            .uploadServiceRequestEvidence(
+              requestId: request.id,
+              fileName: image.name,
+              contentType: contentType,
+              content: bytes,
+              label: 'Parent evidence',
+            );
+      });
+    } catch (error) {
+      _showMessage(_photoPickerError(error));
+    }
   }
 
   Future<void> _download(
@@ -559,6 +574,7 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
   String? _invoiceId;
   XFile? _evidence;
   bool _submitting = false;
+  bool _choosingEvidence = false;
   String? _error;
   String? _idempotencyKey;
 
@@ -712,7 +728,9 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
                 },
               ),
               OutlinedButton.icon(
-                onPressed: _submitting ? null : _chooseEvidence,
+                onPressed: _submitting || _choosingEvidence
+                    ? null
+                    : _chooseEvidence,
                 icon: const Icon(Icons.add_photo_alternate_outlined),
                 label: Text(
                   _evidence == null
@@ -744,6 +762,7 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
                   FilledButton.icon(
                     onPressed:
                         _submitting ||
+                            _choosingEvidence ||
                             (paymentDispute && widget.invoices.isEmpty)
                         ? null
                         : _submit,
@@ -760,25 +779,39 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
   }
 
   Future<void> _chooseEvidence() async {
-    final image = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 88,
-    );
-    if (image == null || !mounted) return;
-    final contentType = _imageContentType(image.name);
-    final bytes = await image.readAsBytes();
-    if (contentType == null ||
-        bytes.isEmpty ||
-        bytes.length > 5 * 1024 * 1024) {
+    if (_submitting || _choosingEvidence) return;
+    setState(() => _choosingEvidence = true);
+    try {
+      final image = await ref
+          .read(parentEvidencePickerProvider)
+          .pickImage(
+            source: ImageSource.gallery,
+            maxWidth: 1600,
+            maxHeight: 1600,
+            imageQuality: 88,
+            requestFullMetadata: false,
+          );
+      if (image == null || !mounted) return;
+      final contentType = _imageContentType(image.name);
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+      if (contentType == null ||
+          bytes.isEmpty ||
+          bytes.length > 5 * 1024 * 1024) {
+        setState(() {
+          _error = 'Choose a JPG, PNG, or WebP image up to 5 MB.';
+        });
+        return;
+      }
       setState(() {
-        _error = 'Choose a JPG, PNG, or WebP image up to 5 MB.';
+        _evidence = image;
+        _error = null;
       });
-      return;
+    } catch (error) {
+      if (mounted) setState(() => _error = _photoPickerError(error));
+    } finally {
+      if (mounted) setState(() => _choosingEvidence = false);
     }
-    setState(() {
-      _evidence = image;
-      _error = null;
-    });
   }
 
   Future<void> _submit() async {
@@ -882,6 +915,15 @@ String _fileSize(int bytes) {
 String _safeError(Object error) {
   if (error is AppException) return error.message;
   return 'This request could not be completed. Please try again.';
+}
+
+String _photoPickerError(Object error) {
+  if (error is PlatformException &&
+      (error.code == 'photo_access_denied' ||
+          error.code == 'photo_access_restricted')) {
+    return 'Photo access is unavailable. Check photo access in device settings, then try again.';
+  }
+  return 'Photo could not be opened. Please try again.';
 }
 
 String _newUuidV4() {

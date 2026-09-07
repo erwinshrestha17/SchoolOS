@@ -182,6 +182,15 @@ if (wave === 'wave6') {
 }
 
 if (wave === 'wave1' || wave === 'wave0') {
+  for (const platform of ['android', 'ios']) {
+    checks.push(
+      run(`mobile ${platform} release configuration`, 'node', [
+        'scripts/check-mobile-release-config.mjs',
+        platform,
+        process.env[`SCHOOLOS_MOBILE_${platform.toUpperCase()}_DEFINES_FILE`] ?? '',
+      ]),
+    );
+  }
   checks.push(
     run('flutter analyze', 'bash', [
       '-lc',

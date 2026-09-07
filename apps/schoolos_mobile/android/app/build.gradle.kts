@@ -1,4 +1,6 @@
 import java.util.Properties
+import java.security.KeyStore
+import java.security.cert.X509Certificate
 
 plugins {
     id("com.android.application")
@@ -23,34 +25,65 @@ val missingReleaseProperties = releasePropertyNames.filter {
     releaseProperties.getProperty(it).isNullOrBlank()
 }
 val releaseSigningReady = releasePropertiesFile.exists() && missingReleaseProperties.isEmpty()
-val releaseBuildRequested = gradle.startParameter.taskNames.any {
-    it.contains("release", ignoreCase = true)
-}
 val configuredApplicationId = releaseProperties.getProperty("applicationId")
     ?.trim()
     ?.takeIf(String::isNotEmpty)
     ?: "com.example.schoolos_mobile"
 
-if (releaseBuildRequested) {
-    val releaseErrors = mutableListOf<String>()
-    if (!releasePropertiesFile.exists()) {
-        releaseErrors += "android/key.properties is required"
-    } else if (missingReleaseProperties.isNotEmpty()) {
-        releaseErrors +=
-            "android/key.properties is missing: ${missingReleaseProperties.joinToString(", ")}"
+val verifySchoolosReleaseConfiguration = tasks.register("verifySchoolosReleaseConfiguration") {
+    group = "verification"
+    description = "Validate the SchoolOS release identity and upload signing key."
+    doLast {
+        val releaseErrors = mutableListOf<String>()
+        if (!releasePropertiesFile.exists()) {
+            releaseErrors += "android/key.properties is required"
+        } else if (missingReleaseProperties.isNotEmpty()) {
+            releaseErrors +=
+                "android/key.properties is missing: ${missingReleaseProperties.joinToString(", ")}"
+        }
+        if (!Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+").matches(configuredApplicationId) ||
+            Regex("example|placeholder|replace|\\.owner\\.", RegexOption.IGNORE_CASE)
+                .containsMatchIn(configuredApplicationId)) {
+            releaseErrors += "applicationId must be the owner-approved production identifier"
+        }
+        val configuredStoreFile = releaseProperties.getProperty("storeFile")?.trim()
+        if (!configuredStoreFile.isNullOrEmpty() && !rootProject.file(configuredStoreFile).isFile) {
+            releaseErrors += "the configured release storeFile does not exist"
+        }
+        if (releaseErrors.isEmpty()) {
+            try {
+                val keyStore = KeyStore.getInstance(
+                    rootProject.file(configuredStoreFile!!),
+                    releaseProperties.getProperty("storePassword").toCharArray(),
+                )
+                val alias = releaseProperties.getProperty("keyAlias")
+                val key = keyStore.getKey(alias, releaseProperties.getProperty("keyPassword").toCharArray())
+                val certificate = keyStore.getCertificate(alias) as? X509Certificate
+                if (key == null || certificate == null) {
+                    releaseErrors += "the configured alias must contain a signing key and certificate"
+                } else if (alias.equals("androiddebugkey", ignoreCase = true) ||
+                    certificate.subjectX500Principal.name.contains("CN=Android Debug", ignoreCase = true)) {
+                    releaseErrors += "Android debug certificates cannot sign a SchoolOS release"
+                }
+            } catch (_: Exception) {
+                // Keystore errors can contain paths or sensitive input; expose no cause.
+                releaseErrors += "the release keystore, alias, or passwords could not be verified"
+            }
+        }
+        if (releaseErrors.isNotEmpty()) {
+            throw GradleException(
+                "SchoolOS Android release configuration failed:\n- " +
+                    releaseErrors.joinToString("\n- "),
+            )
+        }
     }
-    if (configuredApplicationId.contains("example", ignoreCase = true)) {
-        releaseErrors += "applicationId must be the owner-approved production identifier"
-    }
-    val configuredStoreFile = releaseProperties.getProperty("storeFile")?.trim()
-    if (!configuredStoreFile.isNullOrEmpty() && !rootProject.file(configuredStoreFile).isFile) {
-        releaseErrors += "the configured release storeFile does not exist"
-    }
-    if (releaseErrors.isNotEmpty()) {
-        throw GradleException(
-            "SchoolOS Android release configuration failed:\n- " +
-                releaseErrors.joinToString("\n- "),
-        )
+}
+
+// Wire the actual task graph, including aggregate `assemble`/`bundle` and
+// abbreviated Gradle commands. Inspecting requested task names misses these.
+tasks.configureEach {
+    if (name == "preReleaseBuild" || name == "validateSigningRelease") {
+        dependsOn(verifySchoolosReleaseConfiguration)
     }
 }
 
@@ -66,9 +99,8 @@ android {
     }
 
     defaultConfig {
-        // Debug/local builds retain the Flutter template ID. Release builds
-        // fail closed above unless android/key.properties supplies the
-        // owner-approved production identity and signing material.
+        // Local builds use the template ID unless an identity is configured.
+        // The release task validates identity and signing material before build.
         applicationId = configuredApplicationId
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -81,7 +113,7 @@ android {
     signingConfigs {
         if (releaseSigningReady) {
             create("release") {
-                storeFile = rootProject.file(releaseProperties.getProperty("storeFile"))
+                storeFile = rootProject.file(releaseProperties.getProperty("storeFile").trim())
                 storePassword = releaseProperties.getProperty("storePassword")
                 keyAlias = releaseProperties.getProperty("keyAlias")
                 keyPassword = releaseProperties.getProperty("keyPassword")

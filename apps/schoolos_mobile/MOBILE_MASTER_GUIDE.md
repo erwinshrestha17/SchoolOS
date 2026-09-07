@@ -71,6 +71,78 @@ flutter build ios --no-codesign
 
 Use the GA policy and attach current local, emulator/device, staging, and controlled-pilot evidence to CI runs, smoke outputs, staging records, or release artifacts.
 
+## Production Build Configuration
+
+Release packaging requires registered app identities and a deployed HTTPS API.
+Configure Android using `android/key.properties.example` as the template for the
+ignored `android/key.properties`; `storeFile` resolves from `android/`. Use the
+registered application ID and upload keystore. Gradle checks the signing key and
+rejects missing configuration and Android debug certificates for release tasks,
+including aggregate builds. For iOS, copy
+`ios/Flutter/ReleaseIdentity.xcconfig.example` to the ignored
+`ReleaseIdentity.xcconfig`, then configure the registered bundle ID, Apple team,
+and signing style. Apple certificates/provisioning remain required for a signed
+archive. Template IDs are only for local QA.
+
+Create a separate JSON Dart define file for each platform in the ignored
+`.release/` directory (or secure CI file storage):
+
+```json
+{
+  "SCHOOL_OS_ENV": "production",
+  "SCHOOL_OS_API_BASE_URL": "https://<deployed-api-host>/api/v1",
+  "SCHOOL_OS_FIREBASE_API_KEY": "<platform-client-api-key>",
+  "SCHOOL_OS_FIREBASE_APP_ID": "<platform-firebase-app-id>",
+  "SCHOOL_OS_FIREBASE_MESSAGING_SENDER_ID": "<project-number>",
+  "SCHOOL_OS_FIREBASE_PROJECT_ID": "<project-id>"
+}
+```
+
+These values are compiled into the client. Never include server credentials,
+service-account keys, signing passwords, or private school records. The optional
+`SCHOOL_OS_FIREBASE_STORAGE_BUCKET` is also supported. Android and iOS Firebase
+app IDs must match their platform and messaging project number.
+
+From the repository root, validate a platform and optionally build its store
+artifact using the same checked file:
+
+```bash
+pnpm verify:mobile-release android /absolute/path/to/android-defines.json
+pnpm verify:mobile-release android /absolute/path/to/android-defines.json --build
+pnpm verify:mobile-release ios /absolute/path/to/ios-defines.json --build
+```
+
+Android builds an AAB; iOS builds a signed IPA. Additional Dart define overrides
+are rejected. `ga:verify:wave0` and `ga:verify:wave1` require the respective files
+through `SCHOOLOS_MOBILE_ANDROID_DEFINES_FILE` and
+`SCHOOLOS_MOBILE_IOS_DEFINES_FILE`. Missing setup fails those configuration checks.
+This preflight checks local configuration and Android key access; it does not
+verify store registration, Apple provisioning, Firebase delivery, store-download
+size, device QA, or pilot acceptance. Those remain the GA policy's evidence gates.
+
+## Shared-Device Session Safety
+
+Auth and API clients share a process-local session generation for each secure
+credential store. Login, logout, restore, and biometric lock invalidate pending
+work before awaiting network/storage. Private requests bind that generation at
+creation and recheck it before attaching credentials, retrying, and returning
+responses; old responses must not populate a later account's screens or cache.
+
+Refresh is single-flight within one session only. A late 401 after rotation
+reuses the current token once; a second 401 or rejected refresh fails closed.
+Login/refresh/logout endpoints never borrow a stored bearer token or recursively
+trigger refresh. Network errors, timeouts, rate limits, and server failures do not
+by themselves prove revoked credentials or authorize clearing a session.
+Refresh calls have bounded timeouts. Refresh and account replacement/logout
+storage operations are serialized, with access tokens written last.
+
+Delayed login/profile/biometric results cannot replace, unlock, re-enable
+biometrics, or sign out a newer session. These are local deterministic regression
+guarantees, not proof of server/provider revocation during offline logout or
+process termination. Shared-device staging and physical-device tests remain
+required, including token rotation, interrupted secure-storage writes, revoked
+server sessions, weak connectivity, and app restart.
+
 ## Push Notification Configuration
 
 Push and the personal inbox are M12 Notifications and Delivery. Authored school
@@ -89,6 +161,25 @@ The app registers FCM tokens only for authenticated parent, teacher, principal/a
 ```
 
 The backend also requires a verified configured push adapter (`PUSH_PROVIDER_MODE=configured-provider`, `PUSH_PROVIDER_ENABLED=true`, and `PUSH_PROVIDER_READY=true`). Missing app or backend provider configuration must remain visible as unavailable/not-ready; registration or local builds are not delivery proof.
+
+Push lifecycle follows the full auth state, including restored sessions and the
+`authenticated → loading → unauthenticated` logout sequence. Loading, biometric
+lock, password-change gates, unsupported personas, and incomplete tenant identity
+retire device listeners and cancel pending registration. Async setup, token
+refresh, and navigation are session-fenced; a delayed guardian-scope lookup cannot
+navigate a later account. Native token creation/deletion is ordered so old cleanup
+cannot delete the next account's token. Returning to the foreground rechecks
+permission/provider readiness; a failed setup is retryable without signing out.
+Concurrent registration and logout share one secure-storage installation-ID
+operation, including on a fresh install. Failed storage writes never return an
+unpersisted identity and can be retried.
+
+Device token deletion is best-effort; server logout revocation remains
+authoritative, and cancelling a request is not proof that the server rolled it
+back. Local delayed-response regression tests are not FCM delivery evidence.
+Before pilot acceptance, verify shared-device logout/account switching, token
+rotation, terminated-app taps, permission changes, offline logout/reconnect, and
+revoked guardian/teacher scope against the configured provider on real devices.
 
 ## Parent Device QA Release Gate
 

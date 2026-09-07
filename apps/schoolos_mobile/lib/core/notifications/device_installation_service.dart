@@ -11,13 +11,22 @@ final deviceInstallationServiceProvider = Provider<DeviceInstallationService>((
 });
 
 class DeviceInstallationService {
-  const DeviceInstallationService(this._storage);
+  DeviceInstallationService(this._storage);
 
   final SecureStorageService _storage;
+  Future<String>? _installationInFlight;
 
   static const _installationIdKey = 'school_os_push_installation_id';
 
-  Future<String> getOrCreateInstallationId() async {
+  Future<String> getOrCreateInstallationId() =>
+      _installationInFlight ??= _readOrCreateInstallationId().whenComplete(() {
+        _installationInFlight = null;
+      });
+
+  // Registration and logout may both request the ID on a fresh install. Share
+  // the secure-storage operation so logout revokes the same installation that
+  // registration used, and retry storage failures without caching a false ID.
+  Future<String> _readOrCreateInstallationId() async {
     final existing = await _storage.read(_installationIdKey);
     if (existing != null && _isUuid(existing)) {
       return existing;

@@ -2,15 +2,21 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 
 import '../config/env_config.dart';
+import '../auth/session_credential_coordinator.dart';
 import '../errors/app_exception.dart';
 import '../storage/token_storage_service.dart';
 import '../utils/logger.dart';
 
 import 'api_path_resolver.dart';
+import 'session_request_context.dart';
 import 'interceptors/token_refresh_interceptor.dart';
 
 class ApiClient {
-  ApiClient({required this.tokenStorage, this.onSessionExpired}) {
+  ApiClient({
+    required this.tokenStorage,
+    this.onSessionExpired,
+    Dio? refreshClient,
+  }) {
     _dio = Dio(
       BaseOptions(
         baseUrl: EnvConfig.apiBaseUrl,
@@ -31,6 +37,7 @@ class ApiClient {
         tokenStorage: tokenStorage,
         onSessionExpired: () => onSessionExpired?.call(),
         dio: _dio,
+        refreshClient: refreshClient,
       ),
       _loggingInterceptor(),
       _errorInterceptor(),
@@ -39,6 +46,8 @@ class ApiClient {
 
   late final Dio _dio;
   final TokenStorageService tokenStorage;
+  SessionCredentialCoordinator get _session =>
+      SessionCredentialCoordinator.forStorage(tokenStorage);
   void Function()? onSessionExpired;
 
   Dio get dio => _dio;
@@ -82,7 +91,7 @@ class ApiClient {
       return await _dio.get<T>(
         path,
         queryParameters: queryParameters,
-        options: options,
+        options: _sessionOptions(options),
         cancelToken: cancelToken,
       );
     } on DioException catch (e) {
@@ -103,7 +112,7 @@ class ApiClient {
         path,
         data: data,
         queryParameters: queryParameters,
-        options: options,
+        options: _sessionOptions(options),
         cancelToken: cancelToken,
       );
     } on DioException catch (e) {
@@ -124,7 +133,7 @@ class ApiClient {
         path,
         data: data,
         queryParameters: queryParameters,
-        options: options,
+        options: _sessionOptions(options),
         cancelToken: cancelToken,
       );
     } on DioException catch (e) {
@@ -145,7 +154,7 @@ class ApiClient {
         path,
         data: data,
         queryParameters: queryParameters,
-        options: options,
+        options: _sessionOptions(options),
         cancelToken: cancelToken,
       );
     } on DioException catch (e) {
@@ -166,7 +175,7 @@ class ApiClient {
         path,
         data: data,
         queryParameters: queryParameters,
-        options: options,
+        options: _sessionOptions(options),
         cancelToken: cancelToken,
       );
     } on DioException catch (e) {
@@ -174,15 +183,81 @@ class ApiClient {
     }
   }
 
-  /// Interceptor to inject bearer auth token
+  Options _sessionOptions(Options? options) => (options ?? Options()).copyWith(
+    extra: {
+      ...?options?.extra,
+      sessionRequestContextKey: SessionRequestContext(_session.epoch),
+    },
+  );
+
+  /// Bind each request to the session that created it, including while secure
+  /// storage reads, refresh and Dio's asynchronous interceptors are pending.
   Interceptor _authInterceptor() {
     return InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await tokenStorage.getAccessToken();
-        if (token != null && token.isNotEmpty) {
-          options.headers[HttpHeaders.authorizationHeader] = 'Bearer $token';
+        if (isPublicAuthRequest(options)) {
+          options.headers.removeWhere(
+            (key, _) => key.toLowerCase() == HttpHeaders.authorizationHeader,
+          );
+          return handler.next(options);
         }
-        return handler.next(options);
+        final context =
+            options.extra[sessionRequestContextKey] as SessionRequestContext? ??
+            SessionRequestContext(_session.epoch);
+        options.extra[sessionRequestContextKey] = context;
+        try {
+          final token = await _session.withStorage(() async {
+            if (!_session.allowsRequests(context.epoch) ||
+                options.cancelToken?.isCancelled == true) {
+              throw staleSessionRequest(options);
+            }
+            final token = await tokenStorage.getAccessToken();
+            if (!_session.allowsRequests(context.epoch) ||
+                options.cancelToken?.isCancelled == true) {
+              throw staleSessionRequest(options);
+            }
+            return token;
+          });
+          context.accessToken = token;
+          options.headers.removeWhere(
+            (key, _) => key.toLowerCase() == HttpHeaders.authorizationHeader,
+          );
+          if (token != null && token.isNotEmpty) {
+            options.headers[HttpHeaders.authorizationHeader] = 'Bearer $token';
+          }
+          return handler.next(options);
+        } catch (error) {
+          return handler.reject(
+            error is DioException
+                ? error
+                : DioException(
+                    requestOptions: options,
+                    error: const SessionExpiredException(),
+                  ),
+          );
+        }
+      },
+      onResponse: (response, handler) {
+        final request = response.requestOptions;
+        final context =
+            request.extra[sessionRequestContextKey] as SessionRequestContext?;
+        if (!isPublicAuthRequest(request) &&
+            context != null &&
+            !_session.allowsRequests(context.epoch)) {
+          return handler.reject(staleSessionRequest(request));
+        }
+        return handler.next(response);
+      },
+      onError: (error, handler) {
+        final request = error.requestOptions;
+        final context =
+            request.extra[sessionRequestContextKey] as SessionRequestContext?;
+        if (!isPublicAuthRequest(request) &&
+            context != null &&
+            !_session.allowsRequests(context.epoch)) {
+          return handler.next(staleSessionRequest(request));
+        }
+        return handler.next(error);
       },
     );
   }

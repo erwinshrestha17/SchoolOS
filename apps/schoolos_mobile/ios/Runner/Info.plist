@@ -28,6 +28,10 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>SchoolOS uses Face ID to unlock your signed-in session on this device. Biometric data never leaves your device.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>SchoolOS uses the camera when you choose to attach a photo to homework or a class activity.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>SchoolOS lets you choose photos to attach to homework, class activities, or a request to your school.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SchoolOS uses your location while a transport trip is active so parents and school staff can see the latest bus position.</string>
 	<key>UIApplicationSceneManifest</key>

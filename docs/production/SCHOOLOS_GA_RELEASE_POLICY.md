@@ -154,6 +154,22 @@ flutter build apk --debug
 flutter build ios --no-codesign
 ```
 
+Before a mobile release build, run the platform-specific configuration preflight
+from the repository root and use its `--build` mode to compile the validated Dart
+define file into the store artifact:
+
+```bash
+pnpm verify:mobile-release android /absolute/path/to/android-defines.json --build
+pnpm verify:mobile-release ios /absolute/path/to/ios-defines.json --build
+```
+
+The [mobile guide](../../apps/schoolos_mobile/MOBILE_MASTER_GUIDE.md#production-build-configuration)
+owns configuration-file setup. Missing registered identities, upload signing
+material, HTTPS API configuration, or platform Firebase configuration blocks
+release packaging. A preflight pass is only configuration evidence; signed store
+artifacts, the size evidence in section 4.5, provider delivery, and device/pilot
+validation are still required. Wave 0/1 GA helpers include both platform preflights.
+
 Local verification is necessary but insufficient for GA. GA also requires the staging, provider, browser/device, backup/restore, operational, and controlled-pilot evidence in this policy.
 
 ---
