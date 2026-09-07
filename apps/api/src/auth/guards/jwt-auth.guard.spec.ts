@@ -26,6 +26,7 @@ describe('JwtAuthGuard', () => {
     runWithTenantScope: jest.Mock;
     tenant: { findUnique: jest.Mock };
     user: { findUnique: jest.Mock };
+    refreshToken: { findFirst: jest.Mock };
     supportOverride: { findFirst: jest.Mock };
     userRole: { findMany: jest.Mock };
   };
@@ -34,6 +35,7 @@ describe('JwtAuthGuard', () => {
 
   const basePayload: JwtAccessPayload = {
     sub: 'user-1',
+    sid: 'family-1',
     tenantId: 'tenant-1',
     tenantSlug: 'stale-signed-slug',
     securityDomain: SecurityDomain.PLATFORM,
@@ -119,6 +121,7 @@ describe('JwtAuthGuard', () => {
       user: {
         findUnique: jest.fn().mockResolvedValue(mockUser),
       },
+      refreshToken: { findFirst: jest.fn().mockResolvedValue({ id: 'session-1' }) },
       supportOverride: {
         findFirst: jest.fn(),
       },

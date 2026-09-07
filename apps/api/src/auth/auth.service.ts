@@ -2,6 +2,7 @@ import {
   AuthMethod,
   OtpPurpose,
   UserStatus,
+  type Prisma,
   type SecurityDomain,
   type Tenant,
   type User,
@@ -12,7 +13,6 @@ import {
   ForbiddenException,
   HttpException,
   Injectable,
-  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -54,8 +54,6 @@ const LOGIN_LOCK_MINUTES = 15;
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -176,8 +174,6 @@ export class AuthService {
       challenge.sub,
     );
 
-    await this.consumeOtpCode(user.id, OtpPurpose.LOGIN, dto.code);
-
     return this.completeAuthenticatedSession(
       user,
       tenant,
@@ -185,6 +181,7 @@ export class AuthService {
       requestMeta,
       {
         action: user.authMethod === AuthMethod.BOTH ? 'login_mfa' : 'login_otp',
+        otpCode: dto.code,
       },
     );
   }
@@ -245,51 +242,72 @@ export class AuthService {
       dto.email,
     );
 
-    if (!user.passwordHash) {
-      throw new UnauthorizedException('Invalid recovery code');
-    }
-
-    await this.consumeOtpCode(
+    await this.withAuthUserTransaction(
+      tenant.id,
       user.id,
-      OtpPurpose.RESET,
-      dto.code,
-      'Your reset link is invalid or expired.',
+      async (tx, currentUser) => {
+        if (
+          !currentUser.passwordHash ||
+          currentUser.authMethod === AuthMethod.OTP ||
+          currentUser.email !== dto.email
+        ) {
+          throw new UnauthorizedException('Invalid recovery code');
+        }
+
+        // A rejected password or a failed revocation/audit must roll back code
+        // consumption too. The same code can then be corrected and retried.
+        await this.consumeOtpCode(
+          user.id,
+          OtpPurpose.RESET,
+          dto.code,
+          'Your reset link is invalid or expired.',
+          tx,
+        );
+        if (await bcrypt.compare(dto.newPassword, currentUser.passwordHash)) {
+          throw new BadRequestException(
+            'New password cannot be the same as current password.',
+          );
+        }
+        assertStrongPassword(
+          dto.newPassword,
+          await this.getPasswordIdentityHints(user.id, currentUser.email, tx),
+        );
+        const recoveredPasswordHash = await bcrypt.hash(
+          dto.newPassword,
+          this.configService.bcryptRounds,
+        );
+        await tx.user.update({
+          where: { id: user.id, tenantId: tenant.id },
+          data: {
+            passwordHash: recoveredPasswordHash,
+            mustChangePassword: false,
+          },
+        });
+        await this.revokeUserSessions(
+          user.id,
+          { reason: 'password_recovery' },
+          tx,
+        );
+        // Outstanding login/MFA challenges and registered push destinations from
+        // before recovery must not survive the credential reset.
+        await tx.otpCode.updateMany({
+          where: { userId: user.id, usedAt: null },
+          data: { usedAt: new Date() },
+        });
+        await tx.mobilePushToken.deleteMany({
+          where: { tenantId: tenant.id, userId: user.id },
+        });
+        await this.auditService.record(
+          {
+            action: 'password_recovery_complete',
+            resource: 'auth',
+            tenantId: tenant.id,
+            userId: user.id,
+          },
+          tx,
+        );
+      },
     );
-
-    if (await bcrypt.compare(dto.newPassword, user.passwordHash)) {
-      throw new BadRequestException(
-        'New password cannot be the same as current password.',
-      );
-    }
-
-    assertStrongPassword(
-      dto.newPassword,
-      await this.getPasswordIdentityHints(user.id, user.email),
-    );
-
-    const recoveredPasswordHash = await bcrypt.hash(
-      dto.newPassword,
-      this.configService.bcryptRounds,
-    );
-
-    await this.preAuth(() =>
-      this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          passwordHash: recoveredPasswordHash,
-          mustChangePassword: false,
-        },
-      }),
-    );
-
-    await this.revokeUserSessions(user.id);
-
-    await this.auditService.record({
-      action: 'password_recovery_complete',
-      resource: 'auth',
-      tenantId: tenant.id,
-      userId: user.id,
-    });
 
     return { success: true };
   }
@@ -331,77 +349,79 @@ export class AuthService {
     requestMeta?: RequestMeta,
   ) {
     assertPasswordsMatch(dto.newPassword, dto.confirmNewPassword);
-    const { tenant, user } = await this.resolveTenantAndUserById(
+    const logoutOtherDevices = dto.logoutOtherDevices ?? true;
+    await this.withAuthUserTransaction(
       auth.tenantId,
       auth.userId,
-    );
-
-    if (!user.passwordHash) {
-      throw new BadRequestException('Current password is incorrect.');
-    }
-
-    const currentPasswordMatches = await bcrypt.compare(
-      dto.currentPassword,
-      user.passwordHash,
-    );
-
-    if (!currentPasswordMatches) {
-      throw new BadRequestException('Current password is incorrect.');
-    }
-
-    if (await bcrypt.compare(dto.newPassword, user.passwordHash)) {
-      throw new BadRequestException(
-        'New password cannot be the same as current password.',
-      );
-    }
-
-    assertStrongPassword(
-      dto.newPassword,
-      await this.getPasswordIdentityHints(user.id, user.email),
-    );
-
-    const currentSessionId = await this.resolveRefreshSessionId(
-      cookieHeader,
-      undefined,
-    );
-    const logoutOtherDevices = dto.logoutOtherDevices ?? true;
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        passwordHash: await bcrypt.hash(
+      async (tx, user) => {
+        const current = await this.resolveCurrentSession(
+          auth,
+          cookieHeader,
+          undefined,
+          tx,
+        );
+        if (auth.sessionFamilyId && !current)
+          throw new UnauthorizedException('Session has ended');
+        if (
+          !user.passwordHash ||
+          !(await bcrypt.compare(dto.currentPassword, user.passwordHash))
+        ) {
+          throw new BadRequestException('Current password is incorrect.');
+        }
+        if (await bcrypt.compare(dto.newPassword, user.passwordHash)) {
+          throw new BadRequestException(
+            'New password cannot be the same as current password.',
+          );
+        }
+        assertStrongPassword(
           dto.newPassword,
-          this.configService.bcryptRounds,
-        ),
-        mustChangePassword: false,
-        failedLoginCount: 0,
-        lockedUntil: null,
+          await this.getPasswordIdentityHints(user.id, user.email, tx),
+        );
+        await tx.user.update({
+          where: { id: user.id, tenantId: user.tenantId },
+          data: {
+            passwordHash: await bcrypt.hash(
+              dto.newPassword,
+              this.configService.bcryptRounds,
+            ),
+            mustChangePassword: false,
+            failedLoginCount: 0,
+            lockedUntil: null,
+          },
+        });
+        // Do not leave a pre-change recovery/login challenge as a credential bypass.
+        await tx.otpCode.updateMany({
+          where: { userId: user.id, usedAt: null },
+          data: { usedAt: new Date() },
+        });
+        if (logoutOtherDevices)
+          await this.revokeUserSessions(
+            user.id,
+            {
+              exceptRefreshTokenId: current?.id,
+              reason: 'password_change',
+            },
+            tx,
+          );
+        await this.auditService.record(
+          {
+            action: 'change_password',
+            resource: 'auth',
+            tenantId: user.tenantId,
+            userId: user.id,
+            after: {
+              logoutOtherDevices,
+              otherSessionsRevoked: logoutOtherDevices,
+            },
+            ipAddress: requestMeta?.ipAddress,
+            userAgent: requestMeta?.userAgent,
+            requestId: requestMeta?.requestId,
+          },
+          tx,
+        );
       },
-    });
-
-    if (logoutOtherDevices) {
-      await this.revokeUserSessions(user.id, {
-        exceptRefreshTokenId: currentSessionId,
-        reason: 'password_change',
-      });
-    }
-
-    await this.auditService.record({
-      action: 'change_password',
-      resource: 'auth',
-      tenantId: tenant.id,
-      userId: user.id,
-      after: {
-        logoutOtherDevices,
-        otherSessionsRevoked: logoutOtherDevices,
-      },
-      ipAddress: requestMeta?.ipAddress,
-      userAgent: requestMeta?.userAgent,
-      requestId: requestMeta?.requestId,
-    });
-
+    );
     this.clearAccessCookie(response);
-
     return {
       success: true,
       message: logoutOtherDevices
@@ -449,35 +469,46 @@ export class AuthService {
       throw new BadRequestException('Invalid auth method');
     }
 
-    const { tenant, user } = await this.resolveTenantAndUserById(
+    await this.withAuthUserTransaction(
       auth.tenantId,
       auth.userId,
-    );
-
-    await this.consumeOtpCode(user.id, OtpPurpose.VERIFY, dto.code);
-
-    const updatedUser = await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        authMethod: dto.authMethod,
+      async (tx, user) => {
+        if (
+          auth.sessionFamilyId &&
+          !(await this.resolveCurrentSession(auth, undefined, undefined, tx))
+        ) {
+          throw new UnauthorizedException('Session has ended');
+        }
+        await this.consumeOtpCode(
+          user.id,
+          OtpPurpose.VERIFY,
+          dto.code,
+          undefined,
+          tx,
+        );
+        await tx.user.update({
+          where: { id: user.id, tenantId: user.tenantId },
+          data: { authMethod: dto.authMethod },
+        });
+        await this.revokeUserSessions(user.id, { reason: 'mfa_change' }, tx);
+        await tx.otpCode.updateMany({
+          where: { userId: user.id, usedAt: null },
+          data: { usedAt: new Date() },
+        });
+        await this.auditService.record(
+          {
+            action: 'mfa_setup_confirm',
+            resource: 'auth',
+            tenantId: user.tenantId,
+            userId: user.id,
+            before: { authMethod: user.authMethod },
+            after: { authMethod: dto.authMethod },
+          },
+          tx,
+        );
       },
-    });
-
-    await this.revokeUserSessions(user.id);
-
-    await this.auditService.record({
-      action: 'mfa_setup_confirm',
-      resource: 'auth',
-      tenantId: tenant.id,
-      userId: user.id,
-      before: { authMethod: user.authMethod },
-      after: { authMethod: dto.authMethod },
-    });
-
-    return {
-      authMethod: updatedUser.authMethod,
-      success: true,
-    };
+    );
+    return { authMethod: dto.authMethod, success: true };
   }
 
   async refresh(
@@ -486,139 +517,130 @@ export class AuthService {
     cookieHeader?: string,
     requestMeta?: RequestMeta,
   ) {
-    try {
-      const cookieName = this.getRefreshCookieName();
-      if (!cookieHeader && !dto.refreshToken) {
-        throw new UnauthorizedException('Refresh token is required');
-      }
-
-      const rawToken =
-        dto.refreshToken ?? parseCookie(cookieHeader, cookieName);
-
-      if (!rawToken) {
-        throw new UnauthorizedException('Refresh token is invalid');
-      }
-
-      const hashV2 = hmacToken(rawToken, this.configService.tokenHashPepper);
-      const hashV1 = hashToken(rawToken);
-
-      const existingSession = await this.prisma.refreshToken.findFirst({
-        where: {
-          OR: [
-            { tokenHash: hashV2, hashVersion: 2 },
-            { tokenHash: hashV1, hashVersion: 1 },
-          ],
-        },
-        include: {
-          user: {
-            include: this.userAuthInclude,
+    const rawToken =
+      dto.refreshToken ??
+      parseCookie(cookieHeader, this.getRefreshCookieName());
+    if (!rawToken) throw new UnauthorizedException('Refresh token is required');
+    const existingSession = await this.prisma.refreshToken.findFirst({
+      where: {
+        OR: [
+          {
+            tokenHash: hmacToken(rawToken, this.configService.tokenHashPepper),
+            hashVersion: 2,
           },
-        },
-      });
+          { tokenHash: hashToken(rawToken), hashVersion: 1 },
+        ],
+      },
+      include: { user: { include: this.userAuthInclude } },
+    });
+    if (!existingSession)
+      throw new UnauthorizedException('Refresh token is invalid');
 
-      if (!existingSession) {
-        throw new UnauthorizedException('Refresh token is invalid');
-      }
-
-      if (existingSession.revokedAt) {
-        // Suspicious refresh token reuse! Revoke all sessions in the family.
-        const familyId = existingSession.familyId ?? existingSession.id;
-        await this.revokeRefreshTokenFamily(familyId);
-
-        await this.auditService.record({
-          action: 'suspicious_refresh_token_reuse',
-          resource: 'auth',
-          tenantId: existingSession.user.tenantId,
-          userId: existingSession.userId,
-          ipAddress: requestMeta?.ipAddress,
-          userAgent: requestMeta?.userAgent,
-          requestId: requestMeta?.requestId,
-          after: {
-            tokenId: existingSession.id,
-            familyId,
-            revokedAt: existingSession.revokedAt.toISOString(),
-          },
+    const result = await this.withAuthUserTransaction(
+      existingSession.user.tenantId,
+      existingSession.userId,
+      async (tx, user) => {
+        const current = await tx.refreshToken.findFirst({
+          where: { id: existingSession.id, userId: user.id },
         });
-
-        throw new UnauthorizedException('Refresh token is invalid');
-      }
-
-      if (existingSession.expiresAt.getTime() < Date.now()) {
-        throw new UnauthorizedException('Refresh token is invalid');
-      }
-
-      this.assertUserIsActive(existingSession.user);
-
-      const tenant = await this.prisma.tenant.findUnique({
-        where: { id: existingSession.user.tenantId },
-      });
-
-      if (!tenant) {
-        throw new UnauthorizedException('Tenant not found');
-      }
-
-      if (!tenant.isActive) {
-        throw new UnauthorizedException('Tenant is not active');
-      }
-
-      const authContext = this.buildAuthContext(
-        existingSession.user,
-        tenant.slug,
-        tenant.securityDomain,
-      );
-
-      const userAgent = requestMeta?.userAgent?.toLowerCase();
-      const isMobile = userAgent
-        ? userAgent.includes('dart') || userAgent.includes('flutter')
-        : undefined;
-
-      const session = await this.issueSession(authContext, requestMeta, {
-        id: existingSession.id,
-        familyId: existingSession.familyId ?? existingSession.id,
-      });
-
-      await this.prisma.refreshToken.update({
-        where: { id: existingSession.id },
-        data: {
-          revokedAt: new Date(),
-          revokedReason: 'rotated',
-          replacedByTokenId: session.id,
-        },
-      });
-
-      this.attachRefreshCookie(response, session.refreshToken);
-      this.attachAccessCookie(response, session.accessToken);
-      this.attachCsrfCookie(
-        response,
-        generateCsrfToken(this.configService.jwtSecret),
-      );
-
-      await this.auditService.record({
-        action: 'refresh',
-        resource: 'auth',
-        tenantId: authContext.tenantId,
-        userId: authContext.userId,
-        ipAddress: requestMeta?.ipAddress,
-        userAgent: requestMeta?.userAgent,
-        requestId: requestMeta?.requestId,
-      });
-
-      return this.buildAuthSession(
-        session.accessToken,
-        authContext,
-        tenant,
-        session.refreshToken,
-        isMobile,
-        existingSession.user.guardian?.fullName,
-      );
-    } catch (error) {
-      if (error instanceof Error) {
-        this.logger.error(`Refresh failed: ${error.message}`, error.stack);
-      } else {
-        this.logger.error('Refresh failed with a non-Error value');
-      }
-      throw error;
-    }
+        if (!current) return { invalid: true as const };
+        if (current.revokedAt) {
+          const familyId = current.familyId ?? current.id;
+          await this.revokeRefreshTokenFamily(familyId, user.id, tx);
+          await this.auditService.record(
+            {
+              action: 'suspicious_refresh_token_reuse',
+              resource: 'auth',
+              tenantId: user.tenantId,
+              userId: user.id,
+              ipAddress: requestMeta?.ipAddress,
+              userAgent: requestMeta?.userAgent,
+              requestId: requestMeta?.requestId,
+              after: {
+                tokenId: current.id,
+                familyId,
+                revokedAt: current.revokedAt.toISOString(),
+              },
+            },
+            tx,
+          );
+          // Return, don't throw here: the family revocation must commit.
+          return { invalid: true as const };
+        }
+        if (current.expiresAt.getTime() <= Date.now())
+          return { invalid: true as const };
+        const tenant = await tx.tenant.findUnique({
+          where: { id: user.tenantId },
+        });
+        if (!tenant?.isActive)
+          throw new UnauthorizedException('Tenant is not active');
+        const authContext = this.buildAuthContext(
+          user,
+          tenant.slug,
+          tenant.securityDomain,
+        );
+        const claimed = await tx.refreshToken.updateMany({
+          where: {
+            id: current.id,
+            userId: user.id,
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+          data: { revokedAt: new Date(), revokedReason: 'rotated' },
+        });
+        if (claimed.count !== 1) return { invalid: true as const };
+        const session = await this.issueSession(
+          authContext,
+          requestMeta,
+          { id: current.id, familyId: current.familyId ?? current.id },
+          tx,
+        );
+        await tx.refreshToken.update({
+          where: { id: current.id, userId: user.id },
+          data: { replacedByTokenId: session.id },
+        });
+        await this.auditService.record(
+          {
+            action: 'refresh',
+            resource: 'auth',
+            tenantId: user.tenantId,
+            userId: user.id,
+            ipAddress: requestMeta?.ipAddress,
+            userAgent: requestMeta?.userAgent,
+            requestId: requestMeta?.requestId,
+          },
+          tx,
+        );
+        return {
+          invalid: false as const,
+          session,
+          authContext,
+          tenant,
+          guardianName: user.guardian?.fullName,
+        };
+      },
+    );
+    if (result.invalid)
+      throw new UnauthorizedException('Refresh token is invalid');
+    const { session, authContext, tenant } = result;
+    this.attachRefreshCookie(response, session.refreshToken);
+    this.attachAccessCookie(response, session.accessToken);
+    this.attachCsrfCookie(
+      response,
+      generateCsrfToken(this.configService.jwtSecret),
+    );
+    const userAgent = requestMeta?.userAgent?.toLowerCase();
+    const isMobile = userAgent
+      ? userAgent.includes('dart') || userAgent.includes('flutter')
+      : undefined;
+    return this.buildAuthSession(
+      session.accessToken,
+      authContext,
+      tenant,
+      session.refreshToken,
+      isMobile,
+      result.guardianName,
+    );
   }
 
   async logout(
@@ -627,79 +649,78 @@ export class AuthService {
     cookieHeader?: string,
     requestMeta?: RequestMeta,
   ) {
-    const cookieName = this.getRefreshCookieName();
-    const rawToken = dto.refreshToken ?? parseCookie(cookieHeader, cookieName);
-
-    if (rawToken) {
-      const hashV2 = hmacToken(rawToken, this.configService.tokenHashPepper);
-      const hashV1 = hashToken(rawToken);
-
-      await this.prisma.refreshToken.updateMany({
-        where: {
-          tokenHash: { in: [hashV1, hashV2] },
-          revokedAt: null,
-        },
-        data: {
-          revokedAt: new Date(),
-          revokedReason: 'logout',
-        },
-      });
-    }
-
-    this.clearRefreshCookie(response);
-    this.clearAccessCookie(response);
-
-    const session = rawToken
-      ? await this.prisma.refreshToken.findFirst({
-          where: {
-            tokenHash: {
-              in: [
-                hashToken(rawToken),
-                hmacToken(rawToken, this.configService.tokenHashPepper),
+    try {
+      const rawToken =
+        dto.refreshToken ??
+        parseCookie(cookieHeader, this.getRefreshCookieName());
+      const session = rawToken
+        ? await this.prisma.refreshToken.findFirst({
+            where: {
+              OR: [
+                {
+                  tokenHash: hmacToken(
+                    rawToken,
+                    this.configService.tokenHashPepper,
+                  ),
+                  hashVersion: 2,
+                },
+                { tokenHash: hashToken(rawToken), hashVersion: 1 },
               ],
             },
-          },
-          include: { user: true },
-        })
-      : null;
-
-    if (session?.user) {
-      let revokedPushTokenCount = 0;
-      if (dto.installationId) {
-        const result = await this.prisma.runWithTenantScope(
+            include: { user: true },
+          })
+        : null;
+      if (session?.user) {
+        await this.withAuthUserTransaction(
           session.user.tenantId,
-          () =>
-            this.prisma.mobilePushToken.deleteMany({
-              where: {
+          session.userId,
+          async (tx) => {
+            // A cookie can carry the predecessor during an in-flight rotation.
+            // End the family, not just the particular refresh-token row.
+            await this.revokeRefreshTokenFamily(
+              session.familyId ?? session.id,
+              session.userId,
+              tx,
+              'logout',
+            );
+            const removed = dto.installationId
+              ? await tx.mobilePushToken.deleteMany({
+                  where: {
+                    tenantId: session.user.tenantId,
+                    userId: session.userId,
+                    installationId: dto.installationId,
+                  },
+                })
+              : null;
+            await this.auditService.record(
+              {
+                action: 'logout',
+                resource: 'auth',
                 tenantId: session.user.tenantId,
                 userId: session.userId,
-                installationId: dto.installationId,
+                ipAddress: requestMeta?.ipAddress,
+                userAgent: requestMeta?.userAgent,
+                requestId: requestMeta?.requestId,
+                ...(dto.installationId
+                  ? {
+                      after: {
+                        installationId: dto.installationId,
+                        pushTokenRevoked: (removed?.count ?? 0) > 0,
+                      },
+                    }
+                  : {}),
               },
-            }),
+              tx,
+            );
+          },
+          true,
         );
-        revokedPushTokenCount = result.count;
       }
-
-      await this.auditService.record({
-        action: 'logout',
-        resource: 'auth',
-        tenantId: session.user.tenantId,
-        userId: session.userId,
-        ipAddress: requestMeta?.ipAddress,
-        userAgent: requestMeta?.userAgent,
-        requestId: requestMeta?.requestId,
-        ...(dto.installationId
-          ? {
-              after: {
-                installationId: dto.installationId,
-                pushTokenRevoked: revokedPushTokenCount > 0,
-              },
-            }
-          : {}),
-      });
+      return { success: true };
+    } finally {
+      this.clearRefreshCookie(response);
+      this.clearAccessCookie(response);
     }
-
-    return { success: true };
   }
 
   async listSessions(auth: AuthContext) {
@@ -725,30 +746,42 @@ export class AuthService {
   }
 
   async revokeSession(sessionId: string, auth: AuthContext) {
-    const result = await this.prisma.refreshToken.updateMany({
-      where: {
-        id: sessionId,
-        userId: auth.userId,
-        revokedAt: null,
+    await this.withAuthUserTransaction(
+      auth.tenantId,
+      auth.userId,
+      async (tx) => {
+        if (
+          auth.sessionFamilyId &&
+          !(await this.resolveCurrentSession(auth, undefined, undefined, tx))
+        ) {
+          throw new UnauthorizedException('Session has ended');
+        }
+        const selected = await tx.refreshToken.findFirst({
+          where: { id: sessionId, userId: auth.userId },
+        });
+        if (!selected)
+          throw new NotFoundException('Active session was not found');
+        const familyId = selected.familyId ?? selected.id;
+        const result = await this.revokeRefreshTokenFamily(
+          familyId,
+          auth.userId,
+          tx,
+          'user_revoked_session',
+        );
+        if (result.count === 0)
+          throw new NotFoundException('Active session was not found');
+        await this.auditService.record(
+          {
+            action: 'revoke_session',
+            resource: 'auth',
+            tenantId: auth.tenantId,
+            userId: auth.userId,
+            resourceId: sessionId,
+          },
+          tx,
+        );
       },
-      data: {
-        revokedAt: new Date(),
-        revokedReason: 'user_revoked_session',
-      },
-    });
-
-    if (result.count === 0) {
-      throw new NotFoundException('Active session was not found');
-    }
-
-    await this.auditService.record({
-      action: 'revoke_session',
-      resource: 'auth',
-      tenantId: auth.tenantId,
-      userId: auth.userId,
-      resourceId: sessionId,
-    });
-
+    );
     return { success: true as const };
   }
 
@@ -757,30 +790,40 @@ export class AuthService {
     dto: { refreshToken?: string },
     cookieHeader?: string,
   ) {
-    const currentSessionId = await this.resolveRefreshSessionId(
-      cookieHeader,
-      dto.refreshToken,
+    await this.withAuthUserTransaction(
+      auth.tenantId,
+      auth.userId,
+      async (tx) => {
+        const current = await this.resolveCurrentSession(
+          auth,
+          cookieHeader,
+          dto.refreshToken,
+          tx,
+        );
+        if (!current)
+          throw new BadRequestException(
+            'Your current session could not be identified. Sign in again and retry.',
+          );
+        await this.revokeUserSessions(
+          auth.userId,
+          {
+            exceptRefreshTokenId: current.id,
+            reason: 'user_revoked_other_sessions',
+          },
+          tx,
+        );
+        await this.auditService.record(
+          {
+            action: 'revoke_other_sessions',
+            resource: 'auth',
+            tenantId: auth.tenantId,
+            userId: auth.userId,
+            after: { keptSessionId: current.id },
+          },
+          tx,
+        );
+      },
     );
-
-    if (!currentSessionId) {
-      throw new BadRequestException(
-        'Your current session could not be identified. Sign in again and retry.',
-      );
-    }
-
-    await this.revokeUserSessions(auth.userId, {
-      exceptRefreshTokenId: currentSessionId,
-      reason: 'user_revoked_other_sessions',
-    });
-
-    await this.auditService.record({
-      action: 'revoke_other_sessions',
-      resource: 'auth',
-      tenantId: auth.tenantId,
-      userId: auth.userId,
-      after: { keptSessionId: currentSessionId },
-    });
-
     return { success: true as const };
   }
 
@@ -908,42 +951,74 @@ export class AuthService {
     tenant: Tenant,
     response: Response,
     requestMeta?: RequestMeta,
-    audit?: { action: string },
+    audit?: { action: string; otpCode?: string },
   ) {
-    await this.preAuth(() =>
-      this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          lastLoginAt: new Date(),
-          failedLoginCount: 0,
-          lockedUntil: null,
-        },
-      }),
+    const { authContext, session } = await this.withAuthUserTransaction(
+      tenant.id,
+      user.id,
+      async (tx, currentUser) => {
+        if (
+          currentUser.passwordHash !== user.passwordHash ||
+          currentUser.authMethod !== user.authMethod ||
+          currentUser.email !== user.email
+        ) {
+          throw new UnauthorizedException(
+            'Credentials changed. Sign in again.',
+          );
+        }
+        if (audit?.otpCode !== undefined) {
+          await this.consumeOtpCode(
+            user.id,
+            OtpPurpose.LOGIN,
+            audit.otpCode,
+            undefined,
+            tx,
+          );
+        }
+        await tx.user.update({
+          where: { id: user.id, tenantId: tenant.id },
+          data: {
+            lastLoginAt: new Date(),
+            failedLoginCount: 0,
+            lockedUntil: null,
+          },
+        });
+        const authContext = this.buildAuthContext(
+          currentUser,
+          tenant.slug,
+          tenant.securityDomain,
+        );
+        const session = await this.issueSession(
+          authContext,
+          requestMeta,
+          undefined,
+          tx,
+        );
+        await this.auditService.record(
+          {
+            action: audit?.action ?? 'login',
+            resource: 'auth',
+            tenantId: tenant.id,
+            userId: user.id,
+            after: {
+              email: authContext.email,
+              authMethod: authContext.authMethod,
+            },
+            ipAddress: requestMeta?.ipAddress,
+            userAgent: requestMeta?.userAgent,
+            requestId: requestMeta?.requestId,
+          },
+          tx,
+        );
+        return { authContext, session };
+      },
     );
-
-    const authContext = this.buildAuthContext(
-      user,
-      tenant.slug,
-      tenant.securityDomain,
-    );
-    const session = await this.issueSession(authContext, requestMeta);
     this.attachRefreshCookie(response, session.refreshToken);
     this.attachAccessCookie(response, session.accessToken);
     this.attachCsrfCookie(
       response,
       generateCsrfToken(this.configService.jwtSecret),
     );
-
-    await this.auditService.record({
-      action: audit?.action ?? 'login',
-      resource: 'auth',
-      tenantId: authContext.tenantId,
-      userId: authContext.userId,
-      after: { email: authContext.email, authMethod: authContext.authMethod },
-      ipAddress: requestMeta?.ipAddress,
-      userAgent: requestMeta?.userAgent,
-      requestId: requestMeta?.requestId,
-    });
 
     const userAgent = requestMeta?.userAgent?.toLowerCase();
     const isMobile = userAgent
@@ -971,6 +1046,41 @@ export class AuthService {
     return this.prisma.runWithoutTenantScope(
       'authentication: user lookup before tenant context is established',
       fn,
+    );
+  }
+
+  private withAuthUserTransaction<T>(
+    tenantId: string,
+    userId: string,
+    work: (tx: Prisma.TransactionClient, user: UserWithRoles) => Promise<T>,
+    allowInactive = false,
+  ): Promise<T> {
+    return this.prisma.runWithTenantScope(tenantId, () =>
+      this.prisma.$transaction(
+        async (tx) => {
+          // Liveness and the resolved tenant are rechecked after acquiring locks.
+          // This does not authorize a caller-supplied tenant or user identifier.
+          const tenants = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "Tenant" WHERE "id" = ${tenantId} AND ("isActive" = true OR ${allowInactive}) FOR SHARE
+        `;
+          if (tenants.length !== 1)
+            throw new UnauthorizedException('Invalid authentication context');
+          const users = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "User" WHERE "id" = ${userId} AND "tenantId" = ${tenantId} FOR UPDATE
+        `;
+          if (users.length !== 1)
+            throw new UnauthorizedException('Invalid authentication context');
+          const user = await tx.user.findUnique({
+            where: { id: userId, tenantId },
+            include: this.userAuthInclude,
+          });
+          if (!user)
+            throw new UnauthorizedException('Invalid authentication context');
+          if (!allowInactive) this.assertUserIsActive(user);
+          return work(tx, user);
+        },
+        { timeout: 10000 },
+      ),
     );
   }
 
@@ -1109,20 +1219,33 @@ export class AuthService {
       );
     }
 
-    await this.assertOtpIssueAllowed(input.user.id, input.purpose);
-    await this.invalidateActiveOtps(input.user.id, input.purpose);
-
     const code = generateOtpCode(this.configService.otpLength);
     const expiresAt = new Date(Date.now() + input.ttlMinutes * 60 * 1000);
-
-    await this.prisma.otpCode.create({
-      data: {
-        userId: input.user.id,
-        codeHash: hashOtpCode(code),
-        purpose: input.purpose,
-        expiresAt,
+    await this.withAuthUserTransaction(
+      input.tenant.id,
+      input.user.id,
+      async (tx, currentUser) => {
+        if (
+          currentUser.email !== input.user.email ||
+          (input.purpose === OtpPurpose.RESET &&
+            currentUser.authMethod === AuthMethod.OTP)
+        ) {
+          throw new UnauthorizedException('Invalid authentication context');
+        }
+        // Serialize limit checking and replacement with recovery, including when
+        // multiple API processes handle simultaneous requests for this account.
+        await this.assertOtpIssueAllowed(input.user.id, input.purpose, tx);
+        await this.invalidateActiveOtps(input.user.id, input.purpose, tx);
+        await tx.otpCode.create({
+          data: {
+            userId: input.user.id,
+            codeHash: hashOtpCode(code),
+            purpose: input.purpose,
+            expiresAt,
+          },
+        });
       },
-    });
+    );
 
     await this.notificationsService.sendAuthCodeEmail({
       tenantId: input.tenant.id,
@@ -1159,42 +1282,52 @@ export class AuthService {
     purpose: OtpPurpose,
     code: string,
     invalidMessage = 'Invalid or expired verification code',
+    client: Prisma.TransactionClient = this.prisma,
   ) {
-    const otpCode = await this.prisma.otpCode.findFirst({
+    const otpCode = await client.otpCode.findFirst({
       where: {
         userId,
         purpose,
         usedAt: null,
-        expiresAt: {
-          gt: new Date(),
-        },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
 
-    if (otpCode?.codeHash !== hashOtpCode(code)) {
+    if (
+      !otpCode ||
+      otpCode.codeHash !== hashOtpCode(code) ||
+      otpCode.expiresAt <= new Date()
+    ) {
       throw new UnauthorizedException(invalidMessage);
     }
 
-    await this.prisma.otpCode.update({
-      where: { id: otpCode.id },
+    // A compare-and-set, not an unconditional update: only one concurrent
+    // verifier may win, and expiry/replacement is rechecked at the write.
+    const consumed = await client.otpCode.updateMany({
+      where: {
+        id: otpCode.id,
+        userId,
+        purpose,
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
       data: { usedAt: new Date() },
     });
+    if (consumed.count !== 1) throw new UnauthorizedException(invalidMessage);
 
     return otpCode;
   }
 
-  private async invalidateActiveOtps(userId: string, purpose: OtpPurpose) {
-    await this.prisma.otpCode.updateMany({
+  private async invalidateActiveOtps(
+    userId: string,
+    purpose: OtpPurpose,
+    client: Prisma.TransactionClient = this.prisma,
+  ) {
+    await client.otpCode.updateMany({
       where: {
         userId,
         purpose,
         usedAt: null,
-        expiresAt: {
-          gt: new Date(),
-        },
       },
       data: {
         usedAt: new Date(),
@@ -1202,8 +1335,12 @@ export class AuthService {
     });
   }
 
-  private async assertOtpIssueAllowed(userId: string, purpose: OtpPurpose) {
-    const recentOtpCount = await this.prisma.otpCode.count({
+  private async assertOtpIssueAllowed(
+    userId: string,
+    purpose: OtpPurpose,
+    client: Prisma.TransactionClient = this.prisma,
+  ) {
+    const recentOtpCount = await client.otpCode.count({
       where: {
         userId,
         purpose,
@@ -1229,8 +1366,9 @@ export class AuthService {
       exceptRefreshTokenId?: string | null;
       reason?: string;
     } = {},
+    client: Prisma.TransactionClient = this.prisma,
   ) {
-    await this.prisma.refreshToken.updateMany({
+    return client.refreshToken.updateMany({
       where: {
         userId,
         revokedAt: null,
@@ -1245,10 +1383,23 @@ export class AuthService {
     });
   }
 
-  private async resolveRefreshSessionId(
+  private async resolveCurrentSession(
+    auth: AuthContext,
     cookieHeader?: string,
     refreshToken?: string,
+    client: Prisma.TransactionClient = this.prisma,
   ) {
+    if (auth.sessionFamilyId) {
+      return client.refreshToken.findFirst({
+        where: {
+          userId: auth.userId,
+          familyId: auth.sessionFamilyId,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        select: { id: true },
+      });
+    }
     const rawToken =
       refreshToken?.trim() ||
       parseCookie(cookieHeader, this.getRefreshCookieName());
@@ -1256,8 +1407,9 @@ export class AuthService {
       return null;
     }
 
-    const session = await this.prisma.refreshToken.findFirst({
+    const session = await client.refreshToken.findFirst({
       where: {
+        userId: auth.userId,
         OR: [
           {
             tokenHash: hmacToken(rawToken, this.configService.tokenHashPepper),
@@ -1271,15 +1423,19 @@ export class AuthService {
       select: { id: true },
     });
 
-    return session?.id ?? null;
+    return session;
   }
 
-  private async getPasswordIdentityHints(userId: string, email: string | null) {
+  private async getPasswordIdentityHints(
+    userId: string,
+    email: string | null,
+    client: Prisma.TransactionClient = this.prisma,
+  ) {
     // Reached from both the unauthenticated recovery flow and authenticated
     // password change; the bypass only takes effect when no tenant context
     // exists, so the authenticated path stays tenant-scoped.
     const user = await this.preAuth(() =>
-      this.prisma.user.findUnique({
+      client.user.findUnique({
         where: { id: userId },
         select: {
           email: true,
@@ -1404,6 +1560,7 @@ export class AuthService {
     authContext: AuthContext,
     requestMeta?: RequestMeta,
     parentSession?: { id: string; familyId: string | null },
+    client: Prisma.TransactionClient = this.prisma,
   ) {
     const userAgent = requestMeta?.userAgent?.toLowerCase();
     const isMobile = ['dart', 'flutter'].some(
@@ -1413,8 +1570,11 @@ export class AuthService {
       ? this.configService.jwtAudienceMobile
       : this.configService.jwtAudienceWeb;
 
+    const tokenId = randomUUID();
+    const familyId = parentSession?.familyId ?? tokenId;
     const payload: JwtAccessPayload = {
       sub: authContext.userId,
+      sid: familyId,
       tenantId: authContext.tenantId,
       tenantSlug: authContext.tenantSlug,
       securityDomain: authContext.securityDomain,
@@ -1438,10 +1598,7 @@ export class AuthService {
       this.configService.tokenHashPepper,
     );
 
-    const tokenId = randomUUID();
-    const familyId = parentSession?.familyId ?? tokenId;
-
-    await this.prisma.refreshToken.create({
+    await client.refreshToken.create({
       data: {
         id: tokenId,
         userId: authContext.userId,
@@ -1608,15 +1765,21 @@ export class AuthService {
     response.clearCookie(cookieName, options);
   }
 
-  private async revokeRefreshTokenFamily(familyId: string) {
-    await this.prisma.refreshToken.updateMany({
+  private async revokeRefreshTokenFamily(
+    familyId: string,
+    userId: string,
+    client: Prisma.TransactionClient = this.prisma,
+    reason = 'family_theft',
+  ) {
+    return client.refreshToken.updateMany({
       where: {
-        familyId,
+        userId,
+        OR: [{ familyId }, { id: familyId }],
         revokedAt: null,
       },
       data: {
         revokedAt: new Date(),
-        revokedReason: 'family_theft',
+        revokedReason: reason,
       },
     });
   }

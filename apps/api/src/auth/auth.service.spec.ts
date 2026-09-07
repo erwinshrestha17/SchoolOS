@@ -48,6 +48,7 @@ describe('AuthService', () => {
   beforeEach(async () => {
     authUser.passwordHash = await bcrypt.hash('password123', 4);
     prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'resolved-auth-row' }]),
       // Pass-throughs: the mock has no CLS/extension, so tenant-scope regions
       // just execute. Real enforcement is proven in tenant-isolation.int-spec.ts.
       runWithoutTenantScope: jest.fn(
@@ -60,7 +61,7 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
       },
       user: {
-        findUnique: jest.fn(),
+        findUnique: jest.fn().mockImplementation(async () => authUser),
         findFirst: jest.fn(),
         update: jest.fn(),
       },
@@ -69,7 +70,7 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       mobilePushToken: {
         deleteMany: jest.fn(),
@@ -78,10 +79,13 @@ describe('AuthService', () => {
         create: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         count: jest.fn().mockResolvedValue(0),
       },
     };
+    prisma.$transaction = jest.fn(
+      async (work: (tx: unknown) => Promise<unknown>) => work(prisma),
+    );
     jwtService = {
       signAsync: jest
         .fn()
@@ -382,7 +386,7 @@ describe('AuthService', () => {
     expect(result).toEqual({ success: true });
     expect(prisma.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: authUser.id },
+        where: { id: authUser.id, tenantId: authUser.tenantId },
         data: expect.objectContaining({
           passwordHash: expect.any(String),
         }),
@@ -395,6 +399,7 @@ describe('AuthService', () => {
       },
       data: {
         revokedAt: expect.any(Date),
+        revokedReason: 'password_recovery',
       },
     });
   });

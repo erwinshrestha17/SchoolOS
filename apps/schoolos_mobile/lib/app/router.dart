@@ -94,7 +94,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.forgotPassword,
-        builder: (context, state) => const ForgotPasswordScreen(),
+        builder: (context, state) {
+          final extra = state.extra;
+          return ForgotPasswordScreen(
+            initialTenantSlug: extra is Map && extra['tenantSlug'] is String
+                ? extra['tenantSlug'] as String
+                : '',
+            initialEmail: extra is Map && extra['email'] is String
+                ? extra['email'] as String
+                : '',
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.biometricUnlock,
@@ -566,7 +576,9 @@ String? resolveAuthRedirect(AuthState auth, String location) {
   final goingToBiometricUnlock = location == AppRoutes.biometricUnlock;
 
   if (auth.status == AuthStatus.biometricLocked) {
-    if (goingToBiometricUnlock || location == AppRoutes.login) {
+    if (goingToBiometricUnlock ||
+        location == AppRoutes.login ||
+        location == AppRoutes.forgotPassword) {
       return null;
     }
     return AppRoutes.biometricUnlock;

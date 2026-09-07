@@ -101,6 +101,34 @@ Architecture rules:
 9. Provider rejection and transport failure are different states. Retry requires permission, reason and audit.
 10. No UI, export, or configuration label may claim government-system integration, IRD verification, or CBMS certification without recorded official evidence.
 
+## 1C. Authentication recovery transaction boundary
+
+Password recovery uses the existing tenant/email and numeric-code contract. The
+backend resolves the account, then locks the active tenant (shared lock) and the
+resolved user (update lock), in that order. It rechecks account liveness and
+identity after acquiring locks. Code issuance uses the same order to serialize
+account limits and code replacement across API processes. Provider delivery is
+outside the transaction and acknowledgement is not proof of email delivery.
+
+Code consumption uses a conditional update of the selected unused, unexpired
+code. Exactly one verifier may consume it. Recovery commits the password change,
+refresh-token revocation, outstanding OTP invalidation, push-registration removal,
+and completion audit together. Any failure rolls them all back, including a
+password-policy rejection. Existing OTP/session history is retained. Account
+lookup indexes bound the growing-history queries; no in-memory lock is the
+authority for concurrency.
+
+`apps/api/test/auth-recovery-concurrency.int-spec.ts` exercises these boundaries
+against real PostgreSQL. It requires `SCHOOLOS_AUTH_TEST_DATABASE_URL` pointing to
+a dedicated loopback database named `schoolos_auth_recovery_test` (optionally with
+an alphanumeric suffix). It does not inherit `.env` as test authorization, send
+provider messages, or establish staging/pilot evidence.
+
+**Remaining release boundary:** refresh-token revocation alone does not prove
+immediate rejection of previously issued access JWTs, nor fence an already-running
+login or refresh issuance. Those paths require explicit session-liveness checks
+and concurrent credential-change tests before claiming complete session revocation.
+
 ## 2. Storage and File Registry Architecture
 
 ### Global Rule

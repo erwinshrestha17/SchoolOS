@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import '../../network/api_client.dart';
 import '../models/auth_session.dart';
 import '../models/auth_user.dart';
@@ -10,6 +11,50 @@ class AuthRepository {
   const AuthRepository(this.client);
 
   final ApiClient client;
+
+  Future<void> requestPasswordRecovery({
+    required String tenantSlug,
+    required String email,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await client.post(
+      '/auth/password-recovery/request',
+      data: {'tenantSlug': tenantSlug, 'email': email},
+      cancelToken: cancelToken,
+    );
+    _requireRecoveryAcknowledgement(response.data);
+  }
+
+  Future<void> confirmPasswordRecovery({
+    required String tenantSlug,
+    required String email,
+    required String code,
+    required String newPassword,
+    required String confirmNewPassword,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await client.post(
+      '/auth/password-recovery/confirm',
+      data: {
+        'tenantSlug': tenantSlug,
+        'email': email,
+        'code': code,
+        'newPassword': newPassword,
+        'confirmNewPassword': confirmNewPassword,
+      },
+      cancelToken: cancelToken,
+    );
+    _requireRecoveryAcknowledgement(response.data);
+  }
+
+  void _requireRecoveryAcknowledgement(dynamic data) {
+    if (data is! Map<String, dynamic> || data['success'] != true) {
+      throw const AuthException(
+        message: 'SchoolOS could not confirm this recovery request.',
+        code: 'INVALID_RECOVERY_RESPONSE',
+      );
+    }
+  }
 
   /// Sign in with tenant credentials
   Future<LoginResponse> login(LoginRequest request) async {

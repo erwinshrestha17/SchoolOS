@@ -7,6 +7,8 @@ import type { SupportOverrideScope } from '@schoolos/core';
 
 export interface AuthContext {
   userId: string;
+  /** Server-verified refresh family; never accepted from a request body. */
+  sessionFamilyId?: string;
   tenantId: string;
   originalTenantId?: string;
   isSupportOverride?: boolean;
@@ -23,6 +25,8 @@ export interface AuthContext {
 
 export interface JwtAccessPayload {
   sub: string;
+  /** Persisted session family. Legacy access tokens without this fail closed. */
+  sid?: string;
   tenantId: string;
   tenantSlug: string;
   securityDomain?: SecurityDomain;

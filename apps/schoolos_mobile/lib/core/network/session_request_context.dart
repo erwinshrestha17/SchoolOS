@@ -16,6 +16,8 @@ bool isPublicAuthRequest(RequestOptions options) =>
       '/auth/login',
       '/auth/refresh',
       '/auth/logout',
+      '/auth/password-recovery/request',
+      '/auth/password-recovery/confirm',
     }.contains(options.path);
 
 DioException staleSessionRequest(RequestOptions request) => DioException(

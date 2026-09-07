@@ -112,6 +112,22 @@ export class JwtAuthGuard implements CanActivate {
       throw new ForbiddenException('Tenant mismatch');
     }
 
+    if (typeof payload.sid !== 'string' || !payload.sid) {
+      throw new UnauthorizedException('Session must be renewed');
+    }
+    // Never cache session liveness. Rotation keeps the family stable; logout,
+    // account recovery and session removal revoke its remaining active token.
+    const activeSession = await this.prisma.refreshToken.findFirst({
+      where: {
+        userId: user.id,
+        familyId: payload.sid,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      select: { id: true },
+    });
+    if (!activeSession) throw new UnauthorizedException('Session has ended');
+
     // Roles and permissions are derived, slow-changing data with an explicit
     // invalidation contract (see AuthzCacheService). Resolving them here
     // replaces four nested-include round-trips on every authenticated request.
@@ -281,6 +297,7 @@ export class JwtAuthGuard implements CanActivate {
 
     request.auth = {
       userId: user.id,
+      sessionFamilyId: payload.sid,
       tenantId: effectiveTenantId,
       originalTenantId: payload.tenantId,
       isSupportOverride: effectiveTenantId !== payload.tenantId,

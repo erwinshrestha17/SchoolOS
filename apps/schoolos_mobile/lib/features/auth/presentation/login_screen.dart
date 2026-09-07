@@ -176,7 +176,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             .login(
               tenantCode: _tenantController.text.trim(),
               usernameOrEmail: _emailController.text.trim(),
-              password: _passwordController.text.trim(),
+              password: _passwordController.text,
             );
         if (mounted) {
           context.go(AppRoutes.home);
@@ -317,7 +317,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () => context.go(AppRoutes.forgotPassword),
+                      onPressed: () => context.go(
+                        AppRoutes.forgotPassword,
+                        extra: {
+                          'tenantSlug': _tenantController.text.trim(),
+                          'email': _emailController.text.trim(),
+                        },
+                      ),
                       child: const Text('Forgot password?'),
                     ),
                   ),

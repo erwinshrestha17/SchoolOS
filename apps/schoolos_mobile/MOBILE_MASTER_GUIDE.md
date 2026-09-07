@@ -130,9 +130,10 @@ responses; old responses must not populate a later account's screens or cache.
 
 Refresh is single-flight within one session only. A late 401 after rotation
 reuses the current token once; a second 401 or rejected refresh fails closed.
-Login/refresh/logout endpoints never borrow a stored bearer token or recursively
-trigger refresh. Network errors, timeouts, rate limits, and server failures do not
-by themselves prove revoked credentials or authorize clearing a session.
+Login/refresh/logout and public password-recovery endpoints never borrow a stored
+bearer token or recursively trigger refresh. Network errors, timeouts, rate
+limits, and server failures do not by themselves prove revoked credentials or
+authorize clearing a session.
 Refresh calls have bounded timeouts. Refresh and account replacement/logout
 storage operations are serialized, with access tokens written last.
 
@@ -142,6 +143,33 @@ guarantees, not proof of server/provider revocation during offline logout or
 process termination. Shared-device staging and physical-device tests remain
 required, including token rotation, interrupted secure-storage writes, revoked
 server sessions, weak connectivity, and app restart.
+
+## Password Recovery
+
+The sign-in recovery link uses the existing public backend endpoints
+`POST /auth/password-recovery/request` and `POST /auth/password-recovery/confirm`.
+School code and account email are required; the user enters the emailed numeric
+code, a new password, and confirmation. The app does not infer account existence
+or email delivery from the request acknowledgement. Password-change success is
+shown only after the backend confirms it, followed by explicit sign-in; there is
+no automatic login. A locally biometric-locked session is cleared after success
+only if it has not been replaced by another session.
+
+Recovery is online-only and is never queued or automatically retried. Failed
+requests preserve entered fields and offer manual recovery. A confirmation
+timeout has an unknown outcome: try the new password at sign-in or request a new
+code. A resend replaces the previous code, and changing the target account clears
+code/password fields. Passwords preserve whitespace through reset and login;
+client validation is guidance, not authority over backend policy.
+Password-manager saving is offered only after authoritative confirmation;
+leaving an unconfirmed reset cancels its autofill context.
+
+Before pilot acceptance, validate actual email delivery with approved synthetic
+accounts for Parent, Teacher, and Principal; expired/incorrect/superseded codes;
+backend password rejection; network interruption before/after confirmation;
+biometric-lock recovery; and old-session revocation on real devices. Local mocked
+API/widget tests do not prove provider delivery, server concurrency, or physical
+device behavior. Production app identities and API hostname remain owner-gated.
 
 ## Push Notification Configuration
 

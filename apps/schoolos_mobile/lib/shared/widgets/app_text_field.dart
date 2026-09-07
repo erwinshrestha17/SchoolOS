@@ -14,6 +14,8 @@ class AppTextField extends StatefulWidget {
     this.validator,
     this.textInputAction,
     this.onChanged,
+    this.enabled = true,
+    this.autofillHints,
   });
 
   final String label;
@@ -26,6 +28,8 @@ class AppTextField extends StatefulWidget {
   final String? Function(String?)? validator;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onChanged;
+  final bool enabled;
+  final Iterable<String>? autofillHints;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -70,6 +74,10 @@ class _AppTextFieldState extends State<AppTextField> {
       controller: widget.controller,
       keyboardType: widget.keyboardType,
       obscureText: _obscured,
+      enabled: widget.enabled,
+      autofillHints: widget.autofillHints,
+      autocorrect: !widget.obscureText,
+      enableSuggestions: !widget.obscureText,
       validator: widget.validator,
       textInputAction: widget.textInputAction,
       onChanged: widget.onChanged,

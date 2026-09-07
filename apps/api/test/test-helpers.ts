@@ -25,6 +25,7 @@ export interface MockState {
   feeHeads: Record<string, unknown>[];
   otpCodes: Record<string, unknown>[];
   refreshTokens: Record<string, unknown>[];
+  mobilePushTokens: Record<string, unknown>[];
   auditLogs: Record<string, unknown>[];
   tenantSettings: Record<string, unknown>[];
   fileAssets: Record<string, unknown>[];
@@ -287,6 +288,7 @@ export function createPrismaMock() {
     accountingSourceMappings: [] as Record<string, unknown>[],
     otpCodes: [] as Record<string, unknown>[],
     refreshTokens: [] as Record<string, unknown>[],
+    mobilePushTokens: [] as Record<string, unknown>[],
     auditLogs: [] as Record<string, unknown>[],
     tenantSettings: [] as Record<string, unknown>[],
     tenantAuthorityFences: [] as Record<string, unknown>[],
@@ -595,8 +597,29 @@ export function createPrismaMock() {
     onModuleDestroy: jest.fn(() => Promise.resolve()),
   };
   let journalSequence = 0;
-  prisma.$queryRaw = jest.fn(() =>
-    Promise.resolve([{ lastValue: ++journalSequence }]),
+  prisma.$queryRaw = jest.fn(
+    (sql: TemplateStringsArray, ...values: unknown[]) => {
+      const text = Array.isArray(sql) ? sql.join('?') : String(sql);
+      if (text.includes('FROM "Tenant"') && text.includes('FOR SHARE')) {
+        return Promise.resolve(
+          state.tenants
+            .filter(
+              (tenant) => tenant.id === values[0] && tenant.isActive === true,
+            )
+            .map(({ id }) => ({ id })),
+        );
+      }
+      if (text.includes('FROM "User"') && text.includes('FOR UPDATE')) {
+        return Promise.resolve(
+          state.users
+            .filter(
+              (user) => user.id === values[0] && user.tenantId === values[1],
+            )
+            .map(({ id }) => ({ id })),
+        );
+      }
+      return Promise.resolve([{ lastValue: ++journalSequence }]);
+    },
   );
 
   prisma.$transaction = jest.fn((arg: any) => {
@@ -1700,11 +1723,23 @@ export function createPrismaMock() {
         return Promise.resolve({ count: before - state.auditLogs.length });
       }),
     },
+    mobilePushToken: {
+      deleteMany: jest.fn((q: PrismaQuery) => {
+        const before = state.mobilePushTokens.length;
+        state.mobilePushTokens = state.mobilePushTokens.filter(
+          (token) => !matchesWhere(token, q.where),
+        );
+        return Promise.resolve({
+          count: before - state.mobilePushTokens.length,
+        });
+      }),
+    },
     otpCode: {
       create: jest.fn((q: PrismaQuery) => {
         const data = q.data ?? {};
         const item = {
           id: nextId('otp'),
+          usedAt: null,
           ...data,
           createdAt: new Date(),
         };
@@ -1723,11 +1758,7 @@ export function createPrismaMock() {
               const matchesCreatedAt =
                 createdAtGte === undefined ||
                 (otp.createdAt as Date) >= createdAtGte;
-              return (
-                otp.userId === where?.userId &&
-                otp.purpose === where?.purpose &&
-                matchesCreatedAt
-              );
+              return matchesWhere(otp, where) && matchesCreatedAt;
             }),
         );
       }),
@@ -1751,8 +1782,7 @@ export function createPrismaMock() {
       updateMany: jest.fn((q: PrismaQuery) => {
         let count = 0;
         for (const otp of state.otpCodes) {
-          const matches =
-            otp.userId === q.where?.userId && otp.purpose === q.where?.purpose;
+          const matches = matchesWhere(otp, q.where);
           if (matches) {
             Object.assign(otp, q.data ?? {});
             count += 1;

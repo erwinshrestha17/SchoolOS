@@ -51,6 +51,10 @@ void main() {
       isNull,
     );
     expect(resolveAuthRedirect(lockedParent(), AppRoutes.login), isNull);
+    expect(
+      resolveAuthRedirect(lockedParent(), AppRoutes.forgotPassword),
+      isNull,
+    );
   });
 
   test('authenticated users leaving unlock are sent home', () {

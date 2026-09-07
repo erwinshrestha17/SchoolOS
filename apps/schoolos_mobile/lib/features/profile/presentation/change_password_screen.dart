@@ -6,6 +6,7 @@ import '../../../app/constants/app_routes.dart';
 import '../../../app/design_system/app_spacing.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/auth/password_validation.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
@@ -125,7 +126,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                     textInputAction: TextInputAction.next,
                     onChanged: (_) => setState(() => _notice = null),
                     validator: (value) =>
-                        _passwordValidationMessage(value ?? '', user?.email),
+                        passwordValidationMessage(value ?? '', user?.email),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   AppTextField(
@@ -240,36 +241,6 @@ class _Notice extends StatelessWidget {
       ),
     );
   }
-}
-
-String? _passwordValidationMessage(String password, String? email) {
-  final normalized = password.toLowerCase();
-  if (password.length < 8) return 'Password must be at least 8 characters.';
-  if (!RegExp('[A-Z]').hasMatch(password)) {
-    return 'Password needs an uppercase letter.';
-  }
-  if (!RegExp('[a-z]').hasMatch(password)) {
-    return 'Password needs a lowercase letter.';
-  }
-  if (!RegExp(r'\d').hasMatch(password)) {
-    return 'Password needs a number.';
-  }
-  if (!RegExp(r'[^A-Za-z0-9]').hasMatch(password)) {
-    return 'Password needs a symbol.';
-  }
-  if (const {'admin123', 'password123', 'school123'}.contains(normalized)) {
-    return 'Password must not use a common school password.';
-  }
-  final emailParts =
-      email
-          ?.toLowerCase()
-          .split(RegExp('[^a-z0-9]+'))
-          .where((part) => part.length >= 3) ??
-      const Iterable<String>.empty();
-  if (emailParts.any(normalized.contains)) {
-    return 'Password must not include your email.';
-  }
-  return null;
 }
 
 String _friendlyError(AppException error) {

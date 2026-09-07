@@ -211,6 +211,7 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([familyId])
+  @@index([userId, revokedAt])
 }
 
 model OtpCode {
@@ -223,6 +224,8 @@ model OtpCode {
   createdAt DateTime   @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model AuditLog {
