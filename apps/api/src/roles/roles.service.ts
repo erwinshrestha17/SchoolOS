@@ -14,6 +14,8 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { AuthzCacheService } from '../auth/authz-cache.service';
 import { AuthContext } from '../auth/auth.types';
+import { type Prisma } from '@prisma/client';
+import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignPermissionsDto } from './dto/assign-permissions.dto';
 import { AssignRoleDto } from './dto/assign-role.dto';
@@ -89,13 +91,33 @@ export class RolesService {
 
   async createRole(dto: CreateRoleDto, actor: AuthContext) {
     this.assertSchoolSecurityDomain(actor);
+    if (isPlatformRoleName(dto.name))
+      throw new ForbiddenException(
+        'Platform role names cannot be created in a school tenant',
+      );
+    return withSchoolAuthorizationTransaction(
+      this.prisma,
+      actor,
+      'roles:create',
+      [],
+      (tx) => this.createRoleInTransaction(dto, actor, tx),
+      true,
+    );
+  }
+
+  private async createRoleInTransaction(
+    dto: CreateRoleDto,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient,
+  ) {
+    this.assertSchoolSecurityDomain(actor);
     if (isPlatformRoleName(dto.name)) {
       throw new ForbiddenException(
         'Platform role names cannot be created in a school tenant',
       );
     }
 
-    const existingRole = await this.prisma.role.findUnique({
+    const existingRole = await tx.role.findUnique({
       where: {
         tenantId_name: {
           tenantId: actor.tenantId,
@@ -108,7 +130,7 @@ export class RolesService {
       throw new ConflictException('Role already exists in this tenant');
     }
 
-    const role = await this.prisma.role.create({
+    const role = await tx.role.create({
       data: {
         tenantId: actor.tenantId,
         name: dto.name,
@@ -116,14 +138,17 @@ export class RolesService {
       },
     });
 
-    await this.auditService.record({
-      action: 'create',
-      resource: 'role',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: role.id,
-      after: { name: role.name },
-    });
+    await this.auditService.record(
+      {
+        action: 'create',
+        resource: 'role',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: role.id,
+        after: { name: role.name },
+      },
+      tx,
+    );
 
     return role;
   }
@@ -133,8 +158,27 @@ export class RolesService {
     dto: AssignPermissionsDto,
     actor: AuthContext,
   ) {
+    const result = await withSchoolAuthorizationTransaction(
+      this.prisma,
+      actor,
+      'roles:manage_permissions',
+      [],
+      (tx) => this.assignPermissionsInTransaction(roleId, dto, actor, tx),
+      true,
+    );
+    // Database permissions are authoritative; cache cleanup follows commit.
+    await this.authzCache.invalidateTenant(actor.tenantId);
+    return result;
+  }
+
+  private async assignPermissionsInTransaction(
+    roleId: string,
+    dto: AssignPermissionsDto,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient,
+  ) {
     this.assertSchoolSecurityDomain(actor);
-    const role = await this.prisma.role.findFirst({
+    const role = await tx.role.findFirst({
       where: {
         id: roleId,
         tenantId: actor.tenantId,
@@ -151,7 +195,7 @@ export class RolesService {
       );
     }
 
-    const permissions = await this.prisma.permission.findMany({
+    const permissions = await tx.permission.findMany({
       where: { id: { in: dto.permissionIds } },
     });
 
@@ -169,33 +213,31 @@ export class RolesService {
       );
     }
 
-    await this.prisma.rolePermission.deleteMany({
+    await tx.rolePermission.deleteMany({
       where: { roleId: role.id },
     });
 
-    await this.prisma.rolePermission.createMany({
+    await tx.rolePermission.createMany({
       data: dto.permissionIds.map((permissionId) => ({
         roleId: role.id,
         permissionId,
       })),
     });
 
-    // Changing a role's permissions changes the effective permission set of
-    // every user holding it, so the whole tenant namespace is dropped.
-    // AuthzCacheService documents the full invalidation contract.
-    await this.authzCache.invalidateTenant(actor.tenantId);
+    await this.auditService.record(
+      {
+        action: 'assign_permissions',
+        resource: 'role',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: role.id,
+        after: { permissionIds: dto.permissionIds },
+      },
+      tx,
+    );
 
-    await this.auditService.record({
-      action: 'assign_permissions',
-      resource: 'role',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: role.id,
-      after: { permissionIds: dto.permissionIds },
-    });
-
-    return this.prisma.role.findUnique({
-      where: { id: role.id },
+    return tx.role.findUnique({
+      where: { id: role.id, tenantId: actor.tenantId },
       include: {
         rolePermissions: {
           include: {
@@ -207,9 +249,26 @@ export class RolesService {
   }
 
   async assignRoles(dto: AssignRoleDto, actor: AuthContext) {
+    const result = await withSchoolAuthorizationTransaction(
+      this.prisma,
+      actor,
+      'roles:assign',
+      [dto.userId],
+      (tx) => this.assignRolesInTransaction(dto, actor, tx),
+      true,
+    );
+    await this.authzCache.invalidateUser(actor.tenantId, dto.userId);
+    return result;
+  }
+
+  private async assignRolesInTransaction(
+    dto: AssignRoleDto,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient,
+  ) {
     this.assertSchoolSecurityDomain(actor);
     const roleIds = Array.from(new Set(dto.roleIds));
-    const user = await this.prisma.user.findFirst({
+    const user = await tx.user.findFirst({
       where: {
         id: dto.userId,
         tenantId: actor.tenantId,
@@ -220,7 +279,7 @@ export class RolesService {
       throw new NotFoundException('User not found in this tenant');
     }
 
-    const roles = await this.prisma.role.findMany({
+    const roles = await tx.role.findMany({
       where: {
         tenantId: actor.tenantId,
         id: { in: roleIds },
@@ -248,8 +307,9 @@ export class RolesService {
       actor.tenantId,
       dto.userId,
       roleIds,
+      tx,
     );
-    const activeAssignments = await this.prisma.userRole.findMany({
+    const activeAssignments = await tx.userRole.findMany({
       where: {
         userId: dto.userId,
         tenantId: actor.tenantId,
@@ -276,6 +336,7 @@ export class RolesService {
       await this.assertAnotherActiveConfigOwnerExists(
         actor.tenantId,
         dto.userId,
+        tx,
       );
     }
 
@@ -283,68 +344,65 @@ export class RolesService {
       activeAssignments.map((assignment) => [assignment.roleId, assignment]),
     );
     const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      for (const assignment of removedAssignments) {
+    for (const assignment of removedAssignments) {
+      await tx.userRole.update({
+        where: { id: assignment.id, tenantId: actor.tenantId },
+        data: {
+          revokedAt: now,
+          revokedById: actor.userId,
+          revokeReason: dto.reason?.trim() ?? 'Role assignment replaced',
+        },
+      });
+    }
+
+    for (const roleId of roleIds) {
+      const existing = activeByRoleId.get(roleId);
+      const expiresAt = expiresAtByRole.get(roleId) ?? null;
+      if (existing) {
         await tx.userRole.update({
-          where: { id: assignment.id },
-          data: {
-            revokedAt: now,
-            revokedById: actor.userId,
-            revokeReason: dto.reason?.trim() ?? 'Role assignment replaced',
-          },
+          where: { id: existing.id, tenantId: actor.tenantId },
+          data: { expiresAt },
         });
+        continue;
       }
-
-      for (const roleId of roleIds) {
-        const existing = activeByRoleId.get(roleId);
-        const expiresAt = expiresAtByRole.get(roleId) ?? null;
-        if (existing) {
-          await tx.userRole.update({
-            where: { id: existing.id },
-            data: { expiresAt },
-          });
-          continue;
-        }
-        await tx.userRole.create({
-          data: {
-            userId: dto.userId,
-            roleId,
-            tenantId: actor.tenantId,
-            assignedById: actor.userId,
-            expiresAt,
-          },
-        });
-      }
-    });
-
-    // Only this user's role membership changed.
-    await this.authzCache.invalidateUser(actor.tenantId, dto.userId);
-
-    await this.auditService.record({
-      action: 'assign_roles',
-      resource: 'user',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: dto.userId,
-      after: {
-        roleIds,
-        expiresAtByRole: Object.fromEntries(
-          [...expiresAtByRole].map(([roleId, value]) => [
-            roleId,
-            value?.toISOString() ?? null,
-          ]),
-        ),
-        revokedRoleIds: removedAssignments.map(({ roleId }) => roleId),
-        ...(removesOwnerRole
-          ? {
-              configOwnerRoleRemoved: true,
-              reason: dto.reason?.trim(),
-            }
-          : {}),
+      await tx.userRole.create({
+        data: {
+          userId: dto.userId,
+          roleId,
+          tenantId: actor.tenantId,
+          assignedById: actor.userId,
+          expiresAt,
+        },
+      });
+    }
+    await this.auditService.record(
+      {
+        action: 'assign_roles',
+        resource: 'user',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: dto.userId,
+        after: {
+          roleIds,
+          expiresAtByRole: Object.fromEntries(
+            [...expiresAtByRole].map(([roleId, value]) => [
+              roleId,
+              value?.toISOString() ?? null,
+            ]),
+          ),
+          revokedRoleIds: removedAssignments.map(({ roleId }) => roleId),
+          ...(removesOwnerRole
+            ? {
+                configOwnerRoleRemoved: true,
+                reason: dto.reason?.trim(),
+              }
+            : {}),
+        },
       },
-    });
+      tx,
+    );
 
-    return this.prisma.userRole.findMany({
+    return tx.userRole.findMany({
       where: {
         userId: dto.userId,
         tenantId: actor.tenantId,
@@ -356,9 +414,16 @@ export class RolesService {
   }
 
   async previewFinancePermissionReconciliation(actor: AuthContext) {
+    return this.previewFinancePermissions(actor, this.prisma);
+  }
+
+  private async previewFinancePermissions(
+    actor: AuthContext,
+    tx: Prisma.TransactionClient,
+  ) {
     this.assertSchoolSecurityDomain(actor);
     const presetNames = FINANCE_RECONCILIATION_ROLE_PRESETS;
-    const roles = await this.prisma.role.findMany({
+    const roles = await tx.role.findMany({
       where: { tenantId: actor.tenantId, name: { in: [...presetNames] } },
       include: {
         rolePermissions: { include: { permission: true } },
@@ -366,10 +431,11 @@ export class RolesService {
       orderBy: { name: 'asc' },
     });
     const now = new Date();
-    const designatedFinanceUserCount = await this.prisma.userRole.count({
+    const designatedFinanceUserCount = await tx.userRole.count({
       where: {
         tenantId: actor.tenantId,
-        role: { name: 'accountant' },
+        role: { tenantId: actor.tenantId, name: 'accountant' },
+        user: { status: 'ACTIVE' },
         revokedAt: null,
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
@@ -418,6 +484,23 @@ export class RolesService {
   }
 
   async reconcileFinancePermissions(reason: string, actor: AuthContext) {
+    const result = await withSchoolAuthorizationTransaction(
+      this.prisma,
+      actor,
+      'roles:manage_permissions',
+      [],
+      (tx) => this.reconcileFinancePermissionsInTransaction(reason, actor, tx),
+      true,
+    );
+    await this.authzCache.invalidateTenant(actor.tenantId);
+    return result;
+  }
+
+  private async reconcileFinancePermissionsInTransaction(
+    reason: string,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient,
+  ) {
     this.assertSchoolSecurityDomain(actor);
     const trimmedReason = reason.trim();
     if (trimmedReason.length < 3) {
@@ -426,14 +509,14 @@ export class RolesService {
       );
     }
 
-    const preview = await this.previewFinancePermissionReconciliation(actor);
-    const roles = await this.prisma.role.findMany({
+    const preview = await this.previewFinancePermissions(actor, tx);
+    const roles = await tx.role.findMany({
       where: {
         tenantId: actor.tenantId,
         name: { in: [...FINANCE_RECONCILIATION_ROLE_PRESETS] },
       },
     });
-    const permissions = await this.prisma.permission.findMany();
+    const permissions = await tx.permission.findMany();
     const permissionByKey = new Map(
       permissions.map((permission) => [
         `${permission.resource}:${permission.action}`,
@@ -444,55 +527,54 @@ export class RolesService {
       preview.changes.map((change) => [change.roleName, change]),
     );
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const role of roles) {
-        const change = changeByRole.get(role.name);
-        if (!change) continue;
-        const removeIds = change.remove
-          .map((key) => permissionByKey.get(key)?.id)
-          .filter((id): id is string => Boolean(id));
-        if (removeIds.length) {
-          await tx.rolePermission.deleteMany({
-            where: { roleId: role.id, permissionId: { in: removeIds } },
-          });
-        }
-        const addIds = change.add.map((key) => {
-          const permission = permissionByKey.get(key);
-          if (!permission) {
-            throw new ConflictException(
-              `Finance permission catalog entry is missing for ${key}`,
-            );
-          }
-          return permission.id;
+    for (const role of roles) {
+      const change = changeByRole.get(role.name);
+      if (!change) continue;
+      const removeIds = change.remove
+        .map((key) => permissionByKey.get(key)?.id)
+        .filter((id): id is string => Boolean(id));
+      if (removeIds.length) {
+        await tx.rolePermission.deleteMany({
+          where: { roleId: role.id, permissionId: { in: removeIds } },
         });
-        if (addIds.length) {
-          await tx.rolePermission.createMany({
-            data: addIds.map((permissionId) => ({
-              roleId: role.id,
-              permissionId,
-            })),
-            skipDuplicates: true,
-          });
-        }
       }
-    });
-
-    await this.authzCache.invalidateTenant(actor.tenantId);
-    await this.auditService.record({
-      action: 'reconcile_finance_permissions',
-      resource: 'role_permissions',
-      resourceId: actor.tenantId,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      before: { status: preview.status, changes: preview.changes },
-      after: {
-        reason: trimmedReason,
-        userRoleAssignmentsChanged: false,
-        designatedFinanceUserCount: preview.designatedFinanceUserCount,
+      const addIds = change.add.map((key) => {
+        const permission = permissionByKey.get(key);
+        if (!permission) {
+          throw new ConflictException(
+            `Finance permission catalog entry is missing for ${key}`,
+          );
+        }
+        return permission.id;
+      });
+      if (addIds.length) {
+        await tx.rolePermission.createMany({
+          data: addIds.map((permissionId) => ({
+            roleId: role.id,
+            permissionId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+    await this.auditService.record(
+      {
+        action: 'reconcile_finance_permissions',
+        resource: 'role_permissions',
+        resourceId: actor.tenantId,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        before: { status: preview.status, changes: preview.changes },
+        after: {
+          reason: trimmedReason,
+          userRoleAssignmentsChanged: false,
+          designatedFinanceUserCount: preview.designatedFinanceUserCount,
+        },
       },
-    });
+      tx,
+    );
 
-    return this.previewFinancePermissionReconciliation(actor);
+    return this.previewFinancePermissions(actor, tx);
   }
 
   private assertSchoolSecurityDomain(actor: AuthContext): void {
@@ -507,8 +589,9 @@ export class RolesService {
     tenantId: string,
     userId: string,
     nextRoleIds: string[],
+    tx: Prisma.TransactionClient,
   ): Promise<boolean> {
-    const currentOwnerAssignment = await this.prisma.userRole.findFirst({
+    const currentOwnerAssignment = await tx.userRole.findFirst({
       where: {
         tenantId,
         userId,
@@ -527,8 +610,9 @@ export class RolesService {
   private async assertAnotherActiveConfigOwnerExists(
     tenantId: string,
     excludedUserId: string,
+    tx: Prisma.TransactionClient,
   ): Promise<void> {
-    const otherActiveOwners = await this.prisma.userRole.count({
+    const otherActiveOwners = await tx.userRole.count({
       where: {
         tenantId,
         userId: { not: excludedUserId },

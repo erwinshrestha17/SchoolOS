@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { installSchoolGovernanceDouble } from '../../test/helpers/school-governance-double';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import type { AuthContext } from '../auth/auth.types';
 import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
@@ -12,6 +13,7 @@ import { SchoolSettingsWorkspaceController } from './school-settings-workspace.c
 
 const baseActor: Omit<AuthContext, 'tenantId' | 'permissions'> = {
   userId: 'user-1',
+  sessionFamilyId: 'admin-family',
   tenantSlug: 'green-valley',
   email: 'user@school.test',
   authMethod: 'PASSWORD',
@@ -226,6 +228,7 @@ describe('Configuration Owner safeguards', () => {
         findUnique: jest.fn(),
       },
       user: {
+        findUnique: jest.fn(),
         findFirst: jest.fn().mockResolvedValue({ id: 'user-owner' }),
       },
       userRole: {
@@ -255,6 +258,7 @@ describe('Configuration Owner safeguards', () => {
         work(prisma),
       ),
     };
+    installSchoolGovernanceDouble(prisma, ['roles:assign']);
     const auditService = { record: jest.fn().mockResolvedValue({}) };
     return {
       prisma,
@@ -291,7 +295,7 @@ describe('Configuration Owner safeguards', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.userRole.update).not.toHaveBeenCalled();
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.userRole.create).not.toHaveBeenCalled();
   });
 
   it('requires a reason to remove the Configuration Owner role', async () => {
@@ -307,7 +311,7 @@ describe('Configuration Owner safeguards', () => {
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.userRole.update).not.toHaveBeenCalled();
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.userRole.create).not.toHaveBeenCalled();
   });
 
   it('allows owner-role transfer when another active owner remains', async () => {
@@ -324,7 +328,7 @@ describe('Configuration Owner safeguards', () => {
     expect(prisma.$transaction).toHaveBeenCalled();
     expect(prisma.userRole.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'assignment-owner' },
+        where: { id: 'assignment-owner', tenantId: 'tenant-1' },
         data: expect.objectContaining({
           revokedAt: expect.any(Date),
           revokeReason: 'transfer',
@@ -338,6 +342,7 @@ describe('Configuration Owner safeguards', () => {
           reason: 'transfer',
         }),
       }),
+      prisma,
     );
   });
 
@@ -356,6 +361,7 @@ describe('Configuration Owner safeguards', () => {
     };
     const prisma = {
       user: {
+        findUnique: jest.fn(),
         findFirst: jest.fn().mockResolvedValue(ownerUser),
         update: jest.fn().mockResolvedValue({
           ...ownerUser,
@@ -363,10 +369,12 @@ describe('Configuration Owner safeguards', () => {
         }),
       },
       userRole: {
+        findMany: jest.fn(),
         count: jest.fn().mockResolvedValue(options.otherActiveOwners),
       },
       refreshToken: { updateMany: jest.fn() },
     };
+    installSchoolGovernanceDouble(prisma, ['users:update_status']);
     const auditService = { record: jest.fn().mockResolvedValue({}) };
     return {
       prisma,
@@ -426,6 +434,7 @@ describe('Configuration Owner safeguards', () => {
           reason: 'staff transfer',
         }),
       }),
+      prisma,
     );
   });
 });

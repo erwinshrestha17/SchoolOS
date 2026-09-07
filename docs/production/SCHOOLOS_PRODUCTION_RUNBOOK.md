@@ -151,7 +151,7 @@ When using webhook mode (`EMAIL_DELIVERY_MODE=webhook`), the backend sends a JSO
 - `metadata`: Key-value object of delivery details
 
 ### API Security Mechanisms
-- Access tokens are short-lived.
+- Access tokens are short-lived and bound to persisted refresh-token families; every guarded request checks session liveness without caching.
 - Refresh tokens are hashed in the database and rotated on refresh.
 - Password reset and MFA codes are hashed in the database and expire automatically.
 - OTP issuance is rate-limited per user and purpose.
@@ -159,6 +159,59 @@ When using webhook mode (`EMAIL_DELIVERY_MODE=webhook`), the backend sends a JSO
 - Global request throttling is enabled.
 - CORS is allowlisted from configured frontend origins only.
 - Security headers are added at the app boundary.
+
+### Session-Binding Deployment Gate
+
+Deploy JWT issuance and verification together on every serving API instance and
+applicable School Edge authority. Pre-deployment access tokens without `sid` will
+receive 401. Valid existing refresh tokens can rotate into session-bound tokens;
+otherwise users must sign in again. Confirm web and Parent/Teacher/Principal
+mobile clients handle that renewal before rollout. Do not mix old verifiers that
+ignore session liveness with the new implementation, or roll back to such a
+verifier and still claim immediate revocation.
+
+In an isolated staging rehearsal, verify normal login and refresh, next-request
+denial after logout/recovery/session removal, current-device preservation during
+password change, tenant suspension, and storage-unavailable rejection. Also
+verify that clients serialize refresh: concurrent use of the same predecessor
+is treated as replay and revokes that family. A lost refresh response requires
+safe reauthentication if the predecessor was consumed. Never weaken replay
+detection to hide a client retry loop.
+
+Before deploying version-aware authentication code, apply the additive
+`20260907144000_auth_version_fence` migration. Existing accounts default to zero;
+password/session/OTP history is preserved. Administrative reset/force-logout and
+self-service credential and account-status changes increment the version, invalidating old in-flight
+credential proofs and login challenges. Keep issuance, revocation and verification
+implementations aligned across all serving instances. An older application writer
+that does not advance the version cannot provide this guarantee; preserve the
+column on rollback and do not describe a downgraded deployment as fully protected.
+
+Include both administrative reset route aliases and force-logout in the staging
+rehearsal. Check Parent, Teacher and Principal old-token rejection, fresh login,
+cross-tenant denial, current administrator session/permission revalidation, and
+audit-failure rollback. Registered push destinations are removed on administrative
+revocation; clients must register again after a fresh authenticated sign-in.
+
+Include account suspension/reactivation and role/permission changes in that
+rehearsal. Two concurrent owner removals (including one suspension and one role
+removal) must not remove the final active Configuration Owner. Expired/revoked
+alternate assignments do not satisfy that check. Status/role mutations take a
+tenant write lock before user locks; auth/reset use a tenant shared lock. A reset
+waiting behind role revocation must reject stale administrator authority. Required
+password change blocks these administrative actions even on direct service calls.
+Verify audit-failure rollback, no partially committed permission replacement, and
+old-session rejection after suspension followed by reactivation. Inspect tenant
+lock wait/timeout behavior under realistic governance and sign-in load. Preserve
+assignment revocation history and perform cache cleanup only after commit.
+
+Local PostgreSQL and scoped HTTP tests are regression evidence only. Full deployed
+migration-chain validation, provisioning/other lifecycle writers, future-dated
+owner-expiry continuity,
+multi-instance/Edge convergence, physical-device behavior, provider delivery,
+and staging/pilot acceptance remain separate gates.
+Revocation takes effect at the next server authorization check; it does not cancel
+already-authorized work or erase offline device data remotely.
 
 ### Logs and Monitoring
 - Minimum log sources: API process logs, Web process logs, `docker compose logs postgres redis`, Notification processor logs, Reverse proxy logs, Database migration logs.

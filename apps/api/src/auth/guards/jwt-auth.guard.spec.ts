@@ -121,7 +121,9 @@ describe('JwtAuthGuard', () => {
       user: {
         findUnique: jest.fn().mockResolvedValue(mockUser),
       },
-      refreshToken: { findFirst: jest.fn().mockResolvedValue({ id: 'session-1' }) },
+      refreshToken: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'session-1' }),
+      },
       supportOverride: {
         findFirst: jest.fn(),
       },
@@ -168,6 +170,7 @@ describe('JwtAuthGuard', () => {
 
     expect(request.auth).toEqual({
       userId: mockUser.id,
+      sessionFamilyId: 'family-1',
       tenantId: basePayload.tenantId,
       originalTenantId: basePayload.tenantId,
       isSupportOverride: false,
@@ -611,6 +614,61 @@ describe('JwtAuthGuard', () => {
     // the platform-super-admin check earlier in the guard — otherwise this test
     // would still pass while proving nothing about inactive tenants.
     expect(prisma.tenant.findUnique).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([undefined, '', null, 42])(
+    'rejects an unbound or malformed session claim %s',
+    async (sid) => {
+      jwtService.verifyAsync.mockResolvedValue({ ...basePayload, sid });
+      const { context, request } = createContext();
+      await expect(guard.canActivate(context)).rejects.toThrow(
+        'Session must be renewed',
+      );
+      expect(prisma.refreshToken.findFirst).not.toHaveBeenCalled();
+      expect(request.auth).toBeUndefined();
+    },
+  );
+
+  it('requires an unexpired, unrevoked family belonging to the resolved user', async () => {
+    prisma.refreshToken.findFirst.mockResolvedValue(null);
+    const { context, request } = createContext();
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      'Session has ended',
+    );
+    expect(prisma.refreshToken.findFirst).toHaveBeenCalledWith({
+      where: {
+        userId: mockUser.id,
+        familyId: basePayload.sid,
+        revokedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+      },
+      select: { id: true },
+    });
+    expect(prisma.userRole.findMany).not.toHaveBeenCalled();
+    expect(request.auth).toBeUndefined();
+  });
+
+  it('does not reuse cached session liveness on the next request', async () => {
+    await expect(guard.canActivate(createContext().context)).resolves.toBe(
+      true,
+    );
+    prisma.refreshToken.findFirst.mockResolvedValue(null);
+    await expect(guard.canActivate(createContext().context)).rejects.toThrow(
+      'Session has ended',
+    );
+    expect(prisma.refreshToken.findFirst).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails closed if session liveness storage is unavailable', async () => {
+    prisma.refreshToken.findFirst.mockRejectedValue(
+      new Error('Synthetic DB unavailable'),
+    );
+    const { context, request } = createContext();
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      'Synthetic DB unavailable',
+    );
+    expect(request.auth).toBeUndefined();
+    expect(cls.set).not.toHaveBeenCalled();
   });
 
   it('rejects when user tenantId does not match token tenantId (tenant mismatch)', async () => {

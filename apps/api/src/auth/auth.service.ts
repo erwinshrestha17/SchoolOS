@@ -48,6 +48,7 @@ import { RequestPasswordRecoveryDto } from './dto/request-password-recovery.dto'
 import { VerifyOtpLoginDto } from './dto/verify-otp-login.dto';
 import { VerifyPasswordDto } from './dto/verify-password.dto';
 import { assertPasswordsMatch, assertStrongPassword } from './password-policy';
+import { lockAuthTenant, lockAuthUsers } from './auth-account-locks';
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCK_MINUTES = 15;
@@ -173,6 +174,9 @@ export class AuthService {
       challenge.tenantId,
       challenge.sub,
     );
+    if ((challenge.authVersion ?? 0) !== user.authVersion) {
+      throw new UnauthorizedException('Credentials changed. Sign in again.');
+    }
 
     return this.completeAuthenticatedSession(
       user,
@@ -280,6 +284,7 @@ export class AuthService {
           where: { id: user.id, tenantId: tenant.id },
           data: {
             passwordHash: recoveredPasswordHash,
+            authVersion: { increment: 1 },
             mustChangePassword: false,
           },
         });
@@ -384,6 +389,7 @@ export class AuthService {
               dto.newPassword,
               this.configService.bcryptRounds,
             ),
+            authVersion: { increment: 1 },
             mustChangePassword: false,
             failedLoginCount: 0,
             lockedUntil: null,
@@ -448,6 +454,7 @@ export class AuthService {
       purpose: OtpPurpose.VERIFY,
       ttlMinutes: this.configService.otpTtlMinutes,
       emailPurpose: 'mfa_setup',
+      sessionFamilyId: auth.sessionFamilyId,
     });
 
     await this.auditService.record({
@@ -488,7 +495,7 @@ export class AuthService {
         );
         await tx.user.update({
           where: { id: user.id, tenantId: user.tenantId },
-          data: { authMethod: dto.authMethod },
+          data: { authMethod: dto.authMethod, authVersion: { increment: 1 } },
         });
         await this.revokeUserSessions(user.id, { reason: 'mfa_change' }, tx);
         await tx.otpCode.updateMany({
@@ -953,12 +960,13 @@ export class AuthService {
     requestMeta?: RequestMeta,
     audit?: { action: string; otpCode?: string },
   ) {
-    const { authContext, session } = await this.withAuthUserTransaction(
+    const completed = await this.withAuthUserTransaction(
       tenant.id,
       user.id,
       async (tx, currentUser) => {
         if (
           currentUser.passwordHash !== user.passwordHash ||
+          currentUser.authVersion !== user.authVersion ||
           currentUser.authMethod !== user.authMethod ||
           currentUser.email !== user.email
         ) {
@@ -1013,6 +1021,7 @@ export class AuthService {
         return { authContext, session };
       },
     );
+    const { authContext, session } = completed;
     this.attachRefreshCookie(response, session.refreshToken);
     this.attachAccessCookie(response, session.accessToken);
     this.attachCsrfCookie(
@@ -1060,15 +1069,10 @@ export class AuthService {
         async (tx) => {
           // Liveness and the resolved tenant are rechecked after acquiring locks.
           // This does not authorize a caller-supplied tenant or user identifier.
-          const tenants = await tx.$queryRaw<Array<{ id: string }>>`
-          SELECT "id" FROM "Tenant" WHERE "id" = ${tenantId} AND ("isActive" = true OR ${allowInactive}) FOR SHARE
-        `;
-          if (tenants.length !== 1)
+          if (!(await lockAuthTenant(tx, tenantId, allowInactive)))
             throw new UnauthorizedException('Invalid authentication context');
-          const users = await tx.$queryRaw<Array<{ id: string }>>`
-          SELECT "id" FROM "User" WHERE "id" = ${userId} AND "tenantId" = ${tenantId} FOR UPDATE
-        `;
-          if (users.length !== 1)
+          const users = await lockAuthUsers(tx, tenantId, [userId]);
+          if (!users.has(userId))
             throw new UnauthorizedException('Invalid authentication context');
           const user = await tx.user.findUnique({
             where: { id: userId, tenantId },
@@ -1156,39 +1160,48 @@ export class AuthService {
     user: UserWithRoles,
     requestMeta?: RequestMeta,
   ) {
-    const failedLoginCount = user.failedLoginCount + 1;
-    const lockedUntil =
-      failedLoginCount >= MAX_FAILED_LOGIN_ATTEMPTS
-        ? new Date(Date.now() + LOGIN_LOCK_MINUTES * 60 * 1000)
-        : null;
-
-    await this.preAuth(() =>
-      this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          failedLoginCount,
-          lockedUntil,
-        },
-      }),
-    );
-
-    if (lockedUntil) {
-      await this.revokeUserSessions(user.id);
-    }
-
-    await this.auditService.record({
-      action: lockedUntil ? 'login_locked' : 'login_failed',
-      resource: 'auth',
-      tenantId: user.tenantId,
-      userId: user.id,
-      after: {
-        failedLoginCount,
-        lockedUntil,
+    await this.withAuthUserTransaction(
+      user.tenantId,
+      user.id,
+      async (tx, currentUser) => {
+        // An attempt checked against an old credential cannot lock the account
+        // after a successful recovery or password/auth-method change.
+        if (
+          currentUser.passwordHash !== user.passwordHash ||
+          currentUser.authVersion !== user.authVersion ||
+          currentUser.authMethod !== user.authMethod
+        )
+          return;
+        const failedLoginCount = currentUser.failedLoginCount + 1;
+        const lockedUntil =
+          failedLoginCount >= MAX_FAILED_LOGIN_ATTEMPTS
+            ? new Date(Date.now() + LOGIN_LOCK_MINUTES * 60 * 1000)
+            : null;
+        await tx.user.update({
+          where: { id: user.id, tenantId: user.tenantId },
+          data: { failedLoginCount, lockedUntil },
+        });
+        if (lockedUntil)
+          await this.revokeUserSessions(
+            user.id,
+            { reason: 'login_locked' },
+            tx,
+          );
+        await this.auditService.record(
+          {
+            action: lockedUntil ? 'login_locked' : 'login_failed',
+            resource: 'auth',
+            tenantId: user.tenantId,
+            userId: user.id,
+            after: { failedLoginCount, lockedUntil },
+            ipAddress: requestMeta?.ipAddress,
+            userAgent: requestMeta?.userAgent,
+            requestId: requestMeta?.requestId,
+          },
+          tx,
+        );
       },
-      ipAddress: requestMeta?.ipAddress,
-      userAgent: requestMeta?.userAgent,
-      requestId: requestMeta?.requestId,
-    });
+    );
   }
 
   private async issueOtpChallenge(input: IssueOtpInput) {
@@ -1196,6 +1209,7 @@ export class AuthService {
     const challengeToken = await this.jwtService.signAsync<JwtChallengePayload>(
       {
         sub: input.user.id,
+        authVersion: input.user.authVersion,
         tenantId: input.tenant.id,
         tenantSlug: input.tenant.slug,
         purpose: input.purpose,
@@ -1227,11 +1241,27 @@ export class AuthService {
       async (tx, currentUser) => {
         if (
           currentUser.email !== input.user.email ||
+          currentUser.passwordHash !== input.user.passwordHash ||
+          currentUser.authVersion !== input.user.authVersion ||
+          currentUser.authMethod !== input.user.authMethod ||
           (input.purpose === OtpPurpose.RESET &&
             currentUser.authMethod === AuthMethod.OTP)
         ) {
           throw new UnauthorizedException('Invalid authentication context');
         }
+        if (
+          input.sessionFamilyId &&
+          !(await tx.refreshToken.findFirst({
+            where: {
+              userId: currentUser.id,
+              familyId: input.sessionFamilyId,
+              revokedAt: null,
+              expiresAt: { gt: new Date() },
+            },
+            select: { id: true },
+          }))
+        )
+          throw new UnauthorizedException('Session has ended');
         // Serialize limit checking and replacement with recovery, including when
         // multiple API processes handle simultaneous requests for this account.
         await this.assertOtpIssueAllowed(input.user.id, input.purpose, tx);
@@ -1841,13 +1871,14 @@ type UserWithRoles = User & {
 };
 
 interface IssueOtpInput {
-  user: {
-    id: string;
-    email: string | null;
-  };
+  user: Pick<
+    User,
+    'id' | 'email' | 'passwordHash' | 'authMethod' | 'authVersion'
+  >;
   tenant: Tenant;
   purpose: OtpPurpose;
   ttlMinutes: number;
   emailPurpose: 'login' | 'password_recovery' | 'mfa_setup';
   resetUrl?: string;
+  sessionFamilyId?: string;
 }

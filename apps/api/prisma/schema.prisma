@@ -3550,6 +3550,8 @@ model User {
   passwordHash     String?
   mustChangePassword Boolean @default(false)
   authMethod       AuthMethod  @default(PASSWORD)
+  // Fences credential/challenge proofs that began before administrative revocation.
+  authVersion      Int         @default(0)
   status           UserStatus  @default(PENDING)
   lastLoginAt      DateTime?
   failedLoginCount Int         @default(0)

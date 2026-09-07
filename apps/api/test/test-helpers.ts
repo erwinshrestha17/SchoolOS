@@ -600,11 +600,16 @@ export function createPrismaMock() {
   prisma.$queryRaw = jest.fn(
     (sql: TemplateStringsArray, ...values: unknown[]) => {
       const text = Array.isArray(sql) ? sql.join('?') : String(sql);
-      if (text.includes('FROM "Tenant"') && text.includes('FOR SHARE')) {
+      if (
+        text.includes('FROM "Tenant"') &&
+        (text.includes('FOR SHARE') || text.includes('FOR UPDATE'))
+      ) {
         return Promise.resolve(
           state.tenants
             .filter(
-              (tenant) => tenant.id === values[0] && tenant.isActive === true,
+              (tenant) =>
+                tenant.id === values[0] &&
+                (tenant.isActive === true || values[1] === true),
             )
             .map(({ id }) => ({ id })),
         );
@@ -673,6 +678,7 @@ export function createPrismaMock() {
         const data = q.data ?? {};
         const tenant = {
           id: nextId('tenant'),
+          securityDomain: 'SCHOOL',
           isActive: true,
           mode: 'MULTI',
           plan: 'standard',
@@ -741,6 +747,7 @@ export function createPrismaMock() {
           [];
         const user = {
           id: nextId('user'),
+          authVersion: 0,
           ...data,
           userRoles: undefined,
           createdAt: new Date(),
@@ -757,7 +764,7 @@ export function createPrismaMock() {
       update: jest.fn((q: PrismaQuery) => {
         const user = state.users.find((u) => u.id === q.where?.id);
         if (user) {
-          Object.assign(user, q.data);
+          applyMockUpdate(user, q.data ?? {});
         }
         return Promise.resolve(attachUserRoles(state, user));
       }),

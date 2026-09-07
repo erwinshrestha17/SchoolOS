@@ -101,7 +101,7 @@ Architecture rules:
 9. Provider rejection and transport failure are different states. Retry requires permission, reason and audit.
 10. No UI, export, or configuration label may claim government-system integration, IRD verification, or CBMS certification without recorded official evidence.
 
-## 1C. Authentication recovery transaction boundary
+## 1C. Authentication recovery and session transaction boundary
 
 Password recovery uses the existing tenant/email and numeric-code contract. The
 backend resolves the account, then locks the active tenant (shared lock) and the
@@ -124,10 +124,97 @@ a dedicated loopback database named `schoolos_auth_recovery_test` (optionally wi
 an alphanumeric suffix). It does not inherit `.env` as test authorization, send
 provider messages, or establish staging/pilot evidence.
 
-**Remaining release boundary:** refresh-token revocation alone does not prove
-immediate rejection of previously issued access JWTs, nor fence an already-running
-login or refresh issuance. Those paths require explicit session-liveness checks
-and concurrent credential-change tests before claiming complete session revocation.
+Access JWTs carry `sid`, the persisted refresh-token family identifier. The HTTP
+authentication guard checks the resolved user's active, unexpired family directly
+in PostgreSQL on every request, without caching or accepting a client-supplied
+session identifier. Rotation retains the family. Logout and selected-session
+removal revoke the entire family, including a successor created while a client
+still holds a predecessor token. Password recovery, MFA changes, and account
+lockout revoke every family. Password change and revoke-other-sessions preserve
+the current family identified by the verified JWT, including on mobile without a
+refresh cookie. An unavailable session store fails closed.
+
+Login completion, refresh, logout, self-service password/MFA changes, session
+removal, failed-login counters, recovery, and code issuance use the same
+tenant-then-user lock order. Password/MFA snapshots are rechecked after locking;
+a previously verified old password cannot mint a session or a fresh MFA challenge
+after recovery commits. OTP login consumes its code in the issuance transaction.
+Refresh claims the predecessor conditionally and commits its successor and audit
+atomically. Reuse detection commits family revocation before returning rejection;
+simultaneous refresh of one token therefore produces at most one successor, then
+invalidates that family. Clients must serialize refresh and reauthenticate after
+an ambiguous/replayed refresh, not automatically retry the predecessor. Success
+cookies are attached only after issuance commits. Audit failure rolls back the
+associated auth state changes.
+
+Administrative password reset and force-logout also use the tenant-then-user
+lock order, with actor/target user IDs sorted and deduplicated to avoid reciprocal
+operation deadlocks. After locking, they recheck the administrator's active
+account, live session family, school security domain, and current
+`users:reset_password` permission. They cannot operate through Platform/support
+context or on another tenant. The target password/version change, session
+revocation, unused OTP invalidation, push-registration removal, and administrative
+audit commit together. Reset does not reactivate a suspended target.
+
+School account-status and role-governance mutations use the shared
+`withSchoolAuthorizationTransaction` boundary. They acquire a tenant `FOR UPDATE`
+lock before sorted user locks; authentication/reset use a tenant
+`FOR SHARE` lock. This serializes participating role/status writers and makes
+credential transactions waiting behind a revocation recheck committed authority.
+The actor must have a live session, an active unlocked school account, no required
+password change, and the current operation-specific database permission. Owner
+removal/deactivation checks run under the tenant lock and ignore revoked/expired
+alternate owners. The role change, permission replacement or status change and
+its audit commit together; permission replacement never exposes a committed
+delete-only intermediate state. Existing assignment revocation history is retained.
+Finance permission reconciliation participates in the same boundary and only
+counts active-account Accountant assignments. Cache cleanup follows commit;
+database reads remain authorization truth.
+
+A changed account status advances `authVersion`. Non-active status also revokes
+session families, invalidates unused OTPs and removes push registrations in that
+transaction. Reactivation does not revive the previous sessions or challenges.
+The tenant lock is intentionally coarse for infrequent governance changes, not a
+new authorization bypass for other services. All such locks must precede user
+locks; evaluate lock contention in staging before changing their granularity.
+
+`User.authVersion` is a server-owned credential-proof fence, introduced by
+`20260907144000_auth_version_fence`. Recovery, password/MFA change and administrative
+reset/force-logout and account-status changes increment it. Login completion and code issuance compare the
+version captured before credential verification to the locked account. Signed
+login challenges carry the same version; a pre-revocation challenge cannot borrow
+a newly issued code. Legacy challenges without the field are version zero and
+are accepted only while the account remains at zero. A fresh login after force
+logout remains allowed; this action is not account suspension. Clients cannot
+choose this version, and it is not exposed in ordinary user/session response DTOs.
+
+**Rollout boundary:** legacy access JWTs without `sid` are rejected. A still-valid
+legacy refresh token can rotate into a bound family; otherwise sign-in is required.
+Deploy issuance and verification together across API instances and School Edge
+authorities. Mixed old/new instances or rolling back to a verifier without session
+liveness would undermine the guarantee. Family binding uses the existing field
+and index. The additive `authVersion` migration must precede version-aware API
+code; mixed old/new credential writers do not provide the version-fencing guarantee.
+Preserve the column and historical session/code records during application rollback.
+
+**Evidence boundary:** the real-PostgreSQL suite covers these AuthService paths,
+including concurrency, rollback, old-token upgrade, tenant scope, and the next
+guarded request after revocation. It does not establish multi-instance deployment,
+cloud/Edge revocation convergence, cancellation of requests already past the guard,
+removal of already delivered push messages, or deletion of offline cached data.
+`apps/api/test/auth-administrative-concurrency.int-spec.ts` adds real-PostgreSQL
+administrative reset/force-logout races, actor revocation, reciprocal operations,
+rollback, persona/tenant boundaries, a scoped HTTP controller/guard/validation
+harness, and execution of the additive migration on a transaction-local synthetic
+table. It is not evidence of applying the full migration chain to a deployed school.
+The suite also covers concurrent owner role removal/status changes, permission
+replacement rollback, complete assignment replacement, required-password-change
+denial, and a reset demonstrably waiting on PostgreSQL behind role revocation.
+User/staff provisioning, other lifecycle writers, scripts/direct SQL, future-dated
+owner-expiry continuity and cloud/Edge convergence remain separate review areas.
+Tenant-default role provisioning currently runs only inside new-tenant creation;
+it is not a supported live role-reconciliation bypass. This is not a claim that all authentication
+or production release gates are complete.
 
 ## 2. Storage and File Registry Architecture
 

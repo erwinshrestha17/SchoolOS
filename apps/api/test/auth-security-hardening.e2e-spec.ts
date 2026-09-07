@@ -45,6 +45,7 @@ describe('Auth Security Hardening (Regression)', () => {
 
   beforeEach(async () => {
     prisma = createPrismaMock();
+    prisma.refreshToken.findFirst.mockResolvedValue({ id: 'platform-session' });
     jwtService = {
       verifyAsync: jest.fn(),
     } as any;
@@ -136,6 +137,7 @@ describe('Auth Security Hardening (Regression)', () => {
   it('should deny platform users from overriding tenant without an active SupportOverride session', async () => {
     const payload = {
       sub: 'platform-user',
+      sid: 'platform-session',
       tenantId: 'platform-tenant',
       roles: ['platform_super_admin'],
     };
@@ -190,7 +192,11 @@ describe('Auth Security Hardening (Regression)', () => {
   });
 
   it('should throw ForbiddenException if override reason is shorter than 5 characters', async () => {
-    const payload = { sub: 'platform-user', tenantId: 'platform-tenant' };
+    const payload = {
+      sub: 'platform-user',
+      sid: 'platform-session',
+      tenantId: 'platform-tenant',
+    };
     // AuthzCacheService resolves roles from these two reads.
     prisma.userRole.findMany.mockResolvedValue([
       {
@@ -254,7 +260,11 @@ describe('Auth Security Hardening (Regression)', () => {
   });
 
   it('should allow platform users to override tenant with an active SupportOverride session', async () => {
-    const payload = { sub: 'platform-user', tenantId: 'platform-tenant' };
+    const payload = {
+      sub: 'platform-user',
+      sid: 'platform-session',
+      tenantId: 'platform-tenant',
+    };
     // AuthzCacheService resolves roles from these two reads.
     prisma.userRole.findMany.mockResolvedValue([
       {

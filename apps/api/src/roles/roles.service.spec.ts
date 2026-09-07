@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { RolesService } from './roles.service';
+import { installSchoolGovernanceDouble } from '../../test/helpers/school-governance-double';
 
 /** Invalidation is asserted where it matters; elsewhere it is a no-op. */
 function authzCacheDouble() {
@@ -214,6 +215,11 @@ describe('RolesService authorization cache invalidation', () => {
       ),
       ...overrides,
     };
+    installSchoolGovernanceDouble(prisma, [
+      'roles:assign',
+      'roles:manage_permissions',
+      'roles:create',
+    ]);
     const auditService = { record: jest.fn().mockResolvedValue({}) };
     return {
       prisma,
@@ -229,6 +235,7 @@ describe('RolesService authorization cache invalidation', () => {
   const actor = {
     tenantId: 'tenant-1',
     userId: 'admin-1',
+    sessionFamilyId: 'admin-family',
     roles: ['admin'],
     permissions: ['roles:assign', 'roles:manage'],
   } as never;
@@ -275,7 +282,8 @@ describe('RolesService authorization cache invalidation', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.userRole.create).not.toHaveBeenCalled();
+    expect(prisma.userRole.update).not.toHaveBeenCalled();
     expect(authzCache.invalidateUser).not.toHaveBeenCalled();
   });
 
@@ -351,6 +359,7 @@ describe('RolesService authorization cache invalidation', () => {
     const audit = { record: jest.fn().mockResolvedValue({ id: 'audit-1' }) };
     const prisma = {
       role: { findMany: jest.fn().mockResolvedValue([]) },
+      user: {},
       userRole: {
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn(),
@@ -364,6 +373,7 @@ describe('RolesService authorization cache invalidation', () => {
         work(prisma),
       ),
     };
+    installSchoolGovernanceDouble(prisma, ['roles:manage_permissions']);
     const service = new RolesService(
       prisma as never,
       audit as never,
@@ -385,6 +395,7 @@ describe('RolesService authorization cache invalidation', () => {
           userRoleAssignmentsChanged: false,
         }),
       }),
+      prisma,
     );
   });
 });

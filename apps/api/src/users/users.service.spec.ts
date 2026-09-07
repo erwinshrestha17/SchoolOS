@@ -3,7 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { AuthMethod } from '@prisma/client';
+import { AuthMethod, SecurityDomain } from '@prisma/client';
 import { UsersService } from './users.service';
 import { AuthContext } from '../auth/auth.types';
 
@@ -17,22 +17,56 @@ describe('UsersService', () => {
   beforeEach(async () => {
     prisma = {
       user: {
-        findUnique: jest.fn(),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ status: 'ACTIVE', lockedUntil: null }),
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
       },
       refreshToken: {
         updateMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue({ id: 'admin-session' }),
       },
       role: {
         findMany: jest.fn(),
       },
+      tenant: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ securityDomain: SecurityDomain.SCHOOL }),
+      },
+      userRole: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            role: {
+              name: 'admin',
+              rolePermissions: [
+                {
+                  permission: { resource: 'users', action: 'reset_password' },
+                },
+              ],
+            },
+          },
+        ]),
+      },
+      otpCode: { updateMany: jest.fn() },
+      mobilePushToken: { deleteMany: jest.fn() },
+      runWithTenantScope: jest.fn(
+        async (_tenantId: string, work: () => Promise<unknown>) => work(),
+      ),
+      $queryRaw: jest.fn(async (_sql: TemplateStringsArray, id: string) => [
+        { id },
+      ]),
     };
+    prisma.$transaction = jest.fn(
+      async (work: (tx: unknown) => Promise<unknown>) => work(prisma),
+    );
     configService = { bcryptRounds: 4 };
     auditService = { record: jest.fn() };
     actor = {
       userId: 'admin-1',
+      sessionFamilyId: 'admin-family',
       tenantId: 'tenant-1',
       tenantSlug: 'school-a',
       email: 'admin@school.com',
@@ -248,10 +282,11 @@ describe('UsersService', () => {
     });
     expect(prisma.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'user-2' },
+        where: { id: 'user-2', tenantId: 'tenant-1' },
         data: expect.objectContaining({
           passwordHash: expect.any(String),
           mustChangePassword: true,
+          authVersion: { increment: 1 },
         }),
       }),
     );
@@ -262,6 +297,7 @@ describe('UsersService', () => {
       },
       data: {
         revokedAt: expect.any(Date),
+        revokedReason: 'admin_password_reset',
       },
     });
     expect(auditService.record).toHaveBeenCalledWith(
@@ -271,6 +307,7 @@ describe('UsersService', () => {
         userId: 'admin-1',
         resourceId: 'user-2',
       }),
+      prisma,
     );
   });
 

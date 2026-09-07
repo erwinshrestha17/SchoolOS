@@ -41,6 +41,8 @@ export interface JwtAccessPayload {
 
 export interface JwtChallengePayload {
   sub: string;
+  /** Legacy challenges were issued at version zero. */
+  authVersion?: number;
   tenantId: string;
   tenantSlug: string;
   purpose: OtpPurpose;

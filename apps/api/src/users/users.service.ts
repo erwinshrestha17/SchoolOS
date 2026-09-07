@@ -6,8 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { isPlatformRoleName, SCHOOL_CONFIG_OWNER_ROLE } from '@schoolos/core';
-import { AuthMethod, UserStatus } from '@prisma/client';
-import type { Prisma } from '@prisma/client';
+import { AuthMethod, UserStatus, type Prisma, type User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
@@ -22,6 +21,7 @@ import {
   requireProfileEmail,
 } from '../common/validation/contact-profile';
 import { resolveRoleAssignmentExpiries } from '../roles/role-assignment-expiry';
+import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
 
 @Injectable()
 export class UsersService {
@@ -132,72 +132,99 @@ export class UsersService {
     dto: UpdateUserStatusDto,
     actor: AuthContext,
   ) {
-    const user = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        tenantId: actor.tenantId,
-      },
-      include: this.userInclude,
-    });
+    return withSchoolAuthorizationTransaction(
+      this.prisma,
+      actor,
+      'users:update_status',
+      [userId],
+      async (tx) => {
+        const user = await tx.user.findFirst({
+          where: {
+            id: userId,
+            tenantId: actor.tenantId,
+          },
+          include: this.userInclude,
+        });
 
-    if (!user) {
-      throw new NotFoundException('User not found in this tenant');
-    }
+        if (!user) {
+          throw new NotFoundException('User not found in this tenant');
+        }
 
-    const deactivatingConfigOwner =
-      dto.status !== UserStatus.ACTIVE &&
-      user.status === UserStatus.ACTIVE &&
-      user.userRoles.some(({ role }) => role.name === SCHOOL_CONFIG_OWNER_ROLE);
+        const deactivatingConfigOwner =
+          dto.status !== UserStatus.ACTIVE &&
+          user.status === UserStatus.ACTIVE &&
+          user.userRoles.some(
+            ({ role }) => role.name === SCHOOL_CONFIG_OWNER_ROLE,
+          );
 
-    if (deactivatingConfigOwner) {
-      if (!dto.reason?.trim()) {
-        throw new BadRequestException(
-          'A reason is required when deactivating a School Configuration Owner.',
+        if (deactivatingConfigOwner) {
+          if (!dto.reason?.trim()) {
+            throw new BadRequestException(
+              'A reason is required when deactivating a School Configuration Owner.',
+            );
+          }
+          const otherActiveOwners = await tx.userRole.count({
+            where: {
+              tenantId: actor.tenantId,
+              userId: { not: user.id },
+              revokedAt: null,
+              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+              role: {
+                tenantId: actor.tenantId,
+                name: SCHOOL_CONFIG_OWNER_ROLE,
+              },
+              user: { status: UserStatus.ACTIVE },
+            },
+          });
+          if (otherActiveOwners === 0) {
+            throw new ForbiddenException(
+              'At least one active School Configuration Owner must remain. Assign the role to another active user first.',
+            );
+          }
+        }
+
+        const updatedUser = await tx.user.update({
+          where: { id: user.id, tenantId: actor.tenantId },
+          data: {
+            status: dto.status,
+            ...(dto.status !== user.status
+              ? { authVersion: { increment: 1 } }
+              : {}),
+          },
+          include: this.userInclude,
+        });
+
+        if (dto.status !== UserStatus.ACTIVE) {
+          await this.invalidateAuthentication(
+            tx,
+            actor.tenantId,
+            user.id,
+            'account_status_changed',
+          );
+        }
+
+        await this.auditService.record(
+          {
+            action: 'update_status',
+            resource: 'user',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: user.id,
+            before: { status: user.status },
+            after: {
+              status: dto.status,
+              ...(deactivatingConfigOwner
+                ? { configOwnerDeactivated: true, reason: dto.reason?.trim() }
+                : {}),
+            },
+          },
+          tx,
         );
-      }
-      const otherActiveOwners = await this.prisma.userRole.count({
-        where: {
-          tenantId: actor.tenantId,
-          userId: { not: user.id },
-          role: { tenantId: actor.tenantId, name: SCHOOL_CONFIG_OWNER_ROLE },
-          user: { status: UserStatus.ACTIVE },
-        },
-      });
-      if (otherActiveOwners === 0) {
-        throw new ForbiddenException(
-          'At least one active School Configuration Owner must remain. Assign the role to another active user first.',
-        );
-      }
-    }
 
-    const updatedUser = await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        status: dto.status,
+        return this.toUserSummary(updatedUser);
       },
-      include: this.userInclude,
-    });
-
-    if (dto.status !== UserStatus.ACTIVE) {
-      await this.revokeUserSessions(user.id);
-    }
-
-    await this.auditService.record({
-      action: 'update_status',
-      resource: 'user',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: user.id,
-      before: { status: user.status },
-      after: {
-        status: dto.status,
-        ...(deactivatingConfigOwner
-          ? { configOwnerDeactivated: true, reason: dto.reason?.trim() }
-          : {}),
-      },
-    });
-
-    return this.toUserSummary(updatedUser);
+      true,
+    );
   }
 
   async resetPassword(
@@ -205,82 +232,125 @@ export class UsersService {
     dto: ResetUserPasswordDto,
     actor: AuthContext,
   ) {
-    const user = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        tenantId: actor.tenantId,
+    await this.withAdministrativeAuthTransaction(
+      userId,
+      actor,
+      async (tx, user) => {
+        assertStrongPassword(dto.password, [user.email]);
+        if (
+          user.passwordHash &&
+          (await bcrypt.compare(dto.password, user.passwordHash))
+        ) {
+          throw new BadRequestException(
+            'New password cannot be the same as current password.',
+          );
+        }
+        await tx.user.update({
+          where: { id: user.id, tenantId: actor.tenantId },
+          data: {
+            passwordHash: await bcrypt.hash(
+              dto.password,
+              this.configService.bcryptRounds,
+            ),
+            authVersion: { increment: 1 },
+            mustChangePassword: dto.requireChangeOnNextLogin ?? true,
+            failedLoginCount: 0,
+            lockedUntil: null,
+          },
+        });
+        await this.invalidateAuthentication(
+          tx,
+          actor.tenantId,
+          user.id,
+          'admin_password_reset',
+        );
+        await this.auditService.record(
+          {
+            action: 'reset_password',
+            resource: 'user',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: user.id,
+            after: {
+              passwordReset: true,
+              mustChangePassword: dto.requireChangeOnNextLogin ?? true,
+            },
+          },
+          tx,
+        );
       },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found in this tenant');
-    }
-
-    assertStrongPassword(dto.password, [user.email]);
-
-    if (
-      user.passwordHash &&
-      (await bcrypt.compare(dto.password, user.passwordHash))
-    ) {
-      throw new BadRequestException(
-        'New password cannot be the same as current password.',
-      );
-    }
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        passwordHash: await bcrypt.hash(
-          dto.password,
-          this.configService.bcryptRounds,
-        ),
-        mustChangePassword: dto.requireChangeOnNextLogin ?? true,
-        failedLoginCount: 0,
-        lockedUntil: null,
-      },
-    });
-
-    await this.revokeUserSessions(user.id);
-
-    await this.auditService.record({
-      action: 'reset_password',
-      resource: 'user',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: user.id,
-      after: {
-        passwordReset: true,
-        mustChangePassword: dto.requireChangeOnNextLogin ?? true,
-      },
-    });
-
+    );
     return { success: true };
   }
 
   async forceLogout(userId: string, actor: AuthContext) {
-    const user = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        tenantId: actor.tenantId,
+    await this.withAdministrativeAuthTransaction(
+      userId,
+      actor,
+      async (tx, user) => {
+        await tx.user.update({
+          where: { id: user.id, tenantId: actor.tenantId },
+          data: { authVersion: { increment: 1 } },
+        });
+        await this.invalidateAuthentication(
+          tx,
+          actor.tenantId,
+          user.id,
+          'admin_force_logout',
+        );
+        await this.auditService.record(
+          {
+            action: 'force_logout',
+            resource: 'user',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: user.id,
+            after: { sessionsRevoked: true },
+          },
+          tx,
+        );
       },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found in this tenant');
-    }
-
-    await this.revokeUserSessions(user.id);
-
-    await this.auditService.record({
-      action: 'force_logout',
-      resource: 'user',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: user.id,
-      after: { sessionsRevoked: true },
-    });
-
+    );
     return { success: true };
+  }
+
+  private withAdministrativeAuthTransaction<T>(
+    userId: string,
+    actor: AuthContext,
+    work: (tx: Prisma.TransactionClient, user: User) => Promise<T>,
+  ): Promise<T> {
+    return withSchoolAuthorizationTransaction(
+      this.prisma,
+      actor,
+      'users:reset_password',
+      [userId],
+      async (tx, locked) => {
+        if (!locked.has(userId))
+          throw new NotFoundException('User not found in this tenant');
+        const user = await tx.user.findFirst({
+          where: { id: userId, tenantId: actor.tenantId },
+        });
+        if (!user) throw new NotFoundException('User not found in this tenant');
+        return work(tx, user);
+      },
+    );
+  }
+
+  private async invalidateAuthentication(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    userId: string,
+    reason: string,
+  ) {
+    await tx.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date(), revokedReason: reason },
+    });
+    await tx.otpCode.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+    await tx.mobilePushToken.deleteMany({ where: { userId, tenantId } });
   }
 
   private get userInclude() {
@@ -316,18 +386,6 @@ export class UsersService {
     if (existingUser) {
       throw new ConflictException('Email is already registered in this tenant');
     }
-  }
-
-  private async revokeUserSessions(userId: string) {
-    await this.prisma.refreshToken.updateMany({
-      where: {
-        userId,
-        revokedAt: null,
-      },
-      data: {
-        revokedAt: new Date(),
-      },
-    });
   }
 
   private toUserSummary(user: UserWithRelations) {

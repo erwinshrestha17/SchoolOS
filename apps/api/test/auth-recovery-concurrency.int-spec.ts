@@ -1,64 +1,45 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { AuthMethod, OtpPurpose, UserStatus } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 import {
   BadRequestException,
+  ExecutionContext,
   HttpException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Reflector } from '@nestjs/core';
+import type { Response } from 'express';
 import { ClsService } from 'nestjs-cls';
 import * as bcrypt from 'bcrypt';
 import { AuditService } from '../src/audit/audit.service';
 import { AuthService } from '../src/auth/auth.service';
-import { hashOtpCode } from '../src/auth/auth.utils';
+import { hashOtpCode, hashToken } from '../src/auth/auth.utils';
+import type { AuthContext, JwtAccessPayload } from '../src/auth/auth.types';
+import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
+import { MustChangePasswordGuard } from '../src/auth/guards/must-change-password.guard';
+import { AuthzCacheService } from '../src/auth/authz-cache.service';
+import { createPassThroughRedisCache } from './helpers/redis-cache';
+import { createPassThroughRequestCache } from './helpers/request-cache';
 import { ConfigService } from '../src/config/config.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-
-// This suite never inherits DATABASE_URL/.env: use a disposable local database
-// named schoolos_auth_recovery_test*. No existing school data is read or seeded.
-const databaseUrl = process.env.SCHOOLOS_AUTH_TEST_DATABASE_URL;
-if (databaseUrl) {
-  const target = new URL(databaseUrl);
-  if (
-    !['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) ||
-    !/^\/schoolos_auth_recovery_test(?:_[a-z0-9]+)?$/.test(target.pathname)
-  ) {
-    throw new Error(
-      'Auth recovery tests require a dedicated loopback test database.',
-    );
-  }
-}
-
-class IsolatedCls {
-  private readonly storage = new AsyncLocalStorage<Map<string, unknown>>();
-  get(key: string) {
-    return this.storage.getStore()?.get(key);
-  }
-  set(key: string, value: unknown) {
-    const store = this.storage.getStore();
-    if (!store) throw new Error('Test CLS context missing');
-    store.set(key, value);
-  }
-  isActive() {
-    return this.storage.getStore() !== undefined;
-  }
-  run<T>(fn: () => Promise<T>) {
-    return this.storage.run(new Map(this.storage.getStore()), fn);
-  }
-}
+import {
+  authTestDatabaseUrl as databaseUrl,
+  IsolatedAuthCls,
+} from './helpers/auth-test-isolation';
 
 const describeDatabase = databaseUrl ? describe : describe.skip;
 describeDatabase(
   'Auth recovery concurrency (real PostgreSQL, isolated fixtures)',
   () => {
     const originalUrl = process.env.DATABASE_URL;
-    const cls = new IsolatedCls() as unknown as ClsService;
+    const cls = new IsolatedAuthCls() as unknown as ClsService;
     let prisma: PrismaService;
     let audit: AuditService;
     let service: AuthService;
+    let guard: JwtAuthGuard;
+    const jwt = new JwtService();
     let tenantId: string;
     let userId: string;
     let otherTenantId: string;
@@ -77,6 +58,20 @@ describeDatabase(
       otpIssueWindowMinutes: 15,
       passwordResetTtlMinutes: 15,
       passwordResetAppUrl: 'https://example.invalid/reset-password',
+      jwtSecret: 'synthetic-local-session-test-secret-only',
+      jwtIssuer: 'schoolos-test',
+      jwtAudienceWeb: 'schoolos-test-web',
+      jwtAudienceMobile: 'schoolos-test-mobile',
+      tokenHashPepper: 'synthetic-local-pepper-only',
+      challengeSecret: 'synthetic-local-challenge-only',
+      accessTokenTtl: '15m',
+      challengeTokenTtl: '5m',
+      otpTtlMinutes: 5,
+      refreshTokenTtlDays: 14,
+      refreshCookieName: 'refresh_token',
+      accessCookieName: 'access_token',
+      cookieSameSite: 'lax',
+      isProduction: false,
     } as ConfigService;
 
     const scoped = <T>(fn: () => Promise<T>) =>
@@ -107,12 +102,23 @@ describeDatabase(
       process.env.DATABASE_URL = databaseUrl;
       prisma = new PrismaService(cls);
       audit = new AuditService(prisma, cls);
-      service = new AuthService(prisma, new JwtService(), config, audit, {
+      service = new AuthService(prisma, jwt, config, audit, {
         sendAuthCodeEmail: (input: { code: string }) => {
           delivered.push(input);
           return Promise.resolve();
         },
       } as unknown as NotificationsService);
+      guard = new JwtAuthGuard(
+        jwt,
+        config,
+        audit,
+        prisma,
+        cls,
+        { canActivate: () => true } as unknown as MustChangePasswordGuard,
+        new AuthzCacheService(prisma, createPassThroughRedisCache()),
+        createPassThroughRequestCache(),
+        new Reflector(),
+      );
       originalPasswordHash = await bcrypt.hash(oldPassword, 4);
     });
 
@@ -228,6 +234,666 @@ describeDatabase(
         ),
       ).toBe(0);
     }
+
+    function responseStub() {
+      return { cookie: jest.fn(), clearCookie: jest.fn() };
+    }
+
+    async function login(response = responseStub()) {
+      const session = await service.login(
+        { tenantSlug, email, password: oldPassword },
+        response as unknown as Response,
+        { userAgent: 'Dart/3 synthetic-test' },
+      );
+      if (
+        !('accessToken' in session) ||
+        !session.accessToken ||
+        !session.refreshToken
+      )
+        throw new Error('Expected a mobile session');
+      return {
+        ...session,
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+      };
+    }
+
+    async function authorize(accessToken: string) {
+      return cls.run(async () => {
+        const request: {
+          headers: Record<string, string>;
+          method: string;
+          auth?: AuthContext;
+        } = {
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            'user-agent': 'Dart/3 synthetic-test',
+          },
+          method: 'GET',
+        };
+        const context = {
+          switchToHttp: () => ({ getRequest: () => request }),
+          getHandler: () => authorize,
+          getClass: () => AuthService,
+        } as unknown as ExecutionContext;
+        await guard.canActivate(context);
+        if (!request.auth?.sessionFamilyId)
+          throw new Error('Expected an authenticated context');
+        return {
+          ...request.auth,
+          sessionFamilyId: request.auth.sessionFamilyId,
+        };
+      });
+    }
+
+    const rotate = async (refreshToken: string, response = responseStub()) => {
+      const session = await service.refresh(
+        { refreshToken },
+        response as unknown as Response,
+        undefined,
+        { userAgent: 'Dart/3 synthetic-test' },
+      );
+      if (!session.accessToken || !session.refreshToken)
+        throw new Error('Expected a mobile refresh session');
+      return {
+        ...session,
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+      };
+    };
+    const logout = (refreshToken: string) =>
+      service.logout({ refreshToken }, responseStub() as unknown as Response);
+    const activeFamily = (familyId: string) =>
+      prisma.refreshToken.count({
+        where: {
+          userId,
+          familyId,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+      });
+
+    describe('session-bound access and serialized credential lifecycle', () => {
+      it('binds access JWTs to a persisted family and retains it across rotation', async () => {
+        const first = await login();
+        const auth = await authorize(first.accessToken);
+        expect(auth.sessionFamilyId).toEqual(expect.any(String));
+        expect(await activeFamily(auth.sessionFamilyId)).toBe(1);
+        const second = await rotate(first.refreshToken);
+        expect((await authorize(second.accessToken)).sessionFamilyId).toBe(
+          auth.sessionFamilyId,
+        );
+        await expect(authorize(first.accessToken)).resolves.toMatchObject({
+          userId,
+        });
+        expect(await activeFamily(auth.sessionFamilyId)).toBe(1);
+      });
+
+      it('logout with a rotated predecessor ends the entire family, not another login', async () => {
+        const first = await login();
+        const independent = await login();
+        const second = await rotate(first.refreshToken);
+        await logout(first.refreshToken);
+        await expect(authorize(first.accessToken)).rejects.toBeInstanceOf(
+          UnauthorizedException,
+        );
+        await expect(authorize(second.accessToken)).rejects.toBeInstanceOf(
+          UnauthorizedException,
+        );
+        await expect(authorize(independent.accessToken)).resolves.toMatchObject(
+          { userId },
+        );
+        await expect(rotate(second.refreshToken)).rejects.toBeInstanceOf(
+          UnauthorizedException,
+        );
+      });
+
+      it('password recovery invalidates every pre-recovery access token on its next request', async () => {
+        const first = await login();
+        const second = await login();
+        const staleAuth = await authorize(first.accessToken);
+        await addCode();
+        await confirm();
+        await expect(authorize(first.accessToken)).rejects.toBeInstanceOf(
+          UnauthorizedException,
+        );
+        await expect(authorize(second.accessToken)).rejects.toBeInstanceOf(
+          UnauthorizedException,
+        );
+        await expect(rotate(first.refreshToken)).rejects.toBeInstanceOf(
+          UnauthorizedException,
+        );
+        await expect(
+          service.changePassword(
+            staleAuth,
+            {
+              currentPassword: newPassword,
+              newPassword: 'Gt65!xB3',
+              confirmNewPassword: 'Gt65!xB3',
+            },
+            responseStub() as unknown as Response,
+          ),
+        ).rejects.toThrow('Session has ended');
+      });
+
+      it('password change identifies the mobile current session by verified JWT without a cookie', async () => {
+        const current = await login();
+        const other = await login();
+        const auth = await authorize(current.accessToken);
+        await addCode();
+        await service.changePassword(
+          auth,
+          {
+            currentPassword: oldPassword,
+            newPassword,
+            confirmNewPassword: newPassword,
+          },
+          responseStub() as unknown as Response,
+        );
+        await expect(authorize(current.accessToken)).resolves.toMatchObject({
+          userId,
+        });
+        await expect(authorize(other.accessToken)).rejects.toBeInstanceOf(
+          UnauthorizedException,
+        );
+        expect(
+          await prisma.otpCode.count({ where: { userId, usedAt: null } }),
+        ).toBe(0);
+        await expect(rotate(current.refreshToken)).resolves.toHaveProperty(
+          'accessToken',
+        );
+      });
+
+      it('session removal using a rotated list entry revokes its live successor', async () => {
+        const current = await login();
+        const other = await login();
+        const auth = await authorize(current.accessToken);
+        const targetId = (await authorize(other.accessToken)).sessionFamilyId;
+        const successor = await rotate(other.refreshToken);
+        await service.revokeSession(targetId, auth);
+        await expect(authorize(successor.accessToken)).rejects.toBeInstanceOf(
+          UnauthorizedException,
+        );
+        await expect(authorize(current.accessToken)).resolves.toMatchObject({
+          userId,
+        });
+      });
+
+      it('revoke-other-sessions uses verified identity rather than a supplied other-session token', async () => {
+        const current = await login();
+        const other = await login();
+        const auth = await authorize(current.accessToken);
+        await service.revokeOtherSessions(auth, {
+          refreshToken: other.refreshToken,
+        });
+        await expect(authorize(current.accessToken)).resolves.toMatchObject({
+          userId,
+        });
+        await expect(authorize(other.accessToken)).rejects.toBeInstanceOf(
+          UnauthorizedException,
+        );
+      });
+
+      it('MFA changes consume the code and revoke all sessions atomically', async () => {
+        const current = await login();
+        const auth = await authorize(current.accessToken);
+        await addCode(OtpPurpose.VERIFY);
+        await service.confirmMfaSetup(auth, {
+          code,
+          authMethod: AuthMethod.BOTH,
+        });
+        await expect(authorize(current.accessToken)).rejects.toBeInstanceOf(
+          UnauthorizedException,
+        );
+        expect(
+          (
+            await scoped(() =>
+              prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+            )
+          ).authMethod,
+        ).toBe(AuthMethod.BOTH);
+        expect(
+          await prisma.otpCode.count({ where: { userId, usedAt: null } }),
+        ).toBe(0);
+      });
+
+      it('concurrent refresh issues only one successor and replay commits family revocation', async () => {
+        const first = await login();
+        const independent = await login();
+        const familyId = (await authorize(first.accessToken)).sessionFamilyId;
+        const results = await Promise.allSettled([
+          rotate(first.refreshToken),
+          rotate(first.refreshToken),
+        ]);
+        expect(
+          results.filter((result) => result.status === 'fulfilled'),
+        ).toHaveLength(1);
+        expect(
+          results.filter((result) => result.status === 'rejected'),
+        ).toHaveLength(1);
+        expect(
+          await prisma.refreshToken.count({ where: { userId, familyId } }),
+        ).toBe(2);
+        expect(await activeFamily(familyId)).toBe(0);
+        await expect(authorize(first.accessToken)).rejects.toBeInstanceOf(
+          UnauthorizedException,
+        );
+        const winner = results.find((result) => result.status === 'fulfilled');
+        if (winner?.status !== 'fulfilled')
+          throw new Error('Expected one refresh winner');
+        await expect(
+          authorize(winner.value.accessToken),
+        ).rejects.toBeInstanceOf(UnauthorizedException);
+        expect(
+          await scoped(() =>
+            prisma.auditLog.count({
+              where: { userId, action: 'suspicious_refresh_token_reuse' },
+            }),
+          ),
+        ).toBe(1);
+        await expect(authorize(independent.accessToken)).resolves.toMatchObject(
+          { userId },
+        );
+      });
+
+      it('refresh audit failure rolls back token consumption and never attaches success cookies', async () => {
+        const first = await login();
+        const familyId = (await authorize(first.accessToken)).sessionFamilyId;
+        const response = responseStub();
+        const failingAudit = jest
+          .spyOn(audit, 'record')
+          .mockRejectedValueOnce(new Error('Synthetic audit failure'));
+        await expect(rotate(first.refreshToken, response)).rejects.toThrow(
+          'Synthetic audit failure',
+        );
+        expect(response.cookie).not.toHaveBeenCalled();
+        expect(
+          await prisma.refreshToken.count({ where: { userId, familyId } }),
+        ).toBe(1);
+        expect(await activeFamily(familyId)).toBe(1);
+        failingAudit.mockRestore();
+        await expect(rotate(first.refreshToken)).resolves.toHaveProperty(
+          'accessToken',
+        );
+      });
+
+      it('login audit failure rolls back session issuance before response cookies', async () => {
+        const before = await prisma.refreshToken.count({ where: { userId } });
+        const response = responseStub();
+        jest
+          .spyOn(audit, 'record')
+          .mockRejectedValueOnce(new Error('Synthetic audit failure'));
+        await expect(login(response)).rejects.toThrow(
+          'Synthetic audit failure',
+        );
+        expect(response.cookie).not.toHaveBeenCalled();
+        expect(await prisma.refreshToken.count({ where: { userId } })).toBe(
+          before,
+        );
+      });
+
+      it('a login that already checked the old password cannot issue after recovery commits', async () => {
+        // Hold the production completion seam only after bcrypt has accepted the
+        // old credential. All actual locking, recovery, and token writes are real.
+        interface Completion {
+          completeAuthenticatedSession: (
+            ...args: unknown[]
+          ) => Promise<unknown>;
+        }
+        const internal = service as unknown as Completion;
+        const original = internal.completeAuthenticatedSession;
+        let release!: () => void;
+        let arrived!: () => void;
+        const held = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        const ready = new Promise<void>((resolve) => {
+          arrived = resolve;
+        });
+        jest
+          .spyOn(internal, 'completeAuthenticatedSession')
+          .mockImplementationOnce(async (...args) => {
+            arrived();
+            await held;
+            return Reflect.apply(original, service, args) as Promise<unknown>;
+          });
+        const response = responseStub();
+        const pending = login(response);
+        const denied = expect(pending).rejects.toThrow(
+          'Credentials changed. Sign in again.',
+        );
+        await ready;
+        try {
+          await addCode();
+          await confirm();
+        } finally {
+          release();
+          await denied;
+        }
+        expect(response.cookie).not.toHaveBeenCalled();
+        expect(
+          await prisma.refreshToken.count({
+            where: { userId, revokedAt: null },
+          }),
+        ).toBe(0);
+      });
+
+      it.each(['logout', 'recovery'] as const)(
+        'refresh racing with %s leaves no surviving family',
+        async (action) => {
+          const first = await login();
+          const familyId = (await authorize(first.accessToken)).sessionFamilyId;
+          if (action === 'recovery') await addCode();
+          const results = await Promise.allSettled([
+            rotate(first.refreshToken),
+            action === 'recovery' ? confirm() : logout(first.refreshToken),
+          ]);
+          expect(results[1].status).toBe('fulfilled');
+          expect(await activeFamily(familyId)).toBe(0);
+          await expect(authorize(first.accessToken)).rejects.toBeInstanceOf(
+            UnauthorizedException,
+          );
+          if (
+            results[0].status === 'fulfilled' &&
+            'accessToken' in results[0].value
+          )
+            await expect(
+              authorize(results[0].value.accessToken),
+            ).rejects.toBeInstanceOf(UnauthorizedException);
+        },
+      );
+
+      it('legacy access tokens fail closed but a valid legacy refresh upgrades to a bound family', async () => {
+        const legacyId = randomUUID();
+        const raw = randomUUID();
+        await prisma.refreshToken.create({
+          data: {
+            id: legacyId,
+            userId,
+            tokenHash: hashToken(raw),
+            hashVersion: 1,
+            expiresAt: new Date(Date.now() + 60000),
+          },
+        });
+        const current = await login();
+        const payload = jwt.decode<JwtAccessPayload>(current.accessToken);
+        const legacy = await jwt.signAsync(
+          { ...payload, sid: undefined },
+          { secret: config.jwtSecret },
+        );
+        await expect(authorize(legacy)).rejects.toThrow(
+          'Session must be renewed',
+        );
+        const upgraded = await rotate(raw);
+        expect((await authorize(upgraded.accessToken)).sessionFamilyId).toBe(
+          legacyId,
+        );
+        await logout(raw);
+        await expect(authorize(upgraded.accessToken)).rejects.toThrow(
+          'Session has ended',
+        );
+      });
+
+      it('a valid signature cannot bind this user to another tenant user session', async () => {
+        const current = await login();
+        const otherFamily = randomUUID();
+        await prisma.refreshToken.create({
+          data: {
+            userId: otherUserId,
+            familyId: otherFamily,
+            tokenHash: randomUUID(),
+            expiresAt: new Date(Date.now() + 60000),
+          },
+        });
+        const payload = jwt.decode<JwtAccessPayload>(current.accessToken);
+        const forgedBinding = await jwt.signAsync(
+          { ...payload, sid: otherFamily },
+          { secret: config.jwtSecret },
+        );
+        await expect(authorize(forgedBinding)).rejects.toThrow(
+          'Session has ended',
+        );
+      });
+
+      it('five simultaneous bad passwords accumulate five failures and revoke access at lockout', async () => {
+        const current = await login();
+        const results = await Promise.allSettled(
+          Array.from({ length: 5 }, () =>
+            service.login(
+              { tenantSlug, email, password: 'not-the-password' },
+              responseStub() as unknown as Response,
+            ),
+          ),
+        );
+        expect(results.every((result) => result.status === 'rejected')).toBe(
+          true,
+        );
+        const user = await scoped(() =>
+          prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+        );
+        expect(user.failedLoginCount).toBe(5);
+        if (!user.lockedUntil) throw new Error('Expected a persisted lockout');
+        expect(user.lockedUntil.getTime()).toBeGreaterThan(Date.now());
+        expect(
+          await scoped(() =>
+            prisma.auditLog.count({
+              where: { userId, action: 'login_failed' },
+            }),
+          ),
+        ).toBe(4);
+        expect(
+          await scoped(() =>
+            prisma.auditLog.count({
+              where: { userId, action: 'login_locked' },
+            }),
+          ),
+        ).toBe(1);
+        await expect(authorize(current.accessToken)).rejects.toThrow(
+          'Session has ended',
+        );
+      });
+
+      it('a failed-login audit failure rolls back lockout and session revocation', async () => {
+        const current = await login();
+        await scoped(() =>
+          prisma.user.update({
+            where: { id: userId },
+            data: { failedLoginCount: 4 },
+          }),
+        );
+        jest
+          .spyOn(audit, 'record')
+          .mockRejectedValueOnce(new Error('Synthetic audit failure'));
+        await expect(
+          service.login(
+            { tenantSlug, email, password: 'not-the-password' },
+            responseStub() as unknown as Response,
+          ),
+        ).rejects.toThrow('Synthetic audit failure');
+        const user = await scoped(() =>
+          prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+        );
+        expect(user.failedLoginCount).toBe(4);
+        expect(user.lockedUntil).toBeNull();
+        await expect(authorize(current.accessToken)).resolves.toMatchObject({
+          userId,
+        });
+      });
+
+      it('a revoked authenticated context cannot request another MFA setup code', async () => {
+        const current = await login();
+        const auth = await authorize(current.accessToken);
+        await logout(current.refreshToken);
+        await expect(service.requestMfaSetup(auth)).rejects.toThrow(
+          'Session has ended',
+        );
+        expect(
+          await prisma.otpCode.count({
+            where: { userId, purpose: OtpPurpose.VERIFY },
+          }),
+        ).toBe(0);
+        expect(delivered).toHaveLength(0);
+      });
+
+      it('a password-verified MFA request cannot issue a code after recovery changes credentials', async () => {
+        await scoped(() =>
+          prisma.user.update({
+            where: { id: userId },
+            data: { authMethod: AuthMethod.BOTH },
+          }),
+        );
+        interface Issue {
+          issueOtpChallenge: (...args: unknown[]) => Promise<unknown>;
+        }
+        const internal = service as unknown as Issue;
+        const original = internal.issueOtpChallenge;
+        let release!: () => void;
+        let arrived!: () => void;
+        const held = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        const ready = new Promise<void>((resolve) => {
+          arrived = resolve;
+        });
+        jest
+          .spyOn(internal, 'issueOtpChallenge')
+          .mockImplementationOnce(async (...args) => {
+            arrived();
+            await held;
+            return Reflect.apply(original, service, args) as Promise<unknown>;
+          });
+        const pending = service.login(
+          { tenantSlug, email, password: oldPassword },
+          responseStub() as unknown as Response,
+        );
+        const denied = expect(pending).rejects.toThrow(
+          'Invalid authentication context',
+        );
+        await ready;
+        try {
+          await addCode();
+          await confirm();
+        } finally {
+          release();
+          await denied;
+        }
+        expect(
+          await prisma.otpCode.count({
+            where: { userId, purpose: OtpPurpose.LOGIN },
+          }),
+        ).toBe(0);
+        expect(delivered).toHaveLength(0);
+      });
+
+      it('OTP login consumes its code and issues a session in one transaction', async () => {
+        await scoped(() =>
+          prisma.user.update({
+            where: { id: userId },
+            data: { authMethod: AuthMethod.OTP },
+          }),
+        );
+        const otp = await addCode(OtpPurpose.LOGIN);
+        const challengeToken = await jwt.signAsync(
+          { sub: userId, tenantId, tenantSlug, purpose: OtpPurpose.LOGIN },
+          { secret: config.challengeSecret, expiresIn: '5m' },
+        );
+        const verify = (response = responseStub()) =>
+          service.verifyOtpLogin(
+            { challengeToken, code },
+            response as unknown as Response,
+            { userAgent: 'Dart/3 synthetic-test' },
+          );
+        const response = responseStub();
+        const failingAudit = jest
+          .spyOn(audit, 'record')
+          .mockRejectedValueOnce(new Error('Synthetic audit failure'));
+        await expect(verify(response)).rejects.toThrow(
+          'Synthetic audit failure',
+        );
+        expect(response.cookie).not.toHaveBeenCalled();
+        expect(
+          (await prisma.otpCode.findUniqueOrThrow({ where: { id: otp.id } }))
+            .usedAt,
+        ).toBeNull();
+        failingAudit.mockRestore();
+        const results = await Promise.allSettled([verify(), verify()]);
+        expect(
+          results.filter((result) => result.status === 'fulfilled'),
+        ).toHaveLength(1);
+        expect(
+          results.filter((result) => result.status === 'rejected'),
+        ).toHaveLength(1);
+        const winner = results.find((result) => result.status === 'fulfilled');
+        if (winner?.status !== 'fulfilled')
+          throw new Error('Expected one OTP login winner');
+        if (!winner.value.accessToken)
+          throw new Error('Expected an OTP access token');
+        await expect(
+          authorize(winner.value.accessToken),
+        ).resolves.toMatchObject({ userId });
+      });
+
+      it.each(['password', 'mfa', 'logout', 'revoke-other'] as const)(
+        '%s audit failure rolls back security mutation and revocation',
+        async (operation) => {
+          const current = await login();
+          const other = await login();
+          const auth = await authorize(current.accessToken);
+          const otp = await addCode(OtpPurpose.VERIFY);
+          jest
+            .spyOn(audit, 'record')
+            .mockRejectedValueOnce(new Error('Synthetic audit failure'));
+          const action =
+            operation === 'password'
+              ? service.changePassword(
+                  auth,
+                  {
+                    currentPassword: oldPassword,
+                    newPassword,
+                    confirmNewPassword: newPassword,
+                  },
+                  responseStub() as unknown as Response,
+                )
+              : operation === 'mfa'
+                ? service.confirmMfaSetup(auth, {
+                    code,
+                    authMethod: AuthMethod.BOTH,
+                  })
+                : operation === 'logout'
+                  ? logout(current.refreshToken)
+                  : service.revokeOtherSessions(auth, {});
+          await expect(action).rejects.toThrow('Synthetic audit failure');
+          const user = await scoped(() =>
+            prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+          );
+          expect(user.passwordHash).toBe(originalPasswordHash);
+          expect(user.authMethod).toBe(AuthMethod.PASSWORD);
+          expect(
+            (await prisma.otpCode.findUniqueOrThrow({ where: { id: otp.id } }))
+              .usedAt,
+          ).toBeNull();
+          await expect(authorize(current.accessToken)).resolves.toMatchObject({
+            userId,
+          });
+          await expect(authorize(other.accessToken)).resolves.toMatchObject({
+            userId,
+          });
+        },
+      );
+
+      it('logout remains possible after tenant suspension', async () => {
+        const current = await login();
+        const familyId = (await authorize(current.accessToken)).sessionFamilyId;
+        await prisma.tenant.update({
+          where: { id: tenantId },
+          data: { isActive: false },
+        });
+        await expect(logout(current.refreshToken)).resolves.toEqual({
+          success: true,
+        });
+        expect(await activeFamily(familyId)).toBe(0);
+      });
+    });
 
     it('only one of two simultaneous confirmations commits', async () => {
       await addCode();
