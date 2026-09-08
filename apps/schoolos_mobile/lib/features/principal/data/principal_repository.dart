@@ -7,12 +7,46 @@ import '../../../core/errors/app_exception.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/private_read_cache.dart';
 import '../../learning_support/domain/learning_support_models.dart';
+import '../domain/attendance_correction_detail.dart';
 
 class PrincipalRepository {
   const PrincipalRepository(this._client, {this.cache});
 
   final ApiClient _client;
   final PrivateReadCache? cache;
+
+  Future<AttendanceCorrectionDetail> getAttendanceCorrection(String id) async {
+    final response = await _client.get(
+      '/attendance/corrections/${Uri.encodeComponent(id)}',
+    );
+    return AttendanceCorrectionDetail.fromJson(response.data, id);
+  }
+
+  Future<void> reviewAttendanceCorrection({
+    required String id,
+    required String status,
+    required String reason,
+  }) async {
+    if (!{'APPROVED', 'REJECTED'}.contains(status) ||
+        reason.trim().isEmpty ||
+        reason.trim().length > 500) {
+      throw const ValidationException(
+        message:
+            'Choose a decision and enter a reason of up to 500 characters.',
+      );
+    }
+    final response = await _client.patch(
+      '/attendance/corrections/${Uri.encodeComponent(id)}/review',
+      data: {'status': status, 'reviewReason': reason.trim()},
+    );
+    final data = response.data;
+    if (data is! Map || data['id'] != id || data['status'] != status) {
+      throw const ServerException(
+        message:
+            'Decision result could not be verified. Refresh before retrying.',
+      );
+    }
+  }
 
   Future<Map<String, dynamic>> getDashboard() =>
       _getCached('principal_dashboard', '/mobile/principal/dashboard');

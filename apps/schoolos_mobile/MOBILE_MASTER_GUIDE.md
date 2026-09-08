@@ -313,3 +313,53 @@ attendance lint remains failing: current files report 20 errors / 93 warnings;
 the same HEAD files report 21 errors / 93 warnings. This is not a clean lint or
 production gate, and the rehearsal server has not yet been restarted onto this
 backend patch.
+
+### Correction decision PostgreSQL proof — 2026-09-08
+
+`attendance-correction-concurrency.int-spec.ts` passed all three tests against a
+fresh, dedicated loopback PostgreSQL database. A barrier made both competing
+reviewers read `PENDING` before deciding: exactly one decision and its matching
+audit committed, and the attendance record matched the winner. Injected audit
+failure rolled back the request reviewer/status and attendance change for both
+approval and rejection; subsequent retry succeeded. Fixtures are synthetic,
+tenant-isolated, and removed after each test. This is database transaction evidence,
+not HTTP authorization, emulator decision, migration-chain, or pilot evidence.
+
+Run this focused integration suite only with an explicitly disposable database
+using the `SCHOOLOS_AUTH_TEST_DATABASE_URL` guard shared with the auth integration
+tests.
+
+### Principal mobile attendance correction controls — 2026-09-08
+
+Principal Approvals now opens a dedicated review sheet for source attendance
+corrections, using the existing `/attendance/corrections/:id` detail and
+`/attendance/corrections/:id/review` command. It never sends a source correction
+ID to generic approval decisions. Fresh network detail identifies the student,
+AD date, current attendance, requested attendance, and reason. Review requires
+the attendance review permission, an independent reviewer, a pending request,
+connectivity, and a reason. Backend authorization and school reason policy remain
+authoritative. A malformed detail or response fails closed.
+
+The sheet blocks repeat taps during submission and preserves the reason after an
+unconfirmed result, requiring fresh detail before retry. It invalidates approval,
+attention, and dashboard projections only after a matching authoritative response.
+Ten focused checks and the full 793-test Flutter suite passed; analysis is clean.
+The new controls still require a live emulator approve/reject rehearsal against
+the hardened backend before claiming end-to-end completion.
+
+### Live Android correction decisions — 2026-09-08
+
+The updated APK was exercised against a fresh isolated synthetic backend with
+two submitted attendance records and two Parent correction requests created
+through the mobile API. Principal opened each request in Android, entered a
+reason, approved one and rejected the other. The pending queue moved from two
+to one to zero. Read-only database checks confirmed `APPROVED → PRESENT` and
+`REJECTED → ABSENT`, preserved previous `ABSENT` status, review reasons and
+timestamps, and exactly one decision audit per request. Reopening the approved
+request showed its final state without decision buttons.
+
+Android's first-run stylus tutorial initially intercepted input; dismissing it
+and disabling handwriting on the dedicated QA emulator restored normal entry.
+This is synthetic emulator plus database evidence, not physical-device, provider,
+staging or pilot acceptance. Parent request creation in this rehearsal was API-
+driven rather than performed through the Parent UI.

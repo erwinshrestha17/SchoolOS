@@ -24,6 +24,7 @@ import '../../../../shared/widgets/offline_banner.dart';
 import '../../../../shared/widgets/section_header.dart';
 import '../../../../shared/widgets/status_chip.dart';
 import '../../application/principal_providers.dart';
+import 'attendance_correction_review_sheet.dart';
 
 class PrincipalTodayScreen extends ConsumerWidget {
   const PrincipalTodayScreen({super.key});
@@ -3809,6 +3810,19 @@ Future<void> _showReviewSheet(
   String activeTab,
 ) async {
   final parentContext = context;
+  if (item['type'] == 'attendance_correction' &&
+      _string(item['id']).isNotEmpty) {
+    await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (_) =>
+          AttendanceCorrectionReviewSheet(requestId: _string(item['id'])),
+    );
+    return;
+  }
   final approvalRequestId = _approvalRequestIdFromItem(item);
   Map<String, dynamic> approvalDetail = const {};
   if (approvalRequestId.isNotEmpty) {
