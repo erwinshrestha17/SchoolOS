@@ -1881,7 +1881,10 @@ class _DashboardBody extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${data['attentionCount'] ?? 0} items need attention',
+                      data['attentionCount'] is int &&
+                              data['attentionCount'] >= 0
+                          ? '${data['attentionCount']} items need attention'
+                          : 'Attention count unavailable',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: AppColors.slate900,
                         fontWeight: FontWeight.w900,
@@ -2257,7 +2260,9 @@ class _StudentSearchBody extends StatelessWidget {
           icon: Icons.person_add_alt_1_rounded,
           title: 'Recent admissions',
           subtitle:
-              '${data['recentAdmissions'] ?? 0} new students in the last 7 days',
+              data['recentAdmissions'] is int && data['recentAdmissions'] >= 0
+              ? '${data['recentAdmissions']} new students in the last 7 days'
+              : 'Recent admissions count unavailable',
         ),
       ],
     );

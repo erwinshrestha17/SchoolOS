@@ -2988,142 +2988,126 @@ export class AttendanceService {
       );
     }
 
-    if (dto.status === 'REJECTED') {
-      const updated = await this.prisma.attendanceCorrectionRequest.update({
-        where: { id },
+    return this.prisma.$transaction(async (tx) => {
+      // Claim the pending request before changing attendance. Competing decisions
+      // wait for this row and then fail the predicate rather than overwrite it.
+      const claimed = await tx.attendanceCorrectionRequest.updateMany({
+        where: { id, tenantId: actor.tenantId, status: 'PENDING' },
         data: {
-          status: 'REJECTED',
+          status: dto.status,
           reviewedById: actor.userId,
           reviewedAt: new Date(),
           reviewNote: reviewReason,
           reviewReason,
         },
-        select: attendanceCorrectionRequestSelect,
       });
-
-      await this.auditService.record({
-        action: 'reject',
-        resource: 'attendance_correction_request',
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        resourceId: id,
-        after: updated,
-      });
-
-      return updated;
-    }
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      if (request.attendanceRecordId) {
-        const updateResult = await tx.attendanceRecord.updateMany({
-          where: {
-            id: request.attendanceRecordId,
-            tenantId: actor.tenantId,
-            studentId: request.studentId,
-          },
-          data: {
-            status: request.requestedStatus,
-            remark: `Corrected: ${request.reason}`,
-          },
-        });
-        if (updateResult.count !== 1) {
-          throw new NotFoundException('Attendance record not found.');
-        }
-      } else {
-        let sessionId = request.attendanceSessionId;
-        if (!sessionId) {
-          const student = await tx.student.findUnique({
-            where: { id: request.studentId, tenantId: actor.tenantId },
-            select: { classId: true, sectionId: true },
-          });
-          if (!student) {
-            throw new NotFoundException('Student not found in this school.');
-          }
-          const existingSession = await tx.attendanceSession.findFirst({
+      if (claimed.count !== 1) {
+        throw new ConflictException('Request is no longer pending');
+      }
+      if (dto.status === 'APPROVED') {
+        if (request.attendanceRecordId) {
+          const updateResult = await tx.attendanceRecord.updateMany({
             where: {
+              id: request.attendanceRecordId,
               tenantId: actor.tenantId,
-              attendanceDate: request.attendanceDate,
-              classId: student.classId,
-              sectionId: student.sectionId,
-            },
-          });
-          if (existingSession) {
-            sessionId = existingSession.id;
-          } else {
-            const activeYear = await tx.academicYear.findFirst({
-              where: { tenantId: actor.tenantId, isCurrent: true },
-              select: { id: true },
-            });
-            if (!activeYear) {
-              throw new NotFoundException('Current academic year not found.');
-            }
-            const newSession = await tx.attendanceSession.create({
-              data: {
-                tenantId: actor.tenantId,
-                academicYearId: activeYear.id,
-                classId: student.classId,
-                sectionId: student.sectionId,
-                attendanceDate: request.attendanceDate,
-                lockAt: new Date(),
-              },
-            });
-            sessionId = newSession.id;
-          }
-        }
-
-        await tx.attendanceRecord.upsert({
-          where: {
-            attendanceSessionId_studentId: {
-              attendanceSessionId: sessionId,
               studentId: request.studentId,
             },
-          },
-          create: {
-            tenantId: actor.tenantId,
-            attendanceSessionId: sessionId,
-            studentId: request.studentId,
-            status: request.requestedStatus,
-            remark: `Corrected: ${request.reason}`,
-          },
-          update: {
-            status: request.requestedStatus,
-            remark: `Corrected: ${request.reason}`,
-          },
-        });
-      }
+            data: {
+              status: request.requestedStatus,
+              remark: `Corrected: ${request.reason}`,
+            },
+          });
+          if (updateResult.count !== 1) {
+            throw new NotFoundException('Attendance record not found.');
+          }
+        } else {
+          let sessionId = request.attendanceSessionId;
+          if (!sessionId) {
+            const student = await tx.student.findUnique({
+              where: { id: request.studentId, tenantId: actor.tenantId },
+              select: { classId: true, sectionId: true },
+            });
+            if (!student) {
+              throw new NotFoundException('Student not found in this school.');
+            }
+            const existingSession = await tx.attendanceSession.findFirst({
+              where: {
+                tenantId: actor.tenantId,
+                attendanceDate: request.attendanceDate,
+                classId: student.classId,
+                sectionId: student.sectionId,
+              },
+            });
+            if (existingSession) {
+              sessionId = existingSession.id;
+            } else {
+              const activeYear = await tx.academicYear.findFirst({
+                where: { tenantId: actor.tenantId, isCurrent: true },
+                select: { id: true },
+              });
+              if (!activeYear) {
+                throw new NotFoundException('Current academic year not found.');
+              }
+              const newSession = await tx.attendanceSession.create({
+                data: {
+                  tenantId: actor.tenantId,
+                  academicYearId: activeYear.id,
+                  classId: student.classId,
+                  sectionId: student.sectionId,
+                  attendanceDate: request.attendanceDate,
+                  lockAt: new Date(),
+                },
+              });
+              sessionId = newSession.id;
+            }
+          }
 
-      const updated = await tx.attendanceCorrectionRequest.update({
-        where: { id },
-        data: {
-          status: 'APPROVED',
-          reviewedById: actor.userId,
-          reviewedAt: new Date(),
-          reviewNote: reviewReason,
-          reviewReason,
-        },
+          await tx.attendanceRecord.upsert({
+            where: {
+              attendanceSessionId_studentId: {
+                attendanceSessionId: sessionId,
+                studentId: request.studentId,
+              },
+            },
+            create: {
+              tenantId: actor.tenantId,
+              attendanceSessionId: sessionId,
+              studentId: request.studentId,
+              status: request.requestedStatus,
+              remark: `Corrected: ${request.reason}`,
+            },
+            update: {
+              status: request.requestedStatus,
+              remark: `Corrected: ${request.reason}`,
+            },
+          });
+        }
+      }
+      const updated = await tx.attendanceCorrectionRequest.findFirstOrThrow({
+        where: { id, tenantId: actor.tenantId },
         select: attendanceCorrectionRequestSelect,
       });
 
+      await this.auditService.record(
+        {
+          action: dto.status === 'APPROVED' ? 'approve' : 'reject',
+          resource: 'attendance_correction_request',
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          resourceId: id,
+          before: {
+            previousStatus:
+              request.previousStatus ?? request.record?.status ?? null,
+          },
+          after: {
+            ...updated,
+            reviewReason,
+          },
+        },
+        tx,
+      );
       return updated;
     });
-
-    await this.auditService.record({
-      action: 'approve',
-      resource: 'attendance_correction_request',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: id,
-      before: {
-        previousStatus:
-          request.previousStatus ?? request.record?.status ?? null,
-      },
-      after: {
-        ...updated,
-        reviewReason,
-      },
-    });
-
-    return updated;
   }
 
   async getParentSummary(

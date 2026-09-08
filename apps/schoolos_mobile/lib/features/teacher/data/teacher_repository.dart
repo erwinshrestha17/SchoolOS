@@ -42,11 +42,16 @@ class TeacherRepository {
 
   Future<TeacherNoticeSummary> getNoticeSummary() async {
     final response = await _client.get('/mobile/me/notifications/unread-count');
-    final data = response.data is Map<String, dynamic>
-        ? response.data as Map<String, dynamic>
-        : const <String, dynamic>{};
+    final data = response.data;
+    final count = data is Map ? data['unreadCount'] : null;
+    if (count is! int || count < 0) {
+      throw const ServerException(
+        message: 'Notification count is unavailable. Please try again.',
+        code: 'INVALID_NOTIFICATION_SUMMARY',
+      );
+    }
     return TeacherNoticeSummary(
-      unreadCount: _asInt(data['unreadCount']),
+      unreadCount: count,
       lastUpdated: DateTime.now(),
     );
   }

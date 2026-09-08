@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -177,6 +179,66 @@ void main() {
     expect(tapped, isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  for (final count in [null, -1, '0', 0, 5]) {
+    for (final students in [false, true]) {
+      testWidgets('principal count $count is truthful (students=$students)', (
+        tester,
+      ) async {
+        final sharedPrefs = await SharedPreferences.getInstance();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              appPreferencesServiceProvider.overrideWithValue(
+                AppPreferencesService(sharedPrefs),
+              ),
+              tokenStorageServiceProvider.overrideWithValue(
+                _FakeTokenStorage(),
+              ),
+              authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+              authProvider.overrideWith(
+                (ref) => _FakeAuthNotifier(
+                  ref.watch(tokenStorageServiceProvider),
+                  ref.watch(authRepositoryProvider),
+                  ref.watch(appPreferencesServiceProvider),
+                ),
+              ),
+              principalDashboardProvider.overrideWith(
+                (ref) async => {'attentionCount': count},
+              ),
+              principalStudentSearchProvider('').overrideWith(
+                (ref) async => {
+                  'items': <Map<String, dynamic>>[],
+                  'recentAdmissions': count,
+                },
+              ),
+            ],
+            child: MaterialApp(
+              home: students
+                  ? const PrincipalStudentsScreen()
+                  : const PrincipalTodayScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final valid = count is int && count >= 0;
+        final expected = students
+            ? (valid
+                  ? '$count new students in the last 7 days'
+                  : 'Recent admissions count unavailable')
+            : (valid
+                  ? '$count items need attention'
+                  : 'Attention count unavailable');
+        await tester.scrollUntilVisible(
+          find.text(expected),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(find.text(expected), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   testWidgets('principal today stays overflow-free on a compact phone', (
     tester,
@@ -1843,6 +1905,65 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final succeeds in [true, false]) {
+    testWidgets(
+      'teacher unread count remains unknown until authority responds ($succeeds)',
+      (tester) async {
+        final sharedPrefs = await SharedPreferences.getInstance();
+        final summary = Completer<TeacherNoticeSummary>();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              appPreferencesServiceProvider.overrideWithValue(
+                AppPreferencesService(sharedPrefs),
+              ),
+              tokenStorageServiceProvider.overrideWithValue(
+                _FakeTokenStorage(),
+              ),
+              authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+              authProvider.overrideWith(
+                (ref) => _FakeTeacherAuthNotifier(
+                  ref.watch(tokenStorageServiceProvider),
+                  ref.watch(authRepositoryProvider),
+                  ref.watch(appPreferencesServiceProvider),
+                ),
+              ),
+              teacherAssignmentScopeCountProvider.overrideWith(
+                (ref) async => 3,
+              ),
+              teacherNoticeSummaryProvider.overrideWith(
+                (ref) => summary.future,
+              ),
+            ],
+            child: const MaterialApp(home: TeacherProfileScreen()),
+          ),
+        );
+        await tester.pump();
+        expect(find.text('Loading unread count'), findsOneWidget);
+        expect(find.text('0'), findsNothing);
+        if (succeeds) {
+          summary.complete(
+            TeacherNoticeSummary(
+              unreadCount: 0,
+              lastUpdated: DateTime(2026, 9, 8),
+            ),
+          );
+        } else {
+          summary.completeError(const NetworkException());
+        }
+        await tester.pump();
+        await tester.pump();
+        expect(find.text('Loading unread count'), findsNothing);
+        expect(find.text('0'), succeeds ? findsOneWidget : findsNothing);
+        expect(
+          find.text('Unread count unavailable'),
+          succeeds ? findsNothing : findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'teacher profile summary cards stay overflow-free at large text scale with big counts',

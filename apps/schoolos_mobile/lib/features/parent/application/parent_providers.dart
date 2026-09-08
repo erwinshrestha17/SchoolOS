@@ -10,6 +10,7 @@ import '../../../core/storage/private_read_cache.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../data/parent_repository.dart';
+import '../data/parent_dashboard_snapshot_store.dart';
 import '../domain/parent_action_centre_models.dart';
 import '../domain/parent_models.dart';
 import '../domain/parent_service_request_models.dart';
@@ -409,7 +410,24 @@ class ParentController extends StateNotifier<ParentState> {
             resourceKey.startsWith('parent_exam_schedule_') ||
             resourceKey.startsWith('attendance_');
         if (!isChildScoped) return false;
-        return !linkedIds.any(resourceKey.endsWith);
+        // Attendance and homework append query parameters after the child ID.
+        // Suffix matching deleted valid offline records on every child refresh
+        // and could retain an unlinked ID that ended in a linked child's ID.
+        return !linkedIds.any((id) {
+          if (resourceKey == ParentDashboardSnapshotStore.resourceKeyFor(id) ||
+              resourceKey == 'parent_dashboard_summary_$id' ||
+              resourceKey == 'parent_timetable_$id' ||
+              resourceKey == 'parent_exam_schedule_$id') {
+            return true;
+          }
+          final escapedId = RegExp.escape(id);
+          return RegExp(
+                '^attendance_${escapedId}_[0-9]{4}_(?:[1-9]|1[0-2])\$',
+              ).hasMatch(resourceKey) ||
+              RegExp(
+                '^parent_homework_${escapedId}_[1-9][0-9]*\$',
+              ).hasMatch(resourceKey);
+        });
       });
 
       final savedChildId = childId ?? _preferences.getSelectedChildId();

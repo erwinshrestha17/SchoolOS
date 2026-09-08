@@ -95,10 +95,21 @@ class TeacherProfileScreen extends ConsumerWidget {
               );
               final noticesCard = TeacherTaskCard(
                 title: 'Notices',
-                subtitle: 'Unread',
+                subtitle: noticeSummary.isLoading
+                    ? 'Loading unread count'
+                    : noticeSummary.hasError
+                    ? 'Unread count unavailable'
+                    : 'Unread',
                 icon: Icons.campaign_rounded,
                 iconColor: AppColors.teacherAccent,
-                value: '${noticeSummary.valueOrNull?.unreadCount ?? 0}',
+                value: noticeSummary.when(
+                  skipLoadingOnRefresh: false,
+                  skipLoadingOnReload: false,
+                  skipError: false,
+                  data: (summary) => '${summary.unreadCount}',
+                  loading: () => '—',
+                  error: (_, _) => '—',
+                ),
                 onTap: () => context.go(AppRoutes.notices),
               );
               if (constraints.maxWidth < 360) {

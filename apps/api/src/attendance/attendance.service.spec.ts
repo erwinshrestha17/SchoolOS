@@ -3427,7 +3427,7 @@ describe('attendance production hardening', () => {
       reviewedById: adminActor.userId,
       reviewReason: 'Register already matches the submitted status',
     };
-    const { service, prisma } = buildService({
+    const { service, prisma, tx, auditService } = buildService({
       correctionRequest: {
         id: 'correction-1',
         status: 'PENDING',
@@ -3456,9 +3456,19 @@ describe('attendance production hardening', () => {
     );
 
     expect(result).toBe(rejectedCorrection);
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(prisma.attendanceCorrectionRequest.update).toHaveBeenCalledWith(
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.attendanceRecord.updateMany).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'reject' }),
+      tx,
+    );
+    expect(tx.attendanceCorrectionRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        where: {
+          id: 'correction-1',
+          tenantId: adminActor.tenantId,
+          status: 'PENDING',
+        },
         data: expect.objectContaining({
           status: 'REJECTED',
           reviewReason: 'Register already matches the submitted status',
@@ -3467,6 +3477,67 @@ describe('attendance production hardening', () => {
       }),
     );
   });
+
+  for (const status of ['APPROVED', 'REJECTED'] as const) {
+    it(`does not mutate attendance or audit when ${status} loses the pending claim`, async () => {
+      const { service, tx, auditService } = buildService({
+        correctionRequest: {
+          id: 'correction-1',
+          status: 'PENDING',
+          attendanceRecordId: 'record-1',
+          studentId: 'student-1',
+          requestedById: 'parent-1',
+          requestedStatus: AttendanceStatus.PRESENT,
+          session: { submittedById: 'teacher-1' },
+        },
+      });
+      tx.attendanceCorrectionRequest.updateMany.mockResolvedValueOnce({
+        count: 0,
+      });
+      await expect(
+        service.approveCorrectionRequest(
+          'correction-1',
+          {
+            status,
+            reviewReason: 'Reviewed against the original class register',
+          },
+          adminActor,
+        ),
+      ).rejects.toThrow('Request is no longer pending');
+      expect(tx.attendanceRecord.updateMany).not.toHaveBeenCalled();
+      expect(auditService.record).not.toHaveBeenCalled();
+    });
+
+    it(`propagates audit failure inside the ${status} transaction`, async () => {
+      const { service, tx, auditService } = buildService({
+        correctionRequest: {
+          id: 'correction-1',
+          status: 'PENDING',
+          attendanceRecordId: 'record-1',
+          studentId: 'student-1',
+          requestedById: 'parent-1',
+          requestedStatus: AttendanceStatus.PRESENT,
+          session: { submittedById: 'teacher-1' },
+        },
+        correctionUpdated: { id: 'correction-1', status },
+      });
+      auditService.record.mockRejectedValueOnce(new Error('audit unavailable'));
+      await expect(
+        service.approveCorrectionRequest(
+          'correction-1',
+          {
+            status,
+            reviewReason: 'Reviewed against the original class register',
+          },
+          adminActor,
+        ),
+      ).rejects.toThrow('audit unavailable');
+      expect(auditService.record).toHaveBeenCalledWith(expect.any(Object), tx);
+      expect(tx.attendanceRecord.updateMany).toHaveBeenCalledTimes(
+        status === 'APPROVED' ? 1 : 0,
+      );
+    });
+  }
 
   it('blocks original attendance submitter from reviewing corrections', async () => {
     const { service, prisma } = buildService({
@@ -5084,6 +5155,12 @@ function buildService(options: {
   activeAttendanceScopes?: unknown[];
 }) {
   const tx = {
+    attendanceCorrectionRequest: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findFirstOrThrow: jest
+        .fn()
+        .mockResolvedValue(options.correctionUpdated ?? null),
+    },
     attendanceConflict: {
       create: jest.fn().mockResolvedValue({ id: 'tx-conflict' }),
     },
@@ -5096,6 +5173,7 @@ function buildService(options: {
       findFirst: jest.fn().mockResolvedValue(options.attendanceSession ?? null),
     },
     attendanceRecord: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       createMany: jest.fn().mockResolvedValue({ count: 1 }),
       create: jest.fn().mockResolvedValue({}),

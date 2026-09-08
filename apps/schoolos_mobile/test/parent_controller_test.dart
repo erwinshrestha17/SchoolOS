@@ -180,6 +180,62 @@ void main() {
     );
   });
 
+  for (final online in [true, false]) {
+    test(
+      'linked-child refresh retains parameterized caches online=$online',
+      () async {
+        final retained = [
+          'attendance_child-a_2026_9',
+          'attendance_child-b_2026_8',
+          'parent_homework_child-a_20',
+          'parent_homework_child-b_50',
+          'parent_dashboard_summary_child-a',
+          'parent_dashboard_v2.child-a',
+          'parent_timetable_child-b',
+          'parent_exam_schedule_child-a',
+          'notice_feed',
+        ];
+        final removed = [
+          'attendance_unlinked-child_2026_9',
+          'parent_homework_unlinked-child_20',
+          'parent_dashboard_summary_unlinked-child',
+          'parent_dashboard_summary_prefix-child-a',
+          'parent_dashboard_v2.unlinked-child',
+          'parent_dashboard_v1.child-a',
+          'parent_timetable_unlinked-child',
+          'parent_exam_schedule_unlinked-child',
+          'attendance_child-a-other_2026_9',
+          'attendance_child-a_invalid',
+          'parent_homework_child-a_invalid',
+        ];
+        for (final key in [...retained, ...removed]) {
+          expect(await cache.write(key, {'synthetic': true}), isTrue);
+        }
+        if (!online) {
+          when(
+            () => repository.getParentDashboardSummaryForChild(childA),
+          ).thenThrow(const NetworkException());
+        }
+        final controller = buildController(isOnline: online);
+        addTearDown(controller.dispose);
+        await _waitForSuccess(controller);
+        for (final key in retained) {
+          expect(await cache.read(key), isNotNull, reason: key);
+        }
+        for (final key in removed) {
+          expect(await cache.read(key), isNull, reason: key);
+        }
+        when(
+          () => repository.getGuardianChildren(),
+        ).thenAnswer((_) async => const [childA]);
+        await controller.load();
+        expect(await cache.read('attendance_child-b_2026_8'), isNull);
+        expect(await cache.read('parent_homework_child-b_50'), isNull);
+        expect(await cache.read('attendance_child-a_2026_9'), isNotNull);
+      },
+    );
+  }
+
   test(
     'guardian access revocation clears caches and shows access-changed',
     () async {

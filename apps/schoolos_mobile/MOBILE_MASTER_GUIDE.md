@@ -229,3 +229,87 @@ Parent mobile is not release-ready until the following Android emulator or physi
 ```
 
 This checklist is required in addition to `flutter analyze`, `flutter test`, and debug/release build checks. Passing local Flutter tests alone is not parent mobile release evidence.
+
+### Local Parent offline regression evidence — 2026-09-08
+
+Linked-child refresh now retains exact child-scoped attendance month keys,
+homework page-size keys, and current dashboard snapshot keys. It continues to
+purge unlinked-child, malformed, and obsolete snapshot keys; matching a child ID
+suffix is not sufficient authorization. Attendance without a usable saved copy
+distinguishes offline, timeout, permission, module, and session failures.
+
+Verification: `flutter analyze` passed; all 760 Flutter tests passed; Android debug
+APK and unsigned iOS builds passed. On the dedicated Android emulator against an
+isolated synthetic backend, Parent A opened attendance online and then disabled
+Wi-Fi and cellular data. The calendar remained visible with “Offline copy” and
+“Last saved”; corrections required reconnection. Connectivity was restored after
+the check. This fixture had no marked attendance days, so this does not prove
+nonempty history, correction submission, physical-device behavior, other persona
+flows, provider delivery, staging, or pilot acceptance.
+
+Production application IDs, Apple team ID, and API hostname are not registered
+(owner confirmation). Signing and deployment identity remain release blockers;
+local template identifiers and unsigned builds are not distribution readiness.
+
+### Teacher and Principal summary truth — 2026-09-08
+
+Teacher Profile shows an unknown unread count while loading or after failure;
+only a valid nonnegative integer from the notification endpoint renders a count.
+Malformed responses fail explicitly instead of becoming zero. Principal Today
+attention counts and Student Lookup recent-admissions counts likewise show
+unavailable when absent or invalid, preserving genuine authoritative zeroes.
+
+The combined mobile changes passed analysis, all 783 Flutter tests, and Android
+debug compilation. Regression coverage includes delayed/error Teacher responses,
+valid zero and positive counts, malformed payloads, and missing/invalid Principal
+counts. These are local repository/widget checks, not live Teacher/Principal
+workflow or pilot acceptance evidence.
+
+### Local Teacher offline attendance rehearsal — 2026-09-08
+
+Using the Android emulator QA skill, the updated debug app restored the synthetic
+Parent session, signed out through the confirmation sheet, and signed in as the
+Class 1A Teacher against the isolated synthetic backend. Only the assigned
+two-student homeroom roster appeared. With Wi-Fi and cellular disabled, an absent
+mark remained “Draft not submitted”; explicit queueing changed it to “Queued —
+not submitted”. Reconnection submitted the queued operation and made attendance
+read-only, retaining one absent and one present student. A read-only database
+check confirmed a submitted session with a source operation ID, those two records,
+and one `ACCEPTED` sync submission with one attempt. This is local emulator
+workflow evidence, not physical-device, multi-device conflict, or pilot evidence.
+
+### Local Principal entitlement and attention rehearsal — 2026-09-08
+
+On the same isolated Android/backend fixture, Teacher sign-out followed by
+Principal sign-in initially returned the correct entitlement denial: the standard
+rehearsal tenant did not include `feature.mobile.full_role`. A QA-only tenant
+override enabled that feature without changing production plans or deferred
+modules. Principal Today and Attention then loaded, showing the remaining unmarked
+Class 1B while the submitted Class 1A no longer appeared as unmarked. HR and Fees
+cards remained locked. Approvals rendered its empty pending queue. This verifies
+the entitlement boundary and synthetic read flows only; approval decisions require
+a pending workflow fixture and remain unverified by this emulator rehearsal.
+
+### Parent correction to Principal review gap — 2026-09-08
+
+A synthetic Parent attendance correction was created through the existing mobile
+API for the submitted absent record. Principal Approvals displayed it, but Review
+opened a read-only sheet: source attendance corrections are not generic approval
+workflow records. Mobile must use the existing attendance detail/review contract
+with current scope, exact student/date/status comparison, required reason, online
+authority, and an authoritative result. Do not route its ID to generic approval
+decisions or claim that this workflow is complete.
+
+Before enabling that UI, the attendance review service was changed to conditionally
+claim a pending request inside the same transaction as attendance changes and the
+audit. Competing claims fail with conflict. API build/typecheck and 142 focused
+attendance tests passed, including lost-claim and audit-failure regressions for
+approval and rejection. These test doubles verify control flow and transaction
+usage, not PostgreSQL concurrency or rollback; direct database proof and the
+mobile decision UI remain required.
+
+The full API unit suite also passed (2,964 tests / 271 suites). Whole-file
+attendance lint remains failing: current files report 20 errors / 93 warnings;
+the same HEAD files report 21 errors / 93 warnings. This is not a clean lint or
+production gate, and the rehearsal server has not yet been restarted onto this
+backend patch.

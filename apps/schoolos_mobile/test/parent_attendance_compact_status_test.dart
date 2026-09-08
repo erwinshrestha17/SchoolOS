@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
+import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
 import 'package:schoolos_mobile/core/storage/token_storage_service.dart';
 import 'package:schoolos_mobile/features/attendance/application/attendance_providers.dart';
@@ -17,6 +18,30 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
+
+  for (final scenario in <(AppException, String)>[
+    (const NetworkException(), 'Connection lost'),
+    (const TimeoutException(), 'Could not load parent data'),
+    (const PermissionException(), 'Access not available'),
+    (const ModuleLockedException(), 'Module not enabled'),
+    (const SessionExpiredException(), 'Session expired'),
+  ]) {
+    testWidgets(
+      'attendance shows a specific ${scenario.$1.runtimeType} state',
+      (tester) async {
+        final client = _ParentAttendanceApiClient(todayStatus: null)
+          ..attendanceError = scenario.$1;
+        await _pumpAttendanceScreen(tester, client);
+        expect(find.text(scenario.$2), findsOneWidget);
+        expect(
+          find.text('Parent portal data could not be loaded.'),
+          findsNothing,
+        );
+        expect(find.byTooltip('Refresh today’s attendance'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('uses a compact informational row before the monthly summary', (
     tester,
@@ -119,6 +144,7 @@ class _ParentAttendanceApiClient extends ApiClient {
   final String? todayStatus;
   final String? markedAt;
   int attendanceSummaryRequests = 0;
+  AppException? attendanceError;
 
   @override
   Future<Response<T>> get<T>(
@@ -163,6 +189,7 @@ class _ParentAttendanceApiClient extends ApiClient {
       return {'items': <Map<String, dynamic>>[]};
     }
     if (path == '/mobile/students/child-1/attendance-summary') {
+      if (attendanceError case final error?) throw error;
       attendanceSummaryRequests += 1;
       final now = NepaliBsCalendar.getNepalNow();
       final today = DateTime.utc(now.year, now.month, now.day);

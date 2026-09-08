@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../core/network/connectivity_provider.dart';
+import '../../../../core/errors/app_exception.dart';
 import '../../../../shared/utils/date_display_preference.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../parent/presentation/widgets/parent_state_view.dart';
@@ -127,8 +128,20 @@ class _AttendanceBodyState extends ConsumerState<_AttendanceBody> {
     final datePreference = ref.watch(dateDisplayPreferenceProvider);
     return attendance.when(
       loading: () => const PortalLoadingState(),
-      error: (_, _) => PortalErrorState(
+      error: (error, _) => ParentStateView(
+        status: switch (error) {
+          AuthException() => ParentDataStatus.sessionExpired,
+          PermissionException() => ParentDataStatus.forbidden,
+          ModuleLockedException() => ParentDataStatus.moduleLocked,
+          NetworkException() => ParentDataStatus.offline,
+          TimeoutException() => ParentDataStatus.timeout,
+          _ => ParentDataStatus.error,
+        },
+        message: error is NetworkException || error is TimeoutException
+            ? 'A saved attendance record is not available for this month. Reconnect and try again.'
+            : 'Attendance could not be loaded. Please try again.',
         onRetry: () => ref.invalidate(parentAttendanceProvider(query)),
+        child: const SizedBox.shrink(),
       ),
       data: (data) {
         final selectedDay = data.days
