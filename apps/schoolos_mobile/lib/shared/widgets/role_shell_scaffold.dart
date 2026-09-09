@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/constants/app_routes.dart';
-import '../../app/design_system/app_radius.dart';
 import '../../app/theme/app_colors.dart';
 import '../../features/operational_summary/domain/operational_summary_models.dart';
 import '../../features/operational_summary/presentation/operational_summary_card.dart';
+import 'app_bottom_navigation.dart';
 import 'app_scaffold.dart';
 
 class RoleShellScaffold extends StatelessWidget {
@@ -30,11 +30,8 @@ class RoleShellScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = _itemsForRole(role);
     final safeIndex = selectedIndex.clamp(0, items.length - 1);
-    final summaryPersona = selectedIndex == 0
-        ? _summaryPersonaForRole(role)
-        : null;
+    final summaryPersona = selectedIndex == 0 ? _summaryPersonaForRole(role) : null;
     final isStudent = role.toUpperCase() == 'STUDENT';
-    final compactNavigation = MediaQuery.sizeOf(context).width < 360;
 
     return AppScaffold(
       appBar: showAppBar
@@ -68,58 +65,31 @@ class RoleShellScaffold extends StatelessWidget {
       floatingActionButton: floatingActionButton,
       bottomNavigationBar: items.length < 2
           ? null
-          : SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.xxl),
-                  child: NavigationBarTheme(
-                    data: NavigationBarThemeData(
-                      labelTextStyle: WidgetStatePropertyAll(
-                        TextStyle(
-                          fontSize: compactNavigation ? 10 : 12,
-                          letterSpacing: compactNavigation ? -0.35 : 0,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    child: NavigationBar(
-                      selectedIndex: safeIndex,
-                      height: 68,
-                      backgroundColor:
-                          Theme.of(context).brightness == Brightness.dark
-                          ? AppColors.overlayDark
-                          : Colors.white,
-                      indicatorColor: _roleColor(role).withValues(alpha: 0.14),
-                      labelBehavior:
-                          NavigationDestinationLabelBehavior.alwaysShow,
-                      onDestinationSelected: (index) {
-                        final item = items[index];
-                        if (item.route != null) {
-                          context.go(item.route!);
-                          return;
-                        }
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '${item.label} is not available in this mobile workspace yet.',
-                            ),
-                          ),
-                        );
-                      },
-                      destinations: [
-                        for (final item in items)
-                          NavigationDestination(
-                            icon: Icon(item.icon),
-                            selectedIcon: Icon(item.selectedIcon),
-                            label: item.label,
-                          ),
-                      ],
+          : AppBottomNavigation(
+              selectedIndex: safeIndex,
+              accentColor: _roleColor(role),
+              items: [
+                for (final item in items)
+                  AppBottomNavigationItem(
+                    label: item.label,
+                    icon: item.icon,
+                    selectedIcon: item.selectedIcon,
+                  ),
+              ],
+              onSelected: (index) {
+                final item = items[index];
+                if (item.route != null) {
+                  context.go(item.route!);
+                  return;
+                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${item.label} is not available in this mobile workspace yet.',
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
       body: summaryPersona == null
           ? body
@@ -187,9 +157,9 @@ class RoleShellScaffold extends StatelessWidget {
             route: AppRoutes.teacherHomework,
           ),
           _RoleNavItem(
-            label: 'Profile',
-            icon: Icons.account_circle_outlined,
-            selectedIcon: Icons.account_circle_rounded,
+            label: 'More',
+            icon: Icons.grid_view_outlined,
+            selectedIcon: Icons.grid_view_rounded,
             route: AppRoutes.teacherProfile,
           ),
         ];
