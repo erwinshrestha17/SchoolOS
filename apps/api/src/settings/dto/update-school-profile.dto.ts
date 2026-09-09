@@ -7,6 +7,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
   IsNepalContactPhone,
   IsPersonName,
@@ -72,6 +73,27 @@ export class UpdateSchoolProfileDto {
   @IsString()
   @MaxLength(200)
   province?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  localLevelId?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  tole?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  streetAddress?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  landmark?: string | null;
 
   @IsOptional()
   @IsIn(['PRIVATE', 'COMMUNITY', 'TRUST'])

@@ -116,6 +116,24 @@ const payload = {
 };
 
 describe('SettingsDomainMutationService', () => {
+  it('rejects a non-Nepal timezone before opening a transaction', async () => {
+    const { service, prisma } = buildService();
+
+    await expect(
+      service.updateDomain(
+        'identity',
+        {
+          ...payload,
+          changes: [{ key: 'timezone', value: 'UTC' }],
+        },
+        auth(['settings:read', 'settings:identity:manage']),
+      ),
+    ).rejects.toThrow(
+      'Invalid value for timezone. SchoolOS supports Asia/Kathmandu only.',
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('blocks Principal-only institutional mutations before opening a transaction', async () => {
     const { service, prisma } = buildService();
     await expect(

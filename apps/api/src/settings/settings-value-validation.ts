@@ -98,6 +98,13 @@ export function validateSchoolSettingValue(
         );
       }
       return;
+    case 'timezone':
+      if (value !== 'Asia/Kathmandu') {
+        throw new BadRequestException(
+          'Invalid value for timezone. SchoolOS supports Asia/Kathmandu only.',
+        );
+      }
+      return;
     case 'grading_scale':
       validateGradingScale(value);
       return;
@@ -114,7 +121,6 @@ export function validateSchoolSettingValue(
     default:
       if (
         [
-          'timezone',
           'currency',
           'date_format',
           'receipt_format',

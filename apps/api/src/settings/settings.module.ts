@@ -14,6 +14,7 @@ import { AuditModule } from '../audit/audit.module';
 import { PlatformModule } from '../platform/platform.module';
 import { StorageModule } from '../storage/storage.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
+import { AddressModule } from '../addresses/address.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { FileRegistryModule } from '../file-registry/file-registry.module';
     PlatformModule,
     StorageModule,
     FileRegistryModule,
+    AddressModule,
   ],
   controllers: [
     SettingsController,

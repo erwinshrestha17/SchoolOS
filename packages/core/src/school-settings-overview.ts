@@ -1,4 +1,4 @@
-import type { SchoolSettingsNavigation } from './school-settings-navigation.js';
+import type { SchoolSettingsNavigation } from "./school-settings-navigation.js";
 
 export type SchoolProfileSettings = {
   schoolName: string | null;
@@ -11,7 +11,11 @@ export type SchoolProfileSettings = {
   wardNumber: number | null;
   district: string | null;
   province: string | null;
-  schoolType: 'PRIVATE' | 'COMMUNITY' | 'TRUST' | null;
+  localLevelId: number | null;
+  tole: string | null;
+  streetAddress: string | null;
+  landmark: string | null;
+  schoolType: "PRIVATE" | "COMMUNITY" | "TRUST" | null;
   iemisSchoolCode: string | null;
   affiliationBoard: string | null;
   affiliationNumber: string | null;
@@ -19,7 +23,7 @@ export type SchoolProfileSettings = {
 };
 
 export type UpdateSchoolProfilePayload = Partial<
-  Omit<SchoolProfileSettings, 'updatedAt'>
+  Omit<SchoolProfileSettings, "updatedAt">
 >;
 
 export type BrandingDocumentsSettings = {
@@ -31,12 +35,12 @@ export type BrandingDocumentsSettings = {
   payslipFooterText: string | null;
   certificateFooterText: string | null;
   reportCardFooterText: string | null;
-  defaultPaperSize: 'A4' | 'LEGAL' | '80MM' | null;
+  defaultPaperSize: "A4" | "LEGAL" | "80MM" | null;
   updatedAt: string | null;
 };
 
 export type UpdateBrandingDocumentsPayload = Partial<
-  Omit<BrandingDocumentsSettings, 'logoFileAssetId' | 'updatedAt'>
+  Omit<BrandingDocumentsSettings, "logoFileAssetId" | "updatedAt">
 >;
 
 export type SchoolSettingsReadinessItem = {
@@ -44,7 +48,7 @@ export type SchoolSettingsReadinessItem = {
   label: string;
   description: string;
   href: string;
-  status: 'ready' | 'needs_attention';
+  status: "ready" | "needs_attention";
 };
 
 /**

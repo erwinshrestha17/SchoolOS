@@ -1,25 +1,31 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { setTimeout as sleep } from 'node:timers/promises';
-import { repoRoot } from './lib/schoolos-env.mjs';
+import { spawnSync } from "node:child_process";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
+import { repoRoot } from "./lib/schoolos-env.mjs";
 
-const evidenceDir = join(repoRoot, 'docs/production/evidence');
-const localStagingEnv = join(repoRoot, 'deploy/env.local-staging.example');
-const apiEnvPath = join(repoRoot, 'apps/api/.env.staging-local');
+const evidenceDir = join(repoRoot, "docs/production/evidence");
+const localStagingEnv = join(repoRoot, "deploy/env.local-staging.example");
+const apiEnvPath = join(repoRoot, "apps/api/.env.staging-local");
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
-    stdio: options.capture ? 'pipe' : 'inherit',
-    encoding: 'utf8',
+    stdio: options.capture ? "pipe" : "inherit",
+    encoding: "utf8",
     env: options.env ?? process.env,
   });
   if (result.status !== 0) {
     throw new Error(
-      `Command failed: ${command} ${args.join(' ')}${result.stderr ? `\n${result.stderr}` : ''}`,
+      `Command failed: ${command} ${args.join(" ")}${result.stderr ? `\n${result.stderr}` : ""}`,
     );
   }
   return result;
@@ -27,10 +33,10 @@ function run(command, args, options = {}) {
 
 function loadEnvIntoProcess(path) {
   if (!existsSync(path)) return;
-  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+  for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
-    const idx = trimmed.indexOf('=');
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+    const idx = trimmed.indexOf("=");
     const key = trimmed.slice(0, idx);
     const value = trimmed.slice(idx + 1);
     process.env[key] = value;
@@ -39,58 +45,82 @@ function loadEnvIntoProcess(path) {
 
 async function main() {
   const startedAt = new Date().toISOString();
-  console.log('Starting local staging infrastructure (postgres + redis)...');
-  run('docker', [
-    'compose',
-    '-p',
-    'schoolos-staging',
-    '-f',
-    'docker-compose.staging.yml',
-    'up',
-    '-d',
-    'postgres',
-    'redis',
+  console.log("Starting local staging infrastructure (postgres + redis)...");
+  run("docker", [
+    "compose",
+    "-p",
+    "schoolos-staging",
+    "-f",
+    "docker-compose.staging.yml",
+    "up",
+    "-d",
+    "postgres",
+    "redis",
   ]);
 
   copyFileSync(localStagingEnv, apiEnvPath);
   loadEnvIntoProcess(apiEnvPath);
 
-  console.log('Waiting for staging Postgres health...');
+  console.log("Waiting for staging Postgres health...");
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const probe = spawnSync(
-      'docker',
-      ['exec', 'schoolos_staging_postgres', 'pg_isready', '-U', 'schoolos', '-d', 'schoolos_staging'],
-      { encoding: 'utf8' },
+      "docker",
+      [
+        "exec",
+        "schoolos_staging_postgres",
+        "pg_isready",
+        "-U",
+        "schoolos",
+        "-d",
+        "schoolos_staging",
+      ],
+      { encoding: "utf8" },
     );
     if (probe.status === 0) break;
     await sleep(1000);
   }
 
-  console.log('Applying migrations and seed to staging database...');
-  run('pnpm', ['db:generate'], { env: process.env });
-  run('pnpm', ['--filter', '@schoolos/api', 'exec', 'prisma', 'migrate', 'deploy'], {
-    env: process.env,
+  console.log("Applying migrations and seed to staging database...");
+  run("pnpm", ["db:generate"], { env: process.env });
+  run(
+    "pnpm",
+    ["--filter", "@schoolos/api", "exec", "prisma", "migrate", "deploy"],
+    {
+      env: process.env,
+    },
+  );
+  run("pnpm", ["db:seed"], {
+    env: { ...process.env, NODE_ENV: "development" },
   });
-  run('pnpm', ['db:seed'], {
-    env: { ...process.env, NODE_ENV: 'development' },
-  });
-  run('pnpm', ['db:seed:e2e:m0-platform'], {
+  run("pnpm", ["db:seed:geography"], { env: process.env });
+  run("pnpm", ["db:seed:e2e:m0-platform"], {
     env: {
       ...process.env,
-      NODE_ENV: 'development',
-      SCHOOLOS_E2E_M0_PLATFORM_ONBOARD_FIXTURES: 'true',
+      NODE_ENV: "development",
+      SCHOOLOS_E2E_M0_PLATFORM_ONBOARD_FIXTURES: "true",
     },
   });
-  run('pnpm', ['--filter', '@schoolos/api', 'db:backfill:teacher-assignments'], {
-    env: process.env,
-  });
-  run('pnpm', ['--filter', '@schoolos/api', 'db:backfill:guardian-capabilities'], {
-    env: process.env,
-  });
+  run(
+    "pnpm",
+    ["--filter", "@schoolos/api", "db:backfill:teacher-assignments"],
+    {
+      env: process.env,
+    },
+  );
+  run(
+    "pnpm",
+    ["--filter", "@schoolos/api", "db:backfill:guardian-capabilities"],
+    {
+      env: process.env,
+    },
+  );
   const finishedAt = new Date().toISOString();
   mkdirSync(evidenceDir, { recursive: true });
-  const evidenceStamp = finishedAt.replace(/[:.]/g, '-');
-  const evidencePath = join(evidenceDir, `staging-deploy-${evidenceStamp}-local.md`);
+  const evidenceStamp = finishedAt.replace(/[:.]/g, "-");
+  const evidencePath = join(
+    evidenceDir,
+    `staging-deploy-${evidenceStamp}-local.md`,
+  );
   writeFileSync(
     evidencePath,
     `# Staging Deploy Evidence (Local Simulation)
@@ -112,6 +142,7 @@ docker compose -f docker-compose.staging.yml -p schoolos-staging up -d postgres 
 pnpm db:generate
 pnpm --filter @schoolos/api exec prisma migrate deploy
 pnpm db:seed
+pnpm db:seed:geography
 SCHOOLOS_E2E_M0_PLATFORM_ONBOARD_FIXTURES=true pnpm db:seed:e2e:m0-platform
 pnpm --filter @schoolos/api db:backfill:teacher-assignments
 pnpm --filter @schoolos/api db:backfill:guardian-capabilities
@@ -127,7 +158,7 @@ pnpm --filter @schoolos/api db:backfill:guardian-capabilities
 - Rehearsal started: ${startedAt}
 - Rehearsal finished: ${finishedAt}
 `,
-    'utf8',
+    "utf8",
   );
 
   console.log(`Staging deploy evidence written to ${evidencePath}`);

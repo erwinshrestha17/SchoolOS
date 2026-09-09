@@ -1125,6 +1125,69 @@ describe('AdmissionsService production hardening', () => {
     });
   });
 
+  it('retains the committed student when import follow-up processing fails', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction
+      .mockImplementationOnce(async (callback) =>
+        callback({
+          admissionImportBatch: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            create: jest.fn().mockResolvedValue({ id: 'confirmed-batch' }),
+          },
+        }),
+      )
+      .mockImplementationOnce(async (callback) => callback(tx));
+    prisma.student.findFirst.mockResolvedValue({
+      id: 'committed-student',
+      studentSystemId: 'SCH-2026-0099',
+    });
+    const { service } = buildService(prisma);
+    jest
+      .spyOn(service, 'createAdmission')
+      .mockRejectedValueOnce(new Error('provider unavailable'));
+
+    const result = await service.bulkImport(
+      {
+        dryRun: false,
+        validationBatchId: '11111111-1111-4111-8111-111111111111',
+        csvContent: [
+          'firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,guardianFullName,guardianRelation,guardianPhone,confirmNoDisability',
+          'Asha,Tamang,2020-01-02,FEMALE,2026-04-15,ay-1,class-1,Maya Tamang,mother,9800000000,true',
+        ].join('\n'),
+      },
+      actor,
+    );
+
+    expect(prisma.student.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        admissionOperationId: 'bulk:confirmed-batch:row:2',
+      },
+      select: { id: true, studentSystemId: true },
+    });
+    expect(result.results[0]).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        studentId: 'committed-student',
+        studentSystemId: 'SCH-2026-0099',
+        errors: expect.arrayContaining([
+          expect.stringContaining('Student and enrollment were created'),
+        ]),
+      }),
+    );
+    expect(tx.admissionImportRow.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          status: 'FAILED',
+          studentId: 'committed-student',
+        }),
+      ]),
+    });
+    expect(result.created).toBe(0);
+    expect(result.failed).toBe(1);
+  });
+
   it('creates a tenant-scoped admission application with duplicate review metadata', async () => {
     const prisma = buildPrisma({
       studentFindManyResult: [],

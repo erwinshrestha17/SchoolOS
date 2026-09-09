@@ -1829,7 +1829,9 @@ model SubjectTeacherAssignment {
   class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
   section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
 
-  @@unique([tenantId, academicYearId, subjectId, staffId, sectionId])
+  // The migration recreates this as NULLS NOT DISTINCT so a class-wide
+  // (sectionId = null) assignment is unique without colliding across classes.
+  @@unique([tenantId, academicYearId, subjectId, staffId, classId, sectionId])
   @@index([tenantId, classId, sectionId])
 }
 
@@ -8182,6 +8184,8 @@ model TeacherAssignment {
   replacementsAsSource     TeacherReplacement[] @relation("ReplacementSourceAssignment")
   replacementsAsTarget     TeacherReplacement[] @relation("ReplacementTargetAssignment")
 
+  // The migration recreates this index as NULLS NOT DISTINCT so nullable
+  // subject/component members cannot bypass exact-scope uniqueness.
   @@unique([tenantId, academicYearId, staffId, assignmentType, classId, sectionId, subjectId, componentScope], name: "TeacherAssignment_scope_unique")
   @@index([tenantId, staffId, academicYearId, status])
   @@index([tenantId, classId, sectionId, status])

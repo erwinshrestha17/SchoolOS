@@ -644,7 +644,7 @@ export type StudentQrScanAudit = {
 };
 export type AdmissionImportBatchSummary = {
   id: string;
-  sourceFileName: string;
+  sourceFileName: string | null;
   dryRun: boolean;
   confirmDuplicates: boolean;
   status: string;
@@ -652,12 +652,22 @@ export type AdmissionImportBatchSummary = {
   createdRows: number;
   validatedRows: number;
   failedRows: number;
-  createdById: string;
+  createdById: string | null;
   startedAt: string;
   completedAt: string | null;
   createdAt: string;
 };
-export type AdmissionImportBatchDetail = AdmissionImportBatchSummary & {
+export type AdmissionImportBatchDetail = Pick<
+  AdmissionImportBatchSummary,
+  | "id"
+  | "sourceFileName"
+  | "dryRun"
+  | "confirmDuplicates"
+  | "status"
+  | "totalRows"
+  | "startedAt"
+  | "completedAt"
+> & {
   created: number;
   validated: number;
   failed: number;

@@ -5,23 +5,35 @@ describe('SchoolSettingsProfileService', () => {
   const userId = 'user-a';
 
   function buildService() {
+    const tenantSetting = {
+      findMany: jest.fn(),
+      upsert: jest.fn(),
+    };
+    const tx = {
+      tenantSetting,
+      nepalLocalLevel: { findUnique: jest.fn() },
+    };
     const prisma = {
-      tenantSetting: {
-        findMany: jest.fn(),
-        upsert: jest.fn(),
-      },
-      $transaction: jest.fn(async (operations: Promise<unknown>[]) =>
-        Promise.all(operations),
+      tenantSetting,
+      $transaction: jest.fn(
+        async (work: (client: typeof tx) => Promise<unknown>) => work(tx),
       ),
     };
-    const auditService = { record: jest.fn() };
+    const auditService = { record: jest.fn().mockResolvedValue({}) };
+    const addressService = {
+      getActiveAddress: jest.fn().mockResolvedValue(null),
+      upsertAddress: jest.fn().mockResolvedValue({}),
+    };
     return {
       service: new SchoolSettingsProfileService(
         prisma as never,
         auditService as never,
+        addressService as never,
       ),
       prisma,
+      tx,
       auditService,
+      addressService,
     };
   }
 
@@ -77,6 +89,47 @@ describe('SchoolSettingsProfileService', () => {
     expect(profile.affiliationNumber).toBe('AFF-2083-0142');
   });
 
+  it('projects a normalized registered-office address without losing the legacy line', async () => {
+    const { service, prisma, addressService } = buildService();
+    prisma.tenantSetting.findMany.mockResolvedValue([
+      {
+        key: 'school_address',
+        value: 'Bakhundole, Lalitpur, Nepal',
+        updatedAt: new Date('2026-06-20T00:00:00.000Z'),
+      },
+    ]);
+    addressService.getActiveAddress.mockResolvedValue({
+      localLevelId: 501,
+      wardNumber: '4',
+      tole: 'Bakhundole',
+      streetAddress: 'Main Road',
+      landmark: 'Near the ward office',
+      updatedAt: new Date('2026-06-21T00:00:00.000Z'),
+      localLevel: {
+        nameEn: 'Lalitpur Metropolitan City',
+        district: {
+          nameEn: 'Lalitpur',
+          province: { nameEn: 'Bagmati' },
+        },
+      },
+    });
+
+    const profile = await service.getProfile(tenantId);
+
+    expect(profile).toMatchObject({
+      schoolAddress: 'Bakhundole, Lalitpur, Nepal',
+      localLevelId: 501,
+      municipality: 'Lalitpur Metropolitan City',
+      district: 'Lalitpur',
+      province: 'Bagmati',
+      wardNumber: 4,
+      tole: 'Bakhundole',
+      streetAddress: 'Main Road',
+      landmark: 'Near the ward office',
+      updatedAt: '2026-06-21T00:00:00.000Z',
+    });
+  });
+
   it('updates profile fields atomically and audits only changed keys', async () => {
     const { service, prisma, auditService } = buildService();
     prisma.tenantSetting.upsert.mockResolvedValue({});
@@ -116,6 +169,97 @@ describe('SchoolSettingsProfileService', () => {
         after: { changedKeys: ['school_name', 'principal_name'] },
       }),
     );
+  });
+
+  it('persists a selected local level and derives its hierarchy server-side', async () => {
+    const { service, prisma, tx, auditService, addressService } =
+      buildService();
+    prisma.tenantSetting.findMany.mockResolvedValue([]);
+    tx.nepalLocalLevel.findUnique.mockResolvedValue({
+      id: 501,
+      nameEn: 'Lalitpur Metropolitan City',
+      district: {
+        nameEn: 'Lalitpur',
+        province: { nameEn: 'Bagmati' },
+      },
+    });
+
+    await service.updateProfile(
+      tenantId,
+      {
+        schoolAddress: 'Bakhundole, Lalitpur, Nepal',
+        localLevelId: 501,
+        wardNumber: 4,
+        tole: 'Bakhundole',
+        streetAddress: 'Main Road',
+      },
+      userId,
+    );
+
+    expect(addressService.upsertAddress).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        tenantId,
+        ownerId: tenantId,
+        legacyText: 'Bakhundole, Lalitpur, Nepal',
+        input: expect.objectContaining({
+          localLevelId: 501,
+          wardNumber: '4',
+          tole: 'Bakhundole',
+          streetAddress: 'Main Road',
+        }),
+      }),
+    );
+    expect(prisma.tenantSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          key: 'municipality',
+          value: 'Lalitpur Metropolitan City',
+        }),
+      }),
+    );
+    expect(prisma.tenantSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          key: 'district',
+          value: 'Lalitpur',
+        }),
+      }),
+    );
+    expect(prisma.tenantSetting.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          key: 'province',
+          value: 'Bagmati',
+        }),
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        after: expect.objectContaining({
+          changedKeys: expect.arrayContaining([
+            'municipality',
+            'district',
+            'province',
+            'registered_office_address',
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('rejects an unknown local level before changing profile settings', async () => {
+    const { service, prisma, tx, auditService, addressService } =
+      buildService();
+    tx.nepalLocalLevel.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.updateProfile(tenantId, { localLevelId: 999999 }, userId),
+    ).rejects.toThrow('Select a valid Nepal local level');
+
+    expect(prisma.tenantSetting.upsert).not.toHaveBeenCalled();
+    expect(addressService.upsertAddress).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
   });
 
   it('normalizes Nepal contact values before saving school settings', async () => {

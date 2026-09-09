@@ -25,7 +25,7 @@ function actorWith(permissions: string[], tenantId = 'tenant-1'): AuthContext {
 }
 
 function buildSettingsService() {
-  const upserts: Array<{ tenantId: string; key: string; value: unknown }> = [];
+  const upserts: { tenantId: string; key: string; value: unknown }[] = [];
   const prisma = {
     tenantSetting: {
       findUnique: jest.fn().mockResolvedValue(null),
@@ -74,6 +74,26 @@ describe('Suspended-tenant fail-closed wiring', () => {
 });
 
 describe('School settings domain authorization', () => {
+  it('accepts only the Nepal timezone on the legacy setting mutation path', async () => {
+    const { service, upserts } = buildSettingsService();
+    const owner = actorWith(['settings:manage']);
+
+    await service.updateSetting(owner, 'timezone', 'Asia/Kathmandu');
+    await expect(
+      service.updateSetting(owner, 'timezone', 'UTC'),
+    ).rejects.toThrow(
+      'Invalid value for timezone. SchoolOS supports Asia/Kathmandu only.',
+    );
+
+    expect(upserts).toEqual([
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        key: 'timezone',
+        value: 'Asia/Kathmandu',
+      }),
+    ]);
+  });
+
   it('allows a domain-scoped manager to write only that domain', async () => {
     const { service, upserts } = buildSettingsService();
     const accountant = actorWith(['settings:read', 'settings:finance:manage']);

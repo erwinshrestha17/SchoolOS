@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Save } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, Save } from "lucide-react";
 import {
   formatBsDateTime,
   isValidEmail,
@@ -13,15 +13,19 @@ import {
   tryNormalizeNepalContactPhone,
   type SchoolProfileSettings,
   type UpdateSchoolProfilePayload,
-} from '@schoolos/core';
-import { SchoolSettingsPageHeader } from './settings-page-header';
-import { Button } from '../ui/button';
-import { ErrorState } from '../ui/error-state';
-import { schoolSettingsApi } from '../../lib/api/school-settings';
-import { useSession } from '../session-provider';
-import { hasPermission } from '../../lib/session';
+} from "@schoolos/core";
+import { SchoolSettingsPageHeader } from "./settings-page-header";
+import { Button } from "../ui/button";
+import { ErrorState } from "../ui/error-state";
+import { schoolSettingsApi } from "../../lib/api/school-settings";
+import { useSession } from "../session-provider";
+import { hasPermission } from "../../lib/session";
+import {
+  NepalAddressSelector,
+  type NepalAddressValue,
+} from "../geography/nepal-address-selector";
 
-type ProfileForm = Omit<SchoolProfileSettings, 'updatedAt'>;
+type ProfileForm = Omit<SchoolProfileSettings, "updatedAt">;
 const emptyProfile: ProfileForm = {
   schoolName: null,
   schoolAddress: null,
@@ -33,6 +37,10 @@ const emptyProfile: ProfileForm = {
   wardNumber: null,
   district: null,
   province: null,
+  localLevelId: null,
+  tole: null,
+  streetAddress: null,
+  landmark: null,
   schoolType: null,
   iemisSchoolCode: null,
   affiliationBoard: null,
@@ -41,10 +49,10 @@ const emptyProfile: ProfileForm = {
 
 export function SchoolProfileWorkspace() {
   const { session } = useSession();
-  const canManage = hasPermission(session, 'settings:identity:manage');
+  const canManage = hasPermission(session, "settings:identity:manage");
   const client = useQueryClient();
   const profileQuery = useQuery({
-    queryKey: ['school-settings', 'school-profile'],
+    queryKey: ["school-settings", "school-profile"],
     queryFn: schoolSettingsApi.getSchoolProfile,
   });
   const [form, setForm] = useState<ProfileForm>(emptyProfile);
@@ -64,11 +72,11 @@ export function SchoolProfileWorkspace() {
   const updateMutation = useMutation({
     mutationFn: schoolSettingsApi.updateSchoolProfile,
     onSuccess: async (profile) => {
-      client.setQueryData(['school-settings', 'school-profile'], profile);
+      client.setQueryData(["school-settings", "school-profile"], profile);
       await client.invalidateQueries({
-        queryKey: ['school-settings', 'overview'],
+        queryKey: ["school-settings", "overview"],
       });
-      setNotice('School profile saved.');
+      setNotice("School profile saved.");
     },
   });
 
@@ -95,17 +103,23 @@ export function SchoolProfileWorkspace() {
   const save = () => {
     setValidationError(null);
     if (form.principalName && !isValidPersonName(form.principalName)) {
-      setValidationError('Enter a valid principal name.');
+      setValidationError("Enter a valid principal name.");
       return;
     }
     if (form.schoolPhone && !tryNormalizeNepalContactPhone(form.schoolPhone)) {
       setValidationError(
-        'Enter a valid Nepal mobile (NTC/Ncell) or landline contact number.',
+        "Enter a valid Nepal mobile (NTC/Ncell) or landline contact number.",
       );
       return;
     }
     if (form.schoolEmail && !isValidEmail(form.schoolEmail)) {
-      setValidationError('Enter a valid contact email address.');
+      setValidationError("Enter a valid contact email address.");
+      return;
+    }
+    if (!form.localLevelId) {
+      setValidationError(
+        "Select the school province, district, and local level from the Nepal address list.",
+      );
       return;
     }
     const normalized = {
@@ -129,13 +143,13 @@ export function SchoolProfileWorkspace() {
       <SchoolSettingsPageHeader
         title="Identity & general"
         description="Official school information used in records, receipts, certificates, and reports."
-        access={canManage ? 'can-manage' : 'view-only'}
+        access={canManage ? "can-manage" : "view-only"}
       />
       {!canManage ? (
         <section className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
           {session?.user.isSupportOverride
-            ? 'This support session is read-only. School identity changes and save controls are unavailable.'
-            : 'This workspace is view-only for your current role. School identity changes and save controls are unavailable.'}
+            ? "This support session is read-only. School identity changes and save controls are unavailable."
+            : "This workspace is view-only for your current role. School identity changes and save controls are unavailable."}
         </section>
       ) : null}
       <section className="rounded-2xl border border-sky-100 bg-sky-50 p-5 text-sm text-sky-900">
@@ -175,46 +189,46 @@ export function SchoolProfileWorkspace() {
         >
           <TextField
             label="School name"
-            value={form.schoolName ?? ''}
-            onChange={(value) => setValue('schoolName', value)}
+            value={form.schoolName ?? ""}
+            onChange={(value) => setValue("schoolName", value)}
             required
           />
           <SelectField
             label="School type"
-            value={form.schoolType ?? ''}
-            onChange={(value) => setValue('schoolType', parseSchoolType(value))}
+            value={form.schoolType ?? ""}
+            onChange={(value) => setValue("schoolType", parseSchoolType(value))}
             options={[
-              ['', 'Select school type'],
-              ['PRIVATE', 'Private / Institutional'],
-              ['COMMUNITY', 'Community / Government'],
-              ['TRUST', 'Public Trust'],
+              ["", "Select school type"],
+              ["PRIVATE", "Private / Institutional"],
+              ["COMMUNITY", "Community / Government"],
+              ["TRUST", "Public Trust"],
             ]}
           />
           <TextField
             label="PAN / registration number"
-            value={form.schoolPanNumber ?? ''}
-            onChange={(value) => setValue('schoolPanNumber', value)}
+            value={form.schoolPanNumber ?? ""}
+            onChange={(value) => setValue("schoolPanNumber", value)}
           />
           <TextField
             label="iEMIS school code"
-            value={form.iemisSchoolCode ?? ''}
-            onChange={(value) => setValue('iemisSchoolCode', value)}
+            value={form.iemisSchoolCode ?? ""}
+            onChange={(value) => setValue("iemisSchoolCode", value)}
           />
           <TextField
             label="Affiliation board"
-            value={form.affiliationBoard ?? ''}
-            onChange={(value) => setValue('affiliationBoard', value)}
+            value={form.affiliationBoard ?? ""}
+            onChange={(value) => setValue("affiliationBoard", value)}
             placeholder="e.g. NEB for +2, CDC for Grade 1-10"
           />
           <TextField
             label="Affiliation / permission number"
-            value={form.affiliationNumber ?? ''}
-            onChange={(value) => setValue('affiliationNumber', value)}
+            value={form.affiliationNumber ?? ""}
+            onChange={(value) => setValue("affiliationNumber", value)}
           />
           <TextField
             label="Principal name"
-            value={form.principalName ?? ''}
-            onChange={(value) => setValue('principalName', value)}
+            value={form.principalName ?? ""}
+            onChange={(value) => setValue("principalName", value)}
             required
           />
         </Section>
@@ -223,48 +237,47 @@ export function SchoolProfileWorkspace() {
           description="Use the official contact information parents and staff should rely on."
         >
           <TextField
-            label="School address"
-            value={form.schoolAddress ?? ''}
-            onChange={(value) => setValue('schoolAddress', value)}
+            label="Official printable address"
+            value={form.schoolAddress ?? ""}
+            onChange={(value) => setValue("schoolAddress", value)}
             required
             className="md:col-span-2"
+            placeholder="Tole, ward, local level, district, Nepal"
           />
           <TextField
             label="Contact phone"
-            value={form.schoolPhone ?? ''}
-            onChange={(value) => setValue('schoolPhone', value)}
+            value={form.schoolPhone ?? ""}
+            onChange={(value) => setValue("schoolPhone", value)}
             required
           />
           <TextField
             label="Contact email"
             type="email"
-            value={form.schoolEmail ?? ''}
-            onChange={(value) => setValue('schoolEmail', value)}
+            value={form.schoolEmail ?? ""}
+            onChange={(value) => setValue("schoolEmail", value)}
             required
           />
-          <TextField
-            label="Municipality"
-            value={form.municipality ?? ''}
-            onChange={(value) => setValue('municipality', value)}
-          />
-          <TextField
-            label="Ward number"
-            type="number"
-            value={form.wardNumber?.toString() ?? ''}
-            onChange={(value) =>
-              setValue('wardNumber', value ? Number(value) : null)
-            }
-          />
-          <TextField
-            label="District"
-            value={form.district ?? ''}
-            onChange={(value) => setValue('district', value)}
-          />
-          <TextField
-            label="Province"
-            value={form.province ?? ''}
-            onChange={(value) => setValue('province', value)}
-          />
+          <div className="md:col-span-2">
+            <NepalAddressSelector
+              idPrefix="school-registered-address"
+              required
+              value={toNepalAddressValue(form)}
+              onChange={(address) =>
+                setForm((current) => ({
+                  ...current,
+                  localLevelId: address.localLevelId ?? null,
+                  wardNumber: parseWardNumber(address.wardNumber),
+                  tole: address.tole ?? null,
+                  streetAddress: address.streetAddress ?? null,
+                  landmark: address.landmark ?? null,
+                }))
+              }
+            />
+            <p className="mt-2 text-xs leading-5 text-slate-600">
+              Province and district are derived from the selected local level
+              and verified again by the server before saving.
+            </p>
+          </div>
         </Section>
       </fieldset>
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
@@ -279,10 +292,10 @@ export function SchoolProfileWorkspace() {
         </p>
       </section>
       <p className="text-xs text-slate-500">
-        Last updated:{' '}
+        Last updated:{" "}
         {profile.updatedAt
           ? formatBsDateTime(profile.updatedAt)
-          : 'Not yet configured'}
+          : "Not yet configured"}
       </p>
       {canManage && changed ? (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-6 py-4 shadow-lg backdrop-blur">
@@ -299,7 +312,7 @@ export function SchoolProfileWorkspace() {
               </Button>
               <Button onClick={save} disabled={updateMutation.isPending}>
                 <Save className="h-4 w-4" />
-                {updateMutation.isPending ? 'Saving…' : 'Save changes'}
+                {updateMutation.isPending ? "Saving…" : "Save changes"}
               </Button>
             </div>
           </div>
@@ -323,10 +336,23 @@ function changedPayload(
     ),
   ) as UpdateSchoolProfilePayload;
 }
-function parseSchoolType(value: string): ProfileForm['schoolType'] {
-  return value === 'PRIVATE' || value === 'COMMUNITY' || value === 'TRUST'
+function parseSchoolType(value: string): ProfileForm["schoolType"] {
+  return value === "PRIVATE" || value === "COMMUNITY" || value === "TRUST"
     ? value
     : null;
+}
+function toNepalAddressValue(form: ProfileForm): NepalAddressValue {
+  return {
+    localLevelId: form.localLevelId,
+    wardNumber: form.wardNumber?.toString() ?? null,
+    tole: form.tole,
+    streetAddress: form.streetAddress,
+    landmark: form.landmark,
+  };
+}
+function parseWardNumber(value: string | null | undefined) {
+  const normalized = value?.trim();
+  return normalized && /^\d{1,2}$/.test(normalized) ? Number(normalized) : null;
 }
 function Section({
   title,
@@ -350,7 +376,7 @@ function TextField({
   value,
   onChange,
   required,
-  type = 'text',
+  type = "text",
   className,
   placeholder,
 }: {

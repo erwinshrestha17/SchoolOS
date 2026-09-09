@@ -591,6 +591,12 @@ export class SettingsService {
         }
         break;
       case 'timezone':
+        if (value !== 'Asia/Kathmandu') {
+          throw new BadRequestException(
+            'Invalid value for timezone. SchoolOS supports Asia/Kathmandu only.',
+          );
+        }
+        break;
       case 'currency':
       case 'date_format':
       case 'receipt_format':

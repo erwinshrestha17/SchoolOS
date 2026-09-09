@@ -1107,10 +1107,30 @@ export class AdmissionsService {
         });
       } catch (error) {
         const duplicates = extractImportDuplicates(error);
+        // Core admission commits before its retryable side effects. Preserve
+        // that identity in the failed row so operators do not import it again.
+        const persistedStudent = await this.prisma.student.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            admissionOperationId: `bulk:${batch.id}:row:${row.rowNumber}`,
+          },
+          select: { id: true, studentSystemId: true },
+        });
         results.push({
           rowNumber: row.rowNumber,
           status: 'failed',
-          errors: [formatImportError(error)],
+          ...(persistedStudent
+            ? {
+                studentId: persistedStudent.id,
+                studentSystemId: persistedStudent.studentSystemId,
+              }
+            : {}),
+          errors: persistedStudent
+            ? [
+                'Student and enrollment were created, but admission follow-up processing did not complete. Review the existing student before retrying; do not import this row as a new admission.',
+                formatImportError(error),
+              ]
+            : [formatImportError(error)],
           duplicates: duplicates.length > 0 ? duplicates : undefined,
         });
       }

@@ -73,7 +73,7 @@ function hasIndex(
 ) {
   try {
     if (hasPrismaIndex(schema, modelName, fields)) return true;
-  } catch (e) {
+  } catch {
     // Model might be SQL-only or renamed
   }
   return hasSqlIndex(sql, tableName, fields);
@@ -194,6 +194,21 @@ describe('schema index hardening gate', () => {
         ['tenantId', 'date', 'status'],
       ),
     ).toBe(true);
+  });
+
+  it('keeps teacher assignment scope uniqueness null-safe', () => {
+    const normalizedSchema = schema.replace(/\s+/g, ' ');
+    const normalizedMigrations = migrations.replace(/\s+/g, ' ');
+
+    expect(normalizedSchema).toMatch(
+      /model SubjectTeacherAssignment \{[\s\S]*?@@unique\(\[tenantId, academicYearId, subjectId, staffId, classId, sectionId\]\)/,
+    );
+    expect(normalizedMigrations).toMatch(
+      /CREATE UNIQUE INDEX "TeacherAssignment_scope_nnd_key" ON "TeacherAssignment"\([\s\S]*?"componentScope"[\s\S]*?\) NULLS NOT DISTINCT/,
+    );
+    expect(normalizedMigrations).toMatch(
+      /CREATE UNIQUE INDEX "SubjectTeacherAssignment_scope_nnd_key" ON "SubjectTeacherAssignment"\([\s\S]*?"classId"[\s\S]*?"sectionId"[\s\S]*?\) NULLS NOT DISTINCT/,
+    );
   });
 
   it('keeps parent-teacher chat thread and message indexes available', () => {

@@ -216,7 +216,9 @@ model SubjectTeacherAssignment {
   class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
   section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
 
-  @@unique([tenantId, academicYearId, subjectId, staffId, sectionId])
+  // The migration recreates this as NULLS NOT DISTINCT so a class-wide
+  // (sectionId = null) assignment is unique without colliding across classes.
+  @@unique([tenantId, academicYearId, subjectId, staffId, classId, sectionId])
   @@index([tenantId, classId, sectionId])
 }
 

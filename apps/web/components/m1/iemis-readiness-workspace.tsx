@@ -61,6 +61,8 @@ export function IemisReadinessWorkspace() {
   const [pendingImport, setPendingImport] =
     useState<PendingAdmissionImport | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importPage, setImportPage] = useState(1);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [toast, setToast] = useState<{
     title: string;
     description: string;
@@ -74,14 +76,22 @@ export function IemisReadinessWorkspace() {
   const canPrepareReportingCsv =
     session?.user.isSupportOverride !== true &&
     hasPermissions(["students:manage_lifecycle", "reports:export"]);
+  const canReadImportDetails =
+    session?.user.isSupportOverride !== true &&
+    hasPermissions(["enrollments:read", "students:read"]);
 
   const readinessQuery = useQuery({
     queryKey: ["student-iemis-readiness-list", "workspace", status],
     queryFn: () => api.listIemisReadiness({ status }),
   });
   const importBatchesQuery = useQuery({
-    queryKey: ["admission-import-batches", 1],
-    queryFn: () => api.listAdmissionImportBatches({ page: 1, limit: 10 }),
+    queryKey: ["admission-import-batches", importPage],
+    queryFn: () => api.listAdmissionImportBatches({ page: importPage, limit: 10 }),
+  });
+  const importDetailQuery = useQuery({
+    queryKey: ["admission-import-batch", selectedBatchId],
+    queryFn: () => api.getAdmissionImportBatch(selectedBatchId!),
+    enabled: canReadImportDetails && selectedBatchId !== null,
   });
   const importReviewQuery = useQuery({
     queryKey: ["admission-import-review-queue"],
@@ -161,7 +171,7 @@ export function IemisReadinessWorkspace() {
       setImportDialogOpen(false);
       setToast({
         title: "Import processed",
-        description: `${result.created} created, ${result.failed} failed, ${result.validated} validated.`,
+        description: `${result.created} completed, ${result.failed} need review, ${result.validated} validated. Some rows needing review may already have a student record; check the row details.`,
         tone: result.failed ? "info" : "success",
       });
       void queryClient.invalidateQueries({ queryKey: ["students"] });
@@ -401,7 +411,7 @@ export function IemisReadinessWorkspace() {
               <div className="mt-3 grid gap-3 sm:grid-cols-4">
                 {[
                   ["Rows", importResult.totalRows],
-                  ["Created", importResult.created],
+                  ["Completed", importResult.created],
                   ["Validated", importResult.validated],
                   ["Failed", importResult.failed],
                 ].map(([label, value]) => (
@@ -415,6 +425,26 @@ export function IemisReadinessWorkspace() {
                     </p>
                   </div>
                 ))}
+                {importResult.results
+                  .filter((row) => row.status === "failed" && row.studentId)
+                  .map((row) => (
+                    <div
+                      key={row.rowNumber}
+                      className="sm:col-span-4 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900"
+                    >
+                      <p>
+                        Row {row.rowNumber}: the student was created, but
+                        follow-up processing needs review. Do not import this
+                        row again.
+                      </p>
+                      <a
+                        className="mt-2 inline-block underline"
+                        href={`/dashboard/students/${encodeURIComponent(row.studentId!)}`}
+                      >
+                        Review student {row.studentSystemId}
+                      </a>
+                    </div>
+                  ))}
               </div>
             ) : (
               <p className="mt-2 text-sm text-slate-500">
@@ -431,15 +461,17 @@ export function IemisReadinessWorkspace() {
                   CSV Import History
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Import and export batches recorded for this school.
+                  Admission import batches recorded for this school.
                 </p>
               </div>
               <StatusBadge
-                status={`${importBatchesQuery.data?.total ?? 0} JOBS`}
+                status={importBatchesQuery.data ? `${importBatchesQuery.data.total} jobs` : "Unavailable"}
                 tone="info"
               />
             </div>
-            {importBatchesQuery.isError ? (
+            {importBatchesQuery.isPending ? (
+              <p role="status" className="mt-3 text-sm text-slate-600">Loading import history…</p>
+            ) : importBatchesQuery.isError ? (
               <p className="mt-3 rounded-xl bg-danger-50 p-3 text-xs font-bold text-danger-700">
                 Import history could not be loaded.
               </p>
@@ -455,16 +487,17 @@ export function IemisReadinessWorkspace() {
                       <th className="px-3 py-2">File</th>
                       <th className="px-3 py-2">Started</th>
                       <th className="px-3 py-2">Rows</th>
-                      <th className="px-3 py-2">Created</th>
+                      <th className="px-3 py-2">Completed</th>
                       <th className="px-3 py-2">Failed</th>
                       <th className="px-3 py-2">Status</th>
+                      {canReadImportDetails ? <th className="px-3 py-2">Details</th> : null}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {importBatchesQuery.data?.items.map((batch) => (
                       <tr key={batch.id}>
                         <td className="max-w-56 truncate px-3 py-3 font-bold text-slate-800">
-                          {batch.sourceFileName}
+                          {batch.sourceFileName ?? "Unnamed import"}
                         </td>
                         <td className="px-3 py-3 text-slate-600">
                           {formatBsDateTime(batch.startedAt)}
@@ -481,12 +514,55 @@ export function IemisReadinessWorkspace() {
                         <td className="px-3 py-3">
                           <StatusBadge status={batch.status} />
                         </td>
+                        {canReadImportDetails ? (
+                          <td className="px-3 py-3">
+                            <Button variant="outline" onClick={() => setSelectedBatchId(batch.id)} aria-expanded={selectedBatchId === batch.id} aria-controls="admission-import-details">
+                              Review rows
+                            </Button>
+                          </td>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
+            <div className="mt-3 flex items-center justify-end gap-3">
+              <Button variant="outline" disabled={importPage === 1 || importBatchesQuery.isFetching} onClick={() => setImportPage((page) => page - 1)}>Previous</Button>
+              <span className="text-sm text-slate-600">Page {importPage}</span>
+              <Button variant="outline" disabled={!importBatchesQuery.data?.hasNextPage || importBatchesQuery.isFetching} onClick={() => setImportPage((page) => page + 1)}>Next</Button>
+            </div>
+            {selectedBatchId && canReadImportDetails ? (
+              <section id="admission-import-details" aria-labelledby="admission-import-details-title" className="mt-4 rounded-lg border border-slate-200 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h4 id="admission-import-details-title" className="font-bold text-slate-900">Saved import row results</h4>
+                  <Button variant="outline" onClick={() => setSelectedBatchId(null)}>Close details</Button>
+                </div>
+                {importDetailQuery.isPending ? <p role="status">Loading saved rows…</p> : importDetailQuery.isError ? (
+                  <div role="alert">
+                    <p>Saved rows could not be loaded. Check your connection and access, then retry.</p>
+                    <Button variant="outline" onClick={() => void importDetailQuery.refetch()}>Retry details</Button>
+                  </div>
+                ) : importDetailQuery.data ? (
+                  <>
+                    <p className="mt-2 text-sm text-slate-600">{importDetailQuery.data.sourceFileName ?? "Unnamed import"} · {formatBsDateTime(importDetailQuery.data.startedAt)} · {importDetailQuery.data.dryRun ? "Validation only" : "Confirmed import"}</p>
+                    <StatusBadge status={importDetailQuery.data.status} />
+                    <p className="mt-2 text-sm text-slate-600">{importDetailQuery.data.created} completed · {importDetailQuery.data.validated} validated · {importDetailQuery.data.failed} need review</p>
+                    {importDetailQuery.data.rows.length === 0 ? <p className="mt-3 text-sm text-slate-600">No row results have been recorded. This does not confirm that no students were created. Review the batch status before retrying.</p> : (
+                      <ul className="mt-3 space-y-3">
+                        {importDetailQuery.data.rows.map((row) => (
+                          <li key={row.rowNumber} className="rounded-lg border border-slate-200 p-3 text-sm">
+                            <p>Row {row.rowNumber} · <StatusBadge status={row.status} /></p>
+                            {row.status === "failed" ? <p className="mt-2 text-warning-900">{row.studentId ? "Student and enrollment were created, but follow-up processing needs review. Do not import this row again." : "This row needs review before another import. Check the original CSV and duplicate-review queue."}</p> : null}
+                            {row.studentId ? <a className="mt-2 inline-block underline" href={`/dashboard/students/${encodeURIComponent(row.studentId)}`}>Review student {row.studentSystemId ?? "record"}</a> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                ) : null}
+              </section>
+            ) : null}
           </div>
 
           <div className="border-t border-slate-100 p-4">

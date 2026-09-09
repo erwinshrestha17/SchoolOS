@@ -1,37 +1,37 @@
-import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
+import { createRequire } from "node:module";
+import { resolve } from "node:path";
 
-const apiRoot = resolve('apps/api');
-const requireFromApi = createRequire(resolve(apiRoot, 'package.json'));
+const apiRoot = resolve("apps/api");
+const requireFromApi = createRequire(resolve(apiRoot, "package.json"));
 
-requireFromApi('reflect-metadata');
+requireFromApi("reflect-metadata");
 
-const { NestFactory } = requireFromApi('@nestjs/core');
-const { DocumentBuilder, SwaggerModule } = requireFromApi('@nestjs/swagger');
+const { NestFactory } = requireFromApi("@nestjs/core");
+const { DocumentBuilder, SwaggerModule } = requireFromApi("@nestjs/swagger");
 const { AppModule } = requireFromApi(
-  resolve(apiRoot, 'dist/apps/api/src/app.module.js'),
+  resolve(apiRoot, "dist/apps/api/src/app.module.js"),
 );
 
 const HTTP_METHODS = new Set([
-  'delete',
-  'get',
-  'head',
-  'options',
-  'patch',
-  'post',
-  'put',
-  'trace',
+  "delete",
+  "get",
+  "head",
+  "options",
+  "patch",
+  "post",
+  "put",
+  "trace",
 ]);
 
 const REQUIRED_OPERATIONS = [
-  ['post', '/api/v1/auth/login'],
-  ['post', '/api/v1/auth/refresh'],
-  ['get', '/api/v1/ready'],
-  ['get', '/api/v1/platform/tenants'],
-  ['post', '/api/v1/attendance/sync'],
-  ['post', '/api/v1/homework'],
-  ['post', '/api/v1/mobile/teacher/homework'],
-  ['post', '/api/v1/finance/payments'],
+  ["post", "/api/v1/auth/login"],
+  ["post", "/api/v1/auth/refresh"],
+  ["get", "/api/v1/ready"],
+  ["get", "/api/v1/platform/tenants"],
+  ["post", "/api/v1/attendance/sync"],
+  ["post", "/api/v1/homework"],
+  ["post", "/api/v1/mobile/teacher/homework"],
+  ["post", "/api/v1/finance/payments"],
 ];
 
 function fail(message) {
@@ -45,12 +45,12 @@ const app = await NestFactory.create(AppModule, {
 });
 
 try {
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix("api/v1");
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('SchoolOS API')
-    .setDescription('Multi-tenant SchoolOS admin API')
-    .setVersion('1.0.0')
+    .setTitle("SchoolOS API")
+    .setDescription("Multi-tenant SchoolOS admin API")
+    .setVersion("1.0.0")
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
@@ -59,7 +59,7 @@ try {
   const operations = [];
 
   for (const [path, pathItem] of pathEntries) {
-    if (!path.startsWith('/api/v1')) {
+    if (!path.startsWith("/api/v1")) {
       fail(`path is outside the API prefix: ${path}`);
     }
 
@@ -70,11 +70,11 @@ try {
     }
   }
 
-  if (document.openapi !== '3.0.0') {
+  if (document.openapi !== "3.0.0") {
     fail(`expected OpenAPI 3.0.0, received ${String(document.openapi)}`);
   }
-  if (document.info?.title !== 'SchoolOS API') {
-    fail('document title is missing or incorrect');
+  if (document.info?.title !== "SchoolOS API") {
+    fail("document title is missing or incorrect");
   }
   if (pathEntries.length < 100 || operations.length < 100) {
     fail(
@@ -88,11 +88,11 @@ try {
   const bearer = document.components?.securitySchemes?.bearer;
   if (
     !bearer ||
-    '$ref' in bearer ||
-    bearer.type !== 'http' ||
-    bearer.scheme !== 'bearer'
+    "$ref" in bearer ||
+    bearer.type !== "http" ||
+    bearer.scheme !== "bearer"
   ) {
-    fail('JWT bearer security scheme is missing or malformed');
+    fail("JWT bearer security scheme is missing or malformed");
   }
 
   for (const [method, path] of REQUIRED_OPERATIONS) {
@@ -118,12 +118,12 @@ try {
 
   for (const [operationId, locations] of operationIds) {
     if (locations.length > 1) {
-      fail(`duplicate operationId ${operationId}: ${locations.join(', ')}`);
+      fail(`duplicate operationId ${operationId}: ${locations.join(", ")}`);
     }
   }
 
   if (process.exitCode) {
-    throw new Error('Generated OpenAPI contract did not satisfy the gate.');
+    throw new Error("Generated OpenAPI contract did not satisfy the gate.");
   }
 
   console.log(

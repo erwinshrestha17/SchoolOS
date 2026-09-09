@@ -13,12 +13,15 @@ The active education scope is School (Grade 1-10) and Higher Secondary (Grade 11
 ## 1. Deployment and Server Setup
 
 ### Scope
+
 Use this runbook for every staging or production deployment.
 The target pilot architecture is: NestJS API, Next.js dashboard, PostgreSQL, Redis/BullMQ, private local or object storage, and provider adapters in disabled/dev-log/configured mode.
 SchoolOS remains a modular monolith. Angular migration, microservices, AI/ML runtime, broad Student App access, and unverified live transport map expansion are out of scope unless explicitly approved. Optional mobile biometric unlock of local session credentials (M0) is in scope for Parent/Teacher/Principal; biometric templates must never leave the device. Biometric attendance (M2) and other biometric workflows remain out of scope unless explicitly approved.
 
 ### Server Requirements
+
 Recommended pilot VPS specs:
+
 - **CPU:** 2 vCPU minimum; 4 vCPU preferred.
 - **RAM:** 4 GB RAM minimum; 8 GB preferred.
 - **Disk:** 60 GB SSD minimum; 100 GB preferred if storing generated PDFs and activity images locally.
@@ -27,17 +30,21 @@ Recommended pilot VPS specs:
 - Node.js runtime and `pnpm` matching the repo package manager.
 
 Database and queue:
+
 - **Staging default:** Docker PostgreSQL and Docker Redis with persistent volumes.
 - **Production target:** Managed PostgreSQL and managed Redis, with persistence appropriate for BullMQ jobs and retries.
 
 Storage:
+
 - Local storage is acceptable for controlled pilot if backed up. Recommended path: `/var/lib/schoolos/storage`.
 - Do not expose the storage directory through the reverse proxy as a public directory.
 - R2/S3-compatible storage should only be enabled when credentials, lifecycle policy, signed URL behavior, and restore testing are ready.
 
 ### Reverse Proxy Configuration
+
 Use Nginx, Caddy, Traefik, or a managed load balancer.
 Required behavior:
+
 - Terminate TLS at the proxy.
 - Forward `X-Forwarded-Proto`, `X-Forwarded-For`, and `X-Request-Id` headers.
 - Do not expose PostgreSQL, Redis, or storage directories publicly.
@@ -50,7 +57,9 @@ Required behavior:
 ## 2. Environment Variables & Security Mechanisms
 
 ### Environment Setup Examples
+
 API environment (`apps/api/.env`):
+
 ```bash
 NODE_ENV=production
 DEPLOY_ENV=staging
@@ -91,11 +100,13 @@ LOCAL_STORAGE_PUBLIC_BASE_URL=/protected-storage
 ```
 
 Web environment (`apps/web/.env`):
+
 ```bash
 NEXT_PUBLIC_API_BASE_URL=https://api-staging.schoolos.example/api/v1
 ```
 
 Required production environment variables:
+
 ```bash
 NODE_ENV=production
 DEPLOY_ENV=staging or production
@@ -120,6 +131,7 @@ TRUST_PROXY=true
 ```
 
 If using webhook email mode:
+
 ```bash
 EMAIL_DELIVERY_MODE=webhook
 EMAIL_WEBHOOK_URL
@@ -127,6 +139,7 @@ EMAIL_WEBHOOK_TOKEN
 ```
 
 If using R2/object storage:
+
 ```bash
 STORAGE_PROVIDER=r2
 R2_BUCKET
@@ -139,6 +152,7 @@ R2_REGION=auto
 Public-base variable names may be required by the current storage adapter, but they must resolve through protected application-controlled access. Never expose a private storage bucket, object key, or storage directory directly through the reverse proxy.
 
 ### Cookie, CORS, and Security Rules
+
 - HTTPS is mandatory for staging and production.
 - Use `COOKIE_SAME_SITE=lax` for same-site configurations. Use `COOKIE_SAME_SITE=none` only for cross-site HTTPS deployments.
 - Browser auth is cookie-first; do not store raw access or refresh tokens in local browser storage.
@@ -149,7 +163,9 @@ Public-base variable names may be required by the current storage adapter, but t
 - Provider failures must not block core admissions, attendance, fees, activity, or notices workflows.
 
 ### Email Webhook Delivery Details
+
 When using webhook mode (`EMAIL_DELIVERY_MODE=webhook`), the backend sends a JSON POST to the configured `EMAIL_WEBHOOK_URL` with token verification headers (`EMAIL_WEBHOOK_TOKEN`) and the following JSON payload fields:
+
 - `from`: Sender address
 - `to`: Recipient address
 - `subject`: Email subject
@@ -158,6 +174,7 @@ When using webhook mode (`EMAIL_DELIVERY_MODE=webhook`), the backend sends a JSO
 - `metadata`: Key-value object of delivery details
 
 ### API Security Mechanisms
+
 - Access tokens are short-lived and bound to persisted refresh-token families; every guarded request checks session liveness without caching.
 - Refresh tokens are hashed in the database and rotated on refresh.
 - Password reset and MFA codes are hashed in the database and expire automatically.
@@ -221,6 +238,7 @@ Revocation takes effect at the next server authorization check; it does not canc
 already-authorized work or erase offline device data remotely.
 
 ### Logs and Monitoring
+
 - Minimum log sources: API process logs, Web process logs, `docker compose logs postgres redis`, Notification processor logs, Reverse proxy logs, Database migration logs.
 - Review logs daily during the pilot. Verify API request IDs for bug reports.
 - Monitor Redis connections and BullMQ retry errors.
@@ -230,7 +248,9 @@ already-authorized work or erase offline device data remotely.
 ## 3. Branch Hygiene, Build, and Verification
 
 ### Branch and Release Hygiene
+
 Before deployment:
+
 1. Confirm deployment branch and commit SHA.
 2. Ensure no unrelated local changes are included.
 3. Record rollback commit/image.
@@ -240,21 +260,27 @@ Before deployment:
 7. Confirm provider modes (disabled, dev-log, mock, or configured).
 
 ### Canonical Verification Command
+
 Export or inject the real staging values, then run from repo root before deployment:
+
 ```bash
 pnpm verify:env:staging
 DEPLOY_ENV=staging NODE_ENV=production pnpm verify:deploy
 ```
+
 Use `pnpm verify:env:production` for production release checks. These commands require real environment values in the shell; placeholders in `.env.example` are intentionally rejected. `verify:deploy` covers: deploy env preflight, tracked artifact guard, Prisma generate/validate, OpenAPI gate, lint, typecheck, unit tests, API E2E, web smoke E2E, and build.
 
 If staging values live in an untracked file, load them without printing secrets:
+
 ```bash
 DEPLOY_ENV_FILE=/secure/path/schoolos-staging.env pnpm verify:env:staging
 DEPLOY_ENV_FILE=/secure/path/schoolos-staging.env DEPLOY_ENV=staging NODE_ENV=production pnpm verify:deploy
 ```
+
 The env file may contain `DEPLOY_ENV=staging` and `NODE_ENV=production`; shell variables still take precedence over file values.
 
 Full verification fallback:
+
 ```bash
 pnpm db:generate
 pnpm db:validate
@@ -268,12 +294,14 @@ pnpm verify:production
 ```
 
 If Docker/API/web are running:
+
 ```bash
 pnpm smoke:pilot          # Legacy alias: pnpm smoke:phase1
 SMOKE_LOGIN=true pnpm smoke:pilot
 ```
 
 For staging smoke, point the same command at deployed services and record the command output with the release evidence:
+
 ```bash
 SMOKE_API_BASE_URL=https://api-staging.schoolos.example/api/v1 \
 DATABASE_URL=postgresql://... \
@@ -294,11 +322,11 @@ Release validation requires restorable data, not just backups that appear to exi
 
 Use the executable scripts in `scripts/` rather than ad hoc commands when possible:
 
-| Command | Purpose |
-| --- | --- |
-| `pnpm backup:local` | Postgres custom-format dump + local storage tar + manifest metrics |
-| `pnpm restore:local -- --manifest .backups/<timestamp>/manifest.json` | Restore into `RESTORE_DATABASE_URL` and isolated storage dir |
-| `pnpm rehearse:backup-restore:local` | End-to-end local drill (backup → restore DB `schoolos_db_restore` → verify counts → write evidence) |
+| Command                                                               | Purpose                                                                                             |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `pnpm backup:local`                                                   | Postgres custom-format dump + local storage tar + manifest metrics                                  |
+| `pnpm restore:local -- --manifest .backups/<timestamp>/manifest.json` | Restore into `RESTORE_DATABASE_URL` and isolated storage dir                                        |
+| `pnpm rehearse:backup-restore:local`                                  | End-to-end local drill (backup → restore DB `schoolos_db_restore` → verify counts → write evidence) |
 
 Environment variables:
 
@@ -323,6 +351,7 @@ pnpm rehearse:backup-restore:local
 If `pg_dump` / `pg_restore` are not installed on the host, the scripts fall back to `docker exec schoolos_postgres` when that container is running.
 
 ### Backup Scope & Frequency
+
 - **Postgres:** full backup daily (and WAL archiving once live). Captures tenant records, accounting ledger, audit records, sessions, and module data.
 - **Redis:** append-only persistence or RDB snapshots to preserve BullMQ queue states (deferred for first local evidence; queue state is recoverable).
 - **Storage:** daily incremental sync and weekly full verification of uploaded files and generated PDFs. Local pilot uses `STORAGE_PROVIDER=local`; S3/R2 backup is a staging/production follow-up.
@@ -331,16 +360,21 @@ If `pg_dump` / `pg_restore` are not installed on the host, the scripts fall back
 ### Production / VPS manual commands (override path)
 
 Postgres backup:
+
 ```bash
 pg_dump --format=custom --no-owner --no-acl --file=/backups/schoolos-before-$(date +%Y%m%d%H%M).dump "$DATABASE_URL"
 ```
+
 Storage backup:
+
 ```bash
 tar -czf /backups/schoolos-storage-before-$(date +%Y%m%d%H%M).tgz /var/lib/schoolos/storage
 ```
+
 Store backups outside the VPS as soon as possible.
 
 ### Restore Drill
+
 1. Provision a clean test database (`RESTORE_DATABASE_URL` must differ from source unless `ALLOW_RESTORE_INPLACE=1`).
 2. Restore the Postgres backup:
    ```bash
@@ -359,7 +393,7 @@ Store backups outside the VPS as soon as possible.
 ### Local staging simulation (development workstation)
 
 ```bash
-pnpm staging:deploy:local          # postgres:5434, redis:6380, migrate, seed
+pnpm staging:deploy:local          # postgres:5434, redis:6380, migrate, app seed, Nepal geography seed
 node scripts/start-staging-api-local.mjs   # API on :4000 against staging DB
 pnpm staging:verify:def            # automated DEF subset
 pnpm staging:health              # /health + /ready polling
@@ -384,6 +418,7 @@ Evidence templates: `docs/production/evidence/`.
 - Continue monitoring error rate, queue depth, and disk usage in the hosting platform/APM. The HTTP monitor does not replace those signals.
 
 ---
+
 1. Stop API and web traffic.
 2. Redeploy the previous known-good image or commit.
 3. Run `pnpm db:generate` after checkout if dependencies changed.
@@ -397,6 +432,7 @@ Evidence templates: `docs/production/evidence/`.
 This section outlines onboarding a controlled-pilot school onto the agreed supported workflow slice. Use it only after staging health and smoke checks have actually passed and their evidence has been recorded.
 
 ### Local/Staging Startup Quick Reference
+
 1. Install dependencies:
    ```bash
    pnpm install
@@ -412,6 +448,7 @@ This section outlines onboarding a controlled-pilot school onto the agreed suppo
    pnpm db:validate
    pnpm db:migrate
    pnpm db:seed
+   pnpm db:seed:geography
    ```
 4. Start apps:
    ```bash
@@ -421,13 +458,16 @@ This section outlines onboarding a controlled-pilot school onto the agreed suppo
 Use the current idempotent development seed and retrieve local QA credentials from the seed implementation or approved secure development configuration. Routine reseeds preserve existing demo passwords and their completed temporary-password state. Set `SCHOOLOS_DEMO_RESET_CREDENTIALS_ON_SEED=true` or `PLATFORM_SEED_RESET_CREDENTIALS_ON_SEED=true` only for an intentional local credential reset. Do not reuse seed credentials in staging or production.
 
 Expected URLs:
+
 - Web: `http://localhost:3000`
 - API: `http://localhost:4000/api/v1`
 - Swagger: `http://localhost:4000/api/v1/docs`
 
 ### Pre-Pilot Checklist
+
 - Confirm school/tenant name and branding expectations.
 - Confirm current academic year.
+- Confirm `GET /api/v1/reference/nepal/version` and the province/district/local-level counts match the committed geography dataset before collecting structured school addresses.
 - Create or verify classes, sections, fee heads, and fee plans.
 - Create admin, teacher, and accountant/cashier users.
 - Verify notification providers are stubbed or explicitly configured.
@@ -478,6 +518,7 @@ Execute steps 1–11 for the first production school. Steps 12–15 require Wave
 15. Create one manual journal entry, approve, post, export Trial Balance (M11).
 
 ### Browser QA Checklist
+
 - **Authentication:** Login works with cookie-first auth. No raw tokens in browser storage. Logout clears local session metadata. Unauthenticated access redirects to login.
 - **Setup:** Academic year, class, section, fee head, fee plan exist. Setup alerts clear.
 - **Admissions:** Student Directory is default. Search works. Profile panel sections load. ID Card PDF opens. New enrollment requires guardian phone and iEMIS disability confirmation. Duplicate warnings and roll conflicts function.
@@ -499,6 +540,7 @@ Execute steps 1–11 for the first production school. Steps 12–15 require Wave
 - M13 Learning ships in Wave 5; keep disabled until that wave's evidence is recorded.
 
 ### Support Process & Severity Levels
+
 - **S0 (Critical):** Data loss, cross-tenant data exposure, login unavailable, or financial corruption. Stop pilot writes and escalate immediately.
 - **S1 (High):** Core flows (admissions, attendance, fees, notices) blocked for pilot staff. Fix before next school day.
 - **S2 (Medium):** Workaround exists but staff workflow is degraded. Same-week fix.
@@ -509,6 +551,7 @@ Execute steps 1–11 for the first production school. Steps 12–15 require Wave
 ## 6. Release Go/No-Go Checklist
 
 Go only if all items are true:
+
 - Deployment branch and commit SHA are finalized.
 - Backup and rollback path verified.
 - Required environment values are configured.
@@ -521,6 +564,7 @@ Go only if all items are true:
 - Owner has accepted any documented waivers.
 
 No-go if:
+
 - Tenant isolation is failing.
 - Payment/receipt/accounting flow is inconsistent.
 - Parent can view non-linked child data.
