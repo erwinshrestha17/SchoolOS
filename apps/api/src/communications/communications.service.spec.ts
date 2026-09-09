@@ -1198,7 +1198,7 @@ describe('CommunicationsService', () => {
       paymentId: 'payment-1',
       invoiceId: 'invoice-1',
       studentId: 'student-1',
-      amount: 1200,
+      amount: '1200.00',
       method: 'CASH',
       receiptNumber: 'REC-2025-2026-00001',
     });

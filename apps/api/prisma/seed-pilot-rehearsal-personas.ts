@@ -29,6 +29,19 @@ const PERSONA_PASSWORD =
   process.env.PILOT_REHEARSAL_ADMIN_PASSWORD ??
   'PilotRehearsal1!';
 
+function assertPilotRehearsalFixtureAllowed() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Refusing to seed controlled-pilot rehearsal personas in production.',
+    );
+  }
+  if (process.env.SCHOOLOS_PILOT_REHEARSAL_FIXTURES !== 'true') {
+    throw new Error(
+      'Set SCHOOLOS_PILOT_REHEARSAL_FIXTURES=true to seed controlled-pilot rehearsal personas.',
+    );
+  }
+}
+
 const STUDENT_PREFIX = 'PR-01-A';
 
 const demoGuardianCapabilities: GuardianCapability[] = [
@@ -395,6 +408,8 @@ async function seedStudentWithGuardian(input: {
 }
 
 async function main() {
+  assertPilotRehearsalFixtureAllowed();
+
   const tenant = await prisma.tenant.findUnique({ where: { slug: PILOT_SLUG } });
   if (!tenant) {
     throw new Error(
@@ -631,7 +646,7 @@ async function main() {
   console.log(`Tenant: ${PILOT_SLUG}`);
   console.log(`Sections: ${sectionA.name}, ${sectionB.name}`);
   console.log(`Subjects: ${nepali.name}, ${english.name}, ${mathematics.name}`);
-  console.log(`Persona password: ${PERSONA_PASSWORD}`);
+  console.log('Persona credentials: configured for local rehearsal only');
   console.log('Smoke personas: principal, classteacher.1a, subjectteacher.math,');
   console.log('  guardian.c01a001, staff, accountant, driver');
   console.log('');

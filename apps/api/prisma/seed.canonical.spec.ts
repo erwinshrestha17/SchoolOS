@@ -11,6 +11,14 @@ describe('canonical development seed', () => {
     join(__dirname, 'seed-m0-platform-e2e.ts'),
     'utf8',
   );
+  const pilotRehearsalSource = readFileSync(
+    join(__dirname, 'seed-pilot-rehearsal-tenant.ts'),
+    'utf8',
+  );
+  const pilotPersonaSource = readFileSync(
+    join(__dirname, 'seed-pilot-rehearsal-personas.ts'),
+    'utf8',
+  );
 
   it('keeps the Everest Academy Class 1-12 distribution deterministic', () => {
     const expectedCounts = [
@@ -126,5 +134,20 @@ describe('canonical development seed', () => {
       expect(dedicatedSource).toContain("scopeId: 'global'");
       expect(dedicatedSource).toContain('const action = parts.pop()');
     }
+  });
+
+  it('keeps controlled-pilot rehearsal fixtures out of production and logs', () => {
+    for (const rehearsalSource of [pilotRehearsalSource, pilotPersonaSource]) {
+      expect(rehearsalSource).toContain("process.env.NODE_ENV === 'production'");
+      expect(rehearsalSource).toContain(
+        "process.env.SCHOOLOS_PILOT_REHEARSAL_FIXTURES !== 'true'",
+      );
+    }
+    expect(pilotRehearsalSource).not.toContain(
+      'Admin password (default): ${PILOT_ADMIN_PASSWORD}',
+    );
+    expect(pilotPersonaSource).not.toContain(
+      'Persona password: ${PERSONA_PASSWORD}',
+    );
   });
 });

@@ -44,11 +44,20 @@ async function main() {
   }
   loadEnvFile(join(repoRoot, 'apps/api/.env.staging-local'));
 
-  run('pnpm', ['db:seed:platform'], { env: process.env });
+  const fixtureEnv = {
+    ...process.env,
+    NODE_ENV: 'development',
+    SCHOOLOS_PILOT_REHEARSAL_FIXTURES: 'true',
+  };
   const seedResult = run(
     'pnpm',
     ['--filter', '@schoolos/api', 'db:seed:pilot-rehearsal'],
-    { env: process.env, capture: true },
+    { env: fixtureEnv, capture: true },
+  );
+  const personaResult = run(
+    'pnpm',
+    ['--filter', '@schoolos/api', 'db:seed:pilot-rehearsal-personas'],
+    { env: fixtureEnv, capture: true },
   );
 
   const finishedAt = new Date().toISOString();
@@ -68,28 +77,28 @@ async function main() {
 ## Commands
 
 \`\`\`bash
-pnpm db:seed:platform
-pnpm --filter @schoolos/api db:seed:pilot-rehearsal
+SCHOOLOS_PILOT_REHEARSAL_FIXTURES=true pnpm --filter @schoolos/api db:seed:pilot-rehearsal
+SCHOOLOS_PILOT_REHEARSAL_FIXTURES=true pnpm --filter @schoolos/api db:seed:pilot-rehearsal-personas
 \`\`\`
 
 ## Seed output
 
 \`\`\`
 ${(seedResult.stdout ?? '').trim()}
+${(personaResult.stdout ?? '').trim()}
 \`\`\`
 
 ## Tenant
 
 - Slug: \`pilot-rehearsal-1\`
 - Admin: \`admin@pilot-rehearsal.schoolos.test\`
-- Password: set via \`PILOT_REHEARSAL_ADMIN_PASSWORD\` or seed default (see stdout once)
+- Credentials: local rehearsal only; never copied into evidence
 
 ## Next steps
 
 1. \`pnpm staging:api:local\`
-2. \`pnpm seed:pilot-rehearsal-personas\`
-3. \`pnpm verify:pilot-entitlements\`
-4. \`pnpm smoke:pilot:rehearsal\` (Wave 1 mode — after persona seed)
+2. \`pnpm verify:pilot-entitlements\`
+3. \`pnpm smoke:pilot:rehearsal\` (Wave 1 mode)
 `,
     'utf8',
   );

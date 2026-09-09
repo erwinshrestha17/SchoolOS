@@ -190,7 +190,7 @@ async function firstPayrollRunId(
   browser: Browser,
 ) {
   const context = await browser.newContext({
-    storageState: await authStateFor("schoolAdmin"),
+    storageState: await authStateFor("payrollOfficer"),
   });
   const response = await context.request.get(`${API_BASE_URL}/payroll/runs`);
   expect(response.ok()).toBeTruthy();
@@ -206,7 +206,7 @@ async function firstJournalId(
   browser: Browser,
 ) {
   const context = await browser.newContext({
-    storageState: await authStateFor("schoolAdmin"),
+    storageState: await authStateFor("e2eAccountant"),
   });
   const response = await context.request.get(
     `${API_BASE_URL}/accounting/journals`,

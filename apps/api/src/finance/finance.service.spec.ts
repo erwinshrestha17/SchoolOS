@@ -447,6 +447,32 @@ describe('finance production controls', () => {
     );
   });
 
+  it('rejects a zero-value payment before creating financial records', async () => {
+    const invoice = buildInvoice({
+      payments: [],
+      student: { id: 'student-1' },
+    });
+    const { service, prisma, accountingPostingService } = buildService({
+      invoice,
+      feeHead: buildFeeHead(),
+    });
+
+    await expect(
+      service.collectPayment(
+        {
+          invoiceId: invoice.id,
+          amount: '0.00',
+          method: PaymentMethod.CASH,
+          idempotencyKey: 'zero-payment-1',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('Payment amount must be a positive decimal');
+
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+    expect(accountingPostingService.postFeePayment).not.toHaveBeenCalled();
+  });
+
   it('rejects overpayment against the remaining invoice balance', async () => {
     const invoice = buildInvoice({
       totalAmount: new Prisma.Decimal(100),
@@ -515,7 +541,7 @@ describe('finance production controls', () => {
         fileStatus: 'PENDING',
       },
     };
-    const { service, eventEmitter } = buildService({
+    const { service, prisma, eventEmitter } = buildService({
       invoice,
       feeHead: buildFeeHead(),
       duplicatePayment: null,
@@ -539,6 +565,7 @@ describe('finance production controls', () => {
     );
 
     expect(result.receiptNumber).toBe('REC-2025-2026-00001');
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'fees.payment.confirmed',
       expect.objectContaining({
@@ -2656,7 +2683,7 @@ describe('finance production controls', () => {
     const signature = createHmac('sha256', 'webhook-secret')
       .update(JSON.stringify(payload))
       .digest('hex');
-    const { service, auditService } = buildService({
+    const { service, auditService, accountingPostingService } = buildService({
       invoice: buildInvoice({ invoiceNumber: 'INV-001' }),
       feeHead: null,
       createdPayment: {
@@ -2685,6 +2712,7 @@ describe('finance production controls', () => {
       existingPaymentIntent: {
         id: 'intent-1',
         tenantId: actor.tenantId,
+        requestedByUserId: actor.userId,
         invoiceId: 'invoice-1',
         provider: 'NEPAL_GATEWAY',
         providerReference: 'INV-001',
@@ -2708,6 +2736,11 @@ describe('finance production controls', () => {
         action: 'collect',
         tenantId: actor.tenantId,
       }),
+    );
+    expect(accountingPostingService.postFeePayment).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ userId: actor.userId }),
+      expect.any(Object),
     );
   });
 
@@ -3243,7 +3276,19 @@ function buildService(options: {
       }),
       create: jest.fn(),
     },
-    $queryRaw: jest.fn().mockResolvedValue([]),
+    runWithoutTenantScope: jest.fn(
+      async (_reason: string, work: () => Promise<unknown>) => work(),
+    ),
+    runWithTenantScope: jest.fn(
+      async (_tenantId: string, work: () => Promise<unknown>) => work(),
+    ),
+    $queryRaw: jest
+      .fn()
+      .mockImplementation(async (query) =>
+        String(query?.strings ?? '').includes('ReceiptSequence')
+          ? [{ lastValue: (options.receiptCount ?? 0) + 1 }]
+          : [],
+      ),
     $transaction: jest.fn(async (callback) => callback(prisma)),
   };
   const auditService = {

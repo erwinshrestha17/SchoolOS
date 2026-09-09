@@ -35,6 +35,7 @@ model Tenant {
   paymentRefunds                PaymentRefund[]
   cashierCloses                 CashierClose[]
   receipts                      Receipt[]
+  receiptSequences              ReceiptSequence[]
   receiptReprintHistory         ReceiptReprintHistory[]
   chartAccounts                 ChartAccount[]
   journalEntries                JournalEntry[]

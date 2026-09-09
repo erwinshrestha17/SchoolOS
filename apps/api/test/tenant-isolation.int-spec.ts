@@ -142,6 +142,32 @@ describe('P0-01 tenant isolation (real database)', () => {
       expect(total).toBe(1);
     });
 
+    it('aggregate and groupBy exclude tenant B rows', async () => {
+      const aggregate = await prisma.class.aggregate({
+        where: { name: { contains: SUFFIX } },
+        _count: { _all: true },
+      });
+      const groups = await prisma.class.groupBy({
+        by: ['tenantId'],
+        where: { name: { contains: SUFFIX } },
+        _count: { _all: true },
+      });
+
+      expect(aggregate._count._all).toBe(1);
+      expect(groups).toEqual([
+        expect.objectContaining({
+          tenantId: tenantAId,
+          _count: { _all: 1 },
+        }),
+      ]);
+    });
+
+    it("findUniqueOrThrow cannot read tenant B's class by its real id", async () => {
+      await expect(
+        prisma.class.findUniqueOrThrow({ where: { id: classBId } }),
+      ).rejects.toMatchObject({ code: 'P2025' });
+    });
+
     it("updateMany cannot write tenant B's class", async () => {
       const result = await prisma.class.updateMany({
         where: { id: classBId },
@@ -155,6 +181,56 @@ describe('P0-01 tenant isolation (real database)', () => {
         where: { id: classBId },
       });
       expect(untouched?.level).toBe(1);
+    });
+
+    it('update cannot move a tenant A row into tenant B', async () => {
+      const updated = await prisma.class.update({
+        where: { id: classAId },
+        data: { tenantId: tenantBId, level: 2 },
+      });
+
+      expect(updated.tenantId).toBe(tenantAId);
+      expect(updated.level).toBe(2);
+    });
+
+    it('upsert scopes lookup, create, and update branches to tenant A', async () => {
+      const key = `isolation-${SUFFIX}`;
+      const created = await prisma.tenantSetting.upsert({
+        where: {
+          tenantId_key: { tenantId: tenantBId, key },
+        },
+        create: {
+          tenantId: tenantBId,
+          key,
+          value: { status: 'created' },
+        },
+        update: {
+          tenantId: tenantBId,
+          value: { status: 'updated' },
+        },
+      });
+
+      expect(created.tenantId).toBe(tenantAId);
+      expect(created.value).toEqual({ status: 'created' });
+
+      const updated = await prisma.tenantSetting.upsert({
+        where: {
+          tenantId_key: { tenantId: tenantAId, key },
+        },
+        create: {
+          tenantId: tenantBId,
+          key,
+          value: { status: 'duplicate' },
+        },
+        update: {
+          tenantId: tenantBId,
+          value: { status: 'updated' },
+        },
+      });
+
+      expect(updated.tenantId).toBe(tenantAId);
+      expect(updated.value).toEqual({ status: 'updated' });
+      await prisma.tenantSetting.deleteMany({ where: { key } });
     });
 
     it("deleteMany cannot destroy tenant B's class", async () => {
@@ -216,6 +292,12 @@ describe('P0-01 tenant isolation (real database)', () => {
       ).rejects.toThrow(MissingTenantScopeError);
     });
 
+    it('refuses raw SQL without tenant context or an explicit bypass', async () => {
+      await expect(prisma.$queryRaw`SELECT 1`).rejects.toThrow(
+        MissingTenantScopeError,
+      );
+    });
+
     it('names the model and operation so the offending call site is findable', async () => {
       await expect(
         prisma.class.deleteMany({ where: { id: classAId } }),
@@ -239,6 +321,15 @@ describe('P0-01 tenant isolation (real database)', () => {
       );
 
       expect(rows).toHaveLength(2);
+    });
+
+    it('permits reviewed global raw SQL only inside the explicit bypass', async () => {
+      const rows = await prisma.runWithoutTenantScope(
+        'test: global database probe',
+        () => prisma.$queryRaw<Array<{ value: number }>>`SELECT 1 AS value`,
+      );
+
+      expect(rows).toEqual([{ value: 1 }]);
     });
 
     it('preserves explicit target predicates when the surrounding request already has a tenant', async () => {

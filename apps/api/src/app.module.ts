@@ -91,10 +91,7 @@ import { AppThrottlerGuard } from './auth/guards/app-throttler.guard';
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        connection: {
-          host: configService.redisHost,
-          port: configService.redisPort,
-        },
+        connection: configService.redisConnectionOptions,
       }),
     }),
     RequestCacheModule,

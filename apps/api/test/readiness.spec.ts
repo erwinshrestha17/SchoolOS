@@ -17,6 +17,9 @@ describe('Readiness endpoint (E2E)', () => {
     })
       .overrideProvider(PrismaService)
       .useValue({
+        runWithoutTenantScope: jest.fn(
+          async (_reason: string, fn: () => Promise<unknown>) => fn(),
+        ),
         $queryRaw: jest.fn(async () => {
           if (overrides.database === 'error') {
             throw new Error('database unavailable');

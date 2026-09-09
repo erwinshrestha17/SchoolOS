@@ -1,6 +1,6 @@
 # SchoolOS GA Program Tracker
 
-**Owner-approved scope (2026-07-29):** M0–M12 + M15 + M13 (Wave 5); M14 excluded.
+**Current owner posture (2026-08-25):** active P0 is M0–M7, M11, M12, and M15. M8–M10 are deferred compatibility-only, M13 is frozen and disabled by default, and M14 is roadmap-only.
 **First production target:** one real school (Wave 1).
 **Honest release stage:** Local staging validated (smoke + authenticated browser E2E); **not** TLS VPS staging; **not** controlled-pilot validated; **not** GA.
 
@@ -13,9 +13,9 @@ Canonical plan: `.cursor/plans/schoolos_full_ga_program_9f539c81.plan.md` (do no
 | 0 | P0 cross-cutting, doc sync, staging ops | Complete | PASS (`ga:verify:wave0`, `smoke:pilot`, browser E2E) | TLS VPS staging pending |
 | 1 | Core modules for school #1 | Complete | PASS (`ga:verify:wave1`, flutter 539 tests) | Controlled pilot + device QA pending |
 | 2 | M3 full fees + digital payments | verify:m3-fees + mock gateway + collection seed | Local HTTP verify (`verify:m3-fees`, `ga:verify:wave2`) | Production eSewa/Khalti TLS sandbox pending |
-| 3 | M4 exams/report cards/promotion | verify:m4-academics + report-card seed | Local HTTP verify (`verify:m4-academics`, `ga:verify:wave3`) | Staging exams browser E2E optional |
-| 4 | M7–M11 operational modules | verify:m7–m11 HTTP slices | Local HTTP verify (`ga:verify:wave4`) | M7 Nepal CA sign-off external |
-| 5 | M13 Learning unfreeze | Route guard + staging enable | PASS (`smoke:learning`, `ga:verify:wave5`) | Security review + device proof pending |
+| 3 | M4 exams/report cards/promotion | verify:m4-academics + deterministic report-card/marks seeds | PASS (`verify:m4-academics`, 15-test browser suite, `ga:verify:wave3`) | TLS staging rerun pending |
+| 4 | Active M7/M11 plus M8–M10 compatibility | HTTP slices + deterministic role-boundary seed | PASS (`ga:verify:wave4`, 5-test browser suite) | M7 Nepal CA sign-off external |
+| 5 | M13 Learning | Preserved behind route/entitlement guards | Frozen; disabled by default; excluded from current pilot acceptance | Future reactivation requires explicit owner decision, security review, and device proof |
 | 6 | Multi-school self-serve + GA sign-off | Transactional tenant register | PASS (`ga:verify:wave6`) | Load test + owner sign-off pending |
 
 ## Wave 0 checklist
@@ -36,7 +36,7 @@ Canonical plan: `.cursor/plans/schoolos_full_ga_program_9f539c81.plan.md` (do no
 - [x] Settings nav → Day-1 onboarding (`/dashboard/settings/onboarding`)
 - [x] M5 mobile media consent submit guard
 - [x] Flutter analyze + 539 unit/widget tests
-- [ ] Controlled pilot rehearsal tenant provisioned — see `controlled-pilot-pilot-rehearsal-1-2026-07-29.md`
+- [x] Local controlled-pilot rehearsal provisioned, forced-password-change verified, Wave-1 entitlements verified, and persona smoke passed — see `controlled-pilot-pilot-rehearsal-1-provision-log.md`, `pilot-entitlements-pilot-rehearsal-1-2026-09-09.md`, and `controlled-pilot-rehearsal-smoke-2026-09-09-local.md`
 - [ ] Controlled pilot on production school #1 with owner sign-off
 - [ ] Mobile device QA (emulator + physical) — see `mobile-qa-2026-07-29-local.md`
 - [ ] M12 provider sandbox staging proof on TLS host
@@ -54,12 +54,13 @@ Canonical plan: `.cursor/plans/schoolos_full_ga_program_9f539c81.plan.md` (do no
 
 - [x] `verify:m4-academics` — exam terms, components, report catalog, teacher marks, parent report cards
 - [x] `ga:verify:wave3` wires HTTP verify + optional academics browser E2E
-- [ ] Full staging browser E2E with `SCHOOLOS_E2E_M4_REPORT_CARD_FIXTURES=true`
+- [x] Local-staging browser E2E with deterministic report-card and marks fixtures, including assignment-scoped CAS pickers — 15/15 passed; see `ga-wave3-2026-09-09T10-05-33-575Z-local.md`
+- [ ] Repeat authenticated M4 browser E2E on the provisioned TLS staging host
 
 ## Wave 4 checklist
 
 - [x] `verify:m7-hr`, `verify:m8-library`, `verify:m9-transport`, `verify:m10-canteen`, `verify:m11-accounting`
-- [x] `ga:verify:wave4` wires HTTP verify slices + optional M7–M11 role-boundary E2E
+- [x] `ga:verify:wave4` HTTP slices + deterministic M7/M11 role-boundary browser E2E — 5/5 passed; see `ga-wave4-2026-09-09T09-11-26-852Z-local.md`
 - [ ] M7 Nepal statutory payroll CA external sign-off
 
 ## Wave 2–6 code highlights
@@ -68,8 +69,8 @@ Canonical plan: `.cursor/plans/schoolos_full_ga_program_9f539c81.plan.md` (do no
 |---|---|---|
 | 2 | `verify:m3-fees`, mock gateway, parent sandbox, online webhook idempotency | Implemented |
 | 3 | `verify:m4-academics` + report-card fixture seed | Implemented |
-| 4 | `verify:m7-hr` … `verify:m11-accounting` HTTP persona boundaries | Implemented |
-| 5 | `LearningRouteGuard` + staging `module.learning` enable for smoke | Implemented |
+| 4 | Active M7/M11 verification plus preserved M8–M10 compatibility checks | Implemented and locally verified |
+| 5 | Frozen M13 route/entitlement boundary | Preserved; production enablement excluded from current scope |
 | 6 | Transactional tenant register + duplicate admin email check | Implemented |
 
 ## Evidence index
@@ -79,6 +80,9 @@ Canonical plan: `.cursor/plans/schoolos_full_ga_program_9f539c81.plan.md` (do no
 | GA Wave 0–6 verification | `docs/production/evidence/ga-wave{0-6}-2026-07-29-local.md` |
 | Staging browser E2E | `docs/production/evidence/staging-browser-e2e-2026-07-29-local.md` |
 | Controlled pilot rehearsal | `docs/production/evidence/controlled-pilot-pilot-rehearsal-1-2026-07-29.md` |
+| Current pilot rehearsal provision | `docs/production/evidence/controlled-pilot-pilot-rehearsal-1-provision-log.md` |
+| Current pilot entitlement boundary | `docs/production/evidence/pilot-entitlements-pilot-rehearsal-1-2026-09-09.md` |
+| Current pilot persona smoke | `docs/production/evidence/controlled-pilot-rehearsal-smoke-2026-09-09-local.md` |
 | M0 platform core (local) | `docs/production/evidence/m0-platform-core-2026-07-29-local.md` |
 | M1 admissions core (local) | `docs/production/evidence/m1-admissions-core-2026-07-29-local.md` |
 | M2 attendance core (local) | `docs/production/evidence/m2-attendance-core-2026-07-29-local.md` |
@@ -95,6 +99,20 @@ Canonical plan: `.cursor/plans/schoolos_full_ga_program_9f539c81.plan.md` (do no
 | Pilot entitlement verify | `docs/production/evidence/pilot-entitlements-pilot-rehearsal-1-*.md` |
 | Controlled pilot (placeholder) | `docs/production/evidence/controlled-pilot-2026-07-29-placeholder.md` |
 | Mobile QA | `docs/production/evidence/mobile-qa-2026-07-29-local.md` |
+| Core deploy gate (local) | `docs/production/evidence/core-deploy-gate-2026-09-09-local.md` |
+| Wave 3 + authenticated M4 browser | `docs/production/evidence/ga-wave3-2026-09-09T10-05-33-575Z-local.md` |
+| Wave 4 + authenticated M7/M11 browser | `docs/production/evidence/ga-wave4-2026-09-09T09-11-26-852Z-local.md` |
+| Wave 6 tenant registration | `docs/production/evidence/ga-wave6-2026-09-09T09-12-03-362Z-local.md` |
+| Local staging deploy | `docs/production/evidence/staging-deploy-2026-09-09T10-37-32-841Z-local.md` |
+| Local staging gates | `docs/production/evidence/staging-gates-2026-09-09T10-44-17-071Z-local.md` |
+| Full active-P0 smoke (local staging) | `docs/production/evidence/full-smoke-2026-09-09-local.md` |
+| Readiness dependency-failure rehearsal (local staging) | `docs/production/evidence/readiness-dependency-failure-2026-09-09-local.md` |
+| Monitoring incident/recovery webhook rehearsal (local mock) | `docs/production/evidence/monitoring-alert-rehearsal-2026-09-09-local.md` |
+| P1-02 tenant-scope hardening (local PostgreSQL) | `docs/production/evidence/p1-02-tenant-scope-2026-09-09-local.md` |
+| P1-08 Redis authentication/transport hardening (local) | `docs/production/evidence/p1-08-redis-transport-security-2026-09-09-local.md` |
+| P1-10 homework-create idempotency (local) | `docs/production/evidence/p1-10-homework-create-idempotency-2026-09-09-local.md` |
+| P1-09 mobile cold-start token refresh (local) | `docs/production/evidence/p1-09-mobile-cold-start-refresh-2026-09-09-local.md` |
+| P1-16 compiled OpenAPI contract gate (local) | `docs/production/evidence/p1-16-openapi-contract-gate-2026-09-09-local.md` |
 
 ## Verification commands
 
@@ -102,13 +120,16 @@ Canonical plan: `.cursor/plans/schoolos_full_ga_program_9f539c81.plan.md` (do no
 pnpm staging:deploy:local && pnpm staging:api:local && pnpm smoke:pilot
 pnpm provision:pilot-rehearsal && pnpm verify:pilot-entitlements && pnpm smoke:pilot:rehearsal
 pnpm ga:verify:wave0   # through wave6
-pnpm smoke:learning    # after staging deploy (M13 enabled on smoke tenant only)
+pnpm smoke:full        # active P0 + Platform; M13 remains excluded while frozen
 ```
 
 ## Remaining GA blockers (honest)
 
-1. Controlled pilot on production school #1 with owner sign-off
-2. Authenticated Playwright E2E on TLS staging host
-3. M7 Nepal statutory payroll CA verification (Wave 4 external gate)
-4. M13 security review before production enablement on school #1
-5. Multi-school load/ops hardening + GA owner sign-off (Wave 6)
+1. Provision a TLS staging host with non-placeholder secrets, trusted proxy/rate limiting, HTTPS origins, and production-grade private storage.
+2. Run authenticated Playwright E2E on that TLS staging host.
+3. Record real SMS/email/FCM/payment/storage provider sandbox and reconciliation evidence.
+4. Obtain M7 Nepal statutory payroll CA verification (Wave 4 external gate).
+5. Complete emulator/physical-device QA and a controlled pilot on production school #1 with owner sign-off.
+6. Complete multi-school load/operations hardening, configure and prove monitoring/alerting on the TLS host, rehearse release rollback, then obtain GA owner sign-off. The local incident/recovery webhook rehearsal is green but is not hosted monitoring evidence.
+
+M13 is not a blocker for the current controlled-pilot scope because it remains frozen, disabled, and excluded from acceptance. Any future production enablement requires an explicit owner reactivation decision plus its own security and device evidence.

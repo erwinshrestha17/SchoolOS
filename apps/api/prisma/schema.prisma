@@ -5193,6 +5193,17 @@ model Receipt {
   @@index([tenantId, issuedAt])
 }
 
+model ReceiptSequence {
+  tenantId  String
+  fiscalYear String
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, fiscalYear])
+}
+
 model ReceiptReprintHistory {
   id            String   @id @default(uuid())
   tenantId      String
@@ -8363,6 +8374,7 @@ model Tenant {
   paymentRefunds                PaymentRefund[]
   cashierCloses                 CashierClose[]
   receipts                      Receipt[]
+  receiptSequences              ReceiptSequence[]
   receiptReprintHistory         ReceiptReprintHistory[]
   chartAccounts                 ChartAccount[]
   journalEntries                JournalEntry[]

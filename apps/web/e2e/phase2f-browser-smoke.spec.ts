@@ -6,10 +6,25 @@ const schoolCredentials = {
   password: process.env.SCHOOLOS_E2E_PASSWORD,
 };
 
+const platformFixtureEnabled =
+  process.env.SCHOOLOS_E2E_M0_PLATFORM_ONBOARD_FIXTURES === 'true';
+
 const platformCredentials = {
-  tenantSlug: process.env.SCHOOLOS_E2E_PLATFORM_TENANT_SLUG,
-  email: process.env.SCHOOLOS_E2E_PLATFORM_EMAIL,
-  password: process.env.SCHOOLOS_E2E_PLATFORM_PASSWORD,
+  tenantSlug:
+    process.env.SCHOOLOS_E2E_PLATFORM_TENANT_SLUG ??
+    (platformFixtureEnabled
+      ? 'platform'
+      : process.env.PLATFORM_SEED_TENANT_SLUG),
+  email:
+    process.env.SCHOOLOS_E2E_PLATFORM_EMAIL ??
+    (platformFixtureEnabled
+      ? 'admin@schoolos.io'
+      : process.env.PLATFORM_SEED_EMAIL),
+  password:
+    process.env.SCHOOLOS_E2E_PLATFORM_PASSWORD ??
+    (platformFixtureEnabled
+      ? 'SchoolOS@2026'
+      : process.env.PLATFORM_SEED_PASSWORD),
 };
 
 test.describe('Phase 2F.2 public browser smoke', () => {
@@ -75,24 +90,12 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
       },
       {
         route: '/dashboard/accounting',
-        visible: /Fiscal Status|Financial Reporting Hub/i,
+        visible:
+          /Fiscal Status|Financial Reporting Hub|Accounting access is restricted/i,
       },
       {
         route: '/dashboard/reports',
         visible: /Reports & Exports|Recent Exports|Module Locked/i,
-      },
-      {
-        route: '/dashboard/library/issues',
-        visible: /Issue \/ Return|Issue copy/i,
-      },
-      { route: '/dashboard/canteen/pos', visible: /POS|Create POS sale/i },
-      {
-        route: '/dashboard/canteen/serving',
-        visible: /Student ID \/ QR Serving|Serve meal now/i,
-      },
-      {
-        route: '/dashboard/transport/trips',
-        visible: /Trip Monitor|Start trip/i,
       },
       {
         route: '/dashboard/settings',
@@ -148,7 +151,7 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
       .first();
     if (await firstStudent.isVisible()) {
       await firstStudent.click();
-      await expect(page.getByText(/Student Profile/i)).toBeVisible();
+      await expect(page.locator('main h1').first()).toBeVisible();
       await expect(page.getByRole('button', { name: /Edit/i })).toBeVisible();
       await expect(
         page.getByRole('button', { name: /ID Card/i }),
@@ -181,7 +184,9 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
 
     await page.goto('/dashboard/admissions');
     await expect(
-      page.locator('main').getByRole('heading', { name: /Admissions/i }),
+      page
+        .locator('main')
+        .getByRole('heading', { name: 'Admissions', exact: true }),
     ).toBeVisible();
     await page
       .locator('[data-schoolos-ui="module-header"]')

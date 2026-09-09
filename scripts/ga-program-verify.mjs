@@ -19,15 +19,19 @@ import { repoRoot } from './lib/schoolos-env.mjs';
 
 const wave = process.argv[2] ?? 'wave0';
 const evidenceDir = join(repoRoot, 'docs/production/evidence');
-const stamp = new Date().toISOString().slice(0, 10);
-const evidencePath = join(evidenceDir, `ga-${wave}-${stamp}-local.md`);
+const evidenceDate = new Date().toISOString().slice(0, 10);
+const evidenceStamp = new Date().toISOString().replace(/[:.]/g, '-');
+const evidencePath = join(
+  evidenceDir,
+  `ga-${wave}-${evidenceStamp}-local.md`,
+);
 
 function run(name, command, args, options = {}) {
-  const { required = true } = options;
+  const { required = true, env = {} } = options;
   const result = spawnSync(command, args, {
     cwd: repoRoot,
     encoding: 'utf8',
-    env: process.env,
+    env: { ...process.env, ...env },
   });
   const ok = result.status === 0;
 
@@ -108,7 +112,36 @@ if (wave === 'wave1') {
 
 if (wave === 'wave2') {
   checks.push(
+    run(
+      'Seed M3 online gateway fixture',
+      'pnpm',
+      ['db:seed:e2e:m3-payment-gateway'],
+      { env: { SCHOOLOS_E2E_M3_PAYMENT_GATEWAY_FIXTURES: 'true' } },
+    ),
+  );
+  checks.push(
+    run('Seed M3 parent fee fixture', 'pnpm', ['db:seed:e2e:parent-fees'], {
+      env: { SCHOOLOS_PARENT_FEE_FIXTURES: 'true' },
+    }),
+  );
+  checks.push(
+    run(
+      'Seed M3 collection fixture',
+      'pnpm',
+      ['db:seed:e2e:m3-collection'],
+      { env: { SCHOOLOS_E2E_M3_COLLECTION_FIXTURES: 'true' } },
+    ),
+  );
+  checks.push(
     run('verify:m3-fees (staging env)', 'pnpm', ['verify:m3-fees']),
+  );
+  checks.push(
+    run(
+      'Reset M3 collection fixture for browser mutation',
+      'pnpm',
+      ['db:seed:e2e:m3-collection'],
+      { env: { SCHOOLOS_E2E_M3_COLLECTION_FIXTURES: 'true' } },
+    ),
   );
   checks.push(
     run('M3 fees smoke spec', 'pnpm', [
@@ -124,23 +157,80 @@ if (wave === 'wave2') {
 
 if (wave === 'wave3') {
   checks.push(
+    run(
+      'Seed M4 published report-card fixture',
+      'pnpm',
+      ['db:seed:e2e:m4-report-card'],
+      { env: { SCHOOLOS_E2E_M4_REPORT_CARD_FIXTURES: 'true' } },
+    ),
+  );
+  checks.push(
+    run('Seed M4 teacher-assignment scenarios', 'pnpm', [
+      '--filter',
+      '@schoolos/api',
+      'db:seed:teacher-scenarios',
+    ]),
+  );
+  checks.push(
+    run(
+      'Seed M4 marks-entry fixture',
+      'pnpm',
+      ['db:seed:e2e:m4-marks'],
+      { env: { SCHOOLOS_E2E_M4_MARKS_MUTATIONS: 'true' } },
+    ),
+  );
+  checks.push(
     run('verify:m4-academics (staging env)', 'pnpm', [
       'verify:m4-academics',
     ]),
   );
   checks.push(
-    run('M4 academics smoke spec', 'pnpm', [
-      '--filter',
-      '@schoolos/web',
-      'exec',
-      'playwright',
-      'test',
-      'academics-phase2a-smoke.spec.ts',
-    ]),
+    run(
+      'M4 academics smoke spec',
+      'pnpm',
+      [
+        '--filter',
+        '@schoolos/web',
+        'exec',
+        'playwright',
+        'test',
+        'academics-phase2a-smoke.spec.ts',
+      ],
+      {
+        env: {
+          SCHOOLOS_E2E_M4_REPORT_CARD_FIXTURES: 'true',
+          SCHOOLOS_E2E_M4_MARKS_MUTATIONS: 'true',
+          SCHOOLOS_E2E_TENANT_SLUG:
+            process.env.SCHOOLOS_E2E_TENANT_SLUG ?? 'default-school',
+          SCHOOLOS_E2E_M4_TEACHER_EMAIL:
+            process.env.SCHOOLOS_E2E_M4_TEACHER_EMAIL ??
+            'classteacher.1a@schoolos.com',
+          SCHOOLOS_E2E_M4_TEACHER_PASSWORD:
+            process.env.SCHOOLOS_E2E_M4_TEACHER_PASSWORD ??
+            process.env.SCHOOLOS_E2E_PASSWORD ??
+            'schoolos-local-demo-only',
+        },
+      },
+    ),
   );
 }
 
 if (wave === 'wave4') {
+  checks.push(
+    run(
+      'Seed M7/M11 role-boundary fixtures',
+      'pnpm',
+      ['db:seed:e2e:m7-m11-roles'],
+      {
+        env: {
+          SCHOOLOS_E2E_M7_M11_ROLE_FIXTURES: 'true',
+          SCHOOLOS_E2E_PASSWORD:
+            process.env.SCHOOLOS_E2E_PASSWORD ??
+            'schoolos-local-demo-only',
+        },
+      },
+    ),
+  );
   checks.push(
     run('verify:m7-hr (staging env)', 'pnpm', ['verify:m7-hr']),
   );
@@ -159,14 +249,29 @@ if (wave === 'wave4') {
     ]),
   );
   checks.push(
-    run('M7-M11 role boundaries spec', 'pnpm', [
-      '--filter',
-      '@schoolos/web',
-      'exec',
-      'playwright',
-      'test',
-      'm7-m11-role-boundaries.spec.ts',
-    ]),
+    run(
+      'M7-M11 role boundaries spec',
+      'pnpm',
+      [
+        '--filter',
+        '@schoolos/web',
+        'exec',
+        'playwright',
+        'test',
+        'm7-m11-role-boundaries.spec.ts',
+      ],
+      {
+        env: {
+          SCHOOLOS_E2E_TENANT_SLUG:
+            process.env.SCHOOLOS_E2E_TENANT_SLUG ?? 'default-school',
+          SCHOOLOS_E2E_EMAIL:
+            process.env.SCHOOLOS_E2E_EMAIL ?? 'admin@schoolos.com',
+          SCHOOLOS_E2E_PASSWORD:
+            process.env.SCHOOLOS_E2E_PASSWORD ??
+            'schoolos-local-demo-only',
+        },
+      },
+    ),
   );
 }
 
@@ -211,7 +316,7 @@ const overallStatus = blockingFailures.length === 0 ? 'PASS' : 'FAIL';
 mkdirSync(evidenceDir, { recursive: true });
 writeFileSync(
   evidencePath,
-  `# GA ${wave} verification (${stamp}, local)
+  `# GA ${wave} verification (${evidenceDate}, local)
 
 Status: ${overallStatus}
 

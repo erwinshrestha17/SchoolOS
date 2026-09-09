@@ -4,8 +4,8 @@ const port = process.env.SCHOOLOS_WEB_E2E_PORT ?? '3101';
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${port}`;
 const webServerCommand =
   process.env.SCHOOLOS_E2E_SKIP_WEB_BUILD === 'true'
-    ? `node_modules/.bin/next start --hostname localhost --port ${port}`
-    : `node_modules/.bin/next build && node_modules/.bin/next start --hostname localhost --port ${port}`;
+    ? 'node scripts/start-e2e-server.mjs'
+    : 'node scripts/start-e2e-server.mjs --build';
 
 export default defineConfig({
   testDir: './e2e',

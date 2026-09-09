@@ -628,12 +628,16 @@ export default function PlatformSchools() {
                     <Label className="font-bold text-slate-700">Admin password</Label>
                     <Input
                       type="password"
-                      placeholder="Min 8 characters"
+                      placeholder="Use a strong password"
                       value={newSchoolAdminPassword}
                       onChange={(e) => setNewSchoolAdminPassword(e.target.value)}
                       className="rounded-2xl border-slate-200 h-11"
                       required
                     />
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      Use 8+ characters with uppercase, lowercase, a number,
+                      and a symbol. Avoid the school name, slug, or admin email.
+                    </p>
                   </div>
                 </div>
 

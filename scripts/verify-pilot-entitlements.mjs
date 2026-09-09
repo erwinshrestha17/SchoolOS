@@ -16,6 +16,9 @@ const adminPassword =
   process.env.PILOT_REHEARSAL_ADMIN_PASSWORD ??
   process.env.SMOKE_PASSWORD ??
   'PilotRehearsal1!';
+const verifiedAdminPassword =
+  process.env.PILOT_REHEARSAL_VERIFIED_ADMIN_PASSWORD ??
+  'Ktm!7River-Cedar29';
 
 loadEnvFile(join(repoRoot, 'apps/api/.env.staging-local'));
 loadEnvFile(join(repoRoot, 'apps/api/.env'));
@@ -41,7 +44,7 @@ function record(name, ok, detail = '') {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-async function login() {
+async function login(password) {
   const result = await request('/auth/login', {
     method: 'POST',
     headers: {
@@ -51,7 +54,7 @@ async function login() {
     body: JSON.stringify({
       tenantSlug,
       email: adminEmail,
-      password: adminPassword,
+      password,
     }),
   });
   const token = result.body?.data?.accessToken ?? result.body?.accessToken;
@@ -60,7 +63,12 @@ async function login() {
 }
 
 async function main() {
-  const loginResult = await login();
+  let loginResult = await login(adminPassword);
+  let usedProvisionedPassword = loginResult.ok;
+  if (!loginResult.ok) {
+    loginResult = await login(verifiedAdminPassword);
+    usedProvisionedPassword = false;
+  }
   record(
     'Pilot admin login',
     loginResult.ok,
@@ -70,6 +78,62 @@ async function main() {
   if (!loginResult.token) {
     writeEvidence(false);
     process.exit(1);
+  }
+
+  if (usedProvisionedPassword) {
+    const restrictedBeforePasswordChange = await request(
+      '/students?page=1&limit=1',
+      {
+        headers: {
+          Authorization: `Bearer ${loginResult.token}`,
+          'User-Agent': 'flutter',
+        },
+      },
+    );
+    record(
+      'Initial admin requires password change',
+      restrictedBeforePasswordChange.status === 403 &&
+        restrictedBeforePasswordChange.body?.message ===
+          'Password change required before accessing this resource',
+      `HTTP ${restrictedBeforePasswordChange.status}`,
+    );
+
+    const passwordChange = await request('/auth/change-password', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${loginResult.token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'flutter',
+      },
+      body: JSON.stringify({
+        currentPassword: adminPassword,
+        newPassword: verifiedAdminPassword,
+        confirmNewPassword: verifiedAdminPassword,
+        logoutOtherDevices: true,
+      }),
+    });
+    record(
+      'Initial admin password changed',
+      passwordChange.status === 200 || passwordChange.status === 201,
+      `HTTP ${passwordChange.status}`,
+    );
+
+    loginResult = await login(verifiedAdminPassword);
+    record(
+      'Pilot admin reauthenticated after password change',
+      loginResult.ok,
+      loginResult.ok ? 'token received' : `HTTP ${loginResult.status}`,
+    );
+    if (!loginResult.token) {
+      writeEvidence(false);
+      process.exit(1);
+    }
+  } else {
+    record(
+      'Pilot admin password already changed',
+      true,
+      'verified credential accepted',
+    );
   }
 
   const authHeaders = {

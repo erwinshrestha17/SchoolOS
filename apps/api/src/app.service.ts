@@ -40,7 +40,10 @@ export class AppService {
 
   private async checkDatabase() {
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      await this.prisma.runWithoutTenantScope(
+        'global database readiness probe',
+        () => this.prisma.$queryRaw`SELECT 1`,
+      );
       return { status: 'ok' as const };
     } catch (error) {
       return {

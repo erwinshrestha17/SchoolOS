@@ -35,6 +35,19 @@ const PILOT_ADMIN_EMAIL =
 const PILOT_ADMIN_PASSWORD =
   process.env.PILOT_REHEARSAL_ADMIN_PASSWORD ?? 'PilotRehearsal1!';
 
+function assertPilotRehearsalFixtureAllowed() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Refusing to seed controlled-pilot rehearsal fixtures in production.',
+    );
+  }
+  if (process.env.SCHOOLOS_PILOT_REHEARSAL_FIXTURES !== 'true') {
+    throw new Error(
+      'Set SCHOOLOS_PILOT_REHEARSAL_FIXTURES=true to seed the controlled-pilot rehearsal tenant.',
+    );
+  }
+}
+
 const WAVE1_DISABLED_MODULES = [
   'module.fees',
   'module.exams',
@@ -332,6 +345,8 @@ async function assignStandardSubscription(tenantId: string) {
 }
 
 async function main() {
+  assertPilotRehearsalFixtureAllowed();
+
   let tenant = await prisma.tenant.findUnique({ where: { slug: PILOT_SLUG } });
 
   if (!tenant) {
@@ -367,12 +382,7 @@ async function main() {
   console.log(`Tenant ID:   ${tenant.id}`);
   console.log(`Slug:        ${PILOT_SLUG}`);
   console.log(`Admin email: ${PILOT_ADMIN_EMAIL}`);
-  if (!process.env.PILOT_REHEARSAL_ADMIN_PASSWORD) {
-    console.log(`Admin password (default): ${PILOT_ADMIN_PASSWORD}`);
-    console.log('Set PILOT_REHEARSAL_ADMIN_PASSWORD to override.');
-  } else {
-    console.log('Admin password: (from PILOT_REHEARSAL_ADMIN_PASSWORD env)');
-  }
+  console.log('Admin credentials: configured for local rehearsal only');
   console.log('');
   console.log(
     'Wave 1 modules enabled; wave-gated modules forced OFF via overrides.',

@@ -22,19 +22,19 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
       .getByLabel('Concise message')
       .fill('This notice verifies the draft-first web workflow.');
     await page.getByRole('button', { name: 'Preview recipients' }).click();
-    await expect(page.getByText('Backend-selected channels')).toBeVisible();
+    await expect(page.getByText('Selected delivery channels')).toBeVisible();
     await page.getByRole('button', { name: 'Save draft' }).click();
     await expect(page).toHaveURL(/\/dashboard\/notices\/[^/]+$/);
 
-    await page.getByRole('link', { name: 'Edit draft' }).click();
+    await page.getByRole('button', { name: 'Edit draft' }).click();
     await page
       .getByLabel('Concise message')
       .fill('Edited before publication through the real draft endpoint.');
     await page.getByRole('button', { name: 'Save draft' }).click();
 
-    await page.getByRole('link', { name: 'Preview & publish' }).click();
+    await page.getByRole('button', { name: 'Preview & publish' }).click();
     await expect(
-      page.getByRole('heading', { name: 'Backend recipient preview' }),
+      page.getByRole('heading', { name: 'Recipient preview' }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Publish now' }).click();
     const publishDialog = page.getByRole('dialog');
@@ -80,7 +80,7 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
       .fill('Scheduled lifecycle evidence.');
     await page.getByRole('button', { name: 'Save draft' }).click();
 
-    await page.getByRole('link', { name: 'Preview & publish' }).click();
+    await page.getByRole('button', { name: 'Preview & publish' }).click();
     const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const localValue = new Date(
       future.getTime() - future.getTimezoneOffset() * 60_000,
@@ -123,13 +123,13 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
     await expect(page.getByText(/cannot bypass approval/i)).toBeVisible();
     await page.getByRole('button', { name: 'Save draft' }).click();
 
-    await page.getByRole('link', { name: 'Preview & publish' }).click();
+    await page.getByRole('button', { name: 'Preview & publish' }).click();
     await expect(
       page.getByRole('button', { name: 'Submit for approval' }),
     ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Publish now' }),
-    ).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Publish now' })).toHaveCount(
+      0,
+    );
 
     const request = page.waitForRequest(
       (candidate) =>

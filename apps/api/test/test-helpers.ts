@@ -3191,6 +3191,27 @@ export function createPrismaMock() {
           }
           return Promise.resolve(found ? { ...found } : null);
         }),
+        findFirstOrThrow: jest.fn((q: any) => {
+          const items = (state as any)[actualStateKey] || [];
+          const matchableItems =
+            model === 'guardian'
+              ? items.map((item: any) =>
+                  applyIncludes(item, { studentLinks: true }),
+                )
+              : items;
+          let found = matchableItems.find((item: any) =>
+            matchesWhere(item, q?.where),
+          );
+          if (!found) {
+            return Promise.reject(
+              new Error(`${model} record required by findFirstOrThrow`),
+            );
+          }
+          if (q?.include || q?.select) {
+            found = applyIncludes(found, q.include || q.select);
+          }
+          return Promise.resolve({ ...found });
+        }),
         findUnique: jest.fn((q: any) => {
           const items = (state as any)[actualStateKey] || [];
           if (!q?.where) return Promise.resolve(null);

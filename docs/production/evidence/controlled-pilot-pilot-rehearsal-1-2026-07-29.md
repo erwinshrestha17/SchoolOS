@@ -41,7 +41,7 @@ Verification: [pilot-entitlements-pilot-rehearsal-1-2026-07-29.md](./pilot-entit
 - [x] Tenant created: `pilot-rehearsal-1` / **Pilot Rehearsal School** (`7de9c32a-16b5-46b9-bb8b-f5dbaa454a0f`)
 - [x] Standard plan subscription ACTIVE
 - [x] Wave 1 entitlement overrides applied (12 overrides incl. `feature.hr.staff_records`, `feature.accounting.basic_finance`)
-- [x] Initial admin: `admin@pilot-rehearsal.schoolos.test` / `PilotRehearsal1!` (override via `PILOT_REHEARSAL_ADMIN_PASSWORD`)
+- [x] Initial admin: `admin@pilot-rehearsal.schoolos.test`; credential supplied through the approved local rehearsal configuration
 - [x] Entitlement boundary verified (`pnpm verify:pilot-entitlements` — all 8 checks PASS)
 - [ ] Platform operator confirms tenant at `/platform/schools/{tenantId}`
 
@@ -62,7 +62,7 @@ pnpm smoke:pilot:rehearsal         # PASS 2026-07-29 (Wave 1 mode)
 | `pnpm verify:pilot-entitlements` | **PASS** | Wave 1 routes 200; fees/exams/learning/library 403 |
 | `pnpm smoke:pilot:rehearsal` | **PASS** | 41 checks; Wave 1 personas + fail-closed Wave 2+ routes |
 
-Persona seed (`pnpm seed:pilot-rehearsal-personas`): Class 1/A+B, 3 subjects, 7 smoke users, 2 students + guardians, teacher assignments. Password: `PilotRehearsal1!`.
+Persona seed (`pnpm seed:pilot-rehearsal-personas`): Class 1/A+B, 3 subjects, 7 smoke users, 2 students + guardians, teacher assignments. Credentials are deliberately omitted from evidence.
 
 Smoke Wave 1 adaptations (`SMOKE_WAVE1_PILOT=true`): parent fees 403, principal mobile 403 (STANDARD tier), staff/accountant/driver gated routes 403; class/subject teacher full scope PASS.
 

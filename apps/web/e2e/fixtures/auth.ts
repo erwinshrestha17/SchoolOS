@@ -128,9 +128,7 @@ function credentialsFor(role: SchoolE2eRole) {
       passwordEnv: "SCHOOLOS_E2E_PRINCIPAL_PASSWORD",
     },
     principalConfigOwner: {
-      email: requiredEnvironmentValue(
-        "SCHOOLOS_E2E_PRINCIPAL_CONFIG_OWNER_EMAIL",
-      ),
+      email: process.env.SCHOOLOS_E2E_PRINCIPAL_CONFIG_OWNER_EMAIL ?? "",
       passwordEnv: "SCHOOLOS_E2E_PRINCIPAL_CONFIG_OWNER_PASSWORD",
     },
     accountant: {
@@ -168,6 +166,11 @@ function credentialsFor(role: SchoolE2eRole) {
     },
   };
   const config = roleConfig[role];
+  if (!config.email.trim()) {
+    throw new Error(
+      `Set SCHOOLOS_E2E_PRINCIPAL_CONFIG_OWNER_EMAIL to authenticate the ${role} browser fixture.`,
+    );
+  }
 
   return {
     tenantSlug: config.tenantSlug ?? primaryTenantSlug,

@@ -7,6 +7,7 @@ describe('NotificationsProcessor', () => {
   const originalEmailWebhookUrl = process.env.EMAIL_WEBHOOK_URL;
   const originalNotificationMode =
     process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE;
+  const originalPushMode = process.env.PUSH_PROVIDER_MODE;
   const originalPushReady = process.env.PUSH_PROVIDER_READY;
   const originalFetch = global.fetch;
 
@@ -33,6 +34,11 @@ describe('NotificationsProcessor', () => {
       delete process.env.PUSH_PROVIDER_READY;
     } else {
       process.env.PUSH_PROVIDER_READY = originalPushReady;
+    }
+    if (originalPushMode === undefined) {
+      delete process.env.PUSH_PROVIDER_MODE;
+    } else {
+      process.env.PUSH_PROVIDER_MODE = originalPushMode;
     }
 
     global.fetch = originalFetch;
@@ -201,6 +207,7 @@ describe('NotificationsProcessor', () => {
 
   it('sends a generic push payload to registered device tokens through the configured provider', async () => {
     process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'configured-provider';
+    process.env.PUSH_PROVIDER_MODE = 'configured-provider';
     process.env.PUSH_PROVIDER_READY = 'true';
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -304,6 +311,7 @@ describe('NotificationsProcessor', () => {
 
   it('skips configured push dispatch when provider readiness is not proven', async () => {
     process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'configured-provider';
+    process.env.PUSH_PROVIDER_MODE = 'configured-provider';
     delete process.env.PUSH_PROVIDER_READY;
     global.fetch = jest.fn();
 

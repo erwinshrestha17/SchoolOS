@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">SchoolOS</title>
+  <rect width="512" height="512" rx="112" fill="#17324D"/>
+  <path d="M96 194 256 104l160 90-160 90L96 194Z" fill="#EFF6FF"/>
+  <path d="M150 238v82c0 46 48 82 106 82s106-36 106-82v-82l-106 60-106-60Z" fill="#93C5FD"/>
+  <path d="M416 204v118" stroke="#EFF6FF" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="416" cy="344" r="18" fill="#EFF6FF"/>
+</svg>

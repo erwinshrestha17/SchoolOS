@@ -33,7 +33,10 @@ export function formatTimestamp(date = new Date()) {
   ].join('');
 }
 
-export function createBackupBundleDir(outputRoot, timestamp = formatTimestamp()) {
+export function createBackupBundleDir(
+  outputRoot,
+  timestamp = formatTimestamp(),
+) {
   const bundleDir = join(outputRoot, timestamp);
   mkdirSync(bundleDir, { recursive: true });
   return { bundleDir, timestamp };
@@ -53,21 +56,46 @@ function isCliAvailable(binary) {
   return result.status === 0;
 }
 
-function isDockerPostgresRunning() {
-  return (
-    isDockerContainerRunning('schoolos_staging_postgres') ||
-    isDockerContainerRunning('schoolos_postgres')
-  );
-}
-
-function getPostgresDockerContainer() {
+function getPostgresDockerContainer(databaseUrl) {
   if (process.env.POSTGRES_DOCKER_CONTAINER) {
-    return process.env.POSTGRES_DOCKER_CONTAINER;
+    const configured = process.env.POSTGRES_DOCKER_CONTAINER;
+    if (!isDockerContainerRunning(configured)) {
+      throw new Error(
+        `Configured Postgres container ${configured} is not running.`,
+      );
+    }
+    return configured;
   }
-  if (isDockerContainerRunning('schoolos_staging_postgres')) {
-    return 'schoolos_staging_postgres';
+
+  const parsed = parseDatabaseUrl(databaseUrl);
+  const candidates = ['schoolos_postgres', 'schoolos_staging_postgres'].filter(
+    isDockerContainerRunning,
+  );
+  const portMatch = candidates.find(
+    (name) => getDockerPostgresHostPort(name) === parsed.port,
+  );
+  if (portMatch) {
+    return portMatch;
   }
-  return 'schoolos_postgres';
+
+  const databaseMatch =
+    parsed.databaseName === 'schoolos_staging'
+      ? 'schoolos_staging_postgres'
+      : parsed.databaseName === 'schoolos_db' ||
+          parsed.databaseName === 'schoolos_db_restore'
+        ? 'schoolos_postgres'
+        : null;
+  if (databaseMatch && candidates.includes(databaseMatch)) {
+    return databaseMatch;
+  }
+
+  if (candidates.length === 1) {
+    return candidates[0];
+  }
+
+  throw new Error(
+    `Cannot resolve a running Postgres container for ${parsed.databaseName} on host port ${parsed.port}. Set POSTGRES_DOCKER_CONTAINER explicitly.`,
+  );
 }
 
 function isDockerContainerRunning(name) {
@@ -77,6 +105,20 @@ function isDockerContainerRunning(name) {
     { encoding: 'utf8' },
   );
   return result.status === 0 && result.stdout.trim() === 'true';
+}
+
+function getDockerPostgresHostPort(name) {
+  const result = spawnSync(
+    'docker',
+    [
+      'inspect',
+      '-f',
+      '{{(index (index .NetworkSettings.Ports "5432/tcp") 0).HostPort}}',
+      name,
+    ],
+    { encoding: 'utf8' },
+  );
+  return result.status === 0 ? result.stdout.trim() : null;
 }
 
 export function runCommand(command, args, options = {}) {
@@ -118,7 +160,9 @@ export async function collectDatabaseMetrics(connectionString) {
   return withPgClient(connectionString, async (client) => {
     const metrics = {};
     for (const table of METRIC_TABLES) {
-      const result = await client.query(`SELECT COUNT(*)::int AS count FROM "${table}"`);
+      const result = await client.query(
+        `SELECT COUNT(*)::int AS count FROM "${table}"`,
+      );
       metrics[table] = result.rows[0]?.count ?? 0;
     }
     return metrics;
@@ -149,7 +193,10 @@ export function countStorageFiles(storageRoot) {
   return count;
 }
 
-export async function ensureRestoreDatabase(adminConnectionString, databaseName) {
+export async function ensureRestoreDatabase(
+  adminConnectionString,
+  databaseName,
+) {
   await withPgClient(adminConnectionString, async (client) => {
     const existing = await client.query(
       'SELECT 1 FROM pg_database WHERE datname = $1',
@@ -213,11 +260,7 @@ export function runPgDump(databaseUrl, outputPath) {
     return Date.now() - started;
   }
 
-  if (!isDockerPostgresRunning()) {
-    assertCliAvailable('pg_dump');
-  }
-
-  const container = getPostgresDockerContainer();
+  const container = getPostgresDockerContainer(databaseUrl);
   runCommand('docker', [
     'exec',
     container,
@@ -263,11 +306,7 @@ export function runPgRestore(databaseUrl, dumpPath) {
     return Date.now() - started;
   }
 
-  if (!isDockerPostgresRunning()) {
-    assertCliAvailable('pg_restore');
-  }
-
-  const container = getPostgresDockerContainer();
+  const container = getPostgresDockerContainer(databaseUrl);
   runCommand('docker', [
     'cp',
     dumpPath,

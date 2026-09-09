@@ -5,7 +5,9 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 
 const root = resolve(new URL('..', import.meta.url).pathname);
-const requireApiDependency = createRequire(resolve(root, 'apps/api/package.json'));
+const requireApiDependency = createRequire(
+  resolve(root, 'apps/api/package.json'),
+);
 const { Client: PgClient } = requireApiDependency('pg');
 const Redis = requireApiDependency('ioredis');
 
@@ -17,6 +19,13 @@ const databaseUrl =
   'postgresql://schoolos:password123@localhost:5433/schoolos_db?schema=public';
 const redisHost = process.env.REDIS_HOST ?? 'localhost';
 const redisPort = Number(process.env.REDIS_PORT ?? 6379);
+const redisUsername = process.env.REDIS_USERNAME?.trim() || undefined;
+const redisPassword = process.env.REDIS_PASSWORD?.trim() || undefined;
+const redisTlsEnabled = ['1', 'true', 'yes'].includes(
+  (process.env.REDIS_TLS_ENABLED ?? '').toLowerCase(),
+);
+const redisTlsServername =
+  process.env.REDIS_TLS_SERVERNAME?.trim() || redisHost;
 const apiBaseUrl =
   process.env.SMOKE_API_BASE_URL ?? 'http://localhost:4000/api/v1';
 const localDemoPassword =
@@ -117,16 +126,18 @@ const accounts = {
     tenantSlug:
       process.env.SMOKE_PLATFORM_TENANT_SLUG ??
       process.env.PLATFORM_SEED_TENANT_SLUG ??
-      schoolTenant,
+      'platform',
     email:
       process.env.SMOKE_PLATFORM_EMAIL ??
       process.env.PLATFORM_SEED_EMAIL ??
-      'platform@schoolos.com',
+      process.env.SCHOOLOS_E2E_PLATFORM_EMAIL ??
+      'admin@schoolos.io',
     password:
       process.env.SMOKE_PLATFORM_PASSWORD ??
       process.env.PLATFORM_SEED_PASSWORD ??
       process.env.SCHOOLOS_DEMO_PLATFORM_PASSWORD ??
-      localDemoPassword,
+      process.env.SCHOOLOS_E2E_PLATFORM_PASSWORD ??
+      'SchoolOS@2026',
   },
 };
 
@@ -206,7 +217,9 @@ async function main() {
     }
   }
 
-  if (['learning', 'full'].includes(target) && tokens.admin) {
+  // M13 is frozen and disabled by default. Keep its explicit compatibility
+  // smoke separate from the mandatory active-P0 `full` target.
+  if (target === 'learning' && tokens.admin) {
     checks.push(
       await checkAuthApiEndpoint(
         'Learning Activities (/learning/activities)',
@@ -217,7 +230,14 @@ async function main() {
   }
 
   if (['pilot', 'full'].includes(target) && tokens.admin) {
-    checks.push(await checkExpectedHttpFailure('Auth required denial', '/auth/me', null, [401]));
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Auth required denial',
+        '/auth/me',
+        null,
+        [401],
+      ),
+    );
     await runPilotRoleChecks(tokens);
   }
 
@@ -226,7 +246,9 @@ async function main() {
   console.log('');
   for (const check of checks) {
     const prefix = check.status === 'ok' ? 'OK  ' : 'FAIL';
-    console.log(`${prefix} ${check.name}${check.message ? ` - ${check.message}` : ''}`);
+    console.log(
+      `${prefix} ${check.name}${check.message ? ` - ${check.message}` : ''}`,
+    );
   }
   console.log('');
 
@@ -324,10 +346,7 @@ async function runPilotRoleChecks(tokens) {
   }
   if (roleRefreshTokens.parent) {
     checks.push(
-      await checkMobileLogout(
-        roleRefreshTokens.parent,
-        roleTokens.parent,
-      ),
+      await checkMobileLogout(roleRefreshTokens.parent, roleTokens.parent),
     );
   }
 }
@@ -379,10 +398,22 @@ async function checkParentScope(parentToken, seededStudents) {
   if (!childId) return;
 
   checks.push(
-    (await fetchOk('Parent can read linked child profile', `/mobile/students/${childId}/profile`, parentToken)).check,
+    (
+      await fetchOk(
+        'Parent can read linked child profile',
+        `/mobile/students/${childId}/profile`,
+        parentToken,
+      )
+    ).check,
   );
   checks.push(
-    (await fetchOk('Parent can read linked child attendance summary', `/mobile/students/${childId}/attendance-summary`, parentToken)).check,
+    (
+      await fetchOk(
+        'Parent can read linked child attendance summary',
+        `/mobile/students/${childId}/attendance-summary`,
+        parentToken,
+      )
+    ).check,
   );
   if (wave1Pilot) {
     checks.push(
@@ -395,11 +426,19 @@ async function checkParentScope(parentToken, seededStudents) {
     );
   } else {
     checks.push(
-      (await fetchOk('Parent can read linked child fees summary', `/mobile/students/${childId}/fees-summary`, parentToken)).check,
+      (
+        await fetchOk(
+          'Parent can read linked child fees summary',
+          `/mobile/students/${childId}/fees-summary`,
+          parentToken,
+        )
+      ).check,
     );
   }
 
-  const otherStudent = seededStudents.find((student) => student.id && student.id !== childId);
+  const otherStudent = seededStudents.find(
+    (student) => student.id && student.id !== childId,
+  );
   if (otherStudent?.id) {
     checks.push(
       await checkExpectedHttpFailure(
@@ -437,7 +476,13 @@ async function checkClassTeacherScope(classTeacherToken, seededSections) {
 
   const scope = scopes[0];
   checks.push(
-    (await fetchOk('Class teacher can read attendance today', '/mobile/teacher/attendance/today', classTeacherToken)).check,
+    (
+      await fetchOk(
+        'Class teacher can read attendance today',
+        '/mobile/teacher/attendance/today',
+        classTeacherToken,
+      )
+    ).check,
   );
   const rosterPath = queryPath('/mobile/teacher/attendance/roster', {
     academicYearId: scope.academicYearId,
@@ -445,7 +490,13 @@ async function checkClassTeacherScope(classTeacherToken, seededSections) {
     sectionId: scope.sectionId,
   });
   checks.push(
-    (await fetchOk('Class teacher can read assigned roster', rosterPath, classTeacherToken)).check,
+    (
+      await fetchOk(
+        'Class teacher can read assigned roster',
+        rosterPath,
+        classTeacherToken,
+      )
+    ).check,
   );
 
   const unassigned = seededSections.find(
@@ -498,23 +549,27 @@ async function checkSubjectTeacherScope(subjectTeacherToken) {
 
   const scope = scopes[0];
   checks.push(
-    (await fetchOk(
-      'Subject teacher can list scoped homework',
-      queryPath('/mobile/teacher/homework', {
-        classId: scope.classId,
-        sectionId: scope.sectionId,
-        subjectId: scope.subjectId,
-        limit: 10,
-      }),
-      subjectTeacherToken,
-    )).check,
+    (
+      await fetchOk(
+        'Subject teacher can list scoped homework',
+        queryPath('/mobile/teacher/homework', {
+          classId: scope.classId,
+          sectionId: scope.sectionId,
+          subjectId: scope.subjectId,
+          limit: 10,
+        }),
+        subjectTeacherToken,
+      )
+    ).check,
   );
   checks.push(
-    (await fetchOk(
-      'Subject teacher can read own timetable',
-      '/mobile/teacher/timetable?days=7',
-      subjectTeacherToken,
-    )).check,
+    (
+      await fetchOk(
+        'Subject teacher can read own timetable',
+        '/mobile/teacher/timetable?days=7',
+        subjectTeacherToken,
+      )
+    ).check,
   );
 
   const assignmentContext = await fetchOk(
@@ -541,31 +596,42 @@ async function checkSubjectTeacherScope(subjectTeacherToken) {
           `${assignment.academicYearId}:${assignment.classId}:${assignment.subjectId}`,
       ),
   );
-  const marksComponents = await fetchOk(
-    'Subject teacher can list assigned marks components',
-    '/mobile/teacher/marks/components?limit=50',
-    subjectTeacherToken,
-  );
-  checks.push(marksComponents.check);
-  const componentItems = getItems(marksComponents.body);
-  checks.push(
-    assertCheck(
-      'Subject teacher marks components stay within active assignments',
-      componentItems.every((component) => {
-        const academicYearId = component?.examTerm?.academicYearId;
-        const classId = component?.subject?.classId;
-        const subjectId = component?.subjectId ?? component?.subject?.id;
-        return (
-          academicYearId &&
-          classId &&
-          subjectId &&
-          assignedComponentScopes.has(
-            `${academicYearId}:${classId}:${subjectId}`,
-          )
-        );
-      }),
-    ),
-  );
+  if (wave1Pilot) {
+    checks.push(
+      await checkExpectedHttpFailure(
+        'Subject teacher marks denied on Wave 1 pilot',
+        '/mobile/teacher/marks/components?limit=50',
+        subjectTeacherToken,
+        [403],
+      ),
+    );
+  } else {
+    const marksComponents = await fetchOk(
+      'Subject teacher can list assigned marks components',
+      '/mobile/teacher/marks/components?limit=50',
+      subjectTeacherToken,
+    );
+    checks.push(marksComponents.check);
+    const componentItems = getItems(marksComponents.body);
+    checks.push(
+      assertCheck(
+        'Subject teacher marks components stay within active assignments',
+        componentItems.every((component) => {
+          const academicYearId = component?.examTerm?.academicYearId;
+          const classId = component?.subject?.classId;
+          const subjectId = component?.subjectId ?? component?.subject?.id;
+          return (
+            academicYearId &&
+            classId &&
+            subjectId &&
+            assignedComponentScopes.has(
+              `${academicYearId}:${classId}:${subjectId}`,
+            )
+          );
+        }),
+      ),
+    );
+  }
 
   const attendanceClasses = await request(
     '/mobile/teacher/attendance/classes',
@@ -624,7 +690,13 @@ async function checkPrincipalScope(principalToken) {
   );
   checks.push(dashboard.check);
   checks.push(
-    (await fetchOk('Principal can read attendance summary', '/mobile/principal/attendance-summary', principalToken)).check,
+    (
+      await fetchOk(
+        'Principal can read attendance summary',
+        '/mobile/principal/attendance-summary',
+        principalToken,
+      )
+    ).check,
   );
   checks.push(
     await checkExpectedHttpFailure(
@@ -636,7 +708,12 @@ async function checkPrincipalScope(principalToken) {
   );
 
   const dashboardText = JSON.stringify(dashboard.body ?? {});
-  const sensitiveTerms = ['bankAccount', 'tokenHash', 'passwordHash', 'rawObjectKey'];
+  const sensitiveTerms = [
+    'bankAccount',
+    'tokenHash',
+    'passwordHash',
+    'rawObjectKey',
+  ];
   checks.push(
     assertCheck(
       'Principal dashboard omits sensitive internals',
@@ -683,16 +760,40 @@ async function checkStaffScope(staffToken) {
   }
 
   checks.push(
-    (await fetchOk('Staff can read own attendance', '/hr/me/attendance', staffToken)).check,
+    (
+      await fetchOk(
+        'Staff can read own attendance',
+        '/hr/me/attendance',
+        staffToken,
+      )
+    ).check,
   );
   checks.push(
-    (await fetchOk('Staff can read own leave requests', '/hr/me/leave-requests', staffToken)).check,
+    (
+      await fetchOk(
+        'Staff can read own leave requests',
+        '/hr/me/leave-requests',
+        staffToken,
+      )
+    ).check,
   );
   checks.push(
-    (await fetchOk('Staff can read own leave balances', '/hr/me/leave-balances', staffToken)).check,
+    (
+      await fetchOk(
+        'Staff can read own leave balances',
+        '/hr/me/leave-balances',
+        staffToken,
+      )
+    ).check,
   );
   checks.push(
-    (await fetchOk('Staff can read own payslips', '/payroll/me/payslips', staffToken)).check,
+    (
+      await fetchOk(
+        'Staff can read own payslips',
+        '/payroll/me/payslips',
+        staffToken,
+      )
+    ).check,
   );
   checks.push(
     await checkExpectedHttpFailure(
@@ -734,10 +835,22 @@ async function checkAccountantScope(accountantToken) {
   }
 
   checks.push(
-    (await fetchOk('Accountant can list fee invoices', '/fees/invoices', accountantToken)).check,
+    (
+      await fetchOk(
+        'Accountant can list fee invoices',
+        '/fees/invoices',
+        accountantToken,
+      )
+    ).check,
   );
   checks.push(
-    (await fetchOk('Accountant can list finance dues', '/finance/dues?limit=10', accountantToken)).check,
+    (
+      await fetchOk(
+        'Accountant can list finance dues',
+        '/finance/dues?limit=10',
+        accountantToken,
+      )
+    ).check,
   );
   const collections = await fetchOk(
     'Accountant can read backend collection report',
@@ -783,17 +896,31 @@ async function checkDriverScope(driverToken, adminToken) {
   }
 
   checks.push(
-    (await fetchOk('Driver can read own dashboard', '/transport/driver/dashboard', driverToken)).check,
+    (
+      await fetchOk(
+        'Driver can read own dashboard',
+        '/transport/driver/dashboard',
+        driverToken,
+      )
+    ).check,
   );
   checks.push(
-    (await fetchOk('Driver can read own assignments', '/transport/driver/assignments', driverToken)).check,
+    (
+      await fetchOk(
+        'Driver can read own assignments',
+        '/transport/driver/assignments',
+        driverToken,
+      )
+    ).check,
   );
   checks.push(
-    (await fetchOk(
-      'Driver can read assigned trip manifest',
-      `/transport/driver/trips/${ownTrips[0].id}/manifest`,
-      driverToken,
-    )).check,
+    (
+      await fetchOk(
+        'Driver can read assigned trip manifest',
+        `/transport/driver/trips/${ownTrips[0].id}/manifest`,
+        driverToken,
+      )
+    ).check,
   );
 
   const allTripsResult = await fetchOk(
@@ -877,6 +1004,16 @@ async function checkRedis() {
   const redis = new Redis({
     host: redisHost,
     port: redisPort,
+    ...(redisUsername ? { username: redisUsername } : {}),
+    ...(redisPassword ? { password: redisPassword } : {}),
+    ...(redisTlsEnabled
+      ? {
+          tls: {
+            servername: redisTlsServername,
+            rejectUnauthorized: true,
+          },
+        }
+      : {}),
     lazyConnect: true,
     maxRetriesPerRequest: 1,
     enableOfflineQueue: false,
@@ -1058,7 +1195,9 @@ function assertCheck(name, condition) {
 
 function hasAnyNumericTotal(body) {
   const text = JSON.stringify(body ?? {});
-  return /"[^"]*(total|amount|paid|due|collected)[^"]*"\s*:\s*"?-?\d/i.test(text);
+  return /"[^"]*(total|amount|paid|due|collected)[^"]*"\s*:\s*"?-?\d/i.test(
+    text,
+  );
 }
 
 function trimBody(value) {

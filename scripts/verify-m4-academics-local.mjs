@@ -35,7 +35,8 @@ loadEnvFile(join(repoRoot, 'apps/api/.env'));
 
 const checks = [];
 const evidenceDir = join(repoRoot, 'docs/production/evidence');
-const stamp = new Date().toISOString().slice(0, 10);
+const evidenceDate = new Date().toISOString().slice(0, 10);
+const evidenceStamp = new Date().toISOString().replace(/[:.]/g, '-');
 
 async function request(path, options = {}) {
   const response = await fetch(`${apiBaseUrl}${path}`, options);
@@ -192,17 +193,30 @@ async function main() {
       headers: parentAuth,
     });
     const children = getItems(childrenResult.body);
-    const childId = children[0]?.id;
-    if (childId) {
+    let selectedChild = null;
+    let selectedReportCards = null;
+    let selectedCards = [];
+    for (const child of children) {
       const reportCards = await request(
-        `/mobile/students/${childId}/report-cards`,
+        `/mobile/students/${child.id}/report-cards`,
         { headers: parentAuth },
       );
       const cards = getItems(reportCards.body);
+      if (!selectedChild || (reportCards.status === 200 && cards.length > 0)) {
+        selectedChild = child;
+        selectedReportCards = reportCards;
+        selectedCards = cards;
+      }
+      if (reportCards.status === 200 && cards.length > 0) {
+        break;
+      }
+    }
+    const childId = selectedChild?.id;
+    if (childId) {
       record(
         'Parent linked-child published report cards',
-        reportCards.status === 200,
-        `HTTP ${reportCards.status}, cards=${cards.length}${cards.length === 0 ? ' (run SCHOOLOS_E2E_M4_REPORT_CARD_FIXTURES=true pnpm db:seed:e2e:m4-report-card for published fixture)' : ''}`,
+        selectedReportCards.status === 200 && selectedCards.length > 0,
+        `HTTP ${selectedReportCards.status}, cards=${selectedCards.length}`,
       );
 
       const studentsResult = await request('/students?page=1&limit=25', {
@@ -248,10 +262,13 @@ async function main() {
 
 function writeEvidence(passed) {
   mkdirSync(evidenceDir, { recursive: true });
-  const path = join(evidenceDir, `m4-academics-core-${stamp}-local.md`);
+  const path = join(
+    evidenceDir,
+    `m4-academics-core-${evidenceStamp}-local.md`,
+  );
   writeFileSync(
     path,
-    `# M4 Academics verification (${stamp}, local)
+    `# M4 Academics verification (${evidenceDate}, local)
 
 - Tenant slug: \`${tenantSlug}\`
 - API: ${apiBaseUrl}

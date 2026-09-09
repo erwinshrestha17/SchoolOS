@@ -153,7 +153,19 @@ describe('FinanceService - Hardening', () => {
       invoiceLine: {
         create: jest.fn(),
       },
-      $queryRaw: jest.fn().mockResolvedValue([]),
+      runWithoutTenantScope: jest.fn(
+        async (_reason: string, work: () => Promise<unknown>) => work(),
+      ),
+      runWithTenantScope: jest.fn(
+        async (_tenantId: string, work: () => Promise<unknown>) => work(),
+      ),
+      $queryRaw: jest
+        .fn()
+        .mockImplementation(async (query) =>
+          String(query?.strings ?? '').includes('ReceiptSequence')
+            ? [{ lastValue: 1 }]
+            : [],
+        ),
       $transaction: jest.fn((work) =>
         Array.isArray(work) ? Promise.all(work) : work(mockPrisma),
       ),
@@ -710,6 +722,7 @@ describe('FinanceService - Hardening', () => {
       (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
         id: 'intent-1',
         tenantId: actor.tenantId,
+        requestedByUserId: actor.userId,
         invoiceId: 'invoice-1',
         provider: 'ESEWA',
         amount: new Prisma.Decimal(1500),
@@ -738,6 +751,14 @@ describe('FinanceService - Hardening', () => {
         status: 'verified',
       });
       expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.runWithoutTenantScope).toHaveBeenCalledWith(
+        'payment webhook: resolve a signed provider callback before tenant context exists',
+        expect.any(Function),
+      );
+      expect(prisma.runWithTenantScope).toHaveBeenCalledWith(
+        actor.tenantId,
+        expect.any(Function),
+      );
     });
 
     it('ignores online payment webhook if invoice is already paid', async () => {

@@ -6,6 +6,7 @@ import 'package:schoolos_mobile/core/auth/auth_provider.dart';
 import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
 import 'package:schoolos_mobile/core/auth/mobile_role.dart';
 import 'package:schoolos_mobile/core/auth/models/auth_user.dart';
+import 'package:schoolos_mobile/core/auth/models/token_pair.dart';
 import 'package:schoolos_mobile/core/errors/app_exception.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
@@ -17,6 +18,7 @@ class _MemoryTokenStorage implements TokenStorageService {
   String? refreshToken = 'refresh-token';
   String? role = MobileRole.teacher;
   String? cachedUser;
+  bool accessTokenExpired = false;
 
   @override
   Future<void> saveAccessToken(String token) async {
@@ -82,7 +84,8 @@ class _MemoryTokenStorage implements TokenStorageService {
   Future<bool> hasValidSession() async => accessToken != null;
 
   @override
-  bool isAccessTokenExpired(String token, {DateTime? now}) => false;
+  bool isAccessTokenExpired(String token, {DateTime? now}) =>
+      accessTokenExpired;
 }
 
 class _FakeApiClient extends Fake implements ApiClient {
@@ -91,12 +94,23 @@ class _FakeApiClient extends Fake implements ApiClient {
 }
 
 class _SessionAuthRepository extends Fake implements AuthRepository {
-  _SessionAuthRepository({this.user, this.failure});
+  _SessionAuthRepository({
+    this.user,
+    this.failure,
+    this.refreshFailure,
+    this.refreshResult = const TokenPair(
+      accessToken: 'rotated-access-token',
+      refreshToken: 'rotated-refresh-token',
+    ),
+  });
 
   final AuthUser? user;
   final Object? failure;
+  final Object? refreshFailure;
+  final TokenPair refreshResult;
   final ApiClient _client = _FakeApiClient();
   bool logoutCalled = false;
+  int refreshCalls = 0;
 
   @override
   ApiClient get client => _client;
@@ -108,6 +122,14 @@ class _SessionAuthRepository extends Fake implements AuthRepository {
       throw currentFailure;
     }
     return user ?? (throw StateError('No test user configured.'));
+  }
+
+  @override
+  Future<TokenPair> refreshToken(String refresh) async {
+    refreshCalls += 1;
+    final currentFailure = refreshFailure;
+    if (currentFailure != null) throw currentFailure;
+    return refreshResult;
   }
 
   @override
@@ -176,6 +198,12 @@ Future<_Harness> _createHarness({
   String? rawCachedUser,
   Map<String, Object> legacyPreferences = const {},
   String storedRole = MobileRole.teacher,
+  bool accessTokenExpired = false,
+  Object? refreshFailure,
+  TokenPair refreshResult = const TokenPair(
+    accessToken: 'rotated-access-token',
+    refreshToken: 'rotated-refresh-token',
+  ),
 }) async {
   SharedPreferences.setMockInitialValues(legacyPreferences);
   final preferences = AppPreferencesService(
@@ -183,10 +211,16 @@ Future<_Harness> _createHarness({
   );
   final tokenStorage = _MemoryTokenStorage()
     ..role = storedRole
+    ..accessTokenExpired = accessTokenExpired
     ..cachedUser =
         rawCachedUser ??
         (cachedUser == null ? null : jsonEncode(cachedUser.toJson()));
-  final repository = _SessionAuthRepository(user: user, failure: failure);
+  final repository = _SessionAuthRepository(
+    user: user,
+    failure: failure,
+    refreshFailure: refreshFailure,
+    refreshResult: refreshResult,
+  );
   final cleanup = _TrackingCleanup(preferences);
   final notifier = _SessionAuthNotifier(
     tokenStorage,
@@ -204,6 +238,62 @@ Future<_Harness> _createHarness({
 }
 
 void main() {
+  test(
+    'cold start rotates an expired access token before profile verification',
+    () async {
+      final harness = await _createHarness(
+        user: _validTeacher,
+        cachedUser: _validTeacher,
+        accessTokenExpired: true,
+      );
+
+      await harness.notifier.restoreSession();
+
+      expect(harness.repository.refreshCalls, 1);
+      expect(harness.tokenStorage.accessToken, 'rotated-access-token');
+      expect(harness.tokenStorage.refreshToken, 'rotated-refresh-token');
+      expect(harness.notifier.state.status, AuthStatus.authenticated);
+      expect(harness.notifier.state.token, 'rotated-access-token');
+    },
+  );
+
+  test(
+    'rejected cold-start refresh fails closed and clears the session',
+    () async {
+      final harness = await _createHarness(
+        cachedUser: _validTeacher,
+        accessTokenExpired: true,
+        refreshFailure: const SessionExpiredException(),
+      );
+
+      await harness.notifier.restoreSession();
+
+      expect(harness.repository.refreshCalls, 1);
+      expect(harness.notifier.state.status, AuthStatus.unauthenticated);
+      expect(harness.tokenStorage.accessToken, isNull);
+      expect(harness.tokenStorage.refreshToken, isNull);
+      expect(harness.cleanup.called, isTrue);
+    },
+  );
+
+  test(
+    'offline cold-start refresh preserves a valid cached identity',
+    () async {
+      final harness = await _createHarness(
+        cachedUser: _validTeacher,
+        accessTokenExpired: true,
+        refreshFailure: const NetworkException(),
+      );
+
+      await harness.notifier.restoreSession();
+
+      expect(harness.repository.refreshCalls, 1);
+      expect(harness.notifier.state.status, AuthStatus.authenticated);
+      expect(harness.notifier.state.user?.id, _validTeacher.id);
+      expect(harness.cleanup.called, isFalse);
+    },
+  );
+
   test('verified profile stores cached identity in secure storage', () async {
     final harness = await _createHarness(user: _validTeacher);
 

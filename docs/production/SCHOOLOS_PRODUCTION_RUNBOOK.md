@@ -59,6 +59,11 @@ PORT=4000
 DATABASE_URL=postgresql://schoolos:strong-password@postgres:5432/schoolos_db?schema=public
 REDIS_HOST=redis
 REDIS_PORT=6379
+REDIS_USERNAME=
+REDIS_PASSWORD=replace-with-strong-redis-password
+REDIS_TLS_ENABLED=true
+REDIS_TLS_SERVERNAME=redis.internal.example
+REDIS_ALLOW_PLAINTEXT=false
 RATE_LIMIT_ENABLED=true
 JWT_SECRET=replace-with-32-plus-character-random-secret
 JWT_CHALLENGE_SECRET=replace-with-second-32-plus-character-random-secret
@@ -98,6 +103,8 @@ ALLOW_PROD_BOOT=true
 DATABASE_URL
 REDIS_HOST
 REDIS_PORT
+REDIS_PASSWORD
+REDIS_TLS_ENABLED=true (preferred) or REDIS_ALLOW_PLAINTEXT=true only for a verified private network
 RATE_LIMIT_ENABLED=true
 JWT_SECRET
 JWT_CHALLENGE_SECRET
@@ -272,6 +279,8 @@ SMOKE_API_BASE_URL=https://api-staging.schoolos.example/api/v1 \
 DATABASE_URL=postgresql://... \
 REDIS_HOST=... \
 REDIS_PORT=6379 \
+REDIS_PASSWORD=... \
+REDIS_TLS_ENABLED=true \
 pnpm smoke:pilot
 ```
 
@@ -370,7 +379,9 @@ Evidence templates: `docs/production/evidence/`.
 - Poll `GET /api/v1/health` for process liveness (expect 200).
 - Poll `GET /api/v1/ready` for dependency readiness (expect 200; **503 when degraded**).
 - Alert on: readiness 503 sustained > 2 minutes, error rate spike, queue depth growth, disk usage on Postgres/storage volumes.
-- Use `pnpm staging:health` in cron or CI until APM is configured.
+- Run `pnpm monitor:health` as a supervised process for transition-based health/readiness incident and recovery alerts. Configure `MONITOR_API_BASE_URL`, `MONITOR_ALERT_WEBHOOK_URL`, and `MONITOR_ENVIRONMENT`; the default sustained-failure threshold is two minutes and the default poll interval is 30 seconds. Non-local API and webhook URLs must use HTTPS.
+- `MONITOR_RUN_ONCE=true MONITOR_FAILURE_THRESHOLD_MS=0 pnpm monitor:health` is suitable for a scheduler that owns retry/threshold state. `MONITOR_DRY_RUN=true` suppresses external alerts for a local rehearsal only; never count dry-run output as provider evidence.
+- Continue monitoring error rate, queue depth, and disk usage in the hosting platform/APM. The HTTP monitor does not replace those signals.
 
 ---
 1. Stop API and web traffic.

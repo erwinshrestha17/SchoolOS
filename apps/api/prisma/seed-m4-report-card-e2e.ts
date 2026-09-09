@@ -3,10 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import 'dotenv/config';
 
 const TENANT_SLUG = 'default-school';
-// Dilip Gautam, Class 1 Section A — already linked to guardian.c01a002@schoolos.test.
-const STUDENT_ID = 'b464b734-550e-4cdd-8a77-9f60fda31109';
-const CLASS_ID = 'cbf6af3f-bc7c-4798-91d2-817bcd3d5475';
-const SUBJECT_ID = 'b2b241c1-8a4e-41d5-959d-ac4466db0654';
+const GUARDIAN_EMAIL = 'guardian.c01a002@schoolos.test';
 
 const PUBLISHED_EXAM_TERM_ID = 'd4a1f2b3-1c2d-4e5f-8a9b-0c1d2e3f4a01';
 const PUBLISHED_COMPONENT_ID = 'd4a1f2b3-1c2d-4e5f-8a9b-0c1d2e3f4a02';
@@ -51,7 +48,7 @@ async function main() {
     );
   }
 
-  const [academicYear, admin, student] = await Promise.all([
+  const [academicYear, admin, guardianLink] = await Promise.all([
     prisma.academicYear.findFirst({
       where: { tenantId: tenant.id, isCurrent: true },
       orderBy: { startsOn: 'desc' },
@@ -63,16 +60,42 @@ async function main() {
       },
       select: { id: true },
     }),
-    prisma.student.findUnique({
-      where: { id: STUDENT_ID },
-      select: { id: true, tenantId: true, classId: true },
+    prisma.studentGuardian.findFirst({
+      where: {
+        tenantId: tenant.id,
+        status: 'ACTIVE',
+        guardian: { user: { email: GUARDIAN_EMAIL } },
+        student: { lifecycleStatus: 'ACTIVE' },
+      },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+      select: {
+        student: {
+          select: {
+            id: true,
+            tenantId: true,
+            classId: true,
+            firstNameEn: true,
+            lastNameEn: true,
+          },
+        },
+      },
     }),
   ]);
 
+  const student = guardianLink?.student;
   if (!academicYear || !admin || student?.tenantId !== tenant.id) {
     throw new Error(
-      'The M4 report card fixture requires the current academic year, seeded admin, and the dedicated Class 1 Section A student.',
+      `The M4 report card fixture requires the current academic year, seeded admin, and an active student linked to ${GUARDIAN_EMAIL}.`,
     );
+  }
+
+  const subject = await prisma.subject.findFirst({
+    where: { tenantId: tenant.id, classId: student.classId },
+    orderBy: [{ name: 'asc' }, { code: 'asc' }],
+    select: { id: true, name: true, code: true },
+  });
+  if (!subject) {
+    throw new Error('The linked M4 fixture student has no class subject.');
   }
 
   // Extracted as primitives so TypeScript keeps them narrowed as non-null
@@ -81,6 +104,11 @@ async function main() {
   const tenantId = tenant.id;
   const academicYearId = academicYear.id;
   const adminId = admin.id;
+  const studentId = student.id;
+  const classId = student.classId;
+  const subjectId = subject.id;
+  const subjectName = subject.name;
+  const subjectCode = subject.code;
 
   async function seedTermWithReportCard(config: {
     examTermId: string;
@@ -119,7 +147,7 @@ async function main() {
         update: {
           tenantId: tenantId,
           examTermId: config.examTermId,
-          subjectId: SUBJECT_ID,
+          subjectId,
           name: 'Theory',
           type: 'TERMINAL',
           maxMarks: 100,
@@ -129,7 +157,7 @@ async function main() {
           id: config.componentId,
           tenantId: tenantId,
           examTermId: config.examTermId,
-          subjectId: SUBJECT_ID,
+          subjectId,
           name: 'Theory',
           type: 'TERMINAL',
           maxMarks: 100,
@@ -143,8 +171,8 @@ async function main() {
           tenantId: tenantId,
           examTermId: config.examTermId,
           assessmentComponentId: config.componentId,
-          subjectId: SUBJECT_ID,
-          studentId: STUDENT_ID,
+          subjectId,
+          studentId,
           enteredById: adminId,
           marksObtained: config.marksObtained,
           status: 'SUBMITTED',
@@ -155,8 +183,8 @@ async function main() {
           tenantId: tenantId,
           examTermId: config.examTermId,
           assessmentComponentId: config.componentId,
-          subjectId: SUBJECT_ID,
-          studentId: STUDENT_ID,
+          subjectId,
+          studentId,
           enteredById: adminId,
           marksObtained: config.marksObtained,
           status: 'SUBMITTED',
@@ -174,8 +202,8 @@ async function main() {
           tenantId: tenantId,
           academicYearId: academicYearId,
           examTermId: config.examTermId,
-          studentId: STUDENT_ID,
-          classId: CLASS_ID,
+          studentId,
+          classId,
           totalMarks: config.marksObtained,
           maxMarks: 100,
           percentage,
@@ -196,8 +224,8 @@ async function main() {
           tenantId: tenantId,
           academicYearId: academicYearId,
           examTermId: config.examTermId,
-          studentId: STUDENT_ID,
-          classId: CLASS_ID,
+          studentId,
+          classId,
           totalMarks: config.marksObtained,
           maxMarks: 100,
           percentage,
@@ -220,9 +248,9 @@ async function main() {
           tenantId: tenantId,
           reportCardId: config.reportCardId,
           version: 1,
-          subjectId: SUBJECT_ID,
-          subjectName: 'Mathematics',
-          subjectCode: 'C01-MATH',
+          subjectId,
+          subjectName,
+          subjectCode,
           marksObtained: config.marksObtained,
           maxMarks: 100,
           percentage,
@@ -235,9 +263,9 @@ async function main() {
           tenantId: tenantId,
           reportCardId: config.reportCardId,
           version: 1,
-          subjectId: SUBJECT_ID,
-          subjectName: 'Mathematics',
-          subjectCode: 'C01-MATH',
+          subjectId,
+          subjectName,
+          subjectCode,
           marksObtained: config.marksObtained,
           maxMarks: 100,
           percentage,
@@ -295,7 +323,7 @@ async function main() {
 
   console.log('Seeded dedicated M4 report card browser fixture:');
   console.log(
-    '- Dilip Gautam (Class 1 Section A): 1 published report card, 1 unpublished report card',
+    `- ${student.firstNameEn} ${student.lastNameEn}: 1 published report card, 1 unpublished report card`,
   );
 }
 

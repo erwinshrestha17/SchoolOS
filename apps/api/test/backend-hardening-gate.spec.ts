@@ -304,6 +304,7 @@ describe('backend hardening gate', () => {
 
   it('keeps runWithoutTenantScope on an inventoried allowlist with a stated reason', () => {
     const allowlist = new Set([
+      '/app.service.ts',
       '/tenants/tenants.service.ts',
       '/finance/finance.cron.ts',
       '/audit/audit.service.ts',
@@ -315,6 +316,7 @@ describe('backend hardening gate', () => {
       '/auth/guards/jwt-auth.guard.ts',
       '/homework/homework.cron.ts',
       '/communications/notice-lifecycle.cron.ts',
+      '/finance/finance.service.ts',
     ]);
     const expectedReasons = [
       'audit: append with caller-supplied tenantId, including pre-authentication events',
@@ -325,11 +327,14 @@ describe('backend hardening gate', () => {
       'authorize: resolve role/permission set while establishing tenant context',
       'daily fee due-schedule sweep across all tenants',
       'daily homework reminder sweep across all active tenants',
+      'global database readiness probe',
       'notice lifecycle: discover tenants with due notices',
+      'payment webhook: resolve a signed provider callback before tenant context exists',
       'platform billing lifecycle across all tenants',
       'platform dashboard: aggregate authorized SaaS invoice balances',
       'platform dashboard: aggregate authorized subscription lifecycle counts',
       'platform dashboard: correlate authorized tenant usage with subscription limits',
+      'platform database health probe',
       'platform: issue purpose-limited support override for target tenant',
       'platform: provision a new school tenant and its first administrator',
       'platform: read purpose-limited support override history',
@@ -374,6 +379,63 @@ describe('backend hardening gate', () => {
     expect(uninventoried).toEqual([]);
     expect(missingReason).toEqual([]);
     expect([...new Set(foundReasons)].sort()).toEqual(expectedReasons);
+  });
+
+  it('keeps production raw SQL on an exact reviewed inventory with tenant anchors', () => {
+    const expectedInventory = {
+      '/accounting/accounting-posting.service.ts': 1,
+      '/accounting/accounting.service.ts': 2,
+      '/app.service.ts': 1,
+      '/auth/auth-account-locks.ts': 2,
+      '/auth/school-authorization-transaction.ts': 1,
+      '/communications/m10-hardening.service.ts': 10,
+      '/communications/notice-acknowledgement.service.ts': 2,
+      '/communications/notice-unread-recipients.service.ts': 2,
+      '/communications/notification-center.service.ts': 7,
+      '/finance/finance.service.ts': 16,
+      '/messaging/messaging-hardening.service.ts': 1,
+      '/mobile/mobile-principal.service.ts': 1,
+      '/platform/platform.service.ts': 1,
+      '/settings/settings-domain-mutation.service.ts': 1,
+      '/students/student-document-access.service.ts': 1,
+      '/students/student-duplicate-review.service.ts': 3,
+      '/students/student-search.service.ts': 1,
+    };
+    const globalProbeFiles = new Set([
+      '/app.service.ts',
+      '/platform/platform.service.ts',
+    ]);
+    const inventory: Record<string, number> = {};
+    const unsafe: string[] = [];
+    const missingTenantAnchor: string[] = [];
+
+    for (const file of listFiles(API_SRC_ROOT).filter(
+      (candidate) =>
+        !candidate.endsWith('.spec.ts') &&
+        !candidate.endsWith('.test.ts') &&
+        !candidate.endsWith('/prisma/prisma.service.ts'),
+    )) {
+      const source = read(file);
+      const calls = source.match(
+        /\$(?:queryRaw|executeRaw|queryRawUnsafe|executeRawUnsafe)\b/g,
+      );
+      if (!calls?.length) continue;
+
+      const normalized = normalizePath(file);
+      inventory[normalized] = calls.length;
+      if (/\$(?:queryRawUnsafe|executeRawUnsafe)\b/.test(source)) {
+        unsafe.push(normalized);
+      }
+      if (!globalProbeFiles.has(normalized) && !source.includes('tenantId')) {
+        missingTenantAnchor.push(normalized);
+      }
+    }
+
+    expect(Object.fromEntries(Object.entries(inventory).sort())).toEqual(
+      expectedInventory,
+    );
+    expect(unsafe).toEqual([]);
+    expect(missingTenantAnchor).toEqual([]);
   });
 
   it('enforces teacher assignment at attendance, homework, marks, and file-registry writes', () => {

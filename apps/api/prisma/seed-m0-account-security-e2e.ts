@@ -1,8 +1,4 @@
-import {
-  AuthMethod,
-  PrismaClient,
-  UserStatus,
-} from '@prisma/client';
+import { AuthMethod, PrismaClient, UserStatus } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
@@ -11,7 +7,9 @@ const TENANT_SLUG = 'default-school';
 const SECURITY_ADMIN_EMAIL = 'security-e2e-admin@schoolos.test';
 const PASSWORD_TEST_EMAIL = 'password-e2e-user@schoolos.test';
 const DEFAULT_PASSWORD =
-  process.env.SCHOOLOS_E2E_M0_SECURITY_PASSWORD ?? 'SecurityE2eAdmin1!';
+  process.env.SCHOOLOS_E2E_M0_SECURITY_PASSWORD ?? 'NepalPilot7!';
+const PASSWORD_TEST_INITIAL_PASSWORD =
+  process.env.SCHOOLOS_E2E_PASSWORD_TEST_INITIAL ?? 'FixtureStart6!';
 
 const adapter = new PrismaPg({
   connectionString:
@@ -22,11 +20,18 @@ const prisma = new PrismaClient({ adapter });
 
 function assertE2eFixtureAllowed() {
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('Refusing to seed M0 account-security fixtures in production.');
+    throw new Error(
+      'Refusing to seed M0 account-security fixtures in production.',
+    );
   }
   if (process.env.SCHOOLOS_E2E_M0_ACCOUNT_SECURITY_FIXTURES !== 'true') {
     throw new Error(
       'Set SCHOOLOS_E2E_M0_ACCOUNT_SECURITY_FIXTURES=true to seed the dedicated M0 account-security fixture.',
+    );
+  }
+  if (PASSWORD_TEST_INITIAL_PASSWORD === DEFAULT_PASSWORD) {
+    throw new Error(
+      'SCHOOLOS_E2E_PASSWORD_TEST_INITIAL must differ from the temporary reset password.',
     );
   }
 }
@@ -63,6 +68,9 @@ async function upsertManagedUser(input: {
       passwordHash,
       mustChangePassword: input.mustChangePassword,
       status: UserStatus.ACTIVE,
+      failedLoginCount: 0,
+      lockedUntil: null,
+      authVersion: { increment: 1 },
     },
     create: {
       tenantId: input.tenantId,
@@ -89,6 +97,10 @@ async function upsertManagedUser(input: {
       tenantId: input.tenantId,
       scopeId: 'global',
     },
+  });
+
+  await prisma.refreshToken.deleteMany({
+    where: { userId: user.id },
   });
 
   return user;
@@ -120,7 +132,7 @@ async function main() {
   await upsertManagedUser({
     tenantId: tenant.id,
     email: PASSWORD_TEST_EMAIL,
-    password: DEFAULT_PASSWORD,
+    password: PASSWORD_TEST_INITIAL_PASSWORD,
     mustChangePassword: false,
     roleId: adminRoleId,
   });
@@ -129,7 +141,7 @@ async function main() {
   console.log(`  tenant: ${TENANT_SLUG}`);
   console.log(`  security admin: ${SECURITY_ADMIN_EMAIL}`);
   console.log(`  password test user: ${PASSWORD_TEST_EMAIL}`);
-  console.log(`  password: ${DEFAULT_PASSWORD}`);
+  console.log('  credentials: configured for local E2E only');
 }
 
 main()

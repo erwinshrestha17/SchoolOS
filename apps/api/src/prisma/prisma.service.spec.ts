@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
+  applyTenantScopeToArgs,
+  assertRawTenantScope,
   MissingTenantScopeError,
   PrismaService,
   TENANT_ID_KEY,
@@ -193,5 +195,85 @@ describe('PrismaService', () => {
     // Verify that the superclass ($connect / $disconnect) was invoked
     expect(mockConnect).toHaveBeenCalled();
     expect(mockDisconnect).toHaveBeenCalled();
+  });
+});
+
+describe('applyTenantScopeToArgs', () => {
+  const tenantId = 'tenant-a';
+
+  it.each([
+    'findUniqueOrThrow',
+    'findFirstOrThrow',
+    'aggregate',
+    'groupBy',
+    'updateManyAndReturn',
+  ])('scopes %s by tenant', (operation) => {
+    const args = applyTenantScopeToArgs(
+      'Student',
+      operation,
+      { where: { status: 'ACTIVE', tenantId: 'tenant-b' } },
+      tenantId,
+    );
+
+    expect(args).toMatchObject({
+      where: { status: 'ACTIVE', tenantId },
+    });
+  });
+
+  it('forces tenant identity across every upsert branch', () => {
+    const args = applyTenantScopeToArgs(
+      'NotificationPreference',
+      'upsert',
+      {
+        where: { id: 'preference-1', tenantId: 'tenant-b' },
+        create: { id: 'preference-1', tenantId: 'tenant-b' },
+        update: { enabled: true, tenantId: 'tenant-b' },
+      },
+      tenantId,
+    );
+
+    expect(args).toEqual({
+      where: { id: 'preference-1', tenantId },
+      create: { id: 'preference-1', tenantId },
+      update: { enabled: true, tenantId },
+    });
+  });
+
+  it('prevents update data from moving a row to another tenant', () => {
+    const args = applyTenantScopeToArgs(
+      'Student',
+      'update',
+      {
+        where: { id: 'student-1' },
+        data: { firstNameEn: 'Asha', tenantId: 'tenant-b' },
+      },
+      tenantId,
+    );
+
+    expect(args).toEqual({
+      where: { id: 'student-1', tenantId },
+      data: { firstNameEn: 'Asha', tenantId },
+    });
+  });
+
+  it('fails closed for a future model operation without a reviewed strategy', () => {
+    expect(() =>
+      applyTenantScopeToArgs('Student', 'futureOperation', {}, tenantId),
+    ).toThrow(/Unsupported tenant-scoped Prisma operation/);
+  });
+});
+
+describe('assertRawTenantScope', () => {
+  it('fails closed when raw SQL has neither tenant context nor an explicit bypass', () => {
+    expect(() => assertRawTenantScope('$queryRaw')).toThrow(
+      MissingTenantScopeError,
+    );
+  });
+
+  it('allows tenant-scoped and explicitly reviewed cross-tenant raw SQL', () => {
+    expect(() => assertRawTenantScope('$queryRaw', 'tenant-a')).not.toThrow();
+    expect(() =>
+      assertRawTenantScope('$executeRaw', undefined, true),
+    ).not.toThrow();
   });
 });

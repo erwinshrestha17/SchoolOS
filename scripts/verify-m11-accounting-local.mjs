@@ -20,7 +20,8 @@ loadEnvFile(join(repoRoot, 'apps/api/.env'));
 
 const checks = [];
 const evidenceDir = join(repoRoot, 'docs/production/evidence');
-const stamp = new Date().toISOString().slice(0, 10);
+const evidenceDate = new Date().toISOString().slice(0, 10);
+const evidenceStamp = new Date().toISOString().replace(/[:.]/g, '-');
 
 async function request(path, options = {}) {
   const response = await fetch(`${apiBaseUrl}${path}`, options);
@@ -115,20 +116,20 @@ async function main() {
     } else {
       record(
         'Prepare role denied journal approve',
-        true,
-        'skipped — no journals seeded',
+        false,
+        'cannot verify — no journals seeded',
       );
     }
   } else {
     record(
       'E2E accountant journal read',
-      true,
-      `skipped — e2e accountant login failed HTTP ${e2eAccountantLogin.status}`,
+      false,
+      `login failed HTTP ${e2eAccountantLogin.status}`,
     );
     record(
       'Prepare role denied journal approve',
-      true,
-      'skipped — e2e accountant login failed',
+      false,
+      'cannot verify — e2e accountant login failed',
     );
   }
 
@@ -139,10 +140,13 @@ async function main() {
 
 function writeEvidence(passed) {
   mkdirSync(evidenceDir, { recursive: true });
-  const path = join(evidenceDir, `m11-accounting-core-${stamp}-local.md`);
+  const path = join(
+    evidenceDir,
+    `m11-accounting-core-${evidenceStamp}-local.md`,
+  );
   writeFileSync(
     path,
-    `# M11 Accounting verification (${stamp}, local)
+    `# M11 Accounting verification (${evidenceDate}, local)
 
 - Tenant slug: \`${tenantSlug}\`
 - API: ${apiBaseUrl}

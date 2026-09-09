@@ -32,9 +32,21 @@ export class MissingTenantScopeError extends Error {
     this.name = 'MissingTenantScopeError';
   }
 }
+
+export function assertRawTenantScope(
+  operation: string,
+  tenantId?: string,
+  bypassTenantScope = false,
+) {
+  if (!tenantId && !bypassTenantScope) {
+    throw new MissingTenantScopeError('$raw', operation);
+  }
+}
 interface TenantScopedArgs {
   where?: Record<string, unknown>;
   data?: Record<string, unknown> | Array<Record<string, unknown>>;
+  create?: Record<string, unknown>;
+  update?: Record<string, unknown>;
 }
 
 export const TENANT_SCOPE_EXCLUDED_MODELS = [
@@ -54,17 +66,32 @@ export const TENANT_SCOPE_EXCLUDED_MODELS = [
   'NepalLocalLevel',
   'ReferenceDatasetVersion',
 ];
-const TENANT_SCOPED_READ_WRITE_OPERATIONS = [
+const TENANT_SCOPED_WHERE_OPERATIONS = [
   'findUnique',
+  'findUniqueOrThrow',
   'findFirst',
+  'findFirstOrThrow',
   'findMany',
+  'aggregate',
+  'groupBy',
   'update',
   'updateMany',
+  'updateManyAndReturn',
   'delete',
   'deleteMany',
   'count',
 ];
-const TENANT_SCOPED_CREATE_OPERATIONS = ['create', 'createMany'];
+const TENANT_SCOPED_CREATE_OPERATIONS = [
+  'create',
+  'createMany',
+  'createManyAndReturn',
+];
+const TENANT_SCOPED_UPDATE_OPERATIONS = [
+  'update',
+  'updateMany',
+  'updateManyAndReturn',
+];
+const TENANT_SCOPED_UPSERT_OPERATION = 'upsert';
 
 export function applyTenantScopeToArgs<TArgs>(
   model: string,
@@ -87,11 +114,16 @@ export function applyTenantScopeToArgs<TArgs>(
     return args;
   }
 
-  const isReadWrite = TENANT_SCOPED_READ_WRITE_OPERATIONS.includes(operation);
+  const hasWhere = TENANT_SCOPED_WHERE_OPERATIONS.includes(operation);
   const isCreate = TENANT_SCOPED_CREATE_OPERATIONS.includes(operation);
+  const isUpdate = TENANT_SCOPED_UPDATE_OPERATIONS.includes(operation);
+  const isUpsert = operation === TENANT_SCOPED_UPSERT_OPERATION;
 
-  if (!isReadWrite && !isCreate) {
-    return args;
+  if (!hasWhere && !isCreate && !isUpsert) {
+    throw new Error(
+      `Unsupported tenant-scoped Prisma operation ${model}.${operation}. ` +
+        'Add an explicit tenant-scoping strategy before using this operation.',
+    );
   }
 
   if (!tenantId) {
@@ -102,12 +134,23 @@ export function applyTenantScopeToArgs<TArgs>(
 
   const scopedArgs = args as TenantScopedArgs;
 
-  if (isReadWrite) {
+  if (hasWhere || isUpsert) {
     scopedArgs.where = { ...(scopedArgs.where ?? {}), tenantId };
-  } else {
+  }
+
+  if (isCreate) {
     scopedArgs.data = Array.isArray(scopedArgs.data)
       ? scopedArgs.data.map((data) => ({ ...data, tenantId }))
       : { ...(scopedArgs.data ?? {}), tenantId };
+  }
+
+  if (isUpdate) {
+    scopedArgs.data = { ...(scopedArgs.data ?? {}), tenantId };
+  }
+
+  if (isUpsert) {
+    scopedArgs.create = { ...(scopedArgs.create ?? {}), tenantId };
+    scopedArgs.update = { ...(scopedArgs.update ?? {}), tenantId };
   }
 
   return args;
@@ -152,6 +195,38 @@ export class PrismaService
     const cls = this.cls;
     return this.$extends({
       query: {
+        async $queryRaw({ operation, args, query }) {
+          assertRawTenantScope(
+            operation,
+            cls?.get(TENANT_ID_KEY),
+            Boolean(cls?.get(TENANT_SCOPE_BYPASS_KEY)),
+          );
+          return query(args);
+        },
+        async $executeRaw({ operation, args, query }) {
+          assertRawTenantScope(
+            operation,
+            cls?.get(TENANT_ID_KEY),
+            Boolean(cls?.get(TENANT_SCOPE_BYPASS_KEY)),
+          );
+          return query(args);
+        },
+        async $queryRawUnsafe({ operation, args, query }) {
+          assertRawTenantScope(
+            operation,
+            cls?.get(TENANT_ID_KEY),
+            Boolean(cls?.get(TENANT_SCOPE_BYPASS_KEY)),
+          );
+          return query(args);
+        },
+        async $executeRawUnsafe({ operation, args, query }) {
+          assertRawTenantScope(
+            operation,
+            cls?.get(TENANT_ID_KEY),
+            Boolean(cls?.get(TENANT_SCOPE_BYPASS_KEY)),
+          );
+          return query(args);
+        },
         $allModels: {
           async $allOperations({ model, operation, args, query }) {
             const tenantId = cls?.get(TENANT_ID_KEY);

@@ -74,6 +74,13 @@ async function main() {
   run('pnpm', ['db:seed'], {
     env: { ...process.env, NODE_ENV: 'development' },
   });
+  run('pnpm', ['db:seed:e2e:m0-platform'], {
+    env: {
+      ...process.env,
+      NODE_ENV: 'development',
+      SCHOOLOS_E2E_M0_PLATFORM_ONBOARD_FIXTURES: 'true',
+    },
+  });
   run('pnpm', ['--filter', '@schoolos/api', 'db:backfill:teacher-assignments'], {
     env: process.env,
   });
@@ -105,6 +112,7 @@ docker compose -f docker-compose.staging.yml -p schoolos-staging up -d postgres 
 pnpm db:generate
 pnpm --filter @schoolos/api exec prisma migrate deploy
 pnpm db:seed
+SCHOOLOS_E2E_M0_PLATFORM_ONBOARD_FIXTURES=true pnpm db:seed:e2e:m0-platform
 pnpm --filter @schoolos/api db:backfill:teacher-assignments
 pnpm --filter @schoolos/api db:backfill:guardian-capabilities
 \`\`\`
@@ -112,6 +120,7 @@ pnpm --filter @schoolos/api db:backfill:guardian-capabilities
 ## Notes
 
 - M13 Learning remains disabled by the canonical seed for pilot tenants; this staging helper does not override frozen module entitlements.
+- The dedicated Platform fixture is local-E2E-only and is rejected when \`NODE_ENV=production\`; real staging must use explicitly bootstrapped operator credentials.
 - Full TLS staging preflight (\`pnpm verify:env:staging\`) requires HTTPS origins on the target host.
 - Containerized API/web deploy: \`docker compose -f docker-compose.staging.yml --profile app up -d --build\`
 - Optional controlled-pilot rehearsal tenant: \`pnpm provision:pilot-rehearsal\` (separate from \`default-school\` smoke tenant)

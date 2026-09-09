@@ -33,6 +33,7 @@ const requiredVars = [
   'DATABASE_URL',
   'REDIS_HOST',
   'REDIS_PORT',
+  'REDIS_PASSWORD',
   'RATE_LIMIT_ENABLED',
   'JWT_SECRET',
   'JWT_CHALLENGE_SECRET',
@@ -88,6 +89,16 @@ requireSecret('JWT_SECRET', process.env.JWT_SECRET);
 requireSecret('JWT_CHALLENGE_SECRET', process.env.JWT_CHALLENGE_SECRET);
 requireSecret('MEDICAL_ENCRYPTION_KEY', process.env.MEDICAL_ENCRYPTION_KEY);
 requireSecret('TOKEN_HASH_PEPPER', process.env.TOKEN_HASH_PEPPER);
+requireSecret('REDIS_PASSWORD', process.env.REDIS_PASSWORD, 16);
+
+if (
+  !isEnabled(process.env.REDIS_TLS_ENABLED) &&
+  !isEnabled(process.env.REDIS_ALLOW_PLAINTEXT)
+) {
+  errors.push(
+    'REDIS_TLS_ENABLED=true is required unless REDIS_ALLOW_PLAINTEXT=true is explicitly set for a verified private network',
+  );
+}
 
 rejectDefaultValue('JWT_ISSUER', process.env.JWT_ISSUER, ['schoolos']);
 rejectDefaultValue('JWT_AUDIENCE_WEB', process.env.JWT_AUDIENCE_WEB, [
@@ -121,10 +132,7 @@ const webApiUrl = parseHttpsUrl(
   'NEXT_PUBLIC_API_BASE_URL',
   process.env.NEXT_PUBLIC_API_BASE_URL,
 );
-if (
-  webApiUrl &&
-  !webApiUrl.pathname.replace(/\/+$/, '').endsWith('/api/v1')
-) {
+if (webApiUrl && !webApiUrl.pathname.replace(/\/+$/, '').endsWith('/api/v1')) {
   errors.push('NEXT_PUBLIC_API_BASE_URL must include the /api/v1 API prefix');
 }
 
@@ -140,7 +148,9 @@ validatePushProvider();
 validateStorageProvider();
 
 if (errors.length > 0) {
-  console.error(`${capitalize(targetEnv)} deploy environment preflight failed:`);
+  console.error(
+    `${capitalize(targetEnv)} deploy environment preflight failed:`,
+  );
   for (const error of errors) {
     console.error(`- ${error}`);
   }
@@ -184,9 +194,7 @@ function validatePushProvider() {
 function validateStorageProvider() {
   const provider = (process.env.STORAGE_PROVIDER ?? 'local').toLowerCase();
   if (!['local', 's3', 'r2', 'minio', 'gcp'].includes(provider)) {
-    errors.push(
-      'STORAGE_PROVIDER must be one of local, s3, r2, minio, or gcp',
-    );
+    errors.push('STORAGE_PROVIDER must be one of local, s3, r2, minio, or gcp');
     return;
   }
 
@@ -212,7 +220,9 @@ function validateStorageProvider() {
     return;
   }
 
-  requirePresent(storageEnvName(provider, 'OBJECT_STORAGE_BUCKET', 'R2_BUCKET'));
+  requirePresent(
+    storageEnvName(provider, 'OBJECT_STORAGE_BUCKET', 'R2_BUCKET'),
+  );
   requirePresent(
     storageEnvName(
       provider,

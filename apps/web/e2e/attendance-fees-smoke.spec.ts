@@ -6,7 +6,13 @@ const credentials = {
   password: process.env.SCHOOLOS_E2E_PASSWORD,
 };
 
-test.describe("Attendance & Fees Workflow Smoke", () => {
+const m3AccountantCredentials = {
+  tenantSlug: process.env.SCHOOLOS_E2E_TENANT_SLUG,
+  email: process.env.SCHOOLOS_E2E_M3_ACCOUNTANT_EMAIL,
+  password: process.env.SCHOOLOS_E2E_M3_ACCOUNTANT_PASSWORD,
+};
+
+test.describe("Attendance Workflow Smoke", () => {
   test.beforeEach(async ({ page }) => {
     test.skip(
       !credentials.tenantSlug || !credentials.email || !credentials.password,
@@ -39,7 +45,19 @@ test.describe("Attendance & Fees Workflow Smoke", () => {
       page.getByRole("heading", { name: /Attendance Register/i }),
     ).toBeVisible();
     await expect(page.getByLabel(/Academic Year/i)).toBeVisible();
-    await expect(page.getByLabel(/Month/i)).toBeVisible();
+    await expect(page.getByLabel("BS month")).toBeVisible();
+  });
+});
+
+test.describe("Fees Workflow Smoke", () => {
+  test.beforeEach(async ({ page }) => {
+    test.skip(
+      !m3AccountantCredentials.tenantSlug ||
+        !m3AccountantCredentials.email ||
+        !m3AccountantCredentials.password,
+      "Set E2E tenant and M3 accountant credentials to run fees smoke tests.",
+    );
+    await login(page, m3AccountantCredentials);
   });
 
   test("canonical fees overview and collection workspace load", async ({
@@ -201,11 +219,6 @@ test.describe("Attendance Offline Draft & Reconnect Smoke", () => {
   });
 });
 
-const m3AccountantCredentials = {
-  tenantSlug: process.env.SCHOOLOS_E2E_TENANT_SLUG,
-  email: process.env.SCHOOLOS_E2E_M3_ACCOUNTANT_EMAIL,
-  password: process.env.SCHOOLOS_E2E_M3_ACCOUNTANT_PASSWORD,
-};
 const m3CollectionMutationsEnabled =
   process.env.SCHOOLOS_E2E_M3_COLLECTION_MUTATIONS === "true";
 // Matches apps/api/prisma/seed-m3-collection-e2e.ts's fixed IDs; used only to
@@ -268,12 +281,12 @@ test.describe("Fees Collection Offline-Ledger Smoke", () => {
     expect(afterPartial.ok()).toBe(true);
     const partialDetail = unwrapFeesApiData<{
       status: string;
-      paidAmount: number;
-      outstandingAmount: number;
+      paidAmount: string;
+      outstandingAmount: string;
     }>(await afterPartial.json());
     expect(partialDetail.status).toBe("PARTIAL");
-    expect(partialDetail.paidAmount).toBe(600);
-    expect(partialDetail.outstandingAmount).toBe(400);
+    expect(partialDetail.paidAmount).toBe("600.00");
+    expect(partialDetail.outstandingAmount).toBe("400.00");
 
     // Fresh page load: the invoice-detail query isn't invalidated by the
     // first payment, and the selected student/invoice persists in the URL,
@@ -297,12 +310,12 @@ test.describe("Fees Collection Offline-Ledger Smoke", () => {
     expect(afterFull.ok()).toBe(true);
     const fullDetail = unwrapFeesApiData<{
       status: string;
-      paidAmount: number;
-      outstandingAmount: number;
+      paidAmount: string;
+      outstandingAmount: string;
     }>(await afterFull.json());
     expect(fullDetail.status).toBe("PAID");
-    expect(fullDetail.paidAmount).toBe(1000);
-    expect(fullDetail.outstandingAmount).toBe(0);
+    expect(fullDetail.paidAmount).toBe("1000.00");
+    expect(fullDetail.outstandingAmount).toBe("0.00");
   });
 });
 

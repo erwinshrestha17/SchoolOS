@@ -281,6 +281,53 @@ export class ConfigService {
     return Number(process.env.REDIS_PORT ?? 6379);
   }
 
+  get redisUsername() {
+    const username = process.env.REDIS_USERNAME?.trim();
+    return username?.length ? username : undefined;
+  }
+
+  get redisPassword() {
+    const password = process.env.REDIS_PASSWORD?.trim();
+    return password?.length ? password : undefined;
+  }
+
+  get redisTlsEnabled() {
+    return ['1', 'true', 'yes'].includes(
+      (process.env.REDIS_TLS_ENABLED ?? '').toLowerCase(),
+    );
+  }
+
+  get redisTlsServername() {
+    const servername = process.env.REDIS_TLS_SERVERNAME?.trim();
+    return servername?.length ? servername : this.redisHost;
+  }
+
+  get redisAllowPlaintext() {
+    return ['1', 'true', 'yes'].includes(
+      (process.env.REDIS_ALLOW_PLAINTEXT ?? '').toLowerCase(),
+    );
+  }
+
+  get redisConnectionOptions() {
+    const username = this.redisUsername;
+    const password = this.redisPassword;
+
+    return {
+      host: this.redisHost,
+      port: this.redisPort,
+      ...(username ? { username } : {}),
+      ...(password ? { password } : {}),
+      ...(this.redisTlsEnabled
+        ? {
+            tls: {
+              servername: this.redisTlsServername,
+              rejectUnauthorized: true,
+            },
+          }
+        : {}),
+    };
+  }
+
   get passwordResetAppUrl() {
     return process.env.PASSWORD_RESET_APP_URL ?? this.frontendOrigins[0];
   }
@@ -419,6 +466,16 @@ export class ConfigService {
 
     if (!process.env.REDIS_HOST) {
       errors.push('REDIS_HOST is required in production');
+    }
+
+    if (!this.redisPassword) {
+      errors.push('REDIS_PASSWORD is required in production');
+    }
+
+    if (!this.redisTlsEnabled && !this.redisAllowPlaintext) {
+      errors.push(
+        'REDIS_TLS_ENABLED=true is required in production unless REDIS_ALLOW_PLAINTEXT=true is explicitly set for a private network',
+      );
     }
 
     if (!this.rateLimitEnabled) {

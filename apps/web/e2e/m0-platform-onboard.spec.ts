@@ -2,17 +2,11 @@ import { expect, test } from '@playwright/test';
 
 const platformCredentials = {
   tenantSlug:
-    process.env.SCHOOLOS_E2E_PLATFORM_TENANT_SLUG ??
-    process.env.PLATFORM_SEED_TENANT_SLUG ??
-    'platform',
+    process.env.SCHOOLOS_E2E_PLATFORM_TENANT_SLUG ?? 'platform',
   email:
-    process.env.SCHOOLOS_E2E_PLATFORM_EMAIL ??
-    process.env.PLATFORM_SEED_EMAIL ??
-    'admin@schoolos.io',
+    process.env.SCHOOLOS_E2E_PLATFORM_EMAIL ?? 'admin@schoolos.io',
   password:
-    process.env.SCHOOLOS_E2E_PLATFORM_PASSWORD ??
-    process.env.PLATFORM_SEED_PASSWORD ??
-    'SchoolOS@2026',
+    process.env.SCHOOLOS_E2E_PLATFORM_PASSWORD ?? 'SchoolOS@2026',
 };
 
 test.describe('M0 Platform onboard browser E2E', () => {
@@ -37,7 +31,7 @@ test.describe('M0 Platform onboard browser E2E', () => {
     const schoolName = `M0 Onboard ${slugSuffix}`;
     const schoolSlug = `m0-onboard-${slugSuffix}`;
     const adminEmail = `admin-${slugSuffix}@schoolos.test`;
-    const adminPassword = 'OnboardTest1!';
+    const adminPassword = 'RiverStone7!';
 
     await page.goto('/platform/schools');
     await expect(page.getByRole('heading', { level: 1 }).last()).toContainText(
@@ -52,7 +46,7 @@ test.describe('M0 Platform onboard browser E2E', () => {
     await page.getByPlaceholder('e.g. Antigravity Academy').fill(schoolName);
     await page.getByPlaceholder('e.g. antigravity-academy').fill(schoolSlug);
     await page.getByPlaceholder('admin@school.com').fill(adminEmail);
-    await page.getByPlaceholder('Min 8 characters').fill(adminPassword);
+    await page.getByPlaceholder('Use a strong password').fill(adminPassword);
     await page
       .locator('form')
       .getByRole('button', { name: /Onboard school/i })
@@ -60,10 +54,14 @@ test.describe('M0 Platform onboard browser E2E', () => {
 
     await expect(page.getByText(schoolName)).toBeVisible({ timeout: 15000 });
 
-    await page.getByRole('link', { name: schoolName }).click();
+    await page.getByRole('link', { name: schoolName, exact: true }).click();
     await expect(page.getByRole('heading', { name: schoolName })).toBeVisible();
 
-    await page.getByRole('link', { name: 'Onboarding' }).click();
-    await expect(page.getByRole('heading', { name: 'Onboarding' })).toBeVisible();
+    await page
+      .getByRole('link', { name: 'Onboarding', exact: true })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Onboarding', exact: true }),
+    ).toBeVisible();
   });
 });

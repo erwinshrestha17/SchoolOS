@@ -18,7 +18,7 @@ const schoolCredentials = {
     process.env.SCHOOLOS_E2E_PASSWORD ??
     process.env.SCHOOLOS_E2E_SECURITY_PASSWORD ??
     process.env.SCHOOLOS_E2E_M0_SECURITY_PASSWORD ??
-    'SecurityE2eAdmin1!',
+    'NepalPilot7!',
 };
 
 const passwordTestAccount = {
@@ -28,9 +28,9 @@ const passwordTestAccount = {
   temporaryPassword:
     process.env.SCHOOLOS_E2E_PASSWORD_TEST_TEMP ??
     process.env.SCHOOLOS_E2E_M0_SECURITY_PASSWORD ??
-    'SecurityE2eAdmin1!',
+    'NepalPilot7!',
   finalPassword:
-    process.env.SCHOOLOS_E2E_PASSWORD_TEST_FINAL ?? 'SecurityE2eFinal1!',
+    process.env.SCHOOLOS_E2E_PASSWORD_TEST_FINAL ?? 'HimalayaDesk8!',
 };
 
 type Credentials = {

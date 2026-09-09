@@ -15,7 +15,7 @@ services:
       POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:-password123}
       POSTGRES_DB: schoolos_staging
     ports:
-      - "${STAGING_POSTGRES_PORT:-5434}:5432"
+      - "127.0.0.1:${STAGING_POSTGRES_PORT:-5434}:5432"
     volumes:
       - staging_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -28,12 +28,18 @@ services:
     image: redis:7-alpine
     container_name: schoolos_staging_redis
     restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${STAGING_REDIS_PASSWORD:-schoolos-local-staging-redis}
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"
     ports:
-      - "${STAGING_REDIS_PORT:-6380}:6379"
+      - "127.0.0.1:${STAGING_REDIS_PORT:-6380}:6379"
     volumes:
       - staging_redisdata:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -57,6 +63,9 @@ services:
       DATABASE_URL: postgresql://schoolos:${STAGING_POSTGRES_PASSWORD:-password123}@postgres:5432/schoolos_staging?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${STAGING_REDIS_PASSWORD:-schoolos-local-staging-redis}
+      REDIS_TLS_ENABLED: "false"
+      REDIS_ALLOW_PLAINTEXT: "true"
       RATE_LIMIT_ENABLED: "true"
       TRUST_PROXY: "true"
       FRONTEND_ORIGIN: ${STAGING_FRONTEND_ORIGIN:-https://staging.schoolos.example}

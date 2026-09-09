@@ -11,7 +11,13 @@
  * Idempotent: fixed ids, upserts throughout, and prior payments are cleared so
  * it can be replayed.
  */
-import { InvoiceStatus, PaymentMethod, PrismaClient, GuardianCapability } from '@prisma/client';
+import {
+  GuardianCapability,
+  InvoiceStatus,
+  PaymentAllocationType,
+  PaymentMethod,
+  PrismaClient,
+} from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import 'dotenv/config';
 
@@ -69,7 +75,11 @@ const BILLS: BillSpec[] = [
     lines: [
       { feeHeadCode: 'TUITION', description: 'Monthly tuition', amount: 3000 },
       { feeHeadCode: 'TRANSPORT', description: 'School bus', amount: 1200 },
-      { feeHeadCode: 'LATEFEE', description: 'Late payment charge', amount: 200 },
+      {
+        feeHeadCode: 'LATEFEE',
+        description: 'Late payment charge',
+        amount: 200,
+      },
     ],
     paid: 0,
     status: InvoiceStatus.ISSUED,
@@ -182,6 +192,9 @@ async function main() {
       });
       const priorIds = priorPayments.map((payment) => payment.id);
       if (priorIds.length > 0) {
+        await tx.paymentAllocation.deleteMany({
+          where: { tenantId: tenant.id, paymentId: { in: priorIds } },
+        });
         await tx.receipt.deleteMany({
           where: { tenantId: tenant.id, paymentId: { in: priorIds } },
         });
@@ -207,7 +220,8 @@ async function main() {
         subtotal: total,
         vatAmount: 0,
         totalAmount: total,
-        paidAt: bill.status === InvoiceStatus.PAID ? new Date(bill.dueDate) : null,
+        paidAt:
+          bill.status === InvoiceStatus.PAID ? new Date(bill.dueDate) : null,
       };
       await tx.invoice.upsert({
         where: { id: invoiceId },
@@ -243,6 +257,17 @@ async function main() {
             amount: bill.paid,
             paidAt: new Date(bill.dueDate),
             narration: 'Parent fee-breakdown fixture payment',
+          },
+        });
+        await tx.paymentAllocation.create({
+          data: {
+            tenantId: tenant.id,
+            paymentId: payment.id,
+            invoiceId,
+            amount: bill.paid,
+            allocationType: PaymentAllocationType.INVOICE,
+            reason: 'Parent fee-breakdown fixture allocation',
+            allocatedAt: new Date(bill.dueDate),
           },
         });
         if (bill.status === InvoiceStatus.PAID) {

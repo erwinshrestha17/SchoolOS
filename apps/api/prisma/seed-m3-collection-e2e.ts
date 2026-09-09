@@ -73,6 +73,9 @@ async function main() {
     });
     const priorPaymentIds = priorPayments.map((payment) => payment.id);
     if (priorPaymentIds.length > 0) {
+      await tx.paymentAllocation.deleteMany({
+        where: { tenantId: tenant.id, paymentId: { in: priorPaymentIds } },
+      });
       await tx.receipt.deleteMany({
         where: { tenantId: tenant.id, paymentId: { in: priorPaymentIds } },
       });

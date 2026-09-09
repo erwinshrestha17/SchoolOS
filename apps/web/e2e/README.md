@@ -2,6 +2,12 @@
 
 Browser smoke coverage verifies public routes, authenticated school-admin navigation, optional platform checks, and role/persona boundaries for real SchoolOS workflows.
 
+The default `pnpm test:web:e2e` gate covers the current active P0 modules. The
+preserved M8 Library, M9 Transport, and M10 Canteen browser smoke is isolated
+from pilot readiness while those modules are deferred; run it explicitly with
+`pnpm --filter @schoolos/web test:e2e:deferred-compat` when compatibility work
+is authorized.
+
 The Playwright config is available at `apps/web/playwright.config.ts`.
 
 Web and mobile persona boundaries are defined by the PRD, SRS, root/app `AGENTS.md` files, and backend authorization contracts.

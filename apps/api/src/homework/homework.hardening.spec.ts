@@ -412,7 +412,7 @@ describe('Homework Hardening', () => {
           classId: 'class-1',
           sectionId: 'section-1',
           subjectId: 'sub-1',
-          title: 'Fractions revised',
+          title: 'Fractions',
           instructions: 'Complete exercise 2.',
           dueDate: '2026-12-31',
           clientOperationId: 'hw-op-1',
@@ -422,6 +422,124 @@ describe('Homework Hardening', () => {
 
       expect(replayed.id).toBe(first.id);
       expect(p.homeworkAssignment.create.mock.calls.length).toBe(createCalls);
+    });
+
+    it('rejects reuse of a homework operation ID for different data', async () => {
+      const p = prisma as any;
+      const teacherActor: AuthContext = {
+        ...actor,
+        roles: ['subject_teacher'],
+      };
+
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'teacher-1',
+        tenantId: 'tenant-a',
+        userId: 'user-1',
+      });
+      teacherAssignments.push(
+        teacherAssignmentFixture({
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+        }),
+      );
+
+      const base = {
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        subjectId: 'sub-1',
+        title: 'Fractions',
+        instructions: 'Complete exercise 2.',
+        dueDate: '2026-12-31',
+        clientOperationId: 'hw-op-conflict',
+      };
+      await homeworkService.createAssignment(base, teacherActor);
+
+      await expect(
+        homeworkService.createAssignment(
+          { ...base, title: 'A different homework' },
+          teacherActor,
+        ),
+      ).rejects.toThrow(
+        'This homework request identifier was already used for different data',
+      );
+    });
+
+    it('returns the concurrent winner after the database unique fence rejects a duplicate create', async () => {
+      const p = prisma as any;
+      const teacherActor: AuthContext = {
+        ...actor,
+        roles: ['subject_teacher'],
+      };
+      const concurrent = {
+        id: 'hw-concurrent',
+        tenantId: 'tenant-a',
+        clientOperationId: 'hw-op-race',
+        status: HomeworkAssignmentStatus.DRAFT,
+        attachmentMetadata: null,
+      };
+
+      p.homeworkAssignment.findFirst
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(concurrent)
+        .mockResolvedValueOnce(concurrent);
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'teacher-1',
+        tenantId: 'tenant-a',
+        userId: 'user-1',
+      });
+      teacherAssignments.push(
+        teacherAssignmentFixture({
+          assignmentType: 'SUBJECT_TEACHER',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+        }),
+      );
+      p.$transaction.mockRejectedValueOnce({ code: 'P2002' });
+
+      const replayed = (await homeworkService.createAssignment(
+        {
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+          title: 'Fractions',
+          instructions: 'Complete exercise 2.',
+          dueDate: '2026-12-31',
+          clientOperationId: 'hw-op-race',
+        },
+        teacherActor,
+      )) as { id: string };
+
+      expect(replayed.id).toBe('hw-concurrent');
+      expect(p.homeworkAssignment.create).not.toHaveBeenCalled();
     });
 
     it('DENIES a homeroom class teacher with no subject assignment: homework is subject-owned', async () => {

@@ -14,13 +14,9 @@ import {
 } from '../src/rbac/rbac.defaults';
 
 const PLATFORM_EMAIL =
-  process.env.SCHOOLOS_E2E_PLATFORM_EMAIL ??
-  process.env.PLATFORM_SEED_EMAIL ??
-  'admin@schoolos.io';
+  process.env.SCHOOLOS_E2E_PLATFORM_EMAIL ?? 'admin@schoolos.io';
 const PLATFORM_PASSWORD =
-  process.env.SCHOOLOS_E2E_PLATFORM_PASSWORD ??
-  process.env.PLATFORM_SEED_PASSWORD ??
-  'SchoolOS@2026';
+  process.env.SCHOOLOS_E2E_PLATFORM_PASSWORD ?? 'SchoolOS@2026';
 const PLATFORM_TENANT_SLUG = 'platform';
 const PLATFORM_ROLE = 'platform_super_admin';
 
@@ -123,6 +119,9 @@ async function main() {
       passwordHash,
       mustChangePassword: false,
       status: UserStatus.ACTIVE,
+      failedLoginCount: 0,
+      lockedUntil: null,
+      authVersion: { increment: 1 },
     },
     create: {
       tenantId: platformTenant.id,
@@ -186,10 +185,12 @@ async function main() {
     },
   });
 
+  await prisma.refreshToken.deleteMany({ where: { userId: operator.id } });
+
   console.log('M0 platform onboard E2E fixture ready:');
   console.log(`  tenant: ${PLATFORM_TENANT_SLUG}`);
   console.log(`  email: ${PLATFORM_EMAIL}`);
-  console.log(`  password: ${PLATFORM_PASSWORD}`);
+  console.log('  credentials: configured for local E2E only');
 }
 
 main()

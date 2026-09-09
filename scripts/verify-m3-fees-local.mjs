@@ -53,7 +53,8 @@ loadEnvFile(join(repoRoot, 'apps/api/.env'));
 
 const checks = [];
 const evidenceDir = join(repoRoot, 'docs/production/evidence');
-const stamp = new Date().toISOString().slice(0, 10);
+const evidenceDate = new Date().toISOString().slice(0, 10);
+const evidenceStamp = new Date().toISOString().replace(/[:.]/g, '-');
 
 async function request(path, options = {}) {
   const response = await fetch(`${apiBaseUrl}${path}`, options);
@@ -179,7 +180,7 @@ async function main() {
 
   const collectBody = {
     invoiceId: COLLECTION_INVOICE_ID,
-    amount: COLLECTION_PROBE_AMOUNT,
+    amount: COLLECTION_PROBE_AMOUNT.toFixed(2),
     method: 'CASH',
     narration: 'M3 verify idempotent cash collection probe',
     idempotencyKey: COLLECTION_IDEMPOTENCY_KEY,
@@ -246,12 +247,56 @@ async function main() {
       headers: parentAuth,
     });
     const children = getItems(childrenResult.body);
-    const childId = children[0]?.id;
-    if (childId) {
+    let selectedParentFlow = null;
+    for (const child of children) {
       const feesSummary = await request(
-        `/mobile/students/${childId}/fees-summary`,
+        `/mobile/students/${child.id}/fees-summary`,
         { headers: parentAuth },
       );
+      const gatewayReadiness = await request(
+        `/mobile/students/${child.id}/payment-gateway-readiness`,
+        { headers: parentAuth },
+      );
+      const feesData = getData(feesSummary.body);
+      const invoiceItems = feesData?.recentInvoices ?? feesData?.invoices ?? [];
+      const payableInvoice =
+        invoiceItems.find(
+          (invoice) =>
+            invoice.invoiceNumber === PARENT_SANDBOX_INVOICE_NUMBER,
+        ) ??
+        invoiceItems.find(
+          (invoice) =>
+            Number(invoice.outstandingAmount) > 0 ||
+            invoice.status === 'ISSUED' ||
+            invoice.status === 'PARTIAL',
+        ) ?? null;
+
+      if (
+        !selectedParentFlow ||
+        (feesSummary.status === 200 &&
+          gatewayReadiness.status === 200 &&
+          payableInvoice)
+      ) {
+        selectedParentFlow = {
+          child,
+          feesSummary,
+          gatewayReadiness,
+          payableInvoice,
+        };
+      }
+
+      if (
+        feesSummary.status === 200 &&
+        gatewayReadiness.status === 200 &&
+        payableInvoice
+      ) {
+        break;
+      }
+    }
+    const childId = selectedParentFlow?.child?.id;
+    if (childId) {
+      const { feesSummary, gatewayReadiness, payableInvoice } =
+        selectedParentFlow;
       record(
         'Parent linked-child fee summary',
         feesSummary.status === 200,
@@ -294,10 +339,6 @@ async function main() {
         );
       }
 
-      const gatewayReadiness = await request(
-        `/mobile/students/${childId}/payment-gateway-readiness`,
-        { headers: parentAuth },
-      );
       const readinessData = getData(gatewayReadiness.body);
       record(
         'Parent payment gateway readiness (sandbox)',
@@ -307,16 +348,7 @@ async function main() {
       );
 
       const sandboxKey = 'verify-m3-parent-sandbox-fees-01';
-      const feesData = getData(feesSummary.body);
-      const invoiceItems = feesData?.recentInvoices ?? feesData?.invoices ?? [];
-      const unpaidInvoice =
-        invoiceItems.find(
-          (invoice) =>
-            invoice.invoiceNumber === PARENT_SANDBOX_INVOICE_NUMBER ||
-            invoice.outstandingAmount > 0 ||
-            invoice.status === 'ISSUED' ||
-            invoice.status === 'PARTIAL',
-        ) ?? invoiceItems[0];
+      const unpaidInvoice = payableInvoice;
       const sandboxInvoiceId = unpaidInvoice?.id;
       if (sandboxInvoiceId) {
         const sandboxCollect = await request(
@@ -418,18 +450,18 @@ async function main() {
   if (!gatewayReady) {
     record(
       'Online gateway readiness',
-      true,
-      'skipped — mock gateway not running (start scripts/mock-payment-gateway-local.mjs)',
+      false,
+      'mock gateway not running (start scripts/mock-payment-gateway-local.mjs)',
     );
     record(
       'Online payment initiate',
-      true,
-      'skipped — mock gateway not running',
+      false,
+      'blocked — mock gateway not running',
     );
     record(
       'Online webhook settlement idempotent',
-      true,
-      'skipped — mock gateway not running',
+      false,
+      'blocked — mock gateway not running',
     );
   } else {
     const readinessResult = await request('/payments/gateway-readiness', {
@@ -525,10 +557,13 @@ async function main() {
 
 function writeEvidence(passed) {
   mkdirSync(evidenceDir, { recursive: true });
-  const path = join(evidenceDir, `m3-fees-core-${stamp}-local.md`);
+  const path = join(
+    evidenceDir,
+    `m3-fees-core-${evidenceStamp}-local.md`,
+  );
   writeFileSync(
     path,
-    `# M3 Fees verification (${stamp}, local)
+    `# M3 Fees verification (${evidenceDate}, local)
 
 - Tenant slug: \`${tenantSlug}\`
 - API: ${apiBaseUrl}

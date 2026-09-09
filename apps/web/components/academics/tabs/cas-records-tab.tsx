@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LoadingState } from '@/components/ui/loading-state';
+import { useTeacherAssignmentScope } from '@/lib/hooks/use-teacher-assignment-scope';
 
 type Props = {
   academicYears: AcademicYearSummary[];
@@ -110,6 +111,17 @@ function makeDefaultForm(academicYears: AcademicYearSummary[]): CasFormState {
 export function CasRecordsTab({ academicYears, classes, allSections, subjects }: Props) {
   const { status } = useSession();
   const queryClient = useQueryClient();
+  const assignmentScope = useTeacherAssignmentScope();
+  const visibleClasses = assignmentScope.isScoped
+    ? assignmentScope.classes
+    : classes;
+  const visibleSections = assignmentScope.isScoped
+    ? assignmentScope.sections
+    : allSections;
+  const visibleClassIds = useMemo(
+    () => new Set(visibleClasses.map((classItem) => classItem.id)),
+    [visibleClasses],
+  );
   const [filters, setFilters] = useState(() => ({
     academicYearId: getCurrentYear(academicYears)?.id ?? '',
     classId: '',
@@ -125,23 +137,29 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
   const [deleteTarget, setDeleteTarget] = useState<CasRecordSummary | null>(null);
 
   const sectionsForClass = useMemo(
-    () => allSections.filter((section) => section.classId === filters.classId || section.classId === cas.classId),
-    [allSections, filters.classId, cas.classId],
+    () => visibleSections.filter((section) => section.classId === filters.classId || section.classId === cas.classId),
+    [visibleSections, filters.classId, cas.classId],
   );
 
   const formSectionsForClass = useMemo(
-    () => allSections.filter((section) => section.classId === cas.classId),
-    [allSections, cas.classId],
+    () => visibleSections.filter((section) => section.classId === cas.classId),
+    [visibleSections, cas.classId],
   );
 
   const subjectsForClass = useMemo(
-    () => subjects.filter((subject) => subject.classId === cas.classId),
-    [subjects, cas.classId],
+    () => subjects.filter((subject) =>
+      subject.classId === cas.classId &&
+      (!assignmentScope.isScoped || assignmentScope.assignedSubjectIds.has(subject.id)),
+    ),
+    [assignmentScope.assignedSubjectIds, assignmentScope.isScoped, subjects, cas.classId],
   );
 
   const filterSubjectsForClass = useMemo(
-    () => subjects.filter((subject) => !filters.classId || subject.classId === filters.classId),
-    [subjects, filters.classId],
+    () => subjects.filter((subject) =>
+      visibleClassIds.has(subject.classId) &&
+      (!filters.classId || subject.classId === filters.classId),
+    ),
+    [subjects, filters.classId, visibleClassIds],
   );
 
   const formRosterQuery = useQuery({
@@ -342,7 +360,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Class</label>
               <select value={filters.classId} onChange={(e) => setFilters(c => ({ ...c, classId: e.target.value, sectionId: '', subjectId: '', studentId: '' }))} className="premium-input bg-white">
                 <option value="">All Classes</option>
-                {classes.map((classItem) => <option key={classItem.id} value={classItem.id}>{classItem.name}</option>)}
+                {visibleClasses.map((classItem) => <option key={classItem.id} value={classItem.id}>{classItem.name}</option>)}
               </select>
            </div>
            <div className="space-y-2">
@@ -382,9 +400,9 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
                </div>
 
                <div className="space-y-4">
-                  <select value={cas.classId} onChange={(e) => setCas(c => ({ ...c, classId: e.target.value, sectionId: '', subjectId: '', studentId: '' }))} className="premium-input bg-slate-50">
+                  <select data-testid="cas-entry-class" value={cas.classId} onChange={(e) => setCas(c => ({ ...c, classId: e.target.value, sectionId: '', subjectId: '', studentId: '' }))} className="premium-input bg-slate-50">
                     <option value="">Select Class</option>
-                    {classes.map((classItem) => <option key={classItem.id} value={classItem.id}>{classItem.name}</option>)}
+                    {visibleClasses.map((classItem) => <option key={classItem.id} value={classItem.id}>{classItem.name}</option>)}
                   </select>
                   
                   <select value={cas.studentId} onChange={(e) => setCas(c => ({ ...c, studentId: e.target.value }))} className="premium-input bg-slate-50">
@@ -392,7 +410,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, subjects }:
                     {formStudentsForClass.map((student) => <option key={student.id} value={student.id}>{student.rollNumber ? `#${student.rollNumber} ` : ''}{getStudentName(student)}</option>)}
                   </select>
 
-                  <select value={cas.subjectId} onChange={(e) => setCas(c => ({ ...c, subjectId: e.target.value }))} className="premium-input bg-slate-50">
+                  <select data-testid="cas-entry-subject" value={cas.subjectId} onChange={(e) => setCas(c => ({ ...c, subjectId: e.target.value }))} className="premium-input bg-slate-50">
                     <option value="">Select Subject</option>
                     {subjectsForClass.map((subject) => <option key={subject.id} value={subject.id}>{subject.code} — {subject.name}</option>)}
                   </select>

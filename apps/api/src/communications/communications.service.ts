@@ -2480,7 +2480,7 @@ export class CommunicationsService {
       audienceType: AudienceType.ALL,
       studentIds: [event.studentId],
       title: 'Fee receipt ready',
-      body: `Payment of Rs ${event.amount.toFixed(2)} was received. Receipt ${event.receiptNumber ?? 'is ready'}.`,
+      body: `Payment of Rs ${new Prisma.Decimal(event.amount).toFixed(2)} was received. Receipt ${event.receiptNumber ?? 'is ready'}.`,
       channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
       requiredConsentTypes: [ConsentType.MESSAGING],
     });
@@ -3256,7 +3256,7 @@ type FeePaymentConfirmedEvent = TenantDomainEvent & {
   paymentId: string;
   invoiceId: string;
   studentId: string;
-  amount: number;
+  amount: number | string | Prisma.Decimal;
   method: string;
   receiptNumber?: string | null;
 };

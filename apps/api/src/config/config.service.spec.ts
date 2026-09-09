@@ -46,6 +46,8 @@ describe('ConfigService production validation', () => {
       'postgresql://schoolos:schoolos@db:5432/schoolos';
     process.env.REDIS_HOST = 'redis';
     process.env.REDIS_PORT = '6379';
+    process.env.REDIS_PASSWORD = 'redis-production-password';
+    process.env.REDIS_TLS_ENABLED = 'true';
     process.env.JWT_SECRET = 'x'.repeat(40);
     process.env.JWT_CHALLENGE_SECRET = 'y'.repeat(40);
     process.env.MEDICAL_ENCRYPTION_KEY = 'z'.repeat(40);
@@ -57,6 +59,7 @@ describe('ConfigService production validation', () => {
       'https://app.schoolos.local,https://platform.schoolos.local,https://admin.schoolos.local';
     process.env.EMAIL_DELIVERY_MODE = 'log';
     process.env.STORAGE_PROVIDER = 'local';
+    process.env.RATE_LIMIT_ENABLED = 'true';
 
     expect(() => {
       new ConfigService().validateForRuntime();
@@ -110,6 +113,52 @@ describe('ConfigService production validation', () => {
     expect(() => {
       new ConfigService().validateForRuntime();
     }).toThrow(/RATE_LIMIT_ENABLED=true is required in production/);
+  });
+
+  it('requires Redis authentication in production', () => {
+    setCompleteProductionEnvironment();
+    delete process.env.REDIS_PASSWORD;
+
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).toThrow(/REDIS_PASSWORD is required in production/);
+  });
+
+  it('requires Redis TLS or an explicit private-network plaintext exception in production', () => {
+    setCompleteProductionEnvironment();
+    process.env.REDIS_TLS_ENABLED = 'false';
+    delete process.env.REDIS_ALLOW_PLAINTEXT;
+
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).toThrow(/REDIS_TLS_ENABLED=true is required in production/);
+  });
+
+  it('builds one authenticated TLS connection contract for Redis and BullMQ', () => {
+    setCompleteProductionEnvironment();
+    process.env.REDIS_USERNAME = 'schoolos';
+    process.env.REDIS_TLS_SERVERNAME = 'redis.internal.example';
+
+    expect(new ConfigService().redisConnectionOptions).toEqual({
+      host: 'redis',
+      port: 6379,
+      username: 'schoolos',
+      password: 'redis-production-password',
+      tls: {
+        servername: 'redis.internal.example',
+        rejectUnauthorized: true,
+      },
+    });
+  });
+
+  it('allows authenticated plaintext Redis only with an explicit production exception', () => {
+    setCompleteProductionEnvironment();
+    process.env.REDIS_TLS_ENABLED = 'false';
+    process.env.REDIS_ALLOW_PLAINTEXT = 'true';
+
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).not.toThrow();
   });
 
   it.each([
@@ -214,6 +263,9 @@ function setCompleteProductionEnvironment() {
   process.env.DATABASE_URL = 'postgresql://schoolos:schoolos@db:5432/schoolos';
   process.env.REDIS_HOST = 'redis';
   process.env.REDIS_PORT = '6379';
+  process.env.REDIS_PASSWORD = 'redis-production-password';
+  process.env.REDIS_TLS_ENABLED = 'true';
+  delete process.env.REDIS_ALLOW_PLAINTEXT;
   process.env.JWT_SECRET = 'x'.repeat(40);
   process.env.JWT_CHALLENGE_SECRET = 'y'.repeat(40);
   process.env.MEDICAL_ENCRYPTION_KEY = 'z'.repeat(40);

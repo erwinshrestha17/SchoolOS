@@ -63,43 +63,107 @@ test.describe.serial('SchoolOS Phase 4 operations smoke', () => {
     await login(page, schoolAdminCredentials);
   });
 
-  test('Library admin routes and scan/report surfaces load without fatal errors', async ({ page }) => {
+  test('Library compatibility routes and circulation/report surfaces load without fatal errors', async ({
+    page,
+  }) => {
     await assertRoutesLoad(page, libraryRoutes);
     await page.goto('/dashboard/library');
-    await expect(page.getByRole('button', { name: /User profile menu/i })).toBeVisible({
+    await expect(
+      page.getByRole('button', { name: /User profile menu/i }),
+    ).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.locator('body')).toContainText(/scan|barcode|QR/i);
+    await expect(page.locator('#dashboard-main')).toContainText(
+      /Issue \/ Return|Borrower lookup/i,
+    );
     await page.goto('/dashboard/library/reports');
-    await expect(page.getByRole('button', { name: /User profile menu/i })).toBeVisible({
+    await expect(
+      page.getByRole('button', { name: /User profile menu/i }),
+    ).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.locator('body')).toContainText(/export|report/i);
   });
 
-  test('Canteen POS, wallet, inventory, and reports load without fatal errors', async ({ page }) => {
+  test('Canteen POS, wallet, inventory, and reports load without fatal errors', async ({
+    page,
+  }) => {
     await assertRoutesLoad(page, canteenRoutes);
     await page.goto('/dashboard/canteen/pos');
-    await expect(page.getByRole('button', { name: /User profile menu/i })).toBeVisible({
+    await expect(
+      page.getByRole('button', { name: /User profile menu/i }),
+    ).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.locator('body')).toContainText(/QR|manual|search|student/i);
-    await expect(page.getByRole('button', { name: /Create POS sale/i })).toBeVisible();
+    await expect(page.locator('body')).toContainText(
+      /QR|manual|search|student/i,
+    );
+    await expect(
+      page.getByRole('button', { name: /Create POS sale/i }),
+    ).toBeVisible();
     await page.goto('/dashboard/canteen/menu');
-    await expect(page.getByRole('button', { name: /User profile menu/i })).toBeVisible({
+    await expect(
+      page.getByRole('button', { name: /User profile menu/i }),
+    ).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.locator('body')).toContainText(/stock|inventory|menu/i);
   });
 
-  test('Transport admin routes and latest-location surface load without parent tracking UI', async ({ page }) => {
+  test('Transport admin routes and latest-location surface load without parent tracking UI', async ({
+    page,
+  }) => {
     await assertRoutesLoad(page, transportRoutes);
     await page.goto('/dashboard/transport/location');
-    await expect(page.getByRole('button', { name: /User profile menu/i })).toBeVisible({
+    await expect(
+      page.getByRole('button', { name: /User profile menu/i }),
+    ).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.locator('body')).toContainText(/latest|location|tracking|status/i);
+    await expect(page.locator('body')).toContainText(
+      /latest|location|tracking|status/i,
+    );
     await expect(page.locator('body')).not.toContainText(/parent portal/i);
+  });
+
+  test('preserves deferred module canonical deep links and legacy aliases', async ({
+    page,
+  }) => {
+    const journeys = [
+      {
+        overview: '/dashboard/library',
+        link: /Issue \/ Return/i,
+        canonical: '/dashboard/library/issue-return',
+        alias: '/dashboard/library/issues',
+      },
+      {
+        overview: '/dashboard/transport',
+        link: /^Assignments$/i,
+        canonical: '/dashboard/transport/assignments',
+        alias: '/dashboard/transport/students',
+      },
+      {
+        overview: '/dashboard/canteen',
+        link: /Stock & Suppliers/i,
+        canonical: '/dashboard/canteen/stock',
+        alias: '/dashboard/canteen/inventory',
+      },
+    ] as const;
+
+    for (const journey of journeys) {
+      await page.goto(journey.overview);
+      await page
+        .getByRole('link', { name: journey.link })
+        .or(page.getByRole('tab', { name: journey.link }))
+        .first()
+        .click();
+      await expect(page).toHaveURL(journey.canonical);
+      await page.reload();
+      await page.goto(journey.alias);
+      await expect(page).toHaveURL(journey.canonical);
+      await page.goBack();
+      await expect(page).toHaveURL(journey.canonical);
+    }
   });
 });
 
@@ -126,7 +190,9 @@ async function assertRoutesLoad(page: Page, routes: string[]) {
       .poll(() => new URL(page.url()).pathname)
       .toBe(expectedPathname);
     await expect(page.locator('body')).toBeVisible();
-    await expect(page.getByRole('button', { name: /User profile menu/i })).toBeVisible({
+    await expect(
+      page.getByRole('button', { name: /User profile menu/i }),
+    ).toBeVisible({
       timeout: 15_000,
     });
   }
@@ -151,7 +217,9 @@ async function login(
     page.getByRole('button', { name: /Sign in/i }).click(),
   ]);
 
-  await expect(page.getByRole('button', { name: /User profile menu/i })).toBeVisible({
+  await expect(
+    page.getByRole('button', { name: /User profile menu/i }),
+  ).toBeVisible({
     timeout: 15_000,
   });
 }

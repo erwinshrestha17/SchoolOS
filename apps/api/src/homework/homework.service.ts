@@ -31,7 +31,10 @@ import {
 } from './dto/reminder.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertClientAuthorityFence } from '../sync/authority-fence';
-import { CreateHomeworkDto } from './dto/create-homework.dto';
+import {
+  CreateHomeworkDto,
+  type HomeworkRecurrenceDto,
+} from './dto/create-homework.dto';
 import { HomeworkQueryDto } from './dto/homework-query.dto';
 import { HomeworkTemplateQueryDto } from './dto/homework-template-query.dto';
 import { HomeworkSubmissionQueryDto } from './dto/homework-submission-query.dto';
@@ -49,8 +52,7 @@ import {
   LegacyReviewHomeworkSubmissionDto,
   LegacySubmitHomeworkDto,
 } from './dto/legacy-submit-homework.dto';
-import type { HomeworkRecurrenceDto } from './dto/create-homework.dto';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { buildActiveGuardianRelationshipWhere } from '../common/security/parent-scope';
 import { getNepalSchoolDay } from '@schoolos/core';
 
@@ -844,6 +846,9 @@ export class HomeworkService {
   async createAssignment(dto: CreateHomeworkDto, actor: AuthContext) {
     await assertClientAuthorityFence(this.prisma, actor.tenantId, dto);
     const clientOperationId = dto.clientOperationId?.trim();
+    const clientOperationFingerprint = clientOperationId
+      ? fingerprintHomeworkCreate(dto)
+      : undefined;
     if (clientOperationId && dto.recurrence) {
       throw new ConflictException(
         'Offline homework drafts cannot use recurrence',
@@ -857,27 +862,11 @@ export class HomeworkService {
         },
       });
       if (existing) {
-        if (existing.status !== HomeworkAssignmentStatus.DRAFT) {
-          return this.findAssignmentOrThrow(actor, existing.id);
-        }
-        const updated = await this.updateAssignment(
-          existing.id,
-          {
-            title: dto.title,
-            instructions: dto.instructions,
-            description: dto.description,
-            assignedDate: dto.assignedDate,
-            dueDate: dto.dueDate,
-            dueAt: dto.dueAt,
-            submissionRequired: dto.submissionRequired,
-            submissionMethod: dto.submissionMethod,
-            parentInstructions: dto.parentInstructions,
-            attachmentFileIds: dto.attachmentFileIds,
-            maxScore: dto.maxScore,
-          },
-          actor,
+        assertHomeworkCreateReplay(
+          existing.attachmentMetadata,
+          clientOperationFingerprint,
         );
-        return this.findAssignmentOrThrow(actor, updated.id);
+        return this.findAssignmentOrThrow(actor, existing.id);
       }
     }
 
@@ -952,61 +941,84 @@ export class HomeworkService {
     const recurrenceSeriesId =
       occurrences.length > 1 ? cryptoRandomId('hw-series') : null;
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const assignments: HomeworkAssignment[] = [];
+    let result: HomeworkAssignment[];
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        const assignments: HomeworkAssignment[] = [];
 
-      for (const [index, occurrence] of occurrences.entries()) {
-        const assignment = await tx.homeworkAssignment.create({
-          data: {
-            tenantId: actor.tenantId,
-            clientOperationId: clientOperationId || undefined,
-            academicYearId: dto.academicYearId,
-            classId: dto.classId,
-            sectionId: dto.sectionId,
-            subjectId: dto.subjectId,
-            assignedByStaffId: staffId,
-            title:
-              occurrences.length > 1
-                ? `${dto.title} (${index + 1}/${occurrences.length})`
-                : dto.title,
-            description: dto.description,
-            instructions: dto.instructions,
-            assignedDate: occurrence.assignedDate,
-            dueDate: occurrence.dueDate,
-            dueAt: occurrence.dueAt,
-            maxScore: dto.maxScore,
-            submissionRequired: dto.submissionRequired,
-            submissionMethod: dto.submissionMethod,
-            parentInstructions: dto.parentInstructions,
-            status: HomeworkAssignmentStatus.DRAFT,
-            attachmentMetadata: buildHomeworkMetadata(dto.attachmentMetadata, {
-              saveAsTemplate: dto.saveAsTemplate,
-              templateName: dto.templateName,
-              templateSourceTitle: dto.title,
-              actorUserId: actor.userId,
-              recurrence: dto.recurrence,
-              recurrenceSeriesId,
-              occurrenceIndex: index,
-              occurrenceCount: occurrences.length,
-            }),
-          },
-        });
+        for (const [index, occurrence] of occurrences.entries()) {
+          const assignment = await tx.homeworkAssignment.create({
+            data: {
+              tenantId: actor.tenantId,
+              clientOperationId,
+              academicYearId: dto.academicYearId,
+              classId: dto.classId,
+              sectionId: dto.sectionId,
+              subjectId: dto.subjectId,
+              assignedByStaffId: staffId,
+              title:
+                occurrences.length > 1
+                  ? `${dto.title} (${index + 1}/${occurrences.length})`
+                  : dto.title,
+              description: dto.description,
+              instructions: dto.instructions,
+              assignedDate: occurrence.assignedDate,
+              dueDate: occurrence.dueDate,
+              dueAt: occurrence.dueAt,
+              maxScore: dto.maxScore,
+              submissionRequired: dto.submissionRequired,
+              submissionMethod: dto.submissionMethod,
+              parentInstructions: dto.parentInstructions,
+              status: HomeworkAssignmentStatus.DRAFT,
+              attachmentMetadata: buildHomeworkMetadata(
+                dto.attachmentMetadata,
+                {
+                  saveAsTemplate: dto.saveAsTemplate,
+                  templateName: dto.templateName,
+                  templateSourceTitle: dto.title,
+                  actorUserId: actor.userId,
+                  recurrence: dto.recurrence,
+                  recurrenceSeriesId,
+                  occurrenceIndex: index,
+                  occurrenceCount: occurrences.length,
+                  clientOperationFingerprint,
+                },
+              ),
+            },
+          });
 
-        if (dto.attachmentFileIds?.length) {
-          await this.linkAttachments(
-            actor,
-            assignment.id,
-            null,
-            dto.attachmentFileIds,
-            tx,
-          );
+          if (dto.attachmentFileIds?.length) {
+            await this.linkAttachments(
+              actor,
+              assignment.id,
+              null,
+              dto.attachmentFileIds,
+              tx,
+            );
+          }
+
+          assignments.push(assignment);
         }
 
-        assignments.push(assignment);
+        return assignments;
+      });
+    } catch (error) {
+      if (!clientOperationId || !isPrismaUniqueViolation(error)) {
+        throw error;
       }
-
-      return assignments;
-    });
+      const concurrent = await this.prisma.homeworkAssignment.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          clientOperationId,
+        },
+      });
+      if (!concurrent) throw error;
+      assertHomeworkCreateReplay(
+        concurrent.attachmentMetadata,
+        clientOperationFingerprint,
+      );
+      return this.findAssignmentOrThrow(actor, concurrent.id);
+    }
 
     const assignments = await Promise.all(
       result.map((assignment) =>
@@ -3146,6 +3158,7 @@ function buildHomeworkMetadata(
     recurrenceSeriesId: string | null;
     occurrenceIndex: number;
     occurrenceCount: number;
+    clientOperationFingerprint?: string;
   },
 ): Prisma.InputJsonValue | undefined {
   const metadata = normalizeJsonObject(base);
@@ -3167,6 +3180,12 @@ function buildHomeworkMetadata(
       frequency: options.recurrence.frequency,
       interval: options.recurrence.interval ?? 1,
       repeatUntil: options.recurrence.repeatUntil ?? null,
+    };
+  }
+
+  if (options.clientOperationFingerprint) {
+    metadata.schoolosClientOperation = {
+      fingerprint: options.clientOperationFingerprint,
     };
   }
 
@@ -3193,6 +3212,75 @@ function normalizeJsonObject(value: Record<string, unknown> | undefined) {
     return {} as Record<string, unknown>;
   }
   return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+}
+
+function fingerprintHomeworkCreate(dto: CreateHomeworkDto) {
+  const acceptedInput = {
+    academicYearId: dto.academicYearId,
+    classId: dto.classId,
+    sectionId: dto.sectionId ?? null,
+    subjectId: dto.subjectId,
+    title: dto.title,
+    instructions: dto.instructions,
+    description: dto.description ?? null,
+    assignedDate: dto.assignedDate ?? null,
+    dueDate: dto.dueDate,
+    dueAt: dto.dueAt ?? null,
+    submissionRequired: dto.submissionRequired ?? null,
+    submissionMethod: dto.submissionMethod ?? null,
+    parentInstructions: dto.parentInstructions ?? null,
+    attachmentFileIds: dto.attachmentFileIds ?? [],
+    attachmentMetadata: dto.attachmentMetadata ?? null,
+    maxScore: dto.maxScore ?? null,
+    saveAsTemplate: dto.saveAsTemplate ?? false,
+    templateName: dto.templateName ?? null,
+  };
+  return createHash('sha256')
+    .update(stableHomeworkJson(acceptedInput))
+    .digest('hex');
+}
+
+function stableHomeworkJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableHomeworkJson).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableHomeworkJson(item)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+function assertHomeworkCreateReplay(
+  metadata: Prisma.JsonValue | null | undefined,
+  expectedFingerprint: string | undefined,
+) {
+  if (!expectedFingerprint || !metadata || Array.isArray(metadata)) return;
+  if (typeof metadata !== 'object') return;
+  const operation = metadata.schoolosClientOperation;
+  if (!operation || typeof operation !== 'object' || Array.isArray(operation)) {
+    return;
+  }
+  const actualFingerprint = operation.fingerprint;
+  if (
+    typeof actualFingerprint === 'string' &&
+    actualFingerprint !== expectedFingerprint
+  ) {
+    throw new ConflictException(
+      'This homework request identifier was already used for different data',
+    );
+  }
+}
+
+function isPrismaUniqueViolation(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'P2002'
+  );
 }
 
 function shiftDate(date: Date, days: number) {

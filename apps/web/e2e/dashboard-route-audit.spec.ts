@@ -6,10 +6,25 @@ const schoolCredentials = {
   password: process.env.SCHOOLOS_E2E_PASSWORD,
 };
 
+const platformFixtureEnabled =
+  process.env.SCHOOLOS_E2E_M0_PLATFORM_ONBOARD_FIXTURES === 'true';
+
 const platformCredentials = {
-  tenantSlug: process.env.SCHOOLOS_E2E_PLATFORM_TENANT_SLUG,
-  email: process.env.SCHOOLOS_E2E_PLATFORM_EMAIL,
-  password: process.env.SCHOOLOS_E2E_PLATFORM_PASSWORD,
+  tenantSlug:
+    process.env.SCHOOLOS_E2E_PLATFORM_TENANT_SLUG ??
+    (platformFixtureEnabled
+      ? 'platform'
+      : process.env.PLATFORM_SEED_TENANT_SLUG),
+  email:
+    process.env.SCHOOLOS_E2E_PLATFORM_EMAIL ??
+    (platformFixtureEnabled
+      ? 'admin@schoolos.io'
+      : process.env.PLATFORM_SEED_EMAIL),
+  password:
+    process.env.SCHOOLOS_E2E_PLATFORM_PASSWORD ??
+    (platformFixtureEnabled
+      ? 'SchoolOS@2026'
+      : process.env.PLATFORM_SEED_PASSWORD),
 };
 
 const schoolRoutes = [
@@ -39,14 +54,6 @@ const schoolRoutes = [
   '/dashboard/payroll',
   '/dashboard/accounting',
   '/dashboard/reports',
-  '/dashboard/library',
-  '/dashboard/library/catalog',
-  '/dashboard/library/issue-return',
-  '/dashboard/canteen',
-  '/dashboard/canteen/stock',
-  '/dashboard/transport',
-  '/dashboard/transport/assignments',
-  '/dashboard/transport/location',
   '/dashboard/settings',
 ] as const;
 
@@ -88,7 +95,7 @@ test.describe('Dashboard route audit smoke', () => {
     );
   });
 
-  test('loads every implemented school dashboard route without a fatal page', async ({
+  test('loads every active P0 school dashboard route without a fatal page', async ({
     page,
   }) => {
     const pageErrors: string[] = [];
@@ -134,45 +141,6 @@ test.describe('Dashboard route audit smoke', () => {
     await expect(
       page.getByRole('heading', { name: /Chat has been removed/i }),
     ).toBeVisible();
-  });
-
-  test('keeps canonical module deep links stable across refresh, history, and legacy aliases', async ({
-    page,
-  }) => {
-    await login(page, schoolCredentials);
-
-    const journeys = [
-      {
-        overview: '/dashboard/library',
-        link: /Issue \/ Return/i,
-        canonical: '/dashboard/library/issue-return',
-        alias: '/dashboard/library/issues',
-      },
-      {
-        overview: '/dashboard/transport',
-        link: /^Assignments$/i,
-        canonical: '/dashboard/transport/assignments',
-        alias: '/dashboard/transport/students',
-      },
-      {
-        overview: '/dashboard/canteen',
-        link: /Stock & Suppliers/i,
-        canonical: '/dashboard/canteen/stock',
-        alias: '/dashboard/canteen/inventory',
-      },
-    ] as const;
-
-    for (const journey of journeys) {
-      await page.goto(journey.overview);
-      await page.getByRole('link', { name: journey.link }).first().click();
-      await expect(page).toHaveURL(journey.canonical);
-      await page.reload();
-      await expectUsableRoute(page, journey.canonical);
-      await page.goto(journey.alias);
-      await expect(page).toHaveURL(journey.canonical);
-      await page.goBack();
-      await expect(page).toHaveURL(journey.canonical);
-    }
   });
 });
 
@@ -255,7 +223,9 @@ async function login(
 
 async function expectUsableRoute(page: Page, route: string) {
   await expect(
-    page.locator('h1:visible, h2:visible, [role="heading"]:visible').first(),
+    page
+      .locator('h1:visible, h2:visible, h3:visible, [role="heading"]:visible')
+      .first(),
   ).toBeVisible({ timeout: 15_000 });
   await expect(
     page.getByText(

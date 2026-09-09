@@ -647,12 +647,9 @@ class _TeacherHomeworkScreenState extends ConsumerState<TeacherHomeworkScreen> {
                                     return;
                                   }
                                   setSheetState(() => saving = false);
-                                  // Homework create carries no idempotency key
-                                  // (the DTO is shared with the web app), so a
-                                  // dropped reply may still have created the
-                                  // draft. Refresh the list and say so rather
-                                  // than inviting a blind retry that would
-                                  // duplicate it.
+                                  // The operation ID is replay-safe. Refresh so
+                                  // a dropped successful response becomes
+                                  // visible before the teacher retries.
                                   ref.invalidate(
                                     teacherHomeworkProvider(_currentQuery()),
                                   );

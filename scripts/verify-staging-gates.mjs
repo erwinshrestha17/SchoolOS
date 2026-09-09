@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { repoRoot } from './lib/schoolos-env.mjs';
 
 const evidenceDir = join(repoRoot, 'docs/production/evidence');
-const apiBaseUrl = process.env.SMOKE_API_BASE_URL ?? 'http://localhost:4000/api/v1';
+const apiBaseUrl =
+  process.env.SMOKE_API_BASE_URL ?? 'http://localhost:4000/api/v1';
 
 function run(command, args, capture = false) {
   const result = spawnSync(command, args, {
@@ -20,6 +21,10 @@ function run(command, args, capture = false) {
         'postgresql://schoolos:password123@localhost:5434/schoolos_staging?schema=public',
       REDIS_HOST: process.env.REDIS_HOST ?? 'localhost',
       REDIS_PORT: process.env.REDIS_PORT ?? '6380',
+      REDIS_PASSWORD:
+        process.env.REDIS_PASSWORD ?? 'schoolos-local-staging-redis',
+      REDIS_TLS_ENABLED: process.env.REDIS_TLS_ENABLED ?? 'false',
+      REDIS_ALLOW_PLAINTEXT: process.env.REDIS_ALLOW_PLAINTEXT ?? 'true',
       SMOKE_API_BASE_URL: apiBaseUrl,
     },
   });
@@ -44,7 +49,14 @@ async function main() {
 
   const webE2e = run(
     'pnpm',
-    ['--filter', '@schoolos/web', 'exec', 'playwright', 'test', 'e2e/public-smoke.spec.ts'],
+    [
+      '--filter',
+      '@schoolos/web',
+      'exec',
+      'playwright',
+      'test',
+      'e2e/public-smoke.spec.ts',
+    ],
     true,
   );
   results.push({ name: 'web-e2e-public-smoke', ...webE2e });
@@ -54,7 +66,11 @@ async function main() {
 
   const finishedAt = new Date().toISOString();
   const failed = results.filter((result) => !result.ok);
-  const evidencePath = join(evidenceDir, 'staging-gates-2026-07-29-local.md');
+  const evidenceStamp = finishedAt.replace(/[:.]/g, '-');
+  const evidencePath = join(
+    evidenceDir,
+    `staging-gates-${evidenceStamp}-local.md`,
+  );
 
   mkdirSync(evidenceDir, { recursive: true });
   writeFileSync(

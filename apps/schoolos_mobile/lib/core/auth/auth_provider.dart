@@ -11,6 +11,7 @@ import 'biometric_session_store.dart';
 import 'data/auth_repository.dart';
 import 'models/auth_user.dart';
 import 'models/login_request.dart';
+import 'models/token_pair.dart';
 import 'mobile_role.dart';
 import 'session_credential_coordinator.dart';
 import '../network/api_client.dart';
@@ -138,20 +139,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final afterBiometricUnlock = _resumeAfterBiometricUnlock;
     _resumeAfterBiometricUnlock = false;
     state = state.copyWith(status: AuthStatus.loading);
-    final (token, role) = await _credentials.withStorage(
+    var (token, refreshToken, role) = await _credentials.withStorage(
       () async => (
         await _tokenStorage.getAccessToken(),
+        await _tokenStorage.getRefreshToken(),
         await _tokenStorage.getUserRole(),
       ),
     );
     if (!mounted || !_credentials.isCurrent(epoch)) return;
 
     if (token != null && role != null) {
-      if (_tokenStorage.isAccessTokenExpired(token)) {
-        await logout();
-        return;
-      }
-
       final cachedUser = await _credentials.withStorage(_loadCachedUser);
       if (!mounted || !_credentials.isCurrent(epoch)) return;
 
@@ -166,6 +163,44 @@ class AuthNotifier extends StateNotifier<AuthState> {
           user: cachedUser,
         );
         return;
+      }
+
+      if (_tokenStorage.isAccessTokenExpired(token)) {
+        final expiredAccessToken = token;
+        try {
+          token = await _refreshColdStartSession(
+            epoch: epoch,
+            refreshToken: refreshToken,
+          );
+        } on NetworkException catch (_) {
+          if (!mounted || !_credentials.isCurrent(epoch)) return;
+          await _restoreCachedOfflineSession(
+            token: expiredAccessToken,
+            storedRole: role,
+            cachedUser: cachedUser,
+          );
+          return;
+        } on TimeoutException catch (_) {
+          if (!mounted || !_credentials.isCurrent(epoch)) return;
+          await _restoreCachedOfflineSession(
+            token: expiredAccessToken,
+            storedRole: role,
+            cachedUser: cachedUser,
+          );
+          return;
+        } on ServerException catch (_) {
+          if (!mounted || !_credentials.isCurrent(epoch)) return;
+          await _restoreCachedOfflineSession(
+            token: expiredAccessToken,
+            storedRole: role,
+            cachedUser: cachedUser,
+          );
+          return;
+        } catch (_) {
+          if (!mounted || !_credentials.isCurrent(epoch)) return;
+          await logout();
+          return;
+        }
       }
 
       if (!mounted || !_credentials.isCurrent(epoch)) return;
@@ -227,6 +262,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
     } else {
       state = AuthState(status: AuthStatus.unauthenticated);
+    }
+  }
+
+  Future<String> _refreshColdStartSession({
+    required int epoch,
+    required String? refreshToken,
+  }) async {
+    if (refreshToken == null || refreshToken.isEmpty) {
+      throw const SessionExpiredException();
+    }
+    final tokens = await _authRepository.refreshToken(refreshToken);
+    _assertCompleteTokenPair(tokens);
+    await _credentials.withStorage(() async {
+      if (!_credentials.isCurrent(epoch)) throw StateError('Session changed.');
+      final storedRefresh = await _tokenStorage.getRefreshToken();
+      if (storedRefresh != refreshToken) throw StateError('Session changed.');
+      await _tokenStorage.saveRefreshToken(tokens.refreshToken);
+      await _tokenStorage.saveAccessToken(tokens.accessToken);
+      if (!_credentials.isCurrent(epoch)) throw StateError('Session changed.');
+    });
+    return tokens.accessToken;
+  }
+
+  void _assertCompleteTokenPair(TokenPair tokens) {
+    if (tokens.accessToken.isEmpty || tokens.refreshToken.isEmpty) {
+      throw const AuthException(
+        message: 'SchoolOS could not refresh this mobile session.',
+        code: 'INVALID_REFRESH_RESPONSE',
+      );
     }
   }
 

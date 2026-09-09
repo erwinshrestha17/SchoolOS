@@ -1562,7 +1562,7 @@ export class FinanceService {
     }
 
     const waiverAmount = new Prisma.Decimal(dto.amount);
-    if (!waiverAmount.isPositive() || waiverAmount.decimalPlaces() > 2) {
+    if (waiverAmount.lte(0) || waiverAmount.decimalPlaces() > 2) {
       throw new BadRequestException(
         'Waiver amount must be a positive decimal with no more than two decimal places.',
       );
@@ -6511,7 +6511,7 @@ export class FinanceService {
     }
 
     const paymentAmount = new Prisma.Decimal(dto.amount);
-    if (!paymentAmount.isPositive() || paymentAmount.decimalPlaces() > 2) {
+    if (paymentAmount.lte(0) || paymentAmount.decimalPlaces() > 2) {
       throw new BadRequestException(
         'Payment amount must be a positive decimal with no more than two decimal places.',
       );
@@ -6530,7 +6530,7 @@ export class FinanceService {
     const invoiceAllocationAmounts = new Map<string, Prisma.Decimal>();
     for (const allocation of requestedAllocations) {
       const amount = new Prisma.Decimal(allocation.amount);
-      if (!amount.isPositive() || amount.decimalPlaces() > 2) {
+      if (amount.lte(0) || amount.decimalPlaces() > 2) {
         throw new BadRequestException(
           'Each allocation must be a positive decimal with no more than two decimal places.',
         );
@@ -6616,7 +6616,7 @@ export class FinanceService {
         ? allocationPlan[0].invoice.id
         : null;
 
-    if (unallocatedAmount.isPositive() && dto.isAdvance === false) {
+    if (unallocatedAmount.gt(0) && dto.isAdvance === false) {
       throw new ConflictException(
         'The payment includes an unallocated amount. Mark it as an advance or allocate the full amount.',
       );
@@ -6673,7 +6673,7 @@ export class FinanceService {
             status: PaymentStatus.SUCCESS,
             referenceNumber: dto.referenceNumber ?? null,
             amount: paymentAmount,
-            isAdvance: dto.isAdvance ?? unallocatedAmount.isPositive(),
+            isAdvance: dto.isAdvance ?? unallocatedAmount.gt(0),
             recognizedAt: dto.recognizedAt ? new Date(dto.recognizedAt) : null,
             metadata: {
               allocationCount: allocationPlan.length,
@@ -6721,7 +6721,7 @@ export class FinanceService {
               },
             }),
           ),
-          ...(unallocatedAmount.isPositive()
+          ...(unallocatedAmount.gt(0)
             ? [
                 tx.paymentAllocation.create({
                   data: {
@@ -6760,14 +6760,14 @@ export class FinanceService {
           }),
         );
 
-        const receivableAccount = allocatedAmount.isPositive()
+        const receivableAccount = allocatedAmount.gt(0)
           ? await tx.chartAccount.findUniqueOrThrow({
               where: {
                 tenantId_code: { tenantId: actor.tenantId, code: '1200' },
               },
             })
           : null;
-        const advanceAccount = unallocatedAmount.isPositive()
+        const advanceAccount = unallocatedAmount.gt(0)
           ? await tx.chartAccount.upsert({
               where: {
                 tenantId_code: { tenantId: actor.tenantId, code: '2250' },
@@ -6997,7 +6997,7 @@ export class FinanceService {
         (sum, allocation) => sum.add(allocation.amount),
         new Prisma.Decimal(0),
       );
-    if (!unallocatedBalance.isPositive()) {
+    if (unallocatedBalance.lte(0)) {
       throw new ConflictException(
         'This payment has no unallocated advance balance.',
       );
@@ -7006,7 +7006,7 @@ export class FinanceService {
     const targetAmounts = new Map<string, Prisma.Decimal>();
     for (const target of dto.allocations) {
       const amount = new Prisma.Decimal(target.amount);
-      if (!amount.isPositive() || amount.decimalPlaces() > 2) {
+      if (amount.lte(0) || amount.decimalPlaces() > 2) {
         throw new BadRequestException(
           'Each reallocation amount must be positive with no more than two decimal places.',
         );
@@ -7280,7 +7280,7 @@ export class FinanceService {
       );
     }
 
-    if (!refundAmount.isPositive() || refundAmount.decimalPlaces() > 2) {
+    if (refundAmount.lte(0) || refundAmount.decimalPlaces() > 2) {
       throw new BadRequestException(
         'Refund amount must be a positive value with no more than two decimal places',
       );
@@ -8026,7 +8026,7 @@ export class FinanceService {
         ? refundableAmount
         : new Prisma.Decimal(dto.amount);
 
-    if (!refundAmount.isPositive() || refundAmount.decimalPlaces() > 2) {
+    if (refundAmount.lte(0) || refundAmount.decimalPlaces() > 2) {
       throw new BadRequestException(
         'Refund amount must be a positive value with no more than two decimal places',
       );
@@ -10401,12 +10401,16 @@ export class FinanceService {
       throw new BadRequestException('Webhook reference is required.');
     }
 
-    const paymentIntent = await this.prisma.onlinePaymentIntent.findFirst({
-      where: {
-        provider: activeProvider.name,
-        OR: [{ id: reference }, { providerReference: reference }],
-      },
-    });
+    const paymentIntent = await this.prisma.runWithoutTenantScope(
+      'payment webhook: resolve a signed provider callback before tenant context exists',
+      () =>
+        this.prisma.onlinePaymentIntent.findFirst({
+          where: {
+            provider: activeProvider.name,
+            OR: [{ id: reference }, { providerReference: reference }],
+          },
+        }),
+    );
 
     if (!paymentIntent) {
       throw new NotFoundException(
@@ -10414,430 +10418,439 @@ export class FinanceService {
       );
     }
 
-    if (
-      paymentIntent.status === OnlinePaymentIntentStatus.SUCCEEDED &&
-      webhookStatus !== 'SUCCESS'
-    ) {
-      await this.auditService.record({
-        action: 'webhook_ignored',
-        resource: 'online_payment_intent',
-        resourceId: paymentIntent.id,
-        tenantId: paymentIntent.tenantId,
-        userId: 'system',
-        after: {
-          provider: activeProvider.name,
-          callbackStatus: webhookStatus,
-          reason: 'terminal_success_preserved',
-        },
-      });
-      return {
-        status: 'ignored',
-        postedToLedger: true,
-        duplicate: true,
-        message:
-          'A delayed callback was ignored because the payment is already confirmed.',
-      };
-    }
-
-    if (webhookStatus !== 'SUCCESS') {
-      if (webhookStatus === 'UNKNOWN') {
+    return this.prisma.runWithTenantScope(paymentIntent.tenantId, async () => {
+      if (
+        paymentIntent.status === OnlinePaymentIntentStatus.SUCCEEDED &&
+        webhookStatus !== 'SUCCESS'
+      ) {
         await this.auditService.record({
           action: 'webhook_ignored',
           resource: 'online_payment_intent',
           resourceId: paymentIntent.id,
           tenantId: paymentIntent.tenantId,
-          userId: 'system',
+          userId: null,
           after: {
             provider: activeProvider.name,
             callbackStatus: webhookStatus,
-            reason: 'unknown_status',
+            reason: 'terminal_success_preserved',
+          },
+        });
+        return {
+          status: 'ignored',
+          postedToLedger: true,
+          duplicate: true,
+          message:
+            'A delayed callback was ignored because the payment is already confirmed.',
+        };
+      }
+
+      if (webhookStatus !== 'SUCCESS') {
+        if (webhookStatus === 'UNKNOWN') {
+          await this.auditService.record({
+            action: 'webhook_ignored',
+            resource: 'online_payment_intent',
+            resourceId: paymentIntent.id,
+            tenantId: paymentIntent.tenantId,
+            userId: null,
+            after: {
+              provider: activeProvider.name,
+              callbackStatus: webhookStatus,
+              reason: 'unknown_status',
+            },
+          });
+          return {
+            status: 'ignored',
+            postedToLedger: false,
+            message: 'Unknown payment callback status was acknowledged safely.',
+          };
+        }
+        if (
+          paymentIntent.status !== OnlinePaymentIntentStatus.FAILED &&
+          paymentIntent.status !== OnlinePaymentIntentStatus.EXPIRED
+        ) {
+          await this.prisma.onlinePaymentIntent.update({
+            where: { id: paymentIntent.id },
+            data: {
+              status: webhookStatus === 'PENDING' ? 'PENDING' : 'FAILED',
+              failureCode:
+                webhookStatus === 'PENDING'
+                  ? null
+                  : `PROVIDER_${webhookStatus}`,
+              failureMessage:
+                webhookStatus === 'PENDING'
+                  ? null
+                  : 'The payment provider reported that this payment did not complete.',
+            },
+          });
+        }
+        await this.auditService.record({
+          action: 'webhook_acknowledged',
+          resource: 'online_payment_intent',
+          resourceId: paymentIntent.id,
+          tenantId: paymentIntent.tenantId,
+          userId: null,
+          after: {
+            provider: activeProvider.name,
+            callbackStatus: webhookStatus,
           },
         });
         return {
           status: 'ignored',
           postedToLedger: false,
-          message: 'Unknown payment callback status was acknowledged safely.',
+          message: `Webhook event ${webhookStatus.toLowerCase()} was acknowledged without creating a payment.`,
         };
       }
-      if (
-        paymentIntent.status !== OnlinePaymentIntentStatus.FAILED &&
-        paymentIntent.status !== OnlinePaymentIntentStatus.EXPIRED
-      ) {
-        await this.prisma.onlinePaymentIntent.update({
-          where: { id: paymentIntent.id },
-          data: {
-            status: webhookStatus === 'PENDING' ? 'PENDING' : 'FAILED',
-            failureCode:
-              webhookStatus === 'PENDING' ? null : `PROVIDER_${webhookStatus}`,
-            failureMessage:
-              webhookStatus === 'PENDING'
-                ? null
-                : 'The payment provider reported that this payment did not complete.',
-          },
-        });
-      }
-      await this.auditService.record({
-        action: 'webhook_acknowledged',
-        resource: 'online_payment_intent',
-        resourceId: paymentIntent.id,
-        tenantId: paymentIntent.tenantId,
-        userId: 'system',
-        after: {
-          provider: activeProvider.name,
-          callbackStatus: webhookStatus,
-        },
-      });
-      return {
-        status: 'ignored',
-        postedToLedger: false,
-        message: `Webhook event ${webhookStatus.toLowerCase()} was acknowledged without creating a payment.`,
-      };
-    }
 
-    const requestedAmount = new Prisma.Decimal(data.amount || 0);
-    if (requestedAmount.lte(0)) {
-      throw new BadRequestException(
-        'Webhook amount must be greater than zero.',
-      );
-    }
-
-    const tenantId = paymentIntent.tenantId;
-
-    // Duplicate event checking
-    const idempotencyKey = `payment-intent:${paymentIntent.id}`;
-    const existingPayment = await this.prisma.payment.findFirst({
-      where: { tenantId, idempotencyKey },
-      include: { receipt: true },
-    });
-
-    if (existingPayment) {
-      if (paymentIntent.status !== OnlinePaymentIntentStatus.SUCCEEDED) {
-        await this.prisma.onlinePaymentIntent.update({
-          where: { id: paymentIntent.id },
-          data: {
-            status: 'SUCCEEDED',
-            paymentId: existingPayment.id,
-            reconciledAt: new Date(),
-          },
-        });
-      }
-      await this.auditService.record({
-        action: 'idempotent_replay',
-        resource: 'online_payment_intent',
-        resourceId: paymentIntent.id,
-        tenantId,
-        userId: 'system',
-        after: {
-          provider: activeProvider.name,
-          paymentId: existingPayment.id,
-        },
-      });
-      return {
-        status: 'verified',
-        postedToLedger: true,
-        duplicate: true,
-        message: 'Payment already processed and posted.',
-        paymentId: existingPayment.id,
-      };
-    }
-
-    const tenantStatus = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { isActive: true },
-    });
-    if (!tenantStatus?.isActive) {
-      await this.auditService.record({
-        action: 'webhook_ignored',
-        resource: 'online_payment_intent',
-        resourceId: paymentIntent.id,
-        tenantId,
-        userId: 'system',
-        after: {
-          provider: activeProvider.name,
-          reason: 'tenant_suspended',
-        },
-      });
-      return {
-        status: 'ignored',
-        postedToLedger: false,
-        message:
-          'Payment settlement was not posted because the school account is suspended.',
-      };
-    }
-
-    // Look up invoice
-    const invoice = await this.prisma.invoice.findFirst({
-      where: {
-        id: paymentIntent.invoiceId,
-        tenantId,
-      },
-      include: {
-        student: true,
-        lines: {
-          include: {
-            feeHead: true,
-          },
-        },
-        payments: {
-          include: { refunds: true },
-        },
-      },
-    });
-
-    if (!invoice) {
-      throw new NotFoundException('Invoice not found in this tenant');
-    }
-
-    const paidSoFar = sumNetPaidAmount(invoice.payments);
-    const remaining = invoice.totalAmount.sub(paidSoFar);
-
-    if (remaining.lte(0)) {
-      await this.auditService.record({
-        action: 'webhook_ignored',
-        resource: 'online_payment_intent',
-        resourceId: paymentIntent.id,
-        tenantId,
-        userId: 'system',
-        after: {
-          provider: activeProvider.name,
-          invoiceId: invoice.id,
-          reason: 'invoice_already_paid',
-        },
-      });
-      return {
-        status: 'verified',
-        postedToLedger: false,
-        message:
-          'Invoice is already fully paid. Webhook event ignored to prevent duplicate payment.',
-      };
-    }
-
-    if (!requestedAmount.equals(paymentIntent.amount)) {
-      throw new BadRequestException(
-        'Webhook amount does not match the initiated payment amount.',
-      );
-    }
-    if (requestedAmount.gt(remaining)) {
-      throw new BadRequestException(
-        'Webhook amount exceeds the remaining invoice balance.',
-      );
-    }
-    const paymentAmount = requestedAmount;
-
-    const fiscalYear = resolveFiscalYear(new Date());
-    const tenant = await this.prisma.tenant.findUniqueOrThrow({
-      where: { id: tenantId },
-    });
-
-    const webhookActor: AuthContext = {
-      tenantId,
-      userId: 'system',
-      roles: ['admin'],
-      permissions: ['payments:collect', 'receipts:manage'],
-      authMethod: AuthMethod.PASSWORD,
-      tenantSlug: tenant.slug,
-      email: null,
-    };
-
-    let result: CollectedPaymentWithReceipt;
-    try {
-      result = await this.prisma.$transaction(async (tx) => {
-        const receiptNumber = await this.generateReceiptNumber(
-          tenantId,
-          fiscalYear,
-          tx,
+      const requestedAmount = new Prisma.Decimal(data.amount || 0);
+      if (requestedAmount.lte(0)) {
+        throw new BadRequestException(
+          'Webhook amount must be greater than zero.',
         );
+      }
 
-        const receiptVat = invoice.totalAmount.gt(0)
-          ? invoice.vatAmount.mul(paymentAmount).div(invoice.totalAmount)
-          : new Prisma.Decimal(0);
+      const tenantId = paymentIntent.tenantId;
 
-        const payment = await tx.payment.create({
-          data: {
-            tenantId,
-            studentId: invoice.studentId,
-            invoiceId: invoice.id,
-            collectedById: null,
-            method: PaymentMethod.TRANSFER,
-            status: PaymentStatus.SUCCESS,
-            referenceNumber: reference,
-            amount: paymentAmount,
-            isAdvance: false,
-            recognizedAt: new Date(),
-            metadata: {
-              remainingBeforePayment: Number(remaining),
-              webhookProvider: provider,
+      // Duplicate event checking
+      const idempotencyKey = `payment-intent:${paymentIntent.id}`;
+      const existingPayment = await this.prisma.payment.findFirst({
+        where: { tenantId, idempotencyKey },
+        include: { receipt: true },
+      });
+
+      if (existingPayment) {
+        if (paymentIntent.status !== OnlinePaymentIntentStatus.SUCCEEDED) {
+          await this.prisma.onlinePaymentIntent.update({
+            where: { id: paymentIntent.id },
+            data: {
+              status: 'SUCCEEDED',
+              paymentId: existingPayment.id,
+              reconciledAt: new Date(),
             },
-            paidAt: new Date(),
-            narration: `Online payment via webhook for ${provider}`,
-            idempotencyKey,
-            receipt: {
-              create: {
-                tenantId,
-                receiptNumber,
-                fiscalYear,
-                schoolPan: tenant.panNumber,
-                vatAmount: receiptVat,
-                metadata: {
-                  nonReusable: true,
-                  invoiceFiscalYear: invoice.fiscalYear,
-                  billNumber: invoice.billNumber ?? invoice.invoiceNumber,
+          });
+        }
+        await this.auditService.record({
+          action: 'idempotent_replay',
+          resource: 'online_payment_intent',
+          resourceId: paymentIntent.id,
+          tenantId,
+          userId: null,
+          after: {
+            provider: activeProvider.name,
+            paymentId: existingPayment.id,
+          },
+        });
+        return {
+          status: 'verified',
+          postedToLedger: true,
+          duplicate: true,
+          message: 'Payment already processed and posted.',
+          paymentId: existingPayment.id,
+        };
+      }
+
+      const tenantStatus = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { isActive: true },
+      });
+      if (!tenantStatus?.isActive) {
+        await this.auditService.record({
+          action: 'webhook_ignored',
+          resource: 'online_payment_intent',
+          resourceId: paymentIntent.id,
+          tenantId,
+          userId: null,
+          after: {
+            provider: activeProvider.name,
+            reason: 'tenant_suspended',
+          },
+        });
+        return {
+          status: 'ignored',
+          postedToLedger: false,
+          message:
+            'Payment settlement was not posted because the school account is suspended.',
+        };
+      }
+
+      // Look up invoice
+      const invoice = await this.prisma.invoice.findFirst({
+        where: {
+          id: paymentIntent.invoiceId,
+          tenantId,
+        },
+        include: {
+          student: true,
+          lines: {
+            include: {
+              feeHead: true,
+            },
+          },
+          payments: {
+            include: { refunds: true },
+          },
+        },
+      });
+
+      if (!invoice) {
+        throw new NotFoundException('Invoice not found in this tenant');
+      }
+
+      const paidSoFar = sumNetPaidAmount(invoice.payments);
+      const remaining = invoice.totalAmount.sub(paidSoFar);
+
+      if (remaining.lte(0)) {
+        await this.auditService.record({
+          action: 'webhook_ignored',
+          resource: 'online_payment_intent',
+          resourceId: paymentIntent.id,
+          tenantId,
+          userId: null,
+          after: {
+            provider: activeProvider.name,
+            invoiceId: invoice.id,
+            reason: 'invoice_already_paid',
+          },
+        });
+        return {
+          status: 'verified',
+          postedToLedger: false,
+          message:
+            'Invoice is already fully paid. Webhook event ignored to prevent duplicate payment.',
+        };
+      }
+
+      if (!requestedAmount.equals(paymentIntent.amount)) {
+        throw new BadRequestException(
+          'Webhook amount does not match the initiated payment amount.',
+        );
+      }
+      if (requestedAmount.gt(remaining)) {
+        throw new BadRequestException(
+          'Webhook amount exceeds the remaining invoice balance.',
+        );
+      }
+      const paymentAmount = requestedAmount;
+
+      const fiscalYear = resolveFiscalYear(new Date());
+      const tenant = await this.prisma.tenant.findUniqueOrThrow({
+        where: { id: tenantId },
+      });
+
+      const webhookActor: AuthContext = {
+        tenantId,
+        // JournalEntry.createdById is a required User foreign key. Attribute the
+        // provider-confirmed posting to the user who initiated this immutable
+        // payment intent; webhook audit records remain explicitly system-owned.
+        userId: paymentIntent.requestedByUserId,
+        roles: ['admin'],
+        permissions: ['payments:collect', 'receipts:manage'],
+        authMethod: AuthMethod.PASSWORD,
+        tenantSlug: tenant.slug,
+        email: null,
+      };
+
+      let result: CollectedPaymentWithReceipt;
+      try {
+        result = await this.prisma.$transaction(async (tx) => {
+          const receiptNumber = await this.generateReceiptNumber(
+            tenantId,
+            fiscalYear,
+            tx,
+          );
+
+          const receiptVat = invoice.totalAmount.gt(0)
+            ? invoice.vatAmount.mul(paymentAmount).div(invoice.totalAmount)
+            : new Prisma.Decimal(0);
+
+          const payment = await tx.payment.create({
+            data: {
+              tenantId,
+              studentId: invoice.studentId,
+              invoiceId: invoice.id,
+              collectedById: null,
+              method: PaymentMethod.TRANSFER,
+              status: PaymentStatus.SUCCESS,
+              referenceNumber: reference,
+              amount: paymentAmount,
+              isAdvance: false,
+              recognizedAt: new Date(),
+              metadata: {
+                remainingBeforePayment: Number(remaining),
+                webhookProvider: provider,
+              },
+              paidAt: new Date(),
+              narration: `Online payment via webhook for ${provider}`,
+              idempotencyKey,
+              receipt: {
+                create: {
+                  tenantId,
+                  receiptNumber,
+                  fiscalYear,
+                  schoolPan: tenant.panNumber,
+                  vatAmount: receiptVat,
+                  metadata: {
+                    nonReusable: true,
+                    invoiceFiscalYear: invoice.fiscalYear,
+                    billNumber: invoice.billNumber ?? invoice.invoiceNumber,
+                  },
+                  pdfUrl: null,
+                  fileStatus: ReceiptFileStatus.PENDING,
                 },
-                pdfUrl: null,
-                fileStatus: ReceiptFileStatus.PENDING,
               },
             },
-          },
-          include: {
-            receipt: true,
-          },
-        });
+            include: {
+              receipt: true,
+            },
+          });
 
-        await tx.paymentAllocation.create({
-          data: {
-            tenantId,
-            paymentId: payment.id,
-            invoiceId: invoice.id,
-            amount: paymentAmount,
-            allocationType: 'INVOICE',
-          },
-        });
+          await tx.paymentAllocation.create({
+            data: {
+              tenantId,
+              paymentId: payment.id,
+              invoiceId: invoice.id,
+              amount: paymentAmount,
+              allocationType: 'INVOICE',
+            },
+          });
 
-        const usageNow = new Date();
-        const usagePeriodStart = new Date(
-          Date.UTC(usageNow.getUTCFullYear(), usageNow.getUTCMonth(), 1),
-        );
+          const usageNow = new Date();
+          const usagePeriodStart = new Date(
+            Date.UTC(usageNow.getUTCFullYear(), usageNow.getUTCMonth(), 1),
+          );
 
-        await tx.usageCounter.upsert({
-          where: {
-            tenantId_usageKey_period_periodStart: {
+          await tx.usageCounter.upsert({
+            where: {
+              tenantId_usageKey_period_periodStart: {
+                tenantId,
+                usageKey: 'receipts.generated',
+                period: 'MONTHLY',
+                periodStart: usagePeriodStart,
+              },
+            },
+            create: {
               tenantId,
               usageKey: 'receipts.generated',
               period: 'MONTHLY',
               periodStart: usagePeriodStart,
+              value: 1,
             },
-          },
-          create: {
+            update: {
+              value: { increment: 1 },
+            },
+          });
+
+          const totalPaid = paidSoFar.add(paymentAmount);
+
+          await tx.invoice.update({
+            where: { id: invoice.id },
+            data: {
+              status: totalPaid.gte(invoice.totalAmount)
+                ? InvoiceStatus.PAID
+                : InvoiceStatus.PARTIAL,
+              paidAt: totalPaid.gte(invoice.totalAmount) ? new Date() : null,
+            },
+          });
+
+          await tx.onlinePaymentIntent.update({
+            where: { id: paymentIntent.id },
+            data: {
+              status: 'SUCCEEDED',
+              paymentId: payment.id,
+              reconciledAt: new Date(),
+              failureCode: null,
+              failureMessage: null,
+            },
+          });
+
+          await this.accountingPostingService.postFeePayment(
+            {
+              tenantId,
+              paymentId: payment.id,
+              invoiceNumber: invoice.invoiceNumber,
+              receiptNumber,
+              paymentAmount,
+              paymentMethod: PaymentMethod.TRANSFER,
+              paymentAccountCode: resolveCashAccountCode(
+                PaymentMethod.TRANSFER,
+              ),
+              narration: `Fee payment via online webhook for ${provider}`,
+              lines: [],
+            },
+            webhookActor,
+            tx,
+          );
+
+          return payment;
+        });
+      } catch (error) {
+        if (!isPrismaUniqueConstraintError(error)) {
+          throw error;
+        }
+        const concurrentPayment = await this.prisma.payment.findFirst({
+          where: {
             tenantId,
-            usageKey: 'receipts.generated',
-            period: 'MONTHLY',
-            periodStart: usagePeriodStart,
-            value: 1,
+            idempotencyKey,
           },
-          update: {
-            value: { increment: 1 },
-          },
+          include: { receipt: true },
         });
-
-        const totalPaid = paidSoFar.add(paymentAmount);
-
-        await tx.invoice.update({
-          where: { id: invoice.id },
-          data: {
-            status: totalPaid.gte(invoice.totalAmount)
-              ? InvoiceStatus.PAID
-              : InvoiceStatus.PARTIAL,
-            paidAt: totalPaid.gte(invoice.totalAmount) ? new Date() : null,
-          },
-        });
-
-        await tx.onlinePaymentIntent.update({
-          where: { id: paymentIntent.id },
-          data: {
-            status: 'SUCCEEDED',
-            paymentId: payment.id,
-            reconciledAt: new Date(),
-            failureCode: null,
-            failureMessage: null,
-          },
-        });
-
-        await this.accountingPostingService.postFeePayment(
-          {
-            tenantId,
-            paymentId: payment.id,
-            invoiceNumber: invoice.invoiceNumber,
-            receiptNumber,
-            paymentAmount,
-            paymentMethod: PaymentMethod.TRANSFER,
-            paymentAccountCode: resolveCashAccountCode(PaymentMethod.TRANSFER),
-            narration: `Fee payment via online webhook for ${provider}`,
-            lines: [],
-          },
-          webhookActor,
-          tx,
-        );
-
-        return payment;
-      });
-    } catch (error) {
-      if (!isPrismaUniqueConstraintError(error)) {
-        throw error;
-      }
-      const concurrentPayment = await this.prisma.payment.findFirst({
-        where: {
+        if (!concurrentPayment) {
+          throw new ConflictException(
+            'The callback could not be reconciled safely. Retry the same provider event.',
+          );
+        }
+        await this.auditService.record({
+          action: 'idempotent_replay',
+          resource: 'online_payment_intent',
+          resourceId: paymentIntent.id,
           tenantId,
-          idempotencyKey,
-        },
-        include: { receipt: true },
-      });
-      if (!concurrentPayment) {
-        throw new ConflictException(
-          'The callback could not be reconciled safely. Retry the same provider event.',
-        );
-      }
-      await this.auditService.record({
-        action: 'idempotent_replay',
-        resource: 'online_payment_intent',
-        resourceId: paymentIntent.id,
-        tenantId,
-        userId: 'system',
-        after: {
-          provider: activeProvider.name,
+          userId: null,
+          after: {
+            provider: activeProvider.name,
+            paymentId: concurrentPayment.id,
+            concurrent: true,
+          },
+        });
+        return {
+          status: 'verified',
+          postedToLedger: true,
+          duplicate: true,
+          message: 'Payment already processed and posted.',
           paymentId: concurrentPayment.id,
-          concurrent: true,
+        };
+      }
+
+      await this.auditService.record({
+        action: 'collect',
+        resource: 'payment',
+        tenantId,
+        userId: null,
+        resourceId: result.id,
+        after: {
+          invoiceId: invoice.id,
+          amount: Number(result.amount),
+          method: result.method,
+          receiptNumber: result.receipt?.receiptNumber ?? null,
         },
       });
-      return {
-        status: 'verified',
-        postedToLedger: true,
-        duplicate: true,
-        message: 'Payment already processed and posted.',
-        paymentId: concurrentPayment.id,
-      };
-    }
 
-    await this.auditService.record({
-      action: 'collect',
-      resource: 'payment',
-      tenantId,
-      userId: 'system',
-      resourceId: result.id,
-      after: {
+      this.eventEmitter.emit('fees.payment.confirmed', {
+        tenantId,
+        actor: webhookActor,
+        paymentId: result.id,
         invoiceId: invoice.id,
+        studentId: invoice.studentId,
         amount: Number(result.amount),
         method: result.method,
         receiptNumber: result.receipt?.receiptNumber ?? null,
-      },
-    });
+      });
 
-    this.eventEmitter.emit('fees.payment.confirmed', {
-      tenantId,
-      actor: webhookActor,
-      paymentId: result.id,
-      invoiceId: invoice.id,
-      studentId: invoice.studentId,
-      amount: Number(result.amount),
-      method: result.method,
-      receiptNumber: result.receipt?.receiptNumber ?? null,
+      return {
+        status: 'verified',
+        postedToLedger: true,
+        paymentId: result.id,
+        message: 'Online payment processed and posted to ledger.',
+      };
     });
-
-    return {
-      status: 'verified',
-      postedToLedger: true,
-      paymentId: result.id,
-      message: 'Online payment processed and posted to ledger.',
-    };
   }
 
   private getWebhookSigningSecret(config: Record<string, unknown> | null) {
@@ -11798,15 +11811,32 @@ export class FinanceService {
   private async generateReceiptNumber(
     tenantId: string,
     fiscalYear = resolveFiscalYear(new Date()),
-    client: Pick<Prisma.TransactionClient, 'receipt'> = this.prisma,
+    client: Pick<Prisma.TransactionClient, '$queryRaw'> = this.prisma,
   ) {
-    const count = await client.receipt.count({
-      where: { tenantId, fiscalYear },
-    });
+    const sequenceRows = await client.$queryRaw<Array<{ lastValue: number }>>(
+      Prisma.sql`
+        INSERT INTO "ReceiptSequence" (
+          "tenantId",
+          "fiscalYear",
+          "lastValue",
+          "updatedAt"
+        )
+        VALUES (${tenantId}, ${fiscalYear}, 1, CURRENT_TIMESTAMP)
+        ON CONFLICT ("tenantId", "fiscalYear") DO UPDATE
+        SET
+          "lastValue" = "ReceiptSequence"."lastValue" + 1,
+          "updatedAt" = CURRENT_TIMESTAMP
+        RETURNING "lastValue"
+      `,
+    );
+    const nextValue = sequenceRows[0]?.lastValue;
+    if (!Number.isInteger(nextValue) || nextValue < 1) {
+      throw new ConflictException(
+        'Receipt number could not be allocated safely.',
+      );
+    }
 
-    return `REC-${formatFiscalYearForNumber(fiscalYear)}-${String(
-      count + 1,
-    ).padStart(5, '0')}`;
+    return `REC-${formatFiscalYearForNumber(fiscalYear)}-${String(nextValue).padStart(5, '0')}`;
   }
 
   private async generateCashierCloseNumber(
@@ -12226,7 +12256,7 @@ function allocateCorrectionAcrossPaymentAllocations(
   }>,
   correctionAmount: Prisma.Decimal,
 ) {
-  if (!correctionAmount.isPositive()) {
+  if (correctionAmount.lte(0)) {
     throw new BadRequestException('Correction amount must be positive');
   }
 
@@ -12253,7 +12283,7 @@ function allocateCorrectionAcrossPaymentAllocations(
   }> = [];
   for (const balance of balances.values()) {
     if (remaining.lte(0)) break;
-    if (!balance.amount.isPositive()) continue;
+    if (balance.amount.lte(0)) continue;
     const amount = Prisma.Decimal.min(balance.amount, remaining);
     plan.push({ invoiceId: balance.invoiceId, amount });
     remaining = remaining.sub(amount);

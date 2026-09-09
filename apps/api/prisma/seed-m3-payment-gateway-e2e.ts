@@ -27,7 +27,9 @@ const prisma = new PrismaClient({ adapter });
 
 function assertE2eFixtureAllowed() {
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('Refusing to seed M3 payment gateway fixtures in production.');
+    throw new Error(
+      'Refusing to seed M3 payment gateway fixtures in production.',
+    );
   }
   if (process.env.SCHOOLOS_E2E_M3_PAYMENT_GATEWAY_FIXTURES !== 'true') {
     throw new Error(
@@ -92,7 +94,8 @@ async function main() {
         merchantId: 'm3-local-merchant',
         intentUrl: `${gatewayBase}/intents`,
         settlementStatusUrl: `${gatewayBase}/settlements/status`,
-        webhookUrl: 'http://127.0.0.1:4000/api/v1/payments/online/webhook/nepal_gateway',
+        webhookUrl:
+          'http://127.0.0.1:4000/api/v1/payments/online/webhook/nepal_gateway',
         webhookSecret: WEBHOOK_SECRET,
         sandboxHealthUrl: `${gatewayBase}/health`,
       },
@@ -110,7 +113,8 @@ async function main() {
         merchantId: 'm3-local-merchant',
         intentUrl: `${gatewayBase}/intents`,
         settlementStatusUrl: `${gatewayBase}/settlements/status`,
-        webhookUrl: 'http://127.0.0.1:4000/api/v1/payments/online/webhook/nepal_gateway',
+        webhookUrl:
+          'http://127.0.0.1:4000/api/v1/payments/online/webhook/nepal_gateway',
         webhookSecret: WEBHOOK_SECRET,
         sandboxHealthUrl: `${gatewayBase}/health`,
       },
@@ -128,6 +132,9 @@ async function main() {
       .filter((paymentId): paymentId is string => Boolean(paymentId));
 
     if (priorPaymentIds.length > 0) {
+      await tx.paymentAllocation.deleteMany({
+        where: { tenantId: tenant.id, paymentId: { in: priorPaymentIds } },
+      });
       await tx.receipt.deleteMany({
         where: { tenantId: tenant.id, paymentId: { in: priorPaymentIds } },
       });
@@ -149,6 +156,12 @@ async function main() {
     });
     const priorPaymentIdsDirect = priorPayments.map((payment) => payment.id);
     if (priorPaymentIdsDirect.length > 0) {
+      await tx.paymentAllocation.deleteMany({
+        where: {
+          tenantId: tenant.id,
+          paymentId: { in: priorPaymentIdsDirect },
+        },
+      });
       await tx.receipt.deleteMany({
         where: {
           tenantId: tenant.id,
