@@ -15,6 +15,11 @@ import '../../../profile/presentation/widgets/sign_out_confirmation_sheet.dart';
 import '../../application/teacher_providers.dart';
 import '../widgets/teacher_app_widgets.dart';
 
+/// Teacher secondary workspace.
+///
+/// Frequent classroom actions remain on Today/Attendance/Homework. Less
+/// frequent tools are grouped here so the bottom navigation stays small and
+/// predictable while still keeping every teacher-owned workflow close.
 class TeacherProfileScreen extends ConsumerWidget {
   const TeacherProfileScreen({super.key});
 
@@ -28,15 +33,22 @@ class TeacherProfileScreen extends ConsumerWidget {
     return RoleShellScaffold(
       role: 'TEACHER',
       selectedIndex: 3,
-      title: 'Profile',
+      title: 'More',
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
           Text(
-            'Profile',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
+            'More',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Your classes, academic tools, self-service, and account settings.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppColors.slate500,
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
           AppCard(
@@ -45,8 +57,8 @@ class TeacherProfileScreen extends ConsumerWidget {
                 UserAvatar(
                   imageUrl: user?.avatarUrl,
                   name: user?.name ?? 'Teacher',
-                  radius: 36,
-                  borderColor: AppColors.primary,
+                  radius: 32,
+                  borderColor: AppColors.teacherAccent,
                   borderWidth: 2,
                 ),
                 const SizedBox(width: AppSpacing.md),
@@ -56,8 +68,9 @@ class TeacherProfileScreen extends ConsumerWidget {
                     children: [
                       Text(
                         user?.name ?? 'Teacher',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w900),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -73,6 +86,11 @@ class TeacherProfileScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Account profile',
+                  onPressed: () => context.push(AppRoutes.profile),
+                  icon: const Icon(Icons.chevron_right_rounded),
                 ),
               ],
             ),
@@ -92,6 +110,7 @@ class TeacherProfileScreen extends ConsumerWidget {
                   loading: () => '—',
                   error: (_, _) => '—',
                 ),
+                onTap: () => context.go(AppRoutes.teacherClasses),
               );
               final noticesCard = TeacherTaskCard(
                 title: 'Notices',
@@ -131,60 +150,82 @@ class TeacherProfileScreen extends ConsumerWidget {
             },
           ),
           const SizedBox(height: AppSpacing.lg),
-          AppCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                _MenuTile(
-                  icon: Icons.person_outline_rounded,
-                  label: 'My Profile',
-                  subtitle: 'Own teacher account only',
-                  onTap: null,
-                ),
-                const Divider(height: 1),
-                _MenuTile(
-                  icon: Icons.calendar_month_rounded,
-                  label: 'My Timetable',
-                  subtitle: 'Assigned classes and substitutions',
-                  onTap: () => context.go(AppRoutes.teacherTimetable),
-                ),
-                const Divider(height: 1),
-                _MenuTile(
-                  icon: Icons.campaign_outlined,
-                  label: 'Notices',
-                  subtitle: 'Personal notification center',
-                  onTap: () => context.go(AppRoutes.notices),
-                ),
-                const Divider(height: 1),
-                _MenuTile(
-                  icon: Icons.fact_check_outlined,
-                  label: 'Marks Entry',
-                  subtitle: 'Limited assigned assessment marks',
-                  onTap: () => context.go(AppRoutes.teacherMarks),
-                ),
-                const Divider(height: 1),
-                _MenuTile(
-                  icon: Icons.event_busy_outlined,
-                  label: 'Leave Requests',
-                  subtitle: 'Own leave requests only',
-                  onTap: () => context.go(AppRoutes.teacherLeave),
-                ),
-                const Divider(height: 1),
-                _MenuTile(
-                  icon: Icons.receipt_long_outlined,
-                  label: 'Payslips',
-                  subtitle: 'Own payslips when issued',
-                  onTap: () => context.go(AppRoutes.teacherPayslips),
-                ),
-                const Divider(height: 1),
-                _MenuTile(
-                  icon: Icons.help_outline_rounded,
-                  label: 'Help & Support',
-                  subtitle: 'Contact your school administrator',
-                  onTap: null,
-                ),
-              ],
-            ),
+          _MenuSection(
+            title: 'Teaching tools',
+            children: [
+              _MenuTile(
+                icon: Icons.groups_outlined,
+                label: 'Assigned Classes',
+                subtitle: 'Open a class hub within your active scope',
+                onTap: () => context.go(AppRoutes.teacherClasses),
+              ),
+              _MenuTile(
+                icon: Icons.calendar_month_rounded,
+                label: 'My Timetable',
+                subtitle: 'Assigned classes and substitutions',
+                onTap: () => context.go(AppRoutes.teacherTimetable),
+              ),
+              _MenuTile(
+                icon: Icons.fact_check_outlined,
+                label: 'Marks Entry',
+                subtitle: 'Assigned assessment components only',
+                onTap: () => context.go(AppRoutes.teacherMarks),
+              ),
+              _MenuTile(
+                icon: Icons.photo_camera_outlined,
+                label: 'Activities & Milestones',
+                subtitle: 'Capture consent-safe class updates',
+                onTap: () => context.go(AppRoutes.teacherActivity),
+              ),
+              _MenuTile(
+                icon: Icons.campaign_outlined,
+                label: 'Notices',
+                subtitle: 'School and staff announcements',
+                onTap: () => context.go(AppRoutes.notices),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _MenuSection(
+            title: 'My work',
+            children: [
+              _MenuTile(
+                icon: Icons.event_busy_outlined,
+                label: 'Leave Requests',
+                subtitle: 'Own leave requests only',
+                onTap: () => context.go(AppRoutes.teacherLeave),
+              ),
+              _MenuTile(
+                icon: Icons.receipt_long_outlined,
+                label: 'Payslips',
+                subtitle: 'Own protected payslips when issued',
+                onTap: () => context.go(AppRoutes.teacherPayslips),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _MenuSection(
+            title: 'Account',
+            children: [
+              _MenuTile(
+                icon: Icons.person_outline_rounded,
+                label: 'Profile & Security',
+                subtitle: 'Account, password, devices, and security',
+                onTap: () => context.push(AppRoutes.profile),
+              ),
+              _MenuTile(
+                icon: Icons.settings_outlined,
+                label: 'Settings',
+                subtitle: 'Appearance, language, biometrics, notifications',
+                onTap: () => context.push(AppRoutes.settings),
+              ),
+              _MenuTile(
+                icon: Icons.help_outline_rounded,
+                label: 'Help & Support',
+                subtitle: 'Contact your school administrator',
+                onTap: null,
+              ),
+            ],
           ),
           const SizedBox(height: AppSpacing.xl),
           AppButton(
@@ -208,6 +249,40 @@ class TeacherProfileScreen extends ConsumerWidget {
   }
 }
 
+class _MenuSection extends StatelessWidget {
+  const _MenuSection({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        AppCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                children[index],
+                if (index != children.length - 1) const Divider(height: 1),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _MenuTile extends StatelessWidget {
   const _MenuTile({
     required this.icon,
@@ -223,22 +298,17 @@ class _MenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: ListTile(
-        enabled: onTap != null,
-        minVerticalPadding: AppSpacing.md,
-        leading: Icon(
-          icon,
-          color: onTap == null ? AppColors.slate400 : AppColors.primary,
-        ),
-        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
-        subtitle: Text(subtitle),
-        trailing: onTap == null
-            ? null
-            : const Icon(Icons.chevron_right_rounded),
-        onTap: onTap,
+    return ListTile(
+      enabled: onTap != null,
+      minVerticalPadding: AppSpacing.md,
+      leading: Icon(
+        icon,
+        color: onTap == null ? AppColors.slate400 : AppColors.primary,
       ),
+      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+      subtitle: Text(subtitle),
+      trailing: onTap == null ? null : const Icon(Icons.chevron_right_rounded),
+      onTap: onTap,
     );
   }
 }
