@@ -365,7 +365,7 @@ test.describe("Students & Admissions Workflow Smoke", () => {
 
     await expect(page.getByRole("status")).toContainText("Import processed");
     await expect(page.getByRole("status")).toContainText(
-      "1 created, 0 failed, 0 validated.",
+      "1 completed, 0 need review, 0 validated.",
     );
 
     await page.goto("/dashboard/students");

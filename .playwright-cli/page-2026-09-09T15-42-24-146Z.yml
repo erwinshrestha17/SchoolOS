@@ -1,0 +1,55 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - main [ref=e3]:
+      - generic [ref=e4]:
+        - link "S SchoolOS" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e7]: S
+          - generic [ref=e8]: SchoolOS
+        - generic [ref=e9]:
+          - generic [ref=e10]: Staff & Admin Portal
+          - heading "Simple access to your school workspace." [level=1] [ref=e11]
+          - paragraph [ref=e12]: Sign in to manage attendance, fees, students, reports, and daily school operations from one clear place.
+          - list [ref=e13]:
+            - listitem [ref=e14]:
+              - generic [ref=e20]:
+                - paragraph [ref=e21]: Staff access
+                - paragraph [ref=e22]: School teams sign in with secure cookies using school code, email, and password.
+            - listitem [ref=e23]:
+              - generic [ref=e28]:
+                - paragraph [ref=e29]: School workspace
+                - paragraph [ref=e30]: Each school uses its own workspace for day-to-day operations with school-level data isolation.
+            - listitem [ref=e31]:
+              - generic [ref=e37]:
+                - paragraph [ref=e38]: Organized records
+                - paragraph [ref=e39]: Attendance, fees, students, and reports stay easier to manage.
+        - generic [ref=e40]: "Parents & Guardians: Please use the SchoolOS mobile app to log in."
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - heading "Welcome back" [level=2] [ref=e44]
+          - paragraph [ref=e45]: Sign in to your school workspace.
+        - generic [ref=e47]:
+          - generic [ref=e48]:
+            - generic [ref=e49]: School Code
+            - textbox "School Code" [ref=e50]:
+              - /placeholder: e.g. green-valley-school
+            - paragraph [ref=e51]: Enter the school code provided by your school administrator.
+          - generic [ref=e52]:
+            - generic [ref=e53]: Email
+            - textbox "Email" [ref=e54]:
+              - /placeholder: admin@school.edu.np
+          - generic [ref=e55]:
+            - generic [ref=e56]: Password
+            - textbox "Password" [ref=e57]:
+              - /placeholder: Enter your password
+          - button "Sign in" [ref=e58] [cursor=pointer]
+          - link "Forgot password?" [ref=e60] [cursor=pointer]:
+            - /url: /forgot-password
+        - generic [ref=e61]:
+          - paragraph [ref=e62]: Need access? Contact your school administrator.
+          - paragraph [ref=e63]:
+            - text: New school?
+            - link "Request a demo." [ref=e64] [cursor=pointer]:
+              - /url: /request-demo
+    - region "Notifications alt+T"
+  - alert [ref=e65]

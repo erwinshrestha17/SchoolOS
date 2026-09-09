@@ -548,6 +548,34 @@ Execute steps 1–11 for the first production school. Steps 12–15 require Wave
 
 ---
 
+### Interrupted admission CSV imports
+
+If a confirmed import times out, loses connectivity, or remains `PROCESSING`,
+do not upload the same rows as a new admission batch or delete existing students
+to make a retry succeed. A student and enrollment may already have committed even
+when their row checkpoint or follow-up processing did not finish.
+
+An authorized school operator can open Admissions → iEMIS Readiness → CSV Import
+History → Review rows. Check the exact file, timestamp, validation-only versus
+confirmed mode, and batch status. Saved row counts describe recorded outcomes;
+they do not prove an unfinished batch created no other records. Follow existing
+student links for failed rows before taking further action. Missing row results
+are an unresolved state, not permission to re-import.
+
+Escalate an unfinished confirmed batch through the approved incident/support
+process. Retain its batch identity and source CSV in authorized protected storage;
+do not paste student data into public issues or logs. Authorized investigation
+must reconcile the tenant-scoped admission operation identities, student and
+enrollment records, follow-up finance/document work, and recorded import rows.
+Raw batch access remains unavailable during support override; this procedure
+does not grant a bypass. Financial and lifecycle corrections use their existing
+audited workflows, never destructive cleanup of authoritative records.
+
+Automatic batch resume and crash reconciliation are not yet implemented. The
+current per-row checkpoints limit lost progress evidence but do not close the
+gap between an admission commit and its checkpoint. Treat restart/recovery proof
+as an outstanding release requirement for confirmed CSV import use.
+
 ## 6. Release Go/No-Go Checklist
 
 Go only if all items are true:

@@ -1,0 +1,251 @@
+- generic [active] [ref=f2e1]:
+  - generic [ref=f2e2]:
+    - generic [ref=f2e16]:
+      - link "Skip to workspace" [ref=f2e17] [cursor=pointer]:
+        - /url: "#dashboard-main"
+      - complementary [ref=f2e18]:
+        - generic [ref=f2e19]:
+          - generic [ref=f2e20]:
+            - generic [ref=f2e28]:
+              - generic [ref=f2e29]: SchoolOS
+              - generic [ref=f2e30]: School operating desk
+            - generic [ref=f2e38]:
+              - paragraph [ref=f2e39]: Pilot Rehearsal School
+              - paragraph [ref=f2e40]: School workspace
+          - generic [ref=f2e41]:
+            - generic [ref=f2e42]: Find a workspace
+            - textbox "Find a workspace..." [ref=f2e44]
+          - navigation "School operations navigation" [ref=f2e45]:
+            - generic [ref=f2e46]:
+              - paragraph [ref=f2e47]: Home
+              - generic [ref=f2e48]:
+                - link "Home" [ref=f2e49] [cursor=pointer]:
+                  - /url: /dashboard
+                - link "Action Centre" [ref=f2e56] [cursor=pointer]:
+                  - /url: /dashboard/service-requests
+            - generic [ref=f2e65]:
+              - paragraph [ref=f2e66]: Students & Admissions
+              - generic [ref=f2e67]:
+                - link "Students" [ref=f2e68] [cursor=pointer]:
+                  - /url: /dashboard/students
+                - link "Admissions" [ref=f2e75] [cursor=pointer]:
+                  - /url: /dashboard/admissions
+            - link "Attendance" [ref=f2e82] [cursor=pointer]:
+              - /url: /dashboard/attendance
+            - link "Activity Feed" [ref=f2e88] [cursor=pointer]:
+              - /url: /dashboard/activity
+            - link "Homework" [ref=f2e96] [cursor=pointer]:
+              - /url: /dashboard/homework
+            - link "Notifications" [ref=f2e102] [cursor=pointer]:
+              - /url: /dashboard/notifications
+            - link "Notices & Announcements" [ref=f2e108] [cursor=pointer]:
+              - /url: /dashboard/notices
+            - generic [ref=f2e112]:
+              - paragraph [ref=f2e113]: Reports
+              - generic [ref=f2e114]:
+                - link "Reports & Exports" [ref=f2e115] [cursor=pointer]:
+                  - /url: /dashboard/reports
+                - link "Audit" [ref=f2e120] [cursor=pointer]:
+                  - /url: /dashboard/settings/system/audit-log
+          - generic [ref=f2e125]:
+            - generic [ref=f2e126]:
+              - paragraph [ref=f2e127]: Settings
+              - link "Settings" [ref=f2e128] [cursor=pointer]:
+                - /url: /dashboard/settings
+            - generic [ref=f2e133]:
+              - generic [ref=f2e139]:
+                - paragraph [ref=f2e140]: admin@pilot-rehearsal.schoolos.test
+                - paragraph [ref=f2e141]: Admin
+              - button "Collapse sidebar" [ref=f2e142] [cursor=pointer]
+      - generic [ref=f2e145]:
+        - banner [ref=f2e146]:
+          - generic [ref=f2e147]:
+            - generic [ref=f2e148]: P
+            - generic [ref=f2e149]:
+              - paragraph [ref=f2e150]: Pilot Rehearsal School
+              - paragraph [ref=f2e153]: pilot-rehearsal-1 school
+          - generic [ref=f2e155]:
+            - generic [ref=f2e156]: Search students
+            - textbox "Search students by name, ID, admission number, or guardian phone" [ref=f2e157]:
+              - /placeholder: Search students by name, ID, phone...
+          - generic [ref=f2e158]:
+            - generic "Active academic year. Change it in School Settings." [ref=f2e159]:
+              - generic [ref=f2e160]: AY
+              - generic [ref=f2e161]: 2026-2027
+              - generic [ref=f2e162]: Current
+            - button "Notifications, all caught up" [ref=f2e164] [cursor=pointer]
+            - button "User profile menu" [ref=f2e169] [cursor=pointer]:
+              - generic [ref=f2e170]: A
+              - generic [ref=f2e172]:
+                - paragraph [ref=f2e173]: admin
+                - paragraph [ref=f2e174]: admin
+        - main [ref=f2e177]:
+          - generic [ref=f2e179]:
+            - navigation "breadcrumb" [ref=f2e180]:
+              - list [ref=f2e181]:
+                - listitem [ref=f2e182]:
+                  - link "Dashboard" [ref=f2e183] [cursor=pointer]:
+                    - /url: /dashboard
+                - listitem [aria-hidden] [ref=f2e188]
+                - listitem [ref=f2e191]:
+                  - link "Admissions" [ref=f2e192] [cursor=pointer]:
+                    - /url: /dashboard/admissions
+                - listitem [aria-hidden] [ref=f2e193]
+                - listitem [ref=f2e196]:
+                  - link "Iemis" [disabled] [ref=f2e197]
+            - generic [ref=f2e198]:
+              - generic [ref=f2e201]:
+                - paragraph [ref=f2e202]: Students & Admissions
+                - heading "iEMIS Readiness" [level=1] [ref=f2e203]
+                - paragraph [ref=f2e204]: Validate student data against the current SchoolOS internal reporting rules. Exports require authorized review and are not submitted directly to iEMIS.
+              - generic [ref=f2e205]:
+                - generic [ref=f2e206]:
+                  - generic [ref=f2e207]:
+                    - generic [ref=f2e208]: Ready Records
+                    - generic [ref=f2e215]:
+                      - paragraph [ref=f2e216]: "0"
+                      - generic [ref=f2e217]: Current validation result
+                  - generic [ref=f2e218]:
+                    - generic [ref=f2e219]: Validation Errors
+                    - generic [ref=f2e225]:
+                      - paragraph [ref=f2e226]: "2"
+                      - generic [ref=f2e227]: Current readiness result
+                  - generic [ref=f2e228]:
+                    - generic [ref=f2e229]: Missing Fields
+                    - generic [ref=f2e236]:
+                      - paragraph [ref=f2e237]: "2"
+                      - generic [ref=f2e238]: From validation messages
+                  - generic [ref=f2e239]:
+                    - generic [ref=f2e240]: Duplicate Rows
+                    - generic [ref=f2e247]:
+                      - paragraph [ref=f2e248]: —
+                      - generic [ref=f2e249]: Duplicate summary unavailable
+                  - generic [ref=f2e250]:
+                    - generic [ref=f2e251]: Last Export
+                    - generic [ref=f2e258]:
+                      - paragraph [ref=f2e259]: —
+                      - generic [ref=f2e260]: Latest export requested here
+                  - generic [ref=f2e261]:
+                    - generic [ref=f2e262]: Import Jobs
+                    - generic [ref=f2e269]:
+                      - paragraph [ref=f2e270]: "1"
+                      - generic [ref=f2e271]: Persisted admission import batches
+                - generic [ref=f2e272]:
+                  - generic [ref=f2e273]:
+                    - generic [ref=f2e274]:
+                      - generic [ref=f2e275]:
+                        - heading "Validation Issues" [level=2] [ref=f2e276]
+                        - paragraph [ref=f2e277]: Review each rule and issue before preparing an export.
+                      - combobox "Filter readiness status" [ref=f2e278]:
+                        - option "Records with issues" [selected]
+                        - option "Ready records"
+                        - option "All records"
+                    - table [ref=f2e280]:
+                      - rowgroup [ref=f2e281]:
+                        - row [ref=f2e282]:
+                          - columnheader "Student" [ref=f2e283]
+                          - columnheader "Admission No." [ref=f2e284]
+                          - columnheader "Issue" [ref=f2e285]
+                          - columnheader "Affected field" [ref=f2e286]
+                          - columnheader "Severity" [ref=f2e287]
+                          - columnheader "Status" [ref=f2e288]
+                          - columnheader "Action" [ref=f2e289]
+                      - rowgroup [ref=f2e290]:
+                        - row [ref=f2e291]:
+                          - cell "Aarav Shrestha Class 1 / A" [ref=f2e292]:
+                            - strong [ref=f2e293]: Aarav Shrestha
+                            - generic [ref=f2e294]: Class 1 / A
+                          - cell "PR-01-A-001" [ref=f2e295]
+                          - cell "The student's Nepali first and last name are required by the active SchoolOS reporting rule set." [ref=f2e296]
+                          - cell "fullNameNp" [ref=f2e297]
+                          - cell "HIGH" [ref=f2e298]
+                          - cell "OPEN" [ref=f2e300]
+                          - cell [ref=f2e302]:
+                            - link "Fix profile" [ref=f2e303] [cursor=pointer]:
+                              - /url: /dashboard/students/c35aaaee-4d49-4f5e-bcf4-81a8bdf606e7?edit=true
+                        - row [ref=f2e304]:
+                          - cell "Sita Karki Class 1 / A" [ref=f2e305]:
+                            - strong [ref=f2e306]: Sita Karki
+                            - generic [ref=f2e307]: Class 1 / A
+                          - cell "PR-01-A-002" [ref=f2e308]
+                          - cell "The student's Nepali first and last name are required by the active SchoolOS reporting rule set." [ref=f2e309]
+                          - cell "fullNameNp" [ref=f2e310]
+                          - cell "HIGH" [ref=f2e311]
+                          - cell "OPEN" [ref=f2e313]
+                          - cell [ref=f2e315]:
+                            - link "Fix profile" [ref=f2e316] [cursor=pointer]:
+                              - /url: /dashboard/students/bf0c80eb-f287-4dbb-880c-d9a5af31cbe5?edit=true
+                    - generic [ref=f2e317]:
+                      - heading "Recent import result" [level=3] [ref=f2e318]
+                      - paragraph [ref=f2e319]: No import has been run in this browser session. Persisted batch history is listed below.
+                    - generic [ref=f2e320]:
+                      - generic [ref=f2e321]:
+                        - generic [ref=f2e322]:
+                          - heading "CSV Import History" [level=3] [ref=f2e323]
+                          - paragraph [ref=f2e324]: Admission import batches recorded for this school.
+                        - generic [ref=f2e325]: 1 JOBS
+                      - table [ref=f2e327]:
+                        - rowgroup [ref=f2e328]:
+                          - row [ref=f2e329]:
+                            - columnheader "File" [ref=f2e330]
+                            - columnheader "Started" [ref=f2e331]
+                            - columnheader "Rows" [ref=f2e332]
+                            - columnheader "Completed" [ref=f2e333]
+                            - columnheader "Failed" [ref=f2e334]
+                            - columnheader "Status" [ref=f2e335]
+                            - columnheader "Details" [ref=f2e336]
+                        - rowgroup [ref=f2e337]:
+                          - row [ref=f2e338]:
+                            - cell "admission-history-validation.csv" [ref=f2e339]
+                            - cell "Bhadra 24, 2083, 09:28 PM NPT" [ref=f2e340]
+                            - cell "1" [ref=f2e341]
+                            - cell "0" [ref=f2e342]
+                            - cell "1" [ref=f2e343]
+                            - cell "COMPLETED WITH ERRORS" [ref=f2e344]
+                            - cell [ref=f2e346]:
+                              - button "Review rows" [expanded] [ref=f2e347] [cursor=pointer]
+                      - generic [ref=f2e348]:
+                        - button "Previous" [disabled]
+                        - generic [ref=f2e349]: Page 1
+                        - button "Next" [disabled]
+                      - region [ref=f2e396]:
+                        - generic [ref=f2e397]:
+                          - heading "Saved import row results" [level=4] [ref=f2e398]
+                          - button "Close details" [ref=f2e399] [cursor=pointer]
+                        - paragraph [ref=f2e403]: admission-history-validation.csv · Bhadra 24, 2083, 09:28 PM NPT · Validation only
+                        - generic [ref=f2e404]: COMPLETED WITH ERRORS
+                        - paragraph [ref=f2e405]: 0 completed · 0 validated · 1 need review
+                        - list [ref=f2e406]:
+                          - listitem [ref=f2e407]:
+                            - paragraph [ref=f2e408]:
+                              - text: Row 2 ·
+                              - generic [ref=f2e409]: FAILED
+                            - paragraph [ref=f2e410]: This row needs review before another import. Check the original CSV and duplicate-review queue.
+                    - generic [ref=f2e350]:
+                      - generic [ref=f2e351]:
+                        - generic [ref=f2e352]:
+                          - heading "Import Review Queue" [level=3] [ref=f2e353]
+                          - paragraph [ref=f2e354]: Failed or duplicate-matched rows that require operator review.
+                        - generic [ref=f2e355]: 1 ROWS
+                      - generic [ref=f2e357]:
+                        - generic [ref=f2e358]:
+                          - paragraph [ref=f2e359]: admission-history-validation.csv · row 2
+                          - paragraph [ref=f2e360]: Needs correction before import · 1 errors · 0 duplicate candidates
+                        - generic [ref=f2e361]: FAILED
+                  - complementary [ref=f2e362]:
+                    - generic [ref=f2e363]:
+                      - heading "Export Checklist" [level=2] [ref=f2e364]
+                      - paragraph [ref=f2e366]: 0 of 2 records in this validation set are ready.
+                      - button "Run validation" [ref=f2e367] [cursor=pointer]
+                    - generic [ref=f2e370]:
+                      - heading "Import & reporting handoff" [level=2] [ref=f2e371]
+                      - paragraph [ref=f2e372]: SchoolOS prepares an internal reporting-readiness CSV. It does not certify the official iEMIS format or submit records directly.
+                      - generic [ref=f2e373]:
+                        - button "Prepare reporting-readiness CSV" [ref=f2e374] [cursor=pointer]
+                        - button "Download import template" [ref=f2e378] [cursor=pointer]
+                        - button "Validate admission CSV" [ref=f2e382] [cursor=pointer]
+                        - generic [ref=f2e386]:
+                          - button "Download file" [disabled]: Download latest protected readiness CSV
+    - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f2e392] [cursor=pointer]
+  - alert [ref=f2e15]

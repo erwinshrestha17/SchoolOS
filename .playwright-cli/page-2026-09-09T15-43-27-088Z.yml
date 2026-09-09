@@ -1,0 +1,5 @@
+- generic [active] [ref=f2e1]:
+  - generic [ref=f2e2]:
+    - paragraph [ref=f2e14]: Validating your SchoolOS session and loading permissions...
+    - region "Notifications alt+T"
+  - alert [ref=f2e15]

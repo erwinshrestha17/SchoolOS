@@ -851,6 +851,10 @@ describe('AdmissionsService production hardening', () => {
           rowNumber: 2,
           status: 'VALIDATED',
         }),
+      ]),
+    });
+    expect(tx.admissionImportRow.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
         expect.objectContaining({
           tenantId: actor.tenantId,
           batchId: 'import-batch-1',
@@ -1123,6 +1127,130 @@ describe('AdmissionsService production hardening', () => {
         }),
       ],
     });
+  });
+
+  it('checkpoints processed rows before a final audit failure', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    const { service, auditService } = buildService(prisma);
+    auditService.record.mockRejectedValueOnce(new Error('audit unavailable'));
+
+    await expect(
+      service.bulkImport(
+        {
+          dryRun: true,
+          csvContent: [
+            'firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,guardianFullName,guardianRelation,guardianPhone,confirmNoDisability',
+            'Asha,Tamang,2020-01-02,FEMALE,2026-04-15,ay-1,class-1,Maya Tamang,mother,9800000000,true',
+          ].join('\n'),
+        },
+        actor,
+      ),
+    ).rejects.toThrow('audit unavailable');
+
+    expect(tx.admissionImportRow.createMany).toHaveBeenCalledTimes(1);
+    expect(tx.admissionImportBatch.update).toHaveBeenCalledWith({
+      where: { id: 'import-batch-1', tenantId: actor.tenantId },
+      data: {
+        createdRows: { increment: 0 },
+        validatedRows: { increment: 1 },
+        failedRows: { increment: 0 },
+      },
+    });
+    expect(tx.admissionImportBatch.update).toHaveBeenCalledTimes(1);
+    expect(
+      tx.admissionImportRow.createMany.mock.invocationCallOrder[0],
+    ).toBeLessThan(auditService.record.mock.invocationCallOrder[0]);
+  });
+
+  it('stops before the next row when its checkpoint cannot be persisted', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    tx.admissionImportRow.createMany.mockRejectedValueOnce(
+      new Error('database unavailable'),
+    );
+    const { service, auditService } = buildService(prisma);
+
+    await expect(
+      service.bulkImport(
+        {
+          dryRun: true,
+          csvContent: [
+            'firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,guardianFullName,guardianRelation,guardianPhone,confirmNoDisability',
+            'Asha,Tamang,2020-01-02,FEMALE,2026-04-15,ay-1,class-1,Maya Tamang,mother,9800000000,true',
+            'Bimal,Rai,2020-02-03,MALE,2026-04-15,ay-1,class-1,Mohan Rai,father,9800000001,true',
+          ].join('\n'),
+        },
+        actor,
+      ),
+    ).rejects.toThrow('database unavailable');
+
+    expect(prisma.academicYear.findFirst).toHaveBeenCalledTimes(1);
+    expect(tx.admissionImportRow.createMany).toHaveBeenCalledTimes(1);
+    expect(tx.admissionImportBatch.update).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('does not create another student after a confirmed admission checkpoint fails', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction
+      .mockImplementationOnce(async (callback) =>
+        callback({
+          admissionImportBatch: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            create: jest.fn().mockResolvedValue({ id: 'confirmed-batch' }),
+          },
+        }),
+      )
+      .mockImplementation(async (callback) => callback(tx));
+    tx.admissionImportRow.createMany.mockRejectedValueOnce(
+      new Error('checkpoint unavailable'),
+    );
+    const { service, auditService } = buildService(prisma);
+    const createAdmission = jest
+      .spyOn(service, 'createAdmission')
+      .mockResolvedValue({
+        student: { id: 'already-committed', studentSystemId: 'SCH-2026-0099' },
+      } as Awaited<ReturnType<AdmissionsService['createAdmission']>>);
+
+    await expect(
+      service.bulkImport(
+        {
+          dryRun: false,
+          validationBatchId: '11111111-1111-4111-8111-111111111111',
+          csvContent: [
+            'firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,guardianFullName,guardianRelation,guardianPhone,confirmNoDisability',
+            'Asha,Tamang,2020-01-02,FEMALE,2026-04-15,ay-1,class-1,Maya Tamang,mother,9800000000,true',
+            'Bimal,Rai,2020-02-03,MALE,2026-04-15,ay-1,class-1,Mohan Rai,father,9800000001,true',
+          ].join('\n'),
+        },
+        actor,
+      ),
+    ).rejects.toThrow('checkpoint unavailable');
+
+    expect(createAdmission).toHaveBeenCalledTimes(1);
+    expect(createAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientOperationId: 'bulk:confirmed-batch:row:2',
+      }),
+      actor,
+    );
+    expect(tx.admissionImportRow.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          tenantId: actor.tenantId,
+          batchId: 'confirmed-batch',
+          rowNumber: 2,
+          studentId: 'already-committed',
+          status: 'CREATED',
+        }),
+      ],
+    });
+    expect(tx.admissionImportBatch.update).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
   });
 
   it('retains the committed student when import follow-up processing fails', async () => {

@@ -1055,6 +1055,39 @@ export class AdmissionsService {
       duplicates?: BulkImportDuplicateWarning[];
     }> = [];
 
+    const checkpointRow = async (row: (typeof rows)[number]) => {
+      const result = results[results.length - 1];
+      await this.prisma.$transaction(async (tx) => {
+        await tx.admissionImportRow.createMany({
+          data: [
+            {
+              tenantId: actor.tenantId,
+              batchId: batch.id,
+              rowNumber: result.rowNumber,
+              status: result.status.toUpperCase(),
+              studentId: result.studentId ?? null,
+              studentSystemId: result.studentSystemId ?? null,
+              errors: result.errors
+                ? toInputJsonValue(result.errors)
+                : Prisma.JsonNull,
+              duplicates: result.duplicates
+                ? toInputJsonValue(result.duplicates)
+                : Prisma.JsonNull,
+              rawData: toInputJsonValue(row.raw),
+            },
+          ],
+        });
+        await tx.admissionImportBatch.update({
+          where: { id: batch.id, tenantId: actor.tenantId },
+          data: {
+            createdRows: { increment: result.status === 'created' ? 1 : 0 },
+            validatedRows: { increment: result.status === 'validated' ? 1 : 0 },
+            failedRows: { increment: result.status === 'failed' ? 1 : 0 },
+          },
+        });
+      });
+    };
+
     for (const row of rows) {
       const parsed = buildAdmissionDtoFromCsvRow(
         row,
@@ -1067,6 +1100,7 @@ export class AdmissionsService {
           status: 'failed',
           errors: parsed.errors,
         });
+        await checkpointRow(row);
         continue;
       }
 
@@ -1087,6 +1121,7 @@ export class AdmissionsService {
           errors: errors.length > 0 ? errors : undefined,
           duplicates: duplicates.length > 0 ? duplicates : undefined,
         });
+        await checkpointRow(row);
         continue;
       }
 
@@ -1134,6 +1169,9 @@ export class AdmissionsService {
           duplicates: duplicates.length > 0 ? duplicates : undefined,
         });
       }
+      // A failed checkpoint stops the batch before another admission is created.
+      // Do not catch it as a row validation error or falsely finalize the batch.
+      await checkpointRow(row);
     }
 
     await this.auditService.record({
@@ -1165,33 +1203,6 @@ export class AdmissionsService {
     ).length;
 
     await this.prisma.$transaction(async (tx) => {
-      if (results.length > 0) {
-        await tx.admissionImportRow.createMany({
-          data: results.map((result) => {
-            const sourceRow = rows.find(
-              (row) => row.rowNumber === result.rowNumber,
-            );
-            return {
-              tenantId: actor.tenantId,
-              batchId: batch.id,
-              rowNumber: result.rowNumber,
-              status: result.status.toUpperCase(),
-              studentId: result.studentId ?? null,
-              studentSystemId: result.studentSystemId ?? null,
-              errors: result.errors
-                ? toInputJsonValue(result.errors)
-                : Prisma.JsonNull,
-              duplicates: result.duplicates
-                ? toInputJsonValue(result.duplicates)
-                : Prisma.JsonNull,
-              rawData: sourceRow?.raw
-                ? toInputJsonValue(sourceRow.raw)
-                : Prisma.JsonNull,
-            };
-          }),
-        });
-      }
-
       await tx.admissionImportBatch.update({
         where: { id: batch.id },
         data: {

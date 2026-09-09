@@ -1,0 +1,178 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e66]:
+      - link "Skip to workspace" [ref=e67] [cursor=pointer]:
+        - /url: "#dashboard-main"
+      - complementary [ref=e68]:
+        - generic [ref=e69]:
+          - generic [ref=e70]:
+            - generic [ref=e78]:
+              - generic [ref=e79]: SchoolOS
+              - generic [ref=e80]: School operating desk
+            - generic [ref=e88]:
+              - paragraph [ref=e89]: Pilot Rehearsal School
+              - paragraph [ref=e90]: School workspace
+          - generic [ref=e91]:
+            - generic [ref=e92]: Find a workspace
+            - textbox "Find a workspace..." [ref=e94]
+          - navigation "School operations navigation" [ref=e95]:
+            - generic [ref=e96]:
+              - paragraph [ref=e97]: Home
+              - generic [ref=e98]:
+                - link "Home" [ref=e99] [cursor=pointer]:
+                  - /url: /dashboard
+                - link "Action Centre" [ref=e107] [cursor=pointer]:
+                  - /url: /dashboard/service-requests
+            - generic [ref=e116]:
+              - paragraph [ref=e117]: Students & Admissions
+              - generic [ref=e118]:
+                - link "Students" [ref=e119] [cursor=pointer]:
+                  - /url: /dashboard/students
+                - link "Admissions" [ref=e126] [cursor=pointer]:
+                  - /url: /dashboard/admissions
+            - link "Attendance" [ref=e132] [cursor=pointer]:
+              - /url: /dashboard/attendance
+            - link "Activity Feed" [ref=e138] [cursor=pointer]:
+              - /url: /dashboard/activity
+            - link "Homework" [ref=e146] [cursor=pointer]:
+              - /url: /dashboard/homework
+            - link "Notifications" [ref=e152] [cursor=pointer]:
+              - /url: /dashboard/notifications
+            - link "Notices & Announcements" [ref=e158] [cursor=pointer]:
+              - /url: /dashboard/notices
+            - generic [ref=e162]:
+              - paragraph [ref=e163]: Reports
+              - generic [ref=e164]:
+                - link "Reports & Exports" [ref=e165] [cursor=pointer]:
+                  - /url: /dashboard/reports
+                - link "Audit" [ref=e170] [cursor=pointer]:
+                  - /url: /dashboard/settings/system/audit-log
+          - generic [ref=e175]:
+            - generic [ref=e176]:
+              - paragraph [ref=e177]: Settings
+              - link "Settings" [ref=e178] [cursor=pointer]:
+                - /url: /dashboard/settings
+            - generic [ref=e183]:
+              - generic [ref=e189]:
+                - paragraph [ref=e190]: admin@pilot-rehearsal.schoolos.test
+                - paragraph [ref=e191]: Admin
+              - button "Collapse sidebar" [ref=e192] [cursor=pointer]
+      - generic [ref=e195]:
+        - banner [ref=e196]:
+          - generic [ref=e197]:
+            - generic [ref=e198]: P
+            - generic [ref=e199]:
+              - paragraph [ref=e200]: Pilot Rehearsal School
+              - paragraph [ref=e203]: pilot-rehearsal-1 school
+          - generic [ref=e205]:
+            - generic [ref=e206]: Search students
+            - textbox "Search students by name, ID, admission number, or guardian phone" [ref=e207]:
+              - /placeholder: Search students by name, ID, phone...
+          - generic [ref=e208]:
+            - generic "Active academic year. Change it in School Settings." [ref=e209]:
+              - generic [ref=e210]: AY
+              - generic [ref=e211]: 2026-2027
+              - generic [ref=e212]: Current
+            - button "Notifications, all caught up" [ref=e214] [cursor=pointer]
+            - button "User profile menu" [ref=e219] [cursor=pointer]:
+              - generic [ref=e220]: A
+              - generic [ref=e222]:
+                - paragraph [ref=e223]: admin
+                - paragraph [ref=e224]: admin
+        - main [ref=e227]:
+          - generic [ref=e230]:
+            - generic [ref=e233]:
+              - paragraph [ref=e234]: School operations
+              - heading "Operations Dashboard" [level=1] [ref=e235]
+              - paragraph [ref=e236]: Daily operating snapshot for admissions, attendance, fees, and configuration readiness.
+              - generic [ref=e237]:
+                - generic [ref=e238]: "School day: Bhadra 24, 2083"
+                - generic [ref=e239]: Ready
+                - generic [ref=e240]:
+                  - text: Updated Bhadra 24, 2083, 09:27 PM NPT
+                  - button "Refresh dashboard" [ref=e241] [cursor=pointer]
+            - generic [ref=e247]:
+              - generic [ref=e248]:
+                - link [ref=e249] [cursor=pointer]:
+                  - /url: /dashboard/attendance
+                  - paragraph [ref=e258]: Attendance
+                  - paragraph [ref=e259]: Not started
+                  - paragraph [ref=e260]: Attendance has not started.
+                - article [ref=e261]:
+                  - paragraph [ref=e268]: Needs attention
+                  - paragraph [ref=e269]: All clear
+                  - paragraph [ref=e270]: Nothing is waiting for your review.
+              - generic [ref=e271]:
+                - region "Needs your attention" [ref=e273]:
+                  - generic [ref=e274]:
+                    - generic [ref=e276]:
+                      - heading "Needs your attention" [level=3] [ref=e277]
+                      - paragraph [ref=e278]: Nothing needs your attention right now.
+                    - paragraph [ref=e288]: No approvals, warnings, or follow-ups are open for you today.
+                - generic [ref=e290]:
+                  - generic [ref=e292]:
+                    - heading "Today’s operations" [level=3] [ref=e293]
+                    - paragraph [ref=e294]: Where each daily workflow stands right now.
+                  - list [ref=e296]:
+                    - listitem [ref=e297]:
+                      - link "Students & Admissions Information is not available yet." [ref=e298] [cursor=pointer]:
+                        - /url: /dashboard/students
+                        - generic [ref=e305]:
+                          - paragraph [ref=e306]: Students & Admissions
+                          - paragraph [ref=e307]:
+                            - generic [ref=e309]: Information is not available yet.
+                    - listitem [ref=e312]:
+                      - link "Attendance Attendance has not started" [ref=e313] [cursor=pointer]:
+                        - /url: /dashboard/attendance
+                        - generic [ref=e319]:
+                          - paragraph [ref=e320]: Attendance
+                          - paragraph [ref=e321]:
+                            - generic [ref=e323]: Attendance has not started
+                    - listitem [ref=e326]:
+                      - link "Notices No open notice issue" [ref=e327] [cursor=pointer]:
+                        - /url: /dashboard/notices
+                        - generic [ref=e331]:
+                          - paragraph [ref=e332]: Notices
+                          - paragraph [ref=e333]:
+                            - generic [ref=e335]: No open notice issue
+                    - listitem [ref=e338]:
+                      - link "Homework & Timetable No homework due today" [ref=e339] [cursor=pointer]:
+                        - /url: /dashboard/homework
+                        - generic [ref=e343]:
+                          - paragraph [ref=e344]: Homework & Timetable
+                          - paragraph [ref=e345]:
+                            - generic [ref=e347]: No homework due today
+                - region "School readiness" [ref=e351]:
+                  - generic [ref=e352]:
+                    - article [ref=e353]:
+                      - generic [ref=e354]:
+                        - heading "Academic readiness" [level=3] [ref=e355]
+                        - link "View full timetable" [ref=e356] [cursor=pointer]:
+                          - /url: /dashboard/timetable
+                      - paragraph [ref=e357]: No academic blockers reported.
+                    - article [ref=e361]:
+                      - heading "Finance readiness" [level=3] [ref=e363]
+                      - paragraph [ref=e364]: You do not have permission to view this summary.
+                    - article [ref=e365]:
+                      - heading "People & operations" [level=3] [ref=e367]
+                      - paragraph [ref=e368]: No open people or operations issues.
+                - generic [ref=e373]:
+                  - generic [ref=e375]:
+                    - heading "Latest school activity" [level=3] [ref=e376]
+                    - paragraph [ref=e377]: Recent permission-filtered events across the school.
+                  - list [ref=e379]:
+                    - listitem [ref=e380]:
+                      - generic [ref=e387]:
+                        - paragraph [ref=e388]: New enrollment recorded
+                        - paragraph [ref=e389]:
+                          - generic [ref=e390]: Students & Admissions
+                          - time [ref=e391]: Bhadra 24, 2083, 03:27 PM NPT
+                    - listitem [ref=e392]:
+                      - generic [ref=e399]:
+                        - paragraph [ref=e400]: New enrollment recorded
+                        - paragraph [ref=e401]:
+                          - generic [ref=e402]: Students & Admissions
+                          - time [ref=e403]: Bhadra 24, 2083, 03:27 PM NPT
+    - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e409] [cursor=pointer]
+  - alert [ref=e65]
