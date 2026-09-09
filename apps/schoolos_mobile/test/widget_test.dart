@@ -115,7 +115,6 @@ void main() {
       findsOneWidget,
     );
 
-    // Settle splash screen transition timers and animations to prevent pending timers
     await tester.pump(const Duration(milliseconds: 3000));
     await tester.pumpAndSettle();
   });
@@ -249,9 +248,7 @@ void main() {
     expect(find.text('Join a live session'), findsOneWidget);
     expect(find.text('Homework'), findsNothing);
 
-    final sessionContext = tester.element(
-      find.text('Student learning session'),
-    );
+    final sessionContext = tester.element(find.text('Student learning session'));
     GoRouter.of(sessionContext).go(AppRoutes.notices);
     await tester.pumpAndSettle();
 
@@ -280,10 +277,10 @@ void main() {
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('Attendance'), findsOneWidget);
     expect(find.text('Homework'), findsOneWidget);
-    expect(find.text('Profile'), findsOneWidget);
+    expect(find.text('More'), findsOneWidget);
+    expect(find.text('Profile'), findsNothing);
     expect(find.text('Messages'), findsNothing);
     expect(find.text('Classes'), findsNothing);
-    expect(find.text('More'), findsNothing);
   });
 
   testWidgets('parent portal tabs render on a compact phone viewport', (
@@ -385,19 +382,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // The greeting uses the guardian's full display name, not just their given
-    // name: it is the only place the app confirms whose account this is.
     expect(find.text('Namaste, Erwin Shrestha'), findsOneWidget);
     expect(find.text("Aarav's school day"), findsOneWidget);
     expect(find.text('Operational snapshot'), findsNothing);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Homework').last);
+    await tester.tap(find.text('Schoolwork').last);
     await tester.pumpAndSettle();
     expect(find.textContaining('All assignments ·'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Notices').last);
+    await tester.tap(find.text('Updates').last);
     await tester.pumpAndSettle();
     expect(find.text('Holiday notice for Friday'), findsOneWidget);
     expect(tester.takeException(), isNull);
