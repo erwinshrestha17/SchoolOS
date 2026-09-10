@@ -537,6 +537,7 @@ describe('M1AdmissionsHardeningService', () => {
         tenantId: actor.tenantId,
         OR: [
           { status: 'FAILED' },
+          { status: 'PROCESSING' },
           { duplicates: expect.objectContaining({ not: undefined }) },
         ],
       },
@@ -551,6 +552,36 @@ describe('M1AdmissionsHardeningService', () => {
           expect.objectContaining({ studentSystemId: 'SCH-2026-0001' }),
         ],
       }),
+    );
+  });
+
+  it('keeps unfinished import rows visible and reports the full filtered count', async () => {
+    const prisma = buildPrisma();
+    prisma.admissionImportRow.findMany.mockResolvedValueOnce([
+      { ...buildImportRow(), status: 'PROCESSING' },
+    ]);
+    prisma.admissionImportRow.count.mockResolvedValueOnce(26);
+    const { service } = buildService(prisma);
+    const result = await service.listImportReviewQueue({ limit: 1 }, actor);
+    expect(result.items).toHaveLength(1);
+    expect(result.total).toBe(26);
+    expect(result.items[0].workflowLabel).toBe(
+      'Student created; follow-up outcome not yet confirmed',
+    );
+    expect(prisma.admissionImportRow.count).toHaveBeenCalledWith({
+      where: prisma.admissionImportRow.findMany.mock.calls[0][0].where,
+    });
+  });
+
+  it('does not advise re-importing a failed row with an existing student', async () => {
+    const prisma = buildPrisma();
+    prisma.admissionImportRow.findMany.mockResolvedValueOnce([
+      { ...buildImportRow(), studentId: 'committed-student' },
+    ]);
+    const { service } = buildService(prisma);
+    const result = await service.listImportReviewQueue({ limit: 10 }, actor);
+    expect(result.items[0].workflowLabel).toBe(
+      'Student already created; review follow-up before any retry',
     );
   });
 
@@ -786,6 +817,7 @@ function buildPrisma(overrides: Partial<PrismaMockOptions> = {}) {
     },
     admissionImportRow: {
       findMany: jest.fn().mockResolvedValue([buildImportRow()]),
+      count: jest.fn().mockResolvedValue(1),
     },
     enrollment: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -1004,6 +1036,7 @@ function buildImportRow() {
     batchId: 'import-batch-1',
     rowNumber: 2,
     status: 'FAILED',
+    studentId: null as string | null,
     errors: ['Possible duplicate admission found'],
     duplicates: [{ studentSystemId: 'SCH-2026-0001' }],
     rawData: { firstNameEn: 'Asha' },

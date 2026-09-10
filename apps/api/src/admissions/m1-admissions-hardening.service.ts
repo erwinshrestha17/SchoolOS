@@ -614,16 +614,20 @@ export class M1AdmissionsHardeningService {
         : {
             OR: [
               { status: 'FAILED' },
+              { status: 'PROCESSING' },
               { duplicates: { not: Prisma.JsonNull } },
             ],
           }),
     };
-    const rows = await this.prisma.admissionImportRow.findMany({
-      where,
-      include: { batch: true },
-      orderBy: [{ createdAt: 'desc' }, { rowNumber: 'asc' }],
-      take: query.limit ?? 50,
-    });
+    const [rows, total] = await Promise.all([
+      this.prisma.admissionImportRow.findMany({
+        where,
+        include: { batch: true },
+        orderBy: [{ createdAt: 'desc' }, { rowNumber: 'asc' }],
+        take: query.limit ?? 50,
+      }),
+      this.prisma.admissionImportRow.count({ where }),
+    ]);
 
     return {
       items: rows.map((row) => ({
@@ -632,13 +636,13 @@ export class M1AdmissionsHardeningService {
         sourceFileName: row.batch.sourceFileName,
         rowNumber: row.rowNumber,
         status: row.status,
-        workflowLabel: importReviewLabel(row.status),
+        workflowLabel: importReviewLabel(row.status, row.studentId),
         errors: normalizeJsonArray(row.errors),
         duplicates: normalizeJsonArray(row.duplicates),
         rawData: row.rawData ?? null,
         createdAt: row.createdAt.toISOString(),
       })),
-      total: rows.length,
+      total,
       policy:
         'Import-review queue is tenant-scoped and only returns rows needing review or matching the requested status.',
     };
@@ -739,7 +743,8 @@ export class M1AdmissionsHardeningService {
         REJECTED: 'Application closed as rejected',
       },
       importReview: {
-        FAILED: 'Needs correction before import',
+        FAILED: 'Needs review; a student may already exist',
+        PROCESSING: 'Follow-up outcome not yet confirmed',
         VALIDATED: 'Validated and ready to create',
         CREATED: 'Student created from import',
         COMPLETED_WITH_ERRORS: 'Completed with rows needing review',
@@ -1279,8 +1284,12 @@ function normalizeJsonArray(value: Prisma.JsonValue | null) {
   return Array.isArray(value) ? value : [];
 }
 
-function importReviewLabel(status: string) {
+function importReviewLabel(status: string, studentId?: string | null) {
+  if (status === 'FAILED' && studentId) {
+    return 'Student already created; review follow-up before any retry';
+  }
   const labels: Record<string, string> = {
+    PROCESSING: 'Student created; follow-up outcome not yet confirmed',
     FAILED: 'Needs correction before import',
     VALIDATED: 'Validated and ready to create',
     CREATED: 'Student created from import',

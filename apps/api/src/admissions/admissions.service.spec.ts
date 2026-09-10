@@ -108,6 +108,110 @@ describe('AdmissionsService production hardening', () => {
     expect(prisma.admissionImportBatch.findFirst).not.toHaveBeenCalled();
   });
 
+  it('records the import student identity inside the core transaction before follow-up failure', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    const { service, financeService } = buildService(prisma);
+    financeService.createInitialInvoice.mockRejectedValueOnce(
+      new Error('finance unavailable'),
+    );
+    const dto = Object.assign(buildAdmissionDto(), {
+      clientOperationId: 'bulk:confirmed-batch:row:2',
+    });
+
+    await expect(
+      service.createAdmission(dto, actor, {
+        batchId: 'confirmed-batch',
+        rowNumber: 2,
+        rawData: { firstNameEn: 'Asha' },
+      }),
+    ).rejects.toThrow('finance unavailable');
+
+    expect(tx.admissionImportBatch.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'confirmed-batch',
+        tenantId: actor.tenantId,
+        dryRun: false,
+        status: 'PROCESSING',
+      },
+      select: { id: true },
+    });
+    expect(tx.admissionImportRow.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          tenantId: actor.tenantId,
+          batchId: 'confirmed-batch',
+          rowNumber: 2,
+          status: 'PROCESSING',
+          studentId: 'student-1',
+        }),
+      ],
+    });
+    expect(
+      tx.admissionImportRow.createMany.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      financeService.createInitialInvoice.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('rejects an unavailable import batch before follow-up work', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    tx.admissionImportBatch.findFirst.mockResolvedValueOnce(null);
+    const { service, financeService } = buildService(prisma);
+    await expect(
+      service.createAdmission(buildAdmissionDto(), actor, {
+        batchId: 'unavailable',
+        rowNumber: 2,
+        rawData: {},
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.admissionImportRow.createMany).not.toHaveBeenCalled();
+    expect(financeService.createInitialInvoice).not.toHaveBeenCalled();
+  });
+
+  it('rejects an import operation that does not match the batch row', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    const { service, financeService } = buildService(prisma);
+    await expect(
+      service.createAdmission(buildAdmissionDto(), actor, {
+        batchId: 'confirmed-batch',
+        rowNumber: 2,
+        rawData: {},
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.admissionImportRow.createMany).not.toHaveBeenCalled();
+    expect(financeService.createInitialInvoice).not.toHaveBeenCalled();
+  });
+
+  it('does not start follow-up work when the atomic import linkage cannot be recorded', async () => {
+    const prisma = buildPrisma();
+    const tx = buildTransaction();
+    prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+    tx.admissionImportRow.createMany.mockRejectedValueOnce(
+      new Error('row persistence failed'),
+    );
+    const { service, financeService } = buildService(prisma);
+    const dto = Object.assign(buildAdmissionDto(), {
+      clientOperationId: 'bulk:confirmed-batch:row:2',
+    });
+    await expect(
+      service.createAdmission(dto, actor, {
+        batchId: 'confirmed-batch',
+        rowNumber: 2,
+        rawData: {},
+      }),
+    ).rejects.toThrow('row persistence failed');
+    expect(financeService.createInitialInvoice).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: 'Serializable',
+    });
+  });
+
   it('creates the core admission in one tenant-scoped transaction', async () => {
     const prisma = buildPrisma();
     const tx = buildTransaction();
@@ -844,22 +948,24 @@ describe('AdmissionsService production hardening', () => {
       }),
     );
     expect(tx.admissionImportRow.createMany).toHaveBeenCalledWith({
+      skipDuplicates: true,
       data: expect.arrayContaining([
         expect.objectContaining({
           tenantId: actor.tenantId,
           batchId: 'import-batch-1',
           rowNumber: 2,
-          status: 'VALIDATED',
+          status: 'PROCESSING',
         }),
       ]),
     });
     expect(tx.admissionImportRow.createMany).toHaveBeenCalledWith({
+      skipDuplicates: true,
       data: expect.arrayContaining([
         expect.objectContaining({
           tenantId: actor.tenantId,
           batchId: 'import-batch-1',
           rowNumber: 3,
-          status: 'FAILED',
+          status: 'PROCESSING',
         }),
       ]),
     });
@@ -1118,9 +1224,10 @@ describe('AdmissionsService production hardening', () => {
       /Prisma|P2022|tenant_secret|private-host/,
     );
     expect(tx.admissionImportRow.createMany).toHaveBeenCalledWith({
+      skipDuplicates: true,
       data: [
         expect.objectContaining({
-          status: 'FAILED',
+          status: 'PROCESSING',
           errors: [
             'This row could not be processed. Review the row and try again.',
           ],
@@ -1163,6 +1270,44 @@ describe('AdmissionsService production hardening', () => {
       tx.admissionImportRow.createMany.mock.invocationCallOrder[0],
     ).toBeLessThan(auditService.record.mock.invocationCallOrder[0]);
   });
+
+  it.each([0, 2])(
+    'rejects a checkpoint matching %i rows without advancing the batch',
+    async (count) => {
+      const prisma = buildPrisma();
+      const tx = buildTransaction();
+      prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+      tx.admissionImportRow.updateMany.mockResolvedValueOnce({ count });
+      const { service, auditService } = buildService(prisma);
+      await expect(
+        service.bulkImport(
+          {
+            dryRun: true,
+            csvContent: [
+              'firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,guardianFullName,guardianRelation,guardianPhone,confirmNoDisability',
+              'Asha,Tamang,2020-01-02,FEMALE,2026-04-15,ay-1,class-1,Maya Tamang,mother,9800000000,true',
+              'Bimal,Rai,2020-02-03,MALE,2026-04-15,ay-1,class-1,Mohan Rai,father,9800000001,true',
+            ].join('\n'),
+          },
+          actor,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(tx.admissionImportRow.updateMany).toHaveBeenCalledTimes(1);
+      expect(tx.admissionImportRow.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            tenantId: actor.tenantId,
+            batchId: 'import-batch-1',
+            rowNumber: 2,
+            status: 'PROCESSING',
+          },
+        }),
+      );
+      expect(tx.admissionImportBatch.update).not.toHaveBeenCalled();
+      expect(prisma.academicYear.findFirst).toHaveBeenCalledTimes(1);
+      expect(auditService.record).not.toHaveBeenCalled();
+    },
+  );
 
   it('stops before the next row when its checkpoint cannot be persisted', async () => {
     const prisma = buildPrisma();
@@ -1237,15 +1382,17 @@ describe('AdmissionsService production hardening', () => {
         clientOperationId: 'bulk:confirmed-batch:row:2',
       }),
       actor,
+      expect.objectContaining({ batchId: 'confirmed-batch', rowNumber: 2 }),
     );
     expect(tx.admissionImportRow.createMany).toHaveBeenCalledWith({
+      skipDuplicates: true,
       data: [
         expect.objectContaining({
           tenantId: actor.tenantId,
           batchId: 'confirmed-batch',
           rowNumber: 2,
           studentId: 'already-committed',
-          status: 'CREATED',
+          status: 'PROCESSING',
         }),
       ],
     });
@@ -1305,9 +1452,10 @@ describe('AdmissionsService production hardening', () => {
       }),
     );
     expect(tx.admissionImportRow.createMany).toHaveBeenCalledWith({
+      skipDuplicates: true,
       data: expect.arrayContaining([
         expect.objectContaining({
-          status: 'FAILED',
+          status: 'PROCESSING',
           studentId: 'committed-student',
         }),
       ]),
@@ -1958,8 +2106,10 @@ function buildTransaction() {
     },
     admissionImportRow: {
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     admissionImportBatch: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'confirmed-batch' }),
       update: jest.fn().mockResolvedValue({
         id: 'import-batch-1',
       }),

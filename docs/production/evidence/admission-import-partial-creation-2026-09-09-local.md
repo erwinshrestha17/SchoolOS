@@ -69,7 +69,7 @@ the final audit fails and stopping before the next row when row persistence fail
 API TypeScript and diff checks passed. The fault tests use mocked persistence;
 they do not prove database crash durability or end-to-end restart recovery.
 
-The admission-core commit and its row checkpoint remain separate transactions.
+At this checkpoint-only stage, the admission-core commit and its row checkpoint were separate transactions.
 A crash between them still requires reconciliation through the stable student
 operation ID. No automatic resume, stale-worker lease recovery, or permission to
 re-import an unfinished batch is claimed by this change.
@@ -100,3 +100,53 @@ that the outcome is unknown and requires review/reconciliation before re-import.
 All 658 web checks, web TypeScript, touched-component ESLint, and diff checks
 passed on the current worktree. This does not add automatic recovery or prove
 the new error behavior through a rendered browser test.
+
+## Atomic student linkage — 2026-09-10
+
+New confirmed import admissions now insert a PROCESSING import row containing
+the student identity within the existing Serializable student/enrollment
+transaction. The internal import context verifies the tenant, batch mode/status,
+and exact operation ID; it is not an HTTP DTO field. A later row checkpoint
+updates that record and increments the batch counter transactionally, requiring
+exactly one matching tenant-scoped row. Validation failures still create their
+own row without claiming student creation.
+
+Admissions tests: 45/45 passed. New tests cover recording the identity before
+finance follow-up fails and rejecting unavailable batch context before follow-up.
+API TypeScript and diff checks passed. These are mocked transaction tests, not
+live crash/rollback proof. Existing interrupted batches are not backfilled;
+automatic resume, legacy reconciliation, and database restart proof remain open.
+
+Atomic-linkage regression follow-up: added mismatched operation/batch rejection
+and row-write failure tests confirming follow-up finance work never starts on
+those failures. The full API unit run passed 272 suites / 3,002 tests, including
+47 admissions tests; API TypeScript and diff checks passed. The existing real-DB
+integration configuration uses `.int-spec.ts` tests, but no admission atomic-link
+database test has yet been added or run. This remains a required next verification
+step before claiming rollback/crash safety.
+
+Import-review follow-up: the default queue now includes PROCESSING rows so the
+new atomic student linkage is discoverable before finalization. Its workflow
+label explicitly leaves follow-up outcome unconfirmed. Total now comes from a
+database count using the same tenant/status predicate as the bounded list, not
+the returned page length. All 17 M1 hardening tests, API TypeScript, and diff
+checks passed, including a limited-page/full-total regression. Count and list
+are separate reads and may differ transiently during concurrent processing;
+neither is a claim that a batch is complete. Live database and rendered-browser
+verification of these queue changes remains pending.
+
+Checkpoint terminal-state protection: row finalization now claims only a
+PROCESSING row. Initial validation/error row insertion uses PROCESSING inside
+the checkpoint transaction before finalization. Already-final rows therefore
+cannot be overwritten or increment batch counts again through this path; a
+nonmatching claim aborts the transaction. All 49 admissions tests and API
+TypeScript passed. Initial tests exposed two outdated predicate expectations;
+they were updated to include the processing-state guard. This is fail-closed
+duplicate handling, not a completed automatic-resume implementation.
+
+HTTP regression follow-up: the first full HTTP run exposed the test adapter's
+missing import-row count method (one failure). The adapter now counts using its
+existing predicate evaluator, and the tenant-isolation scenario requests one row
+while asserting a total of two matching tenant rows, including a processing row.
+The rerun passed all 43 suites / 287 tests; API TypeScript and diff checks passed.
+These HTTP tests use mocked persistence and do not replace live PostgreSQL proof.

@@ -288,13 +288,39 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
   });
 
   it('returns import-review rows only for the actor tenant over HTTP', async () => {
+    prisma.__state.admissionImportRows.push({
+      ...prisma.__state.admissionImportRows[0],
+      id: 'import-row-a-processing',
+      rowNumber: 4,
+      status: 'PROCESSING',
+    });
     const tenantAResponse = await request(app.getHttpServer())
       .get('/admissions/m1/import-review/queue')
       .set('x-test-tenant', tenantAId)
-      .query({ limit: 10 })
+      .query({ limit: 1 })
       .expect(200);
 
-    expect(tenantAResponse.body.total).toBe(1);
+    expect(tenantAResponse.body.total).toBe(2);
+    expect(tenantAResponse.body.items).toHaveLength(1);
+    const processingResponse = await request(app.getHttpServer())
+      .get('/admissions/m1/import-review/queue')
+      .set('x-test-tenant', tenantAId)
+      .query({ status: 'processing', limit: 10 })
+      .expect(200);
+    expect(processingResponse.body.total).toBe(1);
+    expect(processingResponse.body.items).toEqual([
+      expect.objectContaining({
+        id: 'import-row-a-processing',
+        status: 'PROCESSING',
+      }),
+    ]);
+    const otherTenantProcessing = await request(app.getHttpServer())
+      .get('/admissions/m1/import-review/queue')
+      .set('x-test-tenant', tenantBId)
+      .query({ status: 'processing', limit: 10 })
+      .expect(200);
+    expect(otherTenantProcessing.body.items).toEqual([]);
+    expect(otherTenantProcessing.body.total).toBe(0);
     expect(tenantAResponse.body.items[0]).toEqual(
       expect.objectContaining({
         id: 'import-row-a',
@@ -1265,6 +1291,13 @@ function overrideImportReviewReads(prisma: PrismaMock) {
   };
 
   prisma.admissionImportRow = {
+    count: jest.fn((query: { where?: Record<string, unknown> }) =>
+      Promise.resolve(
+        prisma.__state.admissionImportRows.filter((row) =>
+          matchesRecordWhere(row, query.where),
+        ).length,
+      ),
+    ),
     findMany: jest.fn(
       (query: { where?: Record<string, unknown>; take?: number }) =>
         Promise.resolve(

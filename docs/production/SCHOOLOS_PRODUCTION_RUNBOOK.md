@@ -571,10 +571,12 @@ Raw batch access remains unavailable during support override; this procedure
 does not grant a bypass. Financial and lifecycle corrections use their existing
 audited workflows, never destructive cleanup of authoritative records.
 
-Automatic batch resume and crash reconciliation are not yet implemented. The
-current per-row checkpoints limit lost progress evidence but do not close the
-gap between an admission commit and its checkpoint. Treat restart/recovery proof
-as an outstanding release requirement for confirmed CSV import use.
+Automatic batch resume and crash reconciliation are not yet implemented. New
+confirmed admissions now record a processing row with their student identity in
+the same core transaction; final outcomes and counters are checkpointed later.
+Older batches may still lack that linkage. A processing row does not prove that
+finance/document follow-up completed. Treat restart/recovery proof as an
+outstanding release requirement for confirmed CSV import use.
 
 ## 6. Release Go/No-Go Checklist
 

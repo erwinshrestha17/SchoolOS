@@ -17,7 +17,7 @@ import {
   Play,
   Upload,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiRequestError } from "../../lib/api";
 import { useSession } from "../session-provider";
 import { Button } from "../ui/button";
@@ -63,6 +63,10 @@ export function IemisReadinessWorkspace() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importPage, setImportPage] = useState(1);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+  const batchDetailsRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (selectedBatchId) batchDetailsRef.current?.focus();
+  }, [selectedBatchId]);
   const [toast, setToast] = useState<{
     title: string;
     description: string;
@@ -580,6 +584,8 @@ export function IemisReadinessWorkspace() {
             {selectedBatchId && canReadImportDetails ? (
               <section
                 id="admission-import-details"
+                ref={batchDetailsRef}
+                tabIndex={-1}
                 aria-labelledby="admission-import-details-title"
                 className="mt-4 rounded-lg border border-slate-200 p-4"
               >
@@ -652,6 +658,13 @@ export function IemisReadinessWorkspace() {
                                   : "This row needs review before another import. Check the original CSV and duplicate-review queue."}
                               </p>
                             ) : null}
+                            {row.status === "processing" ? (
+                              <p className="mt-2 text-warning-900">
+                                {row.studentId
+                                  ? "Student and enrollment are recorded. Follow-up processing is not yet confirmed. Do not import this row again."
+                                  : "This row has no confirmed outcome yet. Review the batch before attempting another import."}
+                              </p>
+                            ) : null}
                             {row.studentId ? (
                               <a
                                 className="mt-2 inline-block underline"
@@ -664,6 +677,16 @@ export function IemisReadinessWorkspace() {
                         ))}
                       </ul>
                     )}
+                    <Button
+                      variant="outline"
+                      className="mt-3"
+                      disabled={importDetailQuery.isFetching}
+                      onClick={() => void importDetailQuery.refetch()}
+                    >
+                      {importDetailQuery.isFetching
+                        ? "Refreshing results…"
+                        : "Refresh saved results"}
+                    </Button>
                   </>
                 ) : null}
               </section>
@@ -739,6 +762,20 @@ export function IemisReadinessWorkspace() {
                       </p>
                     </div>
                     <StatusBadge status={row.status} />
+                    {canReadImportDetails ? (
+                      <Button
+                        variant="outline"
+                        aria-label={`Review batch ${row.sourceFileName ?? "Unnamed import"}, row ${row.rowNumber}`}
+                        aria-controls="admission-import-details"
+                        onClick={() => {
+                          setSelectedBatchId(row.batchId);
+                          if (selectedBatchId === row.batchId)
+                            batchDetailsRef.current?.focus();
+                        }}
+                      >
+                        Review batch
+                      </Button>
+                    ) : null}
                   </div>
                 ))}
               </div>

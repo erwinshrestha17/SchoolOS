@@ -232,7 +232,15 @@ export class AdmissionsService {
     };
   }
 
-  async createAdmission(dto: CreateDirectAdmissionDto, actor: AuthContext) {
+  async createAdmission(
+    dto: CreateDirectAdmissionDto,
+    actor: AuthContext,
+    importContext?: {
+      batchId: string;
+      rowNumber: number;
+      rawData: Prisma.InputJsonValue;
+    },
+  ) {
     const requestFingerprint = buildAdmissionConversionFingerprint(dto);
     const existing = await this.findDirectAdmissionOperation(
       dto.clientOperationId,
@@ -251,7 +259,7 @@ export class AdmissionsService {
           if (dto.createLogin) {
             linkedUserId = await this.createAdmissionLogin(dto, actor, tx);
           }
-          return this.createAdmissionCore(
+          const createdCore = await this.createAdmissionCore(
             dto,
             actor,
             context,
@@ -262,6 +270,40 @@ export class AdmissionsService {
               requestFingerprint,
             },
           );
+          if (importContext) {
+            const batch = await tx.admissionImportBatch.findFirst({
+              where: {
+                id: importContext.batchId,
+                tenantId: actor.tenantId,
+                dryRun: false,
+                status: 'PROCESSING',
+              },
+              select: { id: true },
+            });
+            if (
+              !batch ||
+              dto.clientOperationId !==
+                `bulk:${batch.id}:row:${importContext.rowNumber}`
+            ) {
+              throw new ConflictException(
+                'Import context changed. Review the batch before continuing.',
+              );
+            }
+            await tx.admissionImportRow.createMany({
+              data: [
+                {
+                  tenantId: actor.tenantId,
+                  batchId: batch.id,
+                  rowNumber: importContext.rowNumber,
+                  status: 'PROCESSING',
+                  studentId: createdCore.student.id,
+                  studentSystemId: createdCore.student.studentSystemId,
+                  rawData: importContext.rawData,
+                },
+              ],
+            });
+          }
+          return createdCore;
         },
         { isolationLevel: 'Serializable' },
       );
@@ -1059,12 +1101,13 @@ export class AdmissionsService {
       const result = results[results.length - 1];
       await this.prisma.$transaction(async (tx) => {
         await tx.admissionImportRow.createMany({
+          skipDuplicates: true,
           data: [
             {
               tenantId: actor.tenantId,
               batchId: batch.id,
               rowNumber: result.rowNumber,
-              status: result.status.toUpperCase(),
+              status: 'PROCESSING',
               studentId: result.studentId ?? null,
               studentSystemId: result.studentSystemId ?? null,
               errors: result.errors
@@ -1077,6 +1120,30 @@ export class AdmissionsService {
             },
           ],
         });
+        const checkpoint = await tx.admissionImportRow.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            batchId: batch.id,
+            rowNumber: result.rowNumber,
+            status: 'PROCESSING',
+          },
+          data: {
+            status: result.status.toUpperCase(),
+            studentId: result.studentId ?? null,
+            studentSystemId: result.studentSystemId ?? null,
+            errors: result.errors
+              ? toInputJsonValue(result.errors)
+              : Prisma.JsonNull,
+            duplicates: result.duplicates
+              ? toInputJsonValue(result.duplicates)
+              : Prisma.JsonNull,
+          },
+        });
+        if (checkpoint.count !== 1) {
+          throw new ConflictException(
+            'Import row checkpoint is unavailable. Review the batch before continuing.',
+          );
+        }
         await tx.admissionImportBatch.update({
           where: { id: batch.id, tenantId: actor.tenantId },
           data: {
@@ -1133,7 +1200,11 @@ export class AdmissionsService {
             clientOperationId: `bulk:${batch.id}:row:${row.rowNumber}`,
           },
         );
-        const created = await this.createAdmission(directDto, actor);
+        const created = await this.createAdmission(directDto, actor, {
+          batchId: batch.id,
+          rowNumber: row.rowNumber,
+          rawData: toInputJsonValue(row.raw),
+        });
         results.push({
           rowNumber: row.rowNumber,
           status: 'created',
