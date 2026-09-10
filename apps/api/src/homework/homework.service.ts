@@ -3247,7 +3247,9 @@ function stableHomeworkJson(value: unknown): string {
   if (value && typeof value === 'object') {
     return `{${Object.entries(value as Record<string, unknown>)
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableHomeworkJson(item)}`)
+      .map(
+        ([key, item]) => `${JSON.stringify(key)}:${stableHomeworkJson(item)}`,
+      )
       .join(',')}}`;
   }
   return JSON.stringify(value) ?? 'null';

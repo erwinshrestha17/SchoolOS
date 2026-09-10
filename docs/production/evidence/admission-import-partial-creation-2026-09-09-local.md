@@ -91,3 +91,12 @@ the displayed versus total count and directs older-batch review to history.
 Web typecheck, touched-component lint, and all 658 web checks passed. The existing
 checks do not directly exercise this newly added rendered queue failure branch;
 browser fault-injection verification for that branch remains pending.
+
+2026-09-10 follow-up: confirmed-import request failures now invalidate student,
+readiness, batch-history, selected-batch, and review-queue queries without replaying
+the mutation or discarding the CSV. The generic failure message no longer claims
+that rows cannot be hidden or advises an immediate retry. It explicitly states
+that the outcome is unknown and requires review/reconciliation before re-import.
+All 658 web checks, web TypeScript, touched-component ESLint, and diff checks
+passed on the current worktree. This does not add automatic recovery or prove
+the new error behavior through a rendered browser test.
