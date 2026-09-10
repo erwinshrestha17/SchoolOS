@@ -4,9 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
+import '../../../../app/theme/app_semantic_colors.dart';
+import '../../../../shared/widgets/school_os_app_shell.dart';
 import '../../domain/parent_models.dart' as parent_models;
 import 'parent_portal_widgets.dart';
-import '../../../../shared/widgets/school_os_app_shell.dart';
 
 class ParentDetailScaffold extends StatelessWidget {
   const ParentDetailScaffold({
@@ -17,60 +18,78 @@ class ParentDetailScaffold extends StatelessWidget {
     this.onBack,
     this.showGlobalActions = true,
   });
+
   final String title;
+
+  /// Legacy parent detail screens use the previous six-slot index mapping.
+  /// The scaffold normalizes that value into the new five-destination IA so
+  /// route behavior can be migrated incrementally without changing domain or
+  /// backend contracts.
   final int selectedIndex;
   final Widget body;
   final VoidCallback? onBack;
   final bool showGlobalActions;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: ParentPortalColors.page,
-    appBar: showGlobalActions
-        ? AppTopBar(
-            title: title,
-            leading: onBack == null
-                ? null
-                : IconButton(
-                    tooltip: 'Back',
-                    onPressed: onBack,
-                    icon: const Icon(Icons.arrow_back_rounded),
-                  ),
-          )
-        : AppBar(
-            leading: onBack == null
-                ? null
-                : IconButton(
-                    tooltip: 'Back',
-                    onPressed: onBack,
-                    icon: const Icon(Icons.arrow_back_rounded),
-                  ),
-            title: Text(
-              title,
-              style: const TextStyle(
-                color: ParentPortalColors.navy,
-                fontWeight: FontWeight.w900,
+  Widget build(BuildContext context) {
+    final semantic = AppSemanticColors.of(context);
+    return Scaffold(
+      backgroundColor: semantic.background,
+      appBar: showGlobalActions
+          ? AppTopBar(
+              title: title,
+              leading: onBack == null
+                  ? null
+                  : IconButton(
+                      tooltip: 'Back',
+                      onPressed: onBack,
+                      icon: const Icon(Icons.arrow_back_rounded),
+                    ),
+            )
+          : AppBar(
+              leading: onBack == null
+                  ? null
+                  : IconButton(
+                      tooltip: 'Back',
+                      onPressed: onBack,
+                      icon: const Icon(Icons.arrow_back_rounded),
+                    ),
+              title: Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: semantic.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
+              backgroundColor: semantic.background,
+              surfaceTintColor: Colors.transparent,
             ),
-            backgroundColor: ParentPortalColors.page,
-            surfaceTintColor: Colors.transparent,
-          ),
-    body: SafeArea(top: false, child: body),
-    bottomNavigationBar: SchoolOsBottomNavigation(
-      selectedIndex: selectedIndex,
-      onSelected: (index) {
-        final route = [
-          AppRoutes.parentHome,
-          AppRoutes.parentChildren,
-          AppRoutes.parentAttendance,
-          AppRoutes.parentHomework,
-          AppRoutes.notices,
-          AppRoutes.parentMore,
-        ][index];
-        context.go(route);
-      },
-    ),
-  );
+      body: SafeArea(top: false, child: body),
+      bottomNavigationBar: SchoolOsBottomNavigation(
+        selectedIndex: _normalizeLegacyIndex(selectedIndex),
+        onSelected: (index) {
+          final route = [
+            AppRoutes.parentHome,
+            AppRoutes.parentChildren,
+            AppRoutes.parentHomework,
+            AppRoutes.parentUpdates,
+            AppRoutes.parentMore,
+          ][index];
+          context.go(route);
+        },
+      ),
+    );
+  }
+
+  static int _normalizeLegacyIndex(int index) {
+    return switch (index) {
+      0 => 0, // Today
+      1 || 2 => 1, // Child / attendance details
+      3 => 2, // Homework -> Schoolwork
+      4 => 3, // Notices -> Updates
+      _ => 4, // More and secondary modules
+    };
+  }
 }
 
 class ParentApiChildSelector extends StatelessWidget {
@@ -195,9 +214,11 @@ class FeatureIcon extends StatelessWidget {
     this.color = ParentPortalColors.purple,
     this.size = 46,
   });
+
   final IconData icon;
   final Color color;
   final double size;
+
   @override
   Widget build(BuildContext context) => Container(
     width: size,
@@ -211,9 +232,7 @@ class FeatureIcon extends StatelessWidget {
 }
 
 void showFeatureSnack(BuildContext context, String message) =>
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 
 void showUnavailableWorkflowSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));

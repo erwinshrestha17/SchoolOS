@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../design_system/app_radius.dart';
 import '../design_system/app_typography.dart';
 import 'app_colors.dart';
+import 'app_semantic_colors.dart';
 
 class AppTheme {
   const AppTheme._();
@@ -23,9 +25,9 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      extensions: const [AppSemanticColors.light],
       scaffoldBackgroundColor: AppColors.backgroundLight,
       brightness: Brightness.light,
-
       appBarTheme: const AppBarTheme(
         centerTitle: false,
         elevation: 0,
@@ -39,7 +41,6 @@ class AppTheme {
           color: AppColors.slate900,
         ),
       ),
-
       cardTheme: CardThemeData(
         elevation: 0,
         color: Colors.white,
@@ -49,26 +50,21 @@ class AppTheme {
           side: const BorderSide(color: AppColors.slate100, width: 1),
         ),
       ),
-
       dividerTheme: const DividerThemeData(
         color: AppColors.slate100,
         thickness: 1,
         space: 1,
       ),
-
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
-        labelStyle: TextStyle(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        labelStyle: const TextStyle(
           fontFamily: AppTypography.fontFamily,
           color: AppColors.slate500,
           fontSize: 14,
         ),
-        hintStyle: TextStyle(
+        hintStyle: const TextStyle(
           fontFamily: AppTypography.fontFamily,
           color: AppColors.slate400,
           fontSize: 14,
@@ -92,14 +88,13 @@ class AppTheme {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.danger, width: 1),
+          borderSide: const BorderSide(color: AppColors.danger),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
         ),
       ),
-
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
@@ -114,7 +109,6 @@ class AppTheme {
           disabledForegroundColor: AppColors.slate400,
         ),
       ),
-
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           elevation: 0,
@@ -127,7 +121,6 @@ class AppTheme {
           textStyle: AppTypography.labelLarge,
         ),
       ),
-
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
@@ -137,7 +130,6 @@ class AppTheme {
           textStyle: AppTypography.labelLarge,
         ),
       ),
-
       textTheme: const TextTheme(
         displayLarge: AppTypography.displayLarge,
         displayMedium: AppTypography.displayMedium,
@@ -173,9 +165,9 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      extensions: const [AppSemanticColors.dark],
       scaffoldBackgroundColor: AppColors.backgroundDark,
       brightness: Brightness.dark,
-
       appBarTheme: const AppBarTheme(
         centerTitle: false,
         elevation: 0,
@@ -189,7 +181,6 @@ class AppTheme {
           color: Colors.white,
         ),
       ),
-
       cardTheme: CardThemeData(
         elevation: 0,
         color: AppColors.overlayDark,
@@ -199,26 +190,21 @@ class AppTheme {
           side: const BorderSide(color: AppColors.slate800, width: 1),
         ),
       ),
-
       dividerTheme: const DividerThemeData(
         color: AppColors.slate800,
         thickness: 1,
         space: 1,
       ),
-
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.slate900,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
-        labelStyle: TextStyle(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        labelStyle: const TextStyle(
           fontFamily: AppTypography.fontFamily,
           color: AppColors.slate400,
           fontSize: 14,
         ),
-        hintStyle: TextStyle(
+        hintStyle: const TextStyle(
           fontFamily: AppTypography.fontFamily,
           color: AppColors.slate500,
           fontSize: 14,
@@ -242,14 +228,13 @@ class AppTheme {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.danger, width: 1),
+          borderSide: const BorderSide(color: AppColors.danger),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
         ),
       ),
-
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
@@ -264,7 +249,6 @@ class AppTheme {
           disabledForegroundColor: AppColors.slate500,
         ),
       ),
-
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           elevation: 0,
@@ -277,17 +261,15 @@ class AppTheme {
           textStyle: AppTypography.labelLarge,
         ),
       ),
-
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: AppSemanticColors.dark.primary,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           textStyle: AppTypography.labelLarge,
         ),
       ),
-
       textTheme: const TextTheme(
         displayLarge: AppTypography.displayLarge,
         displayMedium: AppTypography.displayMedium,
@@ -302,7 +284,10 @@ class AppTheme {
         labelLarge: AppTypography.labelLarge,
         labelMedium: AppTypography.labelMedium,
         labelSmall: AppTypography.labelSmall,
-      ).apply(bodyColor: Colors.white, displayColor: Colors.white),
+      ).apply(
+        bodyColor: AppSemanticColors.dark.textPrimary,
+        displayColor: AppSemanticColors.dark.textPrimary,
+      ),
     );
   }
 }
