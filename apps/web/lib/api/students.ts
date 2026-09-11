@@ -523,12 +523,16 @@ export const studentsApi = {
       `/admissions/bulk-import/batches/${encodeURIComponent(batchId)}`,
     ),
   listAdmissionImportReviewQueue: (params?: {
+    page?: number;
     status?: string;
     limit?: number;
   }) =>
     request<{
       items: AdmissionImportReviewRow[];
       total: number;
+      page: number;
+      limit: number;
+      hasNextPage: boolean;
       policy: string;
     }>(withQuery("/admissions/m1/import-review/queue", params ?? {})),
   listDocumentExpiryTemplates: () =>

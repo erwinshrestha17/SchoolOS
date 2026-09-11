@@ -93,6 +93,7 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
         getClient: jest.fn().mockReturnValue({
           set: jest.fn().mockResolvedValue('OK'),
           del: jest.fn().mockResolvedValue(1),
+          eval: jest.fn().mockResolvedValue(1),
         }),
       } as any,
     );

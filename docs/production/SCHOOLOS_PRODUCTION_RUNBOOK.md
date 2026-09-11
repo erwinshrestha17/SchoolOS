@@ -571,12 +571,41 @@ Raw batch access remains unavailable during support override; this procedure
 does not grant a bypass. Financial and lifecycle corrections use their existing
 audited workflows, never destructive cleanup of authoritative records.
 
+Direct-admission and application-conversion replay refuse to restart follow-up
+when the linked student is no longer active, the enrollment is no longer active,
+or its effective interval has ended. Review the current student record and use
+the existing lifecycle/financial correction workflows; do not reactivate history
+merely to bypass this conflict. This preflight does not provide a concurrency
+lease against lifecycle changes during follow-up.
+
 Automatic batch resume and crash reconciliation are not yet implemented. New
-confirmed admissions now record a processing row with their student identity in
+admission follow-up now awaits canonical M12 event acceptance before its completion
+audit and response; failure remains retryable under the original admission identity.
+Event acceptance is not provider delivery. A crash between acceptance and listener
+dispatch still requires reconciliation; no automatic dispatch recovery is claimed.
+M12 dispatch/failure callbacks preserve terminal `DISPATCHED` and `CANCELLED`
+states using tenant-scoped conditional updates. This prevents late intake failures
+from downgrading dispatch success; it does not prove provider delivery.
+New confirmed admissions now record a processing row with their student identity in
 the same core transaction; final outcomes and counters are checkpointed later.
 Older batches may still lack that linkage. A processing row does not prove that
 finance/document follow-up completed. Treat restart/recovery proof as an
 outstanding release requirement for confirmed CSV import use.
+
+### Notice publication with incomplete delivery intake
+
+Publication and delivery intake are separate boundaries. A publication request
+can fail after the notice has become PUBLISHED. Refresh and inspect the notice
+detail and delivery records before acting; the web review screen refreshes its
+cached state after failed actions and offers current-status navigation.
+
+The current already-published retry path returns the delivery summary; it does
+not replay missing event intake. Do not recreate or republish a copy merely to
+force delivery. Existing delivery retries apply only to existing records.
+Recovery before recipient records exist remains incomplete and must preserve
+the original audience/version, recheck current recipient authorization, honor
+cancelled events, and prevent duplicate delivery. Local web contract tests do
+not establish browser or provider recovery proof.
 
 ## 6. Release Go/No-Go Checklist
 

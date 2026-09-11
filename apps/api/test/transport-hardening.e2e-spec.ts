@@ -72,6 +72,7 @@ describe('Transport Hardening (E2E)', () => {
         set: jest.fn().mockResolvedValue('OK'),
         setex: jest.fn(),
         del: jest.fn(),
+        eval: jest.fn().mockResolvedValue(1),
       }),
     };
 

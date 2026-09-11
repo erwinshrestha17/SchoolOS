@@ -139,6 +139,7 @@ describe('CommunicationsService', () => {
       getClient: jest.fn().mockReturnValue({
         set: jest.fn().mockResolvedValue('OK'),
         del: jest.fn().mockResolvedValue(1),
+        eval: jest.fn().mockResolvedValue(1),
       }),
     };
     teacherScopeService = {
@@ -293,6 +294,114 @@ describe('CommunicationsService', () => {
       state: 'SKIPPED',
       reason: 'DELIVERY_UNAVAILABLE',
     });
+  });
+
+  it('does not create deliveries for a cancelled admission event replay', async () => {
+    const notificationEventService = {
+      accept: jest
+        .fn()
+        .mockResolvedValue({ id: 'cancelled-event', status: 'CANCELLED' }),
+      markDispatched: jest.fn(),
+      markFailed: jest.fn(),
+    };
+    const replayService = new CommunicationsService(
+      prisma,
+      notificationsService,
+      auditService,
+      {} as never,
+      redisService,
+      fileRegistryService,
+      undefined,
+      notificationEventService as never,
+    );
+    const deliveries = jest.spyOn(replayService, 'recordDeliveryRecords');
+    await replayService.handleStudentAdmitted({
+      tenantId: actor.tenantId,
+      actor,
+      studentId: 'student-1',
+      studentName: 'Synthetic Student',
+      classId: 'class-1',
+    });
+    expect(deliveries).not.toHaveBeenCalled();
+    expect(notificationEventService.markDispatched).not.toHaveBeenCalled();
+    expect(notificationEventService.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('rejects cancelled notice and admission-reminder intake without creating deliveries', async () => {
+    const events = {
+      accept: jest
+        .fn()
+        .mockResolvedValue({ id: 'cancelled-event', status: 'CANCELLED' }),
+      markDispatched: jest.fn(),
+      markFailed: jest.fn(),
+    };
+    const replayService = new CommunicationsService(
+      prisma,
+      notificationsService,
+      auditService,
+      {} as never,
+      redisService,
+      fileRegistryService,
+      undefined,
+      events as never,
+    );
+    const deliveries = jest.spyOn(replayService, 'recordDeliveryRecords');
+    await expect(
+      replayService.recordAdmissionDocumentReminder({
+        actor,
+        admissionCaseId: 'case-1',
+        applicantName: 'Synthetic Student',
+        guardianPhone: '9800000000',
+        sourceUpdatedAt: '2026-09-11T00:00:00Z',
+        missingDocumentLabels: ['Birth certificate'],
+      }),
+    ).rejects.toThrow('Admission reminder event was cancelled');
+    await expect(
+      replayService.handleNoticePublished({
+        tenantId: actor.tenantId,
+        actor,
+        noticeId: 'notice-1',
+        audienceType: AudienceType.ALL,
+        classId: null,
+        sectionId: null,
+        roleNames: [],
+        staffIds: [],
+        studentIds: [],
+        guardianIds: [],
+        recipientUserIds: [],
+        title: 'Synthetic notice',
+        body: 'Synthetic body',
+        priority: NoticePriority.NORMAL,
+      }),
+    ).rejects.toThrow('Notice notification event was cancelled');
+    expect(deliveries).not.toHaveBeenCalled();
+    expect(events.markDispatched).not.toHaveBeenCalled();
+    expect(events.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('releases only its own delivery lock token', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([
+      { id: 'existing', status: NotificationStatus.QUEUED },
+    ]);
+    await service.recordDeliveryRecords({
+      actor,
+      sourceType: 'notice',
+      sourceId: 'notice-1',
+      audienceType: AudienceType.ALL,
+      title: 'Synthetic',
+      body: 'Synthetic',
+      channels: [NotificationChannel.PUSH],
+    });
+    const redis = redisService.getClient();
+    const [key, token] = redis.set.mock.calls[0];
+    expect(token).not.toBe('locked');
+    expect(redis.eval).toHaveBeenCalledWith(
+      expect.stringContaining("redis.call('get', KEYS[1]) == ARGV[1]"),
+      1,
+      key,
+      token,
+    );
+    expect(redis.del).not.toHaveBeenCalled();
   });
 
   it('lists communication templates with tenant-scoped server pagination', async () => {

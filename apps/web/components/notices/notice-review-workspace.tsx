@@ -115,6 +115,19 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
       ]);
       router.replace(`/dashboard/notices/${noticeId}`);
     },
+    onError: async () => {
+      // Publication can commit before delivery intake or the response fails.
+      // Reconcile server state; never replay the mutation automatically.
+      setPendingAction(null);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["notice-detail", noticeId],
+          exact: true,
+        }),
+        queryClient.invalidateQueries({ queryKey: ["notices"] }),
+        queryClient.invalidateQueries({ queryKey: ["communications-summary"] }),
+      ]);
+    },
   });
 
   if (noticeCaps.resolution === "loading") {
@@ -144,10 +157,15 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
   }
   if (!isReviewable) {
     return (
-      <ErrorState
-        title="This notice is no longer awaiting publication"
-        message="Open the notice detail to review its current status."
-      />
+      <div className="space-y-4">
+        <ErrorState
+          title="This notice is no longer awaiting publication"
+          message="Open the notice detail to review its current status."
+        />
+        <Button variant="outline" onClick={() => router.push(`/dashboard/notices/${noticeId}`)}>
+          Review current notice status
+        </Button>
+      </div>
     );
   }
 

@@ -213,6 +213,13 @@ export class GraduateStudentDto {
 
 export class ImportReviewQueueDto {
   @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000000)
+  @Type(() => Number)
+  page?: number = 1;
+
+  @IsOptional()
   @IsString()
   status?: string;
 

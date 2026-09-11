@@ -9,4 +9,5 @@ export default class Redis {
   get = jest.fn().mockResolvedValue(null);
   set = jest.fn().mockResolvedValue('OK');
   del = jest.fn().mockResolvedValue(1);
+  eval = jest.fn().mockResolvedValue(1);
 }

@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
@@ -60,6 +60,7 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
         getClient: jest.fn().mockReturnValue({
           set: jest.fn().mockResolvedValue('OK'),
           del: jest.fn().mockResolvedValue(1),
+          eval: jest.fn().mockResolvedValue(1),
         }),
         onModuleDestroy: jest.fn(() => Promise.resolve(undefined)),
       })
@@ -126,6 +127,13 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
     await app.init();
   });
 
@@ -287,6 +295,27 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
     expect(JSON.stringify(crossTenantRecovery.body)).not.toContain(tenantAId);
   });
 
+  it.each([
+    { page: 0 },
+    { page: -1 },
+    { page: 1.5 },
+    { page: 'invalid' },
+    { page: 1000001 },
+    { limit: 0 },
+    { limit: 101 },
+  ])(
+    'rejects invalid import pagination %j before querying records',
+    async (query) => {
+      await request(app.getHttpServer())
+        .get('/admissions/m1/import-review/queue')
+        .set('x-test-tenant', tenantAId)
+        .query(query)
+        .expect(400);
+      expect(prisma.admissionImportRow.findMany).not.toHaveBeenCalled();
+      expect(prisma.admissionImportRow.count).not.toHaveBeenCalled();
+    },
+  );
+
   it('returns import-review rows only for the actor tenant over HTTP', async () => {
     prisma.__state.admissionImportRows.push({
       ...prisma.__state.admissionImportRows[0],
@@ -302,6 +331,20 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
 
     expect(tenantAResponse.body.total).toBe(2);
     expect(tenantAResponse.body.items).toHaveLength(1);
+    const secondPage = await request(app.getHttpServer())
+      .get('/admissions/m1/import-review/queue')
+      .set('x-test-tenant', tenantAId)
+      .query({ page: 2, limit: 1 })
+      .expect(200);
+    expect(secondPage.body).toEqual(
+      expect.objectContaining({
+        page: 2,
+        limit: 1,
+        total: 2,
+        hasNextPage: false,
+      }),
+    );
+    expect(secondPage.body.items[0].id).toBe('import-row-a-processing');
     const processingResponse = await request(app.getHttpServer())
       .get('/admissions/m1/import-review/queue')
       .set('x-test-tenant', tenantAId)
@@ -1194,7 +1237,11 @@ function overrideAdmissionDraftReads(prisma: PrismaMock) {
       ),
     ),
     findMany: jest.fn(
-      (query: { where?: Record<string, unknown>; take?: number }) =>
+      (query: {
+        where?: Record<string, unknown>;
+        take?: number;
+        skip?: number;
+      }) =>
         Promise.resolve(
           prisma.__state.admissionApplications
             .filter((application) =>
@@ -1299,11 +1346,15 @@ function overrideImportReviewReads(prisma: PrismaMock) {
       ),
     ),
     findMany: jest.fn(
-      (query: { where?: Record<string, unknown>; take?: number }) =>
+      (query: {
+        where?: Record<string, unknown>;
+        take?: number;
+        skip?: number;
+      }) =>
         Promise.resolve(
           prisma.__state.admissionImportRows
             .filter((row) => matchesRecordWhere(row, query.where))
-            .slice(0, query.take ?? 50)
+            .slice(query.skip ?? 0, (query.skip ?? 0) + (query.take ?? 50))
             .map((row) => ({
               ...row,
               batch: prisma.__state.admissionImportBatches.find(

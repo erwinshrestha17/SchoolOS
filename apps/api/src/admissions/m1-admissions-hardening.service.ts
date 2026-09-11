@@ -601,6 +601,9 @@ export class M1AdmissionsHardeningService {
   }
 
   async listImportReviewQueue(query: ImportReviewQueueDto, actor: AuthContext) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+    const skip = (page - 1) * limit;
     if (actor.isSupportOverride) {
       throw new ForbiddenException(
         'Admission import review payloads are unavailable during support override',
@@ -623,8 +626,9 @@ export class M1AdmissionsHardeningService {
       this.prisma.admissionImportRow.findMany({
         where,
         include: { batch: true },
-        orderBy: [{ createdAt: 'desc' }, { rowNumber: 'asc' }],
-        take: query.limit ?? 50,
+        orderBy: [{ createdAt: 'desc' }, { rowNumber: 'asc' }, { id: 'asc' }],
+        skip,
+        take: limit,
       }),
       this.prisma.admissionImportRow.count({ where }),
     ]);
@@ -643,6 +647,9 @@ export class M1AdmissionsHardeningService {
         createdAt: row.createdAt.toISOString(),
       })),
       total,
+      page,
+      limit,
+      hasNextPage: skip + rows.length < total,
       policy:
         'Import-review queue is tenant-scoped and only returns rows needing review or matching the requested status.',
     };

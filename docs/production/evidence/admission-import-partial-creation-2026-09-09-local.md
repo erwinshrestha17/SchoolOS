@@ -150,3 +150,12 @@ existing predicate evaluator, and the tenant-isolation scenario requests one row
 while asserting a total of two matching tenant rows, including a processing row.
 The rerun passed all 43 suites / 287 tests; API TypeScript and diff checks passed.
 These HTTP tests use mocked persistence and do not replace live PostgreSQL proof.
+
+Review-queue pagination now spans backend DTO/service, web client contract, and
+previous/next controls. The server validates positive bounded page numbers, uses
+a deterministic ID tie-breaker, and returns page/limit/hasNextPage with its total.
+Web queries are page-keyed; a now-empty later page retains a way back. Service
+tests passed 19/19, M1 HTTP tests 13/13, and existing web checks 658/658. API/web
+typechecks, touched web lint, and diff checks passed. The HTTP test harness now
+uses the production ValidationPipe settings; without it query numbers were
+untransformed strings. Rendered pagination and live DB verification remain open.

@@ -21,6 +21,7 @@ import { validateImageUpload } from '../common/files/image-upload-validation';
 import { ConfigService } from '../config/config.service';
 import { FinanceService } from '../finance/finance.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationEventService } from '../communications/notification-event.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
@@ -117,6 +118,7 @@ export class AdmissionsService {
     private readonly storageService: StorageService,
     private readonly fileRegistryService: FileRegistryService,
     private readonly usageService: UsageService,
+    private readonly notificationEventService: NotificationEventService,
   ) {}
 
   async listAdmissions(query: ListAdmissionsDto, actor: AuthContext) {
@@ -923,6 +925,15 @@ export class AdmissionsService {
     if (!enrollment) {
       throw new ConflictException(mismatchMessage);
     }
+    if (
+      enrollment.status !== EnrollmentStatus.ACTIVE ||
+      enrollment.effectiveUntil !== null ||
+      enrollment.student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE
+    ) {
+      throw new ConflictException(
+        'The student or enrollment is no longer active. Review the existing student record before retrying admission follow-up.',
+      );
+    }
 
     return {
       student: {
@@ -1728,6 +1739,17 @@ export class AdmissionsService {
         ),
       );
     }
+
+    // Persist M12 intake before reporting follow-up complete. Delivery remains
+    // asynchronous; the listener reuses this canonical event identity.
+    await this.notificationEventService.accept({
+      tenantId: actor.tenantId,
+      type: 'STUDENT_ADMITTED',
+      sourceEntityId: core.student.id,
+      actorId: actor.userId,
+      idempotencyKey: `student:${core.student.id}:admitted`,
+      metadata: { classId: dto.classId, sectionId: dto.sectionId ?? null },
+    });
 
     await this.auditService.record({
       action:

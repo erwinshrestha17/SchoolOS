@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -2154,6 +2155,9 @@ export class CommunicationsService {
         schoolDay,
       },
     });
+    if (notificationEvent.status === 'CANCELLED') {
+      throw new ConflictException('Admission reminder event was cancelled');
+    }
 
     try {
       const result = await this.recordDeliveryRecords({
@@ -2220,7 +2224,8 @@ export class CommunicationsService {
   async recordDeliveryRecords(input: DeliveryRecordInput) {
     const redis = this.redisService.getClient();
     const lockKey = `lock:delivery:${input.actor.tenantId}:${input.sourceType}:${input.sourceId}`;
-    const acquired = await redis.set(lockKey, 'locked', 'PX', 5000, 'NX');
+    const lockToken = randomUUID();
+    const acquired = await redis.set(lockKey, lockToken, 'PX', 5000, 'NX');
 
     if (!acquired) {
       for (let i = 0; i < 20; i++) {
@@ -2375,7 +2380,12 @@ export class CommunicationsService {
         ),
       };
     } finally {
-      await redis.del(lockKey);
+      await redis.eval(
+        "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+        1,
+        lockKey,
+        lockToken,
+      );
     }
   }
 
@@ -2497,6 +2507,8 @@ export class CommunicationsService {
         const notificationEvent = await this.notificationEventService.accept(
           notificationEventInput(eventName, event, input),
         );
+        // A source replay must not resurrect explicitly cancelled delivery work.
+        if (notificationEvent.status === 'CANCELLED') return;
         notificationEventId = notificationEvent.id;
       }
       const result = await this.recordDeliveryRecords({
@@ -3009,6 +3021,9 @@ export class CommunicationsService {
           },
         })
       : null;
+    if (notificationEvent?.status === 'CANCELLED') {
+      throw new ConflictException('Notice notification event was cancelled');
+    }
     try {
       const result = await this.recordDeliveryRecords({
         actor: toNotificationActor(event),

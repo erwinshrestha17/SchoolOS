@@ -1,7 +1,33 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { NotificationEventService } from './notification-event.service';
 
 describe('NotificationEventService', () => {
+  const originalKnownError = Prisma.PrismaClientKnownRequestError;
+  beforeAll(() => {
+    // The unit-test Prisma adapter omits this runtime constructor. Supply it
+    // locally so the production instanceof branch is exercised, not skipped.
+    Object.defineProperty(Prisma, 'PrismaClientKnownRequestError', {
+      configurable: true,
+      value: class extends Error {
+        readonly code: string;
+        constructor(message: string, options: { code: string }) {
+          super(message);
+          this.code = options.code;
+        }
+      },
+    });
+  });
+  afterAll(() => {
+    Object.defineProperty(Prisma, 'PrismaClientKnownRequestError', {
+      configurable: true,
+      value: originalKnownError,
+    });
+  });
   let prisma: any;
   let plansService: any;
   let auditService: any;
@@ -10,6 +36,8 @@ describe('NotificationEventService', () => {
   beforeEach(() => {
     prisma = {
       notificationEvent: {
+        findFirst: jest.fn(),
+        updateMany: jest.fn(),
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockImplementation(({ data }) => ({
           id: 'notification-event-1',
@@ -76,6 +104,148 @@ describe('NotificationEventService', () => {
     await service.accept(input);
     expect(prisma.notificationEvent.create).toHaveBeenCalledTimes(1);
     expect(auditService.record).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { type: 'STUDENT_ADMITTED' },
+    { sourceEntityId: 'another-notice' },
+    { tenantId: 'another-tenant' },
+  ])(
+    'rejects a reused event key with different identity: %j',
+    async (change) => {
+      const input = {
+        tenantId: 'tenant-1',
+        type: 'NOTICE_PUBLISHED',
+        sourceEntityId: 'notice-1',
+        idempotencyKey: 'notice:notice-1:published',
+      };
+      for (const concurrent of [false, true]) {
+        prisma.notificationEvent.findUnique.mockReset();
+        prisma.notificationEvent.create.mockReset();
+        const existing = { id: 'event-1', ...input, ...change };
+        if (concurrent) {
+          prisma.notificationEvent.findUnique
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(existing);
+          prisma.notificationEvent.create.mockRejectedValueOnce(
+            new Prisma.PrismaClientKnownRequestError('synthetic collision', {
+              code: 'P2002',
+              clientVersion: 'test',
+            }),
+          );
+        } else {
+          prisma.notificationEvent.findUnique.mockResolvedValueOnce(existing);
+        }
+        await expect(service.accept(input)).rejects.toThrow(
+          'different source event',
+        );
+        expect(auditService.record).not.toHaveBeenCalled();
+        expect(prisma.notificationEvent.update).not.toHaveBeenCalled();
+        if (!concurrent)
+          expect(prisma.notificationEvent.create).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it('returns the matching event after a concurrent unique-key collision', async () => {
+    const input = {
+      tenantId: 'tenant-1',
+      type: 'NOTICE_PUBLISHED',
+      sourceEntityId: 'notice-1',
+      idempotencyKey: 'same-key',
+    };
+    const existing = { id: 'event-1', ...input };
+    prisma.notificationEvent.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(existing);
+    prisma.notificationEvent.create.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('synthetic collision', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    );
+    await expect(service.accept(input)).resolves.toEqual(existing);
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it.each(['DISPATCHED', 'CANCELLED'])(
+    'preserves terminal %s against late success and failure',
+    async (status) => {
+      const event = {
+        id: 'event-1',
+        tenantId: 'tenant-1',
+        status,
+        dispatchedAt: new Date('2026-01-01'),
+      };
+      prisma.notificationEvent.updateMany.mockImplementation(
+        async ({ where, data }) => {
+          if (
+            where.tenantId === event.tenantId &&
+            where.id === event.id &&
+            where.status.in.includes(event.status)
+          ) {
+            Object.assign(event, data);
+            return { count: 1 };
+          }
+          return { count: 0 };
+        },
+      );
+      prisma.notificationEvent.findFirst.mockResolvedValue(event);
+      await expect(
+        service.markFailed('tenant-1', 'event-1', 'LATE_FAILURE'),
+      ).resolves.toMatchObject({ status });
+      await expect(
+        service.markDispatched('tenant-1', 'event-1'),
+      ).resolves.toMatchObject({
+        status,
+        dispatchedAt: new Date('2026-01-01'),
+      });
+      expect(prisma.notificationEvent.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('allows successful recovery from FAILED and prevents a later failure downgrade', async () => {
+    const event = {
+      id: 'event-1',
+      tenantId: 'tenant-1',
+      status: 'FAILED',
+      failureCode: 'INTAKE_FAILED',
+    };
+    prisma.notificationEvent.updateMany.mockImplementation(
+      async ({ where, data }) => {
+        if (where.status.in.includes(event.status)) {
+          Object.assign(event, data);
+          return { count: 1 };
+        }
+        return { count: 0 };
+      },
+    );
+    prisma.notificationEvent.findFirst.mockResolvedValue(event);
+    await expect(
+      service.markDispatched('tenant-1', 'event-1'),
+    ).resolves.toMatchObject({ status: 'DISPATCHED', failureCode: null });
+    await expect(
+      service.markFailed('tenant-1', 'event-1', 'LATE_FAILURE'),
+    ).resolves.toMatchObject({ status: 'DISPATCHED', failureCode: null });
+  });
+
+  it('does not update an event in another tenant', async () => {
+    prisma.notificationEvent.updateMany.mockResolvedValue({ count: 0 });
+    prisma.notificationEvent.findFirst.mockResolvedValue(null);
+    await expect(
+      service.markFailed('other-tenant', 'event-1', 'FAILED'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.notificationEvent.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'event-1',
+          tenantId: 'other-tenant',
+        }),
+      }),
+    );
+    expect(prisma.notificationEvent.findFirst).toHaveBeenCalledWith({
+      where: { id: 'event-1', tenantId: 'other-tenant' },
+    });
   });
 
   it('rejects unknown event strings before persistence', async () => {

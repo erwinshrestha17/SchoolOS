@@ -6,6 +6,16 @@ const webRoot = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, webRoot), 'utf8');
 
 describe('M15 saved-draft review and publication workflow', () => {
+  it('reconciles uncertain mutation outcomes without automatically replaying publication', () => {
+    const review = read('components/notices/notice-review-workspace.tsx');
+    const errorHandler = review.split('onError: async () => {')[1]?.split('\n  });')[0];
+    assert.ok(errorHandler);
+    assert.match(errorHandler, /setPendingAction\(null\)/);
+    assert.match(errorHandler, /queryClient\.invalidateQueries/);
+    assert.match(errorHandler, /notice-detail/);
+    assert.doesNotMatch(errorHandler, /publishNotice|\.mutate\(/);
+    assert.match(review, /Review current notice status/);
+  });
   it('shows the draft review action without claiming draft content is published', () => {
     const detail = read('app/dashboard/notices/[noticeId]/page.tsx');
 

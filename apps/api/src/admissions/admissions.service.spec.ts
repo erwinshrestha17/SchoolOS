@@ -11,12 +11,14 @@ import {
   EnrollmentStatus,
   Gender,
   StudentDocumentKind,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '../config/config.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { FinanceService } from '../finance/finance.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationEventService } from '../communications/notification-event.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { StudentRecordsService } from '../student-records/student-records.service';
@@ -348,6 +350,73 @@ describe('AdmissionsService production hardening', () => {
     expect(financeService.createInitialInvoice).toHaveBeenCalledWith(
       expect.objectContaining({ enrollmentId: 'enrollment-1' }),
     );
+  });
+
+  it.each([
+    { status: EnrollmentStatus.TRANSFERRED },
+    { status: EnrollmentStatus.EXITED },
+    { status: EnrollmentStatus.PROMOTED },
+    { effectiveUntil: new Date('2026-06-01') },
+    ...Object.values(StudentLifecycleStatus)
+      .filter((status) => status !== StudentLifecycleStatus.ACTIVE)
+      .map((lifecycleStatus) => ({
+        student: { ...buildConvertedEnrollment().student, lifecycleStatus },
+      })),
+  ])(
+    'rejects historical admission follow-up after lifecycle changes: %j',
+    async (change) => {
+      const dto = buildAdmissionDto();
+      const prisma = buildPrisma({
+        studentFindFirstResult: {
+          id: 'student-1',
+          admissionRequestFingerprint: buildAdmissionConversionFingerprint(dto),
+        },
+        enrollmentFindFirstResult: { ...buildConvertedEnrollment(), ...change },
+      });
+      const { service, financeService, studentsService, eventEmitter } =
+        buildService(prisma);
+      await expect(service.createAdmission(dto, actor)).rejects.toThrow(
+        'no longer active',
+      );
+      expect(financeService.assignFeePlansForEnrollment).not.toHaveBeenCalled();
+      expect(financeService.createInitialInvoice).not.toHaveBeenCalled();
+      expect(studentsService.generateStudentDocumentPdf).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not report replay completion when durable notification intake fails', async () => {
+    const dto = buildAdmissionDto();
+    const prisma = buildPrisma({
+      studentFindFirstResult: {
+        id: 'student-1',
+        admissionRequestFingerprint: buildAdmissionConversionFingerprint(dto),
+      },
+      enrollmentFindFirstResult: buildConvertedEnrollment(),
+    });
+    const { service, notificationEventService, eventEmitter } =
+      buildService(prisma);
+    notificationEventService.accept.mockRejectedValueOnce(
+      new Error('intake unavailable'),
+    );
+    await expect(service.createAdmission(dto, actor)).rejects.toThrow(
+      'intake unavailable',
+    );
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    await expect(service.createAdmission(dto, actor)).resolves.toMatchObject({
+      disposition: 'REPLAYED',
+    });
+    expect(notificationEventService.accept).toHaveBeenLastCalledWith({
+      tenantId: actor.tenantId,
+      type: 'STUDENT_ADMITTED',
+      sourceEntityId: 'student-1',
+      actorId: actor.userId,
+      idempotencyKey: 'student:student-1:admitted',
+      metadata: { classId: 'class-1', sectionId: 'section-1' },
+    });
+    expect(eventEmitter.emit).toHaveBeenCalledTimes(1);
   });
 
   it('rejects reuse of a direct-admission operation ID with changed input', async () => {
@@ -1811,6 +1880,8 @@ function buildApplication() {
 
 function buildConvertedEnrollment() {
   return {
+    status: EnrollmentStatus.ACTIVE,
+    effectiveUntil: null,
     id: 'enrollment-1',
     tenantId: actor.tenantId,
     studentId: 'student-1',
@@ -1820,6 +1891,7 @@ function buildConvertedEnrollment() {
     rollNumber: 4,
     createdAt: new Date('2026-04-15T00:00:00.000Z'),
     student: {
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
       id: 'student-1',
       studentSystemId: 'SCH-2026-0001',
       firstNameEn: 'Asha',
@@ -1919,6 +1991,9 @@ function buildService(prisma = buildPrisma()) {
     incrementUsage: jest.fn().mockResolvedValue(undefined),
   };
 
+  const notificationEventService = {
+    accept: jest.fn().mockResolvedValue({ id: 'event-1' }),
+  };
   const service = new AdmissionsService(
     prisma as unknown as PrismaService,
     usersService as unknown as UsersService,
@@ -1932,10 +2007,12 @@ function buildService(prisma = buildPrisma()) {
     storageService as unknown as StorageService,
     fileRegistryService as unknown as FileRegistryService,
     usageService as unknown as UsageService,
+    notificationEventService as unknown as NotificationEventService,
   );
 
   return {
     service,
+    notificationEventService,
     usersService,
     financeService,
     notificationsService,

@@ -62,6 +62,7 @@ export function IemisReadinessWorkspace() {
     useState<PendingAdmissionImport | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importPage, setImportPage] = useState(1);
+  const [reviewPage, setReviewPage] = useState(1);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const batchDetailsRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -99,8 +100,9 @@ export function IemisReadinessWorkspace() {
     enabled: canReadImportDetails && selectedBatchId !== null,
   });
   const importReviewQuery = useQuery({
-    queryKey: ["admission-import-review-queue"],
-    queryFn: () => api.listAdmissionImportReviewQueue({ limit: 25 }),
+    queryKey: ["admission-import-review-queue", reviewPage],
+    queryFn: () =>
+      api.listAdmissionImportReviewQueue({ page: reviewPage, limit: 25 }),
   });
 
   const exportMutation = useMutation({
@@ -738,14 +740,15 @@ export function IemisReadinessWorkspace() {
               </div>
             ) : (importReviewQuery.data?.items.length ?? 0) === 0 ? (
               <p className="mt-3 text-sm text-slate-500">
-                No import rows currently require review.
+                {reviewPage === 1
+                  ? "No import rows currently require review."
+                  : "No review rows on this page. Return to a previous page."}
               </p>
             ) : (
               <div className="mt-3 space-y-2">
                 <p className="text-sm text-slate-600">
                   Showing {importReviewQuery.data?.items.length} of{" "}
-                  {importReviewQuery.data?.total} rows. Use import history to
-                  review older batches.
+                  {importReviewQuery.data?.total} rows · Page {reviewPage}.
                 </p>
                 {importReviewQuery.data?.items.map((row) => (
                   <div
@@ -780,6 +783,29 @@ export function IemisReadinessWorkspace() {
                 ))}
               </div>
             )}
+            <nav
+              aria-label="Import review pagination"
+              className="mt-3 flex justify-end gap-3"
+            >
+              <Button
+                variant="outline"
+                disabled={reviewPage === 1 || importReviewQuery.isFetching}
+                onClick={() => setReviewPage((page) => page - 1)}
+              >
+                Previous review page
+              </Button>
+              <Button
+                variant="outline"
+                disabled={
+                  importReviewQuery.isError ||
+                  !importReviewQuery.data?.hasNextPage ||
+                  importReviewQuery.isFetching
+                }
+                onClick={() => setReviewPage((page) => page + 1)}
+              >
+                Next review page
+              </Button>
+            </nav>
           </div>
         </section>
 

@@ -74,7 +74,10 @@ export class NotificationEventService {
         },
       },
     });
-    if (existing) return existing;
+    if (existing) {
+      this.assertReplayIdentity(existing, input);
+      return existing;
+    }
 
     let notificationEvent;
     try {
@@ -106,7 +109,10 @@ export class NotificationEventService {
             },
           },
         });
-        if (duplicate) return duplicate;
+        if (duplicate) {
+          this.assertReplayIdentity(duplicate, input);
+          return duplicate;
+        }
       }
       throw error;
     }
@@ -130,9 +136,33 @@ export class NotificationEventService {
     return notificationEvent;
   }
 
+  private assertReplayIdentity(
+    existing: { tenantId: string; type: string; sourceEntityId: string },
+    input: AcceptNotificationEventInput,
+  ) {
+    if (
+      existing.tenantId !== input.tenantId ||
+      existing.type !== input.type ||
+      existing.sourceEntityId !== input.sourceEntityId
+    ) {
+      throw new ConflictException(
+        'Notification event idempotency key belongs to a different source event.',
+      );
+    }
+  }
+
   async markDispatched(tenantId: string, eventId: string) {
-    return this.prisma.notificationEvent.update({
-      where: { id: eventId, tenantId },
+    await this.prisma.notificationEvent.updateMany({
+      where: {
+        id: eventId,
+        tenantId,
+        status: {
+          in: [
+            NotificationEventStatus.ACCEPTED,
+            NotificationEventStatus.FAILED,
+          ],
+        },
+      },
       data: {
         status: NotificationEventStatus.DISPATCHED,
         dispatchedAt: new Date(),
@@ -140,17 +170,36 @@ export class NotificationEventService {
         failureCode: null,
       },
     });
+    return this.loadEvent(tenantId, eventId);
   }
 
   async markFailed(tenantId: string, eventId: string, failureCode: string) {
-    return this.prisma.notificationEvent.update({
-      where: { id: eventId, tenantId },
+    await this.prisma.notificationEvent.updateMany({
+      where: {
+        id: eventId,
+        tenantId,
+        status: {
+          in: [
+            NotificationEventStatus.ACCEPTED,
+            NotificationEventStatus.FAILED,
+          ],
+        },
+      },
       data: {
         status: NotificationEventStatus.FAILED,
         failedAt: new Date(),
         failureCode: failureCode.slice(0, 80),
       },
     });
+    return this.loadEvent(tenantId, eventId);
+  }
+
+  private async loadEvent(tenantId: string, eventId: string) {
+    const event = await this.prisma.notificationEvent.findFirst({
+      where: { id: eventId, tenantId },
+    });
+    if (!event) throw new NotFoundException('Notification event not found');
+    return event;
   }
 
   private validateMetadata(

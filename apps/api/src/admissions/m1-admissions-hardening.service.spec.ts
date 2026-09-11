@@ -542,7 +542,8 @@ describe('M1AdmissionsHardeningService', () => {
         ],
       },
       include: { batch: true },
-      orderBy: [{ createdAt: 'desc' }, { rowNumber: 'asc' }],
+      orderBy: [{ createdAt: 'desc' }, { rowNumber: 'asc' }, { id: 'asc' }],
+      skip: 0,
       take: 10,
     });
     expect(result.items[0]).toEqual(
@@ -571,6 +572,31 @@ describe('M1AdmissionsHardeningService', () => {
     expect(prisma.admissionImportRow.count).toHaveBeenCalledWith({
       where: prisma.admissionImportRow.findMany.mock.calls[0][0].where,
     });
+  });
+
+  it('retrieves later review pages with stable ordering and authoritative pagination', async () => {
+    const prisma = buildPrisma();
+    prisma.admissionImportRow.count.mockResolvedValueOnce(26);
+    const { service } = buildService(prisma);
+    const result = await service.listImportReviewQueue(
+      { page: 2, limit: 25 },
+      actor,
+    );
+    expect(prisma.admissionImportRow.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 25,
+        take: 25,
+        orderBy: [{ createdAt: 'desc' }, { rowNumber: 'asc' }, { id: 'asc' }],
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        page: 2,
+        limit: 25,
+        total: 26,
+        hasNextPage: false,
+      }),
+    );
   });
 
   it('does not advise re-importing a failed row with an existing student', async () => {
