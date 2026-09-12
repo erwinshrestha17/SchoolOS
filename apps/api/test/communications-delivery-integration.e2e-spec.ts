@@ -47,6 +47,7 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
     sendEmail: jest.Mock;
     sendSms: jest.Mock;
     sendPushNotification: jest.Mock;
+    releaseInAppNotification: jest.Mock;
     getProviderReadiness: jest.Mock;
   };
   let communicationsService: CommunicationsService;
@@ -68,6 +69,7 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
       sendEmail: jest.fn().mockResolvedValue(undefined),
       sendSms: jest.fn().mockResolvedValue(undefined),
       sendPushNotification: jest.fn().mockResolvedValue(undefined),
+      releaseInAppNotification: jest.fn().mockResolvedValue(undefined),
       getProviderReadiness: jest.fn().mockResolvedValue({
         enabled: true,
         failureCode: null,
@@ -96,6 +98,16 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
           eval: jest.fn().mockResolvedValue(1),
         }),
       } as any,
+      undefined,
+      undefined,
+      undefined,
+      {
+        evaluateDelivery: jest.fn().mockResolvedValue({
+          action: 'IMMEDIATE',
+          mandatory: false,
+          reason: 'Synthetic permitted policy',
+        }),
+      } as never,
     );
     m10HardeningService = new M10HardeningService(
       prisma as unknown as PrismaService,
@@ -140,7 +152,7 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
           noticeId: notice.id,
           guardianId: 'guardian-1',
           recipientUserId: 'guardian-user-1',
-          status: NotificationStatus.SENT,
+          status: NotificationStatus.QUEUED,
           channel: NotificationChannel.IN_APP,
         }),
         expect.objectContaining({
@@ -163,6 +175,13 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
       ]),
     );
     expect(notificationsService.sendPushNotification).toHaveBeenCalledTimes(1);
+    expect(notificationsService.releaseInAppNotification).toHaveBeenCalledWith({
+      metadata: expect.objectContaining({
+        tenantId,
+        notificationDeliveryId: 'delivery-1',
+        deliveryAttempt: '0',
+      }),
+    });
     expect(notificationsService.sendPushNotification).toHaveBeenCalledWith(
       expect.objectContaining({
         audience: 'guardian-user-1',
@@ -487,6 +506,7 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
       title: overrides.title ?? 'Title',
       body: overrides.body ?? 'Body',
       errorMessage: overrides.errorMessage ?? null,
+      retryCount: overrides.retryCount ?? 0,
       sentAt: null,
       createdAt: new Date(),
     });
@@ -506,6 +526,9 @@ function buildPrismaMock() {
   };
 
   const prisma = {
+    $transaction: jest.fn(
+      async (operation: (tx: unknown) => Promise<unknown>) => operation(prisma),
+    ),
     __state: state,
     notice: {
       create: jest.fn(async (q: { data: Record<string, unknown> }) => {
@@ -587,6 +610,33 @@ function buildPrismaMock() {
       }),
     },
     notificationDelivery: {
+      createMany: jest.fn(
+        async (q: {
+          data: Record<string, unknown>[];
+          skipDuplicates?: boolean;
+        }) => {
+          let count = 0;
+          for (const data of q.data) {
+            if (
+              q.skipDuplicates &&
+              state.notificationDeliveries.some(
+                (row) =>
+                  row.tenantId === data.tenantId &&
+                  row.idempotencyKey === data.idempotencyKey,
+              )
+            )
+              continue;
+            state.notificationDeliveries.push({
+              id: `delivery-${state.notificationDeliveries.length + 1}`,
+              createdAt: new Date(),
+              retryCount: 0,
+              ...data,
+            });
+            count++;
+          }
+          return { count };
+        },
+      ),
       create: jest.fn(async (q: { data: Record<string, unknown> }) => {
         const delivery = {
           id: `delivery-${state.notificationDeliveries.length + 1}`,
@@ -631,9 +681,14 @@ function buildPrismaMock() {
           const recipientIn = (
             where.recipientUserId as { in?: string[] } | undefined
           )?.in;
+          const idempotencyKeys = (
+            where.idempotencyKey as { in?: string[] } | undefined
+          )?.in;
           const rows = state.notificationDeliveries.filter(
             (delivery) =>
               delivery.tenantId === where.tenantId &&
+              (!idempotencyKeys ||
+                idempotencyKeys.includes(delivery.idempotencyKey as string)) &&
               (!where.sourceType || delivery.sourceType === where.sourceType) &&
               (!where.sourceId || delivery.sourceId === where.sourceId) &&
               (!where.noticeId || delivery.noticeId === where.noticeId) &&
@@ -653,6 +708,9 @@ function buildPrismaMock() {
             (delivery) =>
               (!where.id || delivery.id === where.id) &&
               delivery.tenantId === where.tenantId &&
+              (where.retryCount === undefined ||
+                (delivery.retryCount ?? 0) === where.retryCount) &&
+              (!where.status || delivery.status === where.status) &&
               (!where.noticeId || delivery.noticeId === where.noticeId) &&
               (!where.recipientUserId ||
                 delivery.recipientUserId === where.recipientUserId),
@@ -672,9 +730,18 @@ function buildPrismaMock() {
         },
       ),
       updateMany: jest.fn(
-        async (q: { where: { id: string }; data: Record<string, any> }) => {
-          const deliveries = state.notificationDeliveries.filter(
-            (item) => item.id === q.where.id,
+        async (q: {
+          where: Record<string, unknown>;
+          data: Record<string, any>;
+        }) => {
+          const deliveries = state.notificationDeliveries.filter((item) =>
+            Object.entries(q.where).every(([key, value]) => {
+              if (key === 'retryCount') return (item.retryCount ?? 0) === value;
+              if (value && typeof value === 'object' && 'in' in value) {
+                return (value.in as unknown[]).includes(item[key]);
+              }
+              return item[key] === value;
+            }),
           );
           for (const delivery of deliveries) {
             const updates = { ...q.data };

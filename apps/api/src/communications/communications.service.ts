@@ -79,6 +79,8 @@ const TEMPLATE_SELECT = {
   updatedAt: true,
 } satisfies Prisma.CommunicationTemplateSelect;
 
+const DELIVERY_INSERT_BATCH_SIZE = 500;
+
 function maskDeliveryDestination(destination: string) {
   if (destination.includes('@')) {
     const [name, domain] = destination.split('@');
@@ -2320,17 +2322,23 @@ export class CommunicationsService {
         );
       }
 
-      const queuedDeliveries = await this.createDeliveryRows(
-        input,
-        allowedRecipients,
-        NotificationStatus.QUEUED,
-      );
-      const skippedDeliveries = await this.createDeliveryRows(
-        input,
-        skippedRecipients,
-        NotificationStatus.SKIPPED,
-        `Missing required consent: ${input.requiredConsentTypes?.join(', ')}`,
-      );
+      const [queuedDeliveries, skippedDeliveries] =
+        await this.prisma.$transaction(async (tx) => {
+          const queued = await this.createDeliveryRows(
+            input,
+            allowedRecipients,
+            NotificationStatus.QUEUED,
+            tx,
+          );
+          const skipped = await this.createDeliveryRows(
+            input,
+            skippedRecipients,
+            NotificationStatus.SKIPPED,
+            tx,
+            `Missing required consent: ${input.requiredConsentTypes?.join(', ')}`,
+          );
+          return [queued, skipped];
+        });
 
       for (const delivery of queuedDeliveries) {
         await this.dispatchDelivery(delivery);
@@ -2542,9 +2550,44 @@ export class CommunicationsService {
     input: DeliveryRecordInput,
     recipients: DeliveryRecipient[],
     status: NotificationStatus,
+    tx: Pick<PrismaService, 'notificationDelivery'>,
     errorMessage?: string,
   ) {
     const deliveries: DeliveryRow[] = [];
+    const batch: Array<
+      Prisma.NotificationDeliveryCreateManyInput & { idempotencyKey: string }
+    > = [];
+
+    const persistBatch = async () => {
+      if (batch.length === 0) return;
+      const rows = batch.splice(0);
+      await tx.notificationDelivery.createMany({
+        data: rows,
+        skipDuplicates: true,
+      });
+      const keys = [...new Set(rows.map((row) => row.idempotencyKey))];
+      const persisted = await tx.notificationDelivery.findMany({
+        where: {
+          tenantId: input.actor.tenantId,
+          idempotencyKey: { in: keys },
+        },
+        take: keys.length,
+      });
+      const byKey = new Map(
+        persisted.map((delivery) => [delivery.idempotencyKey, delivery]),
+      );
+      // SQL does not guarantee IN-query order. Return the original recipient /
+      // channel order and existing identities without rewriting saved content.
+      for (const row of rows) {
+        const delivery = byKey.get(row.idempotencyKey);
+        if (!delivery) {
+          throw new ConflictException(
+            'Notification delivery records could not be confirmed',
+          );
+        }
+        deliveries.push(delivery);
+      }
+    };
 
     for (const recipient of recipients) {
       for (const channel of input.channels) {
@@ -2553,47 +2596,52 @@ export class CommunicationsService {
           recipient,
           channel,
         );
-        const delivery = await this.prisma.notificationDelivery.upsert({
-          where: {
-            tenantId_idempotencyKey: {
-              tenantId: input.actor.tenantId,
-              idempotencyKey,
-            },
-          },
-          create: {
-            tenantId: input.actor.tenantId,
-            idempotencyKey,
-            channel,
-            status,
-            sourceType: input.sourceType,
-            sourceId: input.sourceId,
-            audienceType: input.audienceType,
-            recipientUserId: recipient.userId,
-            guardianId: recipient.guardianId,
-            studentId: recipient.studentId || null,
-            noticeId: input.noticeId ?? null,
-            eventId: input.eventId ?? null,
-            activityPostId: input.activityPostId ?? null,
-            notificationEventId: input.notificationEventId ?? null,
-            destination: resolveDestination(recipient, channel),
-            title: input.title,
-            body: input.body,
-            errorMessage: errorMessage ?? null,
-            sentAt: null,
-          },
-          update: {},
+        batch.push({
+          tenantId: input.actor.tenantId,
+          idempotencyKey,
+          channel,
+          status,
+          sourceType: input.sourceType,
+          sourceId: input.sourceId,
+          audienceType: input.audienceType,
+          recipientUserId: recipient.userId,
+          guardianId: recipient.guardianId,
+          studentId: recipient.studentId || null,
+          noticeId: input.noticeId ?? null,
+          eventId: input.eventId ?? null,
+          activityPostId: input.activityPostId ?? null,
+          notificationEventId: input.notificationEventId ?? null,
+          destination: resolveDestination(recipient, channel),
+          title: input.title,
+          body: input.body,
+          errorMessage: errorMessage ?? null,
+          sentAt: null,
         });
-
-        deliveries.push(delivery);
+        if (batch.length === DELIVERY_INSERT_BATCH_SIZE) await persistBatch();
       }
     }
+
+    await persistBatch();
 
     return deliveries;
   }
 
   private async dispatchDelivery(delivery: DeliveryRow) {
+    const initialAttemptWhere = {
+      id: delivery.id,
+      tenantId: delivery.tenantId,
+      retryCount: 0,
+      status: NotificationStatus.QUEUED,
+    };
+    let handoffStarted = false;
     try {
-      if (!delivery.destination) {
+      if (!this.notificationPreferencePolicy) {
+        throw new Error('Notification delivery policy is unavailable');
+      }
+      if (
+        delivery.channel !== NotificationChannel.IN_APP &&
+        !delivery.destination
+      ) {
         throw new Error(`No destination resolved for ${delivery.channel}`);
       }
 
@@ -2605,22 +2653,19 @@ export class CommunicationsService {
         sourceId: delivery.sourceId,
       };
 
-      if (this.notificationPreferencePolicy) {
-        const decision =
-          await this.notificationPreferencePolicy.evaluateDelivery(
-            delivery.tenantId,
-            delivery.id,
-          );
-        if (decision.action === 'SKIP') {
-          await this.prisma.notificationDelivery.update({
-            where: { id: delivery.id },
-            data: {
-              status: NotificationStatus.SKIPPED,
-              errorMessage: decision.reason,
-            },
-          });
-          return;
-        }
+      const decision = await this.notificationPreferencePolicy.evaluateDelivery(
+        delivery.tenantId,
+        delivery.id,
+      );
+      if (decision.action === 'SKIP') {
+        await this.prisma.notificationDelivery.updateMany({
+          where: initialAttemptWhere,
+          data: {
+            status: NotificationStatus.SKIPPED,
+            errorMessage: decision.reason,
+          },
+        });
+        return;
       }
 
       if (delivery.channel !== NotificationChannel.IN_APP) {
@@ -2628,8 +2673,8 @@ export class CommunicationsService {
           delivery.channel,
         );
         if (!readiness.enabled) {
-          await this.prisma.notificationDelivery.update({
-            where: { id: delivery.id },
+          await this.prisma.notificationDelivery.updateMany({
+            where: initialAttemptWhere,
             data: {
               status: NotificationStatus.SKIPPED,
               errorMessage: readiness.failureReason,
@@ -2641,9 +2686,18 @@ export class CommunicationsService {
         }
       }
 
+      // Policy/readiness can await external state while another worker claims a
+      // retry or completes this delivery. Do not hand off a stale first attempt.
+      const current = await this.prisma.notificationDelivery.findFirst({
+        where: initialAttemptWhere,
+        select: { id: true },
+      });
+      if (!current) return;
+
       if (delivery.channel === NotificationChannel.EMAIL) {
+        handoffStarted = true;
         await this.notificationsService.sendEmail({
-          to: delivery.destination,
+          to: delivery.destination!,
           subject: delivery.title,
           text: delivery.body,
           metadata,
@@ -2652,8 +2706,9 @@ export class CommunicationsService {
       }
 
       if (delivery.channel === NotificationChannel.SMS) {
+        handoffStarted = true;
         await this.notificationsService.sendSms({
-          to: delivery.destination,
+          to: delivery.destination!,
           message: delivery.body,
           metadata,
         });
@@ -2661,32 +2716,41 @@ export class CommunicationsService {
       }
 
       if (delivery.channel === NotificationChannel.IN_APP) {
-        if (this.notificationPreferencePolicy) {
-          await this.notificationsService.releaseInAppNotification({
-            metadata,
-          });
-          return;
-        }
-        await this.prisma.notificationDelivery.update({
-          where: { id: delivery.id },
-          data: { status: NotificationStatus.SENT, sentAt: new Date() },
+        handoffStarted = true;
+        await this.notificationsService.releaseInAppNotification({
+          metadata,
         });
         return;
       }
 
+      handoffStarted = true;
       await this.notificationsService.sendPushNotification({
         title: delivery.title,
         body: delivery.body,
-        audience: delivery.destination,
+        audience: delivery.destination!,
         metadata,
       });
     } catch (error) {
-      await this.prisma.notificationDelivery.update({
-        where: { id: delivery.id },
+      // The queue may have accepted attempt zero even when its reply was lost.
+      // Preserve that identity rather than allowing a fresh manual retry.
+      const errorMessage = handoffStarted
+        ? 'Queue handoff could not be confirmed. This attempt remains pending; review delivery status before further action.'
+        : error instanceof Error
+          ? error.message
+          : 'Notification failed';
+      await this.prisma.notificationDelivery.updateMany({
+        where: initialAttemptWhere,
         data: {
-          status: NotificationStatus.FAILED,
-          errorMessage:
-            error instanceof Error ? error.message : 'Notification failed',
+          status: handoffStarted
+            ? NotificationStatus.RETRY_PENDING
+            : NotificationStatus.FAILED,
+          errorMessage,
+          ...(handoffStarted
+            ? {
+                failureCode: 'QUEUE_HANDOFF_UNCONFIRMED',
+                failureReason: errorMessage,
+              }
+            : {}),
         },
       });
     }

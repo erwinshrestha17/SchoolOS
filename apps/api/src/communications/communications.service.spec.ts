@@ -27,8 +27,22 @@ describe('CommunicationsService', () => {
   let teacherScopeService: any;
   let service: CommunicationsService;
   let actor: AuthContext;
+  let savedDeliveryRows: Array<Record<string, any>>;
+  let batchDeliveryFindMany: jest.Mock;
+  let notificationPreferencePolicy: { evaluateDelivery: jest.Mock };
 
   beforeEach(() => {
+    savedDeliveryRows = [];
+    batchDeliveryFindMany = jest.fn(async ({ where, take }) =>
+      savedDeliveryRows
+        .filter(
+          (row) =>
+            row.tenantId === where.tenantId &&
+            where.idempotencyKey.in.includes(row.idempotencyKey),
+        )
+        .slice(0, take)
+        .reverse(),
+    );
     prisma = {
       class: {
         findFirst: jest.fn(),
@@ -63,6 +77,28 @@ describe('CommunicationsService', () => {
         findMany: jest.fn(),
       },
       notificationDelivery: {
+        createMany: jest.fn(async ({ data, skipDuplicates }) => {
+          let count = 0;
+          for (const row of data) {
+            if (
+              skipDuplicates &&
+              savedDeliveryRows.some(
+                (existing) =>
+                  existing.tenantId === row.tenantId &&
+                  existing.idempotencyKey === row.idempotencyKey,
+              )
+            )
+              continue;
+            savedDeliveryRows.push({
+              id: `delivery-${savedDeliveryRows.length + 1}`,
+              createdAt: new Date('2026-04-27T00:00:00.000Z'),
+              retryCount: 0,
+              ...row,
+            });
+            count++;
+          }
+          return { count };
+        }),
         create: jest.fn((args) =>
           Promise.resolve({
             id: `delivery-${prisma.notificationDelivery.create.mock.calls.length}`,
@@ -73,7 +109,13 @@ describe('CommunicationsService', () => {
           }),
         ),
         update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn(async ({ where, data }) => {
+          const rows = savedDeliveryRows.filter((row) =>
+            Object.entries(where).every(([key, value]) => row[key] === value),
+          );
+          rows.forEach((row) => Object.assign(row, data));
+          return { count: rows.length };
+        }),
         upsert: jest.fn((args) =>
           Promise.resolve({
             id: `delivery-${prisma.notificationDelivery.upsert.mock.calls.length}`,
@@ -84,7 +126,12 @@ describe('CommunicationsService', () => {
           }),
         ),
         findMany: jest.fn(),
-        findFirst: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn(
+          async ({ where }) =>
+            savedDeliveryRows.find((row) =>
+              Object.entries(where).every(([key, value]) => row[key] === value),
+            ) ?? null,
+        ),
         groupBy: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
       },
@@ -115,10 +162,21 @@ describe('CommunicationsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       $queryRaw: jest.fn().mockResolvedValue([]),
-      $transaction: jest.fn(async (operations) => Promise.all(operations)),
+      $transaction: jest.fn(async (operations) =>
+        typeof operations === 'function'
+          ? operations({
+              ...prisma,
+              notificationDelivery: {
+                ...prisma.notificationDelivery,
+                findMany: batchDeliveryFindMany,
+              },
+            })
+          : Promise.all(operations),
+      ),
     };
     notificationsService = {
       sendPushNotification: jest.fn(),
+      releaseInAppNotification: jest.fn(),
       sendSms: jest.fn(),
       sendEmail: jest.fn(),
       getProviderReadiness: jest.fn().mockResolvedValue({
@@ -150,6 +208,15 @@ describe('CommunicationsService', () => {
         allSectionIds: new Set(),
       }),
     };
+    notificationPreferencePolicy = {
+      evaluateDelivery: jest
+        .fn()
+        .mockResolvedValue({
+          action: 'IMMEDIATE',
+          mandatory: false,
+          reason: 'Synthetic permitted policy',
+        }),
+    };
     actor = {
       userId: 'admin-1',
       tenantId: 'tenant-1',
@@ -177,7 +244,7 @@ describe('CommunicationsService', () => {
       fileRegistryService,
       undefined,
       undefined,
-      undefined,
+      notificationPreferencePolicy as never,
       teacherScopeService,
     );
   });
@@ -201,6 +268,7 @@ describe('CommunicationsService', () => {
       fileRegistryService,
       undefined,
       notificationEventService as never,
+      notificationPreferencePolicy as never,
     );
     const recordDeliveryRecords = jest
       .spyOn(reminderService, 'recordDeliveryRecords')
@@ -273,6 +341,7 @@ describe('CommunicationsService', () => {
       fileRegistryService,
       undefined,
       notificationEventService as never,
+      notificationPreferencePolicy as never,
     );
     jest
       .spyOn(reminderService, 'recordDeliveryRecords')
@@ -313,6 +382,7 @@ describe('CommunicationsService', () => {
       fileRegistryService,
       undefined,
       notificationEventService as never,
+      notificationPreferencePolicy as never,
     );
     const deliveries = jest.spyOn(replayService, 'recordDeliveryRecords');
     await replayService.handleStudentAdmitted({
@@ -344,6 +414,7 @@ describe('CommunicationsService', () => {
       fileRegistryService,
       undefined,
       events as never,
+      notificationPreferencePolicy as never,
     );
     const deliveries = jest.spyOn(replayService, 'recordDeliveryRecords');
     await expect(
@@ -379,6 +450,35 @@ describe('CommunicationsService', () => {
     expect(events.markFailed).not.toHaveBeenCalled();
   });
 
+  it('does not dispatch when the recipient batch transaction fails', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.$transaction.mockRejectedValueOnce(
+      new Error('synthetic transaction failure'),
+    );
+    await expect(
+      service.recordDeliveryRecords({
+        actor,
+        sourceType: 'notice',
+        sourceId: 'notice-1',
+        audienceType: AudienceType.ALL,
+        title: 'Synthetic',
+        body: 'Synthetic',
+        channels: [NotificationChannel.PUSH],
+        directRecipients: [
+          {
+            studentId: '',
+            guardianId: null,
+            userId: 'recipient-1',
+            email: null,
+            phone: null,
+          },
+        ],
+      }),
+    ).rejects.toThrow('synthetic transaction failure');
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+    expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
+  });
+
   it('releases only its own delivery lock token', async () => {
     prisma.notificationDelivery.findMany.mockResolvedValue([
       { id: 'existing', status: NotificationStatus.QUEUED },
@@ -402,6 +502,154 @@ describe('CommunicationsService', () => {
       token,
     );
     expect(redis.del).not.toHaveBeenCalled();
+  });
+
+  it('persists a large audience in bounded batches and returns recipient/channel order', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    const recipients = Array.from({ length: 501 }, (_, index) => ({
+      studentId: '',
+      guardianId: null,
+      userId: `recipient-${index}`,
+      email: `recipient-${index}@school.test`,
+      phone: `synthetic-phone-${index}`,
+    }));
+    const channels = [
+      NotificationChannel.PUSH,
+      NotificationChannel.EMAIL,
+      NotificationChannel.SMS,
+    ];
+
+    const result = await service.recordDeliveryRecords({
+      actor,
+      sourceType: 'notice',
+      sourceId: 'batch-notice',
+      audienceType: AudienceType.ALL,
+      title: 'Synthetic batch',
+      body: 'Synthetic batch body',
+      channels,
+      directRecipients: recipients,
+      communicationCategory: 'ESSENTIAL',
+    });
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(
+      prisma.notificationDelivery.createMany.mock.calls.map(
+        ([args]) => args.data.length,
+      ),
+    ).toEqual([500, 500, 500, 3]);
+    expect(batchDeliveryFindMany).toHaveBeenCalledTimes(4);
+    for (const [args] of prisma.notificationDelivery.createMany.mock.calls) {
+      expect(args.skipDuplicates).toBe(true);
+    }
+    for (const [args] of batchDeliveryFindMany.mock.calls) {
+      expect(args.where.tenantId).toBe(actor.tenantId);
+      expect(args.where.idempotencyKey.in.length).toBeLessThanOrEqual(500);
+      expect(args.take).toBe(args.where.idempotencyKey.in.length);
+    }
+    expect(savedDeliveryRows.map((row) => row.idempotencyKey)).toEqual(
+      recipients.flatMap((recipient) =>
+        channels.map(
+          (channel) => `notice:batch-notice:${recipient.userId}:${channel}`,
+        ),
+      ),
+    );
+    // The readback mock deliberately returns each batch in reverse order.
+    expect(result.deliveryIds).toEqual(savedDeliveryRows.map((row) => row.id));
+    expect(notificationsService.sendPushNotification).toHaveBeenCalledTimes(
+      501,
+    );
+    expect(notificationsService.sendEmail).toHaveBeenCalledTimes(501);
+    expect(notificationsService.sendSms).toHaveBeenCalledTimes(501);
+    expect(prisma.notificationDelivery.upsert).not.toHaveBeenCalled();
+  });
+
+  it('bulk insertion preserves existing tenant-scoped identities and contents on replay', async () => {
+    const input = {
+      actor,
+      sourceType: 'notice',
+      sourceId: 'batch-notice',
+      audienceType: AudienceType.ALL,
+      title: 'Original title',
+      body: 'Original body',
+      channels: [NotificationChannel.PUSH],
+    };
+    const recipients = [
+      {
+        studentId: '',
+        guardianId: null,
+        userId: 'recipient-1',
+        email: null,
+        phone: null,
+      },
+    ];
+    const tx = {
+      notificationDelivery: {
+        ...prisma.notificationDelivery,
+        findMany: batchDeliveryFindMany,
+      },
+    };
+    const createRows = (service as any).createDeliveryRows.bind(service);
+    const original = await createRows(
+      input,
+      recipients,
+      NotificationStatus.QUEUED,
+      tx,
+    );
+    original[0].status = NotificationStatus.DELIVERED;
+    savedDeliveryRows.push({
+      ...original[0],
+      id: 'other-tenant-delivery',
+      tenantId: 'tenant-2',
+    });
+
+    const replay = await createRows(
+      { ...input, title: 'Changed title', body: 'Changed body' },
+      recipients,
+      NotificationStatus.QUEUED,
+      tx,
+    );
+
+    expect(replay).toEqual([
+      expect.objectContaining({
+        id: original[0].id,
+        tenantId: actor.tenantId,
+        title: 'Original title',
+        body: 'Original body',
+        status: NotificationStatus.DELIVERED,
+      }),
+    ]);
+    expect(savedDeliveryRows).toHaveLength(2);
+    expect(prisma.notificationDelivery.update).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing batch readback before dispatching any delivery', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    batchDeliveryFindMany.mockResolvedValueOnce([]);
+
+    await expect(
+      service.recordDeliveryRecords({
+        actor,
+        sourceType: 'notice',
+        sourceId: 'batch-notice',
+        audienceType: AudienceType.ALL,
+        title: 'Synthetic',
+        body: 'Synthetic',
+        channels: [NotificationChannel.PUSH],
+        directRecipients: [
+          {
+            studentId: '',
+            guardianId: null,
+            userId: 'recipient-1',
+            email: null,
+            phone: null,
+          },
+        ],
+        communicationCategory: 'ESSENTIAL',
+      }),
+    ).rejects.toThrow('Notification delivery records could not be confirmed');
+
+    expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
   });
 
   it('lists communication templates with tenant-scoped server pagination', async () => {
@@ -503,21 +751,23 @@ describe('CommunicationsService', () => {
         }),
       }),
     );
-    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+    expect(prisma.notificationDelivery.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({
-          tenantId: 'tenant-1',
-          idempotencyKey: 'event:event-1:guardian-user-1:PUSH',
-          channel: NotificationChannel.PUSH,
-          status: NotificationStatus.QUEUED,
-          sourceType: 'event',
-          sourceId: 'event-1',
-          eventId: 'event-1',
-          audienceType: AudienceType.SECTION,
-          guardianId: 'guardian-1',
-          studentId: 'student-1',
-          destination: 'guardian-user-1',
-        }),
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            tenantId: 'tenant-1',
+            idempotencyKey: 'event:event-1:guardian-user-1:PUSH',
+            channel: NotificationChannel.PUSH,
+            status: NotificationStatus.QUEUED,
+            sourceType: 'event',
+            sourceId: 'event-1',
+            eventId: 'event-1',
+            audienceType: AudienceType.SECTION,
+            guardianId: 'guardian-1',
+            studentId: 'student-1',
+            destination: 'guardian-user-1',
+          }),
+        ]),
       }),
     );
     expect(notificationsService.sendPushNotification).toHaveBeenCalledWith(
@@ -731,14 +981,16 @@ describe('CommunicationsService', () => {
         }),
       }),
     );
-    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+    expect(prisma.notificationDelivery.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({
-          activityPostId: 'post-1',
-          studentId: 'student-1',
-          guardianId: 'guardian-1',
-          status: NotificationStatus.QUEUED,
-        }),
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            activityPostId: 'post-1',
+            studentId: 'student-1',
+            guardianId: 'guardian-1',
+            status: NotificationStatus.QUEUED,
+          }),
+        ]),
       }),
     );
   });
@@ -1312,16 +1564,18 @@ describe('CommunicationsService', () => {
       receiptNumber: 'REC-2025-2026-00001',
     });
 
-    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+    expect(prisma.notificationDelivery.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({
-          tenantId: actor.tenantId,
-          sourceType: 'fee_payment_confirmed',
-          sourceId: 'fee-payment:payment-1:confirmed',
-          studentId: 'student-1',
-          guardianId: 'guardian-1',
-          status: NotificationStatus.QUEUED,
-        }),
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            tenantId: actor.tenantId,
+            sourceType: 'fee_payment_confirmed',
+            sourceId: 'fee-payment:payment-1:confirmed',
+            studentId: 'student-1',
+            guardianId: 'guardian-1',
+            status: NotificationStatus.QUEUED,
+          }),
+        ]),
       }),
     );
     expect(notificationsService.sendEmail).toHaveBeenCalledWith(
@@ -1383,16 +1637,18 @@ describe('CommunicationsService', () => {
         }),
       }),
     );
-    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+    expect(prisma.notificationDelivery.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({
-          tenantId: actor.tenantId,
-          sourceType: 'student_admitted',
-          sourceId: 'student:student-1:admitted',
-          guardianId: 'guardian-1',
-          studentId: 'student-1',
-          status: NotificationStatus.QUEUED,
-        }),
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            tenantId: actor.tenantId,
+            sourceType: 'student_admitted',
+            sourceId: 'student:student-1:admitted',
+            guardianId: 'guardian-1',
+            studentId: 'student-1',
+            status: NotificationStatus.QUEUED,
+          }),
+        ]),
       }),
     );
     expect(notificationsService.sendSms).toHaveBeenCalledWith(
@@ -1403,7 +1659,7 @@ describe('CommunicationsService', () => {
     );
   });
 
-  it('marks provider dispatch failures without breaking delivery creation', async () => {
+  it('keeps an uncertain queue handoff pending without breaking delivery creation', async () => {
     prisma.notificationDelivery.findMany.mockResolvedValue([]);
     prisma.student.findMany.mockResolvedValue([
       {
@@ -1452,20 +1708,320 @@ describe('CommunicationsService', () => {
     });
 
     expect(result.count).toBe(1);
-    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+    expect(prisma.notificationDelivery.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({
-          status: NotificationStatus.QUEUED,
-        }),
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            status: NotificationStatus.QUEUED,
+          }),
+        ]),
       }),
     );
-    expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
-      where: { id: 'delivery-1' },
+    expect(prisma.notificationDelivery.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'delivery-1',
+        tenantId: actor.tenantId,
+        retryCount: 0,
+        status: NotificationStatus.QUEUED,
+      },
       data: {
-        status: NotificationStatus.FAILED,
-        errorMessage: 'Queue unavailable',
+        status: NotificationStatus.RETRY_PENDING,
+        errorMessage: expect.stringContaining(
+          'Queue handoff could not be confirmed',
+        ),
+        failureCode: 'QUEUE_HANDOFF_UNCONFIRMED',
+        failureReason: expect.stringContaining(
+          'Queue handoff could not be confirmed',
+        ),
       },
     });
+  });
+
+  describe('initial delivery attempt fencing', () => {
+    const advancedStates = [
+      { status: NotificationStatus.SENT, retryCount: 0 },
+      { status: NotificationStatus.DELIVERED, retryCount: 0 },
+      { status: NotificationStatus.CANCELLED, retryCount: 0 },
+      { status: NotificationStatus.SKIPPED, retryCount: 0 },
+      { status: NotificationStatus.RETRY_PENDING, retryCount: 1 },
+      { status: NotificationStatus.QUEUED, retryCount: 1 },
+    ];
+
+    function seedInitialDelivery() {
+      const row = {
+        id: 'delivery-initial',
+        tenantId: actor.tenantId,
+        status: NotificationStatus.QUEUED,
+        retryCount: 0,
+        channel: NotificationChannel.PUSH,
+        sourceType: 'notice',
+        sourceId: 'notice-1',
+        title: 'Synthetic',
+        body: 'Synthetic',
+        destination: 'recipient-1',
+        errorMessage: null,
+      };
+      savedDeliveryRows.push(row);
+      return row;
+    }
+
+    it.each(advancedStates)(
+      'does not enqueue when current state advanced to $status attempt $retryCount during readiness',
+      async (advanced) => {
+        const row = seedInitialDelivery();
+        const snapshot = { ...row };
+        notificationsService.getProviderReadiness.mockImplementationOnce(
+          async () => {
+            Object.assign(row, advanced);
+            return { enabled: true };
+          },
+        );
+
+        await (service as any).dispatchDelivery(snapshot);
+
+        expect(
+          notificationsService.sendPushNotification,
+        ).not.toHaveBeenCalled();
+        expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledWith({
+          where: {
+            id: row.id,
+            tenantId: actor.tenantId,
+            status: NotificationStatus.QUEUED,
+            retryCount: 0,
+          },
+          select: { id: true },
+        });
+        expect(prisma.notificationDelivery.updateMany).not.toHaveBeenCalled();
+        expect(row).toMatchObject(advanced);
+      },
+    );
+
+    it.each(advancedStates)(
+      'preserves $status attempt $retryCount after a late initial queue failure',
+      async (advanced) => {
+        const row = seedInitialDelivery();
+        notificationsService.sendPushNotification.mockImplementationOnce(
+          async () => {
+            Object.assign(row, advanced, {
+              errorMessage: 'Authoritative newer result',
+            });
+            throw new Error('Late initial handoff failure');
+          },
+        );
+
+        await (service as any).dispatchDelivery({ ...row });
+
+        expect(row).toMatchObject({
+          ...advanced,
+          errorMessage: 'Authoritative newer result',
+        });
+        expect(prisma.notificationDelivery.updateMany).toHaveBeenCalledWith({
+          where: {
+            id: row.id,
+            tenantId: actor.tenantId,
+            status: NotificationStatus.QUEUED,
+            retryCount: 0,
+          },
+          data: {
+            status: NotificationStatus.RETRY_PENDING,
+            errorMessage: expect.stringContaining(
+              'Queue handoff could not be confirmed',
+            ),
+            failureCode: 'QUEUE_HANDOFF_UNCONFIRMED',
+            failureReason: expect.stringContaining(
+              'Queue handoff could not be confirmed',
+            ),
+          },
+        });
+        expect(prisma.notificationDelivery.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it('preserves a newer retry when an initial readiness check returns unavailable', async () => {
+      const row = seedInitialDelivery();
+      notificationsService.getProviderReadiness.mockImplementationOnce(
+        async () => {
+          Object.assign(row, {
+            status: NotificationStatus.RETRY_PENDING,
+            retryCount: 1,
+          });
+          return {
+            enabled: false,
+            failureCode: 'PROVIDER_NOT_READY',
+            failureReason: 'Unavailable',
+          };
+        },
+      );
+      await (service as any).dispatchDelivery({ ...row });
+      expect(row).toMatchObject({
+        status: NotificationStatus.RETRY_PENDING,
+        retryCount: 1,
+        errorMessage: null,
+      });
+      expect(prisma.notificationDelivery.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: row.id,
+            tenantId: actor.tenantId,
+            status: NotificationStatus.QUEUED,
+            retryCount: 0,
+          },
+        }),
+      );
+      expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [NotificationChannel.PUSH, 'sendPushNotification'],
+      [NotificationChannel.EMAIL, 'sendEmail'],
+      [NotificationChannel.SMS, 'sendSms'],
+      [NotificationChannel.IN_APP, 'releaseInAppNotification'],
+    ])(
+      'preserves attempt zero when %s queue acknowledgement is uncertain',
+      async (channel, method) => {
+        const row = seedInitialDelivery();
+        row.channel = channel as NotificationChannel;
+        if (channel === NotificationChannel.IN_APP) {
+          (service as any).notificationPreferencePolicy = {
+            evaluateDelivery: jest
+              .fn()
+              .mockResolvedValue({ action: 'IMMEDIATE' }),
+          };
+        }
+        notificationsService[method] = jest
+          .fn()
+          .mockRejectedValue(
+            new Error('redis://private-internal password=private-token'),
+          );
+
+        await (service as any).dispatchDelivery({ ...row });
+
+        expect(notificationsService[method]).toHaveBeenCalledTimes(1);
+        expect(notificationsService[method]).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              notificationDeliveryId: row.id,
+              deliveryAttempt: '0',
+              tenantId: actor.tenantId,
+            }),
+          }),
+        );
+        expect(row).toMatchObject({
+          status: NotificationStatus.RETRY_PENDING,
+          retryCount: 0,
+          failureCode: 'QUEUE_HANDOFF_UNCONFIRMED',
+          errorMessage: expect.stringContaining('This attempt remains pending'),
+        });
+        expect(JSON.stringify(row)).not.toContain('private-token');
+        // Re-entering the initial path cannot enqueue another copy of this attempt.
+        await (service as any).dispatchDelivery({ ...row });
+        expect(notificationsService[method]).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('records a before-handoff validation failure without a pending queue diagnostic', async () => {
+      const row = seedInitialDelivery();
+      row.destination = '';
+
+      await (service as any).dispatchDelivery({ ...row });
+
+      expect(row).toMatchObject({
+        status: NotificationStatus.FAILED,
+        retryCount: 0,
+        errorMessage: 'No destination resolved for PUSH',
+      });
+      expect(row).not.toHaveProperty('failureCode');
+      expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
+    });
+
+    it('preserves cancellation while the initial policy decides to skip', async () => {
+      const row = seedInitialDelivery();
+      (service as any).notificationPreferencePolicy = {
+        evaluateDelivery: jest.fn(async () => {
+          Object.assign(row, { status: NotificationStatus.CANCELLED });
+          return { action: 'SKIP', reason: 'No longer linked' };
+        }),
+      };
+      await (service as any).dispatchDelivery({ ...row });
+      expect(row).toMatchObject({
+        status: NotificationStatus.CANCELLED,
+        errorMessage: null,
+      });
+      expect(prisma.notificationDelivery.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: row.id,
+            tenantId: actor.tenantId,
+            status: NotificationStatus.QUEUED,
+            retryCount: 0,
+          },
+        }),
+      );
+      expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
+    });
+
+    it('queues in-app delivery with no destination and never marks it optimistically sent', async () => {
+      const row = seedInitialDelivery();
+      row.channel = NotificationChannel.IN_APP;
+      Object.assign(row, { destination: null });
+      await (service as any).dispatchDelivery({ ...row });
+      expect(row.status).toBe(NotificationStatus.QUEUED);
+      expect(
+        notificationPreferencePolicy.evaluateDelivery,
+      ).toHaveBeenCalledWith(actor.tenantId, row.id);
+      expect(
+        notificationsService.releaseInAppNotification,
+      ).toHaveBeenCalledWith({
+        metadata: expect.objectContaining({
+          tenantId: actor.tenantId,
+          notificationDeliveryId: row.id,
+          deliveryAttempt: '0',
+        }),
+      });
+      expect(prisma.notificationDelivery.updateMany).not.toHaveBeenCalled();
+      expect(notificationsService.getProviderReadiness).not.toHaveBeenCalled();
+    });
+
+    it.each(Object.values(NotificationChannel))(
+      'fails closed before any %s handoff when initial policy is missing',
+      async (channel) => {
+        const row = seedInitialDelivery();
+        row.channel = channel;
+        Object.assign(row, { destination: null });
+        (service as any).notificationPreferencePolicy = undefined;
+
+        await (service as any).dispatchDelivery({ ...row });
+
+        expect(row).toMatchObject({
+          status: NotificationStatus.FAILED,
+          retryCount: 0,
+          errorMessage: 'Notification delivery policy is unavailable',
+        });
+        expect(prisma.notificationDelivery.updateMany).toHaveBeenCalledWith({
+          where: {
+            id: row.id,
+            tenantId: actor.tenantId,
+            retryCount: 0,
+            status: NotificationStatus.QUEUED,
+          },
+          data: {
+            status: NotificationStatus.FAILED,
+            errorMessage: 'Notification delivery policy is unavailable',
+          },
+        });
+        expect(
+          notificationsService.getProviderReadiness,
+        ).not.toHaveBeenCalled();
+        expect(
+          notificationsService.sendPushNotification,
+        ).not.toHaveBeenCalled();
+        expect(notificationsService.sendSms).not.toHaveBeenCalled();
+        expect(notificationsService.sendEmail).not.toHaveBeenCalled();
+        expect(
+          notificationsService.releaseInAppNotification,
+        ).not.toHaveBeenCalled();
+      },
+    );
   });
 
   it('throws ConflictException if lock acquisition fails and deliveries are not created', async () => {
@@ -2396,13 +2952,15 @@ describe('CommunicationsService', () => {
       communicationCategory: 'ESSENTIAL',
     });
 
-    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+    expect(prisma.notificationDelivery.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({
-          recipientUserId: 'recipient-1',
-          guardianId: null,
-          studentId: null,
-        }),
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            recipientUserId: 'recipient-1',
+            guardianId: null,
+            studentId: null,
+          }),
+        ]),
       }),
     );
   });

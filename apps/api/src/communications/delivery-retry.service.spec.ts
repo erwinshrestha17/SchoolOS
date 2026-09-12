@@ -18,6 +18,163 @@ describe('DeliveryRetryService failure dashboard', () => {
     permissions: ['communications:read_deliveries'],
   };
 
+  describe('readiness checks before queue handoff', () => {
+    function setup() {
+      const delivery = {
+        id: 'delivery-readiness',
+        tenantId: actor.tenantId,
+        status: NotificationStatus.FAILED as NotificationStatus,
+        channel: NotificationChannel.EMAIL,
+        retryCount: 2,
+        sourceType: 'notice',
+        sourceId: 'notice-readiness',
+        destination: 'synthetic@example.invalid',
+        title: 'Synthetic readiness check',
+        body: 'Synthetic content',
+        errorMessage: null as string | null,
+      };
+      const prisma = {
+        notificationDelivery: {
+          findFirst: jest.fn(async () => ({ ...delivery })),
+          findMany: jest.fn(async () => [{ ...delivery }]),
+          updateMany: jest.fn(async ({ where, data }) => {
+            if (
+              where.id !== delivery.id ||
+              where.tenantId !== delivery.tenantId ||
+              where.retryCount !== delivery.retryCount ||
+              (typeof where.status === 'string'
+                ? where.status !== delivery.status
+                : !where.status.in.includes(delivery.status))
+            ) {
+              return { count: 0 };
+            }
+            Object.assign(delivery, {
+              ...data,
+              retryCount: data.retryCount
+                ? delivery.retryCount + data.retryCount.increment
+                : delivery.retryCount,
+            });
+            return { count: 1 };
+          }),
+        },
+      };
+      const notifications = {
+        getProviderReadiness: jest.fn(),
+        sendEmail: jest.fn(),
+      };
+      const audit = { record: jest.fn() };
+      const service = new DeliveryRetryService(
+        prisma as never,
+        notifications as never,
+        audit as never,
+      );
+      return { delivery, prisma, notifications, audit, service };
+    }
+
+    it.each([
+      ['missing result', undefined],
+      ['null result', null],
+      ['missing enabled flag', {}],
+      ['non-boolean enabled flag', { enabled: 'true' }],
+    ])('fails closed for %s', async (_label, readiness) => {
+      const { service, notifications, delivery, audit } = setup();
+      notifications.getProviderReadiness.mockResolvedValue(readiness);
+
+      await expect(
+        service.retryDelivery(delivery.id, actor),
+      ).resolves.toMatchObject({
+        status: NotificationStatus.FAILED,
+        errorMessage:
+          'Provider readiness could not be confirmed. No queue handoff was attempted.',
+      });
+      expect(delivery).toMatchObject({
+        status: NotificationStatus.FAILED,
+        retryCount: 3,
+        failureCode: 'PROVIDER_NOT_READY',
+      });
+      expect(notifications.sendEmail).not.toHaveBeenCalled();
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'retry_blocked' }),
+      );
+    });
+
+    it('recovers from a readiness exception without stranding or leaking the attempt', async () => {
+      const { service, notifications, delivery, audit } = setup();
+      notifications.getProviderReadiness
+        .mockRejectedValueOnce(new Error('synthetic-private-provider-error'))
+        .mockResolvedValueOnce({ enabled: true });
+
+      const blocked = await service.retryDelivery(delivery.id, actor);
+      expect(blocked.status).toBe(NotificationStatus.FAILED);
+      expect(notifications.sendEmail).not.toHaveBeenCalled();
+      expect(
+        JSON.stringify({ blocked, delivery, audit: audit.record.mock.calls }),
+      ).not.toContain('synthetic-private-provider-error');
+
+      await expect(
+        service.retryDelivery(delivery.id, actor),
+      ).resolves.toMatchObject({ status: NotificationStatus.RETRY_PENDING });
+      expect(delivery.retryCount).toBe(4);
+      expect(notifications.sendEmail).toHaveBeenCalledTimes(1);
+      expect(notifications.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ deliveryAttempt: '4' }),
+        }),
+      );
+    });
+
+    it('fails closed when the readiness dependency is missing', async () => {
+      const { prisma, notifications, delivery, audit } = setup();
+      const service = new DeliveryRetryService(
+        prisma as never,
+        { sendEmail: notifications.sendEmail } as never,
+        audit as never,
+      );
+      await expect(
+        service.retryDelivery(delivery.id, actor),
+      ).resolves.toMatchObject({ status: NotificationStatus.FAILED });
+      expect(notifications.sendEmail).not.toHaveBeenCalled();
+      expect(delivery.retryCount).toBe(3);
+    });
+
+    it('preserves a newer terminal result if readiness fails late', async () => {
+      const { service, notifications, delivery } = setup();
+      notifications.getProviderReadiness.mockImplementation(async () => {
+        delivery.status = NotificationStatus.DELIVERED;
+        throw new Error('late readiness failure');
+      });
+      await expect(
+        service.retryDelivery(delivery.id, actor),
+      ).resolves.toMatchObject({
+        status: NotificationStatus.DELIVERED,
+        errorMessage: null,
+        replayed: true,
+      });
+      expect(delivery.status).toBe(NotificationStatus.DELIVERED);
+      expect(notifications.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('returns a bounded failed result for bulk readiness exceptions', async () => {
+      const { service, notifications, delivery } = setup();
+      notifications.getProviderReadiness.mockRejectedValue(
+        new Error('synthetic-private-provider-error'),
+      );
+      await expect(service.retryFailedDeliveries(actor)).resolves.toEqual({
+        requested: 1,
+        retried: 1,
+        results: [
+          expect.objectContaining({
+            deliveryId: delivery.id,
+            status: NotificationStatus.FAILED,
+            errorMessage:
+              'Provider readiness could not be confirmed. No queue handoff was attempted.',
+          }),
+        ],
+      });
+      expect(notifications.sendEmail).not.toHaveBeenCalled();
+    });
+  });
+
   it('returns tenant-scoped failed delivery details without raw destination leakage', async () => {
     const prisma = {
       notificationDelivery: {
@@ -165,6 +322,296 @@ describe('DeliveryRetryService failure dashboard', () => {
     expect(prisma.notificationDelivery.findMany).not.toHaveBeenCalled();
   });
 
+  it('preserves a newer skipped state during an in-app retry', async () => {
+    const delivery = {
+      id: 'delivery-1',
+      tenantId: actor.tenantId,
+      status: NotificationStatus.FAILED,
+      retryCount: 2,
+      channel: NotificationChannel.IN_APP,
+      sourceType: 'notice',
+      sourceId: 'notice-1',
+      destination: actor.userId,
+      title: 'Synthetic',
+      body: 'Synthetic',
+    };
+    const prisma = {
+      notificationDelivery: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce(delivery)
+          .mockResolvedValueOnce({
+            status: NotificationStatus.SKIPPED,
+            errorMessage: null,
+          }),
+        updateMany: jest
+          .fn()
+          .mockResolvedValueOnce({ count: 1 })
+          .mockResolvedValueOnce({ count: 0 }),
+        update: jest.fn(),
+      },
+    };
+    const service = new DeliveryRetryService(
+      prisma as never,
+      {
+        getProviderReadiness: jest.fn().mockResolvedValue({ enabled: true }),
+        releaseInAppNotification: jest
+          .fn()
+          .mockRejectedValue(new Error('late enqueue failure')),
+      } as never,
+      { record: jest.fn() } as never,
+    );
+    await expect(
+      service.retryDelivery(delivery.id, actor),
+    ).resolves.toMatchObject({
+      status: NotificationStatus.SKIPPED,
+      errorMessage: null,
+      replayed: true,
+    });
+    expect(prisma.notificationDelivery.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: {
+          id: delivery.id,
+          tenantId: actor.tenantId,
+          status: NotificationStatus.RETRY_PENDING,
+          retryCount: 3,
+        },
+      }),
+    );
+    expect(prisma.notificationDelivery.update).not.toHaveBeenCalled();
+  });
+
+  it.each([null, 'admin-1'])(
+    'queues an in-app retry for policy evaluation with destination %s',
+    async (destination) => {
+      const delivery = {
+        id: 'delivery-1',
+        tenantId: actor.tenantId,
+        status: NotificationStatus.FAILED,
+        retryCount: 2,
+        channel: NotificationChannel.IN_APP,
+        sourceType: 'notice',
+        sourceId: 'notice-1',
+        destination,
+        title: 'Synthetic',
+        body: 'Synthetic',
+      };
+      const prisma = {
+        notificationDelivery: {
+          findFirst: jest.fn().mockResolvedValue(delivery),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          update: jest.fn(),
+        },
+      };
+      const notifications = {
+        getProviderReadiness: jest.fn().mockResolvedValue({ enabled: true }),
+        releaseInAppNotification: jest.fn().mockResolvedValue(undefined),
+      };
+      const service = new DeliveryRetryService(
+        prisma as never,
+        notifications as never,
+        { record: jest.fn() } as never,
+      );
+      await expect(
+        service.retryDelivery(delivery.id, actor),
+      ).resolves.toMatchObject({
+        status: NotificationStatus.RETRY_PENDING,
+        errorMessage: null,
+      });
+      expect(notifications.releaseInAppNotification).toHaveBeenCalledWith({
+        metadata: {
+          tenantId: actor.tenantId,
+          notificationDeliveryId: delivery.id,
+          deliveryAttempt: '3',
+          sourceType: 'notice',
+          sourceId: 'notice-1',
+          retry: 'true',
+        },
+      });
+      expect(prisma.notificationDelivery.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.notificationDelivery.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('preserves delivery success after a delayed enqueue failure', async () => {
+    const delivery = {
+      id: 'delivery-1',
+      tenantId: actor.tenantId,
+      status: NotificationStatus.FAILED,
+      retryCount: 2,
+      channel: NotificationChannel.EMAIL,
+      sourceType: 'notice',
+      sourceId: 'notice-1',
+      destination: 'synthetic@example.invalid',
+      title: 'Synthetic',
+      body: 'Synthetic',
+    };
+    const prisma = {
+      notificationDelivery: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce(delivery)
+          .mockResolvedValueOnce({
+            status: NotificationStatus.DELIVERED,
+            errorMessage: null,
+          }),
+        updateMany: jest
+          .fn()
+          .mockResolvedValueOnce({ count: 1 })
+          .mockResolvedValueOnce({ count: 0 }),
+        update: jest.fn(),
+      },
+    };
+    const notifications = {
+      getProviderReadiness: jest.fn().mockResolvedValue({ enabled: true }),
+      sendEmail: jest.fn().mockRejectedValue(new Error('late failure')),
+    };
+    const service = new DeliveryRetryService(
+      prisma as never,
+      notifications as never,
+      { record: jest.fn() } as never,
+    );
+    await expect(
+      service.retryDelivery(delivery.id, actor),
+    ).resolves.toMatchObject({
+      status: NotificationStatus.DELIVERED,
+      replayed: true,
+    });
+    expect(prisma.notificationDelivery.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: {
+          id: delivery.id,
+          tenantId: actor.tenantId,
+          status: NotificationStatus.RETRY_PENDING,
+          retryCount: 3,
+        },
+      }),
+    );
+    expect(prisma.notificationDelivery.update).not.toHaveBeenCalled();
+  });
+
+  it('allows only one claimant for the same observed retry version', async () => {
+    const delivery = {
+      id: 'delivery-1',
+      tenantId: actor.tenantId,
+      status: NotificationStatus.FAILED,
+      retryCount: 2,
+      channel: NotificationChannel.EMAIL,
+      sourceType: 'notice',
+      sourceId: 'notice-1',
+      destination: 'synthetic@example.invalid',
+      title: 'Synthetic',
+      body: 'Synthetic',
+    };
+    let claimed = false;
+    const prisma = {
+      notificationDelivery: {
+        findFirst: jest.fn().mockResolvedValue(delivery),
+        updateMany: jest.fn(async ({ where }) => {
+          expect(where.retryCount).toBe(2);
+          expect(where.status.in).toEqual([
+            NotificationStatus.FAILED,
+            NotificationStatus.QUEUED,
+          ]);
+          if (claimed) return { count: 0 };
+          claimed = true;
+          return { count: 1 };
+        }),
+        update: jest.fn(),
+      },
+    };
+    const notifications = {
+      getProviderReadiness: jest.fn().mockResolvedValue({ enabled: true }),
+      sendEmail: jest.fn(),
+    };
+    const service = new DeliveryRetryService(
+      prisma as never,
+      notifications as never,
+      { record: jest.fn() } as never,
+    );
+    const results = await Promise.allSettled([
+      service.retryDelivery(delivery.id, actor),
+      service.retryDelivery(delivery.id, actor),
+    ]);
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'rejected'),
+    ).toHaveLength(1);
+    expect(notifications.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an unconfirmed queue handoff pending and replays without another enqueue', async () => {
+    const delivery = {
+      id: 'delivery-uncertain',
+      tenantId: actor.tenantId,
+      status: NotificationStatus.FAILED,
+      retryCount: 0,
+      channel: NotificationChannel.EMAIL,
+      sourceType: 'notice',
+      sourceId: 'notice-1',
+      destination: 'synthetic@example.invalid',
+      title: 'Synthetic',
+      body: 'Synthetic',
+      errorMessage: null as string | null,
+      lastRetryAt: null as Date | null,
+    };
+    const prisma = {
+      notificationDelivery: {
+        findFirst: jest.fn(async () => ({ ...delivery })),
+        updateMany: jest.fn(async ({ data }) => {
+          Object.assign(delivery, {
+            ...data,
+            retryCount: data.retryCount
+              ? delivery.retryCount + data.retryCount.increment
+              : delivery.retryCount,
+          });
+          return { count: 1 };
+        }),
+      },
+    };
+    const notifications = {
+      getProviderReadiness: jest.fn().mockResolvedValue({ enabled: true }),
+      sendEmail: jest
+        .fn()
+        .mockRejectedValue(
+          new Error('Redis acknowledgement lost token=private'),
+        ),
+    };
+    const service = new DeliveryRetryService(
+      prisma as never,
+      notifications as never,
+      { record: jest.fn() } as never,
+    );
+    const result = await service.retryDelivery(delivery.id, actor);
+    expect(result).toMatchObject({
+      status: NotificationStatus.RETRY_PENDING,
+      errorMessage: expect.stringContaining(
+        'Queue handoff could not be confirmed',
+      ),
+    });
+    expect(JSON.stringify(result)).not.toContain('private');
+    expect(delivery.retryCount).toBe(1);
+    expect(prisma.notificationDelivery.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: NotificationStatus.RETRY_PENDING,
+          failureCode: 'QUEUE_HANDOFF_UNCONFIRMED',
+          failedAt: undefined,
+        }),
+      }),
+    );
+    await expect(
+      service.retryDelivery(delivery.id, actor),
+    ).resolves.toMatchObject({
+      ...result,
+      replayed: true,
+    });
+    expect(notifications.sendEmail).toHaveBeenCalledTimes(1);
+    expect(delivery.retryCount).toBe(1);
+  });
+
   it('stores the operator reason when failed deliveries are retried in bulk', async () => {
     const prisma = {
       notificationDelivery: {
@@ -294,8 +741,12 @@ describe('DeliveryRetryService failure dashboard', () => {
     );
 
     expect(notificationsService.sendSms).not.toHaveBeenCalled();
-    expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
-      where: { id: 'delivery-1' },
+    expect(prisma.notificationDelivery.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: 'delivery-1',
+        tenantId: actor.tenantId,
+        status: NotificationStatus.RETRY_PENDING,
+      }),
       data: expect.objectContaining({
         status: NotificationStatus.FAILED,
         failureCode: 'PROVIDER_DISABLED',
@@ -369,8 +820,12 @@ describe('DeliveryRetryService failure dashboard', () => {
     });
 
     expect(notificationsService.sendSms).not.toHaveBeenCalled();
-    expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
-      where: { id: 'delivery-1' },
+    expect(prisma.notificationDelivery.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: 'delivery-1',
+        tenantId: actor.tenantId,
+        status: NotificationStatus.RETRY_PENDING,
+      }),
       data: expect.objectContaining({
         status: NotificationStatus.FAILED,
         failureCode: 'PROVIDER_DISABLED',

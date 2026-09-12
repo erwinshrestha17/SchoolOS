@@ -6,7 +6,10 @@ import {
 import { NotificationChannel, NotificationStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
-import { NotificationsService } from '../notifications/notifications.service';
+import {
+  NotificationsService,
+  type NotificationProviderReadiness,
+} from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ListNotificationDeliveriesQueryDto } from './dto/communication-list-query.dto';
 
@@ -344,12 +347,9 @@ export class DeliveryRetryService {
       where: {
         id: delivery.id,
         tenantId: actor.tenantId,
+        retryCount: delivery.retryCount,
         status: {
-          in: [
-            NotificationStatus.FAILED,
-            NotificationStatus.QUEUED,
-            NotificationStatus.RETRY_PENDING,
-          ],
+          in: [NotificationStatus.FAILED, NotificationStatus.QUEUED],
         },
       },
       data: {
@@ -362,26 +362,42 @@ export class DeliveryRetryService {
       },
     });
 
-    if (claimed.count === 0) {
+    if (claimed.count !== 1) {
       throw new BadRequestException('Delivery is no longer retryable');
     }
 
-    const readiness = await this.notificationsService.getProviderReadiness?.(
-      delivery.channel,
-    );
+    let readiness: NotificationProviderReadiness | null = null;
+    try {
+      readiness = await this.notificationsService.getProviderReadiness(
+        delivery.channel,
+      );
+    } catch {
+      // Readiness failed before any queue call. This is a confirmed blocked
+      // attempt, not an ambiguous handoff, and can be retried after recovery.
+    }
 
-    if (readiness && !readiness.enabled) {
-      const errorMessage = sanitizeFailureReason(readiness.failureReason);
-      await this.prisma.notificationDelivery.update({
-        where: { id: delivery.id },
+    if (readiness?.enabled !== true) {
+      const errorMessage = sanitizeFailureReason(
+        readiness?.failureReason ??
+          'Provider readiness could not be confirmed. No queue handoff was attempted.',
+      );
+      const failed = await this.prisma.notificationDelivery.updateMany({
+        where: {
+          id: delivery.id,
+          tenantId: actor.tenantId,
+          status: NotificationStatus.RETRY_PENDING,
+          retryCount: delivery.retryCount + 1,
+        },
         data: {
           status: NotificationStatus.FAILED,
           errorMessage,
-          failureCode: readiness.failureCode ?? 'PROVIDER_NOT_READY',
+          failureCode: readiness?.failureCode ?? 'PROVIDER_NOT_READY',
           failureReason: errorMessage,
           failedAt: new Date(),
         },
       });
+      if (failed.count !== 1)
+        return this.currentRetryResult(delivery.id, actor, retriedAt);
 
       await this.auditService.record({
         action: 'retry_blocked',
@@ -393,7 +409,7 @@ export class DeliveryRetryService {
           channel: delivery.channel,
           sourceType: delivery.sourceType,
           sourceId: delivery.sourceId,
-          failureCode: readiness.failureCode ?? 'PROVIDER_NOT_READY',
+          failureCode: readiness?.failureCode ?? 'PROVIDER_NOT_READY',
           reason: options.reason ?? null,
         },
       });
@@ -406,8 +422,12 @@ export class DeliveryRetryService {
       };
     }
 
+    let handoffStarted = false;
     try {
-      if (!delivery.destination) {
+      if (
+        delivery.channel !== NotificationChannel.IN_APP &&
+        !delivery.destination
+      ) {
         throw new Error(`No destination resolved for ${delivery.channel}`);
       }
 
@@ -420,38 +440,31 @@ export class DeliveryRetryService {
         retry: 'true',
       };
 
+      handoffStarted = true;
       if (delivery.channel === NotificationChannel.EMAIL) {
         await this.notificationsService.sendEmail({
-          to: delivery.destination,
+          to: delivery.destination!,
           subject: delivery.title,
           text: delivery.body,
           metadata,
         });
       } else if (delivery.channel === NotificationChannel.SMS) {
         await this.notificationsService.sendSms({
-          to: delivery.destination,
+          to: delivery.destination!,
           message: delivery.body,
           metadata,
         });
       } else if (delivery.channel === NotificationChannel.IN_APP) {
-        // No external provider to retry against — the delivery row itself
-        // is the notification, so retrying just means marking it sent
-        // immediately rather than waiting on an async job.
-        await this.prisma.notificationDelivery.update({
-          where: { id: delivery.id },
-          data: { status: NotificationStatus.SENT, sentAt: retriedAt },
+        // Release through the same worker policy as initial delivery so current
+        // recipient access, source state and quiet hours are revalidated.
+        await this.notificationsService.releaseInAppNotification({
+          metadata,
         });
-        return {
-          deliveryId: delivery.id,
-          status: NotificationStatus.SENT,
-          errorMessage: null,
-          retriedAt: retriedAt.toISOString(),
-        };
       } else {
         await this.notificationsService.sendPushNotification({
           title: delivery.title,
           body: delivery.body,
-          audience: delivery.destination,
+          audience: delivery.destination!,
           metadata,
         });
       }
@@ -463,26 +476,66 @@ export class DeliveryRetryService {
         retriedAt: retriedAt.toISOString(),
       };
     } catch (error) {
-      const errorMessage = sanitizeFailureReason(
-        error instanceof Error ? error.message : 'Notification retry failed',
-      );
+      // A queue write may have succeeded even when its acknowledgement was
+      // lost. Keep that same attempt pending; a fresh manual retry could send
+      // twice. The worker may still complete the original queued attempt.
+      const status = handoffStarted
+        ? NotificationStatus.RETRY_PENDING
+        : NotificationStatus.FAILED;
+      const errorMessage = handoffStarted
+        ? 'Queue handoff could not be confirmed. This attempt remains pending; review delivery status before further action.'
+        : sanitizeFailureReason(
+            error instanceof Error
+              ? error.message
+              : 'Notification retry failed',
+          );
 
-      await this.prisma.notificationDelivery.update({
-        where: { id: delivery.id },
+      const failed = await this.prisma.notificationDelivery.updateMany({
+        where: {
+          id: delivery.id,
+          tenantId: actor.tenantId,
+          status: NotificationStatus.RETRY_PENDING,
+          retryCount: delivery.retryCount + 1,
+        },
         data: {
-          status: NotificationStatus.FAILED,
+          status,
           errorMessage,
-          failedAt: new Date(),
+          failureCode: handoffStarted ? 'QUEUE_HANDOFF_UNCONFIRMED' : undefined,
+          failureReason: errorMessage,
+          failedAt: handoffStarted ? undefined : new Date(),
         },
       });
+      if (failed.count !== 1)
+        return this.currentRetryResult(delivery.id, actor, retriedAt);
 
       return {
         deliveryId: delivery.id,
-        status: NotificationStatus.FAILED,
+        status,
         errorMessage,
         retriedAt: retriedAt.toISOString(),
       };
     }
+  }
+
+  private async currentRetryResult(
+    deliveryId: string,
+    actor: AuthContext,
+    retriedAt: Date,
+  ): Promise<DeliveryRetryResult> {
+    const current = await this.prisma.notificationDelivery.findFirst({
+      where: { id: deliveryId, tenantId: actor.tenantId },
+      select: { status: true, errorMessage: true },
+    });
+    if (!current) throw new NotFoundException('Delivery record not found');
+    return {
+      deliveryId,
+      status: current.status,
+      errorMessage: current.errorMessage
+        ? sanitizeFailureReason(current.errorMessage)
+        : null,
+      retriedAt: retriedAt.toISOString(),
+      replayed: true,
+    };
   }
 }
 

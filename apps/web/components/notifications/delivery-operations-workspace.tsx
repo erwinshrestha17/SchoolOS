@@ -32,7 +32,8 @@ export function DeliveryOperationsWorkspace({
   // by `communications:read_deliveries`, and retry by
   // `communications:retry_deliveries`.
   const canView = hasPermissions(["notifications:view_delivery_diagnostics"]);
-  const canRetry = hasPermissions(["notifications:retry_deliveries"]);
+  const canRetry =
+    !isSupportOverride && hasPermissions(["notifications:retry_deliveries"]);
   const view = (searchParams.get("view") ?? initialView) as "logs" | "failures";
   const page = positiveNumber(searchParams.get("page"), 1);
   const status = searchParams.get("status") ?? "";
@@ -41,6 +42,7 @@ export function DeliveryOperationsWorkspace({
   const effectiveSourceType = isSupportOverride ? "" : sourceType;
   const [retryId, setRetryId] = useState<string | null>(null);
   const [retryReason, setRetryReason] = useState("");
+  const [retryTarget, setRetryTarget] = useState("");
 
   const diagnostics = useQuery({
     queryKey: ["communications-provider-diagnostics"],
@@ -78,23 +80,34 @@ export function DeliveryOperationsWorkspace({
     enabled: canView && view === "failures",
   });
   const retry = useMutation({
-    mutationFn: () =>
-      communicationsApi.retryNotificationDelivery(retryId!, {
-        reason: retryReason.trim(),
-      }),
-    onSuccess: async () => {
-      setRetryId(null);
-      setRetryReason("");
-      await Promise.all([
+    mutationFn: ({
+      deliveryId,
+      reason,
+    }: {
+      deliveryId: string;
+      reason: string;
+    }) => communicationsApi.retryNotificationDelivery(deliveryId, { reason }),
+    // A timeout can follow a committed retry. Refresh after every outcome;
+    // never infer that an error means no state changed or resend automatically.
+    onSettled: () =>
+      Promise.all([
         queryClient.invalidateQueries({
           queryKey: ["notification-deliveries"],
         }),
         queryClient.invalidateQueries({
           queryKey: ["notification-delivery-failures"],
         }),
-      ]);
-    },
+      ]),
   });
+  const selectedFailure = failures.data?.items.find(
+    (item) => item.id === retryId,
+  );
+  const canSubmitRetry =
+    canRetry &&
+    !retry.isSuccess &&
+    !failures.isFetching &&
+    !failures.isError &&
+    selectedFailure?.retryStatus === "retryable";
 
   function setFilters(next: Record<string, string | number | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -291,7 +304,15 @@ export function DeliveryOperationsWorkspace({
                     {canRetry && item.retryStatus === "retryable" ? (
                       <button
                         type="button"
-                        onClick={() => setRetryId(item.id)}
+                        onClick={() => {
+                          retry.reset();
+                          setRetryReason("");
+                          setRetryTarget(
+                            `${label(item.channel)} · ${item.recipientSummary.destinationMasked ?? "Recipient unavailable"}`,
+                          );
+                          setRetryId(item.id);
+                        }}
+                        disabled={retry.isPending || failures.isFetching}
                         className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold"
                       >
                         <RefreshCcw size={15} /> Retry
@@ -309,13 +330,16 @@ export function DeliveryOperationsWorkspace({
         </div>
       )}
 
-      {retry.isError ? (
+      {retryId === null && retry.isSuccess ? (
         <p
-          role="alert"
-          className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+          role="status"
+          className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700"
         >
-          <AlertTriangle size={16} /> Retry was rejected or could not be queued.
-          No delivery status was changed.
+          {retryTarget}:{" "}
+          {retryResultMessage(
+            retry.data.status,
+            Boolean(retry.data.errorMessage),
+          )}
         </p>
       ) : null}
 
@@ -324,30 +348,103 @@ export function DeliveryOperationsWorkspace({
         title="Retry this delivery?"
         description="School access, recipient policy, and retry eligibility will be checked again before this delivery is queued."
         confirmLabel="Queue retry"
-        confirmDisabled={!retryReason.trim()}
+        confirmDisabled={!retryReason.trim() || !canSubmitRetry}
         isConfirming={retry.isPending}
+        preventCloseWhileConfirming
+        cancelLabel={retry.isSuccess ? "Close" : "Cancel"}
         onClose={() => {
           if (!retry.isPending) {
             setRetryId(null);
             setRetryReason("");
           }
         }}
-        onConfirm={() => retry.mutate()}
+        onConfirm={() => {
+          if (retryId && canSubmitRetry && retryReason.trim()) {
+            retry.mutate({ deliveryId: retryId, reason: retryReason.trim() });
+          }
+        }}
       >
-        <label className="grid gap-2 text-sm font-semibold text-slate-700">
-          Reason
-          <textarea
-            value={retryReason}
-            onChange={(event) => setRetryReason(event.target.value)}
-            maxLength={500}
-            rows={3}
-            className="rounded-xl border border-slate-200 px-3 py-2 font-normal"
-            placeholder="Record why a manual retry is appropriate"
-          />
-        </label>
+        <div className="space-y-3 p-6">
+          <p className="text-sm font-semibold text-slate-700">{retryTarget}</p>
+          {retry.isError ? (
+            <p
+              role="alert"
+              className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+            >
+              <AlertTriangle size={16} className="mr-2 inline" aria-hidden />
+              The retry outcome could not be confirmed. The delivery may already
+              have changed. Your reason is preserved; check the refreshed status
+              before retrying.
+            </p>
+          ) : retry.isSuccess ? (
+            <p
+              role="status"
+              className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"
+            >
+              {retryResultMessage(
+                retry.data.status,
+                Boolean(retry.data.errorMessage),
+              )}{" "}
+              Your reason is preserved until you close this review. Review the
+              refreshed delivery record before starting another retry.
+            </p>
+          ) : null}
+          {(retry.isError || retry.isSuccess) && !retry.isPending ? (
+            <div className="space-y-2 text-sm text-slate-700">
+              <p>
+                {failures.isError
+                  ? "Current retry eligibility is unavailable. Refresh before taking further action."
+                  : selectedFailure
+                    ? `Current state: ${label(selectedFailure.status)} · ${label(selectedFailure.retryStatus)}.`
+                    : "This delivery is no longer in the current failure page. Check delivery logs for its current state."}
+              </p>
+              <button
+                type="button"
+                disabled={failures.isFetching}
+                onClick={() => void failures.refetch()}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold disabled:opacity-50"
+              >
+                <RefreshCcw size={15} aria-hidden /> Refresh delivery status
+              </button>
+            </div>
+          ) : null}
+          <label className="grid gap-2 text-sm font-semibold text-slate-700">
+            Reason
+            <textarea
+              value={retryReason}
+              disabled={retry.isPending}
+              readOnly={retry.isSuccess}
+              onChange={(event) => setRetryReason(event.target.value)}
+              maxLength={500}
+              rows={3}
+              className="rounded-xl border border-slate-200 px-3 py-2 font-normal"
+              placeholder="Record why a manual retry is appropriate"
+            />
+          </label>
+        </div>
       </ConfirmDialog>
     </DashboardPageShell>
   );
+}
+
+function retryResultMessage(status: string, hasDiagnostic: boolean) {
+  if (["QUEUED", "RETRY_PENDING", "RETRYING", "PENDING"].includes(status)) {
+    if (hasDiagnostic) {
+      return "The saved delivery is pending, but queue handoff or processing needs review. Do not assume this retry reached the provider.";
+    }
+    return "The saved delivery is pending. This does not confirm delivery to the recipient.";
+  }
+  if (status === "DELIVERED") return "The saved delivery status is Delivered.";
+  if (status === "SENT") {
+    return "The saved delivery status is Sent, not confirmation that the recipient received or read it.";
+  }
+  if (status === "FAILED")
+    return "The delivery is still failed and needs review.";
+  if (status === "CANCELLED")
+    return "The delivery is cancelled. No new retry is confirmed.";
+  if (status === "SKIPPED")
+    return "The delivery was skipped. No successful delivery is confirmed.";
+  return "The response did not confirm a recognized delivery outcome. Check delivery logs before retrying.";
 }
 
 function FilterSelect({

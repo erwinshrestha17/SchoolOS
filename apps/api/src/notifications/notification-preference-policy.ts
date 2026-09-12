@@ -99,10 +99,12 @@ export class NotificationPreferencePolicy {
         guardianId: true,
         studentId: true,
         noticeId: true,
+        notificationEventId: true,
         recipientUser: { select: { status: true } },
         notice: { select: { lifecycleStatus: true } },
         notificationEvent: {
           select: {
+            tenantId: true,
             type: true,
             priority: true,
             status: true,
@@ -114,6 +116,15 @@ export class NotificationPreferencePolicy {
     });
     if (!delivery) {
       throw new NotFoundException('Notification delivery not found');
+    }
+
+    if (
+      delivery.notificationEventId &&
+      (!delivery.notificationEvent ||
+        delivery.notificationEvent.tenantId !== tenantId ||
+        delivery.notificationEvent.status === NotificationEventStatus.CANCELLED)
+    ) {
+      return inactiveDecision('Notification event is no longer deliverable');
     }
 
     if (

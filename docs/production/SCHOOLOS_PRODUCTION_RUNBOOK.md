@@ -607,6 +607,23 @@ the original audience/version, recheck current recipient authorization, honor
 cancelled events, and prevent duplicate delivery. Local web contract tests do
 not establish browser or provider recovery proof.
 
+### Notification retry with uncertain queue handoff
+
+A retry response of `RETRY_PENDING` confirms only the persisted attempt, not
+delivery. If the queue acknowledgement is lost, the same attempt remains pending
+with `QUEUE_HANDOFF_UNCONFIRMED`; the worker may still complete it. Refresh its
+delivery status. Repeating the existing retry request returns the pending attempt
+without issuing a new one. In-app retries also remain pending until the worker
+rechecks current entitlement, recipient access, source state and delivery policy.
+
+If it stays unresolved, reconcile the exact tenant, delivery ID, retry count,
+retained BullMQ job and provider evidence through the approved incident process.
+Do not reset the row to failed, delete a retained queue job, or create a replacement
+notification to force a resend. A missing Redis job is not proof that no provider
+request occurred. Automatic crash recovery needs durable attempt-start evidence
+and a defined provider-idempotency/reconciliation boundary; neither is established
+by the conditional status updates or local mocked-provider tests.
+
 ## 6. Release Go/No-Go Checklist
 
 Go only if all items are true:

@@ -20,6 +20,20 @@ import {
   withQuery,
 } from "./client";
 
+export type NotificationDeliveryRetryResult = {
+  deliveryId: string;
+  status: string;
+  errorMessage: string | null;
+  retriedAt: string;
+  replayed?: boolean;
+};
+
+export type NotificationDeliveryBulkRetryResult = {
+  requested: number;
+  retried: number;
+  results: NotificationDeliveryRetryResult[];
+};
+
 export type NoticeDetail = {
   id: string;
   title: string;
@@ -414,7 +428,7 @@ export const communicationsApi = {
 
   // Academics - Assessment Components
   retryNotificationDelivery: (deliveryId: string, body?: { reason?: string }) =>
-    request<any>(
+    request<NotificationDeliveryRetryResult>(
       `/communications/deliveries/${encodeURIComponent(deliveryId)}/retry`,
       {
         method: "POST",
@@ -437,10 +451,13 @@ export const communicationsApi = {
       limit: 25,
     }),
   retryFailedNotificationDeliveries: (body?: { reason?: string }) =>
-    request<any>("/communications/deliveries/retry-failed", {
-      method: "POST",
-      json: body ?? {},
-    }),
+    request<NotificationDeliveryBulkRetryResult>(
+      "/communications/deliveries/retry-failed",
+      {
+        method: "POST",
+        json: body ?? {},
+      },
+    ),
 
   getOwnNotificationPreferences: () =>
     request<NotificationPreferenceSummary>("/notifications/preferences/me"),

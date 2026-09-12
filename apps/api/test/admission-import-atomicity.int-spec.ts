@@ -8,6 +8,12 @@ import { IsolatedAuthCls } from './helpers/auth-test-isolation';
 import { NotificationEventService } from '../src/communications/notification-event.service';
 import { PlansService } from '../src/plans/plans.service';
 import { AuditService } from '../src/audit/audit.service';
+import { CommunicationsService } from '../src/communications/communications.service';
+import { DeliveryRetryService } from '../src/communications/delivery-retry.service';
+import { NotificationsService } from '../src/notifications/notifications.service';
+import { NotificationsProcessor } from '../src/notifications/notifications.processor';
+import { NotificationPreferencePolicy } from '../src/notifications/notification-preference-policy';
+import { Job } from 'bullmq';
 
 const databaseUrl = process.env.SCHOOLOS_ADMISSION_TEST_DATABASE_URL;
 if (databaseUrl) {
@@ -27,6 +33,7 @@ if (databaseUrl) {
 (databaseUrl ? describe : describe.skip)('Admission import atomicity', () => {
   const originalUrl = process.env.DATABASE_URL;
   let prisma: PrismaService;
+  let cls: ClsService;
   let service: AdmissionsService;
   let actor: AuthContext;
   let academicYearId: string;
@@ -39,7 +46,8 @@ if (databaseUrl) {
 
   beforeAll(async () => {
     process.env.DATABASE_URL = databaseUrl;
-    prisma = new PrismaService(new IsolatedAuthCls() as unknown as ClsService);
+    cls = new IsolatedAuthCls() as unknown as ClsService;
+    prisma = new PrismaService(cls);
     const slug = `atomic-${randomUUID()}`;
     const tenant = await prisma.tenant.create({
       data: { name: 'Synthetic atomicity test', slug },
@@ -161,6 +169,289 @@ if (databaseUrl) {
         status: 'CANCELLED',
         dispatchedAt: null,
         failedAt: null,
+      });
+    }));
+
+  it('rolls back delivery rows when a later recipient violates a PostgreSQL foreign key', () =>
+    scoped(async () => {
+      const sourceId = randomUUID();
+      const dispatch = jest.fn();
+      const allowed = {
+        userId: actor.userId,
+        studentId: '',
+        guardianId: null,
+        email: null,
+        phone: null,
+      };
+      const invalid = { ...allowed, userId: randomUUID() };
+      const communications = Object.assign(
+        Object.create(CommunicationsService.prototype),
+        {
+          prisma,
+          redisService: {
+            getClient: () => ({
+              set: jest.fn().mockResolvedValue('OK'),
+              eval: jest.fn().mockResolvedValue(1),
+            }),
+          },
+          usageService: { checkLimit: jest.fn(), incrementUsage: jest.fn() },
+          partitionRecipientsByCommunicationPolicy: jest
+            .fn()
+            .mockResolvedValue({
+              allowedRecipients: [allowed],
+              skippedRecipients: [invalid],
+            }),
+          dispatchDelivery: dispatch,
+        },
+      ) as CommunicationsService;
+      await expect(
+        communications.recordDeliveryRecords({
+          actor,
+          sourceType: 'synthetic_atomicity',
+          sourceId,
+          audienceType: 'ALL',
+          title: 'Synthetic test',
+          body: 'Synthetic test',
+          channels: ['IN_APP'],
+          directRecipients: [allowed, invalid],
+        }),
+      ).rejects.toMatchObject({ code: 'P2003' });
+      expect(
+        await prisma.notificationDelivery.count({
+          where: { tenantId: actor.tenantId, sourceId },
+        }),
+      ).toBe(0);
+      expect(dispatch).not.toHaveBeenCalled();
+    }));
+
+  it('persists a 2000-recipient three-channel batch atomically without rewriting it on replay', async () => {
+    await scoped(async () => {
+      const sourceId = randomUUID();
+      const users = Array.from({ length: 2000 }, () => ({
+        id: randomUUID(),
+        tenantId: actor.tenantId,
+        passwordHash: 'synthetic-unused',
+      }));
+      await prisma.user.createMany({ data: users });
+      const recipients = users.map((user) => ({
+        userId: user.id,
+        studentId: '',
+        guardianId: null,
+        email: `${user.id}@example.invalid`,
+        phone: null,
+      }));
+      const dispatch = jest.fn();
+      const communications = Object.assign(
+        Object.create(CommunicationsService.prototype),
+        {
+          prisma,
+          redisService: {
+            getClient: () => ({
+              set: jest.fn().mockResolvedValue('OK'),
+              eval: jest.fn().mockResolvedValue(1),
+            }),
+          },
+          usageService: { checkLimit: jest.fn(), incrementUsage: jest.fn() },
+          auditService: { record: jest.fn() },
+          partitionRecipientsByCommunicationPolicy: jest
+            .fn()
+            .mockResolvedValue({
+              allowedRecipients: recipients,
+              skippedRecipients: [],
+            }),
+          dispatchDelivery: dispatch,
+        },
+      ) as CommunicationsService;
+      const input = {
+        actor,
+        sourceType: 'synthetic_volume',
+        sourceId,
+        audienceType: 'ALL' as const,
+        title: 'Synthetic batch',
+        body: 'Original synthetic content',
+        channels: ['IN_APP', 'EMAIL', 'PUSH'] as Array<
+          'IN_APP' | 'EMAIL' | 'PUSH'
+        >,
+        directRecipients: recipients,
+      };
+      await expect(
+        communications.recordDeliveryRecords(input),
+      ).resolves.toMatchObject({ count: 6000 });
+      expect(dispatch).toHaveBeenCalledTimes(6000);
+      expect(
+        await prisma.notificationDelivery.count({
+          where: { tenantId: actor.tenantId, sourceId },
+        }),
+      ).toBe(6000);
+      dispatch.mockClear();
+      await expect(
+        communications.recordDeliveryRecords({
+          ...input,
+          body: 'Replacement must not overwrite original',
+        }),
+      ).resolves.toMatchObject({ count: 6000, replayed: true });
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(
+        await prisma.notificationDelivery.count({
+          where: { tenantId: actor.tenantId, sourceId, body: input.body },
+        }),
+      ).toBe(6000);
+    });
+  }, 30000);
+
+  it('claims one PostgreSQL retry for concurrent callers using the same version', () =>
+    scoped(async () => {
+      const delivery = await prisma.notificationDelivery.create({
+        data: {
+          tenantId: actor.tenantId,
+          channel: 'EMAIL',
+          status: 'FAILED',
+          sourceType: 'synthetic_retry',
+          sourceId: randomUUID(),
+          audienceType: 'ALL',
+          recipientUserId: actor.userId,
+          destination: 'synthetic@example.invalid',
+          title: 'Synthetic',
+          body: 'Synthetic',
+          retryCount: 2,
+        },
+      });
+      const sendEmail = jest.fn().mockResolvedValue(undefined);
+      const retries = new DeliveryRetryService(
+        prisma,
+        {
+          getProviderReadiness: jest.fn().mockResolvedValue({ enabled: true }),
+          sendEmail,
+        } as unknown as NotificationsService,
+        { record: jest.fn() } as unknown as AuditService,
+      );
+      // Capture the exact same stale read for both claimants, while retaining the
+      // actual service claim/update logic and real PostgreSQL constraints.
+      const dispatch = retries as unknown as {
+        dispatchRetry: (
+          row: typeof delivery,
+          auth: AuthContext,
+        ) => Promise<unknown>;
+      };
+      const outcomes = await Promise.allSettled([
+        dispatch.dispatchRetry(delivery, actor),
+        dispatch.dispatchRetry(delivery, actor),
+      ]);
+      expect(
+        outcomes.filter((outcome) => outcome.status === 'fulfilled'),
+      ).toHaveLength(1);
+      expect(
+        outcomes.filter((outcome) => outcome.status === 'rejected'),
+      ).toHaveLength(1);
+      expect(sendEmail).toHaveBeenCalledTimes(1);
+      expect(sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ deliveryAttempt: '3' }),
+        }),
+      );
+      expect(
+        await prisma.notificationDelivery.findFirstOrThrow({
+          where: { tenantId: actor.tenantId, id: delivery.id },
+        }),
+      ).toMatchObject({ status: 'RETRY_PENDING', retryCount: 3 });
+    }));
+
+  it('ignores an obsolete attempt and blocks queued in-app release after source cancellation', () =>
+    scoped(async () => {
+      const event = await prisma.notificationEvent.create({
+        data: {
+          tenantId: actor.tenantId,
+          type: 'STUDENT_ADMITTED',
+          sourceModule: 'M1_ADMISSIONS',
+          sourceEntityType: 'student',
+          sourceEntityId: randomUUID(),
+          idempotencyKey: randomUUID(),
+          status: 'DISPATCHED',
+        },
+      });
+      const delivery = await prisma.notificationDelivery.create({
+        data: {
+          tenantId: actor.tenantId,
+          notificationEventId: event.id,
+          sourceType: 'student',
+          sourceId: event.sourceEntityId,
+          audienceType: 'ALL',
+          channel: 'IN_APP',
+          recipientUserId: actor.userId,
+          status: 'FAILED',
+          title: 'Synthetic retry cancellation',
+          body: 'Synthetic content only',
+          retryCount: 0,
+        },
+      });
+      const releaseInAppNotification = jest.fn(
+        async (_input: { metadata: Record<string, string> }) => undefined,
+      );
+      const retries = new DeliveryRetryService(
+        prisma,
+        {
+          getProviderReadiness: jest.fn().mockResolvedValue({ enabled: true }),
+          releaseInAppNotification,
+        } as unknown as NotificationsService,
+        { record: jest.fn() } as unknown as AuditService,
+      );
+      await expect(
+        retries.retryDelivery(delivery.id, actor),
+      ).resolves.toMatchObject({
+        status: 'RETRY_PENDING',
+      });
+      expect(releaseInAppNotification).toHaveBeenCalledTimes(1);
+      const policy = new NotificationPreferencePolicy(prisma);
+      const evaluate = jest.spyOn(policy, 'evaluateDelivery');
+      const processor = new NotificationsProcessor(
+        prisma,
+        {
+          shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
+          checkFeatureEnabled: jest.fn().mockResolvedValue({ allowed: true }),
+        } as unknown as PlansService,
+        cls,
+        undefined,
+        undefined,
+        policy,
+      );
+      const pending = releaseInAppNotification.mock.calls[0][0];
+      await processor.process({
+        name: 'releaseInAppNotification',
+        data: { metadata: { ...pending.metadata, deliveryAttempt: '0' } },
+      } as Job);
+      expect(evaluate).not.toHaveBeenCalled();
+      expect(
+        await prisma.notificationDelivery.findFirstOrThrow({
+          where: { tenantId: actor.tenantId, id: delivery.id },
+        }),
+      ).toMatchObject({ status: 'RETRY_PENDING', retryCount: 1, sentAt: null });
+
+      await prisma.notificationEvent.updateMany({
+        where: { tenantId: actor.tenantId, id: event.id },
+        data: { status: 'CANCELLED' },
+      });
+      await prisma.notificationDelivery.updateMany({
+        where: { tenantId: actor.tenantId, id: delivery.id, retryCount: 1 },
+        data: {
+          failureCode: 'QUEUE_HANDOFF_UNCONFIRMED',
+          failureReason: 'Synthetic acknowledgement loss',
+        },
+      });
+      await processor.process({
+        name: 'releaseInAppNotification',
+        data: pending,
+      } as Job);
+      expect(evaluate).toHaveBeenCalledTimes(1);
+      expect(
+        await prisma.notificationDelivery.findFirstOrThrow({
+          where: { tenantId: actor.tenantId, id: delivery.id },
+        }),
+      ).toMatchObject({
+        status: 'SKIPPED',
+        retryCount: 1,
+        sentAt: null,
+        failureCode: null,
+        failureReason: 'Notification event is no longer deliverable',
       });
     }));
 

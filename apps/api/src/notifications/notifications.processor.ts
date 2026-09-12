@@ -95,6 +95,48 @@ export class NotificationsProcessor extends WorkerHost {
   ): Promise<void> {
     const deliveryId = job.data.metadata?.notificationDeliveryId;
     const tenantId = this.extractTenantId(job.data);
+    if (deliveryId !== undefined) {
+      const attempt = deliveryAttempt(job.data.metadata);
+      if (
+        typeof deliveryId !== 'string' ||
+        typeof tenantId !== 'string' ||
+        attempt === null
+      ) {
+        this.logger.warn(
+          'Skipping notification job with invalid delivery identity',
+        );
+        return;
+      }
+      const current = await this.prisma.notificationDelivery.findFirst({
+        where: { id: deliveryId, tenantId },
+        select: { id: true, retryCount: true, status: true },
+      });
+      if (
+        !current ||
+        current.retryCount !== attempt ||
+        !PENDING_DELIVERY_STATUSES.includes(current.status)
+      ) {
+        this.logger.warn(
+          'Skipping stale or terminal notification delivery job',
+        );
+        return;
+      }
+      const entitlement = await this.plansService.checkFeatureEnabled(
+        tenantId,
+        'module.notifications',
+      );
+      if (entitlement?.allowed !== true) {
+        await this.markDelivery(
+          job.data,
+          NotificationStatus.SKIPPED,
+          'Notification delivery is no longer enabled for this school.',
+        );
+        return;
+      }
+      if (!this.notificationPreferencePolicy) {
+        throw new Error('Notification delivery policy is unavailable');
+      }
+    }
     if (
       this.notificationPreferencePolicy &&
       typeof tenantId === 'string' &&
@@ -139,7 +181,7 @@ export class NotificationsProcessor extends WorkerHost {
           result = { status: NotificationStatus.SENT };
           break;
         default:
-          this.logger.warn(`Unknown job name: ${job.name}`);
+          throw new Error('Unsupported notification job type');
       }
 
       await this.markDelivery(
@@ -166,13 +208,23 @@ export class NotificationsProcessor extends WorkerHost {
   ) {
     const deliveryId = input.metadata?.notificationDeliveryId;
     const tenantId = input.metadata?.tenantId;
+    const attempt = deliveryAttempt(input.metadata);
 
-    if (typeof deliveryId !== 'string' || typeof tenantId !== 'string') {
+    if (
+      typeof deliveryId !== 'string' ||
+      typeof tenantId !== 'string' ||
+      attempt === null
+    ) {
       return;
     }
 
-    await this.prisma.notificationDelivery.update({
-      where: { id: deliveryId, tenantId },
+    await this.prisma.notificationDelivery.updateMany({
+      where: {
+        id: deliveryId,
+        tenantId,
+        retryCount: attempt,
+        status: { in: PENDING_DELIVERY_STATUSES },
+      },
       data: {
         status,
         sentAt: status === NotificationStatus.SENT ? new Date() : undefined,
@@ -181,6 +233,9 @@ export class NotificationsProcessor extends WorkerHost {
         failedAt: status === NotificationStatus.FAILED ? new Date() : undefined,
         providerMessageId: providerMessageId ?? undefined,
         errorMessage: errorMessage ?? null,
+        failureReason: errorMessage ?? null,
+        failureCode:
+          status === NotificationStatus.FAILED ? 'DELIVERY_JOB_FAILED' : null,
       },
     });
   }
@@ -513,6 +568,21 @@ export class NotificationsProcessor extends WorkerHost {
     }
     return output;
   }
+}
+
+const PENDING_DELIVERY_STATUSES: NotificationStatus[] = [
+  NotificationStatus.QUEUED,
+  NotificationStatus.RETRY_PENDING,
+  NotificationStatus.FAILED,
+];
+
+function deliveryAttempt(metadata?: Record<string, unknown>): number | null {
+  const value = metadata?.deliveryAttempt;
+  // Older delivery jobs predate explicit attempt metadata and belong to zero.
+  if (value === undefined) return 0;
+  if (typeof value !== 'string' || !/^(0|[1-9]\d*)$/.test(value)) return null;
+  const attempt = Number(value);
+  return Number.isSafeInteger(attempt) ? attempt : null;
 }
 
 function getProviderType(channel: 'email' | 'sms' | 'push') {
