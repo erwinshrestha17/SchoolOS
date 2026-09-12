@@ -12,19 +12,10 @@ function read(relativePath) {
 }
 
 describe('reference dashboard foundation', () => {
-  it('keeps the active repository-grounded web design and readiness sources', () => {
-    const designPath = join(
-      repoRoot,
-      'docs/architecture/SCHOOLOS_MODULE_DESIGN_CATALOG.md',
-    );
-    const readinessPath = join(
-      repoRoot,
-      'docs/production/SCHOOLOS_GA_RELEASE_POLICY.md',
-    );
-    assert.equal(existsSync(designPath), true);
-    assert.equal(existsSync(readinessPath), true);
-    const design = readFileSync(designPath, 'utf8');
-    const readiness = readFileSync(readinessPath, 'utf8');
+  it('keeps the single repository-grounded product and readiness source', () => {
+    const sourceOfTruthPath = join(repoRoot, 'AGENTS.md');
+    assert.equal(existsSync(sourceOfTruthPath), true);
+    const sourceOfTruth = readFileSync(sourceOfTruthPath, 'utf8');
     for (const marker of [
       'M1 Admissions and Student Profiles',
       'M2 Smart Attendance',
@@ -40,16 +31,15 @@ describe('reference dashboard foundation', () => {
       'M12 Notifications and Delivery',
       'M15 Notices and Announcements',
     ]) {
-      assert.match(design, new RegExp(marker.replace(/[&/]/g, '\\$&')));
+      assert.match(sourceOfTruth, new RegExp(marker.replace(/[&/]/g, '\\$&')));
     }
-    assert.match(design, /Chat\/conversations are removed from the active product/);
-    assert.match(readiness, /Internal QA/);
+    assert.match(sourceOfTruth, /Chat\/conversations are removed from the active product/);
+    assert.match(sourceOfTruth, /Internal QA/);
+    assert.match(sourceOfTruth, /single repository-wide source of truth/);
   });
 
   it('provides the requested shared dashboard composition primitives', () => {
-    const requiredFiles = [
-      'components/dashboard/module-tabs.tsx',
-    ];
+    const requiredFiles = ['components/dashboard/module-tabs.tsx'];
 
     for (const relativePath of requiredFiles) {
       assert.equal(
@@ -66,24 +56,16 @@ describe('reference dashboard foundation', () => {
       header.indexOf('{primaryAction}') < header.indexOf('<ActionMenu'),
       'Primary action must appear before the More Actions menu',
     );
-    // The More Actions trigger is icon-only (canonical ActionMenu default
-    // trigger) and must still carry an accessible label since it has no
-    // visible text.
     assert.match(header, /label="Open more actions"/);
   });
 
   it('keeps the permission-scoped real-API operations composition route', () => {
     const operations = read('app/dashboard/operations/page.tsx');
     const layout = read('app/dashboard/layout.tsx');
-    const principalNav = read(
-      'components/layout/sidebar-persona-nav.config.ts',
-    );
+    const principalNav = read('components/layout/sidebar-persona-nav.config.ts');
 
     assert.match(layout, /prefix: ['"]\/dashboard\/operations['"]/);
-    assert.match(
-      principalNav,
-      /href: ['"]\/dashboard\/operations\/overview['"]/,
-    );
+    assert.match(principalNav, /href: ['"]\/dashboard\/operations\/overview['"]/);
     for (const helper of [
       'libraryApi.getOverdueBooksReport',
       'transportApi.getReports',
@@ -106,8 +88,6 @@ describe('reference dashboard foundation', () => {
       read('components/layout/sidebar-persona-nav.base.ts'),
     ].join('\n');
 
-    // /dashboard/notices is the canonical M15 workspace; the older route is
-    // retained only as a compatibility redirect.
     assert.match(layout, /prefix: ['"]\/dashboard\/communications['"]/);
     assert.match(personaNav, /href: '\/dashboard\/notices'/);
     assert.match(communications, /redirect\('\/dashboard\/notices'\)/);

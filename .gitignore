@@ -73,7 +73,6 @@ apps/api/tsc-output*.txt
 apps/web/typecheck_errors*.txt
 apps/web/typecheck_output*.txt
 
-
 /provinces.csv
 /districts.csv
 /local_level_types.csv
@@ -89,5 +88,9 @@ apps/web/typecheck_output*.txt
 /data/
 
 apps/schoolos_mobile/web/manifest.json
-# Load-test run output (evidence is summarised in docs/performance/)
+# Load-test run output
 tests/load/results/
+
+# Repository documentation policy: AGENTS.md is the sole tracked Markdown source of truth.
+**/*.md
+!/AGENTS.md
