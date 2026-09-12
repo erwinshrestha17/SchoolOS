@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import type { OperationalSummaryRouteModule } from '@schoolos/core';
 import { CommandPalette } from './command-palette';
@@ -75,12 +75,15 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       ? undefined
       : candidateSummary;
 
-  function closeMobileNavigation() {
+  const closeMobileNavigation = useCallback(() => {
     setMobileOpen(false);
-    // Return focus to the trigger that opened the drawer instead of losing
-    // it to the (now removed) overlay, matching standard dialog behavior.
-    mobileMenuButtonRef.current?.focus();
-  }
+    // Wait until the modal releases background focus. Do not focus the hidden
+    // compact trigger when a resized window has switched to desktop navigation.
+    requestAnimationFrame(() => {
+      const trigger = mobileMenuButtonRef.current;
+      if (trigger?.getClientRects().length) trigger.focus();
+    });
+  }, []);
 
   if (status === 'loading') {
     return (
@@ -114,6 +117,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
         <SupportOverrideBanner />
         <TopBar
           onMobileMenuToggle={() => setMobileOpen(!mobileOpen)}
+          mobileNavigationOpen={mobileOpen}
           mobileMenuButtonRef={mobileMenuButtonRef}
         />
         <NetworkStatusBanner />

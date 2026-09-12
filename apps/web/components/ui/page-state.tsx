@@ -25,10 +25,10 @@ type PageStateProps = {
 };
 
 const toneStyles: Record<PageStateTone, string> = {
-  info: 'border-info-100 bg-info-50 text-info-800',
-  success: 'border-success-100 bg-success-50 text-success-800',
-  warning: 'border-warning-100 bg-warning-50 text-warning-800',
-  danger: 'border-danger-100 bg-danger-50 text-danger-800',
+  info: 'border-info-100 bg-info-50 text-info-700',
+  success: 'border-success-100 bg-success-50 text-success-700',
+  warning: 'border-warning-100 bg-warning-50 text-warning-700',
+  danger: 'border-danger-100 bg-danger-50 text-danger-700',
   permission: 'border-danger-100 bg-white text-slate-900',
   loading: 'border-slate-200 bg-white text-slate-900',
 };
@@ -69,22 +69,25 @@ export function PageState({
 }: PageStateProps) {
   return (
     <div
+      role={tone === 'danger' || tone === 'permission' ? 'alert' : 'status'}
+      aria-live={tone === 'danger' || tone === 'permission' ? 'assertive' : 'polite'}
+      aria-busy={tone === 'loading' || undefined}
       className={cn(
-        'flex min-h-[280px] flex-col items-center justify-center rounded-2xl border p-8 text-center shadow-sm',
+        'flex min-h-56 flex-col items-center justify-center rounded-xl border p-6 text-center sm:p-8',
         toneStyles[tone],
         className,
       )}
     >
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
+      <div aria-hidden="true" className="mb-4 flex h-10 w-10 items-center justify-center">
         <StateIcon tone={tone} />
       </div>
-      <h3 className="text-xl font-black tracking-tight text-slate-950">{title}</h3>
+      <h3 className="text-base font-semibold text-foreground">{title}</h3>
       {description && (
         <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">{description}</p>
       )}
       {children && <div className="mt-5 w-full max-w-xl">{children}</div>}
       {(actionLabel && onAction) || secondaryAction ? (
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
           {actionLabel && onAction ? (
             <Button type="button" onClick={onAction}>
               {actionLabel}

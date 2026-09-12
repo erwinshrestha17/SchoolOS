@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/design_system/app_spacing.dart';
 import '../../app/theme/app_colors.dart';
 import 'app_button.dart';
+import 'app_empty_state.dart';
 
 class AppAccessState extends StatelessWidget {
   const AppAccessState({
@@ -29,6 +30,15 @@ class AppAccessState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!compact) {
+      return AppEmptyState(
+        title: title,
+        message: message,
+        icon: icon,
+        actionLabel: actionLabel,
+        onActionPressed: onAction,
+      );
+    }
     return Center(
       child: Padding(
         padding: EdgeInsets.all(compact ? AppSpacing.md : AppSpacing.xl),

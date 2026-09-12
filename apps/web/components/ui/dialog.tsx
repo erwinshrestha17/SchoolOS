@@ -1,54 +1,82 @@
-import * as React from "react";
-import { createPortal } from "react-dom";
+'use client';
 
-export const Dialog = ({ children, open, onOpenChange }: any) => {
-  const [mounted, setMounted] = React.useState(false);
+import * as React from 'react';
+import { cn } from '../../lib/utils';
+import {
+  Dialog as PrimitiveDialog,
+  DialogContent as PrimitiveDialogContent,
+  DialogDescription as PrimitiveDialogDescription,
+  DialogFooter as PrimitiveDialogFooter,
+  DialogHeader as PrimitiveDialogHeader,
+  DialogTitle as PrimitiveDialogTitle,
+} from './primitives/dialog';
 
-  React.useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
+export { DialogClose, DialogTrigger } from './primitives/dialog';
+export const Dialog = PrimitiveDialog;
 
-  if (!open) return null;
+function hasDescription(children: React.ReactNode): boolean {
+  return React.Children.toArray(children).some((child) => {
+    if (!React.isValidElement<{ children?: React.ReactNode }>(child)) return false;
+    return child.type === DialogDescription || child.type === PrimitiveDialogDescription || hasDescription(child.props.children);
+  });
+}
 
-  const modalContent = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm">
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="bg-white rounded-2xl shadow-lg w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in"
-      >
-        {children}
-      </div>
-    </div>
+/** Keep the established padded header/body/footer layout on the Radix modal. */
+export function DialogContent({
+  children,
+  className,
+  showCloseButton = false,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
+  onPointerDownOutside,
+  ...props
+}: React.ComponentProps<typeof PrimitiveDialogContent>) {
+  const returnFocusRef = React.useRef<HTMLElement | null>(null);
+
+  return (
+    <PrimitiveDialogContent
+      className={cn(
+        'flex max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl flex-col gap-0 overflow-y-auto rounded-xl bg-[var(--surface)] p-0',
+        className,
+      )}
+      showCloseButton={showCloseButton}
+      {...(!hasDescription(children) ? { 'aria-describedby': undefined } : {})}
+      {...props}
+      onOpenAutoFocus={(event) => {
+        returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        onOpenAutoFocus?.(event);
+      }}
+      onCloseAutoFocus={(event) => {
+        onCloseAutoFocus?.(event);
+        if (!event.defaultPrevented && returnFocusRef.current?.isConnected) {
+          event.preventDefault();
+          returnFocusRef.current.focus();
+        }
+      }}
+      onPointerDownOutside={(event) => {
+        // Existing operational forms never dismissed on a background click.
+        // Keep that data-preserving default; explicit handlers may opt in.
+        if (onPointerDownOutside) onPointerDownOutside(event);
+        else event.preventDefault();
+      }}
+    >
+      {children}
+    </PrimitiveDialogContent>
   );
+}
 
-  if (mounted && typeof window !== "undefined") {
-    return createPortal(modalContent, document.body);
-  }
+export function DialogHeader({ className, ...props }: React.ComponentProps<typeof PrimitiveDialogHeader>) {
+  return <PrimitiveDialogHeader className={cn('shrink-0 border-b border-border p-5 text-left', className)} {...props} />;
+}
 
-  return null;
-};
+export function DialogTitle({ className, ...props }: React.ComponentProps<typeof PrimitiveDialogTitle>) {
+  return <PrimitiveDialogTitle className={cn('text-lg font-semibold leading-6 text-foreground', className)} {...props} />;
+}
 
-export const DialogContent = ({ children, className }: any) => (
-  <div className={`flex flex-col flex-1 overflow-hidden ${className}`}>
-    {children}
-  </div>
-);
-export const DialogHeader = ({ children, className }: any) => (
-  <div className={`p-6 border-b border-gray-100 ${className}`}>{children}</div>
-);
-export const DialogTitle = ({ children, className }: any) => (
-  <h3 className={`text-xl font-bold text-gray-950 ${className}`}>{children}</h3>
-);
-export const DialogDescription = ({ children, className }: any) => (
-  <p className={`text-sm text-gray-500 ${className}`}>{children}</p>
-);
-export const DialogFooter = ({ children, className }: any) => (
-  <div
-    className={`p-6 border-t border-gray-100 bg-gray-50 flex justify-end ${className}`}
-  >
-    {children}
-  </div>
-);
-export const DialogTrigger = ({ children }: any) => children;
+export function DialogDescription({ className, ...props }: React.ComponentProps<typeof PrimitiveDialogDescription>) {
+  return <PrimitiveDialogDescription className={cn('text-sm leading-6 text-muted-foreground', className)} {...props} />;
+}
+
+export function DialogFooter({ className, ...props }: React.ComponentProps<typeof PrimitiveDialogFooter>) {
+  return <PrimitiveDialogFooter className={cn('shrink-0 border-t border-border bg-[var(--hover-subtle)] p-5', className)} {...props} />;
+}

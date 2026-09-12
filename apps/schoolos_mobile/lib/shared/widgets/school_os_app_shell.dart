@@ -120,7 +120,9 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
       surfaceTintColor: Colors.transparent,
       actions: [
         IconButton(
-          tooltip: unread > 0 ? 'Notifications, $unread unread' : 'Notifications',
+          tooltip: unread > 0
+              ? 'Notifications, $unread unread'
+              : 'Notifications',
           onPressed: () => context.push(AppRoutes.notifications),
           icon: Badge.count(
             count: unread,

@@ -46,16 +46,16 @@ export function ErrorState({
   return (
     <div
       className={cn(
-        'flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-danger-100 bg-danger-50 p-8 text-center',
+        'flex min-h-56 flex-col items-center justify-center rounded-xl border border-danger-100 bg-danger-50 p-6 sm:p-8 text-center',
         className,
       )}
       role="alert"
       aria-live="assertive"
     >
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-danger-600 shadow-sm">
-        <AlertTriangle className="h-6 w-6" />
+      <div className="mb-4 flex h-10 w-10 items-center justify-center text-danger-700">
+        <AlertTriangle className="h-6 w-6" aria-hidden="true" />
       </div>
-      <h3 className="text-lg font-black text-slate-950">{title}</h3>
+      <h3 className="text-base font-semibold text-foreground">{title}</h3>
       <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
         {safeMessage}
       </p>
@@ -65,7 +65,8 @@ export function ErrorState({
           <button
             type="button"
             onClick={() => setShowDetails((current) => !current)}
-            className="text-xs font-bold text-slate-500 underline hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)]"
+            aria-expanded={showDetails}
+            className="text-xs font-semibold text-slate-600 underline hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)]"
           >
             {showDetails ? 'Hide technical details' : 'Show technical details'}
           </button>

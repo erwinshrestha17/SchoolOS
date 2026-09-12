@@ -41,7 +41,7 @@ export function ModuleHeader({
               {eyebrow}
             </p>
           ) : null}
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="text-2xl font-semibold leading-8 tracking-tight text-foreground">
             {title}
           </h1>
           {description ? (

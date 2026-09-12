@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:schoolos_mobile/core/auth/auth_provider.dart';
+import 'package:schoolos_mobile/app/theme/app_theme.dart';
 import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/core/storage/app_preferences_service.dart';
@@ -78,7 +79,7 @@ void main() {
         }),
         ...overrides,
       ],
-      child: MaterialApp(home: home),
+      child: MaterialApp(theme: AppTheme.light, home: home),
     );
   }
 
@@ -90,11 +91,7 @@ void main() {
       'labeled-tap-target': labeledTapTargetGuideline,
       'text-contrast': textContrastGuideline,
     }.entries) {
-      try {
-        await expectLater(tester, meetsGuideline(entry.value));
-      } catch (e) {
-        debugPrint('AUDITFAIL [${entry.key}] $e');
-      }
+      await expectLater(tester, meetsGuideline(entry.value), reason: entry.key);
     }
     handle.dispose();
   }

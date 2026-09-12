@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:schoolos_mobile/core/network/connectivity_provider.dart';
 import 'package:schoolos_mobile/app/theme/app_semantic_colors.dart';
 import 'package:schoolos_mobile/app/theme/app_theme.dart';
 import 'package:schoolos_mobile/shared/widgets/role_shell_scaffold.dart';
 import 'package:schoolos_mobile/shared/widgets/school_os_app_shell.dart';
 
 void main() {
-  testWidgets('parent bottom navigation exposes five task groups', (tester) async {
+  testWidgets('parent bottom navigation exposes five task groups', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
@@ -30,12 +35,15 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light,
-        home: const RoleShellScaffold(
-          role: 'TEACHER',
-          selectedIndex: 0,
-          body: SizedBox.shrink(),
+      ProviderScope(
+        overrides: [connectivityProvider.overrideWith((ref) => _Online())],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: const RoleShellScaffold(
+            role: 'TEACHER',
+            selectedIndex: 0,
+            body: SizedBox.shrink(),
+          ),
         ),
       ),
     );
@@ -74,8 +82,25 @@ void main() {
       ),
     );
 
+    await tester.pumpAndSettle();
     expect(lightBackground, isNotNull);
     expect(darkBackground, isNotNull);
     expect(lightBackground, isNot(darkBackground));
   });
+}
+
+class _Online extends ConnectivityNotifier {
+  _Online() : super(_Connectivity()) {
+    state = true;
+  }
+}
+
+class _Connectivity implements Connectivity {
+  @override
+  Future<List<ConnectivityResult>> checkConnectivity() async => [
+    ConnectivityResult.wifi,
+  ];
+  @override
+  Stream<List<ConnectivityResult>> get onConnectivityChanged =>
+      const Stream.empty();
 }

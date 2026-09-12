@@ -82,7 +82,7 @@ describe('MobileService', () => {
     paymentRefund: MockModel<'findMany'>;
     notificationDelivery: MockModel<'findMany' | 'findFirst' | 'count'>;
     notificationReadReceipt: MockModel<'upsert' | 'createMany'>;
-    homeworkAssignment: MockModel<'findMany' | 'findFirst'>;
+    homeworkAssignment: MockModel<'findMany' | 'findFirst' | 'aggregate'>;
     reportCard: MockModel<'findMany' | 'findFirst'>;
     examTimetableSlot: MockModel<'findMany'>;
     activityPost: MockModel<'findMany'>;
@@ -198,6 +198,7 @@ describe('MobileService', () => {
       homeworkAssignment: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
+        aggregate: jest.fn(),
       },
       reportCard: {
         findMany: jest.fn(),
@@ -2135,6 +2136,7 @@ describe('MobileService', () => {
     expect(attendanceSpy).not.toHaveBeenCalled();
     expect(feesSpy).not.toHaveBeenCalled();
     expect(homeworkSpy).not.toHaveBeenCalled();
+    expect(prisma.homeworkAssignment.aggregate).not.toHaveBeenCalled();
     expect(transportSpy).not.toHaveBeenCalled();
     expect(canteenSpy).not.toHaveBeenCalled();
     expect(activitySpy).not.toHaveBeenCalled();

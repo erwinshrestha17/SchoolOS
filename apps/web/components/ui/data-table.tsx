@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { LoadingState } from './loading-state';
 import { EmptyState } from './empty-state';
 import { PageState } from './page-state';
+import { Button } from './button';
 
 interface Column<T> {
   header: string;
@@ -22,6 +23,7 @@ interface DataTableProps<T> {
   emptyTitle?: string;
   loadingLabel?: string;
   onRowClick?: (item: T) => void;
+  getRowActionLabel?: (item: T, index: number) => string;
   getRowKey?: (item: T, index: number) => string;
   className?: string;
   tableClassName?: string;
@@ -36,6 +38,7 @@ export function DataTable<T>({
   emptyTitle = 'No data found',
   loadingLabel = 'Loading data...',
   onRowClick,
+  getRowActionLabel,
   getRowKey,
   className,
   tableClassName,
@@ -62,28 +65,33 @@ export function DataTable<T>({
   }
 
   return (
-    <div className={cn('overflow-x-auto rounded-2xl border border-slate-100 bg-white', className)}>
+    <div className={cn('overflow-x-auto rounded-xl border border-border bg-white', className)}>
       <table className={cn('w-full border-collapse text-left text-sm', tableClassName)}>
-        <thead className="border-b border-slate-100 bg-slate-50/50">
+        <thead className="border-b border-border bg-[var(--hover-subtle)]">
           <tr>
             {columns.map((column, index) => (
               <th
                 key={index}
+                scope="col"
                 className={cn(
-                  'px-6 py-4 text-[0.7rem] font-bold uppercase tracking-wider text-slate-500',
+                  'px-4 py-3 text-xs font-semibold text-muted-foreground',
                   column.className,
                 )}
               >
                 {column.header}
               </th>
             ))}
+            {onRowClick ? <th scope="col" className="w-20 px-4 py-3 text-right text-xs font-semibold text-muted-foreground">Open</th> : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50">
           {data.map((item, rowIndex) => (
             <tr
               key={getRowKey?.(item, rowIndex) ?? rowIndex}
-              onClick={() => onRowClick?.(item)}
+              onClick={onRowClick ? (event) => {
+                if (!(event.target instanceof Element) || event.target.closest('a, button, input, select, textarea, [role="button"], [role="checkbox"]')) return;
+                onRowClick(item);
+              } : undefined}
               className={cn(
                 'transition-colors hover:bg-slate-50/50',
                 onRowClick && 'cursor-pointer',
@@ -96,12 +104,17 @@ export function DataTable<T>({
                 return (
                   <td
                     key={colIndex}
-                    className={cn('px-6 py-4 text-slate-700', column.className)}
+                    className={cn('px-4 py-3 text-slate-700', column.className)}
                   >
                     {column.cell ? column.cell(item, rowIndex) : String(value ?? '')}
                   </td>
                 );
               })}
+              {onRowClick ? (
+                <td className="px-4 py-2 text-right">
+                  <Button type="button" variant="ghost" size="sm" aria-label={getRowActionLabel?.(item, rowIndex) ?? `Open row ${rowIndex + 1}`} onClick={() => onRowClick(item)}>Open</Button>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>

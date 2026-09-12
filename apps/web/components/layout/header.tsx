@@ -32,11 +32,13 @@ import {
 
 export type HeaderProps = {
   onMobileMenuToggle: () => void;
+  mobileNavigationOpen?: boolean;
   mobileMenuButtonRef?: RefObject<HTMLButtonElement | null>;
 };
 
 export function Header({
   onMobileMenuToggle,
+  mobileNavigationOpen = false,
   mobileMenuButtonRef,
 }: HeaderProps) {
   const router = useRouter();
@@ -62,7 +64,7 @@ export function Header({
 
   const academicYears = academicYearsQuery.data ?? [];
   const currentAcademicYear =
-    academicYears.find((year) => year.isCurrent) ?? academicYears[0];
+    academicYears.find((year) => year.isCurrent);
 
   const authenticatedName = profileQuery.data?.staff
     ? [profileQuery.data.staff.firstName, profileQuery.data.staff.lastName]
@@ -99,19 +101,20 @@ export function Header({
   );
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/95 px-4 shadow-sm shadow-slate-200/40 backdrop-blur-md lg:px-8">
+    <header className="sticky top-0 z-20 flex min-h-16 shrink-0 items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-4 lg:px-7">
       <button
         ref={mobileMenuButtonRef}
         type="button"
         onClick={onMobileMenuToggle}
         className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 lg:hidden"
-        aria-controls="dashboard-main"
+        aria-controls="school-navigation-drawer"
+        aria-expanded={mobileNavigationOpen}
         aria-label="Open navigation menu"
       >
         <Menu size={20} />
       </button>
 
-      <div className="hidden min-w-0 items-center gap-3 lg:flex">
+      <div className="hidden min-w-0 max-w-xs items-center gap-3 lg:flex">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-xs font-bold text-white shadow-sm shadow-[var(--primary-soft)]">
           {tenantName[0]?.toUpperCase() ?? <School size={16} />}
         </div>
@@ -120,29 +123,36 @@ export function Header({
             {tenantName}
           </p>
           <div className="mt-0.5 flex items-center gap-1.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-success-500" />
             <p className="truncate text-xs font-semibold leading-[18px] text-slate-500">
-              {session?.tenant.slug ?? "schoolos"} school
+              School workspace
             </p>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto hidden w-full max-w-xl md:block">
+      <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--ink)] md:hidden" title={tenantName}>
+        {tenantName}
+      </p>
+
+      <div className="mx-auto hidden min-w-0 flex-1 max-w-xl md:block">
         <GlobalStudentSearch />
       </div>
 
       <div className="ml-auto flex items-center gap-3">
-        {canReadAcademicYears && currentAcademicYear ? (
+        {canReadAcademicYears ? (
           <div
             className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm sm:flex"
-            title="Active academic year. Change it in School Settings."
+            title={currentAcademicYear ? "Active academic year. Change it in School Settings." : "Academic year context"}
           >
             <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
               AY
             </span>
-            <span>{currentAcademicYear.name}</span>
-            {currentAcademicYear.isCurrent ? (
+            <span>{academicYearsQuery.isPending
+              ? "Loading year…"
+              : academicYearsQuery.isError
+                ? "Year unavailable"
+                : currentAcademicYear?.name ?? "No current year"}</span>
+            {currentAcademicYear ? (
               <Badge variant="success" className="h-4.5 px-1.5 text-[0.6rem]">
                 Current
               </Badge>

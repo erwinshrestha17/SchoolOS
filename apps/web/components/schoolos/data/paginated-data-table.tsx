@@ -81,6 +81,7 @@ export type PaginatedDataTableProps<T> = {
 
   rowActions?: (row: T) => ReactNode;
   onRowClick?: (row: T) => void;
+  getRowActionLabel?: (row: T, index: number) => string;
   /** For master-detail layouts (row click selects detail) — not the checkbox `selection` state. */
   getRowClassName?: (row: T) => string | undefined;
 
@@ -154,6 +155,7 @@ export function PaginatedDataTable<T>({
   bulkActions,
   rowActions,
   onRowClick,
+  getRowActionLabel,
   getRowClassName,
   emptyTitle = 'No records yet',
   emptyDescription = 'Records will appear here once they exist.',
@@ -241,7 +243,7 @@ export function PaginatedDataTable<T>({
   const showNoResults = status === 'ready' && items.length === 0 && hasActiveFilters;
 
   return (
-    <div className={cn('rounded-2xl border border-slate-100 bg-white', className)}>
+    <div className={cn('rounded-xl border border-border bg-card', className)}>
       {selectionActive && bulkActions ? (
         <div
           className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-[var(--primary-soft)] px-4 py-2.5"
@@ -287,7 +289,7 @@ export function PaginatedDataTable<T>({
         <TableHeader>
           <TableRow>
             {selectable ? (
-              <TableHead className="w-10">
+              <TableHead scope="col" className="w-10">
                 <Checkbox
                   checked={isAllMatchingFilterSelected ? true : someOnPageSelected ? 'indeterminate' : allOnPageSelected}
                   onCheckedChange={(checked) => toggleAllOnPage(checked === true)}
@@ -301,6 +303,7 @@ export function PaginatedDataTable<T>({
               return (
                 <TableHead
                   key={column.id}
+                  scope="col"
                   className={cn(alignClass(column.align), hideClass(column.hideBelow), column.headerClassName)}
                   aria-sort={isSorted ? (sort!.direction === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
@@ -329,12 +332,12 @@ export function PaginatedDataTable<T>({
                 </TableHead>
               );
             })}
-            {rowActions ? <TableHead className="w-10 text-right">More</TableHead> : null}
+            {onRowClick || rowActions ? <TableHead scope="col" className="w-20 text-right">Actions</TableHead> : null}
           </TableRow>
         </TableHeader>
         <TableBody>
           {status === 'loading' ? (
-            <TableSkeletonRows columnCount={columns.length + (selectable ? 1 : 0) + (rowActions ? 1 : 0)} />
+            <TableSkeletonRows columnCount={columns.length + (selectable ? 1 : 0) + (onRowClick || rowActions ? 1 : 0)} />
           ) : (
             items.map((row, index) => {
               const id = getRowId(row);
@@ -343,7 +346,10 @@ export function PaginatedDataTable<T>({
                 <TableRow
                   key={id}
                   data-state={isSelected ? 'selected' : undefined}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  onClick={onRowClick ? (event) => {
+                    if (!(event.target instanceof Element) || event.target.closest('a, button, input, select, textarea, [role="button"], [role="checkbox"]')) return;
+                    onRowClick(row);
+                  } : undefined}
                   className={cn(onRowClick && 'cursor-pointer', getRowClassName?.(row))}
                 >
                   {selectable ? (
@@ -364,9 +370,12 @@ export function PaginatedDataTable<T>({
                       {column.cell(row, index)}
                     </TableCell>
                   ))}
-                  {rowActions ? (
+                  {onRowClick || rowActions ? (
                     <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
-                      {rowActions(row)}
+                      <div className="flex items-center justify-end gap-1">
+                        {onRowClick ? <Button type="button" variant="ghost" size="sm" aria-label={getRowActionLabel?.(row, index) ?? `Open row ${index + 1}`} onClick={() => onRowClick(row)}>Open</Button> : null}
+                        {rowActions?.(row)}
+                      </div>
                     </TableCell>
                   ) : null}
                 </TableRow>

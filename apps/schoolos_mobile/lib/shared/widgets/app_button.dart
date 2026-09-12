@@ -33,23 +33,26 @@ class AppButton extends StatelessWidget {
     final Widget labelWidget = Flexible(
       child: Text(
         label,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.center,
         style: const TextStyle(fontWeight: FontWeight.w600),
       ),
     );
 
     final Widget content = isLoading
-        ? SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                variant == AppButtonVariant.filled
-                    ? Colors.white
-                    : (foregroundColor ?? theme.colorScheme.primary),
+        ? Semantics(
+            label: label,
+            value: 'In progress',
+            liveRegion: true,
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  variant == AppButtonVariant.filled
+                      ? (foregroundColor ?? theme.colorScheme.onPrimary)
+                      : (foregroundColor ?? theme.colorScheme.primary),
+                ),
               ),
             ),
           )
@@ -110,10 +113,9 @@ class AppButton extends StatelessWidget {
         );
     }
 
-    if (fullWidth) {
-      return SizedBox(width: double.infinity, height: 52, child: button);
-    }
-
-    return SizedBox(height: 52, child: button);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 52),
+      child: SizedBox(width: fullWidth ? double.infinity : null, child: button),
+    );
   }
 }

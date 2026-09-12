@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,6 +22,7 @@ import { TeacherCapability, useTeacherAccess } from '../../lib/teacher-access';
 import { useSettingsCapabilities } from '../../lib/permissions-ui';
 import { useSchoolWebPersona } from '../../lib/school-web-persona';
 import { cn } from '../../lib/utils';
+import { Sheet, SheetContent, SheetTitle } from '../ui/primitives/sheet';
 import { SidebarNavHeading, SidebarNavLink } from './sidebar-nav-link';
 import {
   navGroupsForPersona,
@@ -177,49 +178,34 @@ export function Sidebar({
     : formatRole(session?.user.roles[0] ?? 'school_user');
   const userLabel = session?.user.email ?? 'Signed-in school user';
 
-  const mobilePanelRef = useRef<HTMLDivElement>(null);
-
-  // Escape-to-close must work regardless of which element inside the drawer
-  // currently has focus, and opening the drawer should move focus into it
-  // (dashboard-shell.tsx returns focus to the menu trigger on close).
+  // A drawer opened on a narrow window must release its modal lock when the
+  // desktop navigation takes over. Radix owns focus trapping and dismissal.
   useEffect(() => {
     if (!mobileOpen) return;
-    mobilePanelRef.current?.focus();
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onMobileClose();
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const closeOnDesktop = () => {
+      if (desktop.matches) onMobileClose();
+    };
+    closeOnDesktop();
+    desktop.addEventListener('change', closeOnDesktop);
+    return () => desktop.removeEventListener('change', closeOnDesktop);
   }, [mobileOpen, onMobileClose]);
 
   return (
     <>
-      {mobileOpen && (
-        <div
-          className="sidebar-overlay lg:hidden"
-          onClick={onMobileClose}
-          role="button"
-          tabIndex={0}
-          aria-label="Close navigation menu"
-        />
-      )}
-
-      <aside
-        ref={mobilePanelRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-hidden={!mobileOpen}
-        inert={!mobileOpen}
-        aria-label="School operations navigation"
-        className={cn(
-          'fixed inset-y-0 left-0 z-50 lg:hidden sidebar-transition focus:outline-none',
-          mobileOpen ? 'translate-x-0' : '-translate-x-full',
-        )}
-      >
+      <Sheet open={mobileOpen} onOpenChange={(open) => { if (!open) onMobileClose(); }}>
+        <SheetContent
+          id="school-navigation-drawer"
+          side="left"
+          showCloseButton={false}
+          aria-describedby={undefined}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            onMobileClose();
+          }}
+          className="w-[280px] max-w-[calc(100vw-2rem)] gap-0 p-0 sm:max-w-[280px]"
+        >
+          <SheetTitle className="sr-only">School operations navigation</SheetTitle>
         <SidebarContent
           collapsed={false}
           groups={groupsToRender}
@@ -231,7 +217,8 @@ export function Sidebar({
           navigationLoading={entitlementsLoading}
           onMobileClose={onMobileClose}
         />
-      </aside>
+        </SheetContent>
+      </Sheet>
 
       <aside className="sticky top-0 z-30 hidden h-screen lg:flex">
         <SidebarContent
@@ -274,6 +261,7 @@ function SidebarContent({
   onMobileClose: () => void;
   onToggle?: () => void;
 }) {
+  const searchId = useId();
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLowerCase();
   const isSearching = !navigationLoading && normalizedQuery.length > 0;
@@ -294,7 +282,7 @@ function SidebarContent({
     <div
       className={cn(
         'sidebar-transition flex h-full flex-col border-r border-[var(--line)] bg-[var(--sidebar-bg)] text-[var(--sidebar-label)]',
-        collapsed ? 'w-[72px]' : 'w-[264px]',
+        collapsed ? 'w-[72px]' : onToggle ? 'w-[264px]' : 'w-full',
       )}
     >
       <header className="border-b border-[var(--line)] px-3 py-3">
@@ -315,6 +303,16 @@ function SidebarContent({
               School operating desk
             </span>
           </div>
+          {!onToggle ? (
+            <button
+              type="button"
+              onClick={onMobileClose}
+              aria-label="Close navigation menu"
+              className="ml-auto flex size-10 shrink-0 items-center justify-center rounded-lg text-[var(--sidebar-label)] hover:bg-[var(--sidebar-hover)]"
+            >
+              <X size={20} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
 
         {!collapsed && (
@@ -336,7 +334,7 @@ function SidebarContent({
 
       {!collapsed && (
         <div className="border-b border-[var(--line)] px-3 py-2.5">
-          <label className="sr-only" htmlFor="sidebar-nav-search">
+          <label className="sr-only" htmlFor={searchId}>
             Find a workspace
           </label>
           <div className="relative">
@@ -346,7 +344,7 @@ function SidebarContent({
               aria-hidden="true"
             />
             <input
-              id="sidebar-nav-search"
+              id={searchId}
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -358,7 +356,7 @@ function SidebarContent({
               <button
                 type="button"
                 onClick={() => setQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-[var(--sidebar-heading)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-label)]"
+                className="absolute right-0.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-[var(--sidebar-heading)] transition-colors hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-label)]"
                 aria-label="Clear search"
               >
                 <X size={13} aria-hidden="true" />

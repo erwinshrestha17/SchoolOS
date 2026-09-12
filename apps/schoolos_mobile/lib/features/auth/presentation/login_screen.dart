@@ -258,7 +258,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: AppSpacing.xs),
                   Center(
                     child: Text(
-                      'Sign in once. SchoolOS opens the right workspace.',
+                      'Your school day, in one place.',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: isDark ? AppColors.slate400 : AppColors.slate600,
                       ),
@@ -275,7 +275,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Use your tenant code, email or username, and password. Your backend role controls which screens open after login.',
+                    'Enter the school code and account details provided by your school.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: isDark ? AppColors.slate400 : AppColors.slate600,
                       height: 1.35,
@@ -283,13 +283,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   AppTextField(
-                    label: 'Tenant code',
+                    label: 'School code',
                     controller: _tenantController,
                     hintText: 'e.g. holyland',
                     prefixIcon: Icons.business_rounded,
                     textInputAction: TextInputAction.next,
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Tenant is required' : null,
+                    validator: (v) => v == null || v.isEmpty
+                        ? 'School code is required'
+                        : null,
                   ),
                   const SizedBox(height: AppSpacing.md),
                   AppTextField(
@@ -428,7 +429,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ],
                   Center(
                     child: Text(
-                      'Secured by SchoolOS platform architecture',
+                      'Need help signing in? Contact your school.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: AppColors.slate400,
                       ),

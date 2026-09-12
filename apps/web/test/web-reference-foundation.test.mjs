@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
@@ -33,9 +33,24 @@ describe('reference dashboard foundation', () => {
     ]) {
       assert.match(sourceOfTruth, new RegExp(marker.replace(/[&/]/g, '\\$&')));
     }
-    assert.match(sourceOfTruth, /Chat\/conversations are removed from the active product/);
-    assert.match(sourceOfTruth, /Internal QA/);
+    assert.match(sourceOfTruth, /Chat\/conversations are not part of the active product/);
+    assert.match(sourceOfTruth, /controlled-pilot readiness/);
     assert.match(sourceOfTruth, /single repository-wide source of truth/);
+    assert.match(sourceOfTruth, /Prose never proves implementation completion/);
+    assert.match(sourceOfTruth, /relevant tests must pass/);
+    const playbooks = readdirSync(repoRoot)
+      .filter((file) => /^SCHOOLOS_.*_DESIGN_ASTRA\.md$/.test(file))
+      .sort();
+    assert.deepEqual(playbooks, [
+      'SCHOOLOS_APP_DESIGN_ASTRA.md',
+      'SCHOOLOS_WEB_DESIGN_ASTRA.md',
+    ]);
+    for (const playbook of playbooks) {
+      assert.ok(sourceOfTruth.includes(playbook));
+      const content = readFileSync(join(repoRoot, playbook), 'utf8');
+      assert.match(content, /If this playbook conflicts with `AGENTS\.md`/);
+      assert.match(content, /`AGENTS\.md` wins/);
+    }
   });
 
   it('provides the requested shared dashboard composition primitives', () => {

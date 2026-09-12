@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../app/design_system/app_spacing.dart';
-import '../../app/theme/app_colors.dart';
+import '../../app/theme/app_semantic_colors.dart';
 
 class OfflineBanner extends StatelessWidget {
   const OfflineBanner({super.key, this.visible = false, this.message});
@@ -10,8 +10,11 @@ class OfflineBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final semantic = AppSemanticColors.of(context);
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 250),
       transitionBuilder: (child, animation) {
         return SizeTransition(
           sizeFactor: animation,
@@ -19,35 +22,41 @@ class OfflineBanner extends StatelessWidget {
         );
       },
       child: visible
-          ? Container(
-              key: const ValueKey('offline_banner_shown'),
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
-                vertical: AppSpacing.sm + 2,
-              ),
-              decoration: const BoxDecoration(color: AppColors.danger),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.cloud_off_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      message ?? 'You are offline. Showing last saved data.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+          ? Semantics(
+              liveRegion: true,
+              child: Container(
+                key: const ValueKey('offline_banner_shown'),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.sm + 2,
+                ),
+                decoration: BoxDecoration(
+                  color: semantic.warning.withValues(alpha: .12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.cloud_off_rounded,
+                      color: semantic.warning,
+                      size: 18,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        message ??
+                            'You are offline. Connect to refresh information.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: semantic.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             )
           : const SizedBox.shrink(key: ValueKey('offline_banner_hidden')),

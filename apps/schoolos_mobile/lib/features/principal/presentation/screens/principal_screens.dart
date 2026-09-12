@@ -9,6 +9,8 @@ import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_semantic_colors.dart';
+import '../../../../shared/widgets/app_bottom_navigation.dart';
 import '../../../../core/auth/auth_provider.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/network/connectivity_provider.dart';
@@ -34,7 +36,7 @@ class PrincipalTodayScreen extends ConsumerWidget {
     final asyncData = ref.watch(principalDashboardProvider);
     return PrincipalShell(
       selectedIndex: 0,
-      title: 'Principal Today',
+      title: 'School overview',
       child: asyncData.when(
         loading: () => const _PrincipalLoading(),
         error: (error, _) => AppExceptionView(
@@ -78,7 +80,7 @@ class _PrincipalAttentionScreenState
           children: [
             _CacheBanner(data: data),
             _SegmentedFilters(
-              values: const ['all', 'critical', 'today', 'assigned'],
+              values: ['all', 'critical', 'today', 'assigned'],
               active: filter,
               labels: const {
                 'all': 'All',
@@ -134,7 +136,7 @@ class _PrincipalAttentionScreenState
                     fallback: 'Open owning module',
                   ),
                   onPressed: () => _go(context, route),
-                  icon: const Icon(Icons.chevron_right_rounded),
+                  icon: Icon(Icons.chevron_right_rounded),
                 );
               },
             ),
@@ -183,7 +185,7 @@ class _PrincipalApprovalsScreenState
           children: [
             _CacheBanner(data: data),
             _SegmentedFilters(
-              values: const ['pending', 'approved', 'rejected'],
+              values: ['pending', 'approved', 'rejected'],
               active: tab,
               labels: const {
                 'pending': 'Pending',
@@ -223,8 +225,8 @@ class _PrincipalApprovalsScreenState
                 child: OutlinedButton.icon(
                   onPressed: () =>
                       unawaited(_showReviewSheet(context, ref, item, tab)),
-                  icon: const Icon(Icons.visibility_rounded, size: 18),
-                  label: const Text('Review'),
+                  icon: Icon(Icons.visibility_rounded, size: 18),
+                  label: Text('Review'),
                 ),
               ),
             ),
@@ -267,7 +269,7 @@ class _PrincipalServiceRequestsScreenState
           children: [
             _CacheBanner(data: data),
             _SegmentedFilters(
-              values: const ['all', 'OPEN', 'IN_PROGRESS', 'RESOLVED'],
+              values: ['all', 'OPEN', 'IN_PROGRESS', 'RESOLVED'],
               active: status,
               labels: const {
                 'all': 'All',
@@ -295,7 +297,7 @@ class _PrincipalServiceRequestsScreenState
                 _SummaryValue(
                   'More',
                   data['hasNextPage'] == true ? 'Yes' : 'No',
-                  AppColors.slate500,
+                  AppSemanticColors.of(context).textMuted,
                   Icons.more_horiz_rounded,
                 ),
               ],
@@ -311,7 +313,7 @@ class _PrincipalServiceRequestsScreenState
                       _string(item['id']),
                     ),
                   ),
-                  child: const Text('Review'),
+                  child: Text('Review'),
                 ),
               ),
             ),
@@ -397,7 +399,7 @@ class _PrincipalServiceRequestDetailScreenState
                       children: [
                         Text(
                           _string(data['subject'], fallback: 'Parent request'),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 18,
                           ),
@@ -446,7 +448,7 @@ class _PrincipalServiceRequestDetailScreenState
                 ),
               if (invoice.isNotEmpty) ...[
                 const Divider(height: 28),
-                const Text(
+                Text(
                   'Linked invoice',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
@@ -488,7 +490,7 @@ class _PrincipalServiceRequestDetailScreenState
               children: [
                 for (final attachment in _list(data['attachments']))
                   ListTile(
-                    leading: const Icon(Icons.attachment_rounded),
+                    leading: Icon(Icons.attachment_rounded),
                     title: Text(
                       _string(
                         attachment['label'],
@@ -501,7 +503,7 @@ class _PrincipalServiceRequestDetailScreenState
                       onPressed: busy
                           ? null
                           : () => _downloadEvidence(attachment),
-                      icon: const Icon(Icons.download_rounded),
+                      icon: Icon(Icons.download_rounded),
                     ),
                   ),
               ],
@@ -517,26 +519,26 @@ class _PrincipalServiceRequestDetailScreenState
             if (active)
               FilledButton.icon(
                 onPressed: busy ? null : () => _triage(data),
-                icon: const Icon(Icons.assignment_ind_rounded),
-                label: const Text('Assign to me'),
+                icon: Icon(Icons.assignment_ind_rounded),
+                label: Text('Assign to me'),
               ),
             if (active || status == 'RESOLVED')
               OutlinedButton.icon(
                 onPressed: busy ? null : () => _addNote(data),
-                icon: const Icon(Icons.add_comment_rounded),
-                label: const Text('Add update'),
+                icon: Icon(Icons.add_comment_rounded),
+                label: Text('Add update'),
               ),
             if (active)
               FilledButton.icon(
                 onPressed: busy ? null : () => _resolve(data),
-                icon: const Icon(Icons.check_circle_rounded),
-                label: const Text('Resolve'),
+                icon: Icon(Icons.check_circle_rounded),
+                label: Text('Resolve'),
               ),
             if (active)
               TextButton.icon(
                 onPressed: busy ? null : () => _escalate(data),
-                icon: const Icon(Icons.priority_high_rounded),
-                label: const Text('Escalate'),
+                icon: Icon(Icons.priority_high_rounded),
+                label: Text('Escalate'),
               ),
           ],
         ),
@@ -717,8 +719,8 @@ class _DetailLine extends StatelessWidget {
           width: 130,
           child: Text(
             label,
-            style: const TextStyle(
-              color: AppColors.slate500,
+            style: TextStyle(
+              color: AppSemanticColors.of(context).textMuted,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -791,21 +793,21 @@ Future<_ServiceRequestEscalation?> _serviceRequestEscalationDialog(
       onDispose: reasonController.dispose,
       child: StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Escalate this request'),
+          title: Text('Escalate this request'),
           content: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Escalation sets high priority and reassigns the case to another manager.',
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
                   initialValue: selectedUserId,
                   isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Reassign to'),
+                  decoration: InputDecoration(labelText: 'Reassign to'),
                   items: candidates
                       .map(
                         (candidate) => DropdownMenuItem<String>(
@@ -840,7 +842,7 @@ Future<_ServiceRequestEscalation?> _serviceRequestEscalationDialog(
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Back'),
+              child: Text('Back'),
             ),
             FilledButton(
               onPressed: () {
@@ -860,7 +862,7 @@ Future<_ServiceRequestEscalation?> _serviceRequestEscalationDialog(
                   ),
                 );
               },
-              child: const Text('Escalate'),
+              child: Text('Escalate'),
             ),
           ],
         ),
@@ -878,14 +880,14 @@ Future<_ServiceRequestTriage?> _triageDialog(BuildContext context) async {
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
-        title: const Text('Assign request to me'),
+        title: Text('Assign request to me'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
               initialValue: priority,
-              decoration: const InputDecoration(labelText: 'Priority'),
-              items: const [
+              decoration: InputDecoration(labelText: 'Priority'),
+              items: [
                 DropdownMenuItem(value: 'NORMAL', child: Text('Normal')),
                 DropdownMenuItem(value: 'HIGH', child: Text('High')),
               ],
@@ -895,8 +897,8 @@ Future<_ServiceRequestTriage?> _triageDialog(BuildContext context) async {
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
               initialValue: hours,
-              decoration: const InputDecoration(labelText: 'Response target'),
-              items: const [
+              decoration: InputDecoration(labelText: 'Response target'),
+              items: [
                 DropdownMenuItem(value: 24, child: Text('Within 24 hours')),
                 DropdownMenuItem(value: 48, child: Text('Within 48 hours')),
                 DropdownMenuItem(value: 120, child: Text('Within 5 days')),
@@ -909,7 +911,7 @@ Future<_ServiceRequestTriage?> _triageDialog(BuildContext context) async {
               minLines: 2,
               maxLines: 4,
               maxLength: 500,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Triage note',
                 hintText: 'What will be reviewed?',
               ),
@@ -919,7 +921,7 @@ Future<_ServiceRequestTriage?> _triageDialog(BuildContext context) async {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Back'),
+            child: Text('Back'),
           ),
           FilledButton(
             onPressed: () {
@@ -933,7 +935,7 @@ Future<_ServiceRequestTriage?> _triageDialog(BuildContext context) async {
                 ),
               );
             },
-            child: const Text('Assign'),
+            child: Text('Assign'),
           ),
         ],
       ),
@@ -959,14 +961,14 @@ Future<_ServiceRequestNote?> _serviceRequestNoteDialog(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
-        title: const Text('Add request update'),
+        title: Text('Add request update'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
               initialValue: visibility,
-              decoration: const InputDecoration(labelText: 'Visibility'),
-              items: const [
+              decoration: InputDecoration(labelText: 'Visibility'),
+              items: [
                 DropdownMenuItem(
                   value: 'PARENT',
                   child: Text('Share with parent'),
@@ -985,14 +987,14 @@ Future<_ServiceRequestNote?> _serviceRequestNoteDialog(
               minLines: 3,
               maxLines: 6,
               maxLength: 1000,
-              decoration: const InputDecoration(labelText: 'Update'),
+              decoration: InputDecoration(labelText: 'Update'),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Back'),
+            child: Text('Back'),
           ),
           FilledButton(
             onPressed: () {
@@ -1005,7 +1007,7 @@ Future<_ServiceRequestNote?> _serviceRequestNoteDialog(
                 ),
               );
             },
-            child: const Text('Save update'),
+            child: Text('Save update'),
           ),
         ],
       ),
@@ -1037,14 +1039,14 @@ Future<String?> _principalPrompt(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Back'),
+          child: Text('Back'),
         ),
         FilledButton(
           onPressed: () {
             final value = controller.text.trim();
             if (value.length >= minLength) Navigator.pop(dialogContext, value);
           },
-          child: const Text('Continue'),
+          child: Text('Continue'),
         ),
       ],
     ),
@@ -1180,7 +1182,7 @@ void _showCreateWalkthroughSheet(
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
                   initialValue: teacherStaffId,
-                  decoration: const InputDecoration(labelText: 'Teacher'),
+                  decoration: InputDecoration(labelText: 'Teacher'),
                   items: [
                     for (final teacher in teachers)
                       DropdownMenuItem(
@@ -1198,9 +1200,9 @@ void _showCreateWalkthroughSheet(
                 const SizedBox(height: AppSpacing.sm),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Observed on (BS)'),
+                  title: Text('Observed on (BS)'),
                   subtitle: Text(NepaliBsCalendar.formatBsDate(observedOn)),
-                  trailing: const Icon(Icons.calendar_month_rounded),
+                  trailing: Icon(Icons.calendar_month_rounded),
                   onTap: saving ? null : pickObservedOn,
                 ),
                 TextField(
@@ -1208,9 +1210,7 @@ void _showCreateWalkthroughSheet(
                   minLines: 2,
                   maxLines: 5,
                   maxLength: 2000,
-                  decoration: const InputDecoration(
-                    labelText: 'Observed strengths',
-                  ),
+                  decoration: InputDecoration(labelText: 'Observed strengths'),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
@@ -1218,9 +1218,7 @@ void _showCreateWalkthroughSheet(
                   minLines: 2,
                   maxLines: 5,
                   maxLength: 2000,
-                  decoration: const InputDecoration(
-                    labelText: 'Development focus',
-                  ),
+                  decoration: InputDecoration(labelText: 'Development focus'),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
@@ -1228,25 +1226,25 @@ void _showCreateWalkthroughSheet(
                   minLines: 2,
                   maxLines: 5,
                   maxLength: 2000,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Agreed action (optional)',
                   ),
                 ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Follow-up date (BS, optional)'),
+                  title: Text('Follow-up date (BS, optional)'),
                   subtitle: Text(
                     followUpOn == null
                         ? 'Not scheduled'
                         : NepaliBsCalendar.formatBsDate(followUpOn!),
                   ),
-                  trailing: const Icon(Icons.event_repeat_rounded),
+                  trailing: Icon(Icons.event_repeat_rounded),
                   onTap: saving ? null : pickFollowUp,
                 ),
                 if (validation != null)
                   Text(
                     validation!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.danger,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1263,7 +1261,7 @@ void _showCreateWalkthroughSheet(
                             color: Colors.white,
                           ),
                         )
-                      : const Icon(Icons.save_rounded),
+                      : Icon(Icons.save_rounded),
                   label: Text(saving ? 'Saving…' : 'Save observation'),
                 ),
               ],
@@ -1368,9 +1366,7 @@ void _showWalkthroughUpdateSheet(
                   minLines: 2,
                   maxLines: 5,
                   maxLength: 500,
-                  decoration: const InputDecoration(
-                    labelText: 'Reason for change',
-                  ),
+                  decoration: InputDecoration(labelText: 'Reason for change'),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
@@ -1378,14 +1374,14 @@ void _showWalkthroughUpdateSheet(
                   minLines: 2,
                   maxLines: 5,
                   maxLength: 2000,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Agreed action (optional)',
                   ),
                 ),
                 if (validation != null)
                   Text(
                     validation!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.danger,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1487,8 +1483,8 @@ void _showImprovementActionSheet(
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
                   initialValue: status,
-                  decoration: const InputDecoration(labelText: 'Status'),
-                  items: const [
+                  decoration: InputDecoration(labelText: 'Status'),
+                  items: [
                     DropdownMenuItem(
                       value: 'NOT_STARTED',
                       child: Text('Not started'),
@@ -1518,9 +1514,7 @@ void _showImprovementActionSheet(
                   minLines: 2,
                   maxLines: 5,
                   maxLength: 500,
-                  decoration: const InputDecoration(
-                    labelText: 'Reason for change',
-                  ),
+                  decoration: InputDecoration(labelText: 'Reason for change'),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
@@ -1528,14 +1522,14 @@ void _showImprovementActionSheet(
                   minLines: 2,
                   maxLines: 5,
                   maxLength: 2000,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Progress note (optional)',
                   ),
                 ),
                 if (validation != null)
                   Text(
                     validation!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.danger,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1692,7 +1686,7 @@ class _PrincipalInstitutionalImprovementScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SegmentedFilters(
-            values: const ['plans', 'GRADE_8', 'SEE', 'GRADE_12'],
+            values: ['plans', 'GRADE_8', 'SEE', 'GRADE_12'],
             active: view,
             labels: const {
               'plans': 'Plans',
@@ -1796,7 +1790,7 @@ class PrincipalShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
     return Scaffold(
-      backgroundColor: AppColors.slate50,
+      backgroundColor: AppSemanticColors.of(context).background,
       bottomNavigationBar: _PrincipalBottomNav(selectedIndex: selectedIndex),
       body: SafeArea(
         bottom: false,
@@ -1809,7 +1803,7 @@ class PrincipalShell extends ConsumerWidget {
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(18, 22, 18, 96),
+                padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
                 children: [
                   Row(
                     children: [
@@ -1825,7 +1819,9 @@ class PrincipalShell extends ConsumerWidget {
                               title,
                               style: Theme.of(context).textTheme.headlineMedium
                                   ?.copyWith(
-                                    color: AppColors.slate950,
+                                    color: AppSemanticColors.of(
+                                      context,
+                                    ).textPrimary,
                                     fontWeight: FontWeight.w900,
                                   ),
                             ),
@@ -1835,7 +1831,9 @@ class PrincipalShell extends ConsumerWidget {
                                 subtitle!,
                                 style: Theme.of(context).textTheme.bodyLarge
                                     ?.copyWith(
-                                      color: AppColors.slate500,
+                                      color: AppSemanticColors.of(
+                                        context,
+                                      ).textMuted,
                                       fontWeight: FontWeight.w600,
                                     ),
                               ),
@@ -1872,7 +1870,7 @@ class _DashboardBody extends StatelessWidget {
           onTap: () => context.go(AppRoutes.principalAttention),
           child: Row(
             children: [
-              const _IconBubble(
+              _IconBubble(
                 icon: Icons.priority_high_rounded,
                 color: AppColors.warning,
               ),
@@ -1887,53 +1885,44 @@ class _DashboardBody extends StatelessWidget {
                           ? '${data['attentionCount']} items need attention'
                           : 'Attention count unavailable',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.slate900,
+                        color: AppSemanticColors.of(context).textPrimary,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Review today\'s highest-priority school issues',
                       style: TextStyle(
-                        color: AppColors.slate500,
+                        color: AppSemanticColors.of(context).textMuted,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
-                color: AppColors.slate400,
+                color: AppSemanticColors.of(context).textMuted,
               ),
             ],
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final compactPhone = constraints.maxWidth < 360;
-            return GridView.count(
-              crossAxisCount: compactPhone ? 1 : 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: compactPhone ? 2.0 : 1.05,
-              crossAxisSpacing: AppSpacing.md,
-              mainAxisSpacing: AppSpacing.md,
-              children: [
-                for (final card in _list(data['cards']))
-                  _MetricCard(
-                    title: _string(card['label']),
-                    value: _string(card['value']),
-                    detail: _string(card['detail']),
-                    icon: _iconFor(_string(card['key'])),
-                    color: _tone(_string(card['tone'])),
-                    locked: card['locked'] == true,
-                    onTap: () => _go(context, _string(card['route'])),
-                  ),
-              ],
-            );
-          },
-        ),
+        for (final card in _list(data['cards'])) ...[
+          _ActionRow(
+            title: _string(card['label']),
+            subtitle: card['locked'] == true
+                ? 'Module not enabled'
+                : _string(card['detail']),
+            trailing: card['locked'] == true
+                ? 'Locked'
+                : _string(card['value']),
+            icon: _iconFor(_string(card['key'])),
+            onTap: card['locked'] == true
+                ? null
+                : () => _go(context, _string(card['route'])),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
         const SizedBox(height: AppSpacing.xl),
         SectionHeader(
           title: 'Alerts / Priority',
@@ -2068,7 +2057,7 @@ class _MoreBody extends StatelessWidget {
             _MenuItem(
               'Settings',
               Icons.settings_rounded,
-              AppColors.slate500,
+              AppSemanticColors.of(context).textMuted,
               AppRoutes.settings,
             ),
           ],
@@ -2286,10 +2275,10 @@ class _StudentSearchField extends StatelessWidget {
       onChanged: onChanged,
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.search_rounded),
+        prefixIcon: Icon(Icons.search_rounded),
         hintText: 'Search name, admission no., guardian phone',
         filled: true,
-        fillColor: Colors.white,
+        fillColor: AppSemanticColors.of(context).surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.xl),
           borderSide: BorderSide.none,
@@ -2316,10 +2305,7 @@ class _StudentResultCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _IconBubble(
-                icon: Icons.face_rounded,
-                color: AppColors.info,
-              ),
+              _IconBubble(icon: Icons.face_rounded, color: AppColors.info),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
@@ -2336,7 +2322,9 @@ class _StudentResultCard extends StatelessWidget {
                         item['classLabel'],
                         fallback: 'Class unavailable',
                       ),
-                      style: const TextStyle(color: AppColors.slate500),
+                      style: TextStyle(
+                        color: AppSemanticColors.of(context).textMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -2380,7 +2368,7 @@ class _InlineMeta extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: AppColors.slate500),
+        Icon(icon, size: 16, color: AppSemanticColors.of(context).textMuted),
         const SizedBox(width: 4),
         Flexible(
           child: Text(
@@ -2413,7 +2401,9 @@ void _showStudentSummary(BuildContext context, Map<String, dynamic> item) {
           const SizedBox(height: AppSpacing.sm),
           Text(
             _string(item['classLabel'], fallback: 'Class unavailable'),
-            style: const TextStyle(color: AppColors.slate600),
+            style: TextStyle(
+              color: AppSemanticColors.of(context).textSecondary,
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
           _PlainCard(
@@ -2670,7 +2660,7 @@ class _WalkthroughsBody extends ConsumerWidget {
             return IconButton(
               tooltip: 'Update observation',
               onPressed: () => _showWalkthroughUpdateSheet(context, ref, raw),
-              icon: const Icon(Icons.edit_note_rounded),
+              icon: Icon(Icons.edit_note_rounded),
             );
           },
         ),
@@ -2719,7 +2709,7 @@ class _SchoolImprovementBody extends ConsumerWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _IconBubble(
+                      _IconBubble(
                         icon: Icons.insights_rounded,
                         color: AppColors.teacherAccent,
                       ),
@@ -2730,16 +2720,18 @@ class _SchoolImprovementBody extends ConsumerWidget {
                           children: [
                             Text(
                               _string(plan['title']),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w900,
-                                color: AppColors.slate950,
+                                color: AppSemanticColors.of(
+                                  context,
+                                ).textPrimary,
                               ),
                             ),
                             const SizedBox(height: AppSpacing.xs),
                             Text(
                               '${_bsDate(plan['startsOn'])} – ${_bsDate(plan['endsOn'])}',
-                              style: const TextStyle(
-                                color: AppColors.slate500,
+                              style: TextStyle(
+                                color: AppSemanticColors.of(context).textMuted,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -2755,15 +2747,17 @@ class _SchoolImprovementBody extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.md),
                   Text(
                     _string(plan['targetSummary']),
-                    style: const TextStyle(color: AppColors.slate700),
+                    style: TextStyle(
+                      color: AppSemanticColors.of(context).textSecondary,
+                    ),
                   ),
                   if (_list(plan['kpis']).isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.md),
-                    const Text(
+                    Text(
                       'Indicators',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        color: AppColors.slate950,
+                        color: AppSemanticColors.of(context).textPrimary,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
@@ -2772,17 +2766,19 @@ class _SchoolImprovementBody extends ConsumerWidget {
                         padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                         child: Text(
                           '${_string(kpi['name'])}: ${_string(kpi['latestValue'], fallback: 'not reviewed')} / ${_string(kpi['targetValue'])} ${_string(kpi['unit'])}',
-                          style: const TextStyle(color: AppColors.slate600),
+                          style: TextStyle(
+                            color: AppSemanticColors.of(context).textSecondary,
+                          ),
                         ),
                       ),
                   ],
                   if (_list(plan['actions']).isNotEmpty) ...[
                     const Divider(height: AppSpacing.xl),
-                    const Text(
+                    Text(
                       'Owned actions',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        color: AppColors.slate950,
+                        color: AppSemanticColors.of(context).textPrimary,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
@@ -2791,7 +2787,7 @@ class _SchoolImprovementBody extends ConsumerWidget {
                         contentPadding: EdgeInsets.zero,
                         title: Text(
                           _string(action['title']),
-                          style: const TextStyle(fontWeight: FontWeight.w800),
+                          style: TextStyle(fontWeight: FontWeight.w800),
                         ),
                         subtitle: Text(
                           'Due ${_bsDate(action['dueOn'])}${_string(action['progressNote']).isEmpty ? '' : '\n${_string(action['progressNote'])}'}',
@@ -2809,7 +2805,7 @@ class _SchoolImprovementBody extends ConsumerWidget {
                                   ref,
                                   action,
                                 ),
-                                icon: const Icon(Icons.edit_rounded),
+                                icon: Icon(Icons.edit_rounded),
                               )
                             : StatusChip(
                                 status: _statusType(_string(action['status'])),
@@ -2899,8 +2895,8 @@ class _BoardReadinessBody extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         Text(
           'Updated ${_bsDateTime(data['generatedAt'])}',
-          style: const TextStyle(
-            color: AppColors.slate500,
+          style: TextStyle(
+            color: AppSemanticColors.of(context).textMuted,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -3008,25 +3004,29 @@ class _PrincipalHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 18, 20, 20),
-      decoration: const BoxDecoration(
-        color: AppColors.infoDark,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+      padding: const EdgeInsets.fromLTRB(18, 12, 12, 14),
+      decoration: BoxDecoration(
+        color: AppSemanticColors.of(context).surface,
+        border: Border(
+          bottom: BorderSide(color: AppSemanticColors.of(context).border),
+        ),
       ),
       child: Row(
         children: [
           Container(
-            width: 54,
-            height: 54,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              color: Colors.white.withValues(alpha: 0.16),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+              color: AppSemanticColors.of(
+                context,
+              ).primary.withValues(alpha: .08),
+              border: Border.all(color: AppSemanticColors.of(context).border),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.account_balance_rounded,
-              color: Colors.white,
-              size: 32,
+              color: AppSemanticColors.of(context).textPrimary,
+              size: 24,
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -3039,14 +3039,14 @@ class _PrincipalHeader extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
+                    color: AppSemanticColors.of(context).textPrimary,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const Text(
+                Text(
                   'Principal',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppSemanticColors.of(context).textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -3055,15 +3055,15 @@ class _PrincipalHeader extends StatelessWidget {
           ),
           IconButton(
             tooltip: 'Notifications',
-            color: Colors.white,
+            color: AppSemanticColors.of(context).textPrimary,
             onPressed: () => context.push(AppRoutes.notifications),
-            icon: const Icon(Icons.notifications_none_rounded, size: 30),
+            icon: Icon(Icons.notifications_none_rounded, size: 24),
           ),
           IconButton(
             tooltip: 'Profile',
-            color: Colors.white,
+            color: AppSemanticColors.of(context).textPrimary,
             onPressed: () => context.go(AppRoutes.profile),
-            icon: const Icon(Icons.account_circle_rounded, size: 34),
+            icon: Icon(Icons.account_circle_rounded, size: 24),
           ),
         ],
       ),
@@ -3081,7 +3081,7 @@ class _PrincipalBottomNav extends StatelessWidget {
       (
         Icons.home_outlined,
         Icons.home_rounded,
-        'Today',
+        'Overview',
         AppRoutes.principalToday,
       ),
       (
@@ -3109,148 +3109,17 @@ class _PrincipalBottomNav extends StatelessWidget {
         AppRoutes.principalMore,
       ),
     ];
-    return SafeArea(
-      top: false,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(26),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.slate300.withValues(alpha: 0.45),
-              blurRadius: 18,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: NavigationBarTheme(
-          data: const NavigationBarThemeData(
-            labelTextStyle: WidgetStatePropertyAll(
-              TextStyle(
-                fontSize: 10,
-                letterSpacing: -0.35,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+    return AppBottomNavigation(
+      selectedIndex: selectedIndex,
+      onSelected: (index) => context.go(destinations[index].$4),
+      items: [
+        for (final destination in destinations)
+          AppBottomNavigationItem(
+            label: destination.$3,
+            icon: destination.$1,
+            selectedIcon: destination.$2,
           ),
-          child: NavigationBar(
-            height: 70,
-            elevation: 0,
-            selectedIndex: selectedIndex,
-            backgroundColor: Colors.transparent,
-            indicatorColor: AppColors.infoLight,
-            onDestinationSelected: (index) =>
-                context.go(destinations[index].$4),
-            destinations: [
-              for (var index = 0; index < destinations.length; index += 1)
-                NavigationDestination(
-                  icon: Icon(destinations[index].$1),
-                  selectedIcon: Icon(
-                    destinations[index].$2,
-                    color: AppColors.infoDark,
-                  ),
-                  label: destinations[index].$3,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.title,
-    required this.value,
-    required this.detail,
-    required this.icon,
-    required this.color,
-    this.locked = false,
-    this.onTap,
-  });
-
-  final String title;
-  final String value;
-  final String detail;
-  final IconData icon;
-  final Color color;
-  final bool locked;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      onTap: locked ? null : onTap,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final horizontal = constraints.maxWidth > 240;
-          final details = Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: horizontal
-                ? CrossAxisAlignment.start
-                : CrossAxisAlignment.center,
-            children: [
-              Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: horizontal ? TextAlign.left : TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                locked ? 'Locked' : value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: horizontal ? TextAlign.left : TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: locked ? AppColors.slate500 : color,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              Text(
-                locked ? 'Module not enabled' : detail,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: horizontal ? TextAlign.left : TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.slate500,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          );
-          final iconBubble = _IconBubble(
-            icon: icon,
-            color: locked ? AppColors.slate400 : color,
-          );
-          if (horizontal) {
-            return Row(
-              children: [
-                iconBubble,
-                const SizedBox(width: AppSpacing.md),
-                Expanded(child: details),
-                if (!locked)
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppColors.slate400,
-                  ),
-              ],
-            );
-          }
-          return Column(
-            children: [
-              Align(alignment: Alignment.centerLeft, child: iconBubble),
-              const Spacer(),
-              details,
-            ],
-          );
-        },
-      ),
+      ],
     );
   }
 }
@@ -3294,9 +3163,11 @@ class _SummaryCards extends StatelessWidget {
                                 value.label,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.slate700,
+                                  color: AppSemanticColors.of(
+                                    context,
+                                  ).textSecondary,
                                 ),
                               ),
                               Text(
@@ -3366,9 +3237,9 @@ class _ItemList extends StatelessWidget {
                   ),
                   title: Text(
                     _string(item['title'], fallback: _string(item['label'])),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w800,
-                      color: AppColors.slate950,
+                      color: AppSemanticColors.of(context).textPrimary,
                     ),
                   ),
                   subtitle: _itemSubtitle(item).isEmpty
@@ -3421,22 +3292,24 @@ class _ActionRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    color: AppColors.slate950,
+                    color: AppSemanticColors.of(context).textPrimary,
                   ),
                 ),
                 if (subtitle != null)
                   Text(
                     subtitle!,
-                    style: const TextStyle(color: AppColors.slate500),
+                    style: TextStyle(
+                      color: AppSemanticColors.of(context).textMuted,
+                    ),
                   ),
               ],
             ),
           ),
           if (trailing != null)
             StatusChip(status: AppStatusType.pending, label: trailing),
-          const Icon(Icons.chevron_right_rounded),
+          Icon(Icons.chevron_right_rounded),
         ],
       ),
     );
@@ -3480,9 +3353,9 @@ class _MenuGroup extends StatelessWidget {
                           ),
                           title: Text(
                             item.title,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                            style: TextStyle(fontWeight: FontWeight.w800),
                           ),
-                          trailing: const Icon(Icons.chevron_right_rounded),
+                          trailing: Icon(Icons.chevron_right_rounded),
                           onTap: () => context.go(item.route),
                         ),
                       ),
@@ -3534,18 +3407,19 @@ class _QuickAction extends StatelessWidget {
         children: [
           _IconBubble(
             icon: icon,
-            color: enabled ? AppColors.info : AppColors.slate400,
+            color: enabled
+                ? AppColors.info
+                : AppSemanticColors.of(context).textMuted,
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
+            child: Text(title, style: TextStyle(fontWeight: FontWeight.w800)),
           ),
           Icon(
             Icons.arrow_forward_rounded,
-            color: enabled ? AppColors.info : AppColors.slate400,
+            color: enabled
+                ? AppColors.info
+                : AppSemanticColors.of(context).textMuted,
           ),
         ],
       ),
@@ -3554,7 +3428,7 @@ class _QuickAction extends StatelessWidget {
 }
 
 class _IconBubble extends StatelessWidget {
-  const _IconBubble({required this.icon, required this.color});
+  _IconBubble({required this.icon, required this.color});
   final IconData icon;
   final Color color;
   static const double size = 50;
@@ -3614,7 +3488,7 @@ class _SegmentedFilters extends StatelessWidget {
                     style: TextStyle(
                       color: active == value
                           ? Colors.white
-                          : AppColors.slate700,
+                          : AppSemanticColors.of(context).textSecondary,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -3652,14 +3526,13 @@ class _Callout extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
+                Text(title, style: TextStyle(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 4),
                 Text(
                   message,
-                  style: const TextStyle(color: AppColors.slate600),
+                  style: TextStyle(
+                    color: AppSemanticColors.of(context).textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -3683,8 +3556,8 @@ class _PlainCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: AppColors.slate500,
+            style: TextStyle(
+              color: AppSemanticColors.of(context).textMuted,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -3722,10 +3595,10 @@ class _ContextCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Principal',
                   style: TextStyle(
-                    color: AppColors.slate500,
+                    color: AppSemanticColors.of(context).textMuted,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -3742,7 +3615,7 @@ class _ContextCard extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded),
+          Icon(Icons.chevron_right_rounded),
         ],
       ),
     );
@@ -3764,9 +3637,9 @@ class _BackButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.slate200),
+          border: Border.all(color: AppSemanticColors.of(context).border),
         ),
-        child: const Icon(Icons.arrow_back_rounded),
+        child: Icon(Icons.arrow_back_rounded),
       ),
     );
   }
@@ -3953,7 +3826,9 @@ Future<void> _showReviewSheet(
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     _itemSubtitle(item),
-                    style: const TextStyle(color: AppColors.slate600),
+                    style: TextStyle(
+                      color: AppSemanticColors.of(context).textSecondary,
+                    ),
                   ),
                   if (_string(item['detail']).isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.md),
@@ -4000,8 +3875,8 @@ Future<void> _showReviewSheet(
                         if (canReject)
                           OutlinedButton.icon(
                             onPressed: saving ? null : () => submit('REJECT'),
-                            icon: const Icon(Icons.close_rounded),
-                            label: const Text('Reject'),
+                            icon: Icon(Icons.close_rounded),
+                            label: Text('Reject'),
                           ),
                         if (canDelegate)
                           OutlinedButton.icon(
@@ -4029,8 +3904,8 @@ Future<void> _showReviewSheet(
                                     }
                                     setSheetState(() => saving = false);
                                   },
-                            icon: const Icon(Icons.forward_to_inbox_rounded),
-                            label: const Text('Delegate'),
+                            icon: Icon(Icons.forward_to_inbox_rounded),
+                            label: Text('Delegate'),
                           ),
                         if (canApprove)
                           FilledButton.icon(
@@ -4044,7 +3919,7 @@ Future<void> _showReviewSheet(
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Icon(Icons.check_rounded),
+                                : Icon(Icons.check_rounded),
                             label: Text(saving ? 'Submitting...' : 'Approve'),
                           ),
                       ],
@@ -4141,23 +4016,21 @@ Future<bool> _showApprovalDelegationDialog(
           }
 
           return AlertDialog(
-            title: const Text('Delegate approval'),
+            title: Text('Delegate approval'),
             content: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'The selected person becomes the only user who can decide this approval step.',
                   ),
                   const SizedBox(height: AppSpacing.md),
                   DropdownButtonFormField<String>(
                     initialValue: selectedUserId,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Eligible approver',
-                    ),
+                    decoration: InputDecoration(labelText: 'Eligible approver'),
                     items: candidates
                         .map(
                           (candidate) => DropdownMenuItem<String>(
@@ -4196,7 +4069,7 @@ Future<bool> _showApprovalDelegationDialog(
                 onPressed: submitting
                     ? null
                     : () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
+                child: Text('Cancel'),
               ),
               FilledButton(
                 onPressed: submitting ? null : submit,
@@ -4344,9 +4217,11 @@ void _showEmergencyNoticeSheet(BuildContext context, WidgetRef ref) {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    const Text(
+                    Text(
                       'Audience is school-wide on mobile until class/section recipient pickers are backend-confirmed.',
-                      style: TextStyle(color: AppColors.slate600),
+                      style: TextStyle(
+                        color: AppSemanticColors.of(context).textSecondary,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     DropdownButtonFormField<String>(
@@ -4357,7 +4232,7 @@ void _showEmergencyNoticeSheet(BuildContext context, WidgetRef ref) {
                           borderRadius: BorderRadius.circular(AppRadius.lg),
                         ),
                       ),
-                      items: const [
+                      items: [
                         DropdownMenuItem(
                           value: 'URGENT',
                           child: Text('Urgent'),
@@ -4429,7 +4304,7 @@ void _showEmergencyNoticeSheet(BuildContext context, WidgetRef ref) {
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         formMessage!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.danger,
                           fontWeight: FontWeight.w700,
                         ),
@@ -4452,7 +4327,7 @@ void _showEmergencyNoticeSheet(BuildContext context, WidgetRef ref) {
                           onPressed: previewing || submitting
                               ? null
                               : () => previewRecipients(),
-                          icon: const Icon(Icons.groups_rounded),
+                          icon: Icon(Icons.groups_rounded),
                           label: Text(previewing ? 'Previewing...' : 'Preview'),
                         ),
                         FilledButton.icon(
@@ -4468,7 +4343,7 @@ void _showEmergencyNoticeSheet(BuildContext context, WidgetRef ref) {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Icon(Icons.send_rounded),
+                              : Icon(Icons.send_rounded),
                           label: Text(submitting ? 'Submitting...' : 'Submit'),
                         ),
                       ],
@@ -4524,7 +4399,7 @@ List<Map<String, dynamic>> _list(Object? value) {
         .map((item) => item.map((key, value) => MapEntry('$key', value)))
         .toList();
   }
-  return const [];
+  return [];
 }
 
 String _string(Object? value, {String fallback = ''}) {
@@ -4614,7 +4489,7 @@ Color _tone(String tone) {
     'orange' => AppColors.warning,
     'red' => AppColors.danger,
     'purple' => Colors.purple,
-    'slate' => AppColors.slate500,
+    'slate' => AppSemanticColors.of(context).textMuted,
     _ => AppColors.info,
   };
 }

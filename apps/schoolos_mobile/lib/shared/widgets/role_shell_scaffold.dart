@@ -30,7 +30,9 @@ class RoleShellScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = _itemsForRole(role);
     final safeIndex = selectedIndex.clamp(0, items.length - 1);
-    final summaryPersona = selectedIndex == 0 ? _summaryPersonaForRole(role) : null;
+    final summaryPersona = selectedIndex == 0
+        ? _summaryPersonaForRole(role)
+        : null;
     final isStudent = role.toUpperCase() == 'STUDENT';
 
     return AppScaffold(

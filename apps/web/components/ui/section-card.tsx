@@ -25,10 +25,10 @@ export function SectionCard({
   return (
     <div className={cn('shell-card flex flex-col', className)}>
       {(title || description || headerAction) && (
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-start sm:justify-between lg:p-6">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
           <div className="min-w-0">
             {title && (
-              <h3 className="text-xl font-bold leading-7 text-slate-950">
+              <h3 className="text-base font-semibold leading-6 text-foreground">
                 {title}
               </h3>
             )}
@@ -46,7 +46,7 @@ export function SectionCard({
         </div>
       )}
 
-      <div className={cn('flex-1', noPadding ? 'p-0' : 'p-5 lg:p-6')}>
+      <div className={cn('flex-1', noPadding ? 'p-0' : 'p-4 sm:p-5')}>
         {children}
       </div>
 

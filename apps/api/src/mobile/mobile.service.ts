@@ -302,7 +302,7 @@ export class MobileService {
         ? this.getStudentFeesSummary(selectedStudentId, actor)
         : Promise.resolve(null),
       moduleAvailability.homework
-        ? this.getStudentHomework(selectedStudentId, actor, '5')
+        ? this.getStudentHomeworkSummary(selectedStudentId, actor)
         : Promise.resolve(null),
       this.listNotifications(actor, {}, [selectedStudentId]),
       moduleAvailability.transport
@@ -321,16 +321,7 @@ export class MobileService {
       children: children.items,
       attendance,
       fees,
-      homework: homework
-        ? {
-            pendingCount: homework.items.filter((item) =>
-              ['NOT_SUBMITTED', 'NEEDS_CORRECTION'].includes(
-                item.submissionStatus,
-              ),
-            ).length,
-            nextDueAt: homework.items[0]?.dueAt ?? null,
-          }
-        : null,
+      homework,
       notices,
       transport,
       canteen,
@@ -2512,6 +2503,52 @@ export class MobileService {
           })),
         };
       }),
+    };
+  }
+
+  private async getStudentHomeworkSummary(
+    studentId: string,
+    actor: AuthContext,
+  ) {
+    const student = await this.getAccessibleStudent(studentId, actor);
+    // A preview page cannot establish the total or earliest pending deadline.
+    // Aggregate the same parent-visible scope in one database snapshot, with
+    // only required work that this child still needs to submit or correct.
+    const summary = await this.prisma.homeworkAssignment.aggregate({
+      where: {
+        tenantId: actor.tenantId,
+        classId: student.classId,
+        status: { in: ['ASSIGNED', 'CLOSED'] },
+        submissionRequired: true,
+        AND: [
+          { OR: [{ sectionId: null }, { sectionId: student.sectionId }] },
+          {
+            OR: [
+              {
+                submissions: {
+                  none: { tenantId: actor.tenantId, studentId },
+                },
+              },
+              {
+                submissions: {
+                  some: {
+                    tenantId: actor.tenantId,
+                    studentId,
+                    status: { in: ['NOT_SUBMITTED', 'NEEDS_CORRECTION'] },
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      },
+      _count: { _all: true },
+      _min: { dueAt: true },
+    });
+
+    return {
+      pendingCount: summary._count._all,
+      nextDueAt: toIso(summary._min.dueAt),
     };
   }
 

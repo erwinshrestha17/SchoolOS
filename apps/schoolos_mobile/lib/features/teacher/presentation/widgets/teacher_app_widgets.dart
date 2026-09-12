@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_semantic_colors.dart';
 import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/status_chip.dart';
@@ -38,13 +39,11 @@ class TeacherPersonaHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF052E9E), Color(0xFF0B4FE8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+      decoration: BoxDecoration(
+        color: AppSemanticColors.of(context).surface,
+        border: Border(
+          bottom: BorderSide(color: AppSemanticColors.of(context).border),
         ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
       ),
       child: SafeArea(
         bottom: false,
@@ -66,17 +65,17 @@ class TeacherPersonaHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.white,
+                      color: AppSemanticColors.of(context).textPrimary,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${teacherGreeting(DateTime.now())}, $teacherName',
+                    '${teacherGreeting(NepaliBsCalendar.toNepalLocalDateTime(DateTime.now()))}, $teacherName',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.88),
+                      color: AppSemanticColors.of(context).textSecondary,
                     ),
                   ),
                   Text(
@@ -84,7 +83,7 @@ class TeacherPersonaHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.78),
+                      color: AppSemanticColors.of(context).textMuted,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -130,7 +129,7 @@ class TeacherScreenFrame extends StatelessWidget {
             child: Text(
               title,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: AppColors.slate900,
+                color: AppSemanticColors.of(context).textPrimary,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -196,9 +195,9 @@ class TeacherTaskCard extends StatelessWidget {
                   subtitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: AppColors.slate500),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppSemanticColors.of(context).textMuted,
+                  ),
                 ),
               ],
             ),
@@ -224,7 +223,10 @@ class TeacherTaskCard extends StatelessWidget {
           ],
           if (onTap != null) ...[
             const SizedBox(width: AppSpacing.xs),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.slate500),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppSemanticColors.of(context).textMuted,
+            ),
           ],
         ],
       ),
@@ -246,7 +248,9 @@ class TeacherLastUpdatedLabel extends StatelessWidget {
         child: Text(
           '${cached == true ? 'Cached' : 'Last synced'} • ${NepaliBsCalendar.formatNepalTime(value)}',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: cached == true ? AppColors.warning : AppColors.slate500,
+            color: cached == true
+                ? AppSemanticColors.of(context).warning
+                : AppSemanticColors.of(context).textMuted,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -269,9 +273,9 @@ class _NotificationButton extends StatelessWidget {
         IconButton(
           tooltip: 'Notifications',
           onPressed: onPressed,
-          icon: const Icon(
+          icon: Icon(
             Icons.notifications_none_rounded,
-            color: Colors.white,
+            color: AppSemanticColors.of(context).textPrimary,
           ),
         ),
         if (unreadCount != null && unreadCount! > 0)

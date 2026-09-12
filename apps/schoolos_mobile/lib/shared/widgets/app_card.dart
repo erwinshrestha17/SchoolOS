@@ -13,7 +13,7 @@ class AppCard extends StatelessWidget {
     this.color,
     this.borderRadius,
     this.border,
-    this.hasShadow = true,
+    this.hasShadow = false,
   });
 
   final Widget child;
@@ -40,7 +40,7 @@ class AppCard extends StatelessWidget {
             : Border.all(color: AppColors.slate100, width: 1));
 
     final Widget cardContent = ConstrainedBox(
-      constraints: BoxConstraints(minHeight: onTap == null ? 0 : 44),
+      constraints: BoxConstraints(minHeight: onTap == null ? 0 : 48),
       child: Container(
         decoration: BoxDecoration(
           color: cardColor,

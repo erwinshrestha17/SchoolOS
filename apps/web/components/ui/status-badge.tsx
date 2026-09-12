@@ -60,6 +60,13 @@ const statusToneMap: Record<string, StatusTone> = {
   READ: 'approved',
   LOCKED: 'locked',
   POSTED: 'locked',
+  FINALIZED: 'locked',
+  REVERSED: 'refunded',
+  RETURNED: 'partial',
+  RESUBMITTED: 'pending',
+  CORRECTED: 'info',
+  CORRECTION_REQUESTED: 'partial',
+  CONFLICTED: 'conflict',
   PAID: 'paid',
   PARTIAL: 'partial',
   UNPAID: 'unpaid',
@@ -121,7 +128,7 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[0.68rem] font-bold uppercase tracking-wide',
+        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold leading-5',
         toneClasses[resolvedTone],
         className,
       )}

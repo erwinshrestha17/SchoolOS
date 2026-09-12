@@ -31,12 +31,17 @@ class _AppSkeletonState extends State<AppSkeleton>
     _controller = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
-    )..repeat(reverse: true);
+    );
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.stop();
+    } else if (!_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 

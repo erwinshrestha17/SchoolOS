@@ -141,7 +141,9 @@ describe('school operations sidebar', () => {
     assert.doesNotMatch(sidebar, /function toggleGroup/);
     assert.doesNotMatch(sidebar, /expandedGroups/);
     assert.doesNotMatch(sidebar, /onExpand/);
-    assert.match(sidebar, /id="sidebar-nav-search"/);
+    assert.match(sidebar, /const searchId = useId\(\)/);
+    assert.match(sidebar, /htmlFor=\{searchId\}/);
+    assert.match(sidebar, /id=\{searchId\}/);
     assert.match(sidebar, /Find a workspace/);
     assert.match(sidebar, /No workspace matches/);
   });
@@ -215,14 +217,15 @@ describe('school operations sidebar', () => {
     assert.doesNotMatch(sidebarNavLink, /hover:bg-slate-100/);
   });
 
-  it('closes the mobile drawer on Escape from anywhere inside it and manages dialog focus', () => {
-    assert.match(sidebar, /role="dialog"/);
-    assert.match(sidebar, /aria-modal="true"/);
-    assert.match(sidebar, /aria-hidden=\{!mobileOpen\}/);
-    assert.match(sidebar, /inert=\{!mobileOpen\}/);
-    assert.match(sidebar, /mobilePanelRef\.current\?\.focus\(\)/);
-    assert.match(sidebar, /document\.addEventListener\('keydown', handleKeyDown\)/);
-    assert.match(sidebar, /event\.key === 'Escape'/);
+  it('uses the shared modal sheet for compact navigation and releases it at desktop width', () => {
+    assert.match(sidebar, /Sheet, SheetContent, SheetTitle/);
+    assert.match(sidebar, /<Sheet open=\{mobileOpen\}/);
+    assert.match(sidebar, /id="school-navigation-drawer"/);
+    assert.match(sidebar, /onCloseAutoFocus/);
+    assert.match(sidebar, /aria-label="Close navigation menu"/);
+    assert.match(sidebar, /matchMedia\('\(min-width: 1024px\)'\)/);
+    assert.match(sidebar, /desktop\.addEventListener\('change', closeOnDesktop\)/);
+    assert.match(sidebar, /desktop\.removeEventListener\('change', closeOnDesktop\)/);
   });
 });
 

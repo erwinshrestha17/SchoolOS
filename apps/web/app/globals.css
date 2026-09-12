@@ -45,7 +45,7 @@
   --sidebar-active-bg: #EAF2FF;
   --sidebar-active-label: #1D4ED8;
   --sidebar-active-indicator: #2563EB;
-  --sidebar-heading: #98A2B3;
+  --sidebar-heading: #667085;
 
   /* Platform operator navigation shell (dark) */
   --platform-sidebar-bg: var(--color-mod-platform-text);
@@ -152,6 +152,7 @@
   --color-success-500: #27875A;
   --color-success-600: #1F754C;
   --color-success-700: #17633E;
+  --color-success-800: #124F33;
   --color-success-900: #0E402B;
 
   --color-warning-50: #FFF6DF;
@@ -160,6 +161,7 @@
   --color-warning-500: #D99016;
   --color-warning-600: #C07E11;
   --color-warning-700: #82580B;
+  --color-warning-800: #6B4809;
   --color-warning-900: #573B07;
 
   --color-danger-50: #FDECEC;
@@ -168,6 +170,7 @@
   --color-danger-500: #D14343;
   --color-danger-600: #C03636;
   --color-danger-700: #9D2929;
+  --color-danger-800: #842323;
   --color-danger-900: #6B1C1C;
 
   --color-info-50: #EAF3FC;
@@ -175,6 +178,7 @@
   --color-info-500: #2878C8;
   --color-info-600: #2369B1;
   --color-info-700: #1F5E9B;
+  --color-info-800: #194D80;
 
   /*
    * Module accents (SchoolOS Colour Direction, M0-M14).
@@ -479,6 +483,7 @@
 }
 
 /* ─── Base resets ─── */
+@layer base {
 * {
   box-sizing: border-box;
   border-color: var(--border);
@@ -500,6 +505,7 @@ body {
 /* Money, marks, counts, and receipt numbers stay column-aligned in tables. */
 table {
   font-variant-numeric: tabular-nums;
+}
 }
 
 /*
@@ -534,13 +540,16 @@ table {
 }
 
 /* ─── Form elements ─── */
-input,
+/* Defaults belong below component utilities so icon padding, density and
+   semantic control styles remain effective at their actual call sites. */
+@layer base {
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
 select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--ink);
   padding: 0.625rem 0.875rem;
   font: inherit;
@@ -564,6 +573,13 @@ button {
 button:disabled {
   cursor: not-allowed;
   opacity: 0.65;
+}
+}
+
+/* A visible keyboard outline must survive legacy focus:outline-none controls. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ─── Card variants ─── */
@@ -761,15 +777,13 @@ button.shell-card:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-in,
-  .animate-slide-in,
-  .animate-scale-in,
-  .sidebar-transition,
-  .sidebar-label,
-  .sidebar-overlay,
-  .dropdown-menu {
-    animation: none !important;
-    transition: none !important;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
