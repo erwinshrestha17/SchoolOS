@@ -51,7 +51,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
             );
           }
           final portalChild = matches.first;
-          final attendance = _attendanceStatus(portalChild);
+          final attendance = _attendanceStatus(context, portalChild);
           final profileAsync = ref.watch(
             parentChildProfileProvider(portalChild.id),
           );
@@ -124,8 +124,8 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                           portalChild.homeworkDetail ??
                           'Open Homework for assignment details',
                       color: portalChild.homeworkPending > 0
-                          ? ParentPortalColors.purple
-                          : ParentPortalColors.green,
+                          ? ParentPortalColors.of(context).purple
+                          : ParentPortalColors.of(context).green,
                       onTap:
                           portalChild.homeworkEnabled &&
                               portalChild.canViewAcademics
@@ -144,7 +144,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                         icon: Icons.directions_bus_rounded,
                         title: _transportTitle(portalChild),
                         subtitle: _transportSupportingText(portalChild),
-                        color: ParentPortalColors.orange,
+                        color: ParentPortalColors.of(context).orange,
                         onTap: () => _openChildRoute(
                           context,
                           ref,
@@ -158,7 +158,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                       icon: Icons.credit_card_rounded,
                       title: _feeTitle(portalChild),
                       subtitle: _feeSupportingText(portalChild),
-                      color: _feeColor(portalChild),
+                      color: _feeColor(context, portalChild),
                       onTap: portalChild.feesEnabled && portalChild.canViewFees
                           ? () => _openChildRoute(
                               context,
@@ -189,7 +189,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                           child: ActionTile(
                             icon: Icons.assessment_outlined,
                             label: 'Results',
-                            color: ParentPortalColors.purple,
+                            color: ParentPortalColors.of(context).purple,
                             onTap: () => _openAvailableRoute(
                               context,
                               ref,
@@ -209,7 +209,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                           child: ActionTile(
                             icon: Icons.credit_card_rounded,
                             label: 'Fees',
-                            color: ParentPortalColors.green,
+                            color: ParentPortalColors.of(context).green,
                             onTap: () => _openAvailableRoute(
                               context,
                               ref,
@@ -231,7 +231,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                           child: ActionTile(
                             icon: Icons.calendar_month_outlined,
                             label: 'Timetable',
-                            color: ParentPortalColors.blue,
+                            color: ParentPortalColors.of(context).blue,
                             onTap: () => _openAvailableRoute(
                               context,
                               ref,
@@ -251,7 +251,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                           child: ActionTile(
                             icon: Icons.support_agent_outlined,
                             label: 'Help & Support',
-                            color: ParentPortalColors.orange,
+                            color: ParentPortalColors.of(context).orange,
                             onTap: () => _openAvailableRoute(
                               context,
                               ref,
@@ -282,14 +282,14 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                       Icons.person_rounded,
                       portalChild.teacher,
                       'Class teacher · ${portalChild.classSection}',
-                      ParentPortalColors.purple,
+                      ParentPortalColors.of(context).purple,
                     ),
                     const Divider(height: 1),
                     _infoRow(
                       Icons.door_front_door_rounded,
                       portalChild.classSection,
                       'Class and section',
-                      ParentPortalColors.green,
+                      ParentPortalColors.of(context).green,
                     ),
                     if (portalChild.rollNumber.trim().isNotEmpty) ...[
                       const Divider(height: 1),
@@ -297,7 +297,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                         Icons.badge_outlined,
                         'Roll ${portalChild.rollNumber}',
                         'School roll number',
-                        ParentPortalColors.blue,
+                        ParentPortalColors.of(context).blue,
                       ),
                     ],
                     if (portalChild.academicYear.trim().isNotEmpty) ...[
@@ -306,7 +306,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
                         Icons.event_note_outlined,
                         portalChild.academicYear,
                         'Academic year',
-                        ParentPortalColors.orange,
+                        ParentPortalColors.of(context).orange,
                       ),
                     ],
                   ],
@@ -323,7 +323,7 @@ class ParentPortalChildDetailScreen extends ConsumerWidget {
               Text(
                 'Last synced at ${NepaliBsCalendar.formatNepalTime(data.lastUpdated)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: ParentPortalColors.muted,
+                  color: ParentPortalColors.of(context).muted,
                 ),
               ),
               const SizedBox(height: 10),
@@ -426,7 +426,7 @@ class _ChildIdentityCard extends StatelessWidget {
                         child.name,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w900,
-                          color: ParentPortalColors.navy,
+                          color: ParentPortalColors.of(context).navy,
                         ),
                       ),
                     ),
@@ -450,15 +450,17 @@ class _ChildIdentityCard extends StatelessWidget {
                 if (details.isNotEmpty)
                   Text(
                     details,
-                    style: const TextStyle(color: ParentPortalColors.muted),
+                    style: TextStyle(
+                      color: ParentPortalColors.of(context).muted,
+                    ),
                   ),
                 if (schoolName.trim().isNotEmpty &&
                     schoolName != 'Your school') ...[
                   const SizedBox(height: 4),
                   Text(
                     schoolName,
-                    style: const TextStyle(
-                      color: ParentPortalColors.navy,
+                    style: TextStyle(
+                      color: ParentPortalColors.of(context).navy,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -467,7 +469,9 @@ class _ChildIdentityCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     'Academic Year ${child.academicYear}',
-                    style: const TextStyle(color: ParentPortalColors.muted),
+                    style: TextStyle(
+                      color: ParentPortalColors.of(context).muted,
+                    ),
                   ),
                 ],
               ],
@@ -576,26 +580,29 @@ class _AttendanceStatus {
   final bool showAlert;
 }
 
-_AttendanceStatus _attendanceStatus(ParentPortalChild child) {
+_AttendanceStatus _attendanceStatus(
+  BuildContext context,
+  ParentPortalChild child,
+) {
   final value = child.attendance.trim().toLowerCase();
   if (!child.attendanceEnabled ||
       value.contains('locked') ||
       value.contains('unavailable')) {
-    return const _AttendanceStatus(
+    return _AttendanceStatus(
       title: 'Attendance unavailable',
       supportingText: 'Attendance is not available for this child right now',
       icon: Icons.info_outline_rounded,
-      color: ParentPortalColors.muted,
+      color: ParentPortalColors.of(context).muted,
     );
   }
   if (value.contains('not marked') ||
       value.contains('not recorded') ||
       value.contains('no record')) {
-    return const _AttendanceStatus(
+    return _AttendanceStatus(
       title: 'Attendance pending',
       supportingText: 'The school has not recorded attendance yet',
       icon: Icons.schedule_rounded,
-      color: ParentPortalColors.blue,
+      color: ParentPortalColors.of(context).blue,
       showAlert: true,
     );
   }
@@ -604,7 +611,7 @@ _AttendanceStatus _attendanceStatus(ParentPortalChild child) {
       title: child.attendance,
       supportingText: 'Recorded by the school',
       icon: Icons.event_busy_rounded,
-      color: ParentPortalColors.red,
+      color: ParentPortalColors.of(context).red,
       showAlert: true,
     );
   }
@@ -613,7 +620,7 @@ _AttendanceStatus _attendanceStatus(ParentPortalChild child) {
       title: child.attendance,
       supportingText: 'Recorded by the school',
       icon: Icons.schedule_rounded,
-      color: ParentPortalColors.orange,
+      color: ParentPortalColors.of(context).orange,
       showAlert: true,
     );
   }
@@ -622,7 +629,7 @@ _AttendanceStatus _attendanceStatus(ParentPortalChild child) {
       title: child.attendance,
       supportingText: 'Recorded by the school',
       icon: Icons.check_rounded,
-      color: ParentPortalColors.green,
+      color: ParentPortalColors.of(context).green,
     );
   }
   return _AttendanceStatus(
@@ -631,7 +638,7 @@ _AttendanceStatus _attendanceStatus(ParentPortalChild child) {
         : child.attendance,
     supportingText: 'Attendance status from the school',
     icon: Icons.info_outline_rounded,
-    color: ParentPortalColors.blue,
+    color: ParentPortalColors.of(context).blue,
   );
 }
 
@@ -659,7 +666,7 @@ class _AttendanceAlert extends StatelessWidget {
                 Text(
                   status.title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: ParentPortalColors.navy,
+                    color: ParentPortalColors.of(context).navy,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -667,7 +674,7 @@ class _AttendanceAlert extends StatelessWidget {
                 Text(
                   status.supportingText,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: ParentPortalColors.muted,
+                    color: ParentPortalColors.of(context).muted,
                   ),
                 ),
                 if (onView != null) ...[
@@ -707,6 +714,7 @@ class _StatusSummaryRow extends StatelessWidget {
       button: onTap != null,
       label: '$title. $subtitle',
       excludeSemantics: true,
+      onTap: onTap,
       child: InkWell(
         onTap: onTap,
         child: ConstrainedBox(
@@ -725,7 +733,7 @@ class _StatusSummaryRow extends StatelessWidget {
                         title,
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
-                              color: ParentPortalColors.navy,
+                              color: ParentPortalColors.of(context).navy,
                               fontWeight: FontWeight.w800,
                             ),
                       ),
@@ -733,7 +741,7 @@ class _StatusSummaryRow extends StatelessWidget {
                       Text(
                         subtitle,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: ParentPortalColors.muted,
+                          color: ParentPortalColors.of(context).muted,
                         ),
                       ),
                     ],
@@ -801,15 +809,15 @@ String _feeSupportingText(ParentPortalChild child) {
   return 'All payments are up to date';
 }
 
-Color _feeColor(ParentPortalChild child) {
+Color _feeColor(BuildContext context, ParentPortalChild child) {
   if (!child.feesEnabled || !child.canViewFees) {
-    return ParentPortalColors.muted;
+    return ParentPortalColors.of(context).muted;
   }
   return child.hasFeesDue
-      ? ParentPortalColors.orange
+      ? ParentPortalColors.of(context).orange
       : child.hasNoFeeInvoices
-      ? ParentPortalColors.blue
-      : ParentPortalColors.green;
+      ? ParentPortalColors.of(context).blue
+      : ParentPortalColors.of(context).green;
 }
 
 class _RecentActivitySection extends StatelessWidget {
@@ -820,11 +828,11 @@ class _RecentActivitySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
-      return const PortalCard(
+      return PortalCard(
         padding: EdgeInsets.all(16),
         child: Text(
           'No recent school activity is available for this child.',
-          style: TextStyle(color: ParentPortalColors.muted),
+          style: TextStyle(color: ParentPortalColors.of(context).muted),
         ),
       );
     }
@@ -852,19 +860,19 @@ class _RecentActivityRow extends StatelessWidget {
     final style = switch (item.category) {
       ParentUpdateCategory.notice => (
         Icons.campaign_outlined,
-        ParentPortalColors.blue,
+        ParentPortalColors.of(context).blue,
       ),
       ParentUpdateCategory.message => (
         Icons.mail_outline_rounded,
-        ParentPortalColors.purple,
+        ParentPortalColors.of(context).purple,
       ),
       ParentUpdateCategory.event => (
         Icons.event_outlined,
-        ParentPortalColors.orange,
+        ParentPortalColors.of(context).orange,
       ),
       ParentUpdateCategory.gallery => (
         Icons.photo_library_outlined,
-        ParentPortalColors.green,
+        ParentPortalColors.of(context).green,
       ),
     };
     final timestamp = item.createdAt == null
@@ -883,8 +891,8 @@ class _RecentActivityRow extends StatelessWidget {
               children: [
                 Text(
                   item.title,
-                  style: const TextStyle(
-                    color: ParentPortalColors.navy,
+                  style: TextStyle(
+                    color: ParentPortalColors.of(context).navy,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -894,7 +902,9 @@ class _RecentActivityRow extends StatelessWidget {
                     item.body,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: ParentPortalColors.muted),
+                    style: TextStyle(
+                      color: ParentPortalColors.of(context).muted,
+                    ),
                   ),
                 ],
                 if (timestamp != null) ...[
@@ -902,7 +912,7 @@ class _RecentActivityRow extends StatelessWidget {
                   Text(
                     timestamp,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: ParentPortalColors.muted,
+                      color: ParentPortalColors.of(context).muted,
                     ),
                   ),
                 ],
@@ -937,7 +947,7 @@ class _DocumentsSection extends ConsumerWidget {
           ),
         ),
       ),
-      error: (_, _) => const PortalCard(
+      error: (_, _) => PortalCard(
         padding: EdgeInsets.all(16),
         child: Row(
           children: [
@@ -946,7 +956,7 @@ class _DocumentsSection extends ConsumerWidget {
             Expanded(
               child: Text(
                 'Student documents are unavailable right now.',
-                style: TextStyle(color: ParentPortalColors.muted),
+                style: TextStyle(color: ParentPortalColors.of(context).muted),
               ),
             ),
           ],
@@ -954,7 +964,7 @@ class _DocumentsSection extends ConsumerWidget {
       ),
       data: (childProfile) {
         if (childProfile.documents.isEmpty) {
-          return const PortalCard(
+          return PortalCard(
             padding: EdgeInsets.all(16),
             child: Row(
               children: [
@@ -967,14 +977,16 @@ class _DocumentsSection extends ConsumerWidget {
                       Text(
                         'Documents · 0 files',
                         style: TextStyle(
-                          color: ParentPortalColors.navy,
+                          color: ParentPortalColors.of(context).navy,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       SizedBox(height: 2),
                       Text(
                         'Documents issued or verified by the school will appear here.',
-                        style: TextStyle(color: ParentPortalColors.muted),
+                        style: TextStyle(
+                          color: ParentPortalColors.of(context).muted,
+                        ),
                       ),
                     ],
                   ),
@@ -1117,6 +1129,7 @@ class _ParentPortalHomeworkDetailScreenState
           final item = matches.first;
           final homeworkStatus = item.primaryStatusAt(DateTime.now());
           final homeworkStatusColor = _parentHomeworkStatusColor(
+            context,
             homeworkStatus,
           );
           final attachments = ref.watch(
@@ -1155,18 +1168,18 @@ class _ParentPortalHomeworkDetailScreenState
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Subject',
                                 style: TextStyle(
-                                  color: ParentPortalColors.muted,
+                                  color: ParentPortalColors.of(context).muted,
                                 ),
                               ),
                               Text(
                                 item.subject,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w900,
-                                  color: ParentPortalColors.navy,
+                                  color: ParentPortalColors.of(context).navy,
                                 ),
                               ),
                             ],
@@ -1184,15 +1197,17 @@ class _ParentPortalHomeworkDetailScreenState
                     const Divider(height: 28),
                     Text(
                       'Title',
-                      style: const TextStyle(color: ParentPortalColors.muted),
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).muted,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       item.displayTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
-                        color: ParentPortalColors.navy,
+                        color: ParentPortalColors.of(context).navy,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1212,7 +1227,7 @@ class _ParentPortalHomeworkDetailScreenState
                       item.dueAt == null
                           ? 'Due date unavailable'
                           : NepaliBsCalendar.formatBsDateTime(item.dueAt!),
-                      ParentPortalColors.green,
+                      ParentPortalColors.of(context).green,
                     ),
                     if (item.submittedAt != null) ...[
                       const SizedBox(height: 14),
@@ -1220,7 +1235,7 @@ class _ParentPortalHomeworkDetailScreenState
                         Icons.task_alt_rounded,
                         'Submitted',
                         NepaliBsCalendar.formatBsDateTime(item.submittedAt!),
-                        ParentPortalColors.blue,
+                        ParentPortalColors.of(context).blue,
                       ),
                     ],
                     if (item.scoreLabel != null) ...[
@@ -1229,7 +1244,7 @@ class _ParentPortalHomeworkDetailScreenState
                         Icons.grade_outlined,
                         'Score',
                         item.scoreLabel!,
-                        ParentPortalColors.purple,
+                        ParentPortalColors.of(context).purple,
                       ),
                     ],
                     const SizedBox(height: 14),
@@ -1237,12 +1252,14 @@ class _ParentPortalHomeworkDetailScreenState
                       Icons.person_rounded,
                       'Assigned by',
                       item.teacher,
-                      ParentPortalColors.green,
+                      ParentPortalColors.of(context).green,
                     ),
                     const SizedBox(height: 14),
                     Text(
                       'Attachment',
-                      style: const TextStyle(color: ParentPortalColors.muted),
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).muted,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     _HomeworkAttachmentList(
@@ -1256,7 +1273,7 @@ class _ParentPortalHomeworkDetailScreenState
                       Text(
                         'Teacher feedback',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: ParentPortalColors.navy,
+                          color: ParentPortalColors.of(context).navy,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -1280,9 +1297,11 @@ class _ParentPortalHomeworkDetailScreenState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Status',
-                            style: TextStyle(color: ParentPortalColors.muted),
+                            style: TextStyle(
+                              color: ParentPortalColors.of(context).muted,
+                            ),
                           ),
                           Text(
                             homeworkStatus.label,
@@ -1346,7 +1365,10 @@ class _ParentPortalHomeworkDetailScreenState
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: ParentPortalColors.muted)),
+          Text(
+            label,
+            style: TextStyle(color: ParentPortalColors.of(context).muted),
+          ),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
         ],
       ),
@@ -1373,12 +1395,12 @@ class _ParentPortalHomeworkDetailScreenState
               Text('Loading attachments...'),
             ],
           ),
-          error: (_, _) => const Column(
+          error: (_, _) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               FeatureIcon(
                 Icons.file_download_off_rounded,
-                color: ParentPortalColors.orange,
+                color: ParentPortalColors.of(context).orange,
                 size: 64,
               ),
               SizedBox(height: 14),
@@ -1399,20 +1421,29 @@ class _ParentPortalHomeworkDetailScreenState
   );
 }
 
-Color _parentHomeworkStatusColor(ParentHomeworkPrimaryStatus status) {
+Color _parentHomeworkStatusColor(
+  BuildContext context,
+  ParentHomeworkPrimaryStatus status,
+) {
   return switch (status) {
     ParentHomeworkPrimaryStatus.overdue ||
     ParentHomeworkPrimaryStatus.needsCorrection ||
     ParentHomeworkPrimaryStatus.incomplete ||
-    ParentHomeworkPrimaryStatus.partiallyCompleted => ParentPortalColors.red,
-    ParentHomeworkPrimaryStatus.dueSoon => ParentPortalColors.orange,
+    ParentHomeworkPrimaryStatus.partiallyCompleted => ParentPortalColors.of(
+      context,
+    ).red,
+    ParentHomeworkPrimaryStatus.dueSoon => ParentPortalColors.of(
+      context,
+    ).orange,
     ParentHomeworkPrimaryStatus.submittedLate ||
-    ParentHomeworkPrimaryStatus.awaitingReview => ParentPortalColors.blue,
-    ParentHomeworkPrimaryStatus.marked => ParentPortalColors.purple,
+    ParentHomeworkPrimaryStatus.awaitingReview => ParentPortalColors.of(
+      context,
+    ).blue,
+    ParentHomeworkPrimaryStatus.marked => ParentPortalColors.of(context).purple,
     ParentHomeworkPrimaryStatus.completedLate ||
     ParentHomeworkPrimaryStatus.completed ||
-    ParentHomeworkPrimaryStatus.excused => ParentPortalColors.green,
-    _ => ParentPortalColors.muted,
+    ParentHomeworkPrimaryStatus.excused => ParentPortalColors.of(context).green,
+    _ => ParentPortalColors.of(context).muted,
   };
 }
 
@@ -1436,23 +1467,23 @@ class _HomeworkAttachmentList extends ConsumerWidget {
         padding: const EdgeInsets.all(12),
         child: Text(
           count == 0 ? 'No attachments' : 'Loading $count attachment(s)...',
-          style: const TextStyle(color: ParentPortalColors.muted),
+          style: TextStyle(color: ParentPortalColors.of(context).muted),
         ),
       ),
       error: (_, _) => PortalCard(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            const FeatureIcon(
+            FeatureIcon(
               Icons.file_download_off_rounded,
-              color: ParentPortalColors.orange,
+              color: ParentPortalColors.of(context).orange,
               size: 40,
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Text(
                 'Attachments could not be loaded.',
-                style: TextStyle(color: ParentPortalColors.muted),
+                style: TextStyle(color: ParentPortalColors.of(context).muted),
               ),
             ),
             IconButton(
@@ -1482,9 +1513,9 @@ class _HomeworkAttachmentList extends ConsumerWidget {
             children: [
               for (var index = 0; index < items.length; index++) ...[
                 ListTile(
-                  leading: const FeatureIcon(
+                  leading: FeatureIcon(
                     Icons.description_rounded,
-                    color: ParentPortalColors.red,
+                    color: ParentPortalColors.of(context).red,
                     size: 40,
                   ),
                   title: Text(
@@ -1548,9 +1579,9 @@ class _HomeworkAttachmentSheet extends ConsumerWidget {
         const SizedBox(height: 12),
         for (final attachment in attachments)
           ListTile(
-            leading: const Icon(
+            leading: Icon(
               Icons.description_rounded,
-              color: ParentPortalColors.red,
+              color: ParentPortalColors.of(context).red,
             ),
             title: Text(attachment.fileName),
             subtitle: Text(_fileSize(attachment.sizeBytes)),
@@ -1617,7 +1648,7 @@ class _DetailUnavailable extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            FeatureIcon(icon, color: ParentPortalColors.orange),
+            FeatureIcon(icon, color: ParentPortalColors.of(context).orange),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -1633,7 +1664,9 @@ class _DetailUnavailable extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     message,
-                    style: const TextStyle(color: ParentPortalColors.muted),
+                    style: TextStyle(
+                      color: ParentPortalColors.of(context).muted,
+                    ),
                   ),
                 ],
               ),

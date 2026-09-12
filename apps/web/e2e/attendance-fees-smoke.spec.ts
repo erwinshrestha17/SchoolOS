@@ -159,7 +159,7 @@ async function login(page: Page, overrides?: Partial<typeof credentials>) {
   await page.goto("/login");
   await page.getByLabel(/School Code/i).fill(resolved.tenantSlug ?? "");
   await page.getByLabel(/Email/i).fill(resolved.email ?? "");
-  await page.getByLabel(/Password/i).fill(resolved.password ?? "");
+  await page.getByLabel(/^Password$/i).fill(resolved.password ?? "");
   await page.getByRole("button", { name: /Sign in/i }).click();
   await page.waitForURL("**/dashboard*", { timeout: 20_000 });
 }

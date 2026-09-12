@@ -36,20 +36,20 @@ class ParentPortalMoreTab extends StatelessWidget {
                     Text(
                       displayName,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: ParentPortalColors.navy,
+                        color: ParentPortalColors.of(context).navy,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     Text(
                       'Parent / Guardian',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: ParentPortalColors.muted,
+                        color: ParentPortalColors.of(context).muted,
                       ),
                     ),
                     Text(
                       '${data.schoolName} • ${data.children.length} linked ${data.children.length == 1 ? 'child' : 'children'}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: ParentPortalColors.muted,
+                        color: ParentPortalColors.of(context).muted,
                       ),
                     ),
                     const SizedBox(height: 8),

@@ -259,14 +259,14 @@ class _CorrectionActionCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (isOffline) {
-      return const PortalCard(
+      return PortalCard(
         padding: EdgeInsets.all(14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             FeatureIcon(
               Icons.wifi_off_rounded,
-              color: ParentPortalColors.orange,
+              color: ParentPortalColors.of(context).orange,
             ),
             SizedBox(width: 12),
             Expanded(
@@ -300,9 +300,9 @@ class _CorrectionActionCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const FeatureIcon(
+              FeatureIcon(
                 Icons.edit_calendar_rounded,
-                color: ParentPortalColors.blue,
+                color: ParentPortalColors.of(context).blue,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -312,7 +312,7 @@ class _CorrectionActionCard extends ConsumerWidget {
                     Text(
                       'Attendance looks incorrect?',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: ParentPortalColors.navy,
+                        color: ParentPortalColors.of(context).navy,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -324,7 +324,9 @@ class _CorrectionActionCard extends ConsumerWidget {
                           : selectedIsEligible
                           ? '${formatPreferredDate(selectedDay!.date, datePreference)} is selected.'
                           : 'This date does not have a recorded attendance status to correct.',
-                      style: TextStyle(color: ParentPortalColors.muted),
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).muted,
+                      ),
                     ),
                   ],
                 ),
@@ -380,7 +382,7 @@ class _RecentCorrectionRequests extends ConsumerWidget {
         Text(
           'Correction requests',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: ParentPortalColors.navy,
+            color: ParentPortalColors.of(context).navy,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -408,11 +410,11 @@ class _RecentCorrectionRequests extends ConsumerWidget {
           ),
           data: (items) {
             if (items.isEmpty) {
-              return const PortalCard(
+              return PortalCard(
                 padding: EdgeInsets.all(14),
                 child: Text(
                   'No correction requests yet.',
-                  style: TextStyle(color: ParentPortalColors.muted),
+                  style: TextStyle(color: ParentPortalColors.of(context).muted),
                 ),
               );
             }
@@ -478,7 +480,7 @@ class _CorrectionRequestRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final color = _correctionStatusColor(item.status);
+    final color = _correctionStatusColor(context, item.status);
     final response = _parentSafeCorrectionText(item.reviewReason);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -488,8 +490,8 @@ class _CorrectionRequestRow extends ConsumerWidget {
             Expanded(
               child: Text(
                 formatPreferredDate(item.attendanceDate, datePreference),
-                style: const TextStyle(
-                  color: ParentPortalColors.navy,
+                style: TextStyle(
+                  color: ParentPortalColors.of(context).navy,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -499,7 +501,10 @@ class _CorrectionRequestRow extends ConsumerWidget {
         ),
         Text(
           'Requested ${formatPreferredDate(item.requestedAt, datePreference)}',
-          style: const TextStyle(color: ParentPortalColors.muted, fontSize: 12),
+          style: TextStyle(
+            color: ParentPortalColors.of(context).muted,
+            fontSize: 12,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
@@ -517,15 +522,15 @@ class _CorrectionRequestRow extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             'School response: $response',
-            style: const TextStyle(color: ParentPortalColors.muted),
+            style: TextStyle(color: ParentPortalColors.of(context).muted),
             maxLines: compact ? 2 : null,
             overflow: compact ? TextOverflow.ellipsis : null,
           ),
         ] else if (item.status == 'PENDING') ...[
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'The school has not responded yet.',
-            style: TextStyle(color: ParentPortalColors.muted),
+            style: TextStyle(color: ParentPortalColors.of(context).muted),
           ),
         ],
         if (item.canCancel || item.canResubmit) ...[
@@ -584,23 +589,23 @@ class _CorrectionStatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (color, background, icon) = switch (status) {
       'APPROVED' => (
-        ParentPortalColors.green,
-        ParentPortalColors.greenSoft,
+        ParentPortalColors.of(context).green,
+        ParentPortalColors.of(context).greenSoft,
         Icons.check_circle_rounded,
       ),
       'REJECTED' => (
-        ParentPortalColors.red,
-        ParentPortalColors.redSoft,
+        ParentPortalColors.of(context).red,
+        ParentPortalColors.of(context).redSoft,
         Icons.cancel_rounded,
       ),
       'CANCELLED' => (
-        ParentPortalColors.muted,
-        ParentPortalColors.surfaceAlt,
+        ParentPortalColors.of(context).muted,
+        ParentPortalColors.of(context).surfaceAlt,
         Icons.remove_circle_outline_rounded,
       ),
       _ => (
-        ParentPortalColors.orange,
-        ParentPortalColors.orangeSoft,
+        ParentPortalColors.of(context).orange,
+        ParentPortalColors.of(context).orangeSoft,
         Icons.schedule_rounded,
       ),
     };
@@ -702,8 +707,8 @@ class _MonthNavHeader extends StatelessWidget {
               Text(
                 labels.$1,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: ParentPortalColors.navy,
+                style: TextStyle(
+                  color: ParentPortalColors.of(context).navy,
                   fontWeight: FontWeight.w900,
                   fontSize: 16,
                 ),
@@ -712,8 +717,8 @@ class _MonthNavHeader extends StatelessWidget {
               Text(
                 labels.$2,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: ParentPortalColors.muted,
+                style: TextStyle(
+                  color: ParentPortalColors.of(context).muted,
                   fontSize: 12,
                 ),
               ),
@@ -747,14 +752,14 @@ class _TodayStatusRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = summary.todayStatus;
     final isUnknown = status == AttendanceStatus.unknown;
-    final color = _todayStatusColor(status);
+    final color = _todayStatusColor(context, status);
     final checkedLabel =
         '${isOffline ? 'Last saved' : 'Last checked'} '
         '${_compactNepalTime(summary.lastUpdated)}';
     return PortalCard(
       key: const ValueKey('parent-attendance-today-status'),
       padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
-      color: _todayStatusSoftColor(status),
+      color: _todayStatusSoftColor(context, status),
       borderColor: color.withValues(alpha: isUnknown ? .20 : .16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -766,7 +771,7 @@ class _TodayStatusRow extends StatelessWidget {
                 ? Text.rich(
                     TextSpan(
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: ParentPortalColors.navy,
+                        color: ParentPortalColors.of(context).navy,
                       ),
                       children: [
                         const TextSpan(
@@ -780,7 +785,9 @@ class _TodayStatusRow extends StatelessWidget {
                         TextSpan(
                           text: ' · $checkedLabel',
                           style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: ParentPortalColors.muted),
+                              ?.copyWith(
+                                color: ParentPortalColors.of(context).muted,
+                              ),
                         ),
                       ],
                     ),
@@ -793,20 +800,23 @@ class _TodayStatusRow extends StatelessWidget {
                       Text(
                         'Today:',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: ParentPortalColors.navy,
+                          color: ParentPortalColors.of(context).navy,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       StatusBadge(
                         label: _todayStatusChipLabel(summary),
                         color: color,
-                        backgroundColor: _todayStatusBadgeColor(status),
+                        backgroundColor: _todayStatusBadgeColor(
+                          context,
+                          status,
+                        ),
                         icon: _todayStatusIcon(status),
                       ),
                       Text(
                         '· $checkedLabel',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: ParentPortalColors.muted,
+                          color: ParentPortalColors.of(context).muted,
                         ),
                       ),
                       if (status == AttendanceStatus.absent &&
@@ -824,7 +834,7 @@ class _TodayStatusRow extends StatelessWidget {
               tooltip: 'Refresh today’s attendance',
               onPressed: onRefresh,
               icon: const Icon(Icons.refresh_rounded, size: 19),
-              color: ParentPortalColors.blue,
+              color: ParentPortalColors.of(context).blue,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints.tightFor(width: 44, height: 44),
             ),
@@ -844,10 +854,10 @@ class _AttendanceOverview extends StatelessWidget {
     final total = summary.totalMarked;
     final rate = summary.attendancePercentage;
     final rateColor = (rate ?? 0) >= 90
-        ? ParentPortalColors.green
+        ? ParentPortalColors.of(context).green
         : (rate ?? 0) >= 75
-        ? ParentPortalColors.orange
-        : ParentPortalColors.red;
+        ? ParentPortalColors.of(context).orange
+        : ParentPortalColors.of(context).red;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -865,7 +875,9 @@ class _AttendanceOverview extends StatelessWidget {
                       value: rate == null ? 0 : rate / 100,
                       strokeWidth: 7,
                       strokeCap: StrokeCap.round,
-                      backgroundColor: ParentPortalColors.surfaceAlt,
+                      backgroundColor: ParentPortalColors.of(
+                        context,
+                      ).surfaceAlt,
                       valueColor: AlwaysStoppedAnimation(rateColor),
                     ),
                   ),
@@ -890,7 +902,7 @@ class _AttendanceOverview extends StatelessWidget {
                         ? 'Attendance rate unavailable'
                         : '${_formatPercentage(rate)}% attendance',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: ParentPortalColors.navy,
+                      color: ParentPortalColors.of(context).navy,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -900,7 +912,7 @@ class _AttendanceOverview extends StatelessWidget {
                         ? 'No marked attendance days in this period yet.'
                         : '${summary.presentCount} of $total marked days recorded as present',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: ParentPortalColors.muted,
+                      color: ParentPortalColors.of(context).muted,
                     ),
                   ),
                 ],
@@ -919,22 +931,30 @@ class _AttendanceOverview extends StatelessWidget {
                   if (summary.presentCount > 0)
                     Expanded(
                       flex: summary.presentCount,
-                      child: Container(color: ParentPortalColors.green),
+                      child: Container(
+                        color: ParentPortalColors.of(context).green,
+                      ),
                     ),
                   if (summary.lateCount > 0)
                     Expanded(
                       flex: summary.lateCount,
-                      child: Container(color: ParentPortalColors.orange),
+                      child: Container(
+                        color: ParentPortalColors.of(context).orange,
+                      ),
                     ),
                   if (summary.leaveCount > 0)
                     Expanded(
                       flex: summary.leaveCount,
-                      child: Container(color: ParentPortalColors.blue),
+                      child: Container(
+                        color: ParentPortalColors.of(context).blue,
+                      ),
                     ),
                   if (summary.absentCount > 0)
                     Expanded(
                       flex: summary.absentCount,
-                      child: Container(color: ParentPortalColors.red),
+                      child: Container(
+                        color: ParentPortalColors.of(context).red,
+                      ),
                     ),
                 ],
               ),
@@ -946,23 +966,23 @@ class _AttendanceOverview extends StatelessWidget {
             runSpacing: 8,
             children: [
               _StatChip(
-                color: ParentPortalColors.green,
+                color: ParentPortalColors.of(context).green,
                 label: 'Present',
                 value: summary.presentCount,
               ),
               _StatChip(
-                color: ParentPortalColors.orange,
+                color: ParentPortalColors.of(context).orange,
                 label: 'Late',
                 value: summary.lateCount,
               ),
               _StatChip(
-                color: ParentPortalColors.red,
+                color: ParentPortalColors.of(context).red,
                 label: 'Absent',
                 value: summary.absentCount,
               ),
               if (summary.leaveCount > 0)
                 _StatChip(
-                  color: ParentPortalColors.blue,
+                  color: ParentPortalColors.of(context).blue,
                   label: 'Leave',
                   value: summary.leaveCount,
                 ),
@@ -971,9 +991,9 @@ class _AttendanceOverview extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             'The school’s current calculation counts only Present as present. Late and leave are reported separately.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: ParentPortalColors.muted),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: ParentPortalColors.of(context).muted,
+            ),
           ),
         ],
       ],
@@ -1005,15 +1025,18 @@ class _StatChip extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           '$value',
-          style: const TextStyle(
-            color: ParentPortalColors.navy,
+          style: TextStyle(
+            color: ParentPortalColors.of(context).navy,
             fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(color: ParentPortalColors.muted, fontSize: 12),
+          style: TextStyle(
+            color: ParentPortalColors.of(context).muted,
+            fontSize: 12,
+          ),
         ),
       ],
     );
@@ -1093,7 +1116,7 @@ class _MonthCalendar extends StatelessWidget {
               for (final status in AttendanceStatus.values)
                 if (statusesUsed.contains(status))
                   _LegendDot(
-                    color: _statusColor(status),
+                    color: _statusColor(context, status),
                     label: _statusLabel(status),
                   ),
             ],
@@ -1114,8 +1137,8 @@ class _WeekdayLabel extends StatelessWidget {
     child: Text(
       label,
       textAlign: TextAlign.center,
-      style: const TextStyle(
-        color: ParentPortalColors.muted,
+      style: TextStyle(
+        color: ParentPortalColors.of(context).muted,
         fontWeight: FontWeight.w800,
         fontSize: 12,
       ),
@@ -1144,7 +1167,7 @@ class _AttendanceDayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = status == null ? null : _statusColor(status!);
+    final color = status == null ? null : _statusColor(context, status!);
     final bsDate = NepaliBsCalendar.fromAd(date);
     final stateLabel = status == null
         ? isFuture
@@ -1167,7 +1190,10 @@ class _AttendanceDayCell extends StatelessWidget {
               color: color?.withValues(alpha: .14),
               shape: BoxShape.circle,
               border: isSelected
-                  ? Border.all(color: ParentPortalColors.navy, width: 2)
+                  ? Border.all(
+                      color: ParentPortalColors.of(context).navy,
+                      width: 2,
+                    )
                   : null,
             ),
             child: Stack(
@@ -1182,8 +1208,10 @@ class _AttendanceDayCell extends StatelessWidget {
                           : '${bsDate.day}',
                       style: TextStyle(
                         color: isFuture
-                            ? ParentPortalColors.muted.withValues(alpha: .6)
-                            : color ?? ParentPortalColors.muted,
+                            ? ParentPortalColors.of(
+                                context,
+                              ).muted.withValues(alpha: .6)
+                            : color ?? ParentPortalColors.of(context).muted,
                         fontWeight: FontWeight.w800,
                         fontSize: 13,
                       ),
@@ -1192,9 +1220,9 @@ class _AttendanceDayCell extends StatelessWidget {
                       Text(
                         'AD ${date.day}',
                         style: TextStyle(
-                          color: ParentPortalColors.muted.withValues(
-                            alpha: .78,
-                          ),
+                          color: ParentPortalColors.of(
+                            context,
+                          ).muted.withValues(alpha: .78),
                           fontSize: 8,
                           height: .9,
                         ),
@@ -1202,11 +1230,11 @@ class _AttendanceDayCell extends StatelessWidget {
                   ],
                 ),
                 if (isToday)
-                  const Positioned(
+                  Positioned(
                     bottom: 3,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: ParentPortalColors.navy,
+                        color: ParentPortalColors.of(context).navy,
                         shape: BoxShape.circle,
                       ),
                       child: SizedBox(width: 4, height: 4),
@@ -1256,8 +1284,8 @@ class _SelectedDateDetails extends StatelessWidget {
           FeatureIcon(
             status == null ? Icons.event_note_rounded : _statusIcon(status),
             color: status == null
-                ? ParentPortalColors.muted
-                : _statusColor(status),
+                ? ParentPortalColors.of(context).muted
+                : _statusColor(context, status),
             size: 40,
           ),
           const SizedBox(width: 12),
@@ -1267,16 +1295,16 @@ class _SelectedDateDetails extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: ParentPortalColors.navy,
+                  style: TextStyle(
+                    color: ParentPortalColors.of(context).navy,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 if (secondaryDate != null)
                   Text(
                     secondaryDate,
-                    style: const TextStyle(
-                      color: ParentPortalColors.muted,
+                    style: TextStyle(
+                      color: ParentPortalColors.of(context).muted,
                       fontSize: 12,
                     ),
                   ),
@@ -1285,8 +1313,8 @@ class _SelectedDateDetails extends StatelessWidget {
                   detail,
                   style: TextStyle(
                     color: status == null
-                        ? ParentPortalColors.muted
-                        : _statusColor(status),
+                        ? ParentPortalColors.of(context).muted
+                        : _statusColor(context, status),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -1294,7 +1322,9 @@ class _SelectedDateDetails extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     day!.remark!.trim(),
-                    style: const TextStyle(color: ParentPortalColors.muted),
+                    style: TextStyle(
+                      color: ParentPortalColors.of(context).muted,
+                    ),
                   ),
                 ],
               ],
@@ -1325,8 +1355,8 @@ class _LegendDot extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: const TextStyle(
-            color: ParentPortalColors.muted,
+          style: TextStyle(
+            color: ParentPortalColors.of(context).muted,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -1361,7 +1391,7 @@ Future<void> _showAllCorrectionRequests(
             child: Text(
               'Correction request history',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: ParentPortalColors.navy,
+                color: ParentPortalColors.of(context).navy,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -1500,14 +1530,14 @@ class _CorrectionRequestSheetState
             Text(
               'Request attendance correction',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: ParentPortalColors.navy,
+                color: ParentPortalColors.of(context).navy,
                 fontWeight: FontWeight.w900,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'The school will review this request. Attendance changes only after approval.',
-              style: TextStyle(color: ParentPortalColors.muted),
+              style: TextStyle(color: ParentPortalColors.of(context).muted),
             ),
             const SizedBox(height: 18),
             DropdownButtonFormField<DateTime>(
@@ -1754,12 +1784,12 @@ const _correctionStatusOptions = <AttendanceStatus>[
   AttendanceStatus.leave,
 ];
 
-Color _correctionStatusColor(String status) {
+Color _correctionStatusColor(BuildContext context, String status) {
   return switch (status) {
-    'APPROVED' => ParentPortalColors.green,
-    'REJECTED' => ParentPortalColors.red,
-    'CANCELLED' => ParentPortalColors.muted,
-    _ => ParentPortalColors.orange,
+    'APPROVED' => ParentPortalColors.of(context).green,
+    'REJECTED' => ParentPortalColors.of(context).red,
+    'CANCELLED' => ParentPortalColors.of(context).muted,
+    _ => ParentPortalColors.of(context).orange,
   };
 }
 
@@ -1786,47 +1816,47 @@ GuardianChild? _selectedChild(ParentState state, String? studentId) {
   return state.selectedChild ?? state.children.first;
 }
 
-Color _statusColor(AttendanceStatus status) {
+Color _statusColor(BuildContext context, AttendanceStatus status) {
   return switch (status) {
-    AttendanceStatus.present => ParentPortalColors.green,
-    AttendanceStatus.late => ParentPortalColors.orange,
-    AttendanceStatus.absent => ParentPortalColors.red,
-    AttendanceStatus.halfDay => ParentPortalColors.orange,
-    AttendanceStatus.leave => ParentPortalColors.blue,
+    AttendanceStatus.present => ParentPortalColors.of(context).green,
+    AttendanceStatus.late => ParentPortalColors.of(context).orange,
+    AttendanceStatus.absent => ParentPortalColors.of(context).red,
+    AttendanceStatus.halfDay => ParentPortalColors.of(context).orange,
+    AttendanceStatus.leave => ParentPortalColors.of(context).blue,
     AttendanceStatus.festival ||
-    AttendanceStatus.holiday => ParentPortalColors.purple,
-    AttendanceStatus.unknown => ParentPortalColors.muted,
+    AttendanceStatus.holiday => ParentPortalColors.of(context).purple,
+    AttendanceStatus.unknown => ParentPortalColors.of(context).muted,
   };
 }
 
-Color _todayStatusColor(AttendanceStatus status) {
+Color _todayStatusColor(BuildContext context, AttendanceStatus status) {
   return switch (status) {
-    AttendanceStatus.present => ParentPortalColors.green,
+    AttendanceStatus.present => ParentPortalColors.of(context).green,
     AttendanceStatus.late ||
-    AttendanceStatus.halfDay => ParentPortalColors.orange,
-    AttendanceStatus.absent => ParentPortalColors.red,
+    AttendanceStatus.halfDay => ParentPortalColors.of(context).orange,
+    AttendanceStatus.absent => ParentPortalColors.of(context).red,
     AttendanceStatus.leave ||
     AttendanceStatus.festival ||
-    AttendanceStatus.holiday => ParentPortalColors.purple,
-    AttendanceStatus.unknown => ParentPortalColors.blue,
+    AttendanceStatus.holiday => ParentPortalColors.of(context).purple,
+    AttendanceStatus.unknown => ParentPortalColors.of(context).blue,
   };
 }
 
-Color _todayStatusSoftColor(AttendanceStatus status) {
+Color _todayStatusSoftColor(BuildContext context, AttendanceStatus status) {
   return switch (status) {
-    AttendanceStatus.present => ParentPortalColors.greenSoft,
+    AttendanceStatus.present => ParentPortalColors.of(context).greenSoft,
     AttendanceStatus.late ||
-    AttendanceStatus.halfDay => ParentPortalColors.orangeSoft,
-    AttendanceStatus.absent => ParentPortalColors.redSoft,
+    AttendanceStatus.halfDay => ParentPortalColors.of(context).orangeSoft,
+    AttendanceStatus.absent => ParentPortalColors.of(context).redSoft,
     AttendanceStatus.leave ||
     AttendanceStatus.festival ||
-    AttendanceStatus.holiday => ParentPortalColors.purpleSoft,
-    AttendanceStatus.unknown => ParentPortalColors.blueSoft,
+    AttendanceStatus.holiday => ParentPortalColors.of(context).purpleSoft,
+    AttendanceStatus.unknown => ParentPortalColors.of(context).blueSoft,
   };
 }
 
-Color _todayStatusBadgeColor(AttendanceStatus status) =>
-    _todayStatusColor(status).withValues(alpha: .10);
+Color _todayStatusBadgeColor(BuildContext context, AttendanceStatus status) =>
+    _todayStatusColor(context, status).withValues(alpha: .10);
 
 IconData _todayStatusIcon(AttendanceStatus status) {
   return switch (status) {

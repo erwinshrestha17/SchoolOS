@@ -161,7 +161,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Connection lost'), findsOneWidget);
+    expect(find.text('No connection'), findsOneWidget);
     expect(find.textContaining('No internet connection'), findsOneWidget);
 
     await tester.pumpWidget(
@@ -248,7 +248,9 @@ void main() {
     expect(find.text('Join a live session'), findsOneWidget);
     expect(find.text('Homework'), findsNothing);
 
-    final sessionContext = tester.element(find.text('Student learning session'));
+    final sessionContext = tester.element(
+      find.text('Student learning session'),
+    );
     GoRouter.of(sessionContext).go(AppRoutes.notices);
     await tester.pumpAndSettle();
 
@@ -387,7 +389,7 @@ void main() {
     expect(find.text('Operational snapshot'), findsNothing);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Schoolwork').last);
+    await tester.tap(find.byTooltip('Schoolwork'));
     await tester.pumpAndSettle();
     expect(find.textContaining('All assignments ·'), findsOneWidget);
     expect(tester.takeException(), isNull);

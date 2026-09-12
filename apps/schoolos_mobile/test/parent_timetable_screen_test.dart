@@ -1,7 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'support/golden_fonts.dart';
+import 'package:schoolos_mobile/app/theme/app_theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_timetable_screen.dart';
@@ -9,14 +10,7 @@ import 'package:schoolos_mobile/features/parent/presentation/widgets/parent_port
 import 'package:schoolos_mobile/shared/widgets/school_os_app_shell.dart';
 
 void main() {
-  setUpAll(() async {
-    if (!Platform.isMacOS) return;
-    await _loadFont('SchoolOsGolden', '/System/Library/Fonts/SFNS.ttf');
-    await _loadFont(
-      'MaterialIcons',
-      'build/unit_test_assets/fonts/MaterialIcons-Regular.otf',
-    );
-  });
+  setUpAll(loadAppGoldenFonts);
 
   const child = GuardianChild(
     id: 'student-1',
@@ -197,69 +191,60 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('matches the parent timetable visual treatment', (tester) async {
-    tester.view.physicalSize = const Size(432, 911);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets(
+    'matches the parent timetable visual treatment',
+    (tester) async {
+      tester.view.physicalSize = const Size(432, 911);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: ParentPortalColors.green,
-          ),
-          scaffoldBackgroundColor: ParentPortalColors.page,
-          fontFamily: Platform.isMacOS ? 'SchoolOsGolden' : null,
-          useMaterial3: true,
-        ),
-        home: Scaffold(
-          appBar: AppBar(
-            title: const Text(
-              'Timetable',
-              style: TextStyle(
-                color: ParentPortalColors.navy,
-                fontWeight: FontWeight.w900,
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          home: Scaffold(
+            appBar: AppBar(
+              title: const Text(
+                'Timetable',
+                style: TextStyle(
+                  color: ParentPortalColors.navy,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              actions: const [
+                Icon(Icons.notifications_none_rounded),
+                SizedBox(width: 16),
+              ],
+            ),
+            body: const SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(16),
+                child: ParentTimetableView(
+                  child: child,
+                  timetable: timetable,
+                  classTeacher: 'Ramesh Gurung',
+                ),
               ),
             ),
-            actions: const [
-              Icon(Icons.notifications_none_rounded),
-              SizedBox(width: 16),
-            ],
-          ),
-          body: const SafeArea(
-            top: false,
-            child: SingleChildScrollView(
-              padding: EdgeInsets.all(16),
-              child: ParentTimetableView(
-                child: child,
-                timetable: timetable,
-                classTeacher: 'Ramesh Gurung',
-              ),
+            bottomNavigationBar: SchoolOsBottomNavigation(
+              selectedIndex: 5,
+              onSelected: (_) {},
             ),
           ),
-          bottomNavigationBar: SchoolOsBottomNavigation(
-            selectedIndex: 5,
-            onSelected: (_) {},
-          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('timetable-day-1')));
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('timetable-day-1')));
+      await tester.pumpAndSettle();
 
-    await expectLater(
-      find.byType(Scaffold),
-      matchesGoldenFile('goldens/parent_timetable_screen.png'),
-    );
-  }, skip: !Platform.isMacOS);
-}
-
-Future<void> _loadFont(String family, String path) async {
-  final bytes = await File(path).readAsBytes();
-  final loader = FontLoader(family)
-    ..addFont(Future.value(ByteData.sublistView(bytes)));
-  await loader.load();
+      await expectLater(
+        find.byType(Scaffold),
+        matchesGoldenFile('goldens/parent_timetable_screen.png'),
+      );
+    },
+    skip: !Platform.isMacOS,
+    tags: ['golden'],
+  );
 }

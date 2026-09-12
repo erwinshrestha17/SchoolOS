@@ -21,10 +21,10 @@ class DashboardCardShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
-      shape: const RoundedRectangleBorder(
+      color: ParentPortalColors.of(context).surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(AppRadius.xl)),
-        side: BorderSide(color: ParentPortalColors.border),
+        side: BorderSide(color: ParentPortalColors.of(context).border),
       ),
       clipBehavior: Clip.antiAlias,
       child: child,
@@ -61,9 +61,10 @@ class StudentDaySummaryCard extends StatelessWidget {
       child: Column(
         children: [
           Semantics(
-            button: true,
+            button: onOpenChild != null,
             label: 'Open ${child.name}\'s profile',
             excludeSemantics: true,
+            onTap: onOpenChild,
             child: InkWell(
               onTap: onOpenChild,
               child: Padding(
@@ -79,7 +80,7 @@ class StudentDaySummaryCard extends StatelessWidget {
                           Text(
                             child.name,
                             style: theme.textTheme.titleMedium?.copyWith(
-                              color: ParentPortalColors.navy,
+                              color: ParentPortalColors.of(context).navy,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -87,14 +88,14 @@ class StudentDaySummaryCard extends StatelessWidget {
                             Text(
                               schoolContext,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: ParentPortalColors.muted,
+                                color: ParentPortalColors.of(context).muted,
                               ),
                             ),
                           if (child.teacher != null)
                             Text(
                               'Class teacher: ${child.teacher}',
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: ParentPortalColors.muted,
+                                color: ParentPortalColors.of(context).muted,
                               ),
                             ),
                         ],
@@ -130,8 +131,16 @@ class StudentStatusRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = ParentDashboardTokens.statusColor(row.kind, row.tone);
-    final surface = ParentDashboardTokens.statusSurface(row.kind, row.tone);
+    final color = ParentDashboardTokens.statusColor(
+      context,
+      row.kind,
+      row.tone,
+    );
+    final surface = ParentDashboardTokens.statusSurface(
+      context,
+      row.kind,
+      row.tone,
+    );
 
     return Semantics(
       button: onTap != null,
@@ -140,6 +149,7 @@ class StudentStatusRow extends StatelessWidget {
       // can see that the tick is green.
       label: row.semanticLabel,
       excludeSemantics: true,
+      onTap: onTap,
       child: InkWell(
         onTap: onTap,
         child: ConstrainedBox(
@@ -174,7 +184,7 @@ class StudentStatusRow extends StatelessWidget {
                       Text(
                         row.title,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: ParentPortalColors.navy,
+                          color: ParentPortalColors.of(context).navy,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -184,18 +194,20 @@ class StudentStatusRow extends StatelessWidget {
                       // otherwise read a balance as current.
                       if (row.isStale) ...[
                         const SizedBox(height: AppSpacing.xs),
-                        const StatusBadge(
+                        StatusBadge(
                           label: 'Saved copy',
                           icon: Icons.cloud_off_rounded,
-                          color: ParentPortalColors.muted,
-                          backgroundColor: ParentPortalColors.surfaceAlt,
+                          color: ParentPortalColors.of(context).muted,
+                          backgroundColor: ParentPortalColors.of(
+                            context,
+                          ).surfaceAlt,
                         ),
                       ],
                       if (row.subtitle != null)
                         Text(
                           row.subtitle!,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: ParentPortalColors.muted,
+                            color: ParentPortalColors.of(context).muted,
                           ),
                         ),
                     ],
@@ -225,12 +237,13 @@ class UpcomingItemTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dueLabel = formatDueLabel(item);
-    final dueColor = ParentDashboardTokens.urgencyColor(item.urgency);
+    final dueColor = ParentDashboardTokens.urgencyColor(context, item.urgency);
 
     return Semantics(
       button: onTap != null,
       label: '${item.title}, ${item.subtitle}, $dueLabel',
       excludeSemantics: true,
+      onTap: onTap,
       child: InkWell(
         onTap: onTap,
         child: ConstrainedBox(
@@ -248,8 +261,8 @@ class UpcomingItemTile extends StatelessWidget {
                   height: 38,
                   decoration: BoxDecoration(
                     color: item.urgency == ParentUpcomingUrgency.overdue
-                        ? ParentPortalColors.redSoft
-                        : ParentPortalColors.blueSoft,
+                        ? ParentPortalColors.of(context).redSoft
+                        : ParentPortalColors.of(context).blueSoft,
                     borderRadius: AppRadius.borderRadiusMD,
                   ),
                   child: Icon(
@@ -270,7 +283,7 @@ class UpcomingItemTile extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: ParentPortalColors.navy,
+                          color: ParentPortalColors.of(context).navy,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -279,7 +292,7 @@ class UpcomingItemTile extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: ParentPortalColors.muted,
+                          color: ParentPortalColors.of(context).muted,
                         ),
                       ),
                     ],
@@ -358,6 +371,7 @@ class LatestUpdateCard extends StatelessWidget {
         update.metadata,
       ].where((part) => part != null && part.trim().isNotEmpty).join('. '),
       excludeSemantics: true,
+      onTap: onTap,
       child: DashboardCardShell(
         child: InkWell(
           onTap: onTap,
@@ -369,15 +383,15 @@ class LatestUpdateCard extends StatelessWidget {
                 Container(
                   width: 44,
                   height: 44,
-                  decoration: const BoxDecoration(
-                    color: ParentPortalColors.blueSoft,
+                  decoration: BoxDecoration(
+                    color: ParentPortalColors.of(context).blueSoft,
                     borderRadius: BorderRadius.all(
                       Radius.circular(AppRadius.md),
                     ),
                   ),
                   child: Icon(
                     ParentDashboardTokens.updateIcon(update.category),
-                    color: ParentPortalColors.blue,
+                    color: ParentPortalColors.of(context).blue,
                     size: 21,
                   ),
                 ),
@@ -391,7 +405,7 @@ class LatestUpdateCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleSmall?.copyWith(
-                          color: ParentPortalColors.navy,
+                          color: ParentPortalColors.of(context).navy,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -401,7 +415,7 @@ class LatestUpdateCard extends StatelessWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: ParentPortalColors.muted,
+                            color: ParentPortalColors.of(context).muted,
                           ),
                         ),
                       if (update.metadata != null)
@@ -410,7 +424,7 @@ class LatestUpdateCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: ParentPortalColors.muted,
+                            color: ParentPortalColors.of(context).muted,
                           ),
                         ),
                     ],

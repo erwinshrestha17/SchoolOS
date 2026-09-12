@@ -9,12 +9,14 @@ class AppBottomNavigationItem {
     required this.label,
     required this.icon,
     required this.selectedIcon,
+    this.wrappedLabel,
     this.badgeCount,
   });
 
   final String label;
   final IconData icon;
   final IconData selectedIcon;
+  final String? wrappedLabel;
   final int? badgeCount;
 }
 
@@ -44,6 +46,8 @@ class AppBottomNavigation extends StatelessWidget {
     final safeIndex = selectedIndex.clamp(0, items.length - 1);
     final compact = MediaQuery.sizeOf(context).width < 360;
     final accent = accentColor ?? semantic.primary;
+    final wrapLabels =
+        compact || MediaQuery.textScalerOf(context).scale(11) > 11;
 
     return SafeArea(
       top: false,
@@ -73,7 +77,7 @@ class AppBottomNavigation extends StatelessWidget {
             ),
             child: NavigationBar(
               selectedIndex: safeIndex,
-              height: 68,
+              height: wrapLabels ? 80 : 68,
               elevation: 0,
               labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
               onDestinationSelected: onSelected,
@@ -91,7 +95,9 @@ class AppBottomNavigation extends StatelessWidget {
                       badgeCount: item.badgeCount,
                       semanticLabel: item.label,
                     ),
-                    label: item.label,
+                    label: wrapLabels
+                        ? item.wrappedLabel ?? item.label
+                        : item.label,
                   ),
               ],
             ),
@@ -116,12 +122,12 @@ class _NavigationIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final count = badgeCount ?? 0;
-    final iconWidget = Semantics(
-      label: count > 0 ? '$semanticLabel, $count unread' : semanticLabel,
-      excludeSemantics: true,
-      child: Icon(icon),
-    );
+    final iconWidget = ExcludeSemantics(child: Icon(icon));
     if (count <= 0) return iconWidget;
-    return Badge.count(count: count, child: iconWidget);
+    return Semantics(
+      label: '$count unread',
+      excludeSemantics: true,
+      child: Badge.count(count: count, child: iconWidget),
+    );
   }
 }

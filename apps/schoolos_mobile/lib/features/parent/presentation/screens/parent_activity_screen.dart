@@ -136,7 +136,7 @@ class _ActivityContentState extends ConsumerState<_ActivityContent> {
                           if (_month != null) _activityMonthLabel(_month!),
                         ].join(' · '),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: ParentPortalColors.muted,
+                          color: ParentPortalColors.of(context).muted,
                         ),
                       ),
                     ),

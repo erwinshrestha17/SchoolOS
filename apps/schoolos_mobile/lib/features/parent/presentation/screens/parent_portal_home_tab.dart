@@ -234,7 +234,7 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
               child: Text(
                 'Choose a child',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: ParentPortalColors.navy,
+                  color: ParentPortalColors.of(context).navy,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -246,9 +246,9 @@ class _ParentPortalHomeTabState extends ConsumerState<ParentPortalHomeTab>
                 title: Text(child.name),
                 subtitle: Text(child.classSection),
                 trailing: child.id == widget.data.activeChild?.id
-                    ? const Icon(
+                    ? Icon(
                         Icons.check_circle_rounded,
-                        color: ParentPortalColors.green,
+                        color: ParentPortalColors.of(context).green,
                       )
                     : null,
               ),
@@ -293,19 +293,19 @@ class _QuickActionsRow extends StatelessWidget {
       QuickActionTile(
         icon: Icons.fact_check_outlined,
         label: 'Attendance',
-        color: ParentPortalColors.green,
+        color: ParentPortalColors.of(context).green,
         onTap: onAttendance,
       ),
       QuickActionTile(
         icon: Icons.payments_outlined,
         label: 'Fees',
-        color: ParentPortalColors.orange,
+        color: ParentPortalColors.of(context).orange,
         onTap: onFees,
       ),
       QuickActionTile(
         icon: Icons.calendar_month_outlined,
         label: 'Calendar',
-        color: ParentPortalColors.blue,
+        color: ParentPortalColors.of(context).blue,
         onTap: onCalendar,
       ),
     ];
@@ -355,20 +355,20 @@ class _NoLinkedChildView extends StatelessWidget {
       children: [
         ParentDashboardHeader(guardianName: guardianName, dateLabel: dateLabel),
         const SizedBox(height: AppSpacing.lgPlus),
-        const PortalCard(
+        PortalCard(
           padding: EdgeInsets.all(AppSpacing.xl),
           child: Column(
             children: [
               Icon(
                 Icons.family_restroom_outlined,
                 size: 44,
-                color: ParentPortalColors.muted,
+                color: ParentPortalColors.of(context).muted,
               ),
               SizedBox(height: AppSpacing.md),
               Text(
                 'No linked child',
                 style: TextStyle(
-                  color: ParentPortalColors.navy,
+                  color: ParentPortalColors.of(context).navy,
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                 ),
@@ -377,7 +377,7 @@ class _NoLinkedChildView extends StatelessWidget {
               Text(
                 'Ask the school office to confirm your guardian link. Child information stays hidden until access is active.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: ParentPortalColors.muted),
+                style: TextStyle(color: ParentPortalColors.of(context).muted),
               ),
             ],
           ),

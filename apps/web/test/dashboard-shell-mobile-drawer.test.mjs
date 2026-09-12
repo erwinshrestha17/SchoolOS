@@ -12,8 +12,10 @@ describe('mobile navigation drawer focus management', () => {
     const shell = read('components/layout/dashboard-shell.tsx');
 
     assert.match(shell, /mobileMenuButtonRef = useRef<HTMLButtonElement>\(null\)/);
-    assert.match(shell, /function closeMobileNavigation\(\)/);
-    assert.match(shell, /mobileMenuButtonRef\.current\?\.focus\(\)/);
+    assert.match(shell, /closeMobileNavigation = useCallback/);
+    assert.match(shell, /requestAnimationFrame/);
+    assert.match(shell, /trigger\?\.getClientRects\(\)\.length/);
+    assert.match(shell, /trigger\.focus\(\)/);
     assert.match(shell, /mobileMenuButtonRef=\{mobileMenuButtonRef\}/);
   });
 

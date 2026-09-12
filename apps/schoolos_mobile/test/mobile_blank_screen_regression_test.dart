@@ -295,7 +295,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Principal Today'), findsOneWidget);
+    expect(find.text('School overview'), findsOneWidget);
     expect(find.text('Attendance Risk'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -408,7 +408,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Principal Today'), findsOneWidget);
+      expect(find.text('School overview'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

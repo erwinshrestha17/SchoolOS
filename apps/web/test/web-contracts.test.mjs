@@ -840,7 +840,7 @@ describe('SchoolOS web production contracts', () => {
     for (const expected of [
       'LoginForm',
       'Staff & Admin Portal',
-      'secure cookies',
+      'credentials provided by your administrator',
       'school-level data isolation',
       'LockKeyhole',
       'ShieldCheck',

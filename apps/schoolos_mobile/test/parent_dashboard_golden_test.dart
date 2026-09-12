@@ -2,9 +2,9 @@
 library;
 
 import 'dart:io';
+import 'support/golden_fonts.dart';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,11 +19,9 @@ import 'package:schoolos_mobile/shared/widgets/school_os_app_shell.dart';
 /// Visual pins for the parent Today dashboard.
 ///
 /// Typeface: the app's own bundled Inter, loaded straight out of
-/// `assets/fonts/`. The older parent-timetable golden pins Apple's system
-/// SFNS instead, which is why it can only run on macOS - and it also means
-/// that golden shows a typeface the app never ships. Loading the real family
-/// removes the host dependency *and* makes the baseline show what a parent
-/// actually sees. Inter and Noto Sans Devanagari are already committed under
+/// `assets/fonts/`, shared with the timetable and filter-sheet goldens.
+/// Loading the real family makes the baseline show what a parent actually
+/// sees. Inter and Noto Sans Devanagari are already committed under
 /// SIL OFL 1.1; nothing new is vendored here.
 ///
 /// Host: these run wherever the bundled font loads, but the baselines are
@@ -38,20 +36,7 @@ import 'package:schoolos_mobile/shared/widgets/school_os_app_shell.dart';
 /// Regenerate with
 /// `flutter test --update-goldens test/parent_dashboard_golden_test.dart`.
 void main() {
-  setUpAll(() async {
-    // Weight variants register under one family; Flutter selects between them
-    // from each file's own weight metadata, so w400-w800 all resolve.
-    await _loadFont('Inter', [
-      'assets/fonts/Inter-Regular.ttf',
-      'assets/fonts/Inter-Medium.ttf',
-      'assets/fonts/Inter-SemiBold.ttf',
-      'assets/fonts/Inter-Bold.ttf',
-    ]);
-    // Written by the test runner into build/ before any test executes.
-    await _loadFont('MaterialIcons', [
-      'build/unit_test_assets/fonts/MaterialIcons-Regular.otf',
-    ]);
-  });
+  setUpAll(loadAppGoldenFonts);
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -60,6 +45,7 @@ void main() {
     ParentPortalData data, {
     required Size size,
     double textScale = 1.0,
+    bool dark = false,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -70,19 +56,17 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           debugShowCheckedModeBanner: false,
-          theme: _goldenTheme,
+          theme: dark ? AppTheme.dark : _goldenTheme,
           home: MediaQuery(
-            data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+            data: MediaQueryData(
+              size: size,
+              textScaler: TextScaler.linear(textScale),
+            ),
             child: Scaffold(
-              backgroundColor: ParentPortalColors.page,
               appBar: AppBar(
-                backgroundColor: ParentPortalColors.page,
                 title: const Text(
                   'Today',
-                  style: TextStyle(
-                    color: ParentPortalColors.navy,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.w900),
                 ),
                 actions: const [
                   Icon(Icons.notifications_none_rounded),
@@ -113,6 +97,19 @@ void main() {
     await expectLater(
       find.byType(Scaffold).first,
       matchesGoldenFile('goldens/parent_dashboard_standard_phone.png'),
+    );
+  });
+
+  testWidgets('dark phone', (tester) async {
+    await pumpDashboard(
+      tester,
+      _fullData(),
+      size: const Size(390, 1500),
+      dark: true,
+    );
+    await expectLater(
+      find.byType(Scaffold).first,
+      matchesGoldenFile('goldens/parent_dashboard_dark_phone.png'),
     );
   });
 
@@ -352,21 +349,4 @@ ParentPortalHomework _homework({
     attachmentCount: 0,
     teacher: 'Assigned by school',
   );
-}
-
-Future<void> _loadFont(String family, List<String> paths) async {
-  final loader = FontLoader(family);
-  for (final path in paths) {
-    final file = File(path);
-    if (!file.existsSync()) {
-      throw StateError(
-        'Golden font missing: $path. Run `flutter test` from '
-        'apps/schoolos_mobile so relative asset paths resolve.',
-      );
-    }
-    loader.addFont(
-      file.readAsBytes().then((bytes) => ByteData.sublistView(bytes)),
-    );
-  }
-  await loader.load();
 }

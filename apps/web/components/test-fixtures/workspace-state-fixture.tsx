@@ -20,6 +20,11 @@ import { ModuleHeader } from '@/components/ui/module-header';
 import { ModuleLockedState } from '@/components/ui/module-locked-state';
 import { PermissionDenied } from '@/components/ui/permission-denied';
 import { WorkSurface } from '@/components/ui/work-surface';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { FormField, Input } from '@/components/ui/form-field';
+import { DataTable } from '@/components/ui/data-table';
+import { PaginatedDataTable } from '@/components/schoolos/data/paginated-data-table';
 import {
   FileUnavailableState,
   NoResultsState,
@@ -43,6 +48,10 @@ type FixtureState = (typeof fixtureStates)[number]['value'];
 export function WorkspaceStateFixture() {
   const [state, setState] = useState<FixtureState>('loading');
   const [lastAction, setLastAction] = useState('No fixture action run.');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [reason, setReason] = useState('');
+  const [validated, setValidated] = useState(false);
 
   return (
     <DashboardPageShell>
@@ -70,6 +79,43 @@ export function WorkspaceStateFixture() {
           onAction={(message) => setLastAction(message)}
         />
       </WorkSurface>
+      <WorkSurface title="Shared interaction fixtures" description="Local UI state only; these controls do not submit school records.">
+        <div className="space-y-4 p-4">
+          <Button onClick={() => { setDialogOpen(true); setValidated(false); }}>Open fixture confirmation</Button>
+          <p role="status" aria-label="Fixture result">{lastAction}</p>
+          <DataTable
+            columns={[{ header: 'Fixture record', accessorKey: 'name' }]}
+            data={[{ id: 'alpha', name: 'Fixture Alpha' }]}
+            getRowActionLabel={(row) => `Open ${row.name}`}
+            onRowClick={() => setLastAction('Alpha opened by row action.')}
+          />
+          <PaginatedDataTable
+            columns={[{ id: 'name', header: 'Fixture record', cell: (row: { id: string; name: string }) => row.name }]}
+            items={[{ id: 'beta', name: 'Fixture Beta' }]}
+            getRowId={(row) => row.id}
+            page={1} pageSize={10} totalItems={1} onPageChange={() => {}}
+            getRowActionLabel={(row) => `Open ${row.name}`}
+            onRowClick={() => setLastAction('Beta opened by row action.')}
+          />
+        </div>
+      </WorkSurface>
+      <ConfirmDialog
+        isOpen={dialogOpen}
+        title="Confirm fixture action"
+        description="Test focus, validation and pending state without changing a school record."
+        confirmLabel="Start fixture action"
+        isConfirming={pending}
+        preventCloseWhileConfirming
+        onClose={() => setDialogOpen(false)}
+        onConfirm={() => { setValidated(true); if (reason.trim()) setPending(true); }}
+      >
+        <div className="space-y-4 p-5">
+          <FormField label="Fixture reason" description="Enter a reason to test the pending state." error={validated && !reason.trim() ? 'Enter a fixture reason.' : undefined}>
+            <Input required value={reason} onChange={(event) => setReason(event.target.value)} />
+          </FormField>
+          {pending ? <Button onClick={() => { setPending(false); setDialogOpen(false); setLastAction('Fixture action completed.'); }}>Complete fixture action</Button> : null}
+        </div>
+      </ConfirmDialog>
     </DashboardPageShell>
   );
 }

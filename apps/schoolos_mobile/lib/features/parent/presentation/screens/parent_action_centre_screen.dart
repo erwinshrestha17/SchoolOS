@@ -57,7 +57,7 @@ class _ParentActionCentreScreenState
               Text(
                 'Reconnect to view current actions',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: ParentPortalColors.navy,
+                  color: ParentPortalColors.of(context).navy,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -165,7 +165,7 @@ class _ActionCentreContent extends StatelessWidget {
                   Text(
                     NepaliBsCalendar.formatBsDateTime(data.generatedAt),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: ParentPortalColors.muted,
+                      color: ParentPortalColors.of(context).muted,
                     ),
                   ),
                 ],
@@ -175,7 +175,7 @@ class _ActionCentreContent extends StatelessWidget {
                 '${data.summary.visibleActionCount} visible '
                 '${data.summary.visibleActionCount == 1 ? 'action' : 'actions'}',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: ParentPortalColors.navy,
+                  color: ParentPortalColors.of(context).navy,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -183,8 +183,8 @@ class _ActionCentreContent extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '${data.summary.urgentCount} marked urgent',
-                  style: const TextStyle(
-                    color: ParentPortalColors.red,
+                  style: TextStyle(
+                    color: ParentPortalColors.of(context).red,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -206,11 +206,14 @@ class _ActionCentreContent extends StatelessWidget {
         const ParentSectionHeader(title: 'Needs attention'),
         const SizedBox(height: 10),
         if (data.items.isEmpty)
-          const PortalCard(
+          PortalCard(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.task_alt_rounded, color: ParentPortalColors.green),
+                Icon(
+                  Icons.task_alt_rounded,
+                  color: ParentPortalColors.of(context).green,
+                ),
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -265,15 +268,15 @@ class _ScopeSelector extends StatelessWidget {
               children: [
                 Text(
                   selected?.name ?? 'All linked children',
-                  style: const TextStyle(
-                    color: ParentPortalColors.navy,
+                  style: TextStyle(
+                    color: ParentPortalColors.of(context).navy,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 Text(
                   selected?.classSection ??
                       'Tasks across ${children.length} linked ${children.length == 1 ? 'child' : 'children'}',
-                  style: const TextStyle(color: ParentPortalColors.muted),
+                  style: TextStyle(color: ParentPortalColors.of(context).muted),
                 ),
               ],
             ),
@@ -319,8 +322,8 @@ class _ActionCard extends StatelessWidget {
               FeatureIcon(
                 _sourceIcon(item.source),
                 color: item.isUrgent
-                    ? ParentPortalColors.red
-                    : ParentPortalColors.purple,
+                    ? ParentPortalColors.of(context).red
+                    : ParentPortalColors.of(context).purple,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -330,7 +333,7 @@ class _ActionCard extends StatelessWidget {
                     Text(
                       item.title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: ParentPortalColors.navy,
+                        color: ParentPortalColors.of(context).navy,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -398,7 +401,7 @@ class _SourceCoverageCard extends StatelessWidget {
           Text(
             'Coverage',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w900,
             ),
           ),

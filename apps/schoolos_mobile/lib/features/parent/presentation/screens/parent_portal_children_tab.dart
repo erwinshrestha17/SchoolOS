@@ -22,21 +22,23 @@ class ParentPortalChildrenTab extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
       children: [
         PortalCard(
-          color: ParentPortalColors.greenSoft,
-          borderColor: ParentPortalColors.green.withValues(alpha: .24),
+          color: ParentPortalColors.of(context).greenSoft,
+          borderColor: ParentPortalColors.of(
+            context,
+          ).green.withValues(alpha: .24),
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               Container(
                 width: 44,
                 height: 44,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
+                decoration: BoxDecoration(
+                  color: ParentPortalColors.of(context).surface,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.family_restroom_rounded,
-                  color: ParentPortalColors.green,
+                  color: ParentPortalColors.of(context).green,
                 ),
               ),
               const SizedBox(width: 12),
@@ -47,14 +49,14 @@ class ParentPortalChildrenTab extends StatelessWidget {
                     Text(
                       '$linkedCount linked ${linkedCount == 1 ? 'child' : 'children'}',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: ParentPortalColors.navy,
+                        color: ParentPortalColors.of(context).navy,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     Text(
                       data.schoolName,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: ParentPortalColors.muted,
+                        color: ParentPortalColors.of(context).muted,
                       ),
                     ),
                     const SizedBox(height: 6),

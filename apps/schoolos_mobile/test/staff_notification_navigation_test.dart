@@ -37,28 +37,35 @@ void main() {
     }
   });
 
-  group('the teacher greeting follows the clock', () {
+  group('the teacher greeting follows the Nepal school clock', () {
+    DateTime schoolTime(int hour, [int minute = 0]) => DateTime.utc(
+      2026,
+      7,
+      25,
+      hour,
+      minute,
+    ).subtract(const Duration(hours: 5, minutes: 45));
     test('morning', () {
-      expect(teacherGreeting(DateTime(2026, 7, 25, 7, 30)), 'Good morning');
-      expect(teacherGreeting(DateTime(2026, 7, 25, 11, 59)), 'Good morning');
+      expect(teacherGreeting(schoolTime(7, 30)), 'Good morning');
+      expect(teacherGreeting(schoolTime(11, 59)), 'Good morning');
     });
 
     test('afternoon', () {
-      expect(teacherGreeting(DateTime(2026, 7, 25, 12)), 'Good afternoon');
-      expect(teacherGreeting(DateTime(2026, 7, 25, 16, 59)), 'Good afternoon');
+      expect(teacherGreeting(schoolTime(12)), 'Good afternoon');
+      expect(teacherGreeting(schoolTime(16, 59)), 'Good afternoon');
     });
 
     test('evening', () {
-      expect(teacherGreeting(DateTime(2026, 7, 25, 17)), 'Good evening');
+      expect(teacherGreeting(schoolTime(17)), 'Good evening');
       // The reading that exposed this: a teacher opening the app at 9:50pm.
-      expect(teacherGreeting(DateTime(2026, 7, 25, 21, 50)), 'Good evening');
-      expect(teacherGreeting(DateTime(2026, 7, 25, 23, 59)), 'Good evening');
+      expect(teacherGreeting(schoolTime(21, 50)), 'Good evening');
+      expect(teacherGreeting(schoolTime(23, 59)), 'Good evening');
     });
 
     test('covers every hour of the day', () {
       for (var hour = 0; hour < 24; hour++) {
         expect(
-          teacherGreeting(DateTime(2026, 7, 25, hour)),
+          teacherGreeting(schoolTime(hour)),
           isNotEmpty,
           reason: 'hour $hour must produce a greeting',
         );

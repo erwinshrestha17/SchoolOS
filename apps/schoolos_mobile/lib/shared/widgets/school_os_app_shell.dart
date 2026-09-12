@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/constants/app_routes.dart';
-import '../../app/theme/app_colors.dart';
 import '../../app/theme/app_semantic_colors.dart';
 import '../../features/parent/application/parent_dashboard_view_model.dart';
 import '../../features/parent/application/parent_portal_providers.dart';
@@ -127,7 +126,7 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
           icon: Badge.count(
             count: unread,
             isLabelVisible: unread > 0,
-            backgroundColor: AppColors.parentAccent,
+            backgroundColor: semantic.primary,
             child: const Icon(Icons.notifications_none_rounded),
           ),
         ),
@@ -137,6 +136,7 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
             button: true,
             label: 'Profile',
             excludeSemantics: true,
+            onTap: () => context.push(AppRoutes.profile),
             child: InkWell(
               onTap: () => context.push(AppRoutes.profile),
               borderRadius: BorderRadius.circular(999),
@@ -147,7 +147,7 @@ class AppTopBar extends ConsumerWidget implements PreferredSizeWidget {
                   child: AvatarInitials(
                     name: parentName,
                     radius: 18,
-                    color: AppColors.parentAccent,
+                    color: semantic.primary,
                   ),
                 ),
               ),
@@ -186,6 +186,7 @@ class SchoolOsBottomNavigation extends StatelessWidget {
     ),
     AppBottomNavigationItem(
       label: 'Schoolwork',
+      wrappedLabel: 'School\nwork',
       icon: Icons.menu_book_outlined,
       selectedIcon: Icons.menu_book_rounded,
     ),
@@ -205,7 +206,6 @@ class SchoolOsBottomNavigation extends StatelessWidget {
   Widget build(BuildContext context) => AppBottomNavigation(
     items: items,
     selectedIndex: selectedIndex,
-    accentColor: AppColors.parentAccent,
     onSelected: onSelected,
   );
 }

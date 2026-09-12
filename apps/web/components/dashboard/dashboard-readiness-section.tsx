@@ -53,8 +53,8 @@ type ReadinessPanelDefinition = {
  * Three bounded readiness panels below the first viewport. Rows appear only
  * when the backend reports a real non-zero exception; a panel whose modules
  * are all clean says so instead of decorating the page with zeros, and a
- * panel whose modules the session cannot see says that instead of hiding
- * the gap.
+ * panel outside the session's scope is omitted. Missing or partial source
+ * data remains explicitly unavailable and is never presented as a clean bill.
  */
 const READINESS_PANELS: ReadinessPanelDefinition[] = [
   {
@@ -196,7 +196,7 @@ export function SchoolReadinessSection({
 
   return (
     <section aria-label="School readiness">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-[repeat(auto-fit,minmax(min(100%,14rem),1fr))]">
         {READINESS_PANELS.filter((panel) =>
           shouldShowReadinessPanel(panel.key, persona),
         ).map((panel) => (
@@ -228,20 +228,24 @@ function ReadinessPanel({
     (row) => persona !== "principal" || PRINCIPAL_READINESS_MODULES.has(row.module),
   );
   const sourceModules = [...new Set(panelRows.map((row) => row.module))];
+  const sourceIsHidden = (summary: OperationalModuleSummary | undefined) =>
+    summary !== undefined &&
+    (summary.status === "locked" || summary.status === "permissionDenied" || !summary.permissions.canView);
+  if (sourceModules.every((module) => sourceIsHidden(moduleMap.get(module)))) return null;
   const visibleModules = sourceModules
     .map((module) => moduleMap.get(module))
     .filter(
       (summary): summary is OperationalModuleSummary =>
-        summary !== undefined && summary.status !== "locked",
+        summary !== undefined && !sourceIsHidden(summary),
     );
-  const hasPartialSource = visibleModules.some(
+  const hasPartialSource = sourceModules.some((module) => !moduleMap.has(module)) || visibleModules.some(
     (summary) => summary.status === "partial",
   );
 
   const rows: ReadinessRow[] = panelRows
     .map((definition) => {
       const summary = moduleMap.get(definition.module);
-      if (!summary || summary.status === "locked") return null;
+      if (!summary || sourceIsHidden(summary)) return null;
       const count = metricNumber(summary, definition.metricKey);
       if (count === null || count <= 0) return null;
       return {
@@ -265,7 +269,7 @@ function ReadinessPanel({
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <h3 className="text-sm font-bold text-slate-950">{panel.title}</h3>
         {panel.key === "academic" && canViewTimetable ? (
           <Link
@@ -277,9 +281,9 @@ function ReadinessPanel({
         ) : null}
       </div>
 
-      {visibleModules.length === 0 ? (
+      {visibleModules.length === 0 || (hasPartialSource && rows.length === 0) ? (
         <p className="mt-3 text-sm leading-5 text-slate-600">
-          You do not have permission to view this summary.
+          This summary is temporarily unavailable.
         </p>
       ) : rows.length ? (
         <ul className="mt-3 space-y-1.5">
@@ -308,7 +312,7 @@ function ReadinessPanel({
         </p>
       ) : null}
 
-      {hasPartialSource ? (
+      {hasPartialSource && rows.length > 0 ? (
         <p className="mt-2 text-xs font-medium text-slate-500">
           Some information is temporarily unavailable.
         </p>

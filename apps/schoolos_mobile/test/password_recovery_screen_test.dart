@@ -559,7 +559,7 @@ void main() {
     'login passes the exact password, including leading and trailing spaces',
     (tester) async {
       await pump(tester, login: true);
-      await tester.enterText(field('Tenant code'), 'synthetic-school');
+      await tester.enterText(field('School code'), 'synthetic-school');
       await tester.enterText(
         field('Email or username'),
         'parent@example.invalid',

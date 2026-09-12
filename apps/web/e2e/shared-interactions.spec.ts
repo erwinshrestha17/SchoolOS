@@ -1,0 +1,58 @@
+import { test, expect } from './fixtures/auth';
+
+test('compact navigation traps focus, restores it and releases the desktop workspace', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.goto('/dashboard');
+  const trigger = page.getByRole('button', { name: 'Open navigation menu' });
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'School operations navigation' });
+  await expect(dialog).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open navigation menu', includeHidden: true })).toHaveAttribute('aria-expanded', 'true');
+  await page.keyboard.press('Shift+Tab');
+  await expect.poll(() => dialog.evaluate((node) => node.contains(document.activeElement))).toBe(true);
+  await dialog.getByRole('textbox', { name: 'Find a workspace' }).fill('zzzz-no-match');
+  await expect(dialog.getByText(/No workspace matches/)).toBeVisible();
+  await dialog.getByRole('button', { name: 'Clear search' }).click();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(dialog).toBeHidden();
+  await page.getByRole('button', { name: 'User profile menu' }).click();
+  await expect(page.getByRole('menu')).toBeVisible();
+});
+
+test('shared modal, field and table interactions work with the keyboard', async ({ page }) => {
+  test.skip(process.env.SCHOOLOS_VISUAL_FIXTURES !== '1', 'Requires the authenticated, opt-in visual fixture route.');
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/dashboard/visual-fixtures/workspace-states');
+  const trigger = page.getByRole('button', { name: 'Open fixture confirmation' });
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Confirm fixture action' });
+  await expect(dialog).toBeVisible();
+  const reason = dialog.getByRole('textbox', { name: 'Fixture reason' });
+  await expect(reason).toBeFocused();
+  await dialog.getByRole('button', { name: 'Start fixture action' }).click();
+  await expect(reason).toHaveAttribute('aria-invalid', 'true');
+  await expect(reason).toHaveAccessibleDescription('Enter a fixture reason.');
+  await reason.fill('Keyboard verification');
+  await dialog.getByRole('button', { name: 'Start fixture action' }).click();
+  await expect(dialog).toHaveAttribute('aria-busy', 'true');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+  await page.mouse.click(5, 5);
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Complete fixture action' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await page.getByRole('button', { name: 'Open Fixture Alpha' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('status', { name: 'Fixture result' })).toContainText('Alpha opened by row action.');
+  await page.getByRole('button', { name: 'Open Fixture Beta' }).focus();
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('status', { name: 'Fixture result' })).toContainText('Beta opened by row action.');
+  expect(errors).toEqual([]);
+});

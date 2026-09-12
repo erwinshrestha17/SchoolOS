@@ -47,7 +47,7 @@ class _OfflineBody extends StatelessWidget {
               Text(
                 'Reconnect to view current weekly progress',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: ParentPortalColors.navy,
+                  color: ParentPortalColors.of(context).navy,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -210,7 +210,7 @@ class _PeriodCard extends StatelessWidget {
               Text(
                 NepaliBsCalendar.formatBsDateTime(data.generatedAt),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: ParentPortalColors.muted,
+                  color: ParentPortalColors.of(context).muted,
                 ),
               ),
             ],
@@ -219,7 +219,7 @@ class _PeriodCard extends StatelessWidget {
           Text(
             '${data.student.name} • ${data.student.classSection}',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -227,8 +227,8 @@ class _PeriodCard extends StatelessWidget {
           Text(
             'BS: ${NepaliBsCalendar.formatBsDate(data.period.startAt)} to '
             '${NepaliBsCalendar.formatBsDate(data.period.endAt)}',
-            style: const TextStyle(
-              color: ParentPortalColors.muted,
+            style: TextStyle(
+              color: ParentPortalColors.of(context).muted,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -266,9 +266,9 @@ class _AttendanceCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FeatureIcon(
+          FeatureIcon(
             Icons.fact_check_outlined,
-            color: ParentPortalColors.blue,
+            color: ParentPortalColors.of(context).blue,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -278,8 +278,8 @@ class _AttendanceCard extends StatelessWidget {
                 Text(
                   '${_percent(attendance.attendanceRate)} attendance across '
                   '${attendance.recordedDays} recorded ${attendance.recordedDays == 1 ? 'day' : 'days'}',
-                  style: const TextStyle(
-                    color: ParentPortalColors.navy,
+                  style: TextStyle(
+                    color: ParentPortalColors.of(context).navy,
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
                   ),
@@ -322,9 +322,9 @@ class _HomeworkCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FeatureIcon(
+          FeatureIcon(
             Icons.menu_book_outlined,
-            color: ParentPortalColors.purple,
+            color: ParentPortalColors.of(context).purple,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -333,8 +333,8 @@ class _HomeworkCard extends StatelessWidget {
               children: [
                 Text(
                   '${homework.completedCount} of ${homework.requiredCount} completed',
-                  style: const TextStyle(
-                    color: ParentPortalColors.navy,
+                  style: TextStyle(
+                    color: ParentPortalColors.of(context).navy,
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
                   ),
@@ -381,9 +381,9 @@ class _AcademicTrendCard extends StatelessWidget {
       _ => 'Stable',
     };
     final directionColor = switch (trend.direction) {
-      'IMPROVED' => ParentPortalColors.green,
-      'DECLINED' => ParentPortalColors.orange,
-      _ => ParentPortalColors.blue,
+      'IMPROVED' => ParentPortalColors.of(context).green,
+      'DECLINED' => ParentPortalColors.of(context).orange,
+      _ => ParentPortalColors.of(context).blue,
     };
     return PortalCard(
       child: Column(
@@ -396,8 +396,8 @@ class _AcademicTrendCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   '$directionLabel by ${_points(trend.changePoints)} percentage points',
-                  style: const TextStyle(
-                    color: ParentPortalColors.navy,
+                  style: TextStyle(
+                    color: ParentPortalColors.of(context).navy,
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
                   ),
@@ -411,9 +411,9 @@ class _AcademicTrendCard extends StatelessWidget {
             '${current.termName}: ${_percent(current.percentage)}',
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Shown only because both published results use the same academic year and subject mark structure.',
-            style: TextStyle(color: ParentPortalColors.muted),
+            style: TextStyle(color: ParentPortalColors.of(context).muted),
           ),
         ],
       ),
@@ -447,9 +447,9 @@ class _TeacherComments extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const FeatureIcon(
+                    FeatureIcon(
                       Icons.chat_bubble_outline_rounded,
-                      color: ParentPortalColors.green,
+                      color: ParentPortalColors.of(context).green,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -458,15 +458,15 @@ class _TeacherComments extends StatelessWidget {
                         children: [
                           Text(
                             comment.subject,
-                            style: const TextStyle(
-                              color: ParentPortalColors.navy,
+                            style: TextStyle(
+                              color: ParentPortalColors.of(context).navy,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
                           Text(
                             comment.title,
-                            style: const TextStyle(
-                              color: ParentPortalColors.muted,
+                            style: TextStyle(
+                              color: ParentPortalColors.of(context).muted,
                             ),
                           ),
                         ],
@@ -474,8 +474,8 @@ class _TeacherComments extends StatelessWidget {
                     ),
                     Text(
                       NepaliBsCalendar.formatBsDate(comment.sharedAt),
-                      style: const TextStyle(
-                        color: ParentPortalColors.muted,
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).muted,
                         fontSize: 12,
                       ),
                     ),
@@ -567,8 +567,8 @@ class _ActionCard extends StatelessWidget {
                     ? Icons.priority_high_rounded
                     : Icons.event_note_rounded,
                 color: item.isUrgent
-                    ? ParentPortalColors.red
-                    : ParentPortalColors.blue,
+                    ? ParentPortalColors.of(context).red
+                    : ParentPortalColors.of(context).blue,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -577,8 +577,8 @@ class _ActionCard extends StatelessWidget {
                   children: [
                     Text(
                       item.title,
-                      style: const TextStyle(
-                        color: ParentPortalColors.navy,
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).navy,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -591,8 +591,8 @@ class _ActionCard extends StatelessWidget {
                         '${NepaliBsCalendar.formatBsDate(item.dueAt!)}',
                         style: TextStyle(
                           color: item.isOverdue
-                              ? ParentPortalColors.red
-                              : ParentPortalColors.muted,
+                              ? ParentPortalColors.of(context).red
+                              : ParentPortalColors.of(context).muted,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -626,14 +626,14 @@ class _SourceCoverageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PortalCard(
-      color: ParentPortalColors.surfaceAlt,
+      color: ParentPortalColors.of(context).surfaceAlt,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Coverage note',
             style: TextStyle(
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -664,7 +664,7 @@ class _UnavailableSection extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FeatureIcon(icon, color: ParentPortalColors.muted),
+          FeatureIcon(icon, color: ParentPortalColors.of(context).muted),
           const SizedBox(width: 12),
           Expanded(child: Text(message)),
         ],

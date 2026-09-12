@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../shared/widgets/app_button.dart';
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../application/parent_dashboard_view_model.dart';
@@ -47,7 +48,7 @@ class ParentDashboardHeader extends StatelessWidget {
         Text(
           greeting,
           style: theme.textTheme.headlineMedium?.copyWith(
-            color: ParentPortalColors.navy,
+            color: ParentPortalColors.of(context).navy,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -55,7 +56,7 @@ class ParentDashboardHeader extends StatelessWidget {
         Text(
           dateLabel,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: ParentPortalColors.muted,
+            color: ParentPortalColors.of(context).muted,
           ),
         ),
         if (isStale) ...[
@@ -90,6 +91,7 @@ class ActiveChildContextCard extends StatelessWidget {
           ? 'Viewing ${child.name}. Double tap to switch child.'
           : 'Viewing ${child.name}.',
       excludeSemantics: true,
+      onTap: canSwitch ? onTap : null,
       child: PortalCard(
         onTap: canSwitch ? onTap : null,
         padding: const EdgeInsets.symmetric(
@@ -107,14 +109,14 @@ class ActiveChildContextCard extends StatelessWidget {
                   Text(
                     'Viewing',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: ParentPortalColors.muted,
+                      color: ParentPortalColors.of(context).muted,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   Text(
                     child.name,
                     style: theme.textTheme.titleSmall?.copyWith(
-                      color: ParentPortalColors.navy,
+                      color: ParentPortalColors.of(context).navy,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -123,7 +125,7 @@ class ActiveChildContextCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: ParentPortalColors.muted,
+                      color: ParentPortalColors.of(context).muted,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xs),
@@ -136,9 +138,9 @@ class ActiveChildContextCard extends StatelessWidget {
             ),
             if (canSwitch) ...[
               const SizedBox(width: AppSpacing.sm),
-              const Icon(
+              Icon(
                 Icons.keyboard_arrow_down_rounded,
-                color: ParentPortalColors.green,
+                color: ParentPortalColors.of(context).green,
               ),
             ],
           ],
@@ -167,23 +169,23 @@ class _StaleDataChip extends StatelessWidget {
         vertical: 6,
       ),
       decoration: BoxDecoration(
-        color: ParentPortalColors.surfaceAlt,
+        color: ParentPortalColors.of(context).surfaceAlt,
         borderRadius: AppRadius.borderRadiusMax,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.cloud_off_rounded,
             size: 14,
-            color: ParentPortalColors.muted,
+            color: ParentPortalColors.of(context).muted,
           ),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
               label,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: ParentPortalColors.muted,
+                color: ParentPortalColors.of(context).muted,
               ),
             ),
           ),
@@ -216,7 +218,7 @@ class DashboardSectionHeader extends StatelessWidget {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -225,7 +227,7 @@ class DashboardSectionHeader extends StatelessWidget {
           TextButton(
             onPressed: onAction,
             style: TextButton.styleFrom(
-              foregroundColor: ParentPortalColors.green,
+              foregroundColor: ParentPortalColors.of(context).green,
               // 44x44 minimum target without letting the label crowd the title.
               minimumSize: const Size(44, 44),
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
@@ -278,25 +280,27 @@ class PriorityAttentionCard extends StatelessWidget {
     return Semantics(
       container: true,
       child: PortalCard(
-        color: ParentPortalColors.orangeSoft,
-        borderColor: ParentPortalColors.orange.withValues(alpha: .35),
+        color: ParentPortalColors.of(context).orangeSoft,
+        borderColor: ParentPortalColors.of(
+          context,
+        ).orange.withValues(alpha: .35),
         padding: const EdgeInsets.all(AppSpacing.lgPlus),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.error_outline_rounded,
                   size: 17,
-                  color: ParentPortalColors.orange,
+                  color: ParentPortalColors.of(context).orange,
                 ),
                 const SizedBox(width: AppSpacing.xs),
                 Flexible(
                   child: Text(
                     'NEEDS YOUR ATTENTION',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: ParentPortalColors.orange,
+                      color: ParentPortalColors.of(context).orange,
                       fontWeight: FontWeight.w800,
                       letterSpacing: .6,
                     ),
@@ -351,7 +355,7 @@ class PriorityAttentionCard extends StatelessWidget {
                     ? '1 more item needs your attention'
                     : '$otherCount more items need your attention',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: ParentPortalColors.muted,
+                  color: ParentPortalColors.of(context).muted,
                 ),
               ),
             ],
@@ -381,14 +385,14 @@ class _PrioritySummary extends StatelessWidget {
         Icon(
           ParentDashboardTokens.priorityIcon(action.kind),
           size: 20,
-          color: ParentPortalColors.orange,
+          color: ParentPortalColors.of(context).orange,
         ),
         const SizedBox(width: AppSpacing.sm),
         Flexible(
           child: Text(
             action.summary,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -411,43 +415,11 @@ class _ReviewButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton(
-      onPressed: isBusy ? null : onPressed,
-      style: FilledButton.styleFrom(
-        backgroundColor: ParentPortalColors.orange,
-        foregroundColor: Colors.white,
-        disabledBackgroundColor: ParentPortalColors.orange.withValues(
-          alpha: .45,
-        ),
-        disabledForegroundColor: Colors.white,
-        minimumSize: const Size(44, 44),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.md,
-        ),
-        shape: const StadiumBorder(),
-      ),
-      child: isBusy
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          // Flexible so the label wraps inside the button at a large text
-          // scale rather than pushing the chevron off a 320dp screen. The
-          // words stay whole - a truncated "Review no…" is worse than two
-          // lines.
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(child: Text(label, textAlign: TextAlign.center)),
-                const SizedBox(width: AppSpacing.xs),
-                const Icon(Icons.chevron_right_rounded, size: 18),
-              ],
-            ),
+    return AppButton(
+      label: label,
+      onPressed: onPressed,
+      isLoading: isBusy,
+      fullWidth: false,
     );
   }
 }
@@ -475,23 +447,24 @@ class QuickActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null && !isBusy;
-    final foreground = enabled ? color : ParentPortalColors.muted;
+    final foreground = enabled ? color : ParentPortalColors.of(context).muted;
 
     return Semantics(
       button: true,
       enabled: enabled,
       label: label,
       excludeSemantics: true,
+      onTap: enabled ? onTap : null,
       child: Material(
         color: enabled
             ? color.withValues(alpha: .08)
-            : ParentPortalColors.surfaceAlt,
+            : ParentPortalColors.of(context).surfaceAlt,
         shape: RoundedRectangleBorder(
           borderRadius: AppRadius.borderRadiusLG,
           side: BorderSide(
             color: enabled
                 ? color.withValues(alpha: .22)
-                : ParentPortalColors.border,
+                : ParentPortalColors.of(context).border,
           ),
         ),
         clipBehavior: Clip.antiAlias,
@@ -509,7 +482,9 @@ class QuickActionTile extends StatelessWidget {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: enabled ? Colors.white : Colors.transparent,
+                    color: enabled
+                        ? ParentPortalColors.of(context).surface
+                        : Colors.transparent,
                     borderRadius: AppRadius.borderRadiusMD,
                   ),
                   child: isBusy
@@ -528,8 +503,8 @@ class QuickActionTile extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: enabled
-                          ? ParentPortalColors.navy
-                          : ParentPortalColors.muted,
+                          ? ParentPortalColors.of(context).navy
+                          : ParentPortalColors.of(context).muted,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -597,7 +572,7 @@ class _SkeletonBlock extends StatelessWidget {
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: ParentPortalColors.surfaceAlt,
+          color: ParentPortalColors.of(context).surfaceAlt,
           borderRadius: AppRadius.borderRadiusSM,
         ),
       ),
@@ -615,9 +590,9 @@ class _SkeletonCard extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ParentPortalColors.of(context).surface,
         borderRadius: AppRadius.borderRadiusXL,
-        border: Border.all(color: ParentPortalColors.border),
+        border: Border.all(color: ParentPortalColors.of(context).border),
       ),
     );
   }
@@ -642,14 +617,14 @@ class DashboardEmptyCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.lgPlus),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: ParentPortalColors.muted),
+          Icon(icon, size: 20, color: ParentPortalColors.of(context).muted),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Text(
               message,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: ParentPortalColors.muted),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: ParentPortalColors.of(context).muted,
+              ),
             ),
           ),
         ],

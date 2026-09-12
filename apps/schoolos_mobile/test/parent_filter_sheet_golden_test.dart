@@ -1,6 +1,7 @@
 @Tags(['golden'])
 library;
 
+import 'support/golden_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:schoolos_mobile/app/theme/app_theme.dart';
@@ -8,6 +9,7 @@ import 'package:schoolos_mobile/features/parent/domain/parent_portal_models.dart
 import 'package:schoolos_mobile/features/parent/presentation/screens/parent_portal_homework_tab.dart';
 
 void main() {
+  setUpAll(loadAppGoldenFonts);
   testWidgets('homework filter sheet stays polished on a compact phone', (
     tester,
   ) async {

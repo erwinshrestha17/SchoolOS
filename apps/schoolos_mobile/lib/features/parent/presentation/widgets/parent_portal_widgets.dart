@@ -5,12 +5,18 @@ import '../../../../shared/utils/nepali_bs_calendar.dart';
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_semantic_colors.dart';
 import '../../application/parent_dashboard_view_model.dart';
 import '../../domain/parent_portal_models.dart';
 import 'parent_dashboard_tokens.dart';
 
 class ParentPortalColors {
   const ParentPortalColors._();
+
+  static ParentPortalPalette of(BuildContext context) => ParentPortalPalette(
+    AppSemanticColors.of(context),
+    Theme.of(context).brightness,
+  );
 
   // `green` and `muted` carry text - the selected and unselected bottom-nav
   // labels, and most secondary copy in the portal. At their previous values
@@ -26,13 +32,65 @@ class ParentPortalColors {
   static const purpleSoft = Color(0xFFF2EDFF);
   static const blue = Color(0xFF377DDF);
   static const blueSoft = Color(0xFFEDF5FF);
-  static const orange = Color(0xFFF28A3A);
+  static const orange = Color(0xFF925B0B);
   static const orangeSoft = Color(0xFFFFF2E8);
   static const red = Color(0xFFD64545);
   static const redSoft = Color(0xFFFFEEEE);
   static const surfaceAlt = Color(0xFFF1F4F8);
   static const page = Color(0xFFF6F8FB);
   static const border = Color(0xFFE6EBF1);
+}
+
+/// Parent surfaces use the same semantic roles as Teacher and Principal.
+/// Legacy constant defaults are resolved here at paint time; the active theme
+/// is always read from the widget context, so changing theme invalidates them.
+class ParentPortalPalette {
+  const ParentPortalPalette(this.semantic, this.brightness);
+  final AppSemanticColors semantic;
+  final Brightness brightness;
+  bool get isDark => brightness == Brightness.dark;
+  Color get green => isDark ? semantic.success : ParentPortalColors.green;
+  Color get navy => semantic.textPrimary;
+  Color get muted => semantic.textSecondary;
+  Color get purple =>
+      isDark ? const Color(0xFFC4B5FD) : const Color(0xFF6745BD);
+  Color get blue => isDark ? semantic.info : const Color(0xFF2463B4);
+  Color get orange => isDark ? semantic.warning : ParentPortalColors.orange;
+  Color get red => isDark ? semantic.error : const Color(0xFFB52E36);
+  Color get surface => semantic.surface;
+  Color get surfaceAlt => semantic.elevatedSurface;
+  Color get page => semantic.background;
+  Color get border => semantic.border;
+  Color _soft(Color tone) =>
+      Color.alphaBlend(tone.withValues(alpha: isDark ? .14 : .08), surface);
+  Color get onGreen => isDark ? semantic.background : Colors.white;
+  Color get greenSoft => _soft(green);
+  Color get purpleSoft => _soft(purple);
+  Color get blueSoft => _soft(blue);
+  Color get orangeSoft => _soft(orange);
+  Color get redSoft => _soft(red);
+
+  Color resolve(Color color) {
+    if (color == Colors.white) return surface;
+    return {
+          ParentPortalColors.green: green,
+          ParentPortalColors.greenSoft: greenSoft,
+          ParentPortalColors.navy: navy,
+          ParentPortalColors.muted: muted,
+          ParentPortalColors.purple: purple,
+          ParentPortalColors.purpleSoft: purpleSoft,
+          ParentPortalColors.blue: blue,
+          ParentPortalColors.blueSoft: blueSoft,
+          ParentPortalColors.orange: orange,
+          ParentPortalColors.orangeSoft: orangeSoft,
+          ParentPortalColors.red: red,
+          ParentPortalColors.redSoft: redSoft,
+          ParentPortalColors.surfaceAlt: surfaceAlt,
+          ParentPortalColors.page: page,
+          ParentPortalColors.border: border,
+        }[color] ??
+        color;
+  }
 }
 
 class PortalCard extends StatelessWidget {
@@ -54,10 +112,12 @@ class PortalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: color,
+      color: ParentPortalColors.of(context).resolve(color),
       shape: RoundedRectangleBorder(
         borderRadius: AppRadius.borderRadiusXL,
-        side: BorderSide(color: borderColor),
+        side: BorderSide(
+          color: ParentPortalColors.of(context).resolve(borderColor),
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -94,11 +154,14 @@ class AvatarInitials extends StatelessWidget {
         .join();
     return CircleAvatar(
       radius: radius,
-      backgroundColor: color?.withValues(alpha: .10) ?? backgroundColor,
+      backgroundColor:
+          color?.withValues(alpha: .10) ??
+          ParentPortalColors.of(context).resolve(backgroundColor),
       child: Text(
         initials,
         style: TextStyle(
-          color: color ?? foregroundColor,
+          color:
+              color ?? ParentPortalColors.of(context).resolve(foregroundColor),
           fontWeight: FontWeight.w800,
           fontSize: radius * .62,
         ),
@@ -128,14 +191,20 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: background ?? backgroundColor,
+        color: ParentPortalColors.of(
+          context,
+        ).resolve(background ?? backgroundColor),
         borderRadius: AppRadius.borderRadiusMax,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 14, color: color),
+            Icon(
+              icon,
+              size: 14,
+              color: ParentPortalColors.of(context).resolve(color),
+            ),
             const SizedBox(width: 4),
           ],
           // Flexible so a long status at a large text scale wraps inside the
@@ -144,7 +213,7 @@ class StatusBadge extends StatelessWidget {
             child: Text(
               label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: color,
+                color: ParentPortalColors.of(context).resolve(color),
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -177,7 +246,7 @@ class ParentSectionHeader extends StatelessWidget {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -231,7 +300,7 @@ class ActionTile extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -241,9 +310,9 @@ class ActionTile extends StatelessWidget {
               subtitle!,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: ParentPortalColors.muted),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: ParentPortalColors.of(context).muted,
+              ),
             ),
           ],
         ],
@@ -288,14 +357,14 @@ class SummaryMetric extends StatelessWidget {
               Text(
                 value,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: ParentPortalColors.navy,
+                  color: ParentPortalColors.of(context).navy,
                   fontWeight: FontWeight.w800,
                 ),
               ),
               Text(
                 label,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: ParentPortalColors.muted,
+                  color: ParentPortalColors.of(context).muted,
                 ),
               ),
             ],
@@ -324,13 +393,17 @@ class ChildSelectorChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: (_) => onSelected(),
-      selectedColor: ParentPortalColors.green,
-      backgroundColor: Colors.white,
+      selectedColor: ParentPortalColors.of(context).green,
+      backgroundColor: ParentPortalColors.of(context).surface,
       side: BorderSide(
-        color: selected ? ParentPortalColors.green : ParentPortalColors.border,
+        color: selected
+            ? ParentPortalColors.of(context).green
+            : ParentPortalColors.of(context).border,
       ),
       labelStyle: TextStyle(
-        color: selected ? Colors.white : ParentPortalColors.navy,
+        color: selected
+            ? ParentPortalColors.of(context).onGreen
+            : ParentPortalColors.of(context).navy,
         fontWeight: FontWeight.w700,
       ),
       shape: const StadiumBorder(),
@@ -374,11 +447,11 @@ class ParentChildCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final attendance = attendanceRowFor(child);
     final attendanceColor = switch (attendance.tone) {
-      ParentStatusTone.positive => ParentPortalColors.green,
-      ParentStatusTone.attention => ParentPortalColors.orange,
-      ParentStatusTone.critical => ParentPortalColors.red,
-      ParentStatusTone.informational => ParentPortalColors.blue,
-      _ => ParentPortalColors.muted,
+      ParentStatusTone.positive => ParentPortalColors.of(context).green,
+      ParentStatusTone.attention => ParentPortalColors.of(context).orange,
+      ParentStatusTone.critical => ParentPortalColors.of(context).red,
+      ParentStatusTone.informational => ParentPortalColors.of(context).blue,
+      _ => ParentPortalColors.of(context).muted,
     };
     return PortalCard(
       onTap: onTap,
@@ -395,14 +468,14 @@ class ParentChildCard extends StatelessWidget {
                     Text(
                       child.name,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: ParentPortalColors.navy,
+                        color: ParentPortalColors.of(context).navy,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     Text(
                       '${child.classSection} • $schoolName',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: ParentPortalColors.muted,
+                        color: ParentPortalColors.of(context).muted,
                       ),
                     ),
                     if (child.teacher.trim().isNotEmpty &&
@@ -410,7 +483,7 @@ class ParentChildCard extends StatelessWidget {
                       Text(
                         'Class teacher: ${child.teacher}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: ParentPortalColors.muted,
+                          color: ParentPortalColors.of(context).muted,
                         ),
                       ),
                     const SizedBox(height: 6),
@@ -427,8 +500,10 @@ class ParentChildCard extends StatelessWidget {
                             label:
                                 '$actionCount ${actionCount == 1 ? 'action needs' : 'actions need'} review',
                             icon: Icons.priority_high_rounded,
-                            color: ParentPortalColors.orange,
-                            backgroundColor: ParentPortalColors.orangeSoft,
+                            color: ParentPortalColors.of(context).orange,
+                            backgroundColor: ParentPortalColors.of(
+                              context,
+                            ).orangeSoft,
                           ),
                       ],
                     ),
@@ -453,8 +528,8 @@ class ParentChildCard extends StatelessWidget {
             _InfoLine(
               icon: Icons.directions_bus_outlined,
               color: child.transportNeedsAttention
-                  ? ParentPortalColors.orange
-                  : ParentPortalColors.blue,
+                  ? ParentPortalColors.of(context).orange
+                  : ParentPortalColors.of(context).blue,
               title: child.transport,
               subtitle: child.transportDetail,
             ),
@@ -462,7 +537,7 @@ class ParentChildCard extends StatelessWidget {
           const SizedBox(height: 12),
           _InfoLine(
             icon: Icons.menu_book_outlined,
-            color: ParentPortalColors.purple,
+            color: ParentPortalColors.of(context).purple,
             title: child.homework.toLowerCase().contains('locked')
                 ? 'Homework not available'
                 : child.homeworkPending == 1
@@ -485,10 +560,10 @@ class ParentChildCard extends StatelessWidget {
                 ? Icons.receipt_long_outlined
                 : Icons.verified_rounded,
             color: child.hasFeesDue
-                ? ParentPortalColors.orange
+                ? ParentPortalColors.of(context).orange
                 : child.hasNoFeeInvoices
-                ? ParentPortalColors.muted
-                : ParentPortalColors.green,
+                ? ParentPortalColors.of(context).muted
+                : ParentPortalColors.of(context).green,
             title: child.hasFeesDue
                 ? 'Fees due ${formatMoney(child.feesDue)}'
                 : child.hasNoFeeInvoices
@@ -509,7 +584,7 @@ class ParentChildCard extends StatelessWidget {
                 Text(
                   'View child',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: ParentPortalColors.green,
+                    color: ParentPortalColors.of(context).green,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -584,7 +659,7 @@ class HomeworkCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: ParentPortalColors.muted,
+                      color: ParentPortalColors.of(context).muted,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -603,7 +678,7 @@ class HomeworkCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -614,7 +689,7 @@ class HomeworkCard extends StatelessWidget {
               _homeworkDueContext(item, effectiveNow),
             ].where((value) => value.isNotEmpty).join(' · '),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: _homeworkStatusColor(status),
+              color: _homeworkStatusColor(context, status),
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -639,7 +714,7 @@ class HomeworkCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: ParentPortalColors.muted,
+                      color: ParentPortalColors.of(context).muted,
                     ),
                   ),
                 ),
@@ -647,15 +722,15 @@ class HomeworkCard extends StatelessWidget {
                 Text(
                   item.actionLabel,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: ParentPortalColors.green,
+                    color: ParentPortalColors.of(context).green,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   size: 20,
-                  color: ParentPortalColors.green,
+                  color: ParentPortalColors.of(context).green,
                 ),
               ],
             ),
@@ -675,8 +750,8 @@ class _HomeworkSubjectBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return StatusBadge(
       label: label,
-      color: ParentPortalColors.purple,
-      backgroundColor: ParentPortalColors.purpleSoft,
+      color: ParentPortalColors.of(context).purple,
+      backgroundColor: ParentPortalColors.of(context).purpleSoft,
     );
   }
 }
@@ -701,16 +776,16 @@ class _HomeworkMetadata extends StatelessWidget {
           icon,
           size: 15,
           color: emphasized
-              ? ParentPortalColors.purple
-              : ParentPortalColors.muted,
+              ? ParentPortalColors.of(context).purple
+              : ParentPortalColors.of(context).muted,
         ),
         const SizedBox(width: AppSpacing.xs),
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: emphasized
-                ? ParentPortalColors.navy
-                : ParentPortalColors.muted,
+                ? ParentPortalColors.of(context).navy
+                : ParentPortalColors.of(context).muted,
             fontWeight: emphasized ? FontWeight.w800 : FontWeight.w500,
           ),
         ),
@@ -719,20 +794,29 @@ class _HomeworkMetadata extends StatelessWidget {
   }
 }
 
-Color _homeworkStatusColor(ParentHomeworkPrimaryStatus status) {
+Color _homeworkStatusColor(
+  BuildContext context,
+  ParentHomeworkPrimaryStatus status,
+) {
   return switch (status) {
     ParentHomeworkPrimaryStatus.overdue ||
     ParentHomeworkPrimaryStatus.needsCorrection ||
     ParentHomeworkPrimaryStatus.incomplete ||
-    ParentHomeworkPrimaryStatus.partiallyCompleted => ParentPortalColors.red,
-    ParentHomeworkPrimaryStatus.dueSoon => ParentPortalColors.orange,
+    ParentHomeworkPrimaryStatus.partiallyCompleted => ParentPortalColors.of(
+      context,
+    ).red,
+    ParentHomeworkPrimaryStatus.dueSoon => ParentPortalColors.of(
+      context,
+    ).orange,
     ParentHomeworkPrimaryStatus.submittedLate ||
-    ParentHomeworkPrimaryStatus.awaitingReview => ParentPortalColors.blue,
-    ParentHomeworkPrimaryStatus.marked => ParentPortalColors.purple,
+    ParentHomeworkPrimaryStatus.awaitingReview => ParentPortalColors.of(
+      context,
+    ).blue,
+    ParentHomeworkPrimaryStatus.marked => ParentPortalColors.of(context).purple,
     ParentHomeworkPrimaryStatus.completedLate ||
     ParentHomeworkPrimaryStatus.completed ||
-    ParentHomeworkPrimaryStatus.excused => ParentPortalColors.green,
-    _ => ParentPortalColors.muted,
+    ParentHomeworkPrimaryStatus.excused => ParentPortalColors.of(context).green,
+    _ => ParentPortalColors.of(context).muted,
   };
 }
 
@@ -812,16 +896,16 @@ class SettingsMenuItem extends StatelessWidget {
                   Text(
                     title,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: color == ParentPortalColors.red
+                      color: color == ParentPortalColors.of(context).red
                           ? color
-                          : ParentPortalColors.navy,
+                          : ParentPortalColors.of(context).navy,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: ParentPortalColors.muted,
+                      color: ParentPortalColors.of(context).muted,
                     ),
                   ),
                 ],
@@ -896,7 +980,7 @@ class _InfoLine extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: ParentPortalColors.navy,
+                  color: ParentPortalColors.of(context).navy,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -904,7 +988,7 @@ class _InfoLine extends StatelessWidget {
                 Text(
                   subtitle!,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: ParentPortalColors.muted,
+                    color: ParentPortalColors.of(context).muted,
                   ),
                 ),
             ],

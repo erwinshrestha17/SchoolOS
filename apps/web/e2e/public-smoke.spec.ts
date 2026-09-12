@@ -66,7 +66,7 @@ test.describe('Public route smoke', () => {
     await expect(page).toHaveURL(/\/login(?:$|[?#])/);
     await expect(page.getByLabel(/School Code/i)).toBeVisible();
     await expect(page.getByLabel(/Email/i)).toBeVisible();
-    await expect(page.getByLabel(/Password/i)).toBeVisible();
+    await expect(page.getByLabel(/^Password$/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /Sign in/i })).toBeVisible();
 
     await expect(

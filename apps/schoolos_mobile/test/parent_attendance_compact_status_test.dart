@@ -20,7 +20,7 @@ void main() {
   });
 
   for (final scenario in <(AppException, String)>[
-    (const NetworkException(), 'Connection lost'),
+    (const NetworkException(), 'No connection'),
     (const TimeoutException(), 'Could not load parent data'),
     (const PermissionException(), 'Access not available'),
     (const ModuleLockedException(), 'Module not enabled'),

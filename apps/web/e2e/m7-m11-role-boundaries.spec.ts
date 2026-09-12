@@ -173,7 +173,7 @@ test.describe.serial("M7/M11 role and tenant boundaries", () => {
     await page.goto("/login");
     await page.getByLabel(/School Code/i).fill("e2e-suspended-school");
     await page.getByLabel(/Email/i).fill("e2e.suspended-tenant@schoolos.test");
-    await page.getByLabel(/Password/i).fill(password);
+    await page.getByLabel(/^Password$/i).fill(password);
     await page.getByRole("button", { name: /Sign in/i }).click();
 
     await expect(page).toHaveURL(/\/login/);

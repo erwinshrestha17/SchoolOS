@@ -60,6 +60,7 @@ void main() {
     Widget home, {
     List<Override> overrides = const [],
     String role = 'principal',
+    ThemeData? theme,
   }) async {
     final sharedPrefs = await SharedPreferences.getInstance();
     return ProviderScope(
@@ -79,7 +80,7 @@ void main() {
         }),
         ...overrides,
       ],
-      child: MaterialApp(theme: AppTheme.light, home: home),
+      child: MaterialApp(theme: theme ?? AppTheme.light, home: home),
     );
   }
 
@@ -141,29 +142,32 @@ void main() {
     await expectAccessible(tester);
   });
 
-  testWidgets('parent child detail', (tester) async {
-    tester.view.physicalSize = const Size(400, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  for (final theme in [AppTheme.light, AppTheme.dark]) {
+    testWidgets('parent child detail ${theme.brightness.name}', (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    final repository = _MockParentPortalRepository();
-    when(
-      () => repository.load(activeChildId: any(named: 'activeChildId')),
-    ).thenAnswer((_) async => _portal());
+      final repository = _MockParentPortalRepository();
+      when(
+        () => repository.load(activeChildId: any(named: 'activeChildId')),
+      ).thenAnswer((_) async => _portal());
 
-    await tester.pumpWidget(
-      await harness(
-        const ParentPortalChildDetailScreen(childId: 'child-a'),
-        role: 'PARENT',
-        overrides: [
-          parentPortalRepositoryProvider.overrideWithValue(repository),
-        ],
-      ),
-    );
-    await tester.pumpAndSettle();
-    await expectAccessible(tester);
-  });
+      await tester.pumpWidget(
+        await harness(
+          const ParentPortalChildDetailScreen(childId: 'child-a'),
+          role: 'PARENT',
+          theme: theme,
+          overrides: [
+            parentPortalRepositoryProvider.overrideWithValue(repository),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      await expectAccessible(tester);
+    });
+  }
 
   testWidgets('principal today', (tester) async {
     tester.view.physicalSize = const Size(400, 900);

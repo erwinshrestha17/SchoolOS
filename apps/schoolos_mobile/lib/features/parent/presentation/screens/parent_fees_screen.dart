@@ -172,7 +172,7 @@ class _FeeTabs extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               decoration: BoxDecoration(
                 color: selectedTab
-                    ? ParentPortalColors.greenSoft
+                    ? ParentPortalColors.of(context).greenSoft
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -182,8 +182,8 @@ class _FeeTabs extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: selectedTab
-                      ? ParentPortalColors.green
-                      : ParentPortalColors.muted,
+                      ? ParentPortalColors.of(context).green
+                      : ParentPortalColors.of(context).muted,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -196,7 +196,7 @@ class _FeeTabs extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: ParentPortalColors.surfaceAlt,
+        color: ParentPortalColors.of(context).surfaceAlt,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -234,8 +234,8 @@ class _EmptyFeeList extends StatelessWidget {
                 : Icons.receipt_long_outlined,
             size: 40,
             color: outstanding
-                ? ParentPortalColors.green
-                : ParentPortalColors.muted,
+                ? ParentPortalColors.of(context).green
+                : ParentPortalColors.of(context).muted,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -246,8 +246,8 @@ class _EmptyFeeList extends StatelessWidget {
                   outstanding
                       ? 'No outstanding fees'
                       : 'No payment history yet',
-                  style: const TextStyle(
-                    color: ParentPortalColors.navy,
+                  style: TextStyle(
+                    color: ParentPortalColors.of(context).navy,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -258,7 +258,7 @@ class _EmptyFeeList extends StatelessWidget {
                       : hasAnyInvoices
                       ? 'Confirmed payments and receipts will appear here.'
                       : 'The school has not issued an invoice for this child.',
-                  style: const TextStyle(color: ParentPortalColors.muted),
+                  style: TextStyle(color: ParentPortalColors.of(context).muted),
                 ),
               ],
             ),
@@ -277,10 +277,10 @@ class _SandboxPaymentBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: ParentPortalColors.blueSoft,
+      color: ParentPortalColors.of(context).blueSoft,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: ParentPortalColors.border),
+        side: BorderSide(color: ParentPortalColors.of(context).border),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
@@ -289,27 +289,27 @@ class _SandboxPaymentBanner extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.science_outlined,
                   size: 20,
-                  color: ParentPortalColors.blue,
+                  color: ParentPortalColors.of(context).blue,
                 ),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Sandbox payment mode',
                         style: TextStyle(
-                          color: ParentPortalColors.navy,
+                          color: ParentPortalColors.of(context).navy,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       Text(
                         'No real money will be charged.',
                         style: TextStyle(
-                          color: ParentPortalColors.muted,
+                          color: ParentPortalColors.of(context).muted,
                           fontSize: 12,
                         ),
                       ),
@@ -444,17 +444,17 @@ class _FeesSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Outstanding balance',
-            style: TextStyle(color: ParentPortalColors.muted),
+            style: TextStyle(color: ParentPortalColors.of(context).muted),
           ),
           const SizedBox(height: 2),
           Text(
             _money(summary.feesDue),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w900,
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
             ),
           ),
           const SizedBox(height: 4),
@@ -469,10 +469,10 @@ class _FeesSummaryCard extends StatelessWidget {
                     : Icons.check_circle_rounded,
                 size: 18,
                 color: hasDues
-                    ? ParentPortalColors.orange
+                    ? ParentPortalColors.of(context).orange
                     : nothingBilled
-                    ? ParentPortalColors.muted
-                    : ParentPortalColors.green,
+                    ? ParentPortalColors.of(context).muted
+                    : ParentPortalColors.of(context).green,
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -484,7 +484,7 @@ class _FeesSummaryCard extends StatelessWidget {
                       : nothingBilled
                       ? 'No fee invoice has been issued.'
                       : 'All fees are paid.',
-                  style: const TextStyle(color: ParentPortalColors.muted),
+                  style: TextStyle(color: ParentPortalColors.of(context).muted),
                 ),
               ),
             ],
@@ -496,8 +496,8 @@ class _FeesSummaryCard extends StatelessWidget {
                       ? 'Next payment: Due date not set'
                       : 'Next payment: ${_date(summary.nextFeeDueDate)}'
                 : 'Next payment: No upcoming invoice',
-            style: const TextStyle(
-              color: ParentPortalColors.navy,
+            style: TextStyle(
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -523,11 +523,14 @@ class _BillBreakdown extends StatelessWidget {
     if (!invoice.isItemised &&
         invoice.waivers.isEmpty &&
         invoice.refunds.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.only(top: 8),
         child: Text(
           'The school has not itemised this bill.',
-          style: TextStyle(color: ParentPortalColors.muted, fontSize: 12),
+          style: TextStyle(
+            color: ParentPortalColors.of(context).muted,
+            fontSize: 12,
+          ),
         ),
       );
     }
@@ -539,7 +542,7 @@ class _BillBreakdown extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: ParentPortalColors.surfaceAlt,
+            color: ParentPortalColors.of(context).surfaceAlt,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -560,12 +563,12 @@ class _BillBreakdown extends StatelessWidget {
               ],
               if (invoice.waivers.isNotEmpty) ...[
                 const Divider(height: 12),
-                const Align(
+                Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'Approved discounts and waivers',
                     style: TextStyle(
-                      color: ParentPortalColors.navy,
+                      color: ParentPortalColors.of(context).navy,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -582,12 +585,12 @@ class _BillBreakdown extends StatelessWidget {
               ],
               if (invoice.refunds.isNotEmpty) ...[
                 const Divider(height: 12),
-                const Align(
+                Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'Refunds and corrections',
                     style: TextStyle(
-                      color: ParentPortalColors.navy,
+                      color: ParentPortalColors.of(context).navy,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -633,14 +636,19 @@ class _BreakdownRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = TextStyle(
       fontWeight: emphasised ? FontWeight.w900 : FontWeight.w600,
-      color: emphasised ? ParentPortalColors.navy : ParentPortalColors.muted,
+      color: emphasised
+          ? ParentPortalColors.of(context).navy
+          : ParentPortalColors.of(context).muted,
     );
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(child: Text(label, style: style)),
         const SizedBox(width: 12),
-        Text(amount, style: style.copyWith(color: ParentPortalColors.navy)),
+        Text(
+          amount,
+          style: style.copyWith(color: ParentPortalColors.of(context).navy),
+        ),
       ],
     );
   }
@@ -713,29 +721,29 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
       _ => _billStatusLabel(invoice),
     };
     final statusColor = switch (_paymentState) {
-      _PaymentAttemptState.processing ||
-      _PaymentAttemptState.checkoutOpened => ParentPortalColors.blue,
-      _PaymentAttemptState.failed => ParentPortalColors.red,
+      _PaymentAttemptState.processing || _PaymentAttemptState.checkoutOpened =>
+        ParentPortalColors.of(context).blue,
+      _PaymentAttemptState.failed => ParentPortalColors.of(context).red,
       _ =>
         invoice.isSettled
-            ? ParentPortalColors.green
-            : ParentPortalColors.orange,
+            ? ParentPortalColors.of(context).green
+            : ParentPortalColors.of(context).orange,
     };
     final statusBackground = switch (_paymentState) {
-      _PaymentAttemptState.processing ||
-      _PaymentAttemptState.checkoutOpened => ParentPortalColors.blueSoft,
-      _PaymentAttemptState.failed => ParentPortalColors.redSoft,
+      _PaymentAttemptState.processing || _PaymentAttemptState.checkoutOpened =>
+        ParentPortalColors.of(context).blueSoft,
+      _PaymentAttemptState.failed => ParentPortalColors.of(context).redSoft,
       _ =>
         invoice.isSettled
-            ? ParentPortalColors.greenSoft
-            : ParentPortalColors.orangeSoft,
+            ? ParentPortalColors.of(context).greenSoft
+            : ParentPortalColors.of(context).orangeSoft,
     };
 
     return PortalCard(
       padding: const EdgeInsets.all(16),
       borderColor: invoice.isOverdue
-          ? ParentPortalColors.orange.withValues(alpha: .4)
-          : ParentPortalColors.border,
+          ? ParentPortalColors.of(context).orange.withValues(alpha: .4)
+          : ParentPortalColors.of(context).border,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -746,10 +754,10 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'School fees',
                       style: TextStyle(
-                        color: ParentPortalColors.navy,
+                        color: ParentPortalColors.of(context).navy,
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
                       ),
@@ -771,8 +779,8 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
             invoice.isSettled
                 ? _money(invoice.totalAmount)
                 : '${_money(invoice.outstandingAmount)} due',
-            style: const TextStyle(
-              color: ParentPortalColors.navy,
+            style: TextStyle(
+              color: ParentPortalColors.of(context).navy,
               fontSize: 24,
               fontWeight: FontWeight.w900,
             ),
@@ -783,7 +791,7 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
               receipt?.paidAt == null
                   ? 'Payment confirmed'
                   : 'Paid on ${_date(receipt!.paidAt)}',
-              style: const TextStyle(color: ParentPortalColors.muted),
+              style: TextStyle(color: ParentPortalColors.of(context).muted),
             )
           else ...[
             Text(
@@ -792,8 +800,8 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
                   : 'Due ${_date(invoice.dueDate)}',
               style: TextStyle(
                 color: invoice.isOverdue
-                    ? ParentPortalColors.orange
-                    : ParentPortalColors.muted,
+                    ? ParentPortalColors.of(context).orange
+                    : ParentPortalColors.of(context).muted,
                 fontWeight: invoice.isOverdue
                     ? FontWeight.w700
                     : FontWeight.w400,
@@ -802,13 +810,13 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
             if (invoice.paidAmount > 0)
               Text(
                 '${_money(invoice.paidAmount)} paid so far',
-                style: const TextStyle(color: ParentPortalColors.muted),
+                style: TextStyle(color: ParentPortalColors.of(context).muted),
               ),
           ],
           Text(
             'Invoice ${invoice.invoiceNumber}',
-            style: const TextStyle(
-              color: ParentPortalColors.muted,
+            style: TextStyle(
+              color: ParentPortalColors.of(context).muted,
               fontSize: 12,
             ),
           ),
@@ -889,7 +897,7 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
             const SizedBox(height: 8),
             if (_paymentState == _PaymentAttemptState.checkoutOpened)
               _PaymentAttemptNotice(
-                color: ParentPortalColors.blueSoft,
+                color: ParentPortalColors.of(context).blueSoft,
                 icon: Icons.hourglass_top_rounded,
                 message:
                     'Payment is being checked. Do not start another payment.',
@@ -898,7 +906,7 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
               )
             else if (_paymentState == _PaymentAttemptState.failed)
               _PaymentAttemptNotice(
-                color: ParentPortalColors.redSoft,
+                color: ParentPortalColors.of(context).redSoft,
                 icon: Icons.error_outline_rounded,
                 message:
                     _paymentFailureMessage ??
@@ -909,8 +917,8 @@ class _InvoiceCardState extends ConsumerState<_InvoiceCard> {
             else
               Text(
                 paymentStatusMessage,
-                style: const TextStyle(
-                  color: ParentPortalColors.muted,
+                style: TextStyle(
+                  color: ParentPortalColors.of(context).muted,
                   fontSize: 12,
                 ),
               ),
@@ -1114,12 +1122,12 @@ class _PaymentAttemptNotice extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: ParentPortalColors.navy),
+          Icon(icon, size: 20, color: ParentPortalColors.of(context).navy),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: ParentPortalColors.navy),
+              style: TextStyle(color: ParentPortalColors.of(context).navy),
             ),
           ),
           if (actionLabel != null)
@@ -1162,11 +1170,11 @@ class _ReceiptDetailsSheetState extends ConsumerState<_ReceiptDetailsSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
                 FeatureIcon(
                   Icons.verified_rounded,
-                  color: ParentPortalColors.green,
+                  color: ParentPortalColors.of(context).green,
                 ),
                 SizedBox(width: 12),
                 Expanded(
@@ -1176,14 +1184,16 @@ class _ReceiptDetailsSheetState extends ConsumerState<_ReceiptDetailsSheet> {
                       Text(
                         'Official receipt',
                         style: TextStyle(
-                          color: ParentPortalColors.navy,
+                          color: ParentPortalColors.of(context).navy,
                           fontSize: 20,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
                       Text(
                         'Protected and available only to authorised guardians.',
-                        style: TextStyle(color: ParentPortalColors.muted),
+                        style: TextStyle(
+                          color: ParentPortalColors.of(context).muted,
+                        ),
                       ),
                     ],
                   ),
@@ -1193,8 +1203,8 @@ class _ReceiptDetailsSheetState extends ConsumerState<_ReceiptDetailsSheet> {
             const SizedBox(height: 20),
             Text(
               _money(widget.receipt.amount),
-              style: const TextStyle(
-                color: ParentPortalColors.navy,
+              style: TextStyle(
+                color: ParentPortalColors.of(context).navy,
                 fontSize: 28,
                 fontWeight: FontWeight.w900,
               ),
@@ -1311,15 +1321,15 @@ class _ReceiptDetailRow extends StatelessWidget {
             width: 124,
             child: Text(
               label,
-              style: const TextStyle(color: ParentPortalColors.muted),
+              style: TextStyle(color: ParentPortalColors.of(context).muted),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                color: ParentPortalColors.navy,
+              style: TextStyle(
+                color: ParentPortalColors.of(context).navy,
                 fontWeight: FontWeight.w700,
               ),
             ),

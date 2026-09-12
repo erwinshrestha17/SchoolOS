@@ -125,14 +125,14 @@ class ParentApiChildSelector extends StatelessWidget {
               children: [
                 Text(
                   child.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w900,
-                    color: ParentPortalColors.navy,
+                    color: ParentPortalColors.of(context).navy,
                   ),
                 ),
                 Text(
                   _compactClassSection(child.classSection),
-                  style: const TextStyle(color: ParentPortalColors.muted),
+                  style: TextStyle(color: ParentPortalColors.of(context).muted),
                 ),
               ],
             ),
@@ -142,9 +142,9 @@ class ParentApiChildSelector extends StatelessWidget {
             const SizedBox(width: AppSpacing.xs),
           ],
           if (selectable)
-            const Icon(
+            Icon(
               Icons.keyboard_arrow_down_rounded,
-              color: ParentPortalColors.muted,
+              color: ParentPortalColors.of(context).muted,
             ),
         ],
       ),
@@ -170,7 +170,7 @@ class ParentApiChildSelector extends StatelessWidget {
               Text(
                 'Select child',
                 style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(
-                  color: ParentPortalColors.navy,
+                  color: ParentPortalColors.of(context).navy,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -184,9 +184,9 @@ class ParentApiChildSelector extends StatelessWidget {
                   ),
                   subtitle: Text(_compactClassSection(item.classSection)),
                   trailing: item.id == child.id
-                      ? const Icon(
+                      ? Icon(
                           Icons.check_rounded,
-                          color: ParentPortalColors.green,
+                          color: ParentPortalColors.of(context).green,
                         )
                       : null,
                   onTap: () => Navigator.pop(sheetContext, item.id),
@@ -232,7 +232,9 @@ class FeatureIcon extends StatelessWidget {
 }
 
 void showFeatureSnack(BuildContext context, String message) =>
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
 
 void showUnavailableWorkflowSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));

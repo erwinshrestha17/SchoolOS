@@ -59,7 +59,7 @@ class ParentFilterSheet extends StatelessWidget {
             width: 48,
             height: 5,
             decoration: BoxDecoration(
-              color: ParentPortalColors.border,
+              color: ParentPortalColors.of(context).border,
               borderRadius: AppRadius.borderRadiusMax,
             ),
           ),
@@ -76,7 +76,7 @@ class ParentFilterSheet extends StatelessWidget {
                   child: Text(
                     title,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: ParentPortalColors.navy,
+                      color: ParentPortalColors.of(context).navy,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -86,7 +86,7 @@ class ParentFilterSheet extends StatelessWidget {
                   tooltip: 'Close filters',
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close_rounded),
-                  color: ParentPortalColors.muted,
+                  color: ParentPortalColors.of(context).muted,
                 ),
               ],
             ),
@@ -102,7 +102,7 @@ class ParentFilterSheet extends StatelessWidget {
               child: body,
             ),
           ),
-          const Divider(height: 1, color: ParentPortalColors.border),
+          Divider(height: 1, color: ParentPortalColors.of(context).border),
           AnimatedPadding(
             duration: const Duration(milliseconds: 180),
             padding: EdgeInsets.fromLTRB(
@@ -119,9 +119,9 @@ class ParentFilterSheet extends StatelessWidget {
                     onPressed: onClearAll,
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(54),
-                      foregroundColor: ParentPortalColors.green,
-                      side: const BorderSide(
-                        color: ParentPortalColors.green,
+                      foregroundColor: ParentPortalColors.of(context).green,
+                      side: BorderSide(
+                        color: ParentPortalColors.of(context).green,
                         width: 1.4,
                       ),
                       shape: RoundedRectangleBorder(
@@ -142,8 +142,8 @@ class ParentFilterSheet extends StatelessWidget {
                     onPressed: onApply,
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(54),
-                      backgroundColor: ParentPortalColors.green,
-                      foregroundColor: Colors.white,
+                      backgroundColor: ParentPortalColors.of(context).green,
+                      foregroundColor: ParentPortalColors.of(context).onGreen,
                       shape: RoundedRectangleBorder(
                         borderRadius: AppRadius.borderRadiusLG,
                       ),
@@ -181,7 +181,7 @@ class ParentFilterSection extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: ParentPortalColors.navy,
+            color: ParentPortalColors.of(context).navy,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -218,10 +218,10 @@ class ParentFilterChoiceGroup<T> extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final textScale = MediaQuery.textScalerOf(context).scale(1);
-        final compact =
-            constraints.maxWidth < 340 || textScale > 1.25 || maxColumns < 3;
-        final columns = compact ? maxColumns.clamp(1, 2) : maxColumns;
         const gap = AppSpacing.sm;
+        final columns = ((constraints.maxWidth + gap) / (120 * textScale + gap))
+            .floor()
+            .clamp(1, maxColumns);
         final optionWidth =
             (constraints.maxWidth - gap * (columns - 1)) / columns;
 
@@ -262,13 +262,15 @@ class _ParentFilterChoice extends StatelessWidget {
       button: true,
       selected: selected,
       child: Material(
-        color: selected ? ParentPortalColors.greenSoft : Colors.transparent,
+        color: selected
+            ? ParentPortalColors.of(context).greenSoft
+            : Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: AppRadius.borderRadiusMD,
           side: BorderSide(
             color: selected
-                ? ParentPortalColors.green
-                : ParentPortalColors.border,
+                ? ParentPortalColors.of(context).green
+                : ParentPortalColors.of(context).border,
             width: selected ? 1.4 : 1,
           ),
         ),
@@ -288,8 +290,8 @@ class _ParentFilterChoice extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: selected
-                        ? ParentPortalColors.green
-                        : ParentPortalColors.navy,
+                        ? ParentPortalColors.of(context).green
+                        : ParentPortalColors.of(context).navy,
                     fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                   ),
                 ),
@@ -370,7 +372,7 @@ class ParentFilterToolbar extends StatelessWidget {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w900,
             ),
           ),

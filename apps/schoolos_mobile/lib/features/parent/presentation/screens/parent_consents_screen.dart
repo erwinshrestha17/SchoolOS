@@ -35,13 +35,13 @@ class ParentConsentsScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
               PortalCard(
-                color: ParentPortalColors.purpleSoft,
+                color: ParentPortalColors.of(context).purpleSoft,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const FeatureIcon(
+                    FeatureIcon(
                       Icons.verified_user_rounded,
-                      color: ParentPortalColors.purple,
+                      color: ParentPortalColors.of(context).purple,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -49,8 +49,8 @@ class ParentConsentsScreen extends ConsumerWidget {
                         data.children.isEmpty
                             ? 'Linked-child permission workflows will appear here when enabled by the school.'
                             : 'Permission workflows for ${_childNames(data.children.map((child) => child.name).toList())} will appear here when enabled by the school.',
-                        style: const TextStyle(
-                          color: ParentPortalColors.muted,
+                        style: TextStyle(
+                          color: ParentPortalColors.of(context).muted,
                           height: 1.4,
                         ),
                       ),
@@ -183,10 +183,10 @@ class _ConsentStatusSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return consents.when(
-      loading: () => const PortalCard(
+      loading: () => PortalCard(
         child: Text(
           'Loading consent status...',
-          style: TextStyle(color: ParentPortalColors.muted),
+          style: TextStyle(color: ParentPortalColors.of(context).muted),
         ),
       ),
       error: (_, _) => _ConsentUnavailable(
@@ -298,7 +298,7 @@ class _ReadOnlyPermissionCard extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            FeatureIcon(icon, color: ParentPortalColors.green),
+            FeatureIcon(icon, color: ParentPortalColors.of(context).green),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -314,8 +314,8 @@ class _ReadOnlyPermissionCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     message,
-                    style: const TextStyle(
-                      color: ParentPortalColors.muted,
+                    style: TextStyle(
+                      color: ParentPortalColors.of(context).muted,
                       height: 1.4,
                     ),
                   ),
@@ -323,8 +323,8 @@ class _ReadOnlyPermissionCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       'Version $version',
-                      style: const TextStyle(
-                        color: ParentPortalColors.muted,
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).muted,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -335,11 +335,11 @@ class _ReadOnlyPermissionCard extends StatelessWidget {
             StatusBadge(
               label: statusLabel,
               color: statusLabel == 'Granted'
-                  ? ParentPortalColors.green
-                  : ParentPortalColors.orange,
+                  ? ParentPortalColors.of(context).green
+                  : ParentPortalColors.of(context).orange,
               background: statusLabel == 'Granted'
-                  ? ParentPortalColors.greenSoft
-                  : ParentPortalColors.orangeSoft,
+                  ? ParentPortalColors.of(context).greenSoft
+                  : ParentPortalColors.of(context).orangeSoft,
             ),
           ],
         ),
@@ -365,10 +365,10 @@ class _ReadOnlyPermissionCard extends StatelessWidget {
           ),
         ] else if (onDecision != null) ...[
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'A school-published consent version is required before mobile decisions are enabled.',
             style: TextStyle(
-              color: ParentPortalColors.muted,
+              color: ParentPortalColors.of(context).muted,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -406,9 +406,9 @@ class _ConsentUnavailable extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const FeatureIcon(
+            FeatureIcon(
               Icons.lock_outline_rounded,
-              color: ParentPortalColors.orange,
+              color: ParentPortalColors.of(context).orange,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -425,8 +425,8 @@ class _ConsentUnavailable extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     message,
-                    style: const TextStyle(
-                      color: ParentPortalColors.muted,
+                    style: TextStyle(
+                      color: ParentPortalColors.of(context).muted,
                       height: 1.4,
                     ),
                   ),
@@ -454,7 +454,7 @@ class _ConsentLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-    children: const [
+    children: [
       PortalCard(
         child: Row(
           children: [
@@ -463,7 +463,7 @@ class _ConsentLoading extends StatelessWidget {
             Expanded(
               child: Text(
                 'Loading linked-child permission context...',
-                style: TextStyle(color: ParentPortalColors.muted),
+                style: TextStyle(color: ParentPortalColors.of(context).muted),
               ),
             ),
           ],

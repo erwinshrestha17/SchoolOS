@@ -306,7 +306,7 @@ async function login(
   await page.goto('/login');
   await page.getByLabel(/School Code/i).fill(credentials.tenantSlug ?? '');
   await page.getByLabel(/Email/i).fill(credentials.email ?? '');
-  await page.getByLabel(/Password/i).fill(credentials.password ?? '');
+  await page.getByLabel(/^Password$/i).fill(credentials.password ?? '');
 
   await Promise.all([
     page.waitForURL(/\/dashboard(?:$|[/?#])/, { timeout: 20_000 }),

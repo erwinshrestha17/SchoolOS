@@ -70,20 +70,22 @@ class _TransportBody extends ConsumerWidget {
           const SizedBox(height: 14),
           _TripCard(info: info),
           const SizedBox(height: 14),
-          const PortalCard(
-            color: ParentPortalColors.blueSoft,
+          PortalCard(
+            color: ParentPortalColors.of(context).blueSoft,
             padding: EdgeInsets.all(12),
             child: Row(
               children: [
                 Icon(
                   Icons.info_outline_rounded,
-                  color: ParentPortalColors.blue,
+                  color: ParentPortalColors.of(context).blue,
                 ),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Live GPS and ETA are shown only when the assigned trip publishes a latest location.',
-                    style: TextStyle(color: ParentPortalColors.muted),
+                    style: TextStyle(
+                      color: ParentPortalColors.of(context).muted,
+                    ),
                   ),
                 ),
               ],
@@ -166,9 +168,9 @@ class _TripCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const FeatureIcon(
+              FeatureIcon(
                 Icons.route_rounded,
-                color: ParentPortalColors.green,
+                color: ParentPortalColors.of(context).green,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -177,15 +179,17 @@ class _TripCard extends StatelessWidget {
                   children: [
                     Text(
                       info.tripStatus ?? 'Active trip',
-                      style: const TextStyle(
-                        color: ParentPortalColors.green,
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).green,
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     Text(
                       info.vehicleLabel ?? 'Vehicle details unavailable',
-                      style: const TextStyle(color: ParentPortalColors.muted),
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).muted,
+                      ),
                     ),
                   ],
                 ),
@@ -193,11 +197,11 @@ class _TripCard extends StatelessWidget {
               StatusBadge(
                 label: info.studentStatus ?? 'Trip active',
                 color: info.isDelayed
-                    ? ParentPortalColors.orange
-                    : ParentPortalColors.green,
+                    ? ParentPortalColors.of(context).orange
+                    : ParentPortalColors.of(context).green,
                 background: info.isDelayed
-                    ? ParentPortalColors.orangeSoft
-                    : ParentPortalColors.greenSoft,
+                    ? ParentPortalColors.of(context).orangeSoft
+                    : ParentPortalColors.of(context).greenSoft,
               ),
             ],
           ),
@@ -205,8 +209,8 @@ class _TripCard extends StatelessWidget {
           if (info.isDelayed)
             Text(
               'Delayed ${info.delayMinutes} min${info.delayReason == null ? '' : ': ${info.delayReason}'}',
-              style: const TextStyle(
-                color: ParentPortalColors.orange,
+              style: TextStyle(
+                color: ParentPortalColors.of(context).orange,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -216,14 +220,14 @@ class _TripCard extends StatelessWidget {
               _gpsStatus(info),
               style: TextStyle(
                 color: info.isLocationStale || info.isLocationDelayed
-                    ? ParentPortalColors.orange
-                    : ParentPortalColors.green,
+                    ? ParentPortalColors.of(context).orange
+                    : ParentPortalColors.of(context).green,
                 fontWeight: FontWeight.w800,
               ),
             ),
             Text(
               _lastUpdated(info),
-              style: const TextStyle(color: ParentPortalColors.muted),
+              style: TextStyle(color: ParentPortalColors.of(context).muted),
             ),
             if (info.latitude != null && info.longitude != null)
               Text(
@@ -231,9 +235,9 @@ class _TripCard extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
           ] else
-            const Text(
+            Text(
               'GPS unavailable. No location has been published for this trip.',
-              style: TextStyle(color: ParentPortalColors.muted),
+              style: TextStyle(color: ParentPortalColors.of(context).muted),
             ),
         ],
       ),
@@ -253,7 +257,10 @@ class _RouteMetric extends StatelessWidget {
     children: [
       Text(
         label,
-        style: const TextStyle(fontSize: 11, color: ParentPortalColors.muted),
+        style: TextStyle(
+          fontSize: 11,
+          color: ParentPortalColors.of(context).muted,
+        ),
       ),
       Text(
         value,

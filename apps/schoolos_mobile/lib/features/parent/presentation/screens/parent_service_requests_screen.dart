@@ -97,7 +97,7 @@ class _ParentServiceRequestsScreenState
                   'Ask the school for help',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w900,
-                    color: ParentPortalColors.navy,
+                    color: ParentPortalColors.of(context).navy,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -421,8 +421,8 @@ class _RequestCard extends StatelessWidget {
               ? Icons.receipt_long_outlined
               : Icons.support_agent_outlined,
           color: request.isOverdue
-              ? ParentPortalColors.red
-              : ParentPortalColors.purple,
+              ? ParentPortalColors.of(context).red
+              : ParentPortalColors.of(context).purple,
         ),
         title: Text(
           request.subject,
@@ -684,9 +684,9 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
                 ),
               if (paymentDispute && widget.invoices.isEmpty) ...[
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'No eligible invoice is available for this child. Refresh Fees & Receipts or ask the school office.',
-                  style: TextStyle(color: ParentPortalColors.red),
+                  style: TextStyle(color: ParentPortalColors.of(context).red),
                 ),
               ],
               const SizedBox(height: 12),
@@ -742,7 +742,7 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
                 const SizedBox(height: 10),
                 Text(
                   _error!,
-                  style: const TextStyle(color: ParentPortalColors.red),
+                  style: TextStyle(color: ParentPortalColors.of(context).red),
                 ),
               ],
               if (_submitting) ...[

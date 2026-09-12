@@ -36,7 +36,7 @@ export function LatestSchoolActivityPanel({
   return (
     <SectionCard
       title="Latest school activity"
-      description="Recent permission-filtered events across the school."
+      description="Recent school updates within your scope."
       noPadding
     >
       {visibleItems.length ? (

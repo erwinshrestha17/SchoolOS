@@ -1797,7 +1797,9 @@ class PrincipalShell extends ConsumerWidget {
         child: Column(
           children: [
             _PrincipalHeader(
-              schoolName: user?.tenantSlug ?? 'SchoolOS',
+              schoolName: user?.tenantName?.trim().isNotEmpty == true
+                  ? user!.tenantName!.trim()
+                  : user?.tenantSlug ?? 'SchoolOS',
               showBack: showBack,
               onBack: () => context.go(backRoute),
             ),
@@ -1925,7 +1927,7 @@ class _DashboardBody extends StatelessWidget {
         ],
         const SizedBox(height: AppSpacing.xl),
         SectionHeader(
-          title: 'Alerts / Priority',
+          title: 'Priority alerts',
           actionLabel: 'View all',
           onActionPressed: () => context.go(AppRoutes.principalAttention),
         ),
@@ -3133,10 +3135,12 @@ class _SummaryCards extends StatelessWidget {
     if (values.isEmpty) return const SizedBox.shrink();
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth < 340
+        final crossAxisCount =
+            constraints.maxWidth < 340 ||
+                MediaQuery.textScalerOf(context).scale(1) > 1.3
             ? 1
             : constraints.maxWidth < 720
-            ? 2
+            ? (values.length == 3 ? 3 : 2)
             : values.length.clamp(1, 3);
         const spacing = AppSpacing.md;
         final itemWidth =
@@ -3152,8 +3156,10 @@ class _SummaryCards extends StatelessWidget {
                   child: AppCard(
                     child: Row(
                       children: [
-                        _IconBubble(icon: value.icon, color: value.color),
-                        const SizedBox(width: AppSpacing.md),
+                        if (itemWidth >= 220) ...[
+                          _IconBubble(icon: value.icon, color: value.color),
+                          const SizedBox(width: AppSpacing.md),
+                        ],
                         Expanded(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -3161,8 +3167,6 @@ class _SummaryCards extends StatelessWidget {
                             children: [
                               Text(
                                 value.label,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   color: AppSemanticColors.of(
@@ -3172,11 +3176,11 @@ class _SummaryCards extends StatelessWidget {
                               ),
                               Text(
                                 '${value.value}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                                 style: Theme.of(context).textTheme.headlineSmall
                                     ?.copyWith(
-                                      color: value.color,
+                                      color: AppSemanticColors.of(
+                                        context,
+                                      ).textPrimary,
                                       fontWeight: FontWeight.w900,
                                     ),
                               ),
@@ -3215,50 +3219,77 @@ class _ItemList extends StatelessWidget {
         icon: Icons.check_circle_outline_rounded,
       );
     }
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          for (final item in items)
-            Column(
-              children: [
-                ListTile(
-                  minVerticalPadding: compact ? 10 : 16,
-                  leading: _IconBubble(
-                    icon: _iconFor(
-                      _string(item['type'], fallback: _string(item['id'])),
-                    ),
-                    color: _severityColor(
-                      _string(
-                        item['severity'],
-                        fallback: _string(item['status']),
-                      ),
-                    ),
-                  ),
-                  title: Text(
-                    _string(item['title'], fallback: _string(item['label'])),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppSemanticColors.of(context).textPrimary,
-                    ),
-                  ),
-                  subtitle: _itemSubtitle(item).isEmpty
-                      ? null
-                      : Text(_itemSubtitle(item)),
-                  trailing:
-                      actionBuilder?.call(item) ??
-                      (_string(item['status']).isNotEmpty
-                          ? StatusChip(
-                              status: _statusType(_string(item['status'])),
-                              label: _string(item['status']),
-                            )
-                          : null),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stackActions =
+            constraints.maxWidth < 600 ||
+            MediaQuery.textScalerOf(context).scale(1) > 1.3;
+        return AppCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (final item in items)
+                Builder(
+                  builder: (context) {
+                    final action =
+                        actionBuilder?.call(item) ??
+                        (_string(item['status']).isNotEmpty
+                            ? StatusChip(
+                                status: _statusType(_string(item['status'])),
+                                label: _string(item['status']),
+                              )
+                            : null);
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ListTile(
+                          minVerticalPadding: compact ? 10 : 16,
+                          leading: _IconBubble(
+                            icon: _iconFor(
+                              _string(
+                                item['type'],
+                                fallback: _string(item['id']),
+                              ),
+                            ),
+                            color: _severityColor(
+                              _string(
+                                item['severity'],
+                                fallback: _string(item['status']),
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            _string(
+                              item['title'],
+                              fallback: _string(item['label']),
+                            ),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: AppSemanticColors.of(context).textPrimary,
+                            ),
+                          ),
+                          subtitle: _itemSubtitle(item).isEmpty
+                              ? null
+                              : Text(_itemSubtitle(item)),
+                          trailing: stackActions ? null : action,
+                        ),
+                        if (stackActions && action != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: action,
+                            ),
+                          ),
+                        if (item != items.last) const Divider(height: 1),
+                      ],
+                    );
+                  },
                 ),
-                if (item != items.last) const Divider(height: 1),
-              ],
-            ),
-        ],
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -3428,7 +3459,7 @@ class _QuickAction extends StatelessWidget {
 }
 
 class _IconBubble extends StatelessWidget {
-  _IconBubble({required this.icon, required this.color});
+  const _IconBubble({required this.icon, required this.color});
   final IconData icon;
   final Color color;
   static const double size = 50;
@@ -4481,17 +4512,6 @@ String _itemSubtitle(Map<String, dynamic> item) {
     _string(item['detail']),
     _string(item['nextAction']),
   ].where((value) => value.isNotEmpty).join('\n');
-}
-
-Color _tone(String tone) {
-  return switch (tone) {
-    'green' => AppColors.success,
-    'orange' => AppColors.warning,
-    'red' => AppColors.danger,
-    'purple' => Colors.purple,
-    'slate' => AppSemanticColors.of(context).textMuted,
-    _ => AppColors.info,
-  };
 }
 
 Color _toneForIndex(int index) {

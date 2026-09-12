@@ -136,7 +136,7 @@ class _LearningSupportContent extends StatelessWidget {
               Text(
                 'Supportive, teacher-approved updates',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: ParentPortalColors.navy,
+                  color: ParentPortalColors.of(context).navy,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -148,7 +148,7 @@ class _LearningSupportContent extends StatelessWidget {
               Text(
                 'Updated ${NepaliBsCalendar.formatBsDateTime(data.generatedAt)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: ParentPortalColors.muted,
+                  color: ParentPortalColors.of(context).muted,
                 ),
               ),
             ],
@@ -161,9 +161,9 @@ class _LearningSupportContent extends StatelessWidget {
               sourceIssues.every((entry) => entry.value == 'empty')
                   ? 'Some sections have no teacher-approved update yet.'
                   : 'Some learning-support sources are currently unavailable.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: ParentPortalColors.muted),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: ParentPortalColors.of(context).muted,
+              ),
             ),
           ),
         ],
@@ -222,16 +222,16 @@ class _GuidanceCard extends StatelessWidget {
           Text(
             item.title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             '${item.subject.name} • ${item.teacherName}',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: ParentPortalColors.muted),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: ParentPortalColors.of(context).muted,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
@@ -241,7 +241,7 @@ class _GuidanceCard extends StatelessWidget {
           const SizedBox(height: 12),
           DecoratedBox(
             decoration: BoxDecoration(
-              color: ParentPortalColors.blueSoft,
+              color: ParentPortalColors.of(context).blueSoft,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Padding(
@@ -249,9 +249,9 @@ class _GuidanceCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.home_work_outlined,
-                    color: ParentPortalColors.blue,
+                    color: ParentPortalColors.of(context).blue,
                   ),
                   const SizedBox(width: 10),
                   Expanded(child: Text(item.homeActivity)),
@@ -282,7 +282,7 @@ class _ProgressCard extends StatelessWidget {
                 child: Text(
                   '${item.outcome.code} • ${item.outcome.title}',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: ParentPortalColors.navy,
+                    color: ParentPortalColors.of(context).navy,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -298,9 +298,9 @@ class _ProgressCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             NepaliBsCalendar.formatBsDate(item.latestAssessedOn),
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: ParentPortalColors.muted),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: ParentPortalColors.of(context).muted,
+            ),
           ),
         ],
       ),
@@ -322,7 +322,7 @@ class _RemedialCard extends StatelessWidget {
           Text(
             item.name,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -361,7 +361,7 @@ class _FollowUpCard extends StatelessWidget {
                 child: Text(
                   item.title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: ParentPortalColors.navy,
+                    color: ParentPortalColors.of(context).navy,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -375,9 +375,9 @@ class _FollowUpCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Next follow-up ${NepaliBsCalendar.formatBsDate(item.nextFollowUpOn!)}',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: ParentPortalColors.muted),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: ParentPortalColors.of(context).muted,
+              ),
             ),
           ],
         ],
@@ -395,7 +395,7 @@ class _CalmStatus extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: ParentPortalColors.blueSoft,
+        color: ParentPortalColors.of(context).blueSoft,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Padding(
@@ -403,7 +403,7 @@ class _CalmStatus extends StatelessWidget {
         child: Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: ParentPortalColors.blue,
+            color: ParentPortalColors.of(context).blue,
             fontWeight: FontWeight.w800,
           ),
         ),

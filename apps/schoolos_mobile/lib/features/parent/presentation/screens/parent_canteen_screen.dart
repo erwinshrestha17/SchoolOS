@@ -166,8 +166,8 @@ class _CanteenBody extends ConsumerWidget {
                               if (item.description?.isNotEmpty == true)
                                 item.description,
                             ].whereType<String>().join(' • '),
-                            style: const TextStyle(
-                              color: ParentPortalColors.muted,
+                            style: TextStyle(
+                              color: ParentPortalColors.of(context).muted,
                             ),
                           ),
                         ],
@@ -199,7 +199,9 @@ class _ServingTile extends StatelessWidget {
     return ListTile(
       leading: FeatureIcon(
         consumed ? Icons.restaurant_rounded : Icons.no_meals_rounded,
-        color: consumed ? ParentPortalColors.green : ParentPortalColors.orange,
+        color: consumed
+            ? ParentPortalColors.of(context).green
+            : ParentPortalColors.of(context).orange,
         size: 40,
       ),
       title: Text(
@@ -211,10 +213,12 @@ class _ServingTile extends StatelessWidget {
       subtitle: Text('${_dateLabel(item.mealDate)} • ${_label(item.mealType)}'),
       trailing: StatusBadge(
         label: consumed ? 'Consumed' : _label(item.status),
-        color: consumed ? ParentPortalColors.green : ParentPortalColors.orange,
+        color: consumed
+            ? ParentPortalColors.of(context).green
+            : ParentPortalColors.of(context).orange,
         background: consumed
-            ? ParentPortalColors.greenSoft
-            : ParentPortalColors.orangeSoft,
+            ? ParentPortalColors.of(context).greenSoft
+            : ParentPortalColors.of(context).orangeSoft,
       ),
     );
   }
@@ -242,15 +246,15 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
     );
     final canTopUp = readiness.valueOrNull?.sandbox == true && !_isToppingUp;
     return PortalCard(
-      color: ParentPortalColors.greenSoft,
+      color: ParentPortalColors.of(context).greenSoft,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const FeatureIcon(
+              FeatureIcon(
                 Icons.account_balance_wallet_rounded,
-                color: ParentPortalColors.green,
+                color: ParentPortalColors.of(context).green,
                 size: 58,
               ),
               const SizedBox(width: 14),
@@ -258,16 +262,18 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Current balance',
-                      style: TextStyle(color: ParentPortalColors.muted),
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).muted,
+                      ),
                     ),
                     Text(
                       balance == null ? 'No wallet' : _money(balance),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w900,
-                        color: ParentPortalColors.navy,
+                        color: ParentPortalColors.of(context).navy,
                       ),
                     ),
                   ],
@@ -278,19 +284,19 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
               // "No wallet", which reads as reassurance about an account that
               // does not exist.
               if (balance == null)
-                const StatusBadge(
+                StatusBadge(
                   label: 'Not set up',
-                  color: ParentPortalColors.muted,
-                  background: ParentPortalColors.surfaceAlt,
+                  color: ParentPortalColors.of(context).muted,
+                  background: ParentPortalColors.of(context).surfaceAlt,
                 )
               else
                 StatusBadge(
                   label: widget.info.isLowBalance ? 'Low balance' : 'OK',
                   color: widget.info.isLowBalance
-                      ? ParentPortalColors.orange
-                      : ParentPortalColors.green,
+                      ? ParentPortalColors.of(context).orange
+                      : ParentPortalColors.of(context).green,
                   background: widget.info.isLowBalance
-                      ? ParentPortalColors.orangeSoft
+                      ? ParentPortalColors.of(context).orangeSoft
                       : Colors.white,
                 ),
             ],
@@ -373,9 +379,9 @@ class _WalletCardState extends ConsumerState<_WalletCard> {
                 },
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'This is a practice payment, not a real one. The balance is added straight away.',
-                style: TextStyle(color: ParentPortalColors.muted),
+                style: TextStyle(color: ParentPortalColors.of(context).muted),
               ),
             ],
           ),
@@ -441,7 +447,9 @@ class _TransactionTile extends StatelessWidget {
     return ListTile(
       leading: FeatureIcon(
         credit ? Icons.add_card_rounded : Icons.lunch_dining_rounded,
-        color: credit ? ParentPortalColors.green : ParentPortalColors.orange,
+        color: credit
+            ? ParentPortalColors.of(context).green
+            : ParentPortalColors.of(context).orange,
         size: 40,
       ),
       title: Text(
@@ -453,7 +461,9 @@ class _TransactionTile extends StatelessWidget {
         '${credit ? '+' : ''}${_money(item.amount)}',
         style: TextStyle(
           fontWeight: FontWeight.w900,
-          color: credit ? ParentPortalColors.green : ParentPortalColors.navy,
+          color: credit
+              ? ParentPortalColors.of(context).green
+              : ParentPortalColors.of(context).navy,
         ),
       ),
     );

@@ -479,7 +479,7 @@ class _HomeworkSummary extends StatelessWidget {
               value: overdueCount,
               label: 'Overdue',
               icon: Icons.error_outline_rounded,
-              color: ParentPortalColors.red,
+              color: ParentPortalColors.of(context).red,
               selected: selected == _HomeworkFilter.overdue,
               onTap: () => onSelected(_HomeworkFilter.overdue),
             ),
@@ -489,7 +489,7 @@ class _HomeworkSummary extends StatelessWidget {
               value: dueSoonCount,
               label: 'Due soon',
               icon: Icons.schedule_rounded,
-              color: ParentPortalColors.orange,
+              color: ParentPortalColors.of(context).orange,
               selected: selected == _HomeworkFilter.dueSoon,
               onTap: () => onSelected(_HomeworkFilter.dueSoon),
             ),
@@ -499,7 +499,7 @@ class _HomeworkSummary extends StatelessWidget {
               value: completedCount,
               label: 'Completed',
               icon: Icons.task_alt_rounded,
-              color: ParentPortalColors.green,
+              color: ParentPortalColors.of(context).green,
               selected: selected == _HomeworkFilter.completed,
               onTap: () => onSelected(_HomeworkFilter.completed),
             ),
@@ -556,7 +556,7 @@ class _SummaryAction extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: selected ? color : ParentPortalColors.navy,
+                  color: selected ? color : ParentPortalColors.of(context).navy,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -592,7 +592,7 @@ class _HomeworkFilterHeaderDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     return ColoredBox(
-      color: ParentPortalColors.page,
+      color: ParentPortalColors.of(context).page,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
         child: Row(
@@ -603,7 +603,7 @@ class _HomeworkFilterHeaderDelegate extends SliverPersistentHeaderDelegate {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: ParentPortalColors.navy,
+                  color: ParentPortalColors.of(context).navy,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -663,15 +663,15 @@ class _HomeworkEmptyState extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
         child: Column(
           children: [
-            const Icon(
+            Icon(
               Icons.assignment_turned_in_outlined,
-              color: ParentPortalColors.muted,
+              color: ParentPortalColors.of(context).muted,
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
               title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: ParentPortalColors.navy,
+                color: ParentPortalColors.of(context).navy,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -679,9 +679,9 @@ class _HomeworkEmptyState extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: ParentPortalColors.muted),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: ParentPortalColors.of(context).muted,
+              ),
             ),
           ],
         ),

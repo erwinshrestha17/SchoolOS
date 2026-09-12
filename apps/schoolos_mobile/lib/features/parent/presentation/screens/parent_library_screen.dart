@@ -125,7 +125,7 @@ class _LibrarySummary extends StatelessWidget {
               Icons.menu_book_rounded,
               '${info.activeIssues.length}',
               'borrowed',
-              ParentPortalColors.green,
+              ParentPortalColors.of(context).green,
             ),
           ),
           Expanded(
@@ -133,7 +133,7 @@ class _LibrarySummary extends StatelessWidget {
               Icons.schedule_rounded,
               '$dueSoon',
               'active',
-              ParentPortalColors.orange,
+              ParentPortalColors.of(context).orange,
             ),
           ),
           Expanded(
@@ -141,7 +141,7 @@ class _LibrarySummary extends StatelessWidget {
               Icons.error_rounded,
               _money(fines),
               'fines',
-              ParentPortalColors.red,
+              ParentPortalColors.of(context).red,
             ),
           ),
         ],
@@ -164,8 +164,8 @@ class _IssueCard extends StatelessWidget {
           FeatureIcon(
             Icons.auto_stories_rounded,
             color: issue.isOverdue
-                ? ParentPortalColors.red
-                : ParentPortalColors.blue,
+                ? ParentPortalColors.of(context).red
+                : ParentPortalColors.of(context).blue,
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -181,17 +181,17 @@ class _IssueCard extends StatelessWidget {
                 ),
                 Text(
                   issue.author ?? 'Author unavailable',
-                  style: const TextStyle(color: ParentPortalColors.muted),
+                  style: TextStyle(color: ParentPortalColors.of(context).muted),
                 ),
                 const SizedBox(height: 7),
                 StatusBadge(
                   label: 'Due ${_date(issue.dueAt)}',
                   color: issue.isOverdue
-                      ? ParentPortalColors.red
-                      : ParentPortalColors.blue,
+                      ? ParentPortalColors.of(context).red
+                      : ParentPortalColors.of(context).blue,
                   background: issue.isOverdue
-                      ? ParentPortalColors.redSoft
-                      : ParentPortalColors.blueSoft,
+                      ? ParentPortalColors.of(context).redSoft
+                      : ParentPortalColors.of(context).blueSoft,
                 ),
               ],
             ),
@@ -226,7 +226,7 @@ class _IssueCard extends StatelessWidget {
               Text(
                 'Due ${_date(issue.dueAt)}\nBarcode ${issue.barcode ?? 'not available'}',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: ParentPortalColors.muted),
+                style: TextStyle(color: ParentPortalColors.of(context).muted),
               ),
             ],
           ),
@@ -244,9 +244,9 @@ class _HistoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: const Icon(
+      leading: Icon(
         Icons.history_rounded,
-        color: ParentPortalColors.green,
+        color: ParentPortalColors.of(context).green,
       ),
       title: Text(issue.bookTitle),
       subtitle: Text(
@@ -278,7 +278,10 @@ class _LibraryMetric extends StatelessWidget {
       Text(
         label,
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 11, color: ParentPortalColors.muted),
+        style: TextStyle(
+          fontSize: 11,
+          color: ParentPortalColors.of(context).muted,
+        ),
       ),
     ],
   );

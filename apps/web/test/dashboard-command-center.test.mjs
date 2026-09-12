@@ -160,7 +160,9 @@ describe('principal dashboard command center', () => {
     assert.match(readiness, /Academic readiness/);
     assert.match(readiness, /Finance readiness/);
     assert.match(readiness, /People & operations/);
-    assert.match(readiness, /You do not have permission to view this summary\./);
+    assert.match(readiness, /This summary is temporarily unavailable\./);
+    assert.match(readiness, /sourceModules.every\(.*sourceIsHidden/);
+    assert.match(readiness, /hasPartialSource && rows.length === 0/);
     assert.match(readiness, /No academic blockers reported\./);
     assert.match(readiness, /count === null \|\| count <= 0/);
     // Timetable is readiness/exceptions plus a drill-through, not a list.

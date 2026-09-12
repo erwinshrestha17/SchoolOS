@@ -260,7 +260,7 @@ class _UpdateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = _style(item.category);
+    final style = _style(context, item.category);
     final audience = _audienceLabel(item);
     final timestamp = item.createdAt == null
         ? ''
@@ -273,11 +273,13 @@ class _UpdateCard extends StatelessWidget {
         onTap: onTap,
         padding: const EdgeInsets.all(14),
         borderColor: item.isEmergency
-            ? ParentPortalColors.red.withValues(alpha: .45)
+            ? ParentPortalColors.of(context).red.withValues(alpha: .45)
             : item.isPinned
-            ? ParentPortalColors.orange.withValues(alpha: .4)
-            : ParentPortalColors.border,
-        color: item.isPinned ? ParentPortalColors.orangeSoft : Colors.white,
+            ? ParentPortalColors.of(context).orange.withValues(alpha: .4)
+            : ParentPortalColors.of(context).border,
+        color: item.isPinned
+            ? ParentPortalColors.of(context).orangeSoft
+            : ParentPortalColors.of(context).surface,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -305,7 +307,7 @@ class _UpdateCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
-                                color: ParentPortalColors.navy,
+                                color: ParentPortalColors.of(context).navy,
                                 fontWeight: item.unreadCount > 0
                                     ? FontWeight.w900
                                     : FontWeight.w700,
@@ -325,7 +327,7 @@ class _UpdateCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: ParentPortalColors.muted,
+                        color: ParentPortalColors.of(context).muted,
                       ),
                     ),
                   ],
@@ -337,16 +339,16 @@ class _UpdateCard extends StatelessWidget {
                       if (item.unreadCount > 0)
                         const _CompactState(label: 'Unread'),
                       if (item.isEmergency)
-                        const _CompactState(
+                        _CompactState(
                           label: 'Emergency',
-                          color: ParentPortalColors.red,
-                          background: ParentPortalColors.redSoft,
+                          color: ParentPortalColors.of(context).red,
+                          background: ParentPortalColors.of(context).redSoft,
                         )
                       else if (item.isImportant)
-                        const _CompactState(
+                        _CompactState(
                           label: 'Urgent',
-                          color: ParentPortalColors.orange,
-                          background: ParentPortalColors.orangeSoft,
+                          color: ParentPortalColors.of(context).orange,
+                          background: ParentPortalColors.of(context).orangeSoft,
                         ),
                       if (item.isPinned)
                         const _CompactState(
@@ -354,11 +356,11 @@ class _UpdateCard extends StatelessWidget {
                           icon: Icons.push_pin_outlined,
                         ),
                       if (item.requiresAcknowledgement)
-                        const _CompactState(
+                        _CompactState(
                           label: 'Action required',
                           icon: Icons.task_alt_rounded,
-                          color: ParentPortalColors.orange,
-                          background: ParentPortalColors.orangeSoft,
+                          color: ParentPortalColors.of(context).orange,
+                          background: ParentPortalColors.of(context).orangeSoft,
                         ),
                       if (item.hasAttachment)
                         const _CompactState(
@@ -376,7 +378,7 @@ class _UpdateCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: ParentPortalColors.muted,
+                      color: ParentPortalColors.of(context).muted,
                     ),
                   ),
                 ],
@@ -411,11 +413,14 @@ class _CommunicationGuide extends StatelessWidget {
   Widget build(BuildContext context) {
     return PortalCard(
       padding: const EdgeInsets.all(14),
-      color: ParentPortalColors.blueSoft,
-      borderColor: ParentPortalColors.blue.withValues(alpha: .22),
+      color: ParentPortalColors.of(context).blueSoft,
+      borderColor: ParentPortalColors.of(context).blue.withValues(alpha: .22),
       child: Row(
         children: [
-          const Icon(Icons.campaign_outlined, color: ParentPortalColors.blue),
+          Icon(
+            Icons.campaign_outlined,
+            color: ParentPortalColors.of(context).blue,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -424,14 +429,14 @@ class _CommunicationGuide extends StatelessWidget {
                 Text(
                   'School posts',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: ParentPortalColors.navy,
+                    color: ParentPortalColors.of(context).navy,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 Text(
                   'Formal notices, events and gallery updates stay here.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: ParentPortalColors.muted,
+                    color: ParentPortalColors.of(context).muted,
                   ),
                 ),
               ],
@@ -455,8 +460,8 @@ class _UnreadDot extends StatelessWidget {
     return Container(
       width: 9,
       height: 9,
-      decoration: const BoxDecoration(
-        color: ParentPortalColors.green,
+      decoration: BoxDecoration(
+        color: ParentPortalColors.of(context).green,
         shape: BoxShape.circle,
       ),
     );
@@ -516,27 +521,30 @@ String _audienceLabel(ParentPortalUpdate item) {
   return item.audience;
 }
 
-(IconData, Color, Color) _style(ParentUpdateCategory category) {
+(IconData, Color, Color) _style(
+  BuildContext context,
+  ParentUpdateCategory category,
+) {
   return switch (category) {
     ParentUpdateCategory.notice => (
       Icons.campaign_outlined,
-      ParentPortalColors.orangeSoft,
-      ParentPortalColors.orange,
+      ParentPortalColors.of(context).orangeSoft,
+      ParentPortalColors.of(context).orange,
     ),
     ParentUpdateCategory.message => (
       Icons.notifications_none_rounded,
-      ParentPortalColors.purpleSoft,
-      ParentPortalColors.purple,
+      ParentPortalColors.of(context).purpleSoft,
+      ParentPortalColors.of(context).purple,
     ),
     ParentUpdateCategory.event => (
       Icons.event_outlined,
-      ParentPortalColors.blueSoft,
-      ParentPortalColors.blue,
+      ParentPortalColors.of(context).blueSoft,
+      ParentPortalColors.of(context).blue,
     ),
     ParentUpdateCategory.gallery => (
       Icons.photo_library_outlined,
-      ParentPortalColors.greenSoft,
-      ParentPortalColors.green,
+      ParentPortalColors.of(context).greenSoft,
+      ParentPortalColors.of(context).green,
     ),
   };
 }

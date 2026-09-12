@@ -42,7 +42,7 @@ class _ParentCalendarScreenState extends ConsumerState<ParentCalendarScreen> {
         data: (data) {
           final bounds = _academicBounds(data);
           visibleMonth = _clampMonth(visibleMonth, bounds.$1, bounds.$2);
-          final markers = _calendarMarkers(data);
+          final markers = _calendarMarkers(context, data);
           final visibleMarkers = markers
               .where(
                 (item) =>
@@ -133,11 +133,13 @@ class _ParentCalendarScreenState extends ConsumerState<ParentCalendarScreen> {
                     const SizedBox(height: 12),
                   ],
                 const SizedBox(height: 10),
-                const PortalCard(
-                  color: ParentPortalColors.surfaceAlt,
+                PortalCard(
+                  color: ParentPortalColors.of(context).surfaceAlt,
                   child: Text(
                     'BS calendar dates are shown in English. School events and child items refresh from mobile parent APIs.',
-                    style: TextStyle(color: ParentPortalColors.muted),
+                    style: TextStyle(
+                      color: ParentPortalColors.of(context).muted,
+                    ),
                   ),
                 ),
               ],
@@ -182,15 +184,15 @@ class _CalendarHeader extends StatelessWidget {
                 Text(
                   '${month.monthName} ${month.year}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: ParentPortalColors.navy,
+                  style: TextStyle(
+                    color: ParentPortalColors.of(context).navy,
                     fontWeight: FontWeight.w900,
                     fontSize: 20,
                   ),
                 ),
                 Text(
                   academicYearLabel,
-                  style: const TextStyle(color: ParentPortalColors.muted),
+                  style: TextStyle(color: ParentPortalColors.of(context).muted),
                 ),
               ],
             ),
@@ -282,15 +284,30 @@ class _MonthGrid extends StatelessWidget {
             },
           ),
           const Divider(height: 18),
-          const Wrap(
+          Wrap(
             spacing: 12,
             runSpacing: 8,
             children: [
-              _LegendDot(color: ParentPortalColors.green, label: 'Attendance'),
-              _LegendDot(color: ParentPortalColors.purple, label: 'Homework'),
-              _LegendDot(color: ParentPortalColors.orange, label: 'Fees'),
-              _LegendDot(color: ParentPortalColors.blue, label: 'Notice/Event'),
-              _LegendDot(color: ParentPortalColors.red, label: 'Holiday'),
+              _LegendDot(
+                color: ParentPortalColors.of(context).green,
+                label: 'Attendance',
+              ),
+              _LegendDot(
+                color: ParentPortalColors.of(context).purple,
+                label: 'Homework',
+              ),
+              _LegendDot(
+                color: ParentPortalColors.of(context).orange,
+                label: 'Fees',
+              ),
+              _LegendDot(
+                color: ParentPortalColors.of(context).blue,
+                label: 'Notice/Event',
+              ),
+              _LegendDot(
+                color: ParentPortalColors.of(context).red,
+                label: 'Holiday',
+              ),
             ],
           ),
         ],
@@ -309,8 +326,8 @@ class _WeekdayLabel extends StatelessWidget {
     child: Text(
       label,
       textAlign: TextAlign.center,
-      style: const TextStyle(
-        color: ParentPortalColors.muted,
+      style: TextStyle(
+        color: ParentPortalColors.of(context).muted,
         fontWeight: FontWeight.w800,
         fontSize: 12,
       ),
@@ -338,10 +355,10 @@ class _DayCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = isSelected
-        ? Colors.white
+        ? ParentPortalColors.of(context).onGreen
         : isHoliday
-        ? ParentPortalColors.red
-        : ParentPortalColors.navy;
+        ? ParentPortalColors.of(context).red
+        : ParentPortalColors.of(context).navy;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -351,14 +368,16 @@ class _DayCell extends StatelessWidget {
           margin: const EdgeInsets.all(2),
           decoration: BoxDecoration(
             color: isSelected
-                ? ParentPortalColors.green
+                ? ParentPortalColors.of(context).green
                 : isToday
-                ? ParentPortalColors.greenSoft
+                ? ParentPortalColors.of(context).greenSoft
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
             border: !isSelected && isToday
                 ? Border.all(
-                    color: ParentPortalColors.green.withValues(alpha: .4),
+                    color: ParentPortalColors.of(
+                      context,
+                    ).green.withValues(alpha: .4),
                   )
                 : null,
           ),
@@ -385,10 +404,16 @@ class _DayCell extends StatelessWidget {
                   children: [
                     if (isHoliday)
                       _MiniDot(
-                        isSelected ? Colors.white : ParentPortalColors.red,
+                        isSelected
+                            ? ParentPortalColors.of(context).onGreen
+                            : ParentPortalColors.of(context).red,
                       ),
                     for (final marker in markers.take(4))
-                      _MiniDot(isSelected ? Colors.white : marker.color),
+                      _MiniDot(
+                        isSelected
+                            ? ParentPortalColors.of(context).onGreen
+                            : marker.color,
+                      ),
                   ],
                 ),
               ],
@@ -422,14 +447,16 @@ class _ChildCalendarSection extends StatelessWidget {
                   children: [
                     Text(
                       child.name,
-                      style: const TextStyle(
-                        color: ParentPortalColors.navy,
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).navy,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     Text(
                       '${child.classSection} - ${child.teacher}',
-                      style: const TextStyle(color: ParentPortalColors.muted),
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).muted,
+                      ),
                     ),
                   ],
                 ),
@@ -438,9 +465,9 @@ class _ChildCalendarSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (markers.isEmpty)
-            const Text(
+            Text(
               'No dated child items in this BS month.',
-              style: TextStyle(color: ParentPortalColors.muted),
+              style: TextStyle(color: ParentPortalColors.of(context).muted),
             )
           else
             for (final item in markers.take(6)) ...[
@@ -519,24 +546,26 @@ class _SelectedDayCard extends StatelessWidget {
                   children: [
                     Text(
                       '${day.day} ${day.monthName} ${day.year}',
-                      style: const TextStyle(
-                        color: ParentPortalColors.navy,
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).navy,
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
                       ),
                     ),
                     Text(
                       _weekdayName(adDate.weekday),
-                      style: const TextStyle(color: ParentPortalColors.muted),
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).muted,
+                      ),
                     ),
                   ],
                 ),
               ),
               if (isHoliday)
-                const StatusBadge(
+                StatusBadge(
                   label: 'Holiday',
-                  color: ParentPortalColors.red,
-                  backgroundColor: ParentPortalColors.redSoft,
+                  color: ParentPortalColors.of(context).red,
+                  backgroundColor: ParentPortalColors.of(context).redSoft,
                 ),
             ],
           ),
@@ -546,7 +575,7 @@ class _SelectedDayCard extends StatelessWidget {
               isHoliday
                   ? 'No school on this day.'
                   : 'No school items on this day.',
-              style: const TextStyle(color: ParentPortalColors.muted),
+              style: TextStyle(color: ParentPortalColors.of(context).muted),
             )
           else
             for (final marker in dayMarkers) ...[
@@ -559,10 +588,10 @@ class _SelectedDayCard extends StatelessWidget {
             ],
           if (upcoming.isNotEmpty) ...[
             const Divider(height: 24),
-            const Text(
+            Text(
               'Coming up',
               style: TextStyle(
-                color: ParentPortalColors.navy,
+                color: ParentPortalColors.of(context).navy,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -598,7 +627,7 @@ class _LegendDot extends StatelessWidget {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: ParentPortalColors.muted),
+          style: TextStyle(color: ParentPortalColors.of(context).muted),
         ),
       ),
     ],
@@ -633,7 +662,10 @@ class _CalendarMarker {
   final IconData icon;
 }
 
-List<_CalendarMarker> _calendarMarkers(ParentPortalData data) {
+List<_CalendarMarker> _calendarMarkers(
+  BuildContext context,
+  ParentPortalData data,
+) {
   final nowBs = NepaliBsCalendar.fromAd(DateTime.now());
   final markers = <_CalendarMarker>[];
   for (final child in data.children) {
@@ -642,7 +674,7 @@ List<_CalendarMarker> _calendarMarkers(ParentPortalData data) {
         childId: child.id,
         title: child.attendance,
         bs: nowBs,
-        color: ParentPortalColors.green,
+        color: ParentPortalColors.of(context).green,
         icon: Icons.fact_check_rounded,
       ),
     );
@@ -653,7 +685,7 @@ List<_CalendarMarker> _calendarMarkers(ParentPortalData data) {
           childId: child.id,
           title: 'Fees due ${formatMoney(child.feesDue)}',
           bs: NepaliBsCalendar.fromAd(feeDue),
-          color: ParentPortalColors.orange,
+          color: ParentPortalColors.of(context).orange,
           icon: Icons.account_balance_wallet_outlined,
         ),
       );
@@ -668,7 +700,7 @@ List<_CalendarMarker> _calendarMarkers(ParentPortalData data) {
         childId: item.childId,
         title: item.title,
         bs: NepaliBsCalendar.fromAd(dueAt),
-        color: ParentPortalColors.purple,
+        color: ParentPortalColors.of(context).purple,
         icon: Icons.menu_book_outlined,
       ),
     );
@@ -690,7 +722,7 @@ List<_CalendarMarker> _calendarMarkers(ParentPortalData data) {
           childId: childId,
           title: item.title,
           bs: NepaliBsCalendar.fromAd(createdAt),
-          color: ParentPortalColors.blue,
+          color: ParentPortalColors.of(context).blue,
           icon: item.category == ParentUpdateCategory.event
               ? Icons.event_outlined
               : Icons.campaign_outlined,

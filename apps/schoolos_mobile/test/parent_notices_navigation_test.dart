@@ -118,10 +118,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Notices'), findsWidgets);
-    expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Children'), findsOneWidget);
-    expect(find.text('Attendance'), findsOneWidget);
-    expect(find.text('Homework'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('Child'), findsOneWidget);
+    expect(find.text('Updates'), findsOneWidget);
+    expect(find.text('Schoolwork'), findsOneWidget);
     expect(find.text('More'), findsOneWidget);
     expect(find.byTooltip('Back'), findsOneWidget);
 
@@ -137,7 +137,7 @@ void main() {
     router.go(AppRoutes.notices);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Home'));
+    await tester.tap(find.text('Today'));
     await tester.pumpAndSettle();
 
     expect(find.text('Parent home'), findsOneWidget);

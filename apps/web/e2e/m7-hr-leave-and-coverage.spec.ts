@@ -39,7 +39,7 @@ test.describe.serial("M7 HR leave workflow and staff-coverage dashboard", () => 
     await page.goto("/login");
     await page.getByLabel(/School Code/i).fill(TENANT_SLUG);
     await page.getByLabel(/Email/i).fill(TEACHER_EMAIL);
-    await page.getByLabel(/Password/i).fill(TEACHER_PASSWORD);
+    await page.getByLabel(/^Password$/i).fill(TEACHER_PASSWORD);
     await Promise.all([
       page.waitForURL(/\/dashboard(?:$|[/?#])/, { timeout: 20_000 }),
       page.getByRole("button", { name: /Sign in/i }).click(),
@@ -174,7 +174,7 @@ test.describe.serial("M7 HR leave workflow and staff-coverage dashboard", () => 
     await page.goto("/login");
     await page.getByLabel(/School Code/i).fill(TENANT_SLUG);
     await page.getByLabel(/Email/i).fill(TEACHER_EMAIL);
-    await page.getByLabel(/Password/i).fill(TEACHER_PASSWORD);
+    await page.getByLabel(/^Password$/i).fill(TEACHER_PASSWORD);
     await Promise.all([
       page.waitForURL(/\/dashboard(?:$|[/?#])/, { timeout: 20_000 }),
       page.getByRole("button", { name: /Sign in/i }).click(),

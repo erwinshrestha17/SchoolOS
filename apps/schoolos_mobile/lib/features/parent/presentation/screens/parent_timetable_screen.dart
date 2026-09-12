@@ -124,7 +124,7 @@ class _TimetableContent extends ConsumerWidget {
         }
 
         return RefreshIndicator(
-          color: ParentPortalColors.green,
+          color: ParentPortalColors.of(context).green,
           onRefresh: () async {
             ref.invalidate(parentTimetableProvider(childId));
             await ref.read(parentTimetableProvider(childId).future);
@@ -257,13 +257,13 @@ class _TimetableHeaderCard extends StatelessWidget {
           Container(
             width: 54,
             height: 54,
-            decoration: const BoxDecoration(
-              color: ParentPortalColors.greenSoft,
+            decoration: BoxDecoration(
+              color: ParentPortalColors.of(context).greenSoft,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.school_outlined,
-              color: ParentPortalColors.green,
+              color: ParentPortalColors.of(context).green,
               size: 30,
             ),
           ),
@@ -277,7 +277,7 @@ class _TimetableHeaderCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: ParentPortalColors.navy,
+                    color: ParentPortalColors.of(context).navy,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -290,7 +290,7 @@ class _TimetableHeaderCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: ParentPortalColors.muted,
+                    color: ParentPortalColors.of(context).muted,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -300,7 +300,7 @@ class _TimetableHeaderCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: ParentPortalColors.muted,
+                    color: ParentPortalColors.of(context).muted,
                     fontSize: 11,
                   ),
                 ),
@@ -351,8 +351,8 @@ class _WeekdaySelector extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     decoration: BoxDecoration(
                       color: day == selectedDay
-                          ? ParentPortalColors.green
-                          : ParentPortalColors.surfaceAlt,
+                          ? ParentPortalColors.of(context).green
+                          : ParentPortalColors.of(context).surfaceAlt,
                       borderRadius: AppRadius.borderRadiusMax,
                     ),
                     child: Text(
@@ -360,8 +360,8 @@ class _WeekdaySelector extends StatelessWidget {
                       maxLines: 1,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: day == selectedDay
-                            ? Colors.white
-                            : ParentPortalColors.navy,
+                            ? ParentPortalColors.of(context).onGreen
+                            : ParentPortalColors.of(context).navy,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -385,9 +385,9 @@ class _DayHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(
+        Icon(
           Icons.calendar_today_outlined,
-          color: ParentPortalColors.navy,
+          color: ParentPortalColors.of(context).navy,
           size: 22,
         ),
         const SizedBox(width: AppSpacing.md),
@@ -395,7 +395,7 @@ class _DayHeader extends StatelessWidget {
           child: Text(
             _dayLabel(day),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: ParentPortalColors.navy,
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -403,8 +403,8 @@ class _DayHeader extends StatelessWidget {
         StatusBadge(
           icon: Icons.schedule_rounded,
           label: '$periodCount ${periodCount == 1 ? 'period' : 'periods'}',
-          color: ParentPortalColors.navy,
-          backgroundColor: ParentPortalColors.surfaceAlt,
+          color: ParentPortalColors.of(context).navy,
+          backgroundColor: ParentPortalColors.of(context).surfaceAlt,
         ),
       ],
     );
@@ -419,7 +419,7 @@ class _TimetableSlotCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visual = _subjectVisual(slot.subjectName, index);
+    final visual = _subjectVisual(context, slot.subjectName, index);
     return PortalCard(
       padding: EdgeInsets.zero,
       child: Stack(
@@ -449,7 +449,7 @@ class _TimetableSlotCard extends StatelessWidget {
                         '${slot.startsAt}\n${slot.endsAt}',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           height: 1.45,
-                          color: ParentPortalColors.muted,
+                          color: ParentPortalColors.of(context).muted,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -457,7 +457,7 @@ class _TimetableSlotCard extends StatelessWidget {
                     Container(
                       width: 1,
                       height: 44,
-                      color: ParentPortalColors.border,
+                      color: ParentPortalColors.of(context).border,
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Container(
@@ -481,7 +481,7 @@ class _TimetableSlotCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.titleSmall
                                 ?.copyWith(
-                                  color: ParentPortalColors.navy,
+                                  color: ParentPortalColors.of(context).navy,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -497,7 +497,7 @@ class _TimetableSlotCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
-                                  color: ParentPortalColors.muted,
+                                  color: ParentPortalColors.of(context).muted,
                                   fontSize: 11,
                                 ),
                           ),
@@ -565,12 +565,16 @@ class _SubjectVisual {
   final IconData icon;
 }
 
-_SubjectVisual _subjectVisual(String subjectName, int index) {
+_SubjectVisual _subjectVisual(
+  BuildContext context,
+  String subjectName,
+  int index,
+) {
   final subject = subjectName.toLowerCase();
   if (subject.contains('math')) {
-    return const _SubjectVisual(
-      color: ParentPortalColors.purple,
-      softColor: ParentPortalColors.purpleSoft,
+    return _SubjectVisual(
+      color: ParentPortalColors.of(context).purple,
+      softColor: ParentPortalColors.of(context).purpleSoft,
       icon: Icons.calculate_outlined,
     );
   }
@@ -582,9 +586,9 @@ _SubjectVisual _subjectVisual(String subjectName, int index) {
     );
   }
   if (subject.contains('computer') || subject.contains('digital')) {
-    return const _SubjectVisual(
-      color: ParentPortalColors.blue,
-      softColor: ParentPortalColors.blueSoft,
+    return _SubjectVisual(
+      color: ParentPortalColors.of(context).blue,
+      softColor: ParentPortalColors.of(context).blueSoft,
       icon: Icons.desktop_windows_outlined,
     );
   }
@@ -596,9 +600,9 @@ _SubjectVisual _subjectVisual(String subjectName, int index) {
     );
   }
   if (subject.contains('social') || subject.contains('geography')) {
-    return const _SubjectVisual(
-      color: ParentPortalColors.orange,
-      softColor: ParentPortalColors.orangeSoft,
+    return _SubjectVisual(
+      color: ParentPortalColors.of(context).orange,
+      softColor: ParentPortalColors.of(context).orangeSoft,
       icon: Icons.public_rounded,
     );
   }
@@ -606,32 +610,32 @@ _SubjectVisual _subjectVisual(String subjectName, int index) {
       subject.contains('english') ||
       subject.contains('nepali') ||
       subject.contains('language')) {
-    return const _SubjectVisual(
-      color: ParentPortalColors.green,
-      softColor: ParentPortalColors.greenSoft,
+    return _SubjectVisual(
+      color: ParentPortalColors.of(context).green,
+      softColor: ParentPortalColors.of(context).greenSoft,
       icon: Icons.menu_book_outlined,
     );
   }
 
-  const fallbacks = [
+  final fallbacks = [
     _SubjectVisual(
-      color: ParentPortalColors.purple,
-      softColor: ParentPortalColors.purpleSoft,
+      color: ParentPortalColors.of(context).purple,
+      softColor: ParentPortalColors.of(context).purpleSoft,
       icon: Icons.auto_stories_outlined,
     ),
     _SubjectVisual(
-      color: ParentPortalColors.blue,
-      softColor: ParentPortalColors.blueSoft,
+      color: ParentPortalColors.of(context).blue,
+      softColor: ParentPortalColors.of(context).blueSoft,
       icon: Icons.school_outlined,
     ),
     _SubjectVisual(
-      color: ParentPortalColors.orange,
-      softColor: ParentPortalColors.orangeSoft,
+      color: ParentPortalColors.of(context).orange,
+      softColor: ParentPortalColors.of(context).orangeSoft,
       icon: Icons.lightbulb_outline_rounded,
     ),
     _SubjectVisual(
-      color: ParentPortalColors.green,
-      softColor: ParentPortalColors.greenSoft,
+      color: ParentPortalColors.of(context).green,
+      softColor: ParentPortalColors.of(context).greenSoft,
       icon: Icons.menu_book_outlined,
     ),
   ];

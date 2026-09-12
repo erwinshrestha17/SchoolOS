@@ -44,8 +44,8 @@ class NoticeDetailScreen extends ConsumerWidget {
                   FeatureIcon(
                     _categoryIcon(notice.category),
                     color: notice.isEmergency
-                        ? ParentPortalColors.red
-                        : ParentPortalColors.purple,
+                        ? ParentPortalColors.of(context).red
+                        : ParentPortalColors.of(context).purple,
                     size: 66,
                   ),
                   const SizedBox(width: 16),
@@ -55,10 +55,10 @@ class NoticeDetailScreen extends ConsumerWidget {
                       children: [
                         Text(
                           notice.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
-                            color: ParentPortalColors.navy,
+                            color: ParentPortalColors.of(context).navy,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -73,21 +73,21 @@ class NoticeDetailScreen extends ConsumerWidget {
                             StatusBadge(
                               label: _categoryLabel(notice.category),
                               color: notice.isEmergency
-                                  ? ParentPortalColors.red
-                                  : ParentPortalColors.purple,
+                                  ? ParentPortalColors.of(context).red
+                                  : ParentPortalColors.of(context).purple,
                               background: notice.isEmergency
-                                  ? ParentPortalColors.redSoft
-                                  : ParentPortalColors.purpleSoft,
+                                  ? ParentPortalColors.of(context).redSoft
+                                  : ParentPortalColors.of(context).purpleSoft,
                               icon: Icons.bookmark_rounded,
                             ),
                             StatusBadge(
                               label: notice.isRead ? 'Read' : 'Unread',
                               color: notice.isRead
-                                  ? ParentPortalColors.green
-                                  : ParentPortalColors.orange,
+                                  ? ParentPortalColors.of(context).green
+                                  : ParentPortalColors.of(context).orange,
                               background: notice.isRead
-                                  ? ParentPortalColors.greenSoft
-                                  : ParentPortalColors.orangeSoft,
+                                  ? ParentPortalColors.of(context).greenSoft
+                                  : ParentPortalColors.of(context).orangeSoft,
                               icon: notice.isRead
                                   ? Icons.done_all_rounded
                                   : Icons.schedule_rounded,
@@ -102,21 +102,21 @@ class NoticeDetailScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
             PortalCard(
-              color: ParentPortalColors.greenSoft,
+              color: ParentPortalColors.of(context).greenSoft,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const FeatureIcon(
+                  FeatureIcon(
                     Icons.campaign_rounded,
-                    color: ParentPortalColors.green,
+                    color: ParentPortalColors.of(context).green,
                     size: 42,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       '${notice.publishedBy} • ${_formatDate(notice.publishedAt)}',
-                      style: const TextStyle(
-                        color: ParentPortalColors.green,
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).green,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -128,10 +128,10 @@ class NoticeDetailScreen extends ConsumerWidget {
             PortalCard(
               child: Text(
                 notice.body.isEmpty ? notice.preview : notice.body,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 17,
                   height: 1.6,
-                  color: ParentPortalColors.navy,
+                  color: ParentPortalColors.of(context).navy,
                 ),
               ),
             ),
@@ -162,20 +162,22 @@ class NoticeDetailScreen extends ConsumerWidget {
               ),
             ],
             const SizedBox(height: 18),
-            const PortalCard(
+            PortalCard(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   FeatureIcon(
                     Icons.verified_user_rounded,
-                    color: ParentPortalColors.green,
+                    color: ParentPortalColors.of(context).green,
                     size: 42,
                   ),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'This notice is loaded through your parent-scoped mobile account. Attachments stay protected and may require internet.',
-                      style: TextStyle(color: ParentPortalColors.muted),
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).muted,
+                      ),
                     ),
                   ),
                 ],
@@ -317,9 +319,9 @@ class _NoticeAttachmentCardState extends State<_NoticeAttachmentCard> {
         children: [
           Row(
             children: [
-              const FeatureIcon(
+              FeatureIcon(
                 Icons.attach_file_rounded,
-                color: ParentPortalColors.red,
+                color: ParentPortalColors.of(context).red,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -332,7 +334,9 @@ class _NoticeAttachmentCardState extends State<_NoticeAttachmentCard> {
                     ),
                     Text(
                       detail,
-                      style: const TextStyle(color: ParentPortalColors.muted),
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).muted,
+                      ),
                     ),
                   ],
                 ),
@@ -407,12 +411,12 @@ class _NoticeAcknowledgementCard extends ConsumerWidget {
 
     if (alreadyAcknowledged || state.isAcknowledged) {
       return PortalCard(
-        color: ParentPortalColors.greenSoft,
+        color: ParentPortalColors.of(context).greenSoft,
         child: Row(
           children: [
-            const FeatureIcon(
+            FeatureIcon(
               Icons.verified_rounded,
-              color: ParentPortalColors.green,
+              color: ParentPortalColors.of(context).green,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -425,7 +429,9 @@ class _NoticeAcknowledgementCard extends ConsumerWidget {
                   ),
                   Text(
                     'The school has recorded that you read this notice.',
-                    style: TextStyle(color: ParentPortalColors.muted),
+                    style: TextStyle(
+                      color: ParentPortalColors.of(context).muted,
+                    ),
                   ),
                 ],
               ),
@@ -439,17 +445,17 @@ class _NoticeAcknowledgementCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Let the school know you have read this notice. Your name and the '
             'time are recorded once.',
-            style: TextStyle(color: ParentPortalColors.muted),
+            style: TextStyle(color: ParentPortalColors.of(context).muted),
           ),
           if (state.error != null) ...[
             const SizedBox(height: 8),
             Text(
               state.error!.message,
-              style: const TextStyle(
-                color: ParentPortalColors.red,
+              style: TextStyle(
+                color: ParentPortalColors.of(context).red,
                 fontWeight: FontWeight.w700,
               ),
             ),

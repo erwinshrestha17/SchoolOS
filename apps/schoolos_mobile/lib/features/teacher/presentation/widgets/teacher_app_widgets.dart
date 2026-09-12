@@ -13,7 +13,7 @@ import '../../../../shared/widgets/user_avatar.dart';
 /// said, so an evening attendance check opened with a greeting that was wrong
 /// most of the day.
 String teacherGreeting(DateTime now) {
-  final hour = now.hour;
+  final hour = NepaliBsCalendar.toNepalLocalDateTime(now).hour;
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
@@ -71,7 +71,7 @@ class TeacherPersonaHeader extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${teacherGreeting(NepaliBsCalendar.toNepalLocalDateTime(DateTime.now()))}, $teacherName',
+                    '${teacherGreeting(DateTime.now())}, $teacherName',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(

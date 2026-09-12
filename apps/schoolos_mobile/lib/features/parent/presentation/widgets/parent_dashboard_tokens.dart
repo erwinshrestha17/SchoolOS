@@ -22,38 +22,46 @@ class ParentDashboardTokens {
   /// on wears the semantic colour instead. Homework keeps the academic purple
   /// even when work is pending, because "some homework is set" is the normal
   /// state of a school week - the attention card above is what escalates it.
-  static Color statusColor(ParentStatusKind kind, ParentStatusTone tone) {
+  static Color statusColor(
+    BuildContext context,
+    ParentStatusKind kind,
+    ParentStatusTone tone,
+  ) {
     return switch (tone) {
-      ParentStatusTone.critical => ParentPortalColors.red,
-      ParentStatusTone.neutral => ParentPortalColors.muted,
-      ParentStatusTone.unavailable => ParentPortalColors.muted,
-      ParentStatusTone.informational => ParentPortalColors.blue,
+      ParentStatusTone.critical => ParentPortalColors.of(context).red,
+      ParentStatusTone.neutral => ParentPortalColors.of(context).muted,
+      ParentStatusTone.unavailable => ParentPortalColors.of(context).muted,
+      ParentStatusTone.informational => ParentPortalColors.of(context).blue,
       ParentStatusTone.attention =>
         kind == ParentStatusKind.homework
-            ? ParentPortalColors.purple
-            : ParentPortalColors.orange,
+            ? ParentPortalColors.of(context).purple
+            : ParentPortalColors.of(context).orange,
       ParentStatusTone.positive =>
         kind == ParentStatusKind.homework
-            ? ParentPortalColors.purple
-            : ParentPortalColors.green,
+            ? ParentPortalColors.of(context).purple
+            : ParentPortalColors.of(context).green,
     };
   }
 
   /// The tinted circle behind a status icon.
-  static Color statusSurface(ParentStatusKind kind, ParentStatusTone tone) {
+  static Color statusSurface(
+    BuildContext context,
+    ParentStatusKind kind,
+    ParentStatusTone tone,
+  ) {
     return switch (tone) {
-      ParentStatusTone.critical => ParentPortalColors.redSoft,
+      ParentStatusTone.critical => ParentPortalColors.of(context).redSoft,
       ParentStatusTone.neutral ||
-      ParentStatusTone.unavailable => ParentPortalColors.surfaceAlt,
-      ParentStatusTone.informational => ParentPortalColors.blueSoft,
+      ParentStatusTone.unavailable => ParentPortalColors.of(context).surfaceAlt,
+      ParentStatusTone.informational => ParentPortalColors.of(context).blueSoft,
       ParentStatusTone.attention =>
         kind == ParentStatusKind.homework
-            ? ParentPortalColors.purpleSoft
-            : ParentPortalColors.orangeSoft,
+            ? ParentPortalColors.of(context).purpleSoft
+            : ParentPortalColors.of(context).orangeSoft,
       ParentStatusTone.positive =>
         kind == ParentStatusKind.homework
-            ? ParentPortalColors.purpleSoft
-            : ParentPortalColors.greenSoft,
+            ? ParentPortalColors.of(context).purpleSoft
+            : ParentPortalColors.of(context).greenSoft,
     };
   }
 
@@ -98,12 +106,15 @@ class ParentDashboardTokens {
     };
   }
 
-  static Color urgencyColor(ParentUpcomingUrgency urgency) {
+  static Color urgencyColor(
+    BuildContext context,
+    ParentUpcomingUrgency urgency,
+  ) {
     return switch (urgency) {
-      ParentUpcomingUrgency.overdue => ParentPortalColors.red,
-      ParentUpcomingUrgency.dueToday => ParentPortalColors.orange,
-      ParentUpcomingUrgency.dueTomorrow => ParentPortalColors.blue,
-      ParentUpcomingUrgency.later => ParentPortalColors.blue,
+      ParentUpcomingUrgency.overdue => ParentPortalColors.of(context).red,
+      ParentUpcomingUrgency.dueToday => ParentPortalColors.of(context).orange,
+      ParentUpcomingUrgency.dueTomorrow => ParentPortalColors.of(context).blue,
+      ParentUpcomingUrgency.later => ParentPortalColors.of(context).blue,
     };
   }
 }

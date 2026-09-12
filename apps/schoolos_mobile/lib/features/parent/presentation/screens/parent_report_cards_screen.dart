@@ -116,9 +116,9 @@ class _ExamScheduleTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FeatureIcon(
+          FeatureIcon(
             Icons.event_available_rounded,
-            color: ParentPortalColors.blue,
+            color: ParentPortalColors.of(context).blue,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -127,8 +127,8 @@ class _ExamScheduleTile extends StatelessWidget {
               children: [
                 Text(
                   item.subjectName,
-                  style: const TextStyle(
-                    color: ParentPortalColors.navy,
+                  style: TextStyle(
+                    color: ParentPortalColors.of(context).navy,
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
                   ),
@@ -136,7 +136,7 @@ class _ExamScheduleTile extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   item.examTermName,
-                  style: const TextStyle(color: ParentPortalColors.muted),
+                  style: TextStyle(color: ParentPortalColors.of(context).muted),
                 ),
                 const SizedBox(height: 10),
                 Text(
@@ -147,7 +147,7 @@ class _ExamScheduleTile extends StatelessWidget {
                   '${NepaliBsCalendar.formatNepalTime(item.startsAt)} - '
                   '${NepaliBsCalendar.formatNepalTime(item.endsAt)}'
                   '${item.room == null ? '' : ' | ${item.room}'}',
-                  style: const TextStyle(color: ParentPortalColors.muted),
+                  style: TextStyle(color: ParentPortalColors.of(context).muted),
                 ),
               ],
             ),
@@ -185,11 +185,11 @@ class _ReportCardsBody extends ConsumerWidget {
               _ReportCardTile(childId: child.id, child: child, card: card),
               const SizedBox(height: 14),
             ],
-            const PortalCard(
-              color: ParentPortalColors.surfaceAlt,
+            PortalCard(
+              color: ParentPortalColors.of(context).surfaceAlt,
               child: Text(
                 'Unpublished results are hidden until finalized by the school.',
-                style: TextStyle(color: ParentPortalColors.muted),
+                style: TextStyle(color: ParentPortalColors.of(context).muted),
               ),
             ),
           ],
@@ -235,9 +235,9 @@ class _ReportCardTileState extends ConsumerState<_ReportCardTile> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const FeatureIcon(
+              FeatureIcon(
                 Icons.description_rounded,
-                color: ParentPortalColors.green,
+                color: ParentPortalColors.of(context).green,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -253,7 +253,9 @@ class _ReportCardTileState extends ConsumerState<_ReportCardTile> {
                     ),
                     Text(
                       '${child.classSection} - Published ${_bsDate(card.publishedAt)}',
-                      style: const TextStyle(color: ParentPortalColors.muted),
+                      style: TextStyle(
+                        color: ParentPortalColors.of(context).muted,
+                      ),
                     ),
                   ],
                 ),
@@ -263,7 +265,7 @@ class _ReportCardTileState extends ConsumerState<_ReportCardTile> {
           ),
           const SizedBox(height: 14),
           PortalCard(
-            color: ParentPortalColors.greenSoft,
+            color: ParentPortalColors.of(context).greenSoft,
             child: Row(
               children: [
                 Expanded(
@@ -288,10 +290,10 @@ class _ReportCardTileState extends ConsumerState<_ReportCardTile> {
           ),
           if (card.subjects.isNotEmpty) ...[
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'Subject grades',
               style: TextStyle(
-                color: ParentPortalColors.navy,
+                color: ParentPortalColors.of(context).navy,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -308,13 +310,13 @@ class _ReportCardTileState extends ConsumerState<_ReportCardTile> {
           if (_finalRemarks(card).isNotEmpty) ...[
             const SizedBox(height: 14),
             PortalCard(
-              color: ParentPortalColors.greenSoft,
+              color: ParentPortalColors.of(context).greenSoft,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const FeatureIcon(
+                  FeatureIcon(
                     Icons.format_quote_rounded,
-                    color: ParentPortalColors.green,
+                    color: ParentPortalColors.of(context).green,
                     size: 38,
                   ),
                   const SizedBox(width: 10),
@@ -419,12 +421,15 @@ class _ResultMetric extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(label, style: const TextStyle(color: ParentPortalColors.muted)),
+      Text(
+        label,
+        style: TextStyle(color: ParentPortalColors.of(context).muted),
+      ),
       const SizedBox(height: 4),
       Text(
         value,
-        style: const TextStyle(
-          color: ParentPortalColors.green,
+        style: TextStyle(
+          color: ParentPortalColors.of(context).green,
           fontSize: 22,
           fontWeight: FontWeight.w900,
         ),
@@ -444,9 +449,9 @@ class _SubjectGradeChip extends StatelessWidget {
       width: 124,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: ParentPortalColors.surfaceAlt,
+        color: ParentPortalColors.of(context).surfaceAlt,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: ParentPortalColors.border),
+        border: Border.all(color: ParentPortalColors.of(context).border),
       ),
       child: Column(
         children: [
@@ -454,23 +459,23 @@ class _SubjectGradeChip extends StatelessWidget {
             subject.subjectName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: ParentPortalColors.navy,
+            style: TextStyle(
+              color: ParentPortalColors.of(context).navy,
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             subject.grade,
-            style: const TextStyle(
-              color: ParentPortalColors.green,
+            style: TextStyle(
+              color: ParentPortalColors.of(context).green,
               fontSize: 24,
               fontWeight: FontWeight.w900,
             ),
           ),
           Text(
             '${subject.percentage.toStringAsFixed(0)}%',
-            style: const TextStyle(color: ParentPortalColors.muted),
+            style: TextStyle(color: ParentPortalColors.of(context).muted),
           ),
         ],
       ),
