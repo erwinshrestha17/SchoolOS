@@ -1,55 +1,63 @@
-# SchoolOS Mobile App Design Charter — GPT-6 Astra
+# SchoolOS Mobile App Design — Astra Flutter Design & Execution Playbook
 
-## Purpose
+## Authority
 
-This document governs **only the design, UX, interaction architecture, visual system, responsiveness, accessibility, and frontend quality of the SchoolOS Flutter mobile application**.
+This file is a **scoped mobile design and Flutter frontend execution playbook** for SchoolOS.
 
-It is written specifically so an advanced autonomous engineering model such as **GPT-6 Astra** can use its strengths in:
+It applies to:
 
-- repository-wide inspection;
-- visual reasoning;
-- UI hierarchy analysis;
-- interaction design;
-- Flutter implementation;
-- cross-screen consistency;
-- accessibility review;
-- responsive/adaptive layout reasoning;
-- iOS and Android convention awareness;
-- rendered-app inspection;
-- regression detection;
-- iterative visual QA;
-- testing and refinement.
+- `apps/schoolos_mobile`
+- Parent mobile UX
+- Teacher mobile UX
+- Principal mobile UX
+- Flutter design-system, accessibility, adaptation, offline-state, and visual QA work
 
-This file is **not** a backend roadmap, API specification, database specification, finance specification, or web-design document.
+This file is **not** an independent repository source of truth.
 
-Backend behavior may be referenced only when the mobile UI must represent a real backend state correctly.
+`AGENTS.md` remains authoritative for:
 
-The objective is to make SchoolOS feel like a **coherent, polished, trustworthy, production-grade mobile application designed specifically for frequent school use**, not a set of web screens compressed onto a phone.
+- product scope;
+- Nepal-only roadmap boundaries;
+- personas and access boundaries;
+- module status;
+- tenant isolation;
+- authentication/authorization;
+- financial/accounting rules;
+- compliance;
+- protected data;
+- offline safety boundaries;
+- backend authority;
+- release and verification policy.
+
+If this playbook conflicts with `AGENTS.md`, **`AGENTS.md` wins**.
+
+This playbook may refine the mobile experience only within those boundaries.
 
 ---
 
-# 1. Design Mission
+# 1. Purpose
 
-The SchoolOS app must be:
+Guide GPT-6 Astra/Codex when auditing, redesigning, implementing, visually verifying, and continuously improving the SchoolOS Flutter application.
 
-- mobile-first;
-- fast to understand;
-- fast to operate;
-- role-aware;
-- one-hand friendly;
-- visually calm;
-- information-efficient;
-- consistent across the complete app;
-- accessible;
-- resilient under weak connectivity;
-- explicit about offline and synchronization state;
-- trustworthy around sensitive school information;
-- appropriate for repeated daily use;
-- scalable as features grow;
-- familiar on both iOS and Android;
-- adapted to platform conventions without creating two different products.
+Use Astra's strengths in:
 
-The mobile app must **not** become a miniature clone of the SchoolOS web application.
+- repository-wide Flutter inspection;
+- visual reasoning;
+- interaction design;
+- mobile information architecture;
+- reusable widget/system consolidation;
+- adaptive iOS/Android behavior;
+- accessibility review;
+- rendered-app inspection;
+- regression detection;
+- offline/sync-state UX;
+- iterative device QA.
+
+The goal is to make SchoolOS feel like a **coherent, polished, trustworthy, production-grade school companion app**, not a compressed copy of the Web application.
+
+---
+
+# 2. Mobile Product Role
 
 Mobile exists for:
 
@@ -64,119 +72,97 @@ Mobile exists for:
 - offline-safe work;
 - contextual actions.
 
-Dense configuration, high-volume administration, large reports, bulk editing, and complex tables should remain web-first unless there is a strong mobile use case.
+Dense configuration, bulk administration, large reports, complex financial operations, high-risk corrections, and governance remain Web-first unless `AGENTS.md` or an explicit task defines a safe mobile use case.
 
 ---
 
-# 2. Astra Operating Principle
+# 3. Existing Flutter Context
 
-When Astra is asked to redesign or improve the SchoolOS app, it must not begin by randomly restyling screens.
+SchoolOS Mobile currently uses technologies including:
 
-It must follow this sequence:
+- Flutter / Dart;
+- Riverpod;
+- GoRouter;
+- Dio;
+- Flutter Secure Storage;
+- local authentication/biometrics;
+- Firebase Messaging;
+- connectivity awareness;
+- Nepal date/localization utilities;
+- platform permissions/location/media utilities where enabled.
+
+Repository structure includes:
+
+- `lib/app`
+- `lib/core`
+- `lib/features`
+- `lib/shared`
+
+Astra should improve the existing app and shared primitives before introducing overlapping architecture or a parallel design system.
+
+---
+
+# 4. Astra Execution Sequence
+
+For broad mobile redesign or UX work:
 
 ```text
-Inspect existing Flutter application
-        ↓
-Map current routes and navigation
-        ↓
-Map personas and feature surfaces
-        ↓
-Inspect existing shared widgets/tokens/theme
-        ↓
-Inspect representative screens from every persona
-        ↓
-Identify repeated UX/design problems
-        ↓
-Define or refine one coherent mobile design system
-        ↓
-Refactor shared primitives first where justified
-        ↓
+Read AGENTS.md
+    ↓
+Read this playbook
+    ↓
+Inspect Flutter routes/navigation
+    ↓
+Map Parent/Teacher/Principal flows
+    ↓
+Inspect theme/tokens/shared widgets
+    ↓
+Run the actual app
+    ↓
+Inspect representative screens
+    ↓
+Identify systemic UX/design problems
+    ↓
+Refine shared mobile design system
+    ↓
 Improve highest-frequency flows
-        ↓
+    ↓
 Migrate remaining screens consistently
-        ↓
-Run app and inspect rendered output
-        ↓
-Test real device sizes
-        ↓
-Test iOS + Android behavior
-        ↓
-Test text scaling/accessibility
-        ↓
+    ↓
+Test iOS/Android adaptation
+    ↓
+Test accessibility/text scaling
+    ↓
 Test loading/error/offline/sync states
-        ↓
-Fix visual and interaction regressions
-        ↓
-Re-run targeted tests and Flutter quality gates
+    ↓
+Run targeted Flutter quality gates
+    ↓
+Re-run and verify
 ```
 
-Astra must prefer **systemic fixes** over isolated cosmetic patches.
+Do not begin a broad redesign by randomly restyling individual screens.
 
-If ten screens use an inconsistent card, input, list row, section header, or status badge, fix the reusable primitive or design rule rather than producing ten unrelated variants.
-
----
-
-# 3. Inspect Before Redesigning
-
-Before major visual work, inspect at minimum:
-
-- `apps/schoolos_mobile/lib/app`
-- `apps/schoolos_mobile/lib/core`
-- `apps/schoolos_mobile/lib/features`
-- `apps/schoolos_mobile/lib/shared`
-- routing and navigation;
-- app theme and design tokens;
-- reusable widgets;
-- typography;
-- spacing;
-- forms;
-- buttons;
-- lists;
-- cards;
-- dialogs;
-- bottom sheets;
-- status chips;
-- loading states;
-- error states;
-- offline states;
-- empty states;
-- permission states;
-- authentication flow;
-- biometric flow;
-- notifications;
-- child switching;
-- teacher class switching;
-- principal attention/approval flows;
-- profile/settings;
-- current Flutter tests related to affected surfaces.
-
-Do not assume a component is missing before searching for an existing equivalent.
-
-Do not introduce a parallel design system when one can be evolved safely.
+Prefer systemic reusable fixes.
 
 ---
 
-# 4. Primary Mobile Personas
+# 5. Mobile Personas
 
-The production mobile experience should primarily optimize for:
+Primary production mobile personas:
 
-```text
-Parent / Guardian
-Teacher
-Principal
-```
+- Parent / Guardian;
+- Teacher;
+- Principal.
 
-Other feature code may exist in the repository, but design work must not silently expand product scope simply because a directory or route exists.
+Other feature code may exist, but design work MUST NOT silently expand product scope merely because a route/directory exists.
 
-Every persona should feel like a purpose-built app experience rather than the same dashboard with different cards hidden.
+Every persona should feel purpose-built rather than like the same dashboard with hidden cards.
 
 ---
 
-# 5. Persona Design Philosophy
+# 6. Parent Experience
 
-## Parent
-
-The parent experience should answer four questions quickly:
+The Parent experience should quickly answer:
 
 ```text
 Is my child okay?
@@ -185,9 +171,9 @@ What requires my attention?
 What do I need to do next?
 ```
 
-The parent app should prioritize:
+Prioritize:
 
-- child context;
+- active child identity;
 - attendance;
 - homework;
 - timetable/calendar;
@@ -195,20 +181,16 @@ The parent app should prioritize:
 - fees/receipts where enabled;
 - notices;
 - notifications;
-- requests/corrections;
+- service/correction requests;
 - school updates;
 - transport status where enabled;
 - profile/security.
 
-The parent should never have to understand the school's internal module structure.
+Parents should not need to understand internal ERP/module terminology.
 
-Use parent-facing language rather than ERP terminology.
+Never expose internal IDs, posting jargon, administrative workflow internals, or implementation detail without a real user need.
 
-Avoid exposing irrelevant internal IDs, workflow jargon, database concepts, posting states, or administrative terminology.
-
-### Parent navigation target
-
-A strong default model is:
+### Navigation target
 
 ```text
 Home
@@ -218,17 +200,17 @@ Requests
 Profile
 ```
 
-Child-specific features should be surfaced contextually rather than forcing every module into bottom navigation.
+Child-specific features should be surfaced contextually.
 
-If multiple children are linked, the active child context must always be obvious.
+When multiple children are linked, active child context MUST always be obvious.
 
-Never allow a child switch to create ambiguous content ownership.
+A child switch MUST NOT retain ambiguous or unauthorized stale content.
 
 ---
 
-## Teacher
+# 7. Teacher Experience
 
-The teacher experience should optimize for **speed during a school day**.
+Teacher mobile should optimize for speed during the school day.
 
 Primary questions:
 
@@ -239,23 +221,23 @@ Which tasks are incomplete?
 Can I finish this in seconds?
 ```
 
-The app should prioritize:
+Prioritize:
 
 - today's timetable;
 - current/next class;
 - attendance;
 - assigned classes;
 - homework;
-- quick marks/CAS where approved;
+- quick marks/CAS where safely enabled;
 - activity capture;
 - substitutions;
 - notices;
 - notifications;
 - offline/sync state;
-- leave/self-service items;
+- leave/self-service;
 - profile/security.
 
-### Teacher navigation target
+### Navigation target
 
 ```text
 Today
@@ -265,26 +247,17 @@ Homework
 More
 ```
 
-`More` can contain lower-frequency functions such as:
+`More` may contain lower-frequency functions.
 
-- marks;
-- timetable;
-- activities;
-- notices;
-- notifications;
-- leave;
-- payslips where permitted;
-- settings;
-- sync status;
-- security.
+High-frequency classroom actions must not be buried beneath several menus.
 
-High-frequency classroom actions must not be buried under multiple menus.
+Design visibility MUST NOT imply assignment authority; backend authorization remains authoritative.
 
 ---
 
-## Principal
+# 8. Principal Experience
 
-The principal app is an **attention and decision surface**, not a mobile replica of the admin dashboard.
+Principal mobile is an **attention and decision surface**, not a miniature Admin dashboard.
 
 Primary questions:
 
@@ -295,7 +268,7 @@ Is the school operating normally?
 What is unusually risky today?
 ```
 
-The app should prioritize:
+Prioritize:
 
 - operational overview;
 - attention items;
@@ -304,12 +277,11 @@ The app should prioritize:
 - academic readiness;
 - staff absence impact;
 - critical finance exceptions;
-- unresolved communication failures;
-- safety alerts;
-- operational disruptions;
+- communication failures;
+- safety/operational alerts;
 - notifications.
 
-### Principal navigation target
+### Navigation target
 
 ```text
 Overview
@@ -319,286 +291,218 @@ School
 Notifications
 ```
 
-The principal app should emphasize exceptions over raw totals.
-
-A principal should not need to inspect ten charts to discover one urgent issue.
+Emphasize exceptions over raw totals.
 
 ---
 
-# 6. Mobile Information Architecture
+# 9. Shared SchoolOS Cross-Surface Contract
 
-Navigation must remain shallow and predictable.
+Mobile must share the same product semantics as Web for:
 
-Prefer:
+- terminology;
+- business-state names;
+- semantic status meaning;
+- success/warning/error/critical semantics;
+- Nepali + English quality;
+- accessibility principles;
+- sensitive-data treatment;
+- identity context;
+- date/time/currency meaning;
+- loading/error/empty-state language principles;
+- icon meaning for equivalent concepts.
+
+Mobile does **not** require pixel parity with Web.
+
+Mobile-specific patterns are expected where appropriate:
+
+- bottom navigation;
+- compact lists;
+- bottom sheets;
+- sticky/reachable actions;
+- one-handed controls;
+- adaptive iOS/Android conventions;
+- explicit offline/sync affordances;
+- gesture-aware interactions.
+
+Never copy Web tables/navigation directly into mobile merely for consistency.
+
+---
+
+# 10. Mobile Information Architecture
+
+Prefer shallow, predictable navigation:
 
 ```text
 Primary destination
     ↓
 Focused list
     ↓
-Record/detail
+Detail
     ↓
 Action
 ```
 
-Avoid:
-
-```text
-Menu
-→ submenu
-→ module menu
-→ category
-→ feature
-→ tab
-→ record
-```
+Avoid deep module-oriented chains.
 
 Rules:
 
 - bottom navigation is reserved for highest-frequency destinations;
-- use no more destinations than can remain immediately understandable;
-- secondary actions belong in contextual menus, sheets, or detail surfaces;
-- use tabs only where sibling views genuinely share one context;
-- never duplicate the same destination in several competing navigation systems;
-- preserve expected back behavior;
-- deep links must land in an understandable context;
-- notification deep links must preserve persona and child/class context;
-- switching school/child/account context must not silently retain stale content.
+- secondary actions belong in contextual menus, sheets, or details;
+- tabs are for genuine sibling views sharing one context;
+- avoid duplicate destinations across competing navigation systems;
+- preserve intuitive back behavior;
+- deep links must land in understandable context;
+- notification deep links must preserve persona + child/class context;
+- context switches must not retain stale content.
 
 ---
 
-# 7. One-Handed Usage
+# 11. One-Handed Use
 
 Design for thumb reach.
 
-Frequent actions should generally live in the comfortable lower and middle screen zones.
+Frequent actions should generally be placed in comfortable lower/middle screen zones where appropriate.
 
-Do not repeatedly place essential primary actions at the extreme top of tall phones.
+Use:
 
-Use bottom sheets, bottom actions, sticky action areas, and reachable controls where appropriate.
+- bottom actions;
+- sticky action regions;
+- bottom sheets;
+- reachable controls.
 
-Examples of high-frequency actions that deserve easy reach:
+Examples:
 
-- mark attendance;
-- submit attendance;
+- mark/submit attendance;
 - publish homework;
 - acknowledge notice;
-- approve/reject an item;
+- approve/reject;
 - switch child;
 - open next class;
-- retry sync;
-- respond to an urgent action item.
+- retry sync.
 
-Avoid floating action buttons unless the action is genuinely primary and the FAB does not obscure content or conflict with navigation.
+Avoid floating action buttons unless they are genuinely the dominant action and do not obstruct content/navigation.
 
 ---
 
-# 8. Visual Character
+# 12. Visual Character
 
-SchoolOS mobile should feel:
+SchoolOS Mobile should feel:
 
 - modern;
-- professional;
 - calm;
+- professional;
 - approachable;
 - dependable;
-- clear;
 - lightweight;
-- institutionally credible.
+- institutionally credible;
+- consistent across personas.
 
-It must **not** look like:
+It must not look like:
 
-- a generic AI-generated SaaS dashboard;
-- a banking app unless the workflow is financial;
+- a generic AI SaaS app;
 - a social network;
 - a children's game;
-- a collection of Material demo screens;
-- a web application placed inside a narrow viewport.
+- a collection of Material demos;
+- a banking app outside financial flows;
+- a web app squeezed onto a phone.
 
-Avoid habitual AI design patterns:
+Avoid excessive:
 
-- excessive gradients;
-- glassmorphism everywhere;
+- gradients;
+- glassmorphism;
 - oversized decorative cards;
-- giant titles consuming the first viewport;
+- giant titles;
 - random pastel backgrounds;
-- excessive pill-shaped containers;
+- pills everywhere;
 - meaningless charts;
-- icon grids with no hierarchy;
-- excessive shadows;
-- unnecessary animations;
-- nested cards inside cards;
-- ornamental blobs;
-- every section using a different accent color;
-- every statistic becoming a dashboard tile.
+- icon grids;
+- shadows;
+- animations;
+- nested cards;
+- ornamental decoration.
 
-Visual hierarchy should come primarily from:
-
-- typography;
-- spacing;
-- grouping;
-- alignment;
-- subtle surfaces;
-- meaningful emphasis;
-- restrained semantic color;
-- position;
-- progressive disclosure.
+Hierarchy should primarily come from typography, spacing, grouping, alignment, subtle surfaces, restrained semantic color, and progressive disclosure.
 
 ---
 
-# 9. Design Tokens
+# 13. Design Tokens
 
-Astra should converge the app toward explicit reusable tokens rather than arbitrary values scattered through screens.
-
-At minimum define or normalize:
+Converge toward explicit reusable tokens for:
 
 - color roles;
 - typography roles;
-- spacing scale;
+- spacing;
 - radii;
 - elevation/surface behavior;
 - icon sizes;
 - control heights;
-- touch target minimums;
-- divider rules;
+- minimum touch targets;
+- dividers;
 - semantic statuses;
-- animation durations;
-- breakpoints/adaptive rules where required.
+- motion durations;
+- adaptive breakpoints/rules where required.
 
-Do not hard-code visually similar but slightly different values across screens.
-
-Example conceptual spacing scale:
-
-```text
-4  — micro relationship
-8  — tight relationship
-12 — compact component spacing
-16 — default component spacing
-24 — section spacing
-32 — strong section separation
-```
-
-The exact implementation should follow repository conventions rather than blindly copying this scale.
+Do not scatter slightly different hard-coded values across screens.
 
 ---
 
-# 10. Color System
+# 14. Color and Semantic Status
 
-Color must communicate purpose.
+Use semantic roles such as:
 
-Define semantic roles such as:
-
-```text
-primary
-surface
-surfaceVariant
-background
-textPrimary
-textSecondary
-border
-success
-warning
-critical
-information
-pending
-disabled
-```
+- primary;
+- surface/background;
+- primary/secondary text;
+- border;
+- success;
+- warning;
+- critical;
+- information;
+- pending;
+- disabled;
+- draft;
+- submitted;
+- finalized;
+- locked;
+- published;
+- failed;
+- conflicted.
 
 Rules:
 
-- do not encode important status using color alone;
+- important meaning must not depend on color alone;
 - maintain accessible contrast;
-- reserve red for actual critical/error/destructive meaning;
-- reserve strong accent color for meaningful emphasis;
-- avoid a different arbitrary module color for every feature;
-- dark mode must remain structurally coherent, not simply invert colors;
-- status colors must be consistent throughout Parent, Teacher, and Principal surfaces.
+- reserve red for actual error/critical/destructive meaning;
+- use strong accent sparingly;
+- avoid arbitrary feature colors;
+- dark mode must remain structurally coherent if supported;
+- equivalent states must mean the same thing as Web.
 
 ---
 
-# 11. Typography
+# 15. Typography
 
-SchoolOS already supports Latin and Devanagari typography; designs must treat Nepali as a first-class language rather than an afterthought.
+SchoolOS supports Latin and Devanagari. Nepali must be treated as a first-class language.
 
-Typography must remain readable under:
+Typography must remain usable with:
 
 - English;
 - Nepali;
 - longer translated labels;
-- large accessibility text;
-- dynamic type/text scaling.
+- dynamic text scaling;
+- accessibility font sizes.
 
-Create a clear hierarchy for:
+Use a clear hierarchy for page title, section title, row/card title, body, supporting text, metadata, labels, buttons, status, and numeric emphasis.
 
-- page title;
-- section title;
-- card/list title;
-- body;
-- supporting text;
-- metadata;
-- labels;
-- buttons;
-- status text;
-- numeric emphasis.
-
-Do not use tiny text to force information onto one line.
-
-Do not rely on font weight alone for every hierarchy distinction.
-
-Avoid excessive typography sizes.
-
-This is an operational app, not an editorial landing page.
+Do not use tiny text merely to keep content on one line.
 
 ---
 
-# 12. Icons
+# 16. Lists and Cards
 
-Icons must be:
+Lists are a primary mobile primitive.
 
-- familiar;
-- semantically correct;
-- consistent in style;
-- supported by labels where ambiguity exists.
-
-Do not use icons as decoration when they add no information.
-
-Avoid placing a colored icon container beside every list item simply because it looks modern.
-
-Critical actions must not be icon-only unless the meaning is universally established and accessible labeling exists.
-
----
-
-# 13. Cards
-
-Cards should be used only when they express a meaningful grouped object or action.
-
-Good uses:
-
-- child summary;
-- current class;
-- approval item;
-- upcoming event;
-- payment/receipt summary;
-- notice preview;
-- operational attention item.
-
-Bad uses:
-
-- wrapping every heading;
-- every row in a long list;
-- nested cards;
-- turning navigation into dozens of tiles;
-- presenting data that would scan better in a simple row/section.
-
-Prefer lists and grouped sections for repeated information.
-
----
-
-# 14. Lists
-
-Lists are one of the most important mobile primitives in SchoolOS.
-
-A list row should clearly communicate:
+A good row communicates:
 
 ```text
 Primary identity
@@ -608,120 +512,66 @@ Relevant metadata
 Available action
 ```
 
-Rows must remain scannable.
+Use separators, grouping, and spacing instead of making every row a floating card.
 
-Use separators, spacing, or grouped surfaces instead of turning every row into a floating card.
+Use cards only for meaningful grouped objects/actions such as:
 
-Support:
+- active child summary;
+- current class;
+- approval item;
+- upcoming event;
+- notice preview;
+- payment/receipt summary;
+- attention item.
 
-- loading;
-- empty;
-- error;
-- retry;
-- refresh;
-- pagination where required;
-- stale-data indication;
-- offline cached state.
-
-Do not display infinite spinners without explaining what is happening.
+Avoid nested cards and grid-of-tiles navigation unless genuinely superior.
 
 ---
 
-# 15. Forms
+# 17. Forms
 
-Forms must be optimized for phones.
+Mobile forms should:
 
-Rules:
-
-- one clear task per form;
-- correct keyboard/input types;
-- explicit labels;
-- helpful validation;
-- preserve entered data after recoverable errors;
-- avoid unnecessarily long forms;
-- divide complex workflows into logical sections;
-- do not use placeholder text as the only label;
-- show required fields clearly;
-- avoid modal dialogs for complex form entry;
-- use bottom sheets only for short, focused interactions;
-- keep submit actions visible/reachable where useful;
+- focus on one clear task;
+- use correct input/keyboard types;
+- use explicit labels;
+- provide recoverable validation;
+- preserve entered data after recoverable failures;
+- break complex forms into logical sections;
+- clearly show required fields;
+- avoid placeholder-only labels;
+- avoid complex forms inside dialogs;
+- keep submission actions reachable when useful;
 - prevent accidental duplicate submission;
-- show submission progress when meaningful.
+- show progress for meaningful network actions.
 
-Errors should explain how to recover.
-
-Bad:
-
-```text
-Invalid input
-```
-
-Better:
-
-```text
-Enter a valid Nepal mobile number.
-```
+Errors should tell the user how to recover.
 
 ---
 
-# 16. Bottom Sheets
+# 18. Bottom Sheets and Dialogs
 
 Use bottom sheets for:
 
 - quick filters;
 - simple selectors;
 - short contextual actions;
-- confirmation with supporting context;
-- compact status explanations.
+- compact explanations;
+- brief confirmations.
 
-Do not use bottom sheets as substitutes for full screens when the workflow includes:
+Use full screens for complex, long, nested, multi-stage, or validation-heavy workflows.
 
-- many fields;
-- complex validation;
-- long content;
-- nested navigation;
-- multi-stage tasks.
+Dialogs should be rare and reserved for consequential choices.
 
-Sheets must account for keyboard height and device safe areas.
+Confirmations should explain the consequence rather than say only “Are you sure?”.
 
 ---
 
-# 17. Dialogs and Confirmation
+# 19. Home Screen Principles
 
-Dialogs should be rare.
+Mobile home is not a desktop dashboard.
 
-Use them for consequential decisions such as:
-
-- destructive action;
-- final submission;
-- irreversible transition;
-- sensitive approval;
-- logout/session revocation where confirmation is useful.
-
-A confirmation must explain the consequence.
-
-Avoid generic:
-
-```text
-Are you sure?
-```
-
-Prefer:
-
-```text
-Submit attendance for Grade 8A?
-You can no longer edit it directly after submission.
-```
-
----
-
-# 18. Home/Dashboard Design
-
-A mobile home screen is not a desktop dashboard.
-
-Do not fill the first screen with a grid of metrics.
-
-The home screen should combine:
+Use:
 
 ```text
 Context
@@ -730,1178 +580,321 @@ Context
 + today's information
 ```
 
-Every persona should have a different content priority.
+Do not fill the first screen with a grid of metrics.
 
 ### Parent home
 
-Prefer:
-
-- active child identity;
-- today's attendance/status;
-- next important event;
-- homework requiring attention;
-- unread/urgent notice;
-- upcoming payment or deadline where relevant;
-- quick child switch.
+Prioritize active child, today's status, homework/notice attention, next event, upcoming deadline/payment when relevant.
 
 ### Teacher home
 
-Prefer:
-
-- current/next period;
-- attendance due;
-- today's classes;
-- homework/marks deadlines;
-- substitution changes;
-- sync warning;
-- actionable alerts.
+Prioritize current/next class, attendance due, today's classes, substitutions, deadlines, sync warnings.
 
 ### Principal home
 
-Prefer:
-
-- high-priority attention items;
-- pending approvals;
-- missing attendance submissions;
-- critical staff/academic/communication exceptions;
-- concise school operating status.
-
-Charts should appear only when the trend itself supports a decision.
+Prioritize high-priority attention, pending approvals, missing attendance, critical operational/academic/staff/communication exceptions.
 
 ---
 
-# 19. Attendance UX
+# 20. Attendance UX
 
-Attendance is a high-frequency teacher workflow and must be exceptionally efficient.
+Attendance is a high-frequency authoritative workflow.
 
-Design goals:
+Design for:
 
-- open correct class quickly;
-- display only authorized roster;
-- mark common state with minimal taps;
-- support "mark all present" then exceptions;
-- clearly distinguish present/absent/late/excused states;
-- allow reason entry without excessive navigation;
-- preserve draft state;
-- show offline status;
-- show sync state;
-- prevent accidental duplicate submissions;
-- clearly distinguish draft vs submitted vs finalized/locked;
-- make correction flow visually distinct from ordinary editing.
+- exact assigned roster;
+- fast exception marking;
+- clear draft/submitted/finalized state;
+- offline draft visibility;
+- pending sync visibility;
+- failure/conflict visibility;
+- safe retry;
+- clear locked state;
+- correction request path.
 
-A teacher should not need to open a separate screen for every student.
+Never imply that a locally edited draft is final authoritative attendance before server acceptance.
 
-Sync/conflict states must never be hidden behind generic success messaging.
+Do not hide sync conflicts.
 
 ---
 
-# 20. Homework UX
+# 21. Homework / Class / Academic UX
 
-Teacher homework creation should be optimized for speed.
+Teacher flows should minimize taps for:
 
-Prefer a compact workflow:
+- choosing assigned context;
+- creating homework;
+- setting due date;
+- attaching media;
+- reviewing submissions;
+- giving quick feedback;
+- checking current/next class.
+
+Academic result/marks screens must visually distinguish draft, submitted, locked, and published states consistently with `AGENTS.md`.
+
+Do not expose unpublished parent data.
+
+---
+
+# 22. Principal Approval UX
+
+Approval screens must show enough context to make a decision safely.
+
+Include where relevant:
+
+- what is being approved;
+- who/what is affected;
+- current state;
+- reason/evidence;
+- consequence of approval/rejection;
+- audit-relevant confirmation.
+
+Do not optimize approvals into blind swipe actions when context matters.
+
+---
+
+# 23. Authentication and Biometrics
+
+Mobile auth UX must respect `AGENTS.md`.
+
+Design for:
 
 ```text
-Class/subject context
-→ title/instructions
-→ due date
-→ optional attachment
-→ publish/schedule
+Credential login
+→ first successful login
+→ optional biometric prompt when supported
+→ user may skip
+→ enable later in Settings
+→ secure credential fallback
 ```
 
-Parent homework presentation should emphasize:
+Also design intentional states for:
 
-- subject;
-- task;
-- due date;
-- status;
-- attachment;
-- teacher feedback where available.
-
-Use meaningful grouping:
-
-```text
-Due today
-Upcoming
-Overdue
-Completed
-```
-
-Avoid presenting homework as an undifferentiated chronological feed.
-
----
-
-# 21. Timetable UX
-
-Timetable must be optimized for "what happens now/next" rather than only displaying a grid.
-
-Teacher view should emphasize:
-
-- current class;
-- next class;
-- location/room if relevant;
-- substitutions;
-- changes;
-- day's schedule.
-
-Parent view should emphasize the selected child's current day and upcoming schedule.
-
-Full-week timetable remains accessible but should not dominate the initial view on small screens.
-
----
-
-# 22. Results and Academic Information
-
-Parent results must clearly distinguish:
-
-- published/final;
-- provisional where applicable;
-- corrected;
-- unavailable/not published.
-
-Avoid exposing internal workflow states that parents do not need.
-
-Use hierarchy so users can understand overall result and then drill into subject/component detail.
-
-Do not make long academic information dependent on horizontal scrolling.
-
-Report-card access should be clearly differentiated from quick result summaries.
-
----
-
-# 23. Notices and Notifications
-
-Do not treat notices and notifications as identical.
-
-### Notices
-
-Formal school communication with:
-
-- title;
-- publisher;
-- date;
-- audience context;
-- priority;
-- attachments;
-- read/acknowledgement state;
-- corrected/superseded state.
-
-### Notifications
-
-Event-driven alerts that should usually deep-link to the source context.
-
-Notification UI must:
-
-- group meaningfully;
-- indicate unread state without excessive visual noise;
-- distinguish critical from routine;
-- avoid leaking sensitive detail on lock-screen previews;
-- clearly identify the related child/class/context.
-
----
-
-# 24. Principal Attention and Approvals
-
-Principal attention lists must be ordered by **importance and actionability**, not just recency.
-
-Every attention item should answer:
-
-```text
-What happened?
-Why does it matter?
-Which context is affected?
-What action is expected?
-By when?
-```
-
-Approval cards must show enough context to make a responsible decision without forcing unnecessary navigation.
-
-Avoid one-tap destructive or high-risk approvals without confirmation.
-
----
-
-# 25. Authentication UX
-
-Authentication must feel secure but simple.
-
-Design complete states for:
-
-- initial login;
-- invalid credentials;
-- expired credentials where applicable;
-- forgot password;
-- reset password;
-- session expiry;
+- expired session;
 - revoked session;
-- tenant/school unavailable;
-- account disabled;
-- no network;
-- server unavailable.
+- disabled account;
+- changed school/tenant context;
+- biometric unavailable;
+- biometric failure;
+- secure fallback.
 
-Never collapse all failures into:
-
-```text
-Something went wrong
-```
-
-when a safer, actionable explanation can be provided.
+Never imply that biometric authentication replaces server authorization.
 
 ---
 
-# 26. Biometric UX
+# 24. Offline and Synchronization UX
 
-After a successful first credential login, eligible Parent, Teacher, and Principal users may be offered device biometric unlock.
+The App playbook governs **how** safe offline state is communicated, not **what high-risk operations are allowed offline**. `AGENTS.md` controls that boundary.
 
-The UI must:
+Every offline-capable workflow should distinguish states such as:
 
-- clearly explain what biometric login does;
-- identify Face ID/fingerprint/device authentication appropriately;
-- make setup optional;
-- provide Skip/Not now;
-- allow later activation from Settings;
-- maintain password/credential fallback;
-- gracefully handle biometrics removed/changed/locked out;
-- never imply SchoolOS stores raw biometric data.
+- local draft;
+- saved locally;
+- pending sync;
+- syncing;
+- synced;
+- stale;
+- failed;
+- conflicted;
+- rejected because authority changed.
 
-Do not repeatedly nag a user who declines setup.
+Principles:
 
----
+- never show “saved” when only local persistence occurred unless wording makes that clear;
+- never silently overwrite newer authoritative server data;
+- explain conflicts in user language;
+- provide retry when safe;
+- show stale-data state when material;
+- after role/assignment/guardian/session changes, now-unauthorized cached data must disappear/become inaccessible.
 
-# 27. Offline-First UX
-
-Offline support is a core mobile design requirement.
-
-The interface must explicitly distinguish:
-
-```text
-Online
-Offline
-Cached
-Draft saved locally
-Waiting to sync
-Syncing
-Synced
-Sync failed
-Conflict
-Access changed
-```
-
-Do not communicate offline state only through a tiny connection icon.
-
-Users need confidence about whether work is safe.
-
-Examples:
-
-```text
-Attendance saved on this device
-Will sync when you're online
-```
-
-or:
-
-```text
-Sync conflict
-This attendance record changed on the server while you were offline.
-Review before continuing.
-```
-
-Never display "Saved" when the system only means "queued locally" if that distinction matters.
-
-High-risk actions that are online-only must be visibly disabled/explained rather than failing mysteriously after input is completed.
+High-risk offline mutations prohibited by `AGENTS.md` remain prohibited regardless of design convenience.
 
 ---
 
-# 28. Connectivity States
+# 25. Notifications and Deep Links
 
-Design for Nepal's realistic connectivity conditions:
+Notifications should:
 
-- slow connection;
-- packet loss;
-- short disconnection;
-- long offline period;
-- app resumed after hours;
-- failed background synchronization;
-- Wi-Fi/mobile network switching.
+- avoid sensitive lock-screen details;
+- use clear action-oriented copy;
+- deep-link to the correct persona/context;
+- preserve child/class/school context;
+- handle corrected/superseded notices clearly;
+- handle expired/unauthorized deep-link targets gracefully.
 
-The app should avoid modal interruption for every short connection fluctuation.
-
-Use calm persistent status for routine offline operation and stronger intervention only when an action cannot continue safely.
+Never route a user into data they are no longer authorized to access.
 
 ---
 
-# 29. Loading States
+# 26. Loading, Empty, Error, Permission, and Offline States
 
-Prefer contextual skeletons or progress states over blocking full-screen spinners.
+Every meaningful screen should intentionally support:
 
-Rules:
-
-- do not flash loading UI for trivial cached transitions;
-- retain useful previous content while refreshing when safe;
-- indicate refresh separately from initial load;
-- avoid layout shift;
-- show progress for long upload/sync operations;
-- permit cancellation when reasonable.
-
----
-
-# 30. Empty States
-
-Empty states should explain the situation and next action.
-
-Examples:
-
-Bad:
-
-```text
-No data
-```
-
-Better:
-
-```text
-No homework due
-Nothing has been assigned for the selected child this week.
-```
-
-or:
-
-```text
-No attendance session yet
-Your next assigned class starts at 10:30 AM.
-```
-
-Do not make every empty state an illustration-heavy marketing card.
-
----
-
-# 31. Error States
-
-Every important screen needs intentional error design.
-
-Errors should distinguish, where possible:
-
+- loading;
+- empty;
+- offline cached;
 - no connection;
-- timeout;
-- server unavailable;
-- session expired;
-- permission denied;
-- no longer assigned;
-- record deleted/changed;
-- validation failure;
-- upload failure;
-- synchronization conflict.
+- API failure;
+- no permission;
+- disabled feature;
+- stale state;
+- partial failure;
+- sync failure/conflict where applicable.
 
-Provide appropriate recovery:
+Never present unauthorized state as empty data.
 
-- retry;
-- refresh;
-- sign in again;
-- go back;
-- contact school/support;
-- review conflict.
+Never present failed data as zero.
 
-Do not expose raw HTTP errors or stack traces.
+Avoid infinite spinners without explanation.
 
 ---
 
-# 32. Permission States
+# 27. iOS and Android Adaptation
 
-Camera, notification, location, biometric, and storage-related permissions must have a clear pre-permission explanation when context is not self-evident.
+SchoolOS should remain one product while respecting platform conventions.
 
-Explain:
-
-- why SchoolOS needs the permission;
-- what feature depends on it;
-- what happens if declined.
-
-Do not repeatedly force permission prompts.
-
-If permanently denied, provide a clear route to system settings only when relevant.
-
----
-
-# 33. Accessibility
-
-Treat accessibility as a design requirement, not a final QA pass.
-
-All important screens must support:
-
-- semantic labels;
-- screen readers;
-- logical focus order;
-- sufficient contrast;
-- text scaling;
-- large touch targets;
-- non-color status indicators;
-- reduced motion where applicable;
-- predictable navigation;
-- accessible form errors;
-- understandable icon labels;
-- Nepali and English content.
-
-Minimum touch targets should respect platform accessibility guidance.
-
-Do not truncate critical information under larger text sizes.
-
-Test at significantly increased font scale.
-
----
-
-# 34. iOS and Android Adaptation
-
-SchoolOS should share one design language while respecting platform expectations.
-
-Astra must inspect whether Flutter components behave naturally on both platforms.
-
-Consider platform conventions for:
+Consider platform-appropriate behavior for:
 
 - back navigation;
-- system gestures;
-- dialogs;
-- date/time pickers;
-- permission handling;
-- biometric terminology;
-- keyboard behavior;
-- scrolling physics where appropriate;
 - safe areas;
-- status/navigation bars;
-- share/open actions;
-- notification settings.
-
-Do not produce an Android-looking app on iOS merely because Material widgets are convenient.
-
-Do not fork every screen into platform-specific implementations without a clear UX reason.
-
----
-
-# 35. Responsive and Adaptive Mobile Layout
-
-The app must work across:
-
-- compact phones;
-- large phones;
-- different aspect ratios;
-- tablets where supported;
-- portrait;
-- landscape where a workflow legitimately supports it;
-- display cutouts;
-- safe-area variations.
-
-Avoid fixed pixel assumptions that only work on one reference phone.
-
-On wider screens, improve information arrangement rather than merely stretching mobile cards edge-to-edge.
-
-Do not make tablet layouts a desktop dashboard by default.
-
----
-
-# 36. Keyboard and Input Behavior
-
-Forms must remain usable when the keyboard opens.
-
-Verify:
-
-- focused field stays visible;
-- primary actions are not permanently hidden;
-- scrolling works;
-- bottom sheets resize safely;
-- appropriate input action Next/Done is used;
-- keyboard types match the field;
-- dismissal feels natural;
-- no overflow occurs on small devices.
-
----
-
-# 37. Motion
-
-Motion should explain relationships, not decorate the interface.
-
-Good motion:
-
-- navigation continuity;
-- expanding details;
-- state transition;
-- successful completion;
-- lightweight feedback.
-
-Bad motion:
-
-- bouncing dashboards;
-- decorative entrance animation for every card;
-- long transitions delaying frequent workflows;
-- animation that hides state changes;
-- excessive parallax.
-
-Frequent teacher workflows should feel almost instantaneous.
-
-Respect reduced-motion preferences where applicable.
-
----
-
-# 38. Haptics
-
-Use haptic feedback selectively for meaningful moments such as:
-
-- confirming a deliberate action;
-- selection in high-frequency controls;
-- error/destructive warning where platform-appropriate.
-
-Do not add haptics to every tap.
-
----
-
-# 39. Dark Mode
-
-If dark mode is supported or being prepared, treat it as a designed theme.
-
-Verify:
-
-- all text contrast;
-- cards/surfaces hierarchy;
-- semantic colors;
-- illustrations/images;
-- disabled states;
-- text fields;
-- dialogs/sheets;
 - system bars;
-- charts;
-- status colors.
+- text selection;
+- haptics;
+- permissions;
+- biometrics;
+- modal presentation;
+- keyboard behavior;
+- scrolling physics where appropriate.
 
-Do not simply invert the light palette.
+Do not fork the entire visual identity by platform.
 
----
-
-# 40. Localization and Nepal Context
-
-SchoolOS is Nepal-scoped.
-
-Mobile design must support:
-
-- English;
-- Nepali Unicode;
-- Devanagari typography;
-- Nepal time zone;
-- NPR formatting;
-- BS/AD presentation where required;
-- Nepal phone formats;
-- long Nepal administrative locality names;
-- realistic low-connectivity behavior.
-
-Do not allow English-only spacing assumptions to break Nepali layouts.
-
-Avoid overly narrow controls that cannot accommodate translated labels.
+Use adaptive behavior only when it materially improves native usability.
 
 ---
 
-# 41. Privacy in Visual Design
+# 28. Responsive and Device Adaptation
 
-Sensitive data should not be unnecessarily exposed on shared/mobile screens.
+Test representative:
 
-Consider privacy for:
+- small phones;
+- large phones;
+- common Android aspect ratios;
+- iPhone safe areas/notches;
+- accessibility text scaling;
+- landscape only where the flow genuinely supports it;
+- tablet layouts where SchoolOS chooses to support them.
 
-- student information;
-- guardian details;
-- marks;
-- attendance;
-- fees;
-- staff salary;
-- medical/safety information;
-- notifications.
-
-Use deliberate masking or reduced previews where appropriate.
-
-Lock-screen notifications should not reveal sensitive details unnecessarily.
-
-Do not rely on visual hiding as authorization; server-side authorization remains authoritative.
+Do not hard-code layouts around one flagship device size.
 
 ---
 
-# 42. Destructive and High-Risk Actions
+# 29. Accessibility
 
-High-risk actions require stronger visual treatment than ordinary actions.
+Audit:
 
-Examples:
-
-- final attendance submission;
-- approval/rejection;
-- logout all sessions;
-- deleting an unpublished draft;
-- irreversible administrative actions exposed on mobile.
-
-Destructive buttons must not be visually identical to neutral actions.
-
-Do not position destructive actions where they are easy to hit accidentally.
-
----
-
-# 43. Search
-
-Search should exist only where the dataset and workflow justify it.
-
-Good mobile search experiences:
-
-- immediate access;
-- relevant scopes;
-- clear empty results;
-- recent query support only if useful;
-- filters that remain understandable.
-
-Do not place a search box on every screen.
-
-Teachers must only search within authorized/assigned scope.
-
-Parents should generally not need global student search.
-
----
-
-# 44. Filters
-
-Mobile filters should use concise chips, segmented controls, or a focused bottom sheet depending on complexity.
-
-Always show active filters.
-
-Provide an obvious way to reset.
-
-Avoid carrying hidden filters between unrelated screens.
-
----
-
-# 45. Dates and Calendars
-
-Date presentation must remain consistent.
-
-Avoid mixing formats arbitrarily.
-
-When BS and AD are both supported, the relationship must be understandable and consistent.
-
-Calendar interfaces should emphasize school-relevant events rather than imitate a generic productivity calendar.
-
----
-
-# 46. Attachments and Media
-
-Media workflows should account for mobile realities.
-
-Design states for:
-
-- choosing photo/file;
-- camera capture;
-- compression/processing;
-- upload progress;
-- offline draft;
-- upload failure;
-- retry;
-- permission denied;
-- file too large;
-- unsupported type.
-
-Do not block the entire screen while one attachment uploads when the workflow can remain usable.
-
----
-
-# 47. Push Notifications and Deep Linking
-
-Every push notification should have an intentional destination.
-
-Astra must verify:
-
-```text
-Push received
-→ tap
-→ app opens/restores
-→ authentication checked
-→ correct persona context resolved
-→ correct child/class/school resolved
-→ source record opened
-```
-
-If the user no longer has access, show a safe state rather than a blank screen or stale cached record.
-
----
-
-# 48. App Restart and Resume UX
-
-Test:
-
-- cold launch;
-- background resume;
-- session expiration while backgrounded;
-- offline cold launch;
-- cached content restoration;
-- pending sync restoration;
-- deep link cold launch;
-- biometric unlock after resume;
-- child/tenant access removed while app was inactive.
-
-The app must not show blank screens during navigation/auth transitions.
-
----
-
-# 49. Design System Components
-
-Astra should identify and normalize a coherent set of reusable primitives, such as:
-
-```text
-AppScaffold
-AppBar / ContextHeader
-BottomNavigation
-SectionHeader
-PrimaryButton
-SecondaryButton
-DestructiveButton
-IconButton
-TextField
-SearchField
-Selector
-StatusBadge
-ListRow
-MetricSummary (only where justified)
-AttentionCard
-NoticeCard
-EmptyState
-ErrorState
-OfflineBanner
-SyncIndicator
-LoadingSkeleton
-BottomSheetShell
-ConfirmationDialog
-Avatar / ChildAvatar
-ContextSwitcher
-```
-
-Names above are conceptual; reuse existing project conventions when they already solve the problem.
-
-Do not create duplicate components merely to rename them.
-
----
-
-# 50. Avoid Screen-Specific Styling Drift
-
-Astra must actively search for drift such as:
-
-- five button styles for the same importance;
-- inconsistent corner radius;
-- different title spacing on each screen;
-- random icon sizes;
-- inconsistent bottom sheet padding;
-- mixed status colors;
-- inconsistent page backgrounds;
-- different empty-state patterns;
-- multiple unrelated loading indicators;
-- different list-row heights without reason.
-
-These are design-system bugs and should be fixed systematically.
-
----
-
-# 51. Visual Density
-
-SchoolOS is used frequently and should not waste screen space.
-
-Aim for **comfortable operational density**, not sparse marketing-page density.
-
-A useful screen should usually communicate meaningful information within the first viewport.
-
-Do not add excessive top padding, giant greeting headers, or massive cards that force important content below the fold.
-
-At the same time, avoid cramped enterprise UI that produces tiny touch targets.
-
----
-
-# 52. Content Design
-
-Mobile copy must be concise and actionable.
-
-Prefer:
-
-```text
-Attendance submitted
-```
-
-over:
-
-```text
-Your attendance submission operation has been successfully completed.
-```
-
-Prefer human descriptions of state.
-
-Avoid backend terms such as:
-
-- entity;
-- mutation;
-- payload;
-- provider callback;
-- entitlement lookup;
-- job status;
-- HTTP error.
-
-Use technical terminology only for advanced diagnostic/support surfaces where appropriate.
-
----
-
-# 53. Trust and Feedback
-
-Users should always know whether an action succeeded.
-
-Use feedback proportional to importance:
-
-- inline state change for trivial actions;
-- toast/snackbar for lightweight confirmation;
-- persistent state for sync/queued operations;
-- dedicated completion state for consequential workflows.
-
-Do not show repetitive success popups that slow frequent work.
-
----
-
-# 54. Performance Perception
-
-A design can feel slow even when API response times are acceptable.
-
-Astra should optimize perceived performance through:
-
-- immediate navigation feedback;
-- cached content where safe;
-- skeletons;
-- optimistic UI only where correctness permits;
-- reduced layout shift;
-- lightweight images;
-- progressive loading;
-- avoiding unnecessary animation.
-
-Never use optimistic success for authoritative operations when server acceptance is required.
-
----
-
-# 55. Visual QA Protocol for Astra
-
-A major redesign is incomplete until rendered output is inspected.
-
-For every affected high-value screen, Astra should inspect at representative sizes such as:
-
-```text
-Small phone
-Typical Android phone
-Large Android phone
-iPhone-class compact/standard size
-Large iPhone-class size
-Tablet/wide size if supported
-```
-
-Exact emulators/devices may vary.
-
-Review:
-
-- clipping;
-- overflow;
-- truncation;
-- safe areas;
-- keyboard overlap;
-- visual hierarchy;
-- touch target spacing;
-- scroll behavior;
-- bottom navigation;
-- sheet/dialog sizing;
-- font scaling;
-- dark mode if supported;
-- English/Nepali content;
-- offline/error states.
-
-Do not declare design work complete solely because Flutter builds successfully.
-
----
-
-# 56. Interaction QA Protocol
-
-For each redesigned flow, exercise the full interaction rather than opening only the first screen.
-
-Examples:
-
-### Teacher attendance
-
-```text
-Open Today
-→ open class
-→ mark attendance
-→ mark exception
-→ save draft
-→ go offline
-→ reopen draft
-→ submit/sync
-→ observe confirmation/state
-```
-
-### Parent notice
-
-```text
-Receive notification
-→ open notice
-→ read attachment
-→ acknowledge
-→ return to inbox
-→ verify state
-```
-
-### Principal approval
-
-```text
-Open attention item
-→ inspect context
-→ approve/reject/return
-→ confirm consequential action
-→ verify resulting state
-```
-
-Design QA is incomplete if only static screenshots look correct.
-
----
-
-# 57. Accessibility QA Protocol
-
-For important screens, test:
-
-- screen reader semantics;
-- 200% or otherwise large text scaling where practical;
+- semantic labels;
+- screen reader order;
+- dynamic text scaling;
+- touch target sizes;
 - contrast;
-- non-color state communication;
-- keyboard/focus behavior where relevant;
-- touch target dimensions;
-- orientation changes where supported;
+- focus where applicable;
+- non-color status communication;
 - reduced motion;
-- English/Nepali rendering.
+- keyboard support on larger devices where relevant;
+- accessible authentication alternatives;
+- Nepali screen-reader/text behavior where possible.
 
-Accessibility defects discovered during a design refactor are within scope when they affect the redesigned surface.
+Accessibility must be tested in priority flows, not only inferred from widgets.
 
 ---
 
-# 58. Regression Testing
+# 30. Deferred Modules and Scope
 
-After mobile UI work, run verification proportional to scope.
+Astra may visually normalize existing deferred-module screens when they are directly encountered in an explicitly scoped task.
 
-Typical checks:
+Astra MUST NOT reactivate, expand, or promote deferred modules merely because feature code exists.
+
+P0 scope restrictions in `AGENTS.md` remain authoritative.
+
+---
+
+# 31. Visual QA
+
+When device/emulator tooling is available:
 
 ```text
-dart format
-flutter analyze
-relevant widget tests
-relevant navigation tests
-relevant state/provider tests
-relevant regression tests
+Inspect source
+→ Run app
+→ Navigate real flow
+→ Observe rendered result
+→ Identify visual/interaction defects
+→ Implement
+→ Re-run
+→ Compare
+→ Repeat
 ```
 
-For navigation/auth changes, include route/session regression tests.
+For changed high-value flows, inspect:
 
-For shared design primitives, broaden verification because many screens may be affected.
+- representative Android device;
+- representative iOS device when available;
+- small/large text;
+- light/dark mode if supported;
+- offline/no-network state;
+- loading/empty/error states;
+- long Nepali/English content;
+- app restart/resume where state matters.
 
-Do not delete or weaken tests simply to accommodate a redesign.
-
----
-
-# 59. Preserve Product Behavior
-
-A visual redesign must not silently alter:
-
-- authorization;
-- backend semantics;
-- attendance state transitions;
-- marks/result rules;
-- payment behavior;
-- guardian scope;
-- notification recipients;
-- offline safety constraints;
-- session security.
-
-If a better UX requires backend capability that does not exist, surface the limitation rather than fabricating behavior client-side.
+Do not rely only on source assumptions.
 
 ---
 
-# 60. Astra Autonomy Rules
+# 32. Verification
 
-When repository evidence is sufficient, Astra should make reasonable design decisions and continue.
+This playbook inherits the verification hierarchy in `AGENTS.md`.
 
-Do not stop merely because:
+For mobile UI-only work, usually run:
 
-- many screens need migration;
-- the redesign touches multiple feature directories;
-- shared components require refactoring;
-- visual QA reveals additional inconsistencies within the affected scope.
+- targeted widget/unit tests;
+- `flutter analyze`;
+- affected navigation/state tests;
+- rendered app inspection;
+- representative device-size checks;
+- accessibility/text-scaling checks.
 
-Continue until the requested design scope is coherent and verified.
+If the design task changes auth, routing, offline state, permissions, finance, protected data, or synchronization logic, escalate verification according to `AGENTS.md`.
 
-Do not expand into unrelated backend or web work.
-
----
-
-# 61. Design Prioritization
-
-When the whole app needs improvement, prioritize in this order:
-
-```text
-1. Navigation and information architecture
-2. Authentication/session/biometric flows
-3. Shared design system primitives
-4. Persona home screens
-5. Teacher attendance and daily workflows
-6. Parent child-centric daily information
-7. Principal attention/approval flows
-8. Notices/notifications
-9. Homework/timetable
-10. Results/fees/read-only high-value information
-11. Profile/settings/security
-12. Remaining lower-frequency screens
-13. Comprehensive accessibility/responsive polish
-```
-
-Do not spend significant time polishing obscure screens while core navigation and high-frequency flows remain inconsistent.
+Visual QA alone is never sufficient for security- or data-sensitive changes.
 
 ---
 
-# 62. Design Quality Gate
+# 33. Mobile Definition of Done
 
-A redesigned SchoolOS mobile surface passes only if it is:
+A mobile design task is complete only when applicable items pass:
 
-- understandable without training for its intended persona;
-- visually consistent with the rest of the app;
-- fast to operate;
-- touch friendly;
-- readable in English and Nepali;
-- responsive to supported phone sizes;
-- safe around notches/system areas;
-- usable with larger text;
-- explicit about loading/error/offline/sync state;
-- compatible with iOS and Android expectations;
-- free of obvious clipping/overflow;
-- connected to real application behavior;
-- verified interactively, not only statically.
-
----
-
-# 63. Definition of Done for App Design Work
-
-A mobile design task is not complete until all applicable items are true:
-
-```text
-[ ] existing relevant screens were audited first
-[ ] information architecture was reviewed
-[ ] navigation remains coherent
-[ ] persona context is clear
-[ ] reusable components were reused/refined
-[ ] duplicate styling was reduced
-[ ] visual hierarchy is intentional
-[ ] spacing is consistent
-[ ] typography is consistent
-[ ] semantic colors are consistent
-[ ] light/dark behavior is correct where supported
-[ ] small phones were checked
-[ ] large phones were checked
-[ ] iOS behavior was considered/tested
-[ ] Android behavior was considered/tested
-[ ] safe areas are correct
-[ ] keyboard behavior is correct
-[ ] text scaling is acceptable
-[ ] accessibility semantics are preserved/improved
-[ ] loading state exists
-[ ] empty state exists
-[ ] error state exists
-[ ] offline/sync state exists where relevant
-[ ] permission state exists where relevant
-[ ] deep linking still works where relevant
-[ ] auth/session transitions remain stable
-[ ] relevant Flutter tests pass
-[ ] flutter analyze passes for affected work
-[ ] no backend rule was duplicated as client authority
-[ ] no placeholder or fake production data was introduced
-[ ] rendered UI was visually inspected
-[ ] affected flow was exercised interactively
-```
+- persona workflow is faster/clearer;
+- one-handed usage is considered;
+- navigation remains shallow/predictable;
+- shared primitives are used consistently;
+- equivalent states look/behave consistently;
+- loading/empty/error/offline/permission states are intentional;
+- sync state is truthful;
+- child/class/school context is always clear;
+- iOS/Android adaptation is reasonable;
+- accessibility/text scaling is checked;
+- Nepali/English presentation remains sound;
+- no backend/security authority was moved into the client;
+- prohibited high-risk offline actions remain prohibited;
+- relevant tests/analyze pass;
+- rendered output was inspected for broad design work;
+- no unrelated module scope was expanded.
 
 ---
 
-# 64. Prohibited Design Behaviors
+# Final Mobile Principle
 
-Do not:
+SchoolOS Mobile should feel like **one intentionally designed, production-grade school operating companion** that Parent, Teacher, and Principal users can trust every day.
 
-- convert web pages directly into mobile screens;
-- create a dashboard card for every piece of information;
-- use large decorative headers that push actionable content down;
-- add gradients merely to make the UI look modern;
-- use glassmorphism as the default surface treatment;
-- create a different visual identity for each module;
-- hide status behind color alone;
-- use tiny text to fit content;
-- put critical actions outside comfortable reach without reason;
-- use horizontal scrolling for normal forms/content;
-- add icons without semantic value;
-- add charts without decision value;
-- use modal dialogs for complex workflows;
-- show generic errors when a recoverable cause is known;
-- label locally queued work as server-synced;
-- imply offline high-risk actions are complete when they are not;
-- show stale sensitive data after access revocation;
-- bypass backend authorization for a smoother demo;
-- invent backend data to fill visually empty designs;
-- introduce inconsistent one-off components;
-- break Nepali text layouts;
-- ignore accessibility because a screen "looks fine";
-- redesign only the happy path;
-- declare completion without rendered-app inspection.
+Use this playbook together with `AGENTS.md`.
 
----
-
-# 65. Final Design Standard
-
-The final question is not:
-
-> Does each individual SchoolOS screen look modern?
-
-The correct question is:
-
-> **Does the complete SchoolOS mobile application feel like one intentionally designed, production-grade school operating companion that a Parent, Teacher, or Principal can use confidently every day?**
-
-The target experience should be recognizable by these qualities:
-
-```text
-Fast
-Calm
-Clear
-Role-aware
-Context-aware
-Accessible
-Offline-aware
-Trustworthy
-Native-feeling
-Consistent
-Operationally efficient
-Nepal-ready
-```
-
-Astra should use its visual reasoning and implementation capability to continuously compare the rendered product against this standard, not merely generate code that compiles.
-
----
-
-# 66. Astra Execution Instruction
-
-When explicitly tasked with improving SchoolOS mobile design:
-
-1. Read this document.
-2. Inspect the actual current Flutter implementation.
-3. Audit complete affected user journeys before editing.
-4. Preserve real product rules and authorization.
-5. Establish or refine reusable design primitives.
-6. Fix information architecture before decorative styling.
-7. Optimize Parent, Teacher, and Principal workflows independently.
-8. Implement the redesign in Flutter using existing architecture where sound.
-9. Run the app.
-10. Inspect the rendered result visually.
-11. Exercise real interactions.
-12. Test representative device sizes.
-13. Test loading, empty, error, offline, sync, permission, and revoked-access states where relevant.
-14. Test accessibility and text scaling.
-15. Fix defects discovered within the design scope.
-16. Run proportional Flutter quality gates.
-17. Do not declare completion until the mobile experience is coherent as a whole.
-
-The goal is not a collection of attractive screenshots.
-
-The goal is a **high-quality operational mobile product**.
+`AGENTS.md` owns product/security/domain authority. This file owns the **mobile-specific design and Flutter execution discipline** within that authority.
