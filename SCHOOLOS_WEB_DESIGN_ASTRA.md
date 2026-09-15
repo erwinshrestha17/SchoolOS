@@ -6,10 +6,10 @@ This file is the **scoped Web design and frontend execution playbook** for Schoo
 
 It applies to:
 
-- `apps/web`
-- tenant-facing SchoolOS web UX
-- SchoolOS Platform web UX when explicitly in scope
-- Web design-system, accessibility, responsiveness, interaction architecture, and visual QA work
+- `apps/web`;
+- tenant-facing SchoolOS web UX;
+- SchoolOS Platform web UX when explicitly in scope;
+- Web design-system, accessibility, responsiveness, interaction architecture, performance UX, and visual QA work.
 
 This file is **not** an independent repository source of truth.
 
@@ -23,15 +23,15 @@ If this file conflicts with `AGENTS.md`, **`AGENTS.md` wins**.
 
 Guide Astra/Codex when auditing, redesigning, implementing, and verifying the SchoolOS web application.
 
-The goal is not to preserve the current visual treatment. The goal is to make SchoolOS feel like a **serious, coherent, fast, high-trust school operating system** for daily work.
+The goal is not to preserve the current visual treatment. The goal is to make SchoolOS feel like a **serious, coherent, fast, high-trust school operating system** for frequent daily work.
 
 When an explicit SchoolOS Web redesign is in scope:
 
-- the existing backend, contracts, permissions, routes, data model, and business rules remain authoritative;
+- existing backend contracts, permissions, routes, data model, domain rules, and security boundaries remain authoritative;
 - the existing visual design is **not** authoritative;
-- Astra MAY substantially replace page composition, shell presentation, navigation presentation, design primitives, layout, typography, spacing, table treatment, filters, forms, drawers, and interaction patterns;
-- Astra SHOULD preserve working application behavior unless the existing interaction model itself is the problem;
-- do not introduce a parallel frontend framework or duplicate design system when the current stack can support the redesign.
+- page composition, shell presentation, navigation presentation, design primitives, layout, typography, spacing, tables, filters, forms, drawers, dashboards, and interaction patterns MAY be substantially redesigned;
+- working application behavior SHOULD be preserved unless the existing interaction model itself is the problem;
+- do not introduce a parallel frontend framework or a third overlapping component system.
 
 This is a **presentation and interaction redesign**, not a rewrite of SchoolOS.
 
@@ -75,7 +75,7 @@ SchoolOS Web currently uses:
 - Zod;
 - Playwright.
 
-Use these foundations unless an explicit technical task authorizes a replacement.
+Use these foundations unless an explicit technical task authorizes replacement.
 
 Prefer one coherent component system over overlapping UI stacks.
 
@@ -96,7 +96,7 @@ SchoolOS Web should feel:
 - dense where the work requires density;
 - visually restrained.
 
-The visual target is **modern productivity software**, not a marketing site and not a generic ERP skin.
+The target is **modern productivity software**, not a marketing site, consumer fintech dashboard, or generic ERP skin.
 
 ## 4.1 Visual principles
 
@@ -104,13 +104,13 @@ Prefer:
 
 - neutral page canvas;
 - white or near-white working surfaces;
-- restrained SchoolOS primary accent;
-- semantic status colors only;
-- thin borders and dividers;
-- moderate radius;
-- minimal shadows;
+- one restrained SchoolOS primary accent;
+- semantic status colors for meaning;
+- thin borders/dividers;
+- small-to-moderate radii;
+- little or no shadow on ordinary work surfaces;
 - strong typography hierarchy;
-- dense but breathable tables;
+- compact but breathable tables;
 - clear focus states;
 - consistent iconography;
 - meaningful whitespace rather than excessive whitespace.
@@ -125,16 +125,170 @@ Avoid excessive:
 - oversized page titles;
 - decorative KPI grids;
 - random module colors;
-- giant illustrations inside operational pages;
+- giant illustrations in operational pages;
 - meaningless charts;
 - floating decorative UI;
 - animation that slows task completion.
 
 Do not turn every data point into a card.
 
+## 4.2 Card restraint rule
+
+A card is **not** the default SchoolOS container.
+
+Use cards only when the content is genuinely a discrete object, such as:
+
+- a current class;
+- a notice;
+- an event;
+- a compact decision unit;
+- media/content feed material.
+
+Prefer for ordinary operational structure:
+
+- sections;
+- dividers;
+- work surfaces;
+- tables;
+- list rows;
+- split panes;
+- inspector panels;
+- grouped form sections.
+
+A page MUST NOT default to four KPI cards merely because four metrics exist.
+
 ---
 
-# 5. Astra Web Redesign Execution Sequence
+# 5. Design System v2 — Required Before Broad Module Migration
+
+Before broad visual migration, audit existing primitives and converge on **one canonical SchoolOS Web component layer**.
+
+The repository currently contains legacy and newer primitives. The redesign MUST NOT create a third generation of near-duplicate components.
+
+## 5.1 Canonical component responsibilities
+
+Converge toward explicit roles:
+
+- `AppShell` — global application frame;
+- `Sidebar` / navigation rail — primary workspace navigation;
+- `Topbar` — school context, search, notifications, user context;
+- `CommandPalette` — global command/search layer;
+- `PageHeader` / `WorkspaceHeader` — title, context, actions;
+- `Surface` — neutral grouped work area, no shadow by default;
+- `Section` — lightweight structural grouping;
+- `Panel` — contextual side/secondary region;
+- `Card` — discrete object only;
+- `Metric` / `DecisionMetric` — compact numeric summary when independently useful;
+- `DataWorkspace` — table/list/filter container;
+- `Inspector` — contextual right-side detail;
+- `Entity360` — coherent major-record workspace;
+- `QueueWorkspace` — review/triage workflow;
+- `FormSection` — structured form grouping;
+- `Timeline` / `AuditTrail` — chronological state/history;
+- `Dialog` / `ConfirmDialog` / `Sheet` — transient interaction surfaces.
+
+## 5.2 Legacy consolidation rule
+
+Before migrating modules, produce and follow a replacement map similar to:
+
+```text
+Legacy / overlapping primitive   → Canonical v2 responsibility
+ui/card                          → Surface or Card
+ui/primitives/card               → Surface or Card
+StatCard                         → Metric
+SummaryCard                      → DecisionMetric / compact summary
+SectionCard                      → Section
+WorkSurface                      → DataWorkspace / Surface / Panel
+shell-card/custom card wrappers  → remove or migrate
+module-specific generic panels   → canonical shared primitive
+```
+
+Do not remove a legacy component until all affected callers are safely migrated, but mark it as legacy and prevent new usage where practical.
+
+## 5.3 Baseline geometry
+
+Use one explicit scale. Exact token names may follow repository conventions, but the system SHOULD converge roughly toward:
+
+```text
+Radius
+small       6px
+medium      8px
+large       12px
+extra-large exceptional only
+
+Control heights
+compact     32px
+standard    36–40px
+large       44px
+
+Table/list rows
+compact     40–44px
+standard    48px
+
+Page gutters
+large desktop   28–32px
+standard        24px
+compact         16–20px
+
+Inspector widths
+small       ~360px
+medium      ~440px
+large       ~560px
+```
+
+Do not permit arbitrary radius, spacing, control height, or shadow values page by page.
+
+## 5.4 Shadow rule
+
+Default work surfaces SHOULD use border and hierarchy rather than shadow.
+
+Use shadows mainly for:
+
+- dialogs;
+- popovers;
+- command palette;
+- floating/sticky overlays;
+- temporary elevated surfaces.
+
+---
+
+# 6. Color System
+
+SchoolOS should feel like one product.
+
+Module identity colors MAY remain for **subtle location context only**.
+
+Allowed module-color usage:
+
+- small navigation icon/accent;
+- thin active indicator;
+- restrained selected-tab marker;
+- small icon chip;
+- very light tint where it materially helps location awareness.
+
+Avoid module color as:
+
+- major page background;
+- primary button system;
+- table background system;
+- large card/panel fill;
+- independent hover language;
+- replacement for semantic status color.
+
+Semantic colors remain authoritative for:
+
+- success;
+- warning;
+- danger/critical;
+- information;
+- disabled;
+- draft/pending/finalized state when applicable.
+
+The user should perceive **SchoolOS first, module second**.
+
+---
+
+# 7. Astra Web Redesign Execution Sequence
 
 For broad Web redesign work:
 
@@ -143,34 +297,38 @@ Read AGENTS.md
     ↓
 Read this playbook
     ↓
-Inspect real routes, layouts, components, API calls, permissions, and tests
+Inspect routes, layouts, components, APIs, permissions, tests, and current rendered UI
     ↓
-Map the persona + module + highest-frequency workflow
+Map persona + module + job-to-be-done + highest-frequency workflow
     ↓
-Run the application and inspect rendered screens
+Identify legacy primitives used by the flow
     ↓
-Define the target workspace pattern
+Define target workspace pattern
     ↓
-Refine shared design-system primitives
+Refine canonical Design System v2 primitives first
     ↓
-Migrate the highest-value flow first
+Migrate the highest-value flow
     ↓
-Verify loading / empty / error / permission states
+Verify desktop + compact widths
     ↓
-Verify responsive + keyboard + accessibility behavior
+Verify keyboard + accessibility
     ↓
-Run targeted tests/typecheck/lint/build
+Verify loading / empty / error / permission / stale states
+    ↓
+Verify low-bandwidth behavior
+    ↓
+Run tests/typecheck/lint/build as appropriate
     ↓
 Re-render and compare
 ```
 
-Do not start broad redesigns by randomly changing CSS page by page.
+Do not begin broad redesign by randomly changing CSS page by page.
 
 ---
 
-# 6. Core Interaction Architecture
+# 8. Core Interaction Architecture
 
-The Web UX should move away from:
+Move away from:
 
 ```text
 Module directory
@@ -180,7 +338,7 @@ Module directory
 → perform task
 ```
 
-toward:
+Toward:
 
 ```text
 Persona context
@@ -189,11 +347,36 @@ Persona context
 → deeper workspace only when needed
 ```
 
-The sidebar remains useful, but it must not be the only way to operate SchoolOS.
+The sidebar remains important, but it must not be the only way to operate SchoolOS.
 
 ---
 
-# 7. Application Shell
+# 9. Interaction Budgets
+
+Use interaction count as a UX quality measure.
+
+Targets for common flows:
+
+| Workflow | Target |
+| --- | ---: |
+| Teacher open current/next class | ≤ 1 meaningful action from Today |
+| Teacher normal attendance | designed toward ~30 seconds for a typical class |
+| Admin locate a student | ≤ 2 meaningful actions |
+| Admin open Student 360 | ≤ 2 meaningful actions |
+| Principal open a critical attention item | ≤ 1 meaningful action from Home/Attention |
+| Principal approve after review | generally ≤ 3 meaningful actions |
+| Accountant start fee collection | ≤ 2 meaningful actions |
+| HR locate a staff member | ≤ 2 meaningful actions |
+| HR open pending leave | ≤ 2 meaningful actions |
+| Open a primary persona workspace | generally ≤ 2 meaningful actions |
+
+These are UX targets, not permission/security shortcuts.
+
+Consequential operations may require additional review/confirmation where safety, finance, audit, or lifecycle integrity demands it.
+
+---
+
+# 10. Application Shell
 
 The shell should provide:
 
@@ -202,7 +385,7 @@ The shell should provide:
 - active branch when applicable;
 - persona/role context;
 - grouped primary navigation;
-- global command search;
+- global command/search;
 - persona-aware quick actions;
 - notifications;
 - user/security menu;
@@ -210,7 +393,7 @@ The shell should provide:
 - responsive collapse;
 - entitlement/module state.
 
-## 7.1 Navigation hierarchy
+## 10.1 Navigation hierarchy
 
 Avoid an endless flat sidebar.
 
@@ -229,7 +412,6 @@ Academics
   Academics
   Homework
   Timetable
-  Activities
 
 Finance
   Fees & Receipts
@@ -238,12 +420,11 @@ Finance
 
 Communication
   Notices
-  Notifications
 
 Operations
-  Library
-  Transport
-  Canteen
+  Activities
+  Service Requests
+  Library / Transport / Canteen when enabled
 
 Insights
   Reports
@@ -252,55 +433,49 @@ Insights
 Settings
 ```
 
-The exact groups and visible destinations MUST be persona-, permission-, capability-, and entitlement-aware.
+The exact groups and visible destinations MUST remain persona-, permission-, capability-, and entitlement-aware.
 
-Specialist sub-functions belong inside their module workspace rather than all being exposed permanently in the global sidebar.
+Specialist sub-functions belong inside module workspaces rather than permanently occupying global navigation.
 
 ---
 
-# 8. Global Command Search
+# 11. Global Command/Search Layer
 
-SchoolOS Web SHOULD provide an authorization-aware command/search surface, preferably available through `Cmd+K` / `Ctrl+K`.
+SchoolOS already has a command palette concept. **Evolve it; do not build a second competing palette.**
 
-It may search permitted:
+The target command/search layer SHOULD support one mental model:
 
-- students;
-- guardians;
-- staff;
-- classes/sections;
-- admissions;
-- invoices;
-- receipts;
-- notices;
-- requests;
-- reports;
-- operational destinations.
+```text
+Search SchoolOS…
 
-It may expose permitted contextual actions such as:
+RECENT
+recent authorized records
 
-- take attendance;
-- add student;
-- create admission;
-- create homework;
-- enter marks;
-- collect payment;
-- create notice;
-- open reconciliation;
-- run a report.
+PEOPLE / RECORDS
+students, guardians, staff, invoices, notices, etc.
+
+ACTIONS
+take attendance, create homework, collect payment, create notice, etc.
+
+WORKSPACES
+Students, Attendance, Accounting, Settings, etc.
+```
 
 Rules:
 
-- search visibility never grants authorization;
+- `Cmd+K` / `Ctrl+K` should remain the primary keyboard entry point;
 - server-backed entity search must remain tenant- and permission-scoped;
+- search visibility never grants authorization;
+- recent records must be revalidated against current access;
 - results should be grouped by type;
-- keyboard navigation should be first-class;
-- recent searches/records may be shown only when still authorized.
+- keyboard navigation must be first-class;
+- do not create separate overlapping “jump”, “global search”, and “action launcher” systems unless there is a strong documented reason.
 
 ---
 
-# 9. Persona-Aware Quick Actions
+# 12. Persona-Aware Quick Actions
 
-Provide a small, controlled quick-action system.
+Provide a small controlled set of high-frequency actions.
 
 ### Teacher
 - Take attendance
@@ -334,16 +509,16 @@ Do not create a universal “create everything” menu.
 
 ---
 
-# 10. Persona Experience Targets
+# 13. Persona Experience Targets
 
-## 10.1 Teacher — task density
+## 13.1 Teacher — task density
 
-Teacher Web should feel like a teaching workspace, not an Admin interface with hidden permissions.
+Teacher Web must feel like a teaching workspace, not an Admin interface with hidden permissions.
 
-Home should prioritize:
+Home prioritizes:
 
 - current/next class;
-- today's timetable;
+- today's schedule;
 - attendance due;
 - homework needing review;
 - missing marks;
@@ -351,11 +526,11 @@ Home should prioritize:
 - returned work/corrections;
 - assigned students/classes.
 
-Common daily tasks should generally be reachable in **1–3 meaningful interactions** from the relevant teacher workspace.
+Prefer one continuous `Today` workspace over many boxed dashboard cards.
 
-## 10.2 Principal — decision density
+## 13.2 Principal — decision density
 
-Principal Web should prioritize:
+Principal Web prioritizes:
 
 - critical attention;
 - approvals;
@@ -366,15 +541,15 @@ Principal Web should prioritize:
 - communication failures;
 - school readiness.
 
-The Principal should not be forced through configuration-heavy Admin workspaces for routine oversight.
+Routine oversight must not require navigating configuration-heavy Admin screens.
 
-## 10.3 Admin — operational density
+## 13.3 Admin — operational density
 
 Admin Web may remain dense.
 
 Prioritize:
 
-- admissions and student operations;
+- admissions/student operations;
 - school-wide attendance completion;
 - academic administration;
 - fee operations where authorized;
@@ -385,7 +560,7 @@ Prioritize:
 
 Use tables, bulk actions, filters, validation queues, and exception workspaces.
 
-## 10.4 HR — workforce density
+## 13.4 HR — workforce density
 
 Prioritize:
 
@@ -395,9 +570,9 @@ Prioritize:
 - contracts;
 - payroll readiness;
 - staff documents;
-- exceptions and expiry.
+- expiry/exceptions.
 
-## 10.5 Accountant — numerical density
+## 13.5 Accountant — numerical density
 
 Prioritize:
 
@@ -415,36 +590,38 @@ Numeric alignment and traceability matter more than decorative presentation.
 
 ---
 
-# 11. Shared Workspace Patterns
+# 14. Shared Workspace Patterns
 
-Not every SchoolOS module should look the same. Use the pattern that matches the work.
+Not every SchoolOS module should look the same. Use the pattern matching the work.
 
-## 11.1 Data Workspace
+## 14.1 Data Workspace
 
 For Students, Staff, Admissions lists, Invoices, Receipts, Requests, Audit, etc.
 
-Standard capability set:
+Required capability set where applicable:
 
 - search;
 - visible high-frequency filters;
 - advanced filters;
 - active filter chips;
-- saved views where useful;
+- saved views;
 - sort;
 - column visibility;
 - density;
 - pagination;
-- bulk selection/actions where valid;
-- export when authorized;
+- bulk selection/actions;
+- authorized export;
 - contextual row actions;
 - refresh/last-updated state;
 - empty/loading/error states.
 
-## 11.2 Entity 360 Workspace
+Rows should optimize scanning. Avoid giving every row several always-visible buttons.
+
+Prefer row click/keyboard open + one primary contextual action + overflow where needed.
+
+## 14.2 Entity 360 Workspace
 
 For a student, staff member, admission case, tenant, or other major entity.
-
-Use:
 
 ```text
 Identity header
@@ -453,14 +630,14 @@ Primary actions
 Tab/section navigation
 Core details
 Related operational records
-History / audit where permitted
+History / audit when permitted
 ```
 
 Prefer one coherent record workspace over forcing users through separate modules to understand one person.
 
-## 11.3 Queue / Triage Workspace
+## 14.3 Queue / Triage Workspace
 
-For approvals, anomalies, corrections, failed deliveries, duplicates, pending reviews.
+For approvals, anomalies, corrections, failures, duplicates, and pending reviews.
 
 Use:
 
@@ -469,14 +646,14 @@ Use:
 - age/deadline;
 - filters;
 - list + contextual inspector;
-- clear approve/return/reject/resolution actions;
+- explicit decision/resolution actions;
 - evidence/reason context.
 
-## 11.4 Ledger / Reconciliation Workspace
+## 14.4 Ledger / Reconciliation Workspace
 
 For finance/accounting.
 
-Use dense, aligned data with:
+Use dense aligned data with:
 
 - debit/credit/amount columns;
 - running balances;
@@ -486,7 +663,7 @@ Use dense, aligned data with:
 - drill-down lineage;
 - side-by-side matching where appropriate.
 
-## 11.5 Schedule / Grid Workspace
+## 14.5 Schedule / Grid Workspace
 
 For timetable and similar planning.
 
@@ -501,9 +678,9 @@ Use:
 - unsaved/change indicators;
 - conflict side panel.
 
-## 11.6 Composer / Publication Workspace
+## 14.6 Composer / Publication Workspace
 
-For notices, activities, homework, report publication.
+For notices, activities, homework, and controlled publication.
 
 Use:
 
@@ -518,7 +695,7 @@ Use:
 
 ---
 
-# 12. Student 360 Standard
+# 15. Student 360 Standard
 
 The student record should become one of the strongest SchoolOS Web experiences.
 
@@ -547,147 +724,156 @@ Only authorized sections appear.
 
 Examples:
 
-- Teacher: Overview, Attendance, Academics, permitted Guardian contact.
-- Accountant: Overview, Fees, payer/receipt context.
-- Admin: full authorized operational record.
+- Teacher: Overview, Attendance, Academics, permitted Guardian contact;
+- Accountant: Overview, Fees, payer/receipt context;
+- Admin: full authorized operational record;
 - Principal: oversight-oriented read/approve views.
 
-Do not duplicate canonical data across modules to create this experience; compose authorized projections from existing sources.
+Do not duplicate canonical data to create Student 360. Compose authorized projections from existing authoritative sources.
 
 ---
 
-# 13. Module-Specific Web Design Blueprint
+# 16. Module-Specific Web Design Blueprint
 
-This section defines **target interaction patterns**, not authorization grants or activation decisions.
+This section defines target interaction patterns, not authorization grants or activation decisions.
+
+Each module MUST optimize its primary job rather than copying a generic dashboard template.
 
 ## M0 — Platform Core / School Settings
 
-### Current feature families
-Platform control plane, schools/tenants, operations, billing, audit, account security, settings; tenant settings include academic calendar/structure, access, admissions, attendance, accounting, communication, branding/documents, audit/data operations and other school configuration.
+**Primary job:** safely configure and operate platform/school context without blurring control-plane and tenant authority.
 
-### Target design
-Use two visibly distinct surfaces:
+Current feature families include Platform control plane, schools/tenants, operations, billing, audit, account security, and tenant settings.
 
-**Platform control plane**
+### Platform target
+
 - operations-console character;
 - tenant table + tenant inspector;
 - platform health/queue/provider status;
 - audit/security timeline;
 - billing/entitlement state;
 - support-access state clearly marked;
-- stronger visual distinction from school tenant UI.
+- visually distinct from normal school UI.
 
-**School Settings**
-- settings hub grouped by domain;
-- searchable settings;
+### School Settings target
+
+- grouped settings hub;
+- settings search;
 - readiness/completeness indicators;
 - change history;
-- explicit save state;
-- impact warnings for high-risk changes;
-- avoid one giant settings form.
-
-Settings should feel like controlled configuration, not a normal operational module.
+- explicit save/dirty state;
+- high-risk impact warnings;
+- no giant settings form.
 
 ---
 
 ## M1 — Admissions & Student Profiles
 
-### Current feature families
-Students list/detail/overview plus Admissions applications, cases, assessments, documents, duplicate review, IEMIS, QR, new application and review workflows.
+**Primary job:** move an applicant safely from intake through review into a trustworthy student record, then provide fast access to that student's full operational context.
 
-### Target design
+Current feature families: Students, Admissions applications/cases, assessments, documents, duplicates, IEMIS, QR, new/review flows.
 
-**Admissions Home**
-- funnel/status summary;
+### Admissions Home
+
+Show:
+
+- stage/status summary;
 - applications requiring review;
 - incomplete documents;
 - duplicate risks;
 - capacity/waitlist signals where available;
-- direct “new application” action.
+- direct New Application action.
 
-**Application/Case Review**
-Use a split workspace:
+### Application Review
+
+Use split workspace:
 
 ```text
-Applicant/case list | Application detail
-                    | Checklist
-                    | Documents
-                    | Assessment
-                    | Decision history
+Applicant list | Application detail
+               | Checklist
+               | Documents
+               | Assessment
+               | Decision history
 ```
 
-Keep review actions visible but separated from destructive/irreversible decisions.
+### Students
 
-**Students**
-Use a dense searchable Data Workspace.
+Use a dense Data Workspace. The student list should scan like a directory/table, not a stack of profile cards.
 
-**Student detail**
-Use the Student 360 standard.
+Prefer columns such as:
 
-**Duplicate Review**
-Use a side-by-side comparison workspace showing exact conflicting fields and merge consequences.
+```text
+Student | Student ID | Class/Section | Guardian | Status
+```
 
-**IEMIS**
-Use a data-quality/readiness workspace:
-- completeness score/status;
-- errors grouped by field/category;
+Routine details open in an inspector; deeper work opens Student 360.
+
+### Duplicate Review
+
+Use side-by-side comparison with exact conflicting fields and merge consequences.
+
+### IEMIS
+
+Use data-quality/readiness design:
+
+- completeness/readiness state;
+- grouped validation errors;
 - affected records;
-- validation detail;
-- export batch history;
-- clear distinction between “SchoolOS ready” and “government submitted”.
+- batch/export history;
+- clear distinction between SchoolOS-ready and government-submitted state.
 
 ---
 
 ## M2 — Smart Attendance
 
-### Current feature families
-Overview, marking, registers, sessions, anomalies, corrections, follow-ups, offline drafts, reports and student attendance views.
+**Primary job:** complete authoritative attendance quickly and resolve exceptions safely.
 
-### Target design
+Current feature families: marking, registers, sessions, anomalies, corrections, follow-ups, offline drafts, reports, student attendance.
 
-**Teacher attendance**
-This is a focused action workspace, not a dashboard.
+### Teacher Attendance
+
+Focused action workspace:
 
 ```text
-Class/period context
+Class / period context
 Roster
 Mark all present
 Exception controls
-Draft/submitted/locked state
-Primary submit action
+Draft / submitted / locked state
+Submit
 ```
 
-Optimize normal attendance for very low interaction count.
+Design the normal flow toward ~30 seconds for a typical class.
 
-**Admin/Principal Attendance Command Centre**
-- today's completion progress;
-- missing class/period submissions;
+### Admin / Principal Attendance Command Centre
+
+Prioritize:
+
+- today's completion;
+- missing submissions;
 - unusual absence/lateness;
 - correction queue;
 - follow-up queue;
-- class/grade drill-down.
+- grade/class drill-down.
 
-**Corrections**
-Queue/triage design with original value, requested value, reason, requester, approver and audit lineage.
+### Corrections
 
-**Anomalies**
-Risk/exception list, not decorative charts.
+Queue with original value, requested value, reason, requester, approver, and audit lineage.
 
-**Reports**
-Calendar/register/table-first with print/export readiness.
-
-Never visually imply that an offline/local draft is final attendance.
+Never visually imply an offline/local draft is final attendance.
 
 ---
 
 ## M3 — Fees & Receipts
 
-### Current feature families
-Billing, collection, invoices, receipts, ledgers, adjustments, cashier close, reports and setup.
+**Primary job:** identify what is owed, receive money correctly, issue proof, and reconcile the result without losing transaction lineage.
 
-### Target design
+Current feature families: billing, collection, invoices, receipts, ledgers, adjustments, cashier close, reports, setup.
 
-**Fees Home**
+### Fees Home
+
+Prioritize:
+
 - collections today;
 - outstanding/overdue;
 - pending reconciliation;
@@ -695,372 +881,278 @@ Billing, collection, invoices, receipts, ledgers, adjustments, cashier close, re
 - cashier status;
 - actionable exceptions.
 
-**Collect Payment**
-Design as a dedicated transaction workspace:
+### Collect Payment
+
+Dedicated transaction workspace:
 
 ```text
-Student/payer search
+Student / payer search
 → outstanding invoices
-→ selected allocation
-→ amount/payment method
+→ allocation
+→ amount / method
 → confirmation
 → receipt result
 ```
 
-Keep the student identity, amount, payment method and allocation visible before confirmation.
+Student identity, amount, payment method, and allocation remain visible before confirmation.
 
-**Student Fee Ledger**
-Dense chronological financial workspace with invoice/payment/refund/reversal lineage.
+### Student Fee Ledger
 
-**Invoices / Receipts**
-Table + right-side inspector for routine review; full detail for complex records.
+Dense chronological transaction lineage including invoice/payment/refund/reversal.
 
-**Adjustments / Refunds / Reversals**
-Use explicit consequence summaries and reason/evidence fields. Never hide original transaction lineage.
+### Cashier Close
 
-**Cashier Close**
-Reconciliation-focused layout: expected vs actual, method totals, differences, unresolved items, approval state.
+Expected vs actual, method totals, differences, unresolved items, approval state.
 
-Avoid consumer-fintech styling; prioritize precision and auditability.
+Avoid consumer-fintech styling.
 
 ---
 
 ## M4 — Academics, Exams, CAS & Report Cards
 
-### Current feature families
-Assessment components, exam terms, CAS, marks, locks, readiness, results, publishing, report cards, promotion, retakes, board readiness and learning-improvement views.
+**Primary job:** move academic data safely from setup → marks → review → lock → publish → correction.
 
-### Target design
+Current feature families: components, exam terms, CAS, marks, locks, readiness, results, publishing, report cards, promotion, retakes, board readiness.
 
-**Academics Home**
-Show readiness and deadlines rather than generic KPIs:
-- marks completion;
+### Academics Home
+
+Do **not** make this mainly a directory of submodules.
+
+Lead with academic readiness and required work:
+
+- marks completion by class/subject;
 - missing/invalid submissions;
-- locked/unlocked state;
-- publication readiness;
-- report generation failures;
+- lock requests;
+- publication blockers;
+- report-card failures;
+- deadlines;
 - promotion/retake exceptions.
 
-**Teacher Marks Entry**
-Spreadsheet-style grid is appropriate:
+Use matrices and exception tables before decorative KPI cards.
+
+### Teacher Marks Entry
+
+Spreadsheet-style grid:
+
 - sticky student identity;
 - keyboard navigation;
-- clear max/pass/component context;
-- autosave/draft state;
-- validation inline;
-- submit state clearly separated from save.
+- max/pass/component context;
+- inline validation;
+- explicit draft/autosave state;
+- Submit clearly separated from Save.
 
-**Exam Administration**
-Use lifecycle/step navigation:
-Setup → Entry → Review → Lock → Publish → Correct.
+### Exam lifecycle
 
-**Readiness**
-Use a class/subject matrix so missing work is immediately visible.
+```text
+Setup → Entry → Review → Lock → Publish → Correct
+```
 
-**Publishing**
-Treat as a controlled release workspace with impact summary, recipient scope, blocking issues, approval state and confirmation.
+### Publishing
 
-**Results / Report Cards**
-Student-level result detail should be readable and printable; admin views should support batch status and regeneration/version history.
-
-Do not use charts where a completion matrix or exception table is more actionable.
+Controlled release workspace with impact summary, recipient scope, blockers, approval state, and confirmation.
 
 ---
 
 ## M5 — Activity Feed & Milestones
 
-### Current feature families
-Activity posts, post detail, gallery, deliveries, milestones, observations, moderation, oversight and reports.
+**Primary job:** capture and publish meaningful school/student activity with correct audience, consent, and moderation context.
 
-### Target design
+Current feature families: posts, gallery, deliveries, milestones, observations, moderation, oversight, reports.
 
-**Teacher Activity Workspace**
-Composer + recent own posts + drafts.
+Use:
 
-**Composer**
-- audience;
-- assigned students;
-- media;
-- consent state;
-- milestone/observation context;
-- preview;
-- publish/submit-for-review state.
-
-**Feed**
-Use restrained content cards only where the content object genuinely benefits from card presentation.
-
-**Gallery**
-Media-first grid with consent/scope metadata available on inspection.
-
-**Moderation**
-Queue/triage pattern with reported/sensitive context, audience, media and decision reason.
-
-**Milestones / Observations**
-Student/class-scoped timeline or structured list, not social-media gamification.
+- teacher composer + drafts/recent posts;
+- restrained content cards only where content objects benefit from cards;
+- media-first gallery;
+- moderation queue;
+- student/class milestone timeline;
+- no social-media gamification.
 
 ---
 
 ## M6 — Homework & Timetable
 
-### Homework feature families
-Homework list, create, detail and review.
+### Homework primary job
 
-### Homework target design
+Create, distribute, track, and review assigned work with minimal teacher navigation.
 
-**Teacher Homework Workspace**
-- assigned classes/subjects;
-- drafts;
-- upcoming;
-- due;
-- review needed;
-- overdue/completion context.
+Teacher workspace prioritizes drafts, upcoming work, due items, review required, and overdue context.
 
-**Create Homework**
-Focused composer: class/subject → instructions → attachments → due date → submission method → preview → publish/schedule.
+Composer:
 
-**Review**
-Submission queue with student list and contextual inspector for quick feedback.
+```text
+Class/subject → Instructions → Attachments → Due date → Submission method → Preview → Publish/Schedule
+```
 
-### Timetable feature families
-Timetable, builder, conflicts, substitutions, replacements, versions and workload.
+Review uses submission queue + contextual inspector.
 
-### Timetable target design
+### Timetable primary job
 
-**Timetable Viewer**
-Calendar/grid first, filters for class/teacher/room.
+Build and operate a conflict-free schedule while making substitutions/replacements immediately actionable.
 
-**Builder**
-True scheduling workspace:
+Viewer is grid/calendar first.
+
+Builder uses:
+
 - schedule grid;
 - unscheduled items;
 - teacher/room context;
-- conflict side panel;
+- conflict panel;
 - workload indicator;
 - version state.
 
-**Conflicts**
-Dedicated queue with direct jump to the affected slots.
-
-**Substitutions/Replacements**
-Today-oriented operational queue with absent teacher, impacted periods, eligible replacements and acknowledgement state.
-
-**Versions**
-Compare, review, publish and archive without losing context.
+Substitutions are Today-oriented operational queues.
 
 ---
 
 ## M7 — HR & Payroll
 
-### HR feature families
-Overview, staff, contracts, attendance, leave and teacher development.
+**Primary job:** maintain trustworthy staff lifecycle data and prepare payroll without omissions or hidden exceptions.
 
-### Payroll feature families
-Salary structures, payroll readiness, runs, payslips and reports.
+Current feature families: staff, contracts, attendance, leave, development, salary structures, payroll readiness, runs, payslips, reports.
 
-### Target design
+### HR Home
 
-**HR Home**
-- present/absent/leave;
-- pending leave;
-- expiring contracts;
-- missing staff data/documents;
-- payroll readiness issues;
-- staff lifecycle attention.
+Avoid the standard four-card dashboard pattern.
 
-**Staff**
-Dense directory + Staff 360: Overview, Employment, Contracts, Attendance, Leave, Payroll access where authorized, Documents, History.
+Prefer compact operational summary + attention list:
 
-**Contracts**
-Expiry/renewal queue with clear dates and actions.
+```text
+Today: present / absent / leave / unconfirmed
 
-**Leave**
-Calendar + request queue; avoid card-per-request when volume is high.
+Needs attention
+pending leave
+expiring contracts
+missing staff data
+missing salary structures
+payroll readiness issues
+```
 
-**Payroll Readiness**
-Checklist/exception workspace before any run can progress.
+### Staff
 
-**Payroll Run**
-Use a controlled step/lifecycle interface: Prepare → Validate → Review → Approve → Finalize → Post.
+Dense directory + Staff 360:
 
-**Payslips**
-Batch state plus individual employee detail/download.
+Overview, Employment, Contracts, Attendance, Leave, permitted Payroll, Documents, History.
 
-Salary and bank information must remain visually and permission-wise protected.
+### Payroll Run
+
+```text
+Prepare → Validate → Review → Approve → Finalize → Post
+```
+
+Salary/bank data remains strongly protected.
 
 ---
 
 ## M8 — Library
 
-M8 may remain deferred under `AGENTS.md`; this design applies only when explicitly in scope.
+M8 may remain deferred under `AGENTS.md`.
 
-### Current feature families
-Books, catalogue, copies, borrowers, issue/return, issues, reservations, overdue, fines and reports.
+**Primary job when activated:** issue/return resources quickly while preserving borrower, copy, reservation, overdue, and fine state.
 
-### Target design
+Use:
 
-**Circulation Desk**
-Scanner/keyboard-first transaction workspace: Borrower → scan/search copy → due status → issue/return.
+- scanner/keyboard-first Circulation Desk;
+- search-first catalogue;
+- copy/resource detail;
+- overdue/fines table;
+- reservations queue.
 
-**Catalogue**
-Search-first list with availability and copy count.
-
-**Book/Resource Detail**
-Bibliographic detail + copy inventory + circulation status.
-
-**Overdue/Fines**
-Queue/table design with borrower, due date, age, amount and resolution.
-
-**Reservations**
-Queue ordered by availability/waitlist rules.
-
-Avoid ornamental book-card grids for staff workflows.
+Avoid ornamental book grids for staff operations.
 
 ---
 
 ## M9 — Transport
 
-M9 may remain deferred under `AGENTS.md`; this design applies only when explicitly in scope.
+M9 may remain deferred under `AGENTS.md`.
 
-### Current feature families
-Routes, assignments, students, vehicles, trips, live status, location and reports.
+**Primary job when activated:** know what routes/trips are operating, who/what is assigned, and where operational exceptions exist.
 
-### Target design
-
-**Transport Operations**
-Use a two-mode workspace:
+Use two modes:
 
 ```text
 Live / Today
 Routes / Setup
 ```
 
-**Live**
-- active trips;
-- delay/incident state;
-- stale/unavailable GPS state;
-- vehicle/driver context;
-- map only when it improves operational understanding.
+Live view must show stale/unavailable GPS truth and never imply real-time data when stale.
 
-**Routes**
-Route/stop list + route detail; map and ordered stop sequence should work together.
+Routes combine ordered stop sequence with map only when useful.
 
-**Assignments**
-Student-route assignment table with bulk assignment where safe.
-
-**Vehicles**
-Fleet table with document/maintenance status.
-
-**Trips**
-Timeline/status table with route, vehicle, driver, start/end and exception state.
-
-Never imply real-time location when data is stale.
+Assignments and fleet are dense operational tables.
 
 ---
 
 ## M10 — Canteen
 
-M10 may remain deferred under `AGENTS.md`; this design applies only when explicitly in scope.
+M10 may remain deferred under `AGENTS.md`.
 
-### Current feature families
-Controls, enrollments, menu, meal plans, plans, POS, serving, wallets, inventory/stock, vendors and reports.
+**Primary job when activated:** serve safely and quickly while maintaining entitlement, wallet, allergy, stock, and vendor truth.
 
-### Target design
+Use:
 
-**POS**
-High-speed transaction surface with large actionable controls, student/account identification, allergy warning, basket, total and clear completion state.
+- fast POS;
+- scan/serve queue;
+- explicit allergy warning;
+- meal-plan editor;
+- wallet ledger;
+- inventory/expiry exceptions;
+- vendor workspace.
 
-**Serving**
-Queue/scan workflow; prioritize entitlement and allergy safety over decoration.
-
-**Menu / Meal Plans**
-Structured planner/editor.
-
-**Wallets**
-Transaction-ledger pattern with balance and adjustment lineage.
-
-**Inventory / Stock**
-Dense table + low-stock/expiry exceptions.
-
-**Vendors**
-Standard procurement/vendor workspace.
-
-Do not make back-office canteen operations look like a consumer food-ordering app.
+Do not make back-office canteen UI look like consumer food ordering.
 
 ---
 
 ## M11 — Accounting & Finance
 
-### Current feature families
-Accounts/chart of accounts, journals, cash/bank, budgets, collections, fiscal periods, payables, receivables, reconciliation, payroll handoff, management and audit.
-
-### Target design
+**Primary job:** preserve financial truth from source transaction through ledger, reconciliation, reporting, and audit lineage.
 
 Accounting should have the highest information density in SchoolOS.
 
-**Accounting Home**
+### Accounting Home
+
+Prioritize:
+
 - cash/bank position;
 - unreconciled items;
 - unposted journals;
 - receivables/payables attention;
 - period status;
 - posting failures;
-- financial reporting shortcuts.
+- reporting shortcuts.
 
-**Chart of Accounts**
-Hierarchical table/tree with account code, type, status and balance context.
+### Core workspaces
 
-**Journals**
-Dense journal register + journal inspector; debit and credit must align clearly.
+- Chart of Accounts — hierarchy/tree + codes + balances;
+- Journals — dense register + inspector;
+- Journal Entry — balanced-entry editor with live debit/credit totals;
+- Cash & Bank — account ledgers with running balance;
+- Reconciliation — split-pane matching;
+- Receivables / Payables — aging-first tables;
+- Fiscal Periods — status/timeline + lock/reopen consequences.
 
-**Journal Entry**
-Balanced-entry editor with live debit/credit totals and explicit validation.
+Every report should drill down:
 
-**Cash & Bank**
-Account-level ledgers with running balance.
+```text
+Statement → line → account → ledger → journal/voucher → source transaction → approval/document
+```
 
-**Reconciliation**
-Split-pane matching workspace: bank statement items ↔ SchoolOS ledger items, with matched/unmatched state.
-
-**Receivables / Payables**
-Aging-first operational tables.
-
-**Fiscal Periods**
-Timeline/status view with lock/reopen state and consequences.
-
-**Reports**
-Every statement must drill down: Statement → line → account → ledger → journal/voucher → source transaction → approval/document.
-
-Avoid large decorative cards and pie-chart dashboards.
+Avoid decorative finance cards and pie-chart dashboards.
 
 ---
 
 ## M12 — Notifications & Delivery
 
-### Current feature families
-Notification center/preferences plus deliveries and failures.
-
-### Target design
+**Primary job:** show delivery truth, surface failures, and support safe retries without duplicating notice-authoring responsibility.
 
 Separate:
 
-**User Inbox**
-Simple readable notification list with filters and deep links.
+- User Inbox — readable list with filters/deep links;
+- Admin Delivery Operations — queued/sent/delivered/read/acknowledged/failed;
+- Failure Queue — reason, provider, retry state, recipient context;
+- Preferences — compact settings.
 
-**Admin Delivery Operations**
-Observability workspace:
-- queued/sent/delivered/read/acknowledged/failed;
-- provider/channel;
-- retry state;
-- failure reason;
-- recipient scope.
-
-**Failure Queue**
-Triage pattern with safe retry controls and provider/context detail.
-
-**Preferences**
-Compact settings, not operational dashboard styling.
-
-M12 should show delivery truth; it must not visually blur M15 notice-authoring ownership.
+M12 must not visually blur M15 authoring ownership.
 
 ---
 
@@ -1070,35 +1162,19 @@ M13 is frozen/disabled by default under `AGENTS.md`.
 
 Do not surface it in active navigation or redesign it into prominence merely because routes exist.
 
-If explicitly reactivated later, target:
+If explicitly reactivated later, target controlled teacher activity/resource authoring, sessions, progress matrices, attempt review, and resource library.
 
-- teacher activity/resource authoring;
-- controlled sessions;
-- progress matrix;
-- learner attempt review;
-- resource library;
-- session state.
-
-Avoid gamified public ranking or social patterns.
+Avoid public ranking/gamification patterns.
 
 ---
 
 ## M15 — Notices & Announcements
 
-### Current feature families
-Notice list/detail, create, approvals, scheduled notices, deliveries and failures.
+**Primary job:** author the correct message, target the correct audience, obtain required approval, publish intentionally, and verify delivery.
 
-### Target design
+Current feature families: notice list/detail, create, approvals, scheduled notices, deliveries, failures.
 
-**Notices Home**
-- drafts;
-- scheduled;
-- awaiting approval;
-- recently published;
-- failed/attention items.
-
-**Notice Composer**
-Structured publication workflow:
+### Notice Composer
 
 ```text
 Content
@@ -1109,24 +1185,21 @@ Content
 → Approval / Publish
 ```
 
-Recipient preview is important for high-impact communication.
+Recipient preview is mandatory for high-impact communication where backend support exists.
 
-**Approval**
-Queue/triage pattern showing author, audience, urgency, attachments and consequence.
+Approval uses queue/triage design.
 
-**Published Notice Detail**
-Content + version/status + exact audience + acknowledgements/delivery summary.
+Published detail shows content, version/status, exact audience, acknowledgements, and delivery summary.
 
-**Delivery**
-Deep-link into M12 delivery diagnostics rather than duplicating provider logic.
+Delivery diagnostics deep-link to M12 rather than duplicating provider state.
 
-Corrected, superseded and withdrawn notices must be visually unambiguous.
+Corrected, superseded, and withdrawn notices must be visually unambiguous.
 
 ---
 
-# 14. Cross-Module Reports & Exports
+# 17. Cross-Module Reports & Exports
 
-Reports should not be a file-download graveyard.
+Reports must not become a file-download graveyard.
 
 Use:
 
@@ -1139,20 +1212,20 @@ Use:
 - generation history;
 - clear draft/final/confidential status.
 
-Financial reports require drill-down and stronger numeric density than general school reports.
+Financial reports require drill-down and stronger numeric density than general reports.
 
 ---
 
-# 15. Master → Detail and Inspector Panels
+# 18. Master → Detail and Inspector Panels
 
-For high-volume workflows, avoid unnecessary full-page navigation.
+Avoid unnecessary full-page navigation for high-volume work.
 
-Good candidates for list + inspector:
+Good list + inspector candidates:
 
 - student quick view;
 - admission review;
 - fee invoice/receipt review;
-- approval items;
+- approvals;
 - attendance corrections;
 - notification failures;
 - audit events;
@@ -1162,15 +1235,15 @@ Good candidates for list + inspector:
 Use a full page when:
 
 - editing is complex;
-- the record has many sibling sections;
+- many sibling sections exist;
 - deep linking matters;
 - audit/history context is substantial.
 
-Preserve list filters, sort, pagination and scroll position when returning from detail.
+Preserve filters, sort, pagination, and scroll position when returning from detail.
 
 ---
 
-# 16. Tables
+# 19. Tables
 
 Tables are first-class SchoolOS surfaces.
 
@@ -1181,41 +1254,41 @@ Required qualities:
 - compact/moderate density;
 - search/filter/sort;
 - pagination;
-- selection and bulk actions when valid;
-- row actions;
-- sticky headers where useful;
+- valid selection/bulk actions;
+- contextual row actions;
+- sticky headers when useful;
 - horizontal overflow strategy;
 - accessible headers;
 - keyboard usability where practical;
-- saved views/column preferences for high-frequency staff work where justified.
+- saved views/column preferences for high-frequency work.
 
-Numeric and monetary columns should align consistently.
+Numeric and monetary columns align consistently.
 
-Do not convert dense desktop tables into giant card lists just to look modern.
+Do not convert desktop tables into giant card lists merely to look modern.
 
 ---
 
-# 17. Forms
+# 20. Forms
 
 Forms should:
 
 - group related fields;
 - use explicit labels;
-- show validation close to fields;
+- show validation near fields;
 - preserve input after recoverable errors;
 - distinguish required fields;
 - use searchable selectors for large datasets;
-- avoid exposing internal IDs;
+- avoid internal IDs;
 - prevent duplicate/destructive submission;
 - use staged flows only when they reduce cognitive load.
 
-For long workflows, use meaningful section navigation or a step model.
+Long workflows should use meaningful section navigation or a step model.
 
 Do not hide important fields behind decorative minimalism.
 
 ---
 
-# 18. Status & Lifecycle UI
+# 21. Status & Lifecycle UI
 
 Equivalent states must look and mean the same thing across modules.
 
@@ -1244,7 +1317,7 @@ Never depend on color alone.
 
 ---
 
-# 19. Dashboard Rules
+# 22. Dashboard Rules
 
 A dashboard is not a gallery of KPI cards.
 
@@ -1259,34 +1332,41 @@ Prioritize:
 
 Fixed safety/compliance-critical attention MUST NOT be user-hideable.
 
-Lower-priority widgets MAY later support controlled personalization such as reorder, pin/hide, favourite views, or default landing preference.
+Lower-priority widgets MAY support controlled personalization such as reorder, pin/hide, favourite views, or default landing preference.
+
+Prefer compact summary strips and attention lists over four independent cards when metrics belong together.
 
 ---
 
-# 20. Low-Bandwidth Web UX
+# 23. Low-Bandwidth Web UX
 
-Design for real Nepal connectivity, not only complete offline/online extremes.
+Design for real Nepal connectivity, not just complete offline/online extremes.
 
-Prefer:
+Default rules:
 
-- smaller payloads;
-- pagination;
-- field projection;
-- deferred secondary panels;
-- image thumbnails;
-- request deduplication;
-- cache-aware reads;
-- clear retry;
-- partial-data honesty;
-- last-updated/stale indicators where material.
+- paginate large datasets; typical default page size should remain around 25–50 unless workflow evidence supports another value;
+- avoid fetching hidden-tab data before needed;
+- field-project list endpoints when practical;
+- defer secondary panels;
+- show thumbnails before large media;
+- deduplicate requests;
+- cancel/ignore obsolete searches;
+- use cache-aware reads where safe;
+- provide retry;
+- show partial-data truthfully;
+- show last-updated/stale state where material;
+- do not block primary content because one secondary panel failed;
+- do not show fake zeros for unavailable data.
 
-Do not block the entire page because one secondary module panel failed.
-
-Do not show fake zeros for unavailable data.
+Every migrated priority screen should be sanity-checked under throttled/poor connectivity where practical.
 
 ---
 
-# 21. Responsive Design
+# 24. Responsive Design
+
+Responsive behavior is **not a final-phase task**.
+
+Every migrated slice must be designed and verified responsively before completion.
 
 Inspect representative widths such as:
 
@@ -1296,12 +1376,10 @@ Inspect representative widths such as:
 - 768px;
 - narrower windows where useful.
 
-SchoolOS Web is a productivity application.
-
 Use:
 
 - column prioritization;
-- horizontal scroll where appropriate;
+- horizontal scroll when appropriate;
 - responsive panels;
 - compact controls;
 - collapsible navigation;
@@ -1311,11 +1389,13 @@ Do not mechanically turn every table into cards.
 
 ---
 
-# 22. Accessibility
+# 25. Accessibility
 
-Target WCAG-aligned behavior, aiming toward WCAG 2.2 AA for priority flows.
+Accessibility is **part of each implementation phase**, not a polish pass.
 
-Audit:
+Target WCAG 2.2 AA for priority flows.
+
+Verify:
 
 - keyboard navigation;
 - visible focus;
@@ -1332,11 +1412,11 @@ Audit:
 - accessible authentication;
 - Nepali/Devanagari content.
 
-Accessibility must be verified in rendered priority flows.
+A component is not considered production-ready merely because its underlying library is accessible; the rendered flow must be checked.
 
 ---
 
-# 23. Loading, Empty, Error, Permission & Disabled States
+# 26. Loading, Empty, Error, Permission & Disabled States
 
 Every meaningful screen must intentionally handle:
 
@@ -1358,7 +1438,17 @@ Provide a useful recovery action where possible.
 
 ---
 
-# 24. Deferred Modules
+# 27. Dark Mode Decision
+
+For the current redesign, **light mode is authoritative** unless the project owner explicitly expands scope.
+
+Design tokens and semantic component architecture SHOULD remain compatible with a future dark mode, but broad dark-mode implementation must not delay or destabilize the primary Web redesign.
+
+Do not create partially supported dark mode on a subset of operational pages.
+
+---
+
+# 28. Deferred Modules
 
 Astra MAY visually normalize existing M8/M9/M10/M13 screens only when explicitly in scope or encountered as part of an authorized redesign task.
 
@@ -1368,61 +1458,84 @@ Astra MUST NOT reactivate, expand, or promote a deferred module through design w
 
 ---
 
-# 25. Redesign Migration Strategy
+# 29. Redesign Migration Strategy
 
-A comprehensive Web redesign SHOULD be incremental even when the target visual system is entirely new.
+A comprehensive redesign SHOULD be incremental even when the target visual system is entirely new.
 
-Recommended sequence:
+## Phase 0 — Design-system audit and convergence
 
-```text
-Phase 1
-Design System v2
-Application shell
-Navigation
-Command search
-Quick actions
-Core Data Workspace / Inspector / Form primitives
+- inventory existing UI primitives;
+- identify duplicate/legacy card/button/input/table systems;
+- define canonical Design System v2 tokens;
+- define replacement map;
+- restrict module-color usage;
+- define Surface/Section/Card/DataWorkspace/Inspector responsibilities;
+- prevent new legacy primitive usage where practical.
 
-Phase 2
-Admin Home
-Teacher Today
-Principal Attention/Approvals
-HR Home
-Finance Home
+## Phase 1 — Core product shell
 
-Phase 3
-Students + Student 360
-Admissions
+- Design System v2 implementation;
+- application shell;
+- navigation;
+- command/search evolution;
+- quick actions;
+- Data Workspace;
+- Inspector;
+- canonical form primitives.
 
-Phase 4
-Attendance
-Homework
-Academics / Marks / Results
-Timetable
+## Phase 2 — Persona homes
 
-Phase 5
-Fees / Receipts
-HR / Payroll
-Accounting
+- Admin Home;
+- Teacher Today;
+- Principal Attention/Approvals;
+- HR Home;
+- Finance Home.
 
-Phase 6
-Activity
-Notices / Notifications
-Reports / Settings
+## Phase 3 — People
 
-Phase 7
-Deferred operational modules only when authorized
-Responsive
-Accessibility
-Low-bandwidth performance
-Visual consistency
-```
+- Students directory;
+- Student 360;
+- Admissions/review.
 
-Do not perform a risky all-routes-at-once visual rewrite unless explicitly required.
+## Phase 4 — Academic operations
+
+- Attendance;
+- Homework;
+- Academics/Marks/Results;
+- Timetable.
+
+## Phase 5 — Financial/workforce depth
+
+- Fees/Receipts;
+- HR/Staff 360;
+- Payroll;
+- Accounting/Reconciliation.
+
+## Phase 6 — Communication and administration
+
+- Activity;
+- Notices/Notifications;
+- Reports;
+- Settings.
+
+## Phase 7 — Cross-product hardening
+
+- deferred modules only when authorized;
+- full WCAG 2.2 AA audit;
+- visual consistency audit;
+- low-bandwidth/performance audit;
+- Nepali typography/localization QA;
+- cross-module keyboard audit;
+- final responsive audit;
+- visual-regression baseline review.
+
+**Important:** responsive, accessibility, loading/error/permission, and low-bandwidth checks are required inside every earlier phase. Phase 7 repeats them across the whole product; it does not postpone them.
+
+Do not perform a risky all-routes-at-once rewrite unless explicitly required.
 
 ---
 
-# 26. Visual QA
+# 30. Visual QA and Regression Protection
 
 When browser tooling is available:
 
@@ -1437,7 +1550,7 @@ Inspect source
 → Repeat
 ```
 
-For changed high-value flows inspect:
+For every changed high-value flow inspect:
 
 - primary desktop width;
 - compact desktop/tablet width;
@@ -1447,11 +1560,30 @@ For changed high-value flows inspect:
 - Nepali text;
 - low-bandwidth behavior where relevant.
 
+## 30.1 Canonical visual baselines
+
+Maintain visual-regression coverage for a small set of design-system reference surfaces rather than snapshotting every page.
+
+Recommended canonical surfaces:
+
+- application shell;
+- Admin Home;
+- Teacher Today;
+- Principal Attention;
+- Student Directory;
+- Student 360;
+- Attendance Register;
+- Marks Grid;
+- Fee Collection;
+- Accounting Reconciliation.
+
+Where Playwright snapshot infrastructure is practical, prefer asserted visual baselines for these canonical views rather than screenshots that are captured only on failure.
+
 Do not rely only on source review.
 
 ---
 
-# 27. Verification
+# 31. Verification
 
 For Web UI-only changes, normally run:
 
@@ -1461,30 +1593,37 @@ For Web UI-only changes, normally run:
 - lint;
 - production build when justified by impact;
 - rendered visual inspection;
-- responsive/accessibility checks.
+- responsive/accessibility checks;
+- low-bandwidth sanity check for priority operational workspaces.
 
-If work changes routing, auth, finance, permissions, contracts, state transitions or sensitive data handling, escalate verification according to `AGENTS.md`.
+If work changes routing, auth, finance, permissions, contracts, state transitions, or sensitive-data handling, escalate verification according to `AGENTS.md`.
 
 Visual QA alone is never sufficient for security- or data-sensitive work.
 
 ---
 
-# 28. Web Definition of Done
+# 32. Web Definition of Done
 
 A Web design task is complete only when applicable items pass:
 
-- the page/workspace matches the persona and job-to-be-done;
+- page/workspace matches the persona and primary job-to-be-done;
 - high-frequency actions are easy to find;
-- unnecessary navigation/context switching has been reduced;
-- shared primitives are used consistently;
+- interaction budget is reasonable for the workflow;
+- unnecessary navigation/context switching is reduced;
+- canonical v2 primitives are used;
+- no new overlapping primitive/design system was introduced;
+- cards are used only where appropriate;
+- module colors are restrained and semantic colors remain correct;
 - lifecycle/status semantics are consistent;
-- loading/empty/error/permission states are intentional;
-- responsive behavior is verified;
-- keyboard/accessibility behavior is checked;
+- loading/empty/error/permission/stale states are intentional;
+- responsive behavior is verified in the same slice;
+- keyboard/accessibility behavior is verified in the same slice;
 - Nepali/English presentation remains sound;
-- no authorization/security authority was moved to the client;
+- low-bandwidth behavior is acceptable for the flow;
+- no authorization/security authority moved to the client;
 - relevant tests/typecheck/lint/build pass;
 - broad design work was inspected in the actual rendered application;
+- canonical visual baseline is updated/verified when applicable;
 - no unrelated product/module scope was expanded.
 
 ---
@@ -1496,5 +1635,7 @@ SchoolOS Web should feel like **one intentionally designed operational product w
 The existing application architecture is valuable and should be preserved.
 
 The existing visual design is replaceable.
+
+Design System v2 must remove the structural causes of the current card-heavy, module-colored inconsistency before broad module migration.
 
 `AGENTS.md` owns product/security/domain authority. This file owns the **Web-specific design and interaction discipline** within that authority.
