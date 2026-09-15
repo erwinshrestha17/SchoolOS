@@ -25,16 +25,24 @@ Important distinctions:
 - Do not create another repository-wide Markdown source of truth.
 - If repository evidence conflicts with this file, do not silently choose one. Preserve safety, identify the conflict, and resolve it within scope when possible.
 
-## 1.1 Recognized scoped design playbooks
+## 1.1 Recognized scoped execution playbooks
 
-Exactly two root-level design playbooks are recognized:
+Exactly three root-level scoped execution playbooks are recognized:
 
+- `SCHOOLOS_RBAC_AUTHORIZATION_IMPLEMENTATION.md` — scoped to authorization architecture and implementation across `apps/api`, `packages/core`, Prisma/migrations, security-sensitive server contracts, and the authorization projections consumed by Web/Mobile.
 - `SCHOOLOS_WEB_DESIGN_ASTRA.md` — scoped to `apps/web` and SchoolOS web UX/frontend design.
 - `SCHOOLOS_APP_DESIGN_ASTRA.md` — scoped to `apps/schoolos_mobile` and SchoolOS Flutter mobile UX/frontend design.
 
-These files are **specialized execution playbooks, not independent sources of truth**.
+These files are **specialized execution playbooks, not independent repository sources of truth**.
 
-They MAY refine:
+Authority is intentionally partitioned:
+
+- `AGENTS.md` defines durable product, security, domain, roadmap, compliance, offline, and verification invariants.
+- `SCHOOLOS_RBAC_AUTHORIZATION_IMPLEMENTATION.md` defines how those authorization invariants are implemented: permission vocabulary, typed scopes, policy evaluation, relationship checks, sensitive-data projections, separation of duties, delegation, support access, audit, migration, and authorization testing.
+- `SCHOOLOS_WEB_DESIGN_ASTRA.md` defines how authorized capabilities/data are presented and operated on Web.
+- `SCHOOLOS_APP_DESIGN_ASTRA.md` defines how authorized capabilities/data are presented and operated on Mobile, including truthful offline/sync UX.
+
+The Web/App playbooks MAY refine:
 
 - visual hierarchy;
 - interaction patterns;
@@ -45,13 +53,25 @@ They MAY refine:
 - accessibility details;
 - surface-specific visual QA.
 
-They MUST NOT override this file on:
+The RBAC playbook MAY refine implementation details for:
+
+- permission catalog and naming;
+- role templates;
+- scope/relationship policy;
+- authorization decision contracts;
+- field/data projections;
+- separation of duties;
+- delegation/JIT/support access;
+- security audit/observability;
+- authorization migration/testing.
+
+No scoped playbook may override this file on:
 
 - Nepal-only roadmap scope;
 - module status or product scope;
-- personas and access boundaries;
+- canonical personas;
 - tenant isolation;
-- authentication/authorization;
+- authentication/authorization invariants;
 - financial/accounting integrity;
 - privacy/protected data;
 - compliance behavior;
@@ -60,9 +80,12 @@ They MUST NOT override this file on:
 - source-of-truth decisions;
 - release/verification requirements.
 
-If a design playbook conflicts with this file, **this file wins**.
+Conflict rules:
 
-If Web and App playbooks differ, that is allowed when the difference is platform-appropriate. Neither design playbook has authority over the other surface.
+1. If any scoped playbook conflicts with `AGENTS.md`, **`AGENTS.md` wins**.
+2. If RBAC and a design playbook conflict on access, scope, sensitive data, approval authority, or backend/client responsibility, **the RBAC playbook wins within `AGENTS.md` authority**.
+3. If RBAC and a design playbook differ only on presentation/interaction, the relevant Web/App playbook governs that surface.
+4. Web and App may intentionally differ when platform-appropriate; neither design playbook has authority over the other surface.
 
 ---
 
@@ -83,16 +106,18 @@ Bias toward action and completion.
 When asked to implement, fix, audit, refactor, harden, migrate, redesign, investigate, prepare a PR, or make SchoolOS production-ready:
 
 1. Read this `AGENTS.md` first.
-2. If the task touches `apps/web`, also read `SCHOOLOS_WEB_DESIGN_ASTRA.md`.
-3. If the task touches `apps/schoolos_mobile`, also read `SCHOOLOS_APP_DESIGN_ASTRA.md`.
-4. Inspect relevant implementation before editing.
-5. Trace affected backend, database, contracts, web, mobile, and tests as required by impact.
-6. Infer routine implementation details from repository evidence and existing patterns.
-7. Prefer the smallest coherent end-to-end change over speculative redesign.
-8. Continue until requested scope is complete, verified, or blocked by a legitimate external dependency.
-9. Fix directly related defects when required for correctness.
-10. Do not broaden into unrelated cleanup.
-11. Never weaken authorization, validation, tests, or quality gates merely to make work pass.
+2. If the task touches authorization, roles, permissions, scopes, entitlements, relationship checks, sensitive-data projection, support access, delegation, exports/search authorization, approval authority, or offline re-authorization, also read `SCHOOLOS_RBAC_AUTHORIZATION_IMPLEMENTATION.md`.
+3. If the task touches `apps/web`, also read `SCHOOLOS_WEB_DESIGN_ASTRA.md`.
+4. If the task touches `apps/schoolos_mobile`, also read `SCHOOLOS_APP_DESIGN_ASTRA.md`.
+5. When a task crosses these boundaries, read **all applicable playbooks before editing** and implement one coherent end-to-end contract rather than separate client/server interpretations.
+6. Inspect relevant implementation before editing.
+7. Trace affected backend, database, contracts, web, mobile, and tests as required by impact.
+8. Infer routine implementation details from repository evidence and existing patterns.
+9. Prefer the smallest coherent end-to-end change over speculative redesign.
+10. Continue until requested scope is complete, verified, or blocked by a legitimate external dependency.
+11. Fix directly related defects when required for correctness.
+12. Do not broaden into unrelated cleanup.
+13. Never weaken authorization, validation, tests, or quality gates merely to make work pass.
 
 For long-running work, progress updates should be concise and factual.
 
@@ -512,7 +537,86 @@ For changes touching both Web and Mobile:
 
 ---
 
-# 19. Verification Policy
+# 19. Cross-Playbook Coordination and Delivery Gates
+
+The three scoped playbooks MUST work toward one product contract.
+
+## 19.1 End-to-end implementation order
+
+For any feature that exposes protected data or actions:
+
+```text
+AGENTS.md invariant
+    ↓
+RBAC authorization contract / server projection
+    ↓
+API/shared contract
+    ↓
+Web and/or Mobile presentation
+    ↓
+surface-specific interaction + accessibility/offline handling
+    ↓
+negative authorization + functional + visual verification
+```
+
+Do not design a client capability first and then invent backend permission semantics to match the UI.
+
+## 19.2 Shared authorization-to-UI contract
+
+Web/Mobile MAY use server-provided information such as:
+
+- `allowedActions`;
+- `capabilities`;
+- authorized section/tab projections;
+- scoped search results;
+- approval state;
+- lifecycle state;
+- entitlement/module availability.
+
+These values may guide presentation, but every protected API operation MUST re-authorize server-side.
+
+Clients MUST NOT derive authoritative access from:
+
+- role names alone;
+- hidden navigation;
+- cached permission lists;
+- locally inferred assignment/guardian relationships;
+- client-supplied tenant IDs.
+
+## 19.3 Feature dependency gates
+
+The following dependencies are mandatory:
+
+| Surface/feature | Authorization prerequisite |
+| --- | --- |
+| Student 360 sensitive tabs | server-authorized student projection; teacher/guardian scope policies; sensitive-section rules |
+| Staff 360 payroll/bank/document tabs | server-authorized staff projection and HR/payroll separation |
+| Teacher Today / attendance / marks | active assignment-aware authorization |
+| Parent child switch / child detail | active guardian relationship authorization |
+| Principal approval surfaces | explicit approval capability + lifecycle/SoD policy |
+| Fee/refund/accounting actions | finance separation of duties + lifecycle policy |
+| Payroll actions | payroll preparation/review/approval/posting separation |
+| Global command/search | server-side authorization-aware search projection |
+| Reports/exports | explicit read/export permission and scoped field projection |
+| Access Control Center | P0 authorization semantics trustworthy before broad role-admin UX |
+| Offline mutation sync | server re-authorization at sync and conflict handling |
+| Platform tenant inspection | explicit Platform capability; tenant support access when tenant data is involved |
+
+A design task may prepare visual primitives before a prerequisite is complete, but MUST NOT expose a production capability whose authorization prerequisite is unresolved.
+
+## 19.4 Coordinated Definition of Done
+
+For work spanning authorization and a client surface, completion requires both:
+
+1. the RBAC/security contract is implemented and negatively tested; and
+2. the Web/Mobile experience consumes that contract correctly and passes its surface-specific UX/accessibility/visual checks.
+
+A frontend-only green build does not prove authorization correctness.
+A backend-only authorization change is not complete when the requested user-facing capability still exposes stale or contradictory UI semantics.
+
+---
+
+# 20. Verification Policy
 
 Testing must be proportional to impact.
 
@@ -558,7 +662,7 @@ Do not repeatedly run the entire repository suite after every small edit, but do
 
 ---
 
-# 20. Definition of Done
+# 21. Definition of Done
 
 A task is complete only when applicable items are satisfied:
 
@@ -579,7 +683,7 @@ A task is complete only when applicable items are satisfied:
 
 ---
 
-# 21. Prohibited Actions
+# 22. Prohibited Actions
 
 Do not:
 
@@ -604,8 +708,10 @@ Do not:
 
 `AGENTS.md` is the constitution.
 
-`SCHOOLOS_WEB_DESIGN_ASTRA.md` and `SCHOOLOS_APP_DESIGN_ASTRA.md` are scoped design execution manuals.
+`SCHOOLOS_RBAC_AUTHORIZATION_IMPLEMENTATION.md` is the scoped authorization implementation manual.
+
+`SCHOOLOS_WEB_DESIGN_ASTRA.md` and `SCHOOLOS_APP_DESIGN_ASTRA.md` are the platform-specific design execution manuals.
 
 The codebase, schema, tests, and runtime are evidence of implementation.
 
-Astra/Codex should use all three together without ambiguity: **one repository authority, two platform-specific design playbooks, and no conflict in product/security ownership.**
+Astra/Codex must use all four root documents together without ambiguity: **one repository authority, one authorization implementation contract, two platform-specific design playbooks, and one shared SchoolOS product goal.**
