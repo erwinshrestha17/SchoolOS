@@ -25,7 +25,7 @@ Important distinctions:
 - Do not create another repository-wide Markdown source of truth.
 - If repository evidence conflicts with this file, do not silently choose one. Preserve safety, identify the conflict, and resolve it within scope when possible.
 
-## 1.1 Recognized scoped execution playbooks
+## 1.1 Recognized scoped execution playbooks and master roadmap
 
 Exactly three root-level scoped execution playbooks are recognized:
 
@@ -33,7 +33,11 @@ Exactly three root-level scoped execution playbooks are recognized:
 - `SCHOOLOS_WEB_DESIGN_ASTRA.md` — scoped to `apps/web` and SchoolOS web UX/frontend design.
 - `SCHOOLOS_APP_DESIGN_ASTRA.md` — scoped to `apps/schoolos_mobile` and SchoolOS Flutter mobile UX/frontend design.
 
-These files are **specialized execution playbooks, not independent repository sources of truth**.
+One coordinated root-level execution roadmap is also recognized:
+
+- `SCHOOLOS_PHASE_WISE_IMPLEMENTATION_MASTER_PLAN_WITH_EDGE_CASES.md` — sequences implementation across authorization, backend contracts, Web, Mobile, finance, offline, governance, testing, and production hardening. It defines phase dependencies, edge-case gates, risk-based verification, and recommended Codex session order. It does not create new product/security authority and must remain subordinate to this `AGENTS.md` and the applicable scoped playbooks.
+
+These files are **specialized execution documents, not independent repository sources of truth**.
 
 Authority is intentionally partitioned:
 
@@ -106,18 +110,19 @@ Bias toward action and completion.
 When asked to implement, fix, audit, refactor, harden, migrate, redesign, investigate, prepare a PR, or make SchoolOS production-ready:
 
 1. Read this `AGENTS.md` first.
-2. If the task touches authorization, roles, permissions, scopes, entitlements, relationship checks, sensitive-data projection, support access, delegation, exports/search authorization, approval authority, or offline re-authorization, also read `SCHOOLOS_RBAC_AUTHORIZATION_IMPLEMENTATION.md`.
-3. If the task touches `apps/web`, also read `SCHOOLOS_WEB_DESIGN_ASTRA.md`.
-4. If the task touches `apps/schoolos_mobile`, also read `SCHOOLOS_APP_DESIGN_ASTRA.md`.
-5. When a task crosses these boundaries, read **all applicable playbooks before editing** and implement one coherent end-to-end contract rather than separate client/server interpretations.
-6. Inspect relevant implementation before editing.
-7. Trace affected backend, database, contracts, web, mobile, and tests as required by impact.
-8. Infer routine implementation details from repository evidence and existing patterns.
-9. Prefer the smallest coherent end-to-end change over speculative redesign.
-10. Continue until requested scope is complete, verified, or blocked by a legitimate external dependency.
-11. Fix directly related defects when required for correctness.
-12. Do not broaden into unrelated cleanup.
-13. Never weaken authorization, validation, tests, or quality gates merely to make work pass.
+2. For roadmap/phase implementation, production-readiness programs, or work spanning multiple domains/surfaces, read `SCHOOLOS_PHASE_WISE_IMPLEMENTATION_MASTER_PLAN_WITH_EDGE_CASES.md` and start from the earliest incomplete prerequisite/phase slice.
+3. If the task touches authorization, roles, permissions, scopes, entitlements, relationship checks, sensitive-data projection, support access, delegation, exports/search authorization, approval authority, or offline re-authorization, also read `SCHOOLOS_RBAC_AUTHORIZATION_IMPLEMENTATION.md`.
+4. If the task touches `apps/web`, also read `SCHOOLOS_WEB_DESIGN_ASTRA.md`.
+5. If the task touches `apps/schoolos_mobile`, also read `SCHOOLOS_APP_DESIGN_ASTRA.md`.
+6. When a task crosses these boundaries, read **all applicable execution documents before editing** and implement one coherent end-to-end contract rather than separate client/server interpretations.
+7. Inspect relevant implementation before editing.
+8. Trace affected backend, database, contracts, web, mobile, and tests as required by impact.
+9. Infer routine implementation details from repository evidence and existing patterns.
+10. Prefer the smallest coherent end-to-end change over speculative redesign.
+11. Continue until requested scope is complete, verified, or blocked by a legitimate external dependency.
+12. Fix directly related defects when required for correctness.
+13. Do not broaden into unrelated cleanup.
+14. Never weaken authorization, validation, tests, or quality gates merely to make work pass.
 
 For long-running work, progress updates should be concise and factual.
 
@@ -708,10 +713,12 @@ Do not:
 
 `AGENTS.md` is the constitution.
 
+`SCHOOLOS_PHASE_WISE_IMPLEMENTATION_MASTER_PLAN_WITH_EDGE_CASES.md` is the coordinated phase execution roadmap and edge-case gatekeeper.
+
 `SCHOOLOS_RBAC_AUTHORIZATION_IMPLEMENTATION.md` is the scoped authorization implementation manual.
 
 `SCHOOLOS_WEB_DESIGN_ASTRA.md` and `SCHOOLOS_APP_DESIGN_ASTRA.md` are the platform-specific design execution manuals.
 
 The codebase, schema, tests, and runtime are evidence of implementation.
 
-Astra/Codex must use all four root documents together without ambiguity: **one repository authority, one authorization implementation contract, two platform-specific design playbooks, and one shared SchoolOS product goal.**
+Astra/Codex must use all five root documents together without ambiguity: **one repository authority, one coordinated implementation roadmap, one authorization implementation contract, two platform-specific design playbooks, and one shared SchoolOS product goal.**
