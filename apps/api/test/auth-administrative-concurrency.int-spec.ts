@@ -804,12 +804,15 @@ describeDatabase(
         let waiting = false;
         const deadline = Date.now() + 2000;
         while (!waiting && Date.now() < deadline) {
-          const rows = await prisma.$queryRaw<{ waiting: boolean }[]>`
+          const rows = await prisma.runWithoutTenantScope(
+            'test diagnostic: inspect PostgreSQL lock waiters in the isolated test database',
+            () => prisma.$queryRaw<{ waiting: boolean }[]>`
           SELECT EXISTS (SELECT 1 FROM pg_stat_activity
             WHERE datname = current_database() AND wait_event_type = 'Lock'
               AND cardinality(pg_blocking_pids(pid)) > 0
               AND query LIKE '%FROM "User"%' AND query LIKE '%FOR UPDATE%') AS waiting
-        `;
+        `,
+          );
           waiting = rows[0].waiting;
           if (!waiting) await new Promise((resolve) => setTimeout(resolve, 10));
         }
@@ -1089,9 +1092,13 @@ describeDatabase(
           let waiting = false;
           const deadline = Date.now() + 2000;
           while (!waiting && Date.now() < deadline) {
-            const rows = await prisma.$queryRaw<
-              { waiting: boolean }[]
-            >`SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND cardinality(pg_blocking_pids(pid)) > 0 AND query LIKE '%FROM "Tenant"%' AND query LIKE '%FOR SHARE%') AS waiting`;
+            const rows = await prisma.runWithoutTenantScope(
+              'test diagnostic: inspect PostgreSQL lock waiters in the isolated test database',
+              () =>
+                prisma.$queryRaw<
+                  { waiting: boolean }[]
+                >`SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND cardinality(pg_blocking_pids(pid)) > 0 AND query LIKE '%FROM "Tenant"%' AND query LIKE '%FOR SHARE%') AS waiting`,
+            );
             waiting = rows[0].waiting;
             if (!waiting)
               await new Promise((resolve) => setTimeout(resolve, 10));
@@ -1275,22 +1282,26 @@ describeDatabase(
       );
       // A connection-local temporary User table shadows the real table only in
       // this transaction. The actual migration is applied, never duplicated here.
-      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        await tx.$executeRaw`CREATE TEMP TABLE "User" ("id" TEXT PRIMARY KEY, "passwordHash" TEXT) ON COMMIT DROP`;
-        await tx.$executeRaw`INSERT INTO "User" ("id", "passwordHash") VALUES ('old', 'synthetic-preserved-hash')`;
-        await tx.$executeRawUnsafe(migration);
-        await tx.$executeRaw`INSERT INTO "User" ("id", "passwordHash") VALUES ('new', 'synthetic-new-hash')`;
-        expect(
-          await tx.$queryRaw`SELECT "id", "passwordHash", "authVersion" FROM "User" ORDER BY "id"`,
-        ).toEqual([
-          { id: 'new', passwordHash: 'synthetic-new-hash', authVersion: 0 },
-          {
-            id: 'old',
-            passwordHash: 'synthetic-preserved-hash',
-            authVersion: 0,
-          },
-        ]);
-      });
+      await prisma.runWithoutTenantScope(
+        'test migration: use a transaction-local temporary User table in the isolated test database',
+        () =>
+          prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+            await tx.$executeRaw`CREATE TEMP TABLE "User" ("id" TEXT PRIMARY KEY, "passwordHash" TEXT) ON COMMIT DROP`;
+            await tx.$executeRaw`INSERT INTO "User" ("id", "passwordHash") VALUES ('old', 'synthetic-preserved-hash')`;
+            await tx.$executeRawUnsafe(migration);
+            await tx.$executeRaw`INSERT INTO "User" ("id", "passwordHash") VALUES ('new', 'synthetic-new-hash')`;
+            expect(
+              await tx.$queryRaw`SELECT "id", "passwordHash", "authVersion" FROM "User" ORDER BY "id"`,
+            ).toEqual([
+              { id: 'new', passwordHash: 'synthetic-new-hash', authVersion: 0 },
+              {
+                id: 'old',
+                passwordHash: 'synthetic-preserved-hash',
+                authVersion: 0,
+              },
+            ]);
+          }),
+      );
       expect((await target()).authVersion).toBe(0);
     });
   },

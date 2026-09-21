@@ -1135,14 +1135,17 @@ describeDatabase(
         let waiting = false;
         const deadline = Date.now() + 2000;
         while (!waiting && Date.now() < deadline) {
-          const rows = await prisma.$queryRaw<{ waiting: boolean }[]>`
+          const rows = await prisma.runWithoutTenantScope(
+            'test diagnostic: inspect PostgreSQL lock waiters in the isolated test database',
+            () => prisma.$queryRaw<{ waiting: boolean }[]>`
             SELECT EXISTS (
               SELECT 1 FROM pg_stat_activity
               WHERE datname = current_database() AND wait_event_type = 'Lock'
                 AND cardinality(pg_blocking_pids(pid)) > 0
                 AND query LIKE '%FROM "User"%' AND query LIKE '%FOR UPDATE%'
             ) AS waiting
-          `;
+          `,
+          );
           waiting = rows[0].waiting;
           if (!waiting) await new Promise((resolve) => setTimeout(resolve, 10));
         }

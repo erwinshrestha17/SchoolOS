@@ -8,7 +8,7 @@ const shouldBuild = process.argv.includes('--build');
 if (shouldBuild) {
   const nextBin = resolve('node_modules/next/dist/bin/next');
   const result = spawnSync(process.execPath, [nextBin, 'build'], {
-    env: process.env,
+    env: { ...process.env, NODE_ENV: 'production' },
     stdio: 'inherit',
   });
 
@@ -38,6 +38,7 @@ if (existsSync(resolve('public'))) {
   });
 }
 
+process.env.NODE_ENV = 'production';
 process.env.PORT = process.env.SCHOOLOS_WEB_E2E_PORT ?? '3101';
 process.env.HOSTNAME = 'localhost';
 

@@ -5,6 +5,7 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -38,6 +39,8 @@ jobs:
       ALLOW_PROD_BOOT: 'false'
       PORT: '4000'
       DATABASE_URL: postgresql://schoolos:password123@localhost:5433/schoolos_db?schema=public
+      SCHOOLOS_AUTH_TEST_DATABASE_URL: postgresql://schoolos:password123@localhost:5433/schoolos_auth_recovery_test?schema=public
+      SCHOOLOS_ADMISSION_TEST_DATABASE_URL: postgresql://schoolos:password123@localhost:5433/schoolos_admission_atomic_test?schema=public
       REDIS_HOST: localhost
       REDIS_PORT: '6379'
       JWT_SECRET: ci-e2e-jwt-secret-not-for-production-use
@@ -90,7 +93,7 @@ jobs:
               - '.github/workflows/ci.yml'
 
       - name: Install Playwright Chromium
-        if: steps.changes.outputs.web == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true'
         run: pnpm --filter @schoolos/web exec playwright install chromium
 
       - name: Verify API formatting
@@ -154,6 +157,15 @@ jobs:
       - name: Migrate database
         run: pnpm --filter @schoolos/api exec prisma migrate deploy
 
+      - name: Prepare isolated concurrency test databases
+        env:
+          PGPASSWORD: password123
+        run: |
+          createdb -h localhost -p 5433 -U schoolos schoolos_auth_recovery_test
+          createdb -h localhost -p 5433 -U schoolos schoolos_admission_atomic_test
+          DATABASE_URL="$SCHOOLOS_AUTH_TEST_DATABASE_URL" pnpm --filter @schoolos/api exec prisma migrate deploy
+          DATABASE_URL="$SCHOOLOS_ADMISSION_TEST_DATABASE_URL" pnpm --filter @schoolos/api exec prisma migrate deploy
+
       - name: API integration tests
         run: pnpm test:integration
 
@@ -161,11 +173,11 @@ jobs:
         run: pnpm build
 
       - name: Seed e2e database
-        if: steps.changes.outputs.web == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true'
         run: pnpm db:seed
 
       - name: Start API server for e2e
-        if: steps.changes.outputs.web == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true'
         run: |
           pnpm --filter @schoolos/api build
           nohup pnpm --filter @schoolos/api start > api-server.log 2>&1 &
@@ -181,11 +193,11 @@ jobs:
           exit 1
 
       - name: Web e2e smoke
-        if: steps.changes.outputs.web == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true'
         run: pnpm test:web:e2e
 
       - name: API server logs
-        if: always() && steps.changes.outputs.web == 'true'
+        if: always() && (github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true')
         run: cat api-server.log || true
 
   # The Flutter app had no CI coverage at all: its suite ran only on whichever
@@ -212,7 +224,7 @@ jobs:
               - '.github/workflows/ci.yml'
 
       - name: Setup Flutter
-        if: steps.changes.outputs.mobile == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.mobile == 'true'
         uses: subosito/flutter-action@v2
         with:
           # Pin the toolchain: goldens are pixel comparisons, and a Flutter
@@ -222,17 +234,17 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        if: steps.changes.outputs.mobile == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.mobile == 'true'
         run: flutter pub get
 
       - name: Verify formatting
-        if: steps.changes.outputs.mobile == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.mobile == 'true'
         run: |
           dart format lib test
           git diff --exit-code -- lib test
 
       - name: Analyze
-        if: steps.changes.outputs.mobile == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.mobile == 'true'
         run: flutter analyze
 
       # Goldens are excluded, not skipped by accident. Measured on
@@ -242,5 +254,5 @@ jobs:
       # baselines stay pinned to the platform that generates them. See
       # apps/schoolos_mobile/dart_test.yaml.
       - name: Test
-        if: always() && steps.changes.outputs.mobile == 'true'
+        if: always() && (github.event_name == 'workflow_dispatch' || steps.changes.outputs.mobile == 'true')
         run: flutter test --exclude-tags golden
