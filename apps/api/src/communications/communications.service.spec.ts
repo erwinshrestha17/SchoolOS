@@ -209,13 +209,11 @@ describe('CommunicationsService', () => {
       }),
     };
     notificationPreferencePolicy = {
-      evaluateDelivery: jest
-        .fn()
-        .mockResolvedValue({
-          action: 'IMMEDIATE',
-          mandatory: false,
-          reason: 'Synthetic permitted policy',
-        }),
+      evaluateDelivery: jest.fn().mockResolvedValue({
+        action: 'IMMEDIATE',
+        mandatory: false,
+        reason: 'Synthetic permitted policy',
+      }),
     };
     actor = {
       userId: 'admin-1',
@@ -1753,7 +1751,7 @@ describe('CommunicationsService', () => {
         tenantId: actor.tenantId,
         status: NotificationStatus.QUEUED,
         retryCount: 0,
-        channel: NotificationChannel.PUSH,
+        channel: NotificationChannel.PUSH as NotificationChannel,
         sourceType: 'notice',
         sourceId: 'notice-1',
         title: 'Synthetic',

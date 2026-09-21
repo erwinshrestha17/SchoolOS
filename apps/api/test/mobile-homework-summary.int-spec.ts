@@ -137,10 +137,13 @@ describe('Parent homework dashboard summary (real database)', () => {
         guardianLinkId = link.id;
         actor = {
           tenantId: school.tenantId,
+          tenantSlug: 'mobile-homework-summary-test',
           userId: user.id,
+          email: 'parent@mobile-homework-summary.test',
+          authMethod: 'PASSWORD',
           roles: ['parent'],
           permissions: [],
-        } as AuthContext;
+        };
 
         async function assignment(
           title: string,

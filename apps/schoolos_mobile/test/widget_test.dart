@@ -394,11 +394,20 @@ void main() {
     expect(find.textContaining('All assignments ·'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Updates').last);
+    await tester.tap(find.byTooltip('Updates'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Holiday notice for Friday'),
+      100,
+      scrollable: find.descendant(
+        of: find.byKey(const PageStorageKey('parent-updates')),
+        matching: find.byType(Scrollable),
+      ),
+    );
     expect(find.text('Holiday notice for Friday'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    await tester.ensureVisible(find.text('Filter'));
     await tester.tap(find.text('Filter'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Events'));

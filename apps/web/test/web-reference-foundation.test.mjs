@@ -48,7 +48,7 @@ describe('reference dashboard foundation', () => {
     for (const playbook of playbooks) {
       assert.ok(sourceOfTruth.includes(playbook));
       const content = readFileSync(join(repoRoot, playbook), 'utf8');
-      assert.match(content, /If this playbook conflicts with `AGENTS\.md`/);
+      assert.match(content, /If this (?:playbook|file) conflicts with `AGENTS\.md`/);
       assert.match(content, /`AGENTS\.md` wins/);
     }
   });
