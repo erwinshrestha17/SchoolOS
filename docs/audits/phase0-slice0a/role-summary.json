@@ -1,0 +1,135 @@
+{
+  "catalogCount": 326,
+  "roles": {
+    "admin": {
+      "direct": 222,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "school_config_owner": {
+      "direct": 32,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "principal": {
+      "direct": 65,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "teacher": {
+      "direct": 42,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "subject_teacher": {
+      "direct": 39,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "support_staff": {
+      "direct": 6,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "student": {
+      "direct": 10,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "parent": {
+      "direct": 14,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "accountant": {
+      "direct": 65,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "financial_auditor": {
+      "direct": 25,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "hr_manager": {
+      "direct": 36,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "librarian": {
+      "direct": 6,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "driver": {
+      "direct": 5,
+      "platformPermissions": [],
+      "wildcard": []
+    },
+    "platform_super_admin": {
+      "direct": 28,
+      "platformPermissions": [
+        "platform:read",
+        "platform:manage",
+        "platform:dashboard:read",
+        "platform:tenants:read",
+        "platform:tenants:status",
+        "platform:plans:read",
+        "platform:plans:manage",
+        "platform:subscriptions:read",
+        "platform:subscriptions:manage",
+        "platform:usage:read",
+        "platform:billing:read",
+        "platform:billing:manage",
+        "platform:providers:read",
+        "platform:providers:manage",
+        "platform:api-keys:read",
+        "platform:api-keys:manage",
+        "platform:queues:read",
+        "platform:queues:retry",
+        "platform:queues:manage",
+        "platform:support:override",
+        "platform:audit:read",
+        "platform:health:read",
+        "platform:reports:read",
+        "platform:onboarding:read",
+        "platform:onboarding:manage",
+        "platform:demo-requests:read",
+        "platform:demo-requests:manage",
+        "tenants:manage"
+      ],
+      "wildcard": []
+    },
+    "platform_support": {
+      "direct": 10,
+      "platformPermissions": [
+        "platform:read",
+        "platform:dashboard:read",
+        "platform:tenants:read",
+        "platform:usage:read",
+        "platform:audit:read",
+        "platform:queues:read",
+        "platform:health:read",
+        "platform:reports:read",
+        "platform:onboarding:read",
+        "platform:demo-requests:read"
+      ],
+      "wildcard": []
+    },
+    "platform_billing_admin": {
+      "direct": 9,
+      "platformPermissions": [
+        "platform:read",
+        "platform:dashboard:read",
+        "platform:tenants:read",
+        "platform:plans:read",
+        "platform:subscriptions:read",
+        "platform:subscriptions:manage",
+        "platform:usage:read",
+        "platform:billing:read",
+        "platform:billing:manage"
+      ],
+      "wildcard": []
+    }
+  }
+}

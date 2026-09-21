@@ -1,0 +1,19 @@
+{"gate": "install22", "command": "pnpm install --frozen-lockfile", "exit": 0, "seconds": 0.63, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "generate", "command": "pnpm db:generate", "exit": 0, "seconds": 6.61, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "validate", "command": "pnpm db:validate", "exit": 0, "seconds": 0.79, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "tracked", "command": "pnpm verify:tracked-artifacts", "exit": 0, "seconds": 0.15, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "environment", "command": "pnpm verify:env:deploy", "exit": 0, "seconds": 0.14, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "openapi", "command": "pnpm verify:openapi", "exit": 0, "seconds": 24.56, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "lint", "command": "pnpm lint", "exit": 0, "seconds": 10.86, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "api-eslint", "command": "pnpm --filter @schoolos/api lint:check", "exit": 1, "seconds": 36.17, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "typecheck", "command": "pnpm typecheck", "exit": 0, "seconds": 25.97, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "unit", "command": "pnpm test", "exit": 0, "seconds": 13.36, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "api-e2e", "command": "pnpm test:e2e", "exit": 0, "seconds": 30.08, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "migration-status", "command": "pnpm --filter @schoolos/api exec prisma migrate status", "exit": 0, "seconds": 0.53, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "integration", "command": "pnpm test:integration", "exit": 0, "seconds": 17.52, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "empty-migration", "command": "pnpm db:migrate", "exit": 1, "seconds": 1.21, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "seed", "command": "pnpm db:seed", "exit": 1, "seconds": 1.32, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "empty-migration-retry", "command": "pnpm db:migrate", "exit": 0, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "seed-retry", "command": "pnpm db:seed", "exit": 0, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "build", "command": "pnpm build", "exit": 0, "seconds": 71.07, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
+{"gate": "core-lint", "command": "pnpm --filter @schoolos/core lint", "exit": 0, "seconds": 0.4, "sha": "3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c"}
