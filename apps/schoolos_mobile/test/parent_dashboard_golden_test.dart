@@ -25,7 +25,8 @@ import 'package:schoolos_mobile/shared/widgets/school_os_app_shell.dart';
 /// SIL OFL 1.1; nothing new is vendored here.
 ///
 /// Host: these run wherever the bundled font loads, but the baselines are
-/// generated on macOS and only match there. Measured on a Linux container
+/// certified on macOS 27.0 (26A428), arm64, Flutter 3.44.0 / Dart 3.12.0.
+/// Host rendering changes require a reviewed rebaseline, not tolerance changes. Measured on a Linux container
 /// (`ghcr.io/cirruslabs/flutter:3.44.0`) the layout is identical while 4.96%
 /// of pixels differ - glyph anti-aliasing, not reflow. Exact-pixel golden
 /// comparison across operating systems is not achievable, which is why

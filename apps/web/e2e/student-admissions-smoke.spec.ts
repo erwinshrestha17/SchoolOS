@@ -1,3 +1,4 @@
+import { paceCredentialAttempt } from "./fixtures/credential-pacing";
 import { expect, test, type Page } from "@playwright/test";
 import { formatBsDateForInput, toNepalLocalDateTime } from "@schoolos/core";
 
@@ -321,7 +322,7 @@ test.describe("Students & Admissions Workflow Smoke", () => {
 
     const uniqueSuffix = alphabeticSuffix(Date.now());
     const studentName = `Aditi Karki ${uniqueSuffix}`;
-    const guardianPhone = `98${String(Date.now()).slice(-8)}`;
+    const guardianPhone = `984${String(Date.now()).slice(-7)}`;
     const admissionDate = academicYear.startsOn.slice(0, 10);
     const csvContent = [
       "firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,guardianFullName,guardianRelation,guardianPhone,confirmNoDisability",
@@ -357,8 +358,20 @@ test.describe("Students & Admissions Workflow Smoke", () => {
     );
     await expect(dialog).toContainText("Ready");
     await expect(dialog).toContainText("Need attention");
-    await expect(dialog.getByText("1", { exact: true })).toHaveCount(2);
-    await expect(dialog.getByText("0", { exact: true })).toHaveCount(1);
+    await expect(
+      dialog
+        .locator("dt")
+        .filter({ hasText: /^Ready$/ })
+        .locator("..")
+        .locator("dd"),
+    ).toHaveText("1");
+    await expect(
+      dialog
+        .locator("dt")
+        .filter({ hasText: /^Need attention$/ })
+        .locator("..")
+        .locator("dd"),
+    ).toHaveText("0");
     await dialog
       .getByRole("button", { name: "Create 1 admission", exact: true })
       .click();
@@ -580,6 +593,7 @@ function sidebarLink(page: Page, name: string) {
 }
 
 async function login(page: Page) {
+  await paceCredentialAttempt();
   await page.goto("/login");
   await page.getByLabel(/School Code/i).fill(credentials.tenantSlug ?? "");
   await page.getByLabel(/Email/i).fill(credentials.email ?? "");

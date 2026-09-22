@@ -1,3 +1,4 @@
+import { paceCredentialAttempt } from './fixtures/credential-pacing';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 const API_BASE_URL =
@@ -40,6 +41,7 @@ type Credentials = {
 };
 
 test.describe.serial('M0 Account & Security browser E2E', () => {
+  test.setTimeout(90_000); // The reset scenario performs multiple paced sign-ins.
   test.beforeEach(async ({ context, page }) => {
     test.skip(
       !schoolCredentials.tenantSlug ||
@@ -207,6 +209,7 @@ async function clearBrowserSession(context: BrowserContext, page: Page) {
 }
 
 async function login(page: Page, credentials: Credentials) {
+  await paceCredentialAttempt();
   await page.goto('/login');
   await expect(page.getByLabel(/School Code/i)).toBeVisible();
   await page.getByLabel(/School Code/i).fill(credentials.tenantSlug ?? '');

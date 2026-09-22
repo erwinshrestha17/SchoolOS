@@ -58,9 +58,18 @@ jobs:
       SCHOOLOS_E2E_TENANT_SLUG: default-school
       SCHOOLOS_E2E_EMAIL: admin@schoolos.com
       SCHOOLOS_E2E_PASSWORD: ci-e2e-demo-password-not-for-production-use
-      SCHOOLOS_E2E_PLATFORM_TENANT_SLUG: default-school
+      SCHOOLOS_E2E_PLATFORM_TENANT_SLUG: platform
       SCHOOLOS_E2E_PLATFORM_EMAIL: platform@schoolos.com
-      SCHOOLOS_E2E_PLATFORM_PASSWORD: ci-e2e-demo-password-not-for-production-use
+      SCHOOLOS_E2E_PLATFORM_PASSWORD: CI-Platform-Only7!
+      PLATFORM_SEED_EMAIL: platform@schoolos.com
+      PLATFORM_SEED_PASSWORD: CI-Platform-Only7!
+      SCHOOLOS_E2E_M0_ACCOUNT_SECURITY_FIXTURES: 'true'
+      SCHOOLOS_E2E_M1_MUTATIONS: 'true'
+      SCHOOLOS_E2E_M1_REMINDER_FIXTURES: 'true'
+      SCHOOLOS_E2E_M1_WAITLIST_FIXTURES: 'true'
+      SCHOOLOS_E2E_M1_ASSESSMENT_FIXTURES: 'true'
+      SCHOOLOS_E2E_M1_BULK_IMPORT: 'true'
+      SCHOOLOS_E2E_M1_QR_STUDENT_SEARCH: Aarav Karki
 
     steps:
       - name: Checkout
@@ -157,6 +166,9 @@ jobs:
       - name: Migrate database
         run: pnpm --filter @schoolos/api exec prisma migrate deploy
 
+      - name: Verify migrated schema has no drift
+        run: pnpm db:verify:drift
+
       - name: Prepare isolated concurrency test databases
         env:
           PGPASSWORD: password123
@@ -174,7 +186,13 @@ jobs:
 
       - name: Seed e2e database
         if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true'
-        run: pnpm db:seed
+        run: |
+          pnpm db:seed
+          pnpm db:seed:platform
+          pnpm db:seed:e2e:m0-account-security
+          pnpm db:seed:e2e:m1-reminders
+          pnpm db:seed:e2e:m1-waitlist
+          pnpm db:seed:e2e:m1-assessment
 
       - name: Start API server for e2e
         if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true'

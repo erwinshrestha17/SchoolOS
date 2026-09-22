@@ -11,6 +11,7 @@ import {
   resolveBackupOutputDir,
 } from './lib/schoolos-env.mjs';
 import {
+  assertSafeRestoreTarget,
   checkPostgresConnectivity,
   collectDatabaseMetrics,
   compareMetrics,
@@ -163,6 +164,8 @@ pnpm rehearse:backup-restore:local
 }
 
 async function main() {
+  // Reject an accidental source-as-target before backup or target recreation.
+  assertSafeRestoreTarget(databaseUrl, restoreDatabaseUrl);
   const startedAt = new Date().toISOString();
 
   if (!skipDockerCheck) {

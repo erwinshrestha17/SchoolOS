@@ -58,7 +58,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         labelStyle: const TextStyle(
           fontFamily: AppTypography.fontFamily,
           color: AppColors.slate500,
@@ -198,7 +201,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.slate900,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         labelStyle: const TextStyle(
           fontFamily: AppTypography.fontFamily,
           color: AppColors.slate400,
@@ -270,24 +276,25 @@ class AppTheme {
           textStyle: AppTypography.labelLarge,
         ),
       ),
-      textTheme: const TextTheme(
-        displayLarge: AppTypography.displayLarge,
-        displayMedium: AppTypography.displayMedium,
-        headlineLarge: AppTypography.headlineLarge,
-        headlineMedium: AppTypography.headlineMedium,
-        titleLarge: AppTypography.titleLarge,
-        titleMedium: AppTypography.titleMedium,
-        titleSmall: AppTypography.titleSmall,
-        bodyLarge: AppTypography.bodyLarge,
-        bodyMedium: AppTypography.bodyMedium,
-        bodySmall: AppTypography.bodySmall,
-        labelLarge: AppTypography.labelLarge,
-        labelMedium: AppTypography.labelMedium,
-        labelSmall: AppTypography.labelSmall,
-      ).apply(
-        bodyColor: AppSemanticColors.dark.textPrimary,
-        displayColor: AppSemanticColors.dark.textPrimary,
-      ),
+      textTheme:
+          const TextTheme(
+            displayLarge: AppTypography.displayLarge,
+            displayMedium: AppTypography.displayMedium,
+            headlineLarge: AppTypography.headlineLarge,
+            headlineMedium: AppTypography.headlineMedium,
+            titleLarge: AppTypography.titleLarge,
+            titleMedium: AppTypography.titleMedium,
+            titleSmall: AppTypography.titleSmall,
+            bodyLarge: AppTypography.bodyLarge,
+            bodyMedium: AppTypography.bodyMedium,
+            bodySmall: AppTypography.bodySmall,
+            labelLarge: AppTypography.labelLarge,
+            labelMedium: AppTypography.labelMedium,
+            labelSmall: AppTypography.labelSmall,
+          ).apply(
+            bodyColor: AppSemanticColors.dark.textPrimary,
+            displayColor: AppSemanticColors.dark.textPrimary,
+          ),
     );
   }
 }

@@ -177,8 +177,8 @@ model TeacherReplacementPendingWork {
   replacement TeacherReplacement @relation(fields: [replacementId], references: [id], onDelete: Cascade)
   disposedBy  User?              @relation("DisposedReplacementPendingWork", fields: [disposedById], references: [id], onDelete: SetNull)
 
-  @@unique([tenantId, replacementId, kind, resourceId])
-  @@index([tenantId, replacementId, disposition])
+  @@unique([tenantId, replacementId, kind, resourceId], map: "TeacherReplacementPendingWork_tenantId_replacementId_kind_resou")
+  @@index([tenantId, replacementId, disposition], map: "TeacherReplacementPendingWork_tenantId_replacementId_dispositio")
 }
 
 model TeacherHandoverNote {

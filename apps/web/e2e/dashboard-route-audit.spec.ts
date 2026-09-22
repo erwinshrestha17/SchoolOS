@@ -1,3 +1,4 @@
+import { paceCredentialAttempt } from './fixtures/credential-pacing';
 import { expect, test, type Page } from '@playwright/test';
 
 const schoolCredentials = {
@@ -105,8 +106,23 @@ test.describe('Dashboard route audit smoke', () => {
     await expect(page.getByLabel(/User profile menu/i)).toBeVisible();
 
     for (const route of schoolRoutes) {
+      const substitutionsResponse =
+        route === '/dashboard/timetable'
+          ? page.waitForResponse((response) =>
+              new URL(response.url()).pathname.endsWith(
+                '/timetable/substitutions',
+              ),
+            )
+          : undefined;
       await page.goto(route);
       await expectUsableRoute(page, route);
+      if (substitutionsResponse) {
+        const response = await substitutionsResponse;
+        expect(
+          response.ok(),
+          `Timetable summary returned ${response.status()}`,
+        ).toBe(true);
+      }
     }
 
     await page.goto('/dashboard/students');
@@ -211,6 +227,7 @@ async function login(
     password?: string;
   },
 ) {
+  await paceCredentialAttempt();
   await page.goto('/login');
   await page.getByLabel(/School Code/i).fill(credentials.tenantSlug ?? '');
   await page.getByLabel(/Email/i).fill(credentials.email ?? '');
@@ -229,7 +246,7 @@ async function expectUsableRoute(page: Page, route: string) {
   ).toBeVisible({ timeout: 15_000 });
   await expect(
     page.getByText(
-      /Application error|Unhandled Runtime Error|This page could not be found|Internal Server Error/i,
+      /SchoolOS could not verify access|Secure session check unavailable|Application error|Unhandled Runtime Error|This page could not be found|Internal Server Error/i,
     ),
     `${route} rendered a framework or fatal error page`,
   ).toHaveCount(0);

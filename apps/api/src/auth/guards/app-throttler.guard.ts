@@ -10,6 +10,7 @@ import { ConfigService } from '../../config/config.service';
 
 interface ThrottledHttpRequest {
   path?: string;
+  method?: string;
   headers: Record<string, string | string[] | undefined>;
 }
 
@@ -52,7 +53,16 @@ export class AppThrottlerGuard extends ThrottlerGuard {
     const hasApiKeyHeader =
       typeof apiKeyHeader !== 'undefined' || hasBearerApiKeyHeader;
 
-    if (throttler.name === 'auth' || path.includes('/api/v1/auth/')) {
+    // Session revalidation is a JWT-protected read, not a credential attempt.
+    // Applying the credential budget here locks normal multi-page clients out
+    // of their verified shell. Keep the general API budget for this read only;
+    // login, refresh, recovery and other auth operations retain the strict cap.
+    const isSessionProfileRead =
+      req.method === 'GET' && path.replace(/\/+$/, '') === '/api/v1/auth/me';
+    if (
+      throttler.name === 'auth' ||
+      (path.includes('/api/v1/auth/') && !isSessionProfileRead)
+    ) {
       limit = this.configService.authRateLimitMax;
       ttl = this.configService.authRateLimitWindow * 1000;
     } else if (

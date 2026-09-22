@@ -5199,7 +5199,7 @@ model ReceiptSequence {
   tenantId  String
   fiscalYear String
   lastValue Int      @default(0)
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -5651,9 +5651,9 @@ model TeacherClassroomObservation {
   tenant  Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   teacher Staff  @relation(fields: [teacherStaffId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, observerUserId, clientRequestId])
-  @@index([tenantId, academicYearId, status, followUpOn])
-  @@index([tenantId, teacherStaffId, observedOn])
+  @@unique([tenantId, observerUserId, clientRequestId], map: "TeacherClassroomObservation_tenantId_observerUserId_clientReque")
+  @@index([tenantId, academicYearId, status, followUpOn], map: "TeacherClassroomObservation_tenantId_academicYearId_status_foll")
+  @@index([tenantId, teacherStaffId, observedOn], map: "TeacherClassroomObservation_tenantId_teacherStaffId_observedOn_")
 }
 
 model TeacherDevelopmentGoal {
@@ -5682,7 +5682,7 @@ model TeacherDevelopmentGoal {
   teacher Staff  @relation("DevelopmentGoalTeacher", fields: [teacherStaffId], references: [id], onDelete: Restrict)
   mentor  Staff? @relation("DevelopmentGoalMentor", fields: [mentorStaffId], references: [id], onDelete: SetNull)
 
-  @@unique([tenantId, createdByUserId, clientRequestId])
+  @@unique([tenantId, createdByUserId, clientRequestId], map: "TeacherDevelopmentGoal_tenantId_createdByUserId_clientRequestId")
   @@index([tenantId, academicYearId, status, dueOn])
   @@index([tenantId, teacherStaffId, status])
   @@index([tenantId, mentorStaffId, status])
@@ -5708,7 +5708,7 @@ model TeacherTrainingRecord {
   tenant  Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   teacher Staff  @relation(fields: [teacherStaffId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, createdByUserId, clientRequestId])
+  @@unique([tenantId, createdByUserId, clientRequestId], map: "TeacherTrainingRecord_tenantId_createdByUserId_clientRequestId_")
   @@index([tenantId, teacherStaffId, startsOn])
   @@index([tenantId, status, startsOn])
   @@index([tenantId, certificateFileAssetId])
@@ -5737,7 +5737,7 @@ model SchoolImprovementPlan {
   actions SchoolImprovementAction[]
   reviews SchoolImprovementReview[]
 
-  @@unique([tenantId, createdByUserId, clientRequestId])
+  @@unique([tenantId, createdByUserId, clientRequestId], map: "SchoolImprovementPlan_tenantId_createdByUserId_clientRequestId_")
   @@index([tenantId, academicYearId, status])
   @@index([tenantId, ownerUserId, status])
 }
@@ -5802,7 +5802,7 @@ model SchoolImprovementReview {
   tenant Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   plan   SchoolImprovementPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, reviewedByUserId, clientRequestId])
+  @@unique([tenantId, reviewedByUserId, clientRequestId], map: "SchoolImprovementReview_tenantId_reviewedByUserId_clientRequest")
   @@index([tenantId, planId, reviewedOn])
 }
 
@@ -5831,8 +5831,8 @@ model LearningOutcome {
   curriculumItems    CurriculumProgressItem[]
   parentGuidance     ParentLearningGuidance[]
 
-  @@unique([tenantId, academicYearId, classId, subjectId, code])
-  @@index([tenantId, academicYearId, classId, subjectId, isActive])
+  @@unique([tenantId, academicYearId, classId, subjectId, code], map: "LearningOutcome_scope_code_key")
+  @@index([tenantId, academicYearId, classId, subjectId, isActive], map: "LearningOutcome_scope_active_idx")
 }
 
 model FormativeAssessmentEvidence {
@@ -5871,9 +5871,9 @@ model FormativeAssessmentEvidence {
   reassessments  FormativeAssessmentEvidence[] @relation("FormativeAssessmentReassessment")
 
   @@unique([tenantId, teacherStaffId, clientSubmissionId], map: "formative_assessment_client_submission_key")
-  @@index([tenantId, studentId, assessedOn])
-  @@index([tenantId, outcomeId, masteryStatus, assessedOn])
-  @@index([tenantId, academicYearId, classId, sectionId, subjectId])
+  @@index([tenantId, studentId, assessedOn], map: "FormativeAssessmentEvidence_student_date_idx")
+  @@index([tenantId, outcomeId, masteryStatus, assessedOn], map: "FormativeAssessmentEvidence_outcome_status_idx")
+  @@index([tenantId, academicYearId, classId, sectionId, subjectId], map: "FormativeAssessmentEvidence_scope_idx")
 }
 
 model StudentInterventionCase {
@@ -5910,9 +5910,9 @@ model StudentInterventionCase {
   entries      StudentInterventionEntry[]
 
   @@unique([tenantId, createdByUserId, clientRequestId], map: "student_intervention_client_request_key")
-  @@index([tenantId, status, nextFollowUpOn])
-  @@index([tenantId, studentId, status])
-  @@index([tenantId, ownerStaffId, status])
+  @@index([tenantId, status, nextFollowUpOn], map: "StudentInterventionCase_status_followup_idx")
+  @@index([tenantId, studentId, status], map: "StudentInterventionCase_student_status_idx")
+  @@index([tenantId, ownerStaffId, status], map: "StudentInterventionCase_owner_status_idx")
 }
 
 model StudentInterventionEntry {
@@ -5933,7 +5933,7 @@ model StudentInterventionEntry {
   case   StudentInterventionCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, actorUserId, clientRequestId], map: "student_intervention_entry_client_request_key")
-  @@index([tenantId, caseId, createdAt])
+  @@index([tenantId, caseId, createdAt], map: "StudentInterventionEntry_case_created_idx")
 }
 
 model RemedialGroup {
@@ -5969,8 +5969,8 @@ model RemedialGroup {
   parentGuidance ParentLearningGuidance[]
 
   @@unique([tenantId, createdByUserId, clientRequestId], map: "remedial_group_client_request_key")
-  @@index([tenantId, academicYearId, classId, sectionId, subjectId, status])
-  @@index([tenantId, teacherStaffId, status])
+  @@index([tenantId, academicYearId, classId, sectionId, subjectId, status], map: "RemedialGroup_scope_status_idx")
+  @@index([tenantId, teacherStaffId, status], map: "RemedialGroup_teacher_status_idx")
 }
 
 model RemedialGroupMember {
@@ -5987,8 +5987,8 @@ model RemedialGroupMember {
   group   RemedialGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   student Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, groupId, studentId])
-  @@index([tenantId, studentId, isActive])
+  @@unique([tenantId, groupId, studentId], map: "RemedialGroupMember_group_student_key")
+  @@index([tenantId, studentId, isActive], map: "RemedialGroupMember_student_active_idx")
 }
 
 model CurriculumProgressItem {
@@ -6023,8 +6023,8 @@ model CurriculumProgressItem {
   teacher      Staff            @relation(fields: [teacherStaffId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, createdByUserId, clientRequestId], map: "curriculum_progress_client_request_key")
-  @@index([tenantId, academicYearId, classId, sectionId, subjectId, status, plannedOn])
-  @@index([tenantId, teacherStaffId, plannedOn])
+  @@index([tenantId, academicYearId, classId, sectionId, subjectId, status, plannedOn], map: "CurriculumProgressItem_scope_status_idx")
+  @@index([tenantId, teacherStaffId, plannedOn], map: "CurriculumProgressItem_teacher_date_idx")
 }
 
 model ParentLearningGuidance {
@@ -6058,8 +6058,8 @@ model ParentLearningGuidance {
   teacher       Staff            @relation(fields: [teacherStaffId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, createdByUserId, clientRequestId], map: "parent_learning_guidance_client_request_key")
-  @@index([tenantId, studentId, status, visibleFrom])
-  @@index([tenantId, academicYearId, subjectId])
+  @@index([tenantId, studentId, status, visibleFrom], map: "ParentLearningGuidance_student_status_idx")
+  @@index([tenantId, academicYearId, subjectId], map: "ParentLearningGuidance_year_subject_idx")
 }
 
 
@@ -7298,7 +7298,7 @@ model SchoolServiceRequest {
   attachments  SchoolServiceRequestAttachment[]
 
   @@unique([tenantId, idempotencyKey])
-  @@index([tenantId, status, priority, responseDeadline])
+  @@index([tenantId, status, priority, responseDeadline], map: "SchoolServiceRequest_tenantId_status_priority_deadline_idx")
   @@index([tenantId, studentId, createdAt])
   @@index([tenantId, requestedById, createdAt])
   @@index([tenantId, assignedToId, status])
@@ -7336,7 +7336,7 @@ model SchoolServiceRequestAttachment {
   createdBy   User                 @relation("SchoolServiceRequestAttachmentAuthors", fields: [createdById], references: [id], onDelete: Restrict)
 
   @@unique([requestId, fileAssetId])
-  @@index([tenantId, requestId, createdAt])
+  @@index([tenantId, requestId, createdAt], map: "SchoolServiceRequestAttachment_tenant_request_created_idx")
 }
 
 
@@ -7729,7 +7729,7 @@ model StudentGuardian {
   approvedById             String?
   approvedAt               DateTime?
   createdAt                DateTime                               @default(now())
-  updatedAt                DateTime                               @updatedAt
+  updatedAt                DateTime                               @default(now()) @updatedAt
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   student  Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -8313,8 +8313,8 @@ model TeacherReplacementPendingWork {
   replacement TeacherReplacement @relation(fields: [replacementId], references: [id], onDelete: Cascade)
   disposedBy  User?              @relation("DisposedReplacementPendingWork", fields: [disposedById], references: [id], onDelete: SetNull)
 
-  @@unique([tenantId, replacementId, kind, resourceId])
-  @@index([tenantId, replacementId, disposition])
+  @@unique([tenantId, replacementId, kind, resourceId], map: "TeacherReplacementPendingWork_tenantId_replacementId_kind_resou")
+  @@index([tenantId, replacementId, disposition], map: "TeacherReplacementPendingWork_tenantId_replacementId_dispositio")
 }
 
 model TeacherHandoverNote {

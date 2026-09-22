@@ -1,3 +1,4 @@
+import { paceCredentialAttempt } from "./credential-pacing";
 import {
   expect,
   test as base,
@@ -90,6 +91,7 @@ async function createAuthenticatedState(
   browser: Browser,
   role: SchoolE2eRole,
 ): Promise<StorageState> {
+  await paceCredentialAttempt();
   const credentials = credentialsFor(role);
   const context = await browser.newContext({ baseURL: WEB_BASE_URL });
   const page = await context.newPage();

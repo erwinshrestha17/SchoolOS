@@ -1,3 +1,4 @@
+import { paceCredentialAttempt } from './fixtures/credential-pacing';
 import { expect, test, type Page } from '@playwright/test';
 
 const schoolCredentials = {
@@ -216,19 +217,23 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
     await page.goto('/platform/dashboard');
     await expectNoFatalPage(page, '/platform/dashboard');
 
-    const platformUrl = page.url().includes('/platform');
-    if (platformUrl) {
-      await expect(
-        page
+    // Hydration can redirect after goto resolves. Re-evaluate the URL while
+    // waiting instead of committing to the pre-hydration Platform branch.
+    await expect
+      .poll(async () => {
+        const pathname = new URL(page.url()).pathname;
+        if (/^\/(?:dashboard|login)(?:$|\/)/.test(pathname)) return true;
+        if (!pathname.startsWith('/platform')) return false;
+        return page
           .locator('main')
-          .getByText(
-            /permission|not authorized|access denied|School Dashboard/i,
-          )
-          .first(),
-      ).toBeVisible();
-    } else {
-      await expect(page).toHaveURL(/\/(?:dashboard|login)(?:$|[/?#])/);
-    }
+          .getByText(/permission|not authorized|access denied/i)
+          .first()
+          .isVisible();
+      })
+      .toBe(true);
+    await expect(
+      page.getByRole('heading', { name: /^Platform Dashboard$/i }),
+    ).toHaveCount(0);
   });
 });
 
@@ -271,6 +276,7 @@ async function login(
     password?: string;
   },
 ) {
+  await paceCredentialAttempt();
   await page.goto('/login');
   await page.getByLabel(/School Code/i).fill(credentials.tenantSlug ?? '');
   await page.getByLabel(/Email/i).fill(credentials.email ?? '');

@@ -39,16 +39,16 @@ class TeacherProfileScreen extends ConsumerWidget {
         children: [
           Text(
             'More',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             'Your classes, academic tools, self-service, and account settings.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.slate500,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.slate500),
           ),
           const SizedBox(height: AppSpacing.md),
           AppCard(
@@ -68,9 +68,8 @@ class TeacherProfileScreen extends ConsumerWidget {
                     children: [
                       Text(
                         user?.name ?? 'Teacher',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w900),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -262,9 +261,9 @@ class _MenuSection extends StatelessWidget {
       children: [
         Text(
           title,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: AppSpacing.sm),
         AppCard(

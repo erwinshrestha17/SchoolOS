@@ -117,7 +117,7 @@ function SchoolTimetableConsole() {
         sectionId: filters.sectionId || undefined,
         teacherId: filters.teacherId || undefined,
         status: filters.status || undefined,
-        limit: 200,
+        limit: 1,
       }),
   });
   const conflictCount = validationQuery.data

@@ -24,9 +24,9 @@ model TeacherClassroomObservation {
   tenant  Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   teacher Staff  @relation(fields: [teacherStaffId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, observerUserId, clientRequestId])
-  @@index([tenantId, academicYearId, status, followUpOn])
-  @@index([tenantId, teacherStaffId, observedOn])
+  @@unique([tenantId, observerUserId, clientRequestId], map: "TeacherClassroomObservation_tenantId_observerUserId_clientReque")
+  @@index([tenantId, academicYearId, status, followUpOn], map: "TeacherClassroomObservation_tenantId_academicYearId_status_foll")
+  @@index([tenantId, teacherStaffId, observedOn], map: "TeacherClassroomObservation_tenantId_teacherStaffId_observedOn_")
 }
 
 model TeacherDevelopmentGoal {
@@ -55,7 +55,7 @@ model TeacherDevelopmentGoal {
   teacher Staff  @relation("DevelopmentGoalTeacher", fields: [teacherStaffId], references: [id], onDelete: Restrict)
   mentor  Staff? @relation("DevelopmentGoalMentor", fields: [mentorStaffId], references: [id], onDelete: SetNull)
 
-  @@unique([tenantId, createdByUserId, clientRequestId])
+  @@unique([tenantId, createdByUserId, clientRequestId], map: "TeacherDevelopmentGoal_tenantId_createdByUserId_clientRequestId")
   @@index([tenantId, academicYearId, status, dueOn])
   @@index([tenantId, teacherStaffId, status])
   @@index([tenantId, mentorStaffId, status])
@@ -81,7 +81,7 @@ model TeacherTrainingRecord {
   tenant  Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   teacher Staff  @relation(fields: [teacherStaffId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, createdByUserId, clientRequestId])
+  @@unique([tenantId, createdByUserId, clientRequestId], map: "TeacherTrainingRecord_tenantId_createdByUserId_clientRequestId_")
   @@index([tenantId, teacherStaffId, startsOn])
   @@index([tenantId, status, startsOn])
   @@index([tenantId, certificateFileAssetId])
@@ -110,7 +110,7 @@ model SchoolImprovementPlan {
   actions SchoolImprovementAction[]
   reviews SchoolImprovementReview[]
 
-  @@unique([tenantId, createdByUserId, clientRequestId])
+  @@unique([tenantId, createdByUserId, clientRequestId], map: "SchoolImprovementPlan_tenantId_createdByUserId_clientRequestId_")
   @@index([tenantId, academicYearId, status])
   @@index([tenantId, ownerUserId, status])
 }
@@ -175,6 +175,6 @@ model SchoolImprovementReview {
   tenant Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   plan   SchoolImprovementPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, reviewedByUserId, clientRequestId])
+  @@unique([tenantId, reviewedByUserId, clientRequestId], map: "SchoolImprovementReview_tenantId_reviewedByUserId_clientRequest")
   @@index([tenantId, planId, reviewedOn])
 }

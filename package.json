@@ -17,6 +17,7 @@
     "db:generate": "pnpm compile:artifacts && pnpm --filter @schoolos/api prisma:generate",
     "db:validate": "pnpm compile:artifacts && pnpm --filter @schoolos/api exec prisma validate --schema prisma/schema.prisma",
     "db:migrate": "pnpm --filter @schoolos/api db:migrate",
+    "db:verify:drift": "pnpm --filter @schoolos/api db:verify:drift",
     "db:seed": "pnpm --filter @schoolos/api db:seed",
     "db:seed:e2e:m1-reminders": "pnpm --filter @schoolos/api db:seed:e2e:m1-reminders",
     "db:seed:e2e:m1-waitlist": "pnpm --filter @schoolos/api db:seed:e2e:m1-waitlist",

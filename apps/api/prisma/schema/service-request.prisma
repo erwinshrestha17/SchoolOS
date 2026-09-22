@@ -44,7 +44,7 @@ model SchoolServiceRequest {
   attachments  SchoolServiceRequestAttachment[]
 
   @@unique([tenantId, idempotencyKey])
-  @@index([tenantId, status, priority, responseDeadline])
+  @@index([tenantId, status, priority, responseDeadline], map: "SchoolServiceRequest_tenantId_status_priority_deadline_idx")
   @@index([tenantId, studentId, createdAt])
   @@index([tenantId, requestedById, createdAt])
   @@index([tenantId, assignedToId, status])
@@ -82,5 +82,5 @@ model SchoolServiceRequestAttachment {
   createdBy   User                 @relation("SchoolServiceRequestAttachmentAuthors", fields: [createdById], references: [id], onDelete: Restrict)
 
   @@unique([requestId, fileAssetId])
-  @@index([tenantId, requestId, createdAt])
+  @@index([tenantId, requestId, createdAt], map: "SchoolServiceRequestAttachment_tenant_request_created_idx")
 }

@@ -47,13 +47,14 @@ function buildGuard(rateLimitEnabled = true) {
 
 function contextFor(input: {
   path: string;
+  method?: string;
   handler?: (...args: never[]) => unknown;
   controller?: object;
   headers?: Record<string, string>;
 }) {
   const response = { header: jest.fn() };
-  const handler = input.handler ?? function handler() {};
-  const controller = input.controller ?? class TestController {};
+  const handler = input.handler ?? jest.fn();
+  const controller = input.controller ?? AppThrottlerGuard;
 
   return {
     context: {
@@ -62,6 +63,7 @@ function contextFor(input: {
       switchToHttp: () => ({
         getRequest: () => ({
           ip: '127.0.0.1',
+          method: input.method ?? 'GET',
           path: input.path,
           headers: input.headers ?? {},
         }),
@@ -86,6 +88,45 @@ describe('AppThrottlerGuard', () => {
     await guard.onModuleInit();
     const { context } = contextFor({ path: '/api/v1/auth/login' });
 
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(increment).toHaveBeenCalledWith(
+      expect.any(String),
+      60_000,
+      5,
+      60_000,
+      'default',
+    );
+  });
+
+  it.each(['/api/v1/auth/me', '/api/v1/auth/me/'])(
+    'keeps the general API budget for JWT-protected profile read %s',
+    async (path) => {
+      const { guard, increment } = buildGuard();
+      await guard.onModuleInit();
+      const { context } = contextFor({ path, method: 'GET' });
+      await expect(guard.canActivate(context)).resolves.toBe(true);
+      expect(increment).toHaveBeenCalledWith(
+        expect.any(String),
+        60_000,
+        100,
+        60_000,
+        'default',
+      );
+    },
+  );
+
+  it.each([
+    'login',
+    'refresh',
+    'otp/request-login',
+    'password-recovery/confirm',
+  ])('retains the credential budget for %s', async (operation) => {
+    const { guard, increment } = buildGuard();
+    await guard.onModuleInit();
+    const { context } = contextFor({
+      path: `/api/v1/auth/${operation}`,
+      method: 'POST',
+    });
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(increment).toHaveBeenCalledWith(
       expect.any(String),

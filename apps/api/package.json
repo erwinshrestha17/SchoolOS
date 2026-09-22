@@ -12,6 +12,7 @@
     "prisma:generate": "prisma generate",
     "db:preflight:qr-duplicate-active": "tsx prisma/qr-migration-replay/duplicate-active-preflight.ts",
     "db:migrate": "pnpm run db:preflight:qr-duplicate-active && prisma migrate deploy",
+    "db:verify:drift": "prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code",
     "db:seed": "prisma db seed",
     "db:seed:e2e:m1-reminders": "tsx prisma/seed-m1-reminder-e2e.ts",
     "db:seed:e2e:m1-waitlist": "tsx prisma/seed-m1-waitlist-e2e.ts",
