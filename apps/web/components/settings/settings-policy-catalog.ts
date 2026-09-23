@@ -204,7 +204,10 @@ export const SCHOOL_SETTINGS_POLICIES: SchoolSettingsPolicy[] = [
     navigationItemId: 'attendance',
     operationalImpact:
       'These rules control when teachers can mark or correct attendance in Smart Attendance (M2). Correction approvals stay in the Attendance workspace.',
-    operationalLink: { href: '/dashboard/attendance', label: 'Open Attendance' },
+    operationalLink: {
+      href: '/dashboard/attendance',
+      label: 'Open Attendance',
+    },
     fields: [
       {
         key: 'attendance_lock_hours',
@@ -440,7 +443,10 @@ export const SCHOOL_SETTINGS_POLICIES: SchoolSettingsPolicy[] = [
     navigationItemId: 'accounting',
     operationalImpact:
       'These defaults guide posting and numbering in Accounting (M11). Journal posting, approval, and fiscal close stay in the Accounting workspace.',
-    operationalLink: { href: '/dashboard/accounting', label: 'Open Accounting' },
+    operationalLink: {
+      href: '/dashboard/accounting',
+      label: 'Open Accounting',
+    },
     fields: [
       {
         key: 'active_fiscal_year_label',

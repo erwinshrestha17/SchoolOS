@@ -4,7 +4,13 @@ import { formatBsDate } from '@schoolos/core';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/dialog';
 import { Button } from '../ui/button';
 import { FormField, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
@@ -58,12 +64,20 @@ export function LeaveReviewDialog({
       // Check if backend returned overlap anomalies
       if (data && data.overlapAnomalies && data.overlapAnomalies.length > 0) {
         setAnomalies(data.overlapAnomalies);
-        setToastError('Review succeeded but overlap anomalies were detected. Attendance conflict logs have been updated.');
+        setToastError(
+          'Review succeeded but overlap anomalies were detected. Attendance conflict logs have been updated.',
+        );
       } else {
-        void queryClient.invalidateQueries({ queryKey: ['staff-leave-requests'] });
+        void queryClient.invalidateQueries({
+          queryKey: ['staff-leave-requests'],
+        });
         void queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
-        void queryClient.invalidateQueries({ queryKey: ['staff-leave-balances'] });
-        void queryClient.invalidateQueries({ queryKey: ['staff-attendance-summary'] });
+        void queryClient.invalidateQueries({
+          queryKey: ['staff-leave-balances'],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ['staff-attendance-summary'],
+        });
         void queryClient.invalidateQueries({ queryKey: ['staff-detail'] });
         void queryClient.invalidateQueries({ queryKey: ['payroll-preview'] });
         handleClose();
@@ -95,12 +109,19 @@ export function LeaveReviewDialog({
     : 'Staff Member';
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open: boolean) => { if (!open) handleClose(); }}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open: boolean) => {
+        if (!open) handleClose();
+      }}
+    >
       <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle>Review Leave Request</DialogTitle>
-            <p className="text-xs text-slate-500 mt-1">Review leave details for {staffName}.</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Review leave details for {staffName}.
+            </p>
           </div>
           <button
             type="button"
@@ -126,34 +147,44 @@ export function LeaveReviewDialog({
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <p className="text-slate-400 font-bold uppercase">Leave Type</p>
-                <p className="font-bold text-slate-900 mt-1 uppercase tracking-tight">{leaveRequest.leaveType.replace('_', ' ')}</p>
+                <p className="font-bold text-slate-900 mt-1 uppercase tracking-tight">
+                  {leaveRequest.leaveType.replace('_', ' ')}
+                </p>
               </div>
               <div>
                 <p className="text-slate-400 font-bold uppercase">Duration</p>
-                <p className="font-bold text-slate-900 mt-1">{leaveRequest.days} Day{leaveRequest.days !== 1 ? 's' : ''}</p>
+                <p className="font-bold text-slate-900 mt-1">
+                  {leaveRequest.days} Day{leaveRequest.days !== 1 ? 's' : ''}
+                </p>
               </div>
             </div>
             <div>
               <p className="text-slate-400 font-bold uppercase">Dates</p>
               <p className="font-bold text-slate-900 mt-1">
-                {formatBsDate(leaveRequest.startsOn)} - {formatBsDate(leaveRequest.endsOn)}
+                {formatBsDate(leaveRequest.startsOn)} -{' '}
+                {formatBsDate(leaveRequest.endsOn)}
               </p>
             </div>
             <div>
               <p className="text-slate-400 font-bold uppercase">Reason</p>
-              <p className="font-medium text-slate-600 italic mt-1 leading-relaxed">&ldquo;{leaveRequest.reason}&rdquo;</p>
+              <p className="font-medium text-slate-600 italic mt-1 leading-relaxed">
+                &ldquo;{leaveRequest.reason}&rdquo;
+              </p>
             </div>
           </div>
 
           {anomalies.length > 0 && (
             <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 space-y-2 text-xs text-rose-800">
               <p className="font-bold flex items-center gap-1">
-                <ShieldAlert size={14} className="text-rose-600" /> Overlap Conflicts Detected:
+                <ShieldAlert size={14} className="text-rose-600" /> Overlap
+                Conflicts Detected:
               </p>
               <ul className="list-disc pl-4 space-y-1">
                 {anomalies.map((anom, idx) => (
                   <li key={idx}>
-                    {formatBsDate(anom.attendanceDate)}: Proposed {anom.proposedStatus} overlaps with existing {anom.existingStatus}.
+                    {formatBsDate(anom.attendanceDate)}: Proposed{' '}
+                    {anom.proposedStatus} overlaps with existing{' '}
+                    {anom.existingStatus}.
                   </li>
                 ))}
               </ul>
@@ -161,11 +192,21 @@ export function LeaveReviewDialog({
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  void queryClient.invalidateQueries({ queryKey: ['staff-leave-requests'] });
-                  void queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
-                  void queryClient.invalidateQueries({ queryKey: ['staff-leave-balances'] });
-                  void queryClient.invalidateQueries({ queryKey: ['staff-attendance-summary'] });
-                  void queryClient.invalidateQueries({ queryKey: ['staff-detail'] });
+                  void queryClient.invalidateQueries({
+                    queryKey: ['staff-leave-requests'],
+                  });
+                  void queryClient.invalidateQueries({
+                    queryKey: ['leave-requests'],
+                  });
+                  void queryClient.invalidateQueries({
+                    queryKey: ['staff-leave-balances'],
+                  });
+                  void queryClient.invalidateQueries({
+                    queryKey: ['staff-attendance-summary'],
+                  });
+                  void queryClient.invalidateQueries({
+                    queryKey: ['staff-detail'],
+                  });
                   handleClose();
                 }}
                 className="mt-2"
@@ -194,7 +235,10 @@ export function LeaveReviewDialog({
               variant="destructive"
               onClick={() => handleAction('REJECTED')}
               disabled={reviewMutation.isPending}
-              isLoading={reviewMutation.isPending && reviewMutation.variables === 'REJECTED'}
+              isLoading={
+                reviewMutation.isPending &&
+                reviewMutation.variables === 'REJECTED'
+              }
             >
               <XCircle size={16} className="mr-2" />
               Reject Request
@@ -203,7 +247,10 @@ export function LeaveReviewDialog({
               type="button"
               onClick={() => handleAction('APPROVED')}
               disabled={reviewMutation.isPending}
-              isLoading={reviewMutation.isPending && reviewMutation.variables === 'APPROVED'}
+              isLoading={
+                reviewMutation.isPending &&
+                reviewMutation.variables === 'APPROVED'
+              }
             >
               <CheckCircle size={16} className="mr-2" />
               Approve Request

@@ -28,7 +28,9 @@ type PayslipRegenerationTarget = Pick<
 export function PayslipList() {
   const { hasPermissions } = useSession();
   const [search, setSearch] = useState('');
-  const [downloadingPayslip, setDownloadingPayslip] = useState<string | null>(null);
+  const [downloadingPayslip, setDownloadingPayslip] = useState<string | null>(
+    null,
+  );
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [regenerationTarget, setRegenerationTarget] =
     useState<PayslipRegenerationTarget | null>(null);
@@ -36,10 +38,12 @@ export function PayslipList() {
     useState<PayslipRegenerationJobSummary | null>(null);
   const [page, setPage] = useState(1);
   const limit = 10;
-  const canRegeneratePayslips = hasPermissions([
-    'payroll:payslip:generate',
-  ]);
-  const { data: payslipPage, isLoading, error } = useQuery({
+  const canRegeneratePayslips = hasPermissions(['payroll:payslip:generate']);
+  const {
+    data: payslipPage,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['payslips', page, limit, search],
     queryFn: () =>
       api.listPayslipsPage({
@@ -81,8 +85,7 @@ export function PayslipList() {
 
   const payslips = payslipPage?.items ?? [];
   const totalItems = payslipPage?.total ?? 0;
-  const currentRegenerationJob =
-    regenerationJobQuery.data ?? regenerationJob;
+  const currentRegenerationJob = regenerationJobQuery.data ?? regenerationJob;
   const regenerationInProgress =
     regenerationMutation.isPending ||
     currentRegenerationJob?.status === 'QUEUED' ||
@@ -90,7 +93,8 @@ export function PayslipList() {
 
   function isRegenerationPendingFor(payslipId: string) {
     return (
-      (regenerationMutation.isPending && regenerationTarget?.id === payslipId) ||
+      (regenerationMutation.isPending &&
+        regenerationTarget?.id === payslipId) ||
       (currentRegenerationJob?.payslipId === payslipId &&
         (currentRegenerationJob.status === 'QUEUED' ||
           currentRegenerationJob.status === 'PROCESSING'))
@@ -125,10 +129,7 @@ export function PayslipList() {
         setDownloadError(
           'This protected payslip file is unavailable. Regenerate payslips before downloading.',
         );
-      } else if (
-        error instanceof ApiRequestError &&
-        error.statusCode === 403
-      ) {
+      } else if (error instanceof ApiRequestError && error.statusCode === 403) {
         setDownloadError(
           'You do not have permission to download this payslip.',
         );
@@ -148,7 +149,9 @@ export function PayslipList() {
       id: 'payslipNumber',
       header: 'Payslip #',
       cell: (payslip) => (
-        <span className="font-bold text-[var(--color-mod-hr-text)]">{payslip.payslipNumber}</span>
+        <span className="font-bold text-[var(--color-mod-hr-text)]">
+          {payslip.payslipNumber}
+        </span>
       ),
     },
     {
@@ -186,7 +189,10 @@ export function PayslipList() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+            size={18}
+          />
           <input
             type="text"
             placeholder="Search payslips by number or staff..."
@@ -336,7 +342,9 @@ export function PayslipList() {
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-[var(--color-mod-hr-soft)] hover:text-[var(--color-mod-hr-text)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Download size={14} />
-              {downloadingPayslip === payslip.payslipNumber ? 'Downloading...' : 'Download PDF'}
+              {downloadingPayslip === payslip.payslipNumber
+                ? 'Downloading...'
+                : 'Download PDF'}
             </button>
           </div>
         )}

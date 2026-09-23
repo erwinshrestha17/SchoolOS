@@ -1,6 +1,6 @@
-import type { SchoolSettingsDomain } from './school-settings-domains.js';
-import { getSchoolSettingsKeysForDomain } from './school-settings-domains.js';
-import type { TenantSettingKey, TenantSettingSummary } from './types.js';
+import type { SchoolSettingsDomain } from "./school-settings-domains.js";
+import { getSchoolSettingsKeysForDomain } from "./school-settings-domains.js";
+import type { TenantSettingKey, TenantSettingSummary } from "./types.js";
 
 export type SchoolSettingsDomainChange = {
   key: TenantSettingKey;
@@ -36,5 +36,5 @@ export function buildSchoolSettingsDomainVersion(
     .filter((setting) => keys.has(setting.key))
     .map((setting) => `${setting.key}@${setting.updatedAt}`)
     .sort();
-  return scoped.length ? scoped.join('|') : 'empty';
+  return scoped.length ? scoped.join("|") : "empty";
 }

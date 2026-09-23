@@ -46,7 +46,7 @@ import type {
   UpdateStudentGuardianPayload,
   UpdateStudentProfilePayload,
   UploadStudentDocumentPayload,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   ApiRequestError,
   API_BASE_URL,
@@ -57,7 +57,7 @@ import {
   readFileAsBase64,
   request,
   withQuery,
-} from "./client";
+} from './client';
 
 type ListDuplicateStudentCandidatesParams = {
   studentId?: string;
@@ -69,17 +69,17 @@ type ListDuplicateStudentCandidatesParams = {
 };
 
 type MarkDuplicateStudentPairNotDuplicateResult = {
-  reviewState: Extract<StudentDuplicateQueueStatus, "NOT_DUPLICATE">;
+  reviewState: Extract<StudentDuplicateQueueStatus, 'NOT_DUPLICATE'>;
   review: StudentDuplicateReviewMetadata;
 };
 
 type ReopenDuplicateStudentReviewResult = {
-  reviewState: Extract<StudentDuplicateQueueStatus, "PENDING">;
+  reviewState: Extract<StudentDuplicateQueueStatus, 'PENDING'>;
   review: StudentDuplicateReviewMetadata;
 };
 
 type GuardianIdentityVerificationSummary =
-  GuardianAccessAdministration["identityVerifications"][number] & {
+  GuardianAccessAdministration['identityVerifications'][number] & {
     guardianId: string;
   };
 
@@ -96,7 +96,7 @@ export const studentsApi = {
     signal?: AbortSignal,
   ) =>
     request<RemoteLookupPage<StudentLookupOption>>(
-      withQuery("/students/options", params),
+      withQuery('/students/options', params),
       { signal },
     ),
   listStudents: (params?: {
@@ -109,7 +109,7 @@ export const studentsApi = {
     search?: string;
   }) =>
     request<PaginatedResponse<StudentProfile>>(
-      withQuery("/students", params ?? {}),
+      withQuery('/students', params ?? {}),
     ),
   getStudentModuleSummary: (params?: {
     classId?: string;
@@ -118,7 +118,7 @@ export const studentsApi = {
     academicYearId?: string;
     search?: string;
   }) =>
-    request<StudentModuleSummary>(withQuery("/students/summary", params ?? {})),
+    request<StudentModuleSummary>(withQuery('/students/summary', params ?? {})),
   getSupportStudentModuleSummary: (params?: {
     classId?: string;
     sectionId?: string;
@@ -127,14 +127,14 @@ export const studentsApi = {
     search?: string;
   }) =>
     request<StudentModuleSummary>(
-      withQuery("/students/support/summary", params ?? {}),
+      withQuery('/students/support/summary', params ?? {}),
     ),
   getStudentProfile: (studentId: string) =>
     request<StudentProfileDetail>(`/students/${encodeURIComponent(studentId)}`),
   updateStudent: (studentId: string, body: UpdateStudentProfilePayload) =>
     request<StudentProfileDetail>(
       `/students/${encodeURIComponent(studentId)}`,
-      { method: "PATCH", json: body as JsonBody },
+      { method: 'PATCH', json: body as JsonBody },
     ),
   updateStudentGuardian: (
     studentId: string,
@@ -143,12 +143,12 @@ export const studentsApi = {
   ) =>
     request<StudentProfileDetail>(
       `/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}`,
-      { method: "PATCH", json: body as JsonBody },
+      { method: 'PATCH', json: body as JsonBody },
     ),
   addStudentGuardian: (studentId: string, body: CreateStudentGuardianPayload) =>
     request<StudentProfileDetail>(
       `/students/${encodeURIComponent(studentId)}/guardians`,
-      { method: "POST", json: body as JsonBody },
+      { method: 'POST', json: body as JsonBody },
     ),
   getGuardianAccessAdministration: (studentId: string, guardianId: string) =>
     request<GuardianAccessAdministration>(
@@ -161,14 +161,14 @@ export const studentsApi = {
   ) =>
     request<{
       success: true;
-      action: GuardianRecoveryActionPayload["action"];
+      action: GuardianRecoveryActionPayload['action'];
       sessionsRevoked: number;
       relationshipsChanged: number;
       relationshipStatus: string;
       accountStatus: string | null;
     }>(
       `/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}/access-actions`,
-      { method: "POST", json: body as JsonBody },
+      { method: 'POST', json: body as JsonBody },
     ),
   provisionGuardianAccount: (
     studentId: string,
@@ -185,7 +185,7 @@ export const studentsApi = {
       };
     }>(
       `/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}/account`,
-      { method: "POST", json: body as JsonBody },
+      { method: 'POST', json: body as JsonBody },
     ),
   revokeGuardianSession: (
     studentId: string,
@@ -195,7 +195,7 @@ export const studentsApi = {
   ) =>
     request<{ success: true; sessionId: string }>(
       `/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}/sessions/${encodeURIComponent(sessionId)}/revoke`,
-      { method: "POST", json: body as JsonBody },
+      { method: 'POST', json: body as JsonBody },
     ),
   createGuardianIdentityVerification: (
     guardianId: string,
@@ -208,19 +208,19 @@ export const studentsApi = {
   ) =>
     request<GuardianIdentityVerificationSummary>(
       `/students/guardians/${encodeURIComponent(guardianId)}/identity-verifications`,
-      { method: "POST", json: body as JsonBody },
+      { method: 'POST', json: body as JsonBody },
     ),
   reviewGuardianIdentityVerification: (
     guardianId: string,
     verificationId: string,
     body: {
-      status: "VERIFIED" | "REJECTED" | "REVOKED";
+      status: 'VERIFIED' | 'REJECTED' | 'REVOKED';
       reviewNote?: string;
     },
   ) =>
     request<GuardianIdentityVerificationSummary>(
       `/students/guardians/${encodeURIComponent(guardianId)}/identity-verifications/${encodeURIComponent(verificationId)}/review`,
-      { method: "POST", json: body as JsonBody },
+      { method: 'POST', json: body as JsonBody },
     ),
   getStudentFeeClearance: (studentId: string) =>
     request<StudentFeeClearance>(
@@ -239,22 +239,22 @@ export const studentsApi = {
   transferStudent: (studentId: string, body: StudentTransferPayload) =>
     request<StudentLifecycleActionResult>(
       `/students/${encodeURIComponent(studentId)}/transfer`,
-      { method: "POST", json: body as JsonBody },
+      { method: 'POST', json: body as JsonBody },
     ),
   archiveStudent: (studentId: string, body: StudentArchivePayload) =>
     request<StudentLifecycleActionResult>(
       `/students/${encodeURIComponent(studentId)}/archive`,
-      { method: "POST", json: body as JsonBody },
+      { method: 'POST', json: body as JsonBody },
     ),
   archiveStudentAsAlumni: (studentId: string, body: StudentArchivePayload) =>
     request<StudentLifecycleActionResult>(
       `/students/${encodeURIComponent(studentId)}/archive-alumni`,
-      { method: "POST", json: body as JsonBody },
+      { method: 'POST', json: body as JsonBody },
     ),
   softDeleteStudent: (studentId: string, body: StudentDeletePayload) =>
     request<StudentLifecycleActionResult>(
       `/students/${encodeURIComponent(studentId)}/delete`,
-      { method: "POST", json: body as JsonBody },
+      { method: 'POST', json: body as JsonBody },
     ),
   revokeGeneratedStudentDocument: (
     studentId: string,
@@ -263,19 +263,19 @@ export const studentsApi = {
   ) =>
     request(
       `/students/${encodeURIComponent(studentId)}/generated-documents/${encodeURIComponent(documentId)}/revoke`,
-      { method: "POST", json: body as JsonBody },
+      { method: 'POST', json: body as JsonBody },
     ),
   generateStudentQr: (studentId: string) =>
     request<StudentCredentialArtifactResult>(
       `/students/${encodeURIComponent(studentId)}/qr`,
-      { method: "POST" },
+      { method: 'POST' },
     ),
   getStudentQrStatus: (studentId: string) =>
     request<StudentQrStatusHistory>(
       `/students/${encodeURIComponent(studentId)}/qr`,
     ),
   getStudentQrWorkspaceSummary: () =>
-    request<StudentQrWorkspaceSummary>("/students/qr/summary"),
+    request<StudentQrWorkspaceSummary>('/students/qr/summary'),
   listStudentQrScans: (studentId: string) =>
     request<StudentQrScanAudit[]>(
       `/students/${encodeURIComponent(studentId)}/qr/scans`,
@@ -283,15 +283,15 @@ export const studentsApi = {
   rotateStudentQr: (studentId: string, body: { reason: string }) =>
     request<StudentCredentialArtifactResult>(
       `/students/${encodeURIComponent(studentId)}/qr/rotate`,
-      { method: "POST", json: body },
+      { method: 'POST', json: body },
     ),
   revokeStudentQr: (studentId: string, body: { reason: string }) =>
     request<any>(`/students/${encodeURIComponent(studentId)}/qr/revoke`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   resolveStudentQr: (body: { token: string; purpose: string }) =>
-    request<any>("/students/qr/resolve", { method: "POST", json: body }),
+    request<any>('/students/qr/resolve', { method: 'POST', json: body }),
   listAdmissions: (params?: {
     page?: number;
     limit?: number;
@@ -301,7 +301,7 @@ export const studentsApi = {
     classId?: string;
   }) =>
     request<PaginatedResponse<AdmissionSummary>>(
-      withQuery("/admissions", params ?? {}),
+      withQuery('/admissions', params ?? {}),
     ),
   listAdmissionApplications: (params?: {
     page?: number;
@@ -311,11 +311,11 @@ export const studentsApi = {
     classId?: string;
   }) =>
     request<PaginatedResponse<AdmissionApplication>>(
-      withQuery("/admissions/applications", params ?? {}),
+      withQuery('/admissions/applications', params ?? {}),
     ),
   createAdmissionApplication: (body: CreateAdmissionApplicationPayload) =>
-    request<AdmissionApplication>("/admissions/applications", {
-      method: "POST",
+    request<AdmissionApplication>('/admissions/applications', {
+      method: 'POST',
       json: body as JsonBody,
     }),
   updateAdmissionApplicationStatus: (
@@ -324,41 +324,41 @@ export const studentsApi = {
   ) =>
     request<AdmissionApplication>(
       `/admissions/applications/${encodeURIComponent(applicationId)}/status`,
-      { method: "POST", json: body },
+      { method: 'POST', json: body },
     ),
   enrollAdmissionApplication: (applicationId: string, body: JsonBody) =>
     request<{
       application: AdmissionApplication;
       admission: AdmissionCreationResult;
     }>(`/admissions/applications/${encodeURIComponent(applicationId)}/enroll`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   createAdmission: (body: JsonBody & { clientOperationId: string }) =>
-    request<AdmissionCreationResult>("/admissions", {
-      method: "POST",
+    request<AdmissionCreationResult>('/admissions', {
+      method: 'POST',
       json: body,
     }),
   checkAdmissionDuplicates: (body: JsonBody) =>
-    request<AdmissionDuplicateCheckResult>("/admissions/duplicates", {
-      method: "POST",
+    request<AdmissionDuplicateCheckResult>('/admissions/duplicates', {
+      method: 'POST',
       json: body,
     }),
   bulkImportAdmissions: (body: BulkAdmissionImportPayload) =>
-    request<BulkAdmissionImportResult>("/admissions/bulk-import", {
-      method: "POST",
+    request<BulkAdmissionImportResult>('/admissions/bulk-import', {
+      method: 'POST',
       json: body,
     }),
   downloadAdmissionImportTemplate: () =>
     downloadCsv(
-      "/admissions/bulk-import/template",
-      "admission-import-template.csv",
+      '/admissions/bulk-import/template',
+      'admission-import-template.csv',
     ),
   listStudentDocuments: (studentId: string) =>
-    request<StudentDocument[]>(withQuery("/student-documents", { studentId })),
+    request<StudentDocument[]>(withQuery('/student-documents', { studentId })),
   listStudentDocumentHistory: (studentId: string) =>
     request<StudentDocumentHistory[]>(
-      withQuery("/student-documents/history", { studentId }),
+      withQuery('/student-documents/history', { studentId }),
     ),
   uploadStudentPhoto: async (studentId: string, file: File, note?: string) =>
     request<{
@@ -370,7 +370,7 @@ export const studentsApi = {
       previewUrl: string;
       downloadUrl: string;
     }>(`/students/${encodeURIComponent(studentId)}/photo`, {
-      method: "POST",
+      method: 'POST',
       json: {
         fileName: file.name,
         mimeType: file.type,
@@ -381,7 +381,7 @@ export const studentsApi = {
   removeStudentPhoto: (studentId: string) =>
     request<{ success: true; deleted: boolean }>(
       `/students/${encodeURIComponent(studentId)}/photo`,
-      { method: "DELETE" },
+      { method: 'DELETE' },
     ),
   getStudentPhotoPreview: (studentId: string) =>
     request<{
@@ -396,35 +396,35 @@ export const studentsApi = {
   getStudentPhotoBlob: async (studentId: string, signal?: AbortSignal) => {
     const response = await fetch(
       `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/photo/content`,
-      { credentials: "include", signal },
+      { credentials: 'include', signal },
     );
     if (!response.ok)
       throw new ApiRequestError(
         parseApiErrorMessage(await response.text()) ||
-          "Student photo could not be loaded.",
+          'Student photo could not be loaded.',
         response.status,
       );
     const contentType =
-      response.headers.get("content-type")?.toLowerCase() ?? "";
-    if (!contentType.startsWith("image/"))
+      response.headers.get('content-type')?.toLowerCase() ?? '';
+    if (!contentType.startsWith('image/'))
       throw new ApiRequestError(
-        "The server did not return an image preview.",
+        'The server did not return an image preview.',
         response.status,
       );
     const blob = await response.blob();
     if (blob.size === 0)
-      throw new ApiRequestError("The student photo is empty.", response.status);
+      throw new ApiRequestError('The student photo is empty.', response.status);
     return blob;
   },
   exportIemisStudents: () =>
-    request<IemisExportResult>("/students/iemis/export"),
+    request<IemisExportResult>('/students/iemis/export'),
   listIemisReadiness: (params?: {
     classId?: string;
     sectionId?: string;
-    status?: "all" | "ready" | "has_issues";
+    status?: 'all' | 'ready' | 'has_issues';
   }) =>
     request<StudentIemisReadinessSummary[]>(
-      withQuery("/students/iemis/validation", params ?? {}),
+      withQuery('/students/iemis/validation', params ?? {}),
     ),
   getIemisReadiness: (studentId: string) =>
     request<StudentIemisReadiness>(
@@ -438,15 +438,15 @@ export const studentsApi = {
     params?: ListDuplicateStudentCandidatesParams,
   ) =>
     request<StudentDuplicateCandidatesResult>(
-      withQuery("/students/duplicates/candidates", params ?? {}),
+      withQuery('/students/duplicates/candidates', params ?? {}),
     ),
   markDuplicateStudentPairNotDuplicate: (
     body: MarkDuplicateStudentPairNotDuplicatePayload,
   ) =>
     request<MarkDuplicateStudentPairNotDuplicateResult>(
-      "/students/duplicates/reviews",
+      '/students/duplicates/reviews',
       {
-        method: "POST",
+        method: 'POST',
         json: body as JsonBody,
       },
     ),
@@ -457,7 +457,7 @@ export const studentsApi = {
     request<ReopenDuplicateStudentReviewResult>(
       `/students/duplicates/reviews/${encodeURIComponent(reviewId)}/reopen`,
       {
-        method: "POST",
+        method: 'POST',
         json: body as JsonBody,
       },
     ),
@@ -480,14 +480,14 @@ export const studentsApi = {
       };
       mergeCounts: Record<string, number>;
       isProbableDuplicate: boolean;
-    }>("/students/duplicates/merge/preview", { method: "POST", json: body }),
+    }>('/students/duplicates/merge/preview', { method: 'POST', json: body }),
   mergeDuplicateStudent: (body: {
     sourceStudentId: string;
     targetStudentId: string;
     reason: string;
   }) =>
-    request<DuplicateStudentMergeResult>("/students/duplicates/merge", {
-      method: "POST",
+    request<DuplicateStudentMergeResult>('/students/duplicates/merge', {
+      method: 'POST',
       json: body,
     }),
   saveAdmissionDraft: (body: {
@@ -503,20 +503,20 @@ export const studentsApi = {
     previousSchool?: string;
     payload?: Record<string, unknown>;
   }) =>
-    request("/admissions/m1/drafts/autosave", { method: "POST", json: body }),
+    request('/admissions/m1/drafts/autosave', { method: 'POST', json: body }),
   recoverAdmissionDrafts: (params?: {
     draftKey?: string;
     guardianPhone?: string;
     limit?: number;
   }) =>
-    request<any[]>(withQuery("/admissions/m1/drafts/recover", params ?? {})),
+    request<any[]>(withQuery('/admissions/m1/drafts/recover', params ?? {})),
   listAdmissionImportBatches: (params?: {
     page?: number;
     limit?: number;
     status?: string;
   }) =>
     request<PaginatedResponse<AdmissionImportBatchSummary>>(
-      withQuery("/admissions/bulk-import/batches", params ?? {}),
+      withQuery('/admissions/bulk-import/batches', params ?? {}),
     ),
   getAdmissionImportBatch: (batchId: string) =>
     request<AdmissionImportBatchDetail>(
@@ -534,19 +534,19 @@ export const studentsApi = {
       limit: number;
       hasNextPage: boolean;
       policy: string;
-    }>(withQuery("/admissions/m1/import-review/queue", params ?? {})),
+    }>(withQuery('/admissions/m1/import-review/queue', params ?? {})),
   listDocumentExpiryTemplates: () =>
-    request<DocumentExpiryTemplate[]>("/students/document-expiry/templates"),
+    request<DocumentExpiryTemplate[]>('/students/document-expiry/templates'),
   upsertDocumentExpiryTemplate: (body: {
-    channel: "email" | "sms";
-    reminderStatus: "expired" | "expiring";
+    channel: 'email' | 'sms';
+    reminderStatus: 'expired' | 'expiring';
     subjectTemplate?: string;
     messageTemplate: string;
     daysBeforeExpiry?: number;
     isActive?: boolean;
   }) =>
-    request<DocumentExpiryTemplate>("/students/document-expiry/templates", {
-      method: "POST",
+    request<DocumentExpiryTemplate>('/students/document-expiry/templates', {
+      method: 'POST',
       json: body,
     }),
   removeStudentGuardianAccess: (
@@ -556,11 +556,11 @@ export const studentsApi = {
   ) =>
     request<{ removed: true }>(
       `/admissions/m1/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}`,
-      { method: "DELETE", json: body as JsonBody },
+      { method: 'DELETE', json: body as JsonBody },
     ),
   uploadStudentDocument: (body: UploadStudentDocumentPayload) =>
-    request<StudentDocument>("/student-documents", {
-      method: "POST",
+    request<StudentDocument>('/student-documents', {
+      method: 'POST',
       json: body as JsonBody,
     }),
   previewStudentDocument: (studentId: string, documentId: string) =>
@@ -589,27 +589,27 @@ export const studentsApi = {
     ),
   deleteStudentDocument: (id: string, body: { reason: string }) =>
     request(`/student-documents/${encodeURIComponent(id)}`, {
-      method: "DELETE",
+      method: 'DELETE',
       json: body,
     }),
   verifyStudentDocument: (
     documentId: string,
-    body: { status: "VERIFIED" | "REJECTED"; notes: string },
+    body: { status: 'VERIFIED' | 'REJECTED'; notes: string },
   ) =>
     request<{ success: boolean }>(
       `/student-documents/${encodeURIComponent(documentId)}/verify`,
-      { method: "POST", json: body },
+      { method: 'POST', json: body },
     ),
   archiveStudentDocument: (documentId: string, body: { reason: string }) =>
     request<{ success: boolean }>(
       `/student-documents/${encodeURIComponent(documentId)}/archive`,
-      { method: "POST", json: body },
+      { method: 'POST', json: body },
     ),
   openStudentDocumentPdf: async (studentId: string, kind: string) => {
     const artifact = await request<{
       fileAssetId: string;
       fileName: string;
-      mimeType: "application/pdf";
+      mimeType: 'application/pdf';
       fileAvailable: true;
     }>(
       `/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(kind)}.pdf`,
@@ -619,7 +619,7 @@ export const studentsApi = {
     });
   },
   listMyLinkedStudents: () =>
-    request<{ items: MyLinkedStudent[] }>("/mobile/me/students"),
+    request<{ items: MyLinkedStudent[] }>('/mobile/me/students'),
 };
 
 export type MyLinkedStudent = {
@@ -663,14 +663,14 @@ export type AdmissionImportBatchSummary = {
 };
 export type AdmissionImportBatchDetail = Pick<
   AdmissionImportBatchSummary,
-  | "id"
-  | "sourceFileName"
-  | "dryRun"
-  | "confirmDuplicates"
-  | "status"
-  | "totalRows"
-  | "startedAt"
-  | "completedAt"
+  | 'id'
+  | 'sourceFileName'
+  | 'dryRun'
+  | 'confirmDuplicates'
+  | 'status'
+  | 'totalRows'
+  | 'startedAt'
+  | 'completedAt'
 > & {
   created: number;
   validated: number;
@@ -700,8 +700,8 @@ export type AdmissionImportReviewRow = {
 };
 export type DocumentExpiryTemplate = {
   id: string;
-  channel: "email" | "sms";
-  reminderStatus: "expired" | "expiring";
+  channel: 'email' | 'sms';
+  reminderStatus: 'expired' | 'expiring';
   subjectTemplate: string | null;
   messageTemplate: string;
   daysBeforeExpiry: number | null;

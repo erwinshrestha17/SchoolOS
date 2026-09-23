@@ -9,13 +9,31 @@ import {
 export type DateDisplayMode = 'AD' | 'BS' | 'BOTH';
 
 const monthNames = [
-  'Baisakh', 'Jestha', 'Asar', 'Shrawan', 'Bhadra', 'Ashwin',
-  'Kartik', 'Mangsir', 'Poush', 'Magh', 'Falgun', 'Chaitra',
+  'Baisakh',
+  'Jestha',
+  'Asar',
+  'Shrawan',
+  'Bhadra',
+  'Ashwin',
+  'Kartik',
+  'Mangsir',
+  'Poush',
+  'Magh',
+  'Falgun',
+  'Chaitra',
 ] as const;
 
 export function normalizeActivityDate(item: any): string {
   if (!item) return '';
-  return item.publishedAt || item.createdAt || item.timestamp || item.occurredAt || item.created_at || item.issuedAt || '';
+  return (
+    item.publishedAt ||
+    item.createdAt ||
+    item.timestamp ||
+    item.occurredAt ||
+    item.created_at ||
+    item.issuedAt ||
+    ''
+  );
 }
 
 /** Formats an instant for a datetime-local input using Nepal civil time. */
@@ -131,6 +149,16 @@ export function formatLabelledSchoolDate(
 }
 
 const AD_MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ] as const;

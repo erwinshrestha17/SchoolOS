@@ -5,15 +5,15 @@ import { formatBsDateTime, type StudentProfileDetail } from '@schoolos/core';
 import { api } from '@/lib/api';
 import { SectionCard } from '@/components/ui/section-card';
 import { LoadingState } from '@/components/ui/loading-state';
-import { 
-  History, 
-  User, 
-  ArrowRightLeft, 
-  GraduationCap, 
-  Ban, 
-  Trash2, 
+import {
+  History,
+  User,
+  ArrowRightLeft,
+  GraduationCap,
+  Ban,
+  Trash2,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -28,7 +28,11 @@ const formatDate = (date: string | Date) => {
 export function HistoryTab({ profile }: { profile: StudentProfileDetail }) {
   const studentId = profile.student.id;
 
-  const { data: timeline, isLoading, isError } = useQuery({
+  const {
+    data: timeline,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['student-lifecycle-timeline', studentId],
     queryFn: () => api.getStudentLifecycleTimeline(studentId),
     enabled: Boolean(studentId),
@@ -42,8 +46,12 @@ export function HistoryTab({ profile }: { profile: StudentProfileDetail }) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center rounded-xl border border-red-100 bg-red-50/20 p-6">
         <AlertCircle className="h-10 w-10 text-red-500 mb-2" />
-        <p className="text-sm font-bold text-slate-900">Failed to load history</p>
-        <p className="text-xs text-slate-500 mt-1">An error occurred while fetching the lifecycle timeline.</p>
+        <p className="text-sm font-bold text-slate-900">
+          Failed to load history
+        </p>
+        <p className="text-xs text-slate-500 mt-1">
+          An error occurred while fetching the lifecycle timeline.
+        </p>
       </div>
     );
   }
@@ -99,8 +107,8 @@ export function HistoryTab({ profile }: { profile: StudentProfileDetail }) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <SectionCard 
-        title="Student History Log" 
+      <SectionCard
+        title="Student History Log"
         description="Chronological audit trail of student lifecycle transitions and events"
       >
         {timeline && timeline.length > 0 ? (
@@ -109,17 +117,30 @@ export function HistoryTab({ profile }: { profile: StudentProfileDetail }) {
               const details = getTransitionDetails(item.toStatus);
               return (
                 <div key={item.id} className="relative pl-12">
-                  <div className={`absolute left-0 top-0 z-10 flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm ${details.color}`}>
+                  <div
+                    className={`absolute left-0 top-0 z-10 flex h-10 w-10 items-center justify-center rounded-xl border shadow-sm ${details.color}`}
+                  >
                     {details.icon}
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-sm font-bold text-slate-900">{details.title}</h4>
-                      <Badge variant={item.toStatus === 'ACTIVE' ? 'success' : 'secondary'} className="text-[10px] uppercase font-extrabold tracking-wider">
-                        {item.fromStatus ? `${item.fromStatus} → ` : ''}{item.toStatus}
+                      <h4 className="text-sm font-bold text-slate-900">
+                        {details.title}
+                      </h4>
+                      <Badge
+                        variant={
+                          item.toStatus === 'ACTIVE' ? 'success' : 'secondary'
+                        }
+                        className="text-[10px] uppercase font-extrabold tracking-wider"
+                      >
+                        {item.fromStatus ? `${item.fromStatus} → ` : ''}
+                        {item.toStatus}
                       </Badge>
                       {item.feeClearanceWaived && (
-                        <Badge variant="warning" className="text-[10px] font-extrabold uppercase">
+                        <Badge
+                          variant="warning"
+                          className="text-[10px] font-extrabold uppercase"
+                        >
                           Fee Clearance Waived
                         </Badge>
                       )}
@@ -148,8 +169,13 @@ export function HistoryTab({ profile }: { profile: StudentProfileDetail }) {
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-bg)] text-[var(--color-mod-admissions-accent)]">
               <History size={32} />
             </div>
-            <p className="text-sm font-bold text-slate-900">No history events recorded</p>
-            <p className="mt-1 text-xs text-slate-400">Student lifecycle events (admissions, transfers, deletions) will appear here after updates.</p>
+            <p className="text-sm font-bold text-slate-900">
+              No history events recorded
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              Student lifecycle events (admissions, transfers, deletions) will
+              appear here after updates.
+            </p>
           </div>
         )}
       </SectionCard>

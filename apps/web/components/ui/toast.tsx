@@ -51,7 +51,9 @@ export function Toast({
       <Icon className="mt-0.5 shrink-0" size={18} />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold">{title}</p>
-        {description ? <p className="mt-1 text-sm opacity-85">{description}</p> : null}
+        {description ? (
+          <p className="mt-1 text-sm opacity-85">{description}</p>
+        ) : null}
         {action ? (
           <button
             type="button"

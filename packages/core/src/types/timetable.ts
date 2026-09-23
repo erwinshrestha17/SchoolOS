@@ -1,9 +1,13 @@
-import type { ClassSummary, SectionSummary, SubjectSummary } from './academic.js';
+import type {
+  ClassSummary,
+  SectionSummary,
+  SubjectSummary,
+} from "./academic.js";
 import type {
   StablePaginationMeta,
   TimetableVersionStatus,
   TimetableValidationIssue,
-} from './common.js';
+} from "./common.js";
 
 export type TimetableSlotSummary = {
   id: string;
@@ -83,7 +87,7 @@ export type TeacherAvailabilitySummary = {
     dayOfWeek: number;
     startsAt: string;
     endsAt: string;
-    type: 'AVAILABLE' | 'UNAVAILABLE';
+    type: "AVAILABLE" | "UNAVAILABLE";
     note: string | null;
   }>;
   limit: {
@@ -112,7 +116,7 @@ export type TimetableSubstitutionSummary = {
   substituteTeacherId: string | null;
   date: string;
   reason: string;
-  status: 'DRAFT' | 'ASSIGNED' | 'CANCELLED' | 'COMPLETED';
+  status: "DRAFT" | "ASSIGNED" | "CANCELLED" | "COMPLETED";
   timetableSlot?: TimetableSlotSummary;
   absentTeacher: TimetableTeacherIdentity;
   substituteTeacher: TimetableTeacherIdentity | null;

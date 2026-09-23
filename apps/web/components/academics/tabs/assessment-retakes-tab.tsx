@@ -169,7 +169,8 @@ const retakeColumns: PaginatedDataTableColumn<AssessmentRetakeSummary>[] = [
       ) : (
         <>
           <p className="font-bold text-slate-900">
-            {retake.attemptMarks} / {retake.assessmentComponent?.maxMarks ?? '-'}
+            {retake.attemptMarks} /{' '}
+            {retake.assessmentComponent?.maxMarks ?? '-'}
           </p>
           <p className="mt-1 text-xs text-slate-500">
             {displayDecision(retake.resultDecision)}
@@ -460,10 +461,7 @@ function RetakeDetailDialog({
   open: boolean;
   onClose: () => void;
   onRetry: () => void;
-  onAction: (
-    action: RetakeAction,
-    retake: AssessmentRetakeSummary,
-  ) => void;
+  onAction: (action: RetakeAction, retake: AssessmentRetakeSummary) => void;
 }) {
   if (!open) return null;
 
@@ -733,9 +731,7 @@ function RetakeActionDialog({
               id="retake-review-note"
               label="Review note (optional)"
               value={form.note}
-              onChange={(note) =>
-                setForm((current) => ({ ...current, note }))
-              }
+              onChange={(note) => setForm((current) => ({ ...current, note }))}
             />
           ) : null}
 
@@ -803,9 +799,7 @@ function RetakeActionDialog({
                 label={`Marks obtained (maximum ${target.retake.assessmentComponent?.maxMarks ?? '-'})`}
                 type="number"
                 min="0"
-                max={String(
-                  target.retake.assessmentComponent?.maxMarks ?? '',
-                )}
+                max={String(target.retake.assessmentComponent?.maxMarks ?? '')}
                 step="0.01"
                 value={form.marksObtained}
                 onChange={(marksObtained) =>
@@ -826,9 +820,7 @@ function RetakeActionDialog({
           {target.action === 'apply' ? (
             <>
               <div className="space-y-2">
-                <Label htmlFor="retake-result-decision">
-                  Result decision
-                </Label>
+                <Label htmlFor="retake-result-decision">Result decision</Label>
                 <Select
                   id="retake-result-decision"
                   value={form.decision}

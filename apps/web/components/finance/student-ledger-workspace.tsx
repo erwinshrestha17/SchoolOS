@@ -1,24 +1,24 @@
-"use client";
+'use client';
 
-import { useQuery } from "@tanstack/react-query";
-import { formatBsDate } from "@schoolos/core";
-import { ArrowLeft, Search } from "lucide-react";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ErrorState } from "@/components/ui/error-state";
-import { FilterChips } from "@/components/ui/filter-chips";
-import { SearchInput } from "@/components/ui/search-input";
-import { SectionCard } from "@/components/ui/section-card";
-import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { api } from "@/lib/api";
+import { useQuery } from '@tanstack/react-query';
+import { formatBsDate } from '@schoolos/core';
+import { ArrowLeft, Search } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { FilterChips } from '@/components/ui/filter-chips';
+import { SearchInput } from '@/components/ui/search-input';
+import { SectionCard } from '@/components/ui/section-card';
+import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { api } from '@/lib/api';
 
 const formatCurrency = (amount: string) =>
-  new Intl.NumberFormat("en-NP", {
-    style: "currency",
-    currency: "NPR",
+  new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(amount));
@@ -27,22 +27,22 @@ export function StudentLedgerWorkspace() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const studentId = searchParams.get("studentId");
-  const search = searchParams.get("search") ?? "";
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
-  const transactionType = searchParams.get("transactionType") ?? "";
-  const invoiceStatus = searchParams.get("invoiceStatus") ?? "";
+  const studentId = searchParams.get('studentId');
+  const search = searchParams.get('search') ?? '';
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
+  const transactionType = searchParams.get('transactionType') ?? '';
+  const invoiceStatus = searchParams.get('invoiceStatus') ?? '';
   const sortDirection =
-    searchParams.get("sortDirection") === "asc" ? "asc" : "desc";
+    searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc';
 
   const searchQuery = useQuery({
-    queryKey: ["ledger-students", search],
+    queryKey: ['ledger-students', search],
     queryFn: () => api.searchLedgerStudents(search),
     enabled: !studentId && search.trim().length >= 2,
   });
   const ledgerQuery = useQuery({
     queryKey: [
-      "student-fee-ledger",
+      'student-fee-ledger',
       studentId,
       page,
       transactionType,
@@ -50,7 +50,7 @@ export function StudentLedgerWorkspace() {
       sortDirection,
     ],
     queryFn: () => {
-      if (!studentId) throw new Error("Student context is unavailable.");
+      if (!studentId) throw new Error('Student context is unavailable.');
       return api.getStudentFeeLedgerPage(studentId, {
         page,
         limit: 25,
@@ -68,7 +68,7 @@ export function StudentLedgerWorkspace() {
       if (!value || value === 1) params.delete(key);
       else params.set(key, String(value));
     });
-    if ("search" in updates) params.delete("page");
+    if ('search' in updates) params.delete('page');
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, {
       scroll: false,
@@ -134,8 +134,8 @@ export function StudentLedgerWorkspace() {
                           {student.studentSystemId} · {student.className}
                           {student.sectionName
                             ? ` · ${student.sectionName}`
-                            : ""}
-                          {` · ${student.invoiceCount} ${student.invoiceCount === 1 ? "invoice" : "invoices"}`}
+                            : ''}
+                          {` · ${student.invoiceCount} ${student.invoiceCount === 1 ? 'invoice' : 'invoices'}`}
                         </span>
                       </span>
                       <span className="shrink-0 text-sm font-semibold text-slate-700">
@@ -185,23 +185,23 @@ export function StudentLedgerWorkspace() {
   const ledgerFilterChips = [
     transactionType
       ? {
-          key: "transactionType",
+          key: 'transactionType',
           label: `Type: ${transactionTypeLabel(transactionType)}`,
           onRemove: () => updateUrl({ transactionType: null, page: null }),
         }
       : null,
     invoiceStatus
       ? {
-          key: "invoiceStatus",
+          key: 'invoiceStatus',
           label: `Invoice: ${invoiceStatusLabel(invoiceStatus)}`,
           onRemove: () => updateUrl({ invoiceStatus: null, page: null }),
         }
       : null,
-    sortDirection === "asc"
+    sortDirection === 'asc'
       ? {
-          key: "sortDirection",
-          label: "Order: Oldest first",
-          onRemove: () => updateUrl({ sortDirection: "desc", page: null }),
+          key: 'sortDirection',
+          label: 'Order: Oldest first',
+          onRemove: () => updateUrl({ sortDirection: 'desc', page: null }),
         }
       : null,
   ].filter((chip): chip is NonNullable<typeof chip> => chip !== null);
@@ -217,7 +217,7 @@ export function StudentLedgerWorkspace() {
             {ledger.student.studentSystemId} · {ledger.student.className}
             {ledger.student.sectionName
               ? ` · ${ledger.student.sectionName}`
-              : ""}
+              : ''}
           </p>
         </div>
         <Button
@@ -354,16 +354,16 @@ export function StudentLedgerWorkspace() {
                         {row.reference}
                       </td>
                       <td className="px-5 py-3.5 text-right text-slate-900">
-                        {row.debit ? formatCurrency(row.debit) : "—"}
+                        {row.debit ? formatCurrency(row.debit) : '—'}
                       </td>
                       <td className="px-5 py-3.5 text-right text-slate-900">
-                        {row.credit ? formatCurrency(row.credit) : "—"}
+                        {row.credit ? formatCurrency(row.credit) : '—'}
                       </td>
                       <td className="px-5 py-3.5 text-right font-semibold text-slate-950">
                         {formatCurrency(row.runningBalance)}
                       </td>
                       <td className="px-5 py-3.5">
-                        {row.status ? <StatusBadge status={row.status} /> : "—"}
+                        {row.status ? <StatusBadge status={row.status} /> : '—'}
                       </td>
                     </tr>
                   ))}
@@ -372,8 +372,8 @@ export function StudentLedgerWorkspace() {
             </div>
             <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs font-semibold text-slate-600">
               <span>
-                {ledger.total} matching{" "}
-                {ledger.total === 1 ? "entry" : "entries"} · As of{" "}
+                {ledger.total} matching{' '}
+                {ledger.total === 1 ? 'entry' : 'entries'} · As of{' '}
                 {formatBsDate(ledger.generatedAt)}
               </span>
               <div className="flex gap-2">
@@ -428,7 +428,7 @@ function LedgerSummary({
 }) {
   return (
     <div
-      className={`rounded-xl border p-4 ${emphasized ? "border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)]" : "border-slate-200 bg-white"}`}
+      className={`rounded-xl border p-4 ${emphasized ? 'border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)]' : 'border-slate-200 bg-white'}`}
     >
       <p className="text-xs font-medium text-slate-600">{label}</p>
       <p className="mt-2 text-xl font-bold tracking-tight text-slate-950 tabular-nums">
@@ -440,22 +440,22 @@ function LedgerSummary({
 
 function transactionTypeLabel(value: string) {
   const labels: Record<string, string> = {
-    INVOICE: "Invoices",
-    PAYMENT: "Payments",
-    WAIVER: "Waivers",
-    REFUND: "Refunds",
-    REVERSAL: "Reversals",
+    INVOICE: 'Invoices',
+    PAYMENT: 'Payments',
+    WAIVER: 'Waivers',
+    REFUND: 'Refunds',
+    REVERSAL: 'Reversals',
   };
   return labels[value] ?? value;
 }
 
 function invoiceStatusLabel(value: string) {
   const labels: Record<string, string> = {
-    DRAFT: "Draft",
-    ISSUED: "Issued",
-    PARTIAL: "Partially paid",
-    PAID: "Paid",
-    VOID: "Void",
+    DRAFT: 'Draft',
+    ISSUED: 'Issued',
+    PARTIAL: 'Partially paid',
+    PAID: 'Paid',
+    VOID: 'Void',
   };
   return labels[value] ?? value;
 }

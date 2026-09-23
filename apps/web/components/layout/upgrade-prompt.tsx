@@ -39,15 +39,22 @@ export function UpgradePrompt({ moduleName, currentTier }: UpgradePromptProps) {
           Module Locked
         </h2>
         <p className="mb-6 text-sm leading-relaxed text-slate-500 max-w-sm mx-auto">
-          The <span className="font-semibold text-slate-800">{friendlyName}</span> module is not included in your school&apos;s current plan
+          The{' '}
+          <span className="font-semibold text-slate-800">{friendlyName}</span>{' '}
+          module is not included in your school&apos;s current plan
           {currentTier ? (
             <span>
-              {' '}(<span className="font-semibold uppercase text-[var(--primary)]">{currentTier}</span>)
+              {' '}
+              (
+              <span className="font-semibold uppercase text-[var(--primary)]">
+                {currentTier}
+              </span>
+              )
             </span>
           ) : (
             ''
-          )}.
-          Please contact your administrator to upgrade your subscription.
+          )}
+          . Please contact your administrator to upgrade your subscription.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">

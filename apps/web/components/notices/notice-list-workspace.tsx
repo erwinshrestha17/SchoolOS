@@ -1,30 +1,30 @@
-"use client";
+'use client';
 
 import {
   NOTICE_LIFECYCLE_STATUSES,
   formatBsDateTime,
   type NoticeLifecycleStatus,
   type NoticeSummary,
-} from "@schoolos/core";
-import { useQuery } from "@tanstack/react-query";
-import { Search, SlidersHorizontal } from "lucide-react";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState, type FormEvent } from "react";
-import { communicationsApi } from "@/lib/api/communications";
+} from '@schoolos/core';
+import { useQuery } from '@tanstack/react-query';
+import { Search, SlidersHorizontal } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useMemo, useState, type FormEvent } from 'react';
+import { communicationsApi } from '@/lib/api/communications';
 import {
   PaginatedDataTable,
   type PaginatedDataTableColumn,
-} from "@/components/schoolos/data/paginated-data-table";
-import { FilterBar } from "@/components/ui/filter-bar";
-import { FilterChips } from "@/components/ui/filter-chips";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { useSession } from "@/components/session-provider";
-import { hasAnyPermission } from "@/lib/session";
+} from '@/components/schoolos/data/paginated-data-table';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { FilterChips } from '@/components/ui/filter-chips';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { useSession } from '@/components/session-provider';
+import { hasAnyPermission } from '@/lib/session';
 
 const PAGE_SIZE = 25;
-const priorities = ["NORMAL", "URGENT", "EMERGENCY"] as const;
-const audiences = ["ALL", "CLASS", "SECTION"] as const;
+const priorities = ['NORMAL', 'URGENT', 'EMERGENCY'] as const;
+const audiences = ['ALL', 'CLASS', 'SECTION'] as const;
 
 export function NoticeListWorkspace({
   fixedLifecycleStatus,
@@ -36,21 +36,21 @@ export function NoticeListWorkspace({
   const searchParams = useSearchParams();
   const { session } = useSession();
   const isSupportOverride = session?.user.isSupportOverride === true;
-  const canRead = hasAnyPermission(session, ["notices:read"]);
-  const page = positiveNumber(searchParams.get("page"), 1);
-  const search = searchParams.get("search") ?? "";
-  const priority = searchParams.get("priority") ?? "";
-  const audienceType = searchParams.get("audienceType") ?? "";
+  const canRead = hasAnyPermission(session, ['notices:read']);
+  const page = positiveNumber(searchParams.get('page'), 1);
+  const search = searchParams.get('search') ?? '';
+  const priority = searchParams.get('priority') ?? '';
+  const audienceType = searchParams.get('audienceType') ?? '';
   const lifecycleStatus = isSupportOverride
-    ? ""
+    ? ''
     : (fixedLifecycleStatus ??
-      (searchParams.get("lifecycleStatus") as NoticeLifecycleStatus | null) ??
-      "");
+      (searchParams.get('lifecycleStatus') as NoticeLifecycleStatus | null) ??
+      '');
   const [searchDraft, setSearchDraft] = useState(search);
 
   const noticesQuery = useQuery({
     queryKey: [
-      "notices",
+      'notices',
       { page, search, priority, audienceType, lifecycleStatus },
     ],
     queryFn: () =>
@@ -68,10 +68,10 @@ export function NoticeListWorkspace({
   function setFilters(next: Record<string, string | number | null>) {
     const params = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(next)) {
-      if (value === null || value === "" || value === 1) params.delete(key);
+      if (value === null || value === '' || value === 1) params.delete(key);
       else params.set(key, String(value));
     }
-    router.replace(`${pathname}${params.size ? `?${params}` : ""}`);
+    router.replace(`${pathname}${params.size ? `?${params}` : ''}`);
   }
 
   function submitSearch(event: FormEvent) {
@@ -82,8 +82,8 @@ export function NoticeListWorkspace({
   const columns = useMemo<PaginatedDataTableColumn<NoticeSummary>[]>(
     () => [
       {
-        id: "title",
-        header: "Notice",
+        id: 'title',
+        header: 'Notice',
         cell: (notice) => (
           <div className="min-w-0">
             <Link
@@ -99,8 +99,8 @@ export function NoticeListWorkspace({
         ),
       },
       {
-        id: "priority",
-        header: "Priority",
+        id: 'priority',
+        header: 'Priority',
         cell: (notice) => (
           <StatusBadge
             status={notice.priority}
@@ -109,8 +109,8 @@ export function NoticeListWorkspace({
         ),
       },
       {
-        id: "lifecycle",
-        header: "Lifecycle",
+        id: 'lifecycle',
+        header: 'Lifecycle',
         cell: (notice) => (
           <StatusBadge
             status={notice.lifecycleStatus}
@@ -121,29 +121,29 @@ export function NoticeListWorkspace({
       ...(!isSupportOverride
         ? [
             {
-              id: "author",
-              header: "Author",
-              hideBelow: "md" as const,
+              id: 'author',
+              header: 'Author',
+              hideBelow: 'md' as const,
               cell: (notice: NoticeSummary) =>
-                notice.createdBy?.email ?? "Author unavailable",
+                notice.createdBy?.email ?? 'Author unavailable',
             },
           ]
         : []),
       {
-        id: "delivery",
-        header: "Delivery / acknowledgements",
-        hideBelow: "lg",
+        id: 'delivery',
+        header: 'Delivery / acknowledgements',
+        hideBelow: 'lg',
         cell: (notice) => (
           <span className="text-sm text-slate-600">
-            {notice.deliveryCount ?? 0} delivery rows ·{" "}
+            {notice.deliveryCount ?? 0} delivery rows ·{' '}
             {notice.acknowledgementCount ?? 0} acknowledged
           </span>
         ),
       },
       {
-        id: "time",
-        header: "Scheduled / published",
-        hideBelow: "sm",
+        id: 'time',
+        header: 'Scheduled / published',
+        hideBelow: 'sm',
         cell: (notice) => formatNoticeTime(notice),
       },
     ],
@@ -160,33 +160,33 @@ export function NoticeListWorkspace({
   const activeFilterChips = [
     search
       ? {
-          key: "search",
+          key: 'search',
           label: `Search: ${search}`,
           onRemove: () => {
-            setSearchDraft("");
+            setSearchDraft('');
             setFilters({ search: null, page: null });
           },
         }
       : null,
     priority
       ? {
-          key: "priority",
+          key: 'priority',
           label: `Priority: ${label(priority)}`,
           onRemove: () => setFilters({ priority: null, page: null }),
         }
       : null,
     audienceType
       ? {
-          key: "audienceType",
+          key: 'audienceType',
           label: `Audience: ${
-            audienceType === "ALL" ? "Whole school" : label(audienceType)
+            audienceType === 'ALL' ? 'Whole school' : label(audienceType)
           }`,
           onRemove: () => setFilters({ audienceType: null, page: null }),
         }
       : null,
     !fixedLifecycleStatus && !isSupportOverride && lifecycleStatus
       ? {
-          key: "lifecycleStatus",
+          key: 'lifecycleStatus',
           label: `Lifecycle: ${label(lifecycleStatus)}`,
           onRemove: () => setFilters({ lifecycleStatus: null, page: null }),
         }
@@ -199,8 +199,8 @@ export function NoticeListWorkspace({
         label="Notice filters"
         description={
           isSupportOverride
-            ? "The server applies these filters only to published or expired notices in the selected school."
-            : "The server applies these filters to the full notice record set."
+            ? 'The server applies these filters only to published or expired notices in the selected school.'
+            : 'The server applies these filters to the full notice record set.'
         }
         searchSlot={
           <form onSubmit={submitSearch} className="flex min-w-0 gap-2">
@@ -255,7 +255,7 @@ export function NoticeListWorkspace({
             <button
               type="button"
               onClick={() => {
-                setSearchDraft("");
+                setSearchDraft('');
                 router.replace(pathname);
               }}
               className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700"
@@ -271,7 +271,7 @@ export function NoticeListWorkspace({
         onClearAll={
           hasActiveFilters
             ? () => {
-                setSearchDraft("");
+                setSearchDraft('');
                 router.replace(pathname);
               }
             : undefined
@@ -284,12 +284,12 @@ export function NoticeListWorkspace({
         getRowId={(notice) => notice.id}
         status={
           !canRead
-            ? "permission-denied"
+            ? 'permission-denied'
             : noticesQuery.isLoading
-              ? "loading"
+              ? 'loading'
               : noticesQuery.isError
-                ? "error"
-                : "ready"
+                ? 'error'
+                : 'ready'
         }
         page={noticesQuery.data?.page ?? page}
         pageSize={noticesQuery.data?.limit ?? PAGE_SIZE}
@@ -299,8 +299,8 @@ export function NoticeListWorkspace({
         emptyTitle="No notices yet"
         emptyDescription={
           isSupportOverride
-            ? "No published notices are available in this support scope."
-            : "Create a draft to begin the school notice workflow."
+            ? 'No published notices are available in this support scope.'
+            : 'Create a draft to begin the school notice workflow.'
         }
         noResultsTitle="No notices match these filters"
         noResultsDescription="Clear one or more filters to widen the result set."
@@ -308,7 +308,7 @@ export function NoticeListWorkspace({
         onRetry={() => void noticesQuery.refetch()}
         caption={
           <caption className="sr-only">
-            Notices matching the current filters. Total records:{" "}
+            Notices matching the current filters. Total records:{' '}
             {noticesQuery.data?.total ?? 0}.
           </caption>
         }
@@ -339,8 +339,8 @@ function FilterSelect({
         <option value="">All</option>
         {options.map((option) => (
           <option key={option} value={option}>
-            {filterLabel === "Audience" && option === "ALL"
-              ? "Whole school"
+            {filterLabel === 'Audience' && option === 'ALL'
+              ? 'Whole school'
               : label(option)}
           </option>
         ))}
@@ -355,19 +355,19 @@ function positiveNumber(value: string | null, fallback: number) {
 }
 
 function audienceLabel(notice: NoticeSummary) {
-  if (notice.audienceType === "SECTION") {
+  if (notice.audienceType === 'SECTION') {
     return notice.sectionName
-      ? `${notice.className ?? "Class"} · ${notice.sectionName}`
-      : "Selected section";
+      ? `${notice.className ?? 'Class'} · ${notice.sectionName}`
+      : 'Selected section';
   }
-  if (notice.audienceType === "CLASS") {
-    return notice.className ?? "Selected class";
+  if (notice.audienceType === 'CLASS') {
+    return notice.className ?? 'Selected class';
   }
-  return "Whole school";
+  return 'Whole school';
 }
 
 function formatNoticeTime(notice: NoticeSummary) {
-  if (notice.lifecycleStatus === "SCHEDULED" && notice.scheduledFor) {
+  if (notice.lifecycleStatus === 'SCHEDULED' && notice.scheduledFor) {
     return `Scheduled ${formatBsDateTime(notice.scheduledFor)}`;
   }
   if (notice.publishedAt) {
@@ -375,12 +375,12 @@ function formatNoticeTime(notice: NoticeSummary) {
   }
   return notice.createdAt
     ? `Created ${formatBsDateTime(notice.createdAt)}`
-    : "Time unavailable";
+    : 'Time unavailable';
 }
 
 function label(value: string) {
   return value
-    .split("_")
+    .split('_')
     .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-    .join(" ");
+    .join(' ');
 }

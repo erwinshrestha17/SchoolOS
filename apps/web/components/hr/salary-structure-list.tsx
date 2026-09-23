@@ -17,7 +17,9 @@ const moneyFormatter = new Intl.NumberFormat('en-NP', {
   maximumFractionDigits: 0,
 });
 
-type SalaryStructureRow = Awaited<ReturnType<typeof api.listSalaryStructuresPage>>['items'][number];
+type SalaryStructureRow = Awaited<
+  ReturnType<typeof api.listSalaryStructuresPage>
+>['items'][number];
 
 export function SalaryStructureList() {
   const queryClient = useQueryClient();
@@ -29,11 +31,13 @@ export function SalaryStructureList() {
   });
   const activateMutation = useMutation({
     mutationFn: api.activateSalaryStructure,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['salary-structures'] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ['salary-structures'] }),
   });
   const archiveMutation = useMutation({
     mutationFn: api.archiveSalaryStructure,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['salary-structures'] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ['salary-structures'] }),
   });
   const structures = structuresQuery.data?.items ?? [];
   const totalItems = structuresQuery.data?.total ?? 0;
@@ -52,7 +56,9 @@ export function SalaryStructureList() {
       id: 'effectiveFrom',
       header: 'Effective',
       cell: (structure) => (
-        <span className="text-xs font-medium text-slate-500">{formatBsDate(structure.effectiveFrom)}</span>
+        <span className="text-xs font-medium text-slate-500">
+          {formatBsDate(structure.effectiveFrom)}
+        </span>
       ),
     },
     {
@@ -60,9 +66,12 @@ export function SalaryStructureList() {
       header: 'Structure',
       cell: (structure) => (
         <div className="space-y-1">
-          <p className="font-black text-slate-900 text-sm">{moneyFormatter.format(Number(structure.basicSalary))}</p>
+          <p className="font-black text-slate-900 text-sm">
+            {moneyFormatter.format(Number(structure.basicSalary))}
+          </p>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-            {structure.pfEnabled ? 'PF Enabled' : 'No PF'} &bull; {structure.tdsEnabled ? 'TDS Enabled' : 'No TDS'}
+            {structure.pfEnabled ? 'PF Enabled' : 'No PF'} &bull;{' '}
+            {structure.tdsEnabled ? 'TDS Enabled' : 'No TDS'}
           </p>
         </div>
       ),
@@ -90,7 +99,13 @@ export function SalaryStructureList() {
       columns={columns}
       items={structures}
       getRowId={(structure) => structure.id}
-      status={structuresQuery.isError ? 'error' : structuresQuery.isLoading ? 'loading' : 'ready'}
+      status={
+        structuresQuery.isError
+          ? 'error'
+          : structuresQuery.isLoading
+            ? 'loading'
+            : 'ready'
+      }
       page={page}
       pageSize={limit}
       totalItems={totalItems}

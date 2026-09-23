@@ -126,7 +126,9 @@ export function useTeacherAssignmentScope(): TeacherAssignmentScope {
       assignedSubjectIds,
       hasNoAssignments: !loading && assignedSections.length === 0,
       homeroomSections,
-      homeroomClasses: allClasses.filter((item) => homeroomClassIds.has(item.id)),
+      homeroomClasses: allClasses.filter((item) =>
+        homeroomClassIds.has(item.id),
+      ),
     };
   }, [
     assignmentsQuery.data,

@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import type { PermissionKey } from "@schoolos/core";
-import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { ReactNode, useState } from "react";
-import { useSession } from "../session-provider";
+import type { PermissionKey } from '@schoolos/core';
+import Link from 'next/link';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { ReactNode, useState } from 'react';
+import { useSession } from '../session-provider';
 import {
   Activity,
   Building2,
@@ -24,13 +24,10 @@ import {
   Webhook,
   X,
   type LucideIcon,
-} from "lucide-react";
-import { cn } from "../../lib/utils";
-import { SchoolBreadcrumbs } from "../schoolos/navigation/school-breadcrumbs";
-import {
-  PlatformNavHeading,
-  SidebarNavLink,
-} from "./sidebar-nav-link";
+} from 'lucide-react';
+import { cn } from '../../lib/utils';
+import { SchoolBreadcrumbs } from '../schoolos/navigation/school-breadcrumbs';
+import { PlatformNavHeading, SidebarNavLink } from './sidebar-nav-link';
 
 type PlatformNavItem = {
   href: string;
@@ -48,120 +45,120 @@ type PlatformNavGroup = {
 
 const platformNavGroups: PlatformNavGroup[] = [
   {
-    label: "Platform",
+    label: 'Platform',
     items: [
       {
-        href: "/platform/dashboard",
-        label: "Dashboard",
-        description: "Global SaaS health and tenant metrics",
+        href: '/platform/dashboard',
+        label: 'Dashboard',
+        description: 'Global SaaS health and tenant metrics',
         icon: LayoutDashboard,
-        permissions: ["platform:dashboard:read"],
+        permissions: ['platform:dashboard:read'],
       },
       {
-        href: "/platform/schools",
-        label: "Schools",
-        description: "Tenant onboarding, status and usage",
+        href: '/platform/schools',
+        label: 'Schools',
+        description: 'Tenant onboarding, status and usage',
         icon: Building2,
-        permissions: ["platform:tenants:read"],
+        permissions: ['platform:tenants:read'],
       },
       {
-        href: "/platform/demo-requests",
-        label: "Demo Requests",
-        description: "Public marketing intake and follow-up",
+        href: '/platform/demo-requests',
+        label: 'Demo Requests',
+        description: 'Public marketing intake and follow-up',
         icon: MessageSquare,
-        permissions: ["platform:demo-requests:read"],
+        permissions: ['platform:demo-requests:read'],
       },
     ],
   },
   {
-    label: "Operations",
+    label: 'Operations',
     items: [
       {
-        href: "/platform/settings?tab=health",
-        label: "System Health",
-        description: "Infrastructure readiness",
+        href: '/platform/settings?tab=health',
+        label: 'System Health',
+        description: 'Infrastructure readiness',
         icon: MonitorCheck,
-        permissions: ["platform:health:read"],
+        permissions: ['platform:health:read'],
       },
       {
-        href: "/platform/audit",
-        label: "Audit Logs",
-        description: "Cross-tenant operator actions",
+        href: '/platform/audit',
+        label: 'Audit Logs',
+        description: 'Cross-tenant operator actions',
         icon: FileClock,
-        permissions: ["platform:audit:read"],
+        permissions: ['platform:audit:read'],
       },
       {
-        href: "/platform/settings?tab=queues",
-        label: "Queue Health",
-        description: "Failed jobs and retry audit",
+        href: '/platform/settings?tab=queues',
+        label: 'Queue Health',
+        description: 'Failed jobs and retry audit',
         icon: Activity,
-        permissions: ["platform:queues:read"],
+        permissions: ['platform:queues:read'],
       },
     ],
   },
   {
-    label: "Configuration",
+    label: 'Configuration',
     items: [
       {
-        href: "/platform/settings/plans",
-        label: "Plans",
-        description: "SchoolOS subscription plans and limits",
+        href: '/platform/settings/plans',
+        label: 'Plans',
+        description: 'SchoolOS subscription plans and limits',
         icon: CreditCard,
-        permissions: ["platform:plans:read"],
+        permissions: ['platform:plans:read'],
       },
       {
-        href: "/platform/settings/providers",
-        label: "Providers",
-        description: "SMS, email and storage providers",
+        href: '/platform/settings/providers',
+        label: 'Providers',
+        description: 'SMS, email and storage providers',
         icon: SlidersHorizontal,
-        permissions: ["platform:providers:read"],
+        permissions: ['platform:providers:read'],
       },
       {
-        href: "/platform/settings?tab=webhooks",
-        label: "Webhooks",
-        description: "Signed endpoint registry and delivery history",
+        href: '/platform/settings?tab=webhooks',
+        label: 'Webhooks',
+        description: 'Signed endpoint registry and delivery history',
         icon: Webhook,
-        permissions: ["platform:providers:read"],
+        permissions: ['platform:providers:read'],
       },
       {
-        href: "/platform/settings/modules",
-        label: "Modules / Features",
-        description: "Plan-backed feature availability",
+        href: '/platform/settings/modules',
+        label: 'Modules / Features',
+        description: 'Plan-backed feature availability',
         icon: Flag,
-        permissions: ["platform:plans:read"],
+        permissions: ['platform:plans:read'],
       },
       {
-        href: "/platform/settings/feature-flags",
-        label: "Feature Flags",
-        description: "Platform rollout controls",
+        href: '/platform/settings/feature-flags',
+        label: 'Feature Flags',
+        description: 'Platform rollout controls',
         icon: Flag,
-        permissions: ["platform:plans:read"],
+        permissions: ['platform:plans:read'],
       },
     ],
   },
   {
-    label: "Billing",
+    label: 'Billing',
     items: [
       {
-        href: "/platform/billing/subscriptions",
-        label: "Subscriptions",
-        description: "SchoolOS school subscriptions",
+        href: '/platform/billing/subscriptions',
+        label: 'Subscriptions',
+        description: 'SchoolOS school subscriptions',
         icon: CreditCard,
-        permissions: ["platform:subscriptions:read"],
+        permissions: ['platform:subscriptions:read'],
       },
       {
-        href: "/platform/billing/invoices",
-        label: "SaaS Invoices",
-        description: "SchoolOS subscription invoices only",
+        href: '/platform/billing/invoices',
+        label: 'SaaS Invoices',
+        description: 'SchoolOS subscription invoices only',
         icon: FileClock,
-        permissions: ["platform:billing:read"],
+        permissions: ['platform:billing:read'],
       },
       {
-        href: "/platform/billing/payments",
-        label: "Payments",
-        description: "Platform SaaS payment records",
+        href: '/platform/billing/payments',
+        label: 'Payments',
+        description: 'Platform SaaS payment records',
         icon: CreditCard,
-        permissions: ["platform:billing:read"],
+        permissions: ['platform:billing:read'],
       },
     ],
   },
@@ -182,9 +179,9 @@ export function PlatformShell({ children }: { children: ReactNode }) {
       ),
     }))
     .filter((group) => group.items.length > 0);
-  const displayName = session?.user.email?.split("@")[0] ?? "Operator";
+  const displayName = session?.user.email?.split('@')[0] ?? 'Operator';
   const primaryRole =
-    session?.user.roles[0]?.replace(/_/g, " ") ?? "Platform user";
+    session?.user.roles[0]?.replace(/_/g, ' ') ?? 'Platform user';
 
   return (
     <div className="flex min-h-screen bg-slate-100">
@@ -200,8 +197,8 @@ export function PlatformShell({ children }: { children: ReactNode }) {
 
       <aside
         className={cn(
-          "sidebar-transition fixed inset-y-0 left-0 z-50 flex w-[304px] flex-col border-r border-white/10 bg-[var(--platform-sidebar-bg)] text-white shadow-lg shadow-black/20 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
-          mobileOpen ? "translate-x-0" : "-translate-x-full",
+          'sidebar-transition fixed inset-y-0 left-0 z-50 flex w-[304px] flex-col border-r border-white/10 bg-[var(--platform-sidebar-bg)] text-white shadow-lg shadow-black/20 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         <div className="flex h-20 items-center justify-between border-b border-white/10 px-5">
@@ -341,7 +338,11 @@ export function PlatformShell({ children }: { children: ReactNode }) {
           tabIndex={-1}
         >
           <div className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-8">
-            <SchoolBreadcrumbs rootHref="/platform" rootLabel="Platform" className="mb-4" />
+            <SchoolBreadcrumbs
+              rootHref="/platform"
+              rootLabel="Platform"
+              className="mb-4"
+            />
             {children}
           </div>
         </main>
@@ -392,7 +393,7 @@ function isActivePlatformRoute(
   pathname: string | null,
   currentSearch: string,
 ) {
-  const [hrefPath, hrefQuery = ""] = href.split("?");
+  const [hrefPath, hrefQuery = ''] = href.split('?');
 
   if (!pathname) {
     return false;
@@ -406,27 +407,27 @@ function isActivePlatformRoute(
   }
 
   const redirectedTabRoutes: Record<string, string> = {
-    "/platform/settings/plans": "tab=plans",
-    "/platform/settings/modules": "tab=plans",
-    "/platform/settings/feature-flags": "tab=plans",
-    "/platform/settings/providers": "tab=providers",
+    '/platform/settings/plans': 'tab=plans',
+    '/platform/settings/modules': 'tab=plans',
+    '/platform/settings/feature-flags': 'tab=plans',
+    '/platform/settings/providers': 'tab=providers',
   };
 
   const redirectedWorkflowRoutes: Record<string, string> = {
-    "/platform/billing/subscriptions": "workflow=subscriptions",
-    "/platform/billing/invoices": "workflow=saas-invoices",
-    "/platform/billing/payments": "workflow=payments",
+    '/platform/billing/subscriptions': 'workflow=subscriptions',
+    '/platform/billing/invoices': 'workflow=saas-invoices',
+    '/platform/billing/payments': 'workflow=payments',
   };
 
   if (
-    pathname === "/platform/settings" &&
+    pathname === '/platform/settings' &&
     redirectedTabRoutes[hrefPath] === currentSearch
   ) {
     return true;
   }
 
   if (
-    pathname === "/platform/schools" &&
+    pathname === '/platform/schools' &&
     redirectedWorkflowRoutes[hrefPath] === currentSearch
   ) {
     return true;

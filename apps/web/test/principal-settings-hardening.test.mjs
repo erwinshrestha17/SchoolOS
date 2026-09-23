@@ -50,14 +50,19 @@ describe('Principal Settings hardening', () => {
     const frame = read('components/settings/settings-route-frame.tsx');
     assert.match(frame, /isPrincipalRestrictedFromInstitutionalSettings/);
     assert.match(frame, /principalInstitutionalRestricted/);
-    assert.match(frame, /!pathname\.startsWith\('\/dashboard\/settings\/personal\/'\)/);
+    assert.match(
+      frame,
+      /!pathname\.startsWith\(['"]\/dashboard\/settings\/personal\/['"]\)/,
+    );
     assert.match(frame, /School Settings access needed/);
     assert.match(frame, /School Configuration Owner role/);
     assert.match(frame, /Personal Settings/);
   });
 
   it('keeps backend Settings item ownership explicit in the web catalog', () => {
-    const navigation = read('components/settings/settings-navigation.config.ts');
+    const navigation = read(
+      'components/settings/settings-navigation.config.ts',
+    );
     for (const id of backendSettingsItemIds) {
       const hasDefinition = navigation.includes(`backendItemId: '${id}'`);
       const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -72,10 +77,19 @@ describe('Principal Settings hardening', () => {
         `Backend Settings item ${id} must have frontend metadata or an explicit disposition`,
       );
     }
-    for (const id of ['fees', 'accounting', 'hr-payroll', 'security', 'admissions']) {
+    for (const id of [
+      'fees',
+      'accounting',
+      'hr-payroll',
+      'security',
+      'admissions',
+    ]) {
       assert.match(navigation, new RegExp(`backendItemId: '${id}'`));
     }
-    assert.match(navigation, /'learning-settings': 'frozen-hidden'/);
+    assert.match(
+      navigation,
+      /['"]learning-settings['"]: ['"]frozen-hidden['"]/,
+    );
   });
 
   it('uses one atomic domain mutation instead of sequential setting writes', () => {
@@ -98,7 +112,7 @@ describe('Principal Settings hardening', () => {
     assert.match(workspace, /Grade point/);
     assert.match(workspace, /Pass status/);
     assert.match(workspace, /Add grade band/);
-    assert.match(workspace, /field\.key === 'grading_scale'/);
+    assert.match(workspace, /field\.key === ['"]grading_scale['"]/);
   });
 
   it('stabilizes Settings until entitlements resolve', () => {
@@ -106,7 +120,10 @@ describe('Principal Settings hardening', () => {
     assert.match(frame, /loading: entitlementsLoading/);
     assert.match(frame, /navigationLoading/);
     assert.match(frame, /SettingsControlCenterSkeleton/);
-    assert.match(frame, /enabled: mayLoadSchoolSettings && !entitlementsLoading/);
+    assert.match(
+      frame,
+      /enabled: mayLoadSchoolSettings && !entitlementsLoading/,
+    );
   });
 
   it('makes Settings access state visible before entering a workspace', () => {
@@ -121,8 +138,8 @@ describe('Principal Settings hardening', () => {
     const modules = read(
       'components/settings/school-modules-settings-workspace.tsx',
     );
-    assert.doesNotMatch(modules, /key: 'timetable'/);
-    assert.doesNotMatch(modules, /key: 'learning'/);
+    assert.doesNotMatch(modules, /key: ['"]timetable['"]/);
+    assert.doesNotMatch(modules, /key: ['"]learning['"]/);
     assert.match(modules, /Homework & Timetable/);
     for (const route of [
       '/dashboard/students/overview',
@@ -134,7 +151,10 @@ describe('Principal Settings hardening', () => {
       '/dashboard/communications/oversight',
       '/dashboard/operations/overview',
     ]) {
-      assert.ok(modules.includes(route), `Missing Principal-safe module route ${route}`);
+      assert.ok(
+        modules.includes(route),
+        `Missing Principal-safe module route ${route}`,
+      );
     }
   });
 

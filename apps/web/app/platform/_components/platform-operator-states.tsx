@@ -7,7 +7,10 @@ export function PlatformSectionSkeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="space-y-3 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
       {Array.from({ length: rows }).map((_, index) => (
-        <div key={index} className="h-14 animate-pulse rounded-2xl bg-slate-100" />
+        <div
+          key={index}
+          className="h-14 animate-pulse rounded-2xl bg-slate-100"
+        />
       ))}
     </div>
   );
@@ -30,7 +33,9 @@ export function PlatformEmptyState({
         <Icon size={28} />
       </div>
       <h3 className="mt-5 text-lg font-black text-slate-900">{title}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{description}</p>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+        {description}
+      </p>
       {action ? <div className="mt-6">{action}</div> : null}
     </div>
   );
@@ -53,7 +58,11 @@ export function PlatformInlineError({
       </div>
       <p className="mt-2 text-sm leading-6">{message}</p>
       {onRetry ? (
-        <Button className="mt-4 rounded-2xl" variant="outline" onClick={onRetry}>
+        <Button
+          className="mt-4 rounded-2xl"
+          variant="outline"
+          onClick={onRetry}
+        >
           Try again
         </Button>
       ) : null}
@@ -70,7 +79,9 @@ export function PlatformBoundaryNote({
 }) {
   return (
     <div className="rounded-3xl border border-cyan-100 bg-cyan-50 p-5 text-cyan-900">
-      <p className="text-sm font-black uppercase tracking-[0.14em] text-cyan-700">{title}</p>
+      <p className="text-sm font-black uppercase tracking-[0.14em] text-cyan-700">
+        {title}
+      </p>
       <div className="mt-2 text-sm leading-6 text-cyan-800">{children}</div>
     </div>
   );

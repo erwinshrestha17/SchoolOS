@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { FinanceApprovalRequestView } from "@schoolos/core";
-import { formatBsDate } from "@schoolos/core";
-import { AlertCircle, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
-import { useSession } from "@/components/session-provider";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ErrorState } from "@/components/ui/error-state";
-import { SectionCard } from "@/components/ui/section-card";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { FinanceApprovalRequestView } from '@schoolos/core';
+import { formatBsDate } from '@schoolos/core';
+import { AlertCircle, CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useRef, useState } from 'react';
+import { useSession } from '@/components/session-provider';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { SectionCard } from '@/components/ui/section-card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
   Dialog,
   DialogContent,
@@ -19,28 +19,28 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { api } from "@/lib/api";
+} from '@/components/ui/dialog';
+import { api } from '@/lib/api';
 
 type PendingDecision =
   | {
-      kind: "REQUEST";
-      requestType: "REFUND" | "REVERSAL";
+      kind: 'REQUEST';
+      requestType: 'REFUND' | 'REVERSAL';
       paymentId: string;
       amount?: string;
       reason: string;
     }
   | {
-      kind: "REVIEW";
+      kind: 'REVIEW';
       requestId: string;
-      status: "APPROVED" | "REJECTED";
+      status: 'APPROVED' | 'REJECTED';
       note: string;
     };
 
 const money = (value: string) =>
-  new Intl.NumberFormat("en-NP", {
-    style: "currency",
-    currency: "NPR",
+  new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
     maximumFractionDigits: 2,
   }).format(Number(value));
 
@@ -52,22 +52,22 @@ export function FinanceApprovalQueue() {
   const queryClient = useQueryClient();
   const page = Math.max(
     1,
-    Number(searchParams.get("approvalPage") ?? "1") || 1,
+    Number(searchParams.get('approvalPage') ?? '1') || 1,
   );
-  const status = searchParams.get("approvalStatus") ?? "";
-  const type = searchParams.get("approvalType") ?? "";
-  const search = searchParams.get("approvalSearch") ?? "";
-  const paymentSearch = searchParams.get("paymentSearch") ?? "";
-  const canRequest = hasPermissions(["payments:collect"]);
-  const canApproveRefund = hasPermissions(["payments:refund"]);
-  const canApproveReversal = hasPermissions(["payments:reverse"]);
-  const [requestType, setRequestType] = useState<"REFUND" | "REVERSAL">(
-    "REFUND",
+  const status = searchParams.get('approvalStatus') ?? '';
+  const type = searchParams.get('approvalType') ?? '';
+  const search = searchParams.get('approvalSearch') ?? '';
+  const paymentSearch = searchParams.get('paymentSearch') ?? '';
+  const canRequest = hasPermissions(['payments:collect']);
+  const canApproveRefund = hasPermissions(['payments:refund']);
+  const canApproveReversal = hasPermissions(['payments:reverse']);
+  const [requestType, setRequestType] = useState<'REFUND' | 'REVERSAL'>(
+    'REFUND',
   );
-  const [paymentId, setPaymentId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [reason, setReason] = useState("");
-  const [reviewNote, setReviewNote] = useState("");
+  const [paymentId, setPaymentId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const [reviewNote, setReviewNote] = useState('');
   const [pendingDecision, setPendingDecision] =
     useState<PendingDecision | null>(null);
   const requestAttemptRef = useRef<{
@@ -76,25 +76,25 @@ export function FinanceApprovalQueue() {
   } | null>(null);
 
   const approvalQuery = useQuery({
-    queryKey: ["finance-approval-requests", page, status, type, search],
+    queryKey: ['finance-approval-requests', page, status, type, search],
     queryFn: () =>
       api.listFinanceApprovalRequests({
         page,
         limit: 25,
         status: status || undefined,
-        type: (type || undefined) as "REFUND" | "REVERSAL" | undefined,
+        type: (type || undefined) as 'REFUND' | 'REVERSAL' | undefined,
         search: search || undefined,
       }),
     enabled: canApproveRefund || canApproveReversal,
   });
   const paymentsQuery = useQuery({
-    queryKey: ["finance-payments", paymentSearch],
+    queryKey: ['finance-payments', paymentSearch],
     queryFn: () =>
       api.listPaymentsPage({
         page: 1,
         limit: 25,
         search: paymentSearch || undefined,
-        status: "SUCCESS",
+        status: 'SUCCESS',
       }),
     enabled: canRequest,
   });
@@ -106,11 +106,11 @@ export function FinanceApprovalQueue() {
       else params.set(key, String(value));
     }
     if (
-      "approvalStatus" in updates ||
-      "approvalType" in updates ||
-      "approvalSearch" in updates
+      'approvalStatus' in updates ||
+      'approvalType' in updates ||
+      'approvalSearch' in updates
     ) {
-      params.delete("approvalPage");
+      params.delete('approvalPage');
     }
     router.replace(`${pathname}?${params.toString()}`, {
       scroll: false,
@@ -119,7 +119,7 @@ export function FinanceApprovalQueue() {
 
   const decisionMutation = useMutation({
     mutationFn: async (decision: PendingDecision) => {
-      if (decision.kind === "REVIEW") {
+      if (decision.kind === 'REVIEW') {
         return api.reviewFinanceApprovalRequest(decision.requestId, {
           status: decision.status,
           reviewNote: decision.note || undefined,
@@ -132,7 +132,7 @@ export function FinanceApprovalQueue() {
           key: crypto.randomUUID(),
         };
       }
-      if (decision.requestType === "REFUND") {
+      if (decision.requestType === 'REFUND') {
         return api.requestPaymentRefund(decision.paymentId, {
           amount: decision.amount,
           reason: decision.reason,
@@ -147,17 +147,17 @@ export function FinanceApprovalQueue() {
     onSuccess: () => {
       requestAttemptRef.current = null;
       setPendingDecision(null);
-      setPaymentId("");
-      setAmount("");
-      setReason("");
-      setReviewNote("");
+      setPaymentId('');
+      setAmount('');
+      setReason('');
+      setReviewNote('');
       void queryClient.invalidateQueries({
-        queryKey: ["finance-approval-requests"],
+        queryKey: ['finance-approval-requests'],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["finance-dashboard-summary"],
+        queryKey: ['finance-dashboard-summary'],
       });
-      void queryClient.invalidateQueries({ queryKey: ["finance-payments"] });
+      void queryClient.invalidateQueries({ queryKey: ['finance-payments'] });
     },
   });
 
@@ -189,7 +189,7 @@ export function FinanceApprovalQueue() {
                 <option value="">Select a payment</option>
                 {paymentsQuery.data?.items.map((payment) => (
                   <option key={payment.id} value={payment.id}>
-                    {payment.receiptNumber ?? payment.id} ·{" "}
+                    {payment.receiptNumber ?? payment.id} ·{' '}
                     {payment.student.name} · {money(payment.amount)}
                   </option>
                 ))}
@@ -200,7 +200,7 @@ export function FinanceApprovalQueue() {
                 <select
                   value={requestType}
                   onChange={(event) =>
-                    setRequestType(event.target.value as "REFUND" | "REVERSAL")
+                    setRequestType(event.target.value as 'REFUND' | 'REVERSAL')
                   }
                   className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 >
@@ -211,7 +211,7 @@ export function FinanceApprovalQueue() {
                   type="number"
                   min={0.01}
                   step="0.01"
-                  disabled={requestType === "REVERSAL"}
+                  disabled={requestType === 'REVERSAL'}
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
                   placeholder="Refund amount"
@@ -229,14 +229,14 @@ export function FinanceApprovalQueue() {
                 disabled={
                   !paymentId ||
                   reason.trim().length < 5 ||
-                  (requestType === "REFUND" && (!amount || Number(amount) <= 0))
+                  (requestType === 'REFUND' && (!amount || Number(amount) <= 0))
                 }
                 onClick={() =>
                   setPendingDecision({
-                    kind: "REQUEST",
+                    kind: 'REQUEST',
                     requestType,
                     paymentId,
-                    amount: requestType === "REFUND" ? amount : undefined,
+                    amount: requestType === 'REFUND' ? amount : undefined,
                     reason: reason.trim(),
                   })
                 }
@@ -284,11 +284,11 @@ export function FinanceApprovalQueue() {
               >
                 <option value="">All statuses</option>
                 {[
-                  "PENDING",
-                  "PROCESSING",
-                  "EXECUTED",
-                  "REJECTED",
-                  "FAILED",
+                  'PENDING',
+                  'PROCESSING',
+                  'EXECUTED',
+                  'REJECTED',
+                  'FAILED',
                 ].map((value) => (
                   <option key={value} value={value}>
                     {value}
@@ -314,7 +314,7 @@ export function FinanceApprovalQueue() {
                     key={request.id}
                     request={request}
                     canApprove={
-                      request.type === "REFUND"
+                      request.type === 'REFUND'
                         ? canApproveRefund
                         : canApproveReversal
                     }
@@ -322,7 +322,7 @@ export function FinanceApprovalQueue() {
                     setReviewNote={setReviewNote}
                     onDecision={(status) =>
                       setPendingDecision({
-                        kind: "REVIEW",
+                        kind: 'REVIEW',
                         requestId: request.id,
                         status,
                         note: reviewNote.trim(),
@@ -377,7 +377,7 @@ export function FinanceApprovalQueue() {
           <AlertCircle size={18} />
           {decisionMutation.error instanceof Error
             ? decisionMutation.error.message
-            : "The finance correction was not changed."}
+            : 'The finance correction was not changed.'}
         </div>
       ) : null}
       {decisionMutation.isSuccess ? (
@@ -400,11 +400,11 @@ export function FinanceApprovalQueue() {
           <DialogHeader>
             <DialogTitle>Confirm high-risk finance action</DialogTitle>
             <DialogDescription>
-              {pendingDecision?.kind === "REQUEST"
-                ? "Submit this correction for review. It will not change the confirmed payment until a different authorized user approves it."
-                : pendingDecision?.status === "APPROVED"
-                  ? "Approval immediately executes the idempotent correction and accounting entry."
-                  : "Reject this request with the recorded review note."}
+              {pendingDecision?.kind === 'REQUEST'
+                ? 'Submit this correction for review. It will not change the confirmed payment until a different authorized user approves it.'
+                : pendingDecision?.status === 'APPROVED'
+                  ? 'Approval immediately executes the idempotent correction and accounting entry.'
+                  : 'Reject this request with the recorded review note.'}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -421,15 +421,15 @@ export function FinanceApprovalQueue() {
               variant="destructive"
               disabled={
                 decisionMutation.isPending ||
-                (pendingDecision?.kind === "REVIEW" &&
-                  pendingDecision.status === "REJECTED" &&
+                (pendingDecision?.kind === 'REVIEW' &&
+                  pendingDecision.status === 'REJECTED' &&
                   !pendingDecision.note)
               }
               onClick={() => {
                 if (pendingDecision) decisionMutation.mutate(pendingDecision);
               }}
             >
-              {decisionMutation.isPending ? "Processing…" : "Confirm action"}
+              {decisionMutation.isPending ? 'Processing…' : 'Confirm action'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -449,7 +449,7 @@ function ApprovalRequestCard({
   canApprove: boolean;
   reviewNote: string;
   setReviewNote: (value: string) => void;
-  onDecision: (status: "APPROVED" | "REJECTED") => void;
+  onDecision: (status: 'APPROVED' | 'REJECTED') => void;
 }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -482,7 +482,7 @@ function ApprovalRequestCard({
           >
             <span>
               {entry.action}
-              {entry.note ? ` · ${entry.note}` : ""}
+              {entry.note ? ` · ${entry.note}` : ''}
             </span>
             <span className="shrink-0 font-semibold">
               {formatBsDate(entry.createdAt)}
@@ -490,7 +490,7 @@ function ApprovalRequestCard({
           </div>
         ))}
       </div>
-      {canApprove && request.status === "PENDING" ? (
+      {canApprove && request.status === 'PENDING' ? (
         <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
           <textarea
             value={reviewNote}
@@ -499,14 +499,14 @@ function ApprovalRequestCard({
             className="min-h-20 w-full rounded-xl border border-slate-200 p-3 text-sm"
           />
           <div className="flex gap-2">
-            <Button type="button" onClick={() => onDecision("APPROVED")}>
+            <Button type="button" onClick={() => onDecision('APPROVED')}>
               Approve
             </Button>
             <Button
               type="button"
               variant="destructive"
               disabled={!reviewNote.trim()}
-              onClick={() => onDecision("REJECTED")}
+              onClick={() => onDecision('REJECTED')}
             >
               Reject
             </Button>

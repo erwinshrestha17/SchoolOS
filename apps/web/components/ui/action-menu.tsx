@@ -64,7 +64,10 @@ export function ActionMenu({
     const triggerRect = rootRef.current?.getBoundingClientRect();
     if (!triggerRect) return;
 
-    const menuWidth = Math.max(menuRef.current?.offsetWidth ?? MENU_MIN_WIDTH, MENU_MIN_WIDTH);
+    const menuWidth = Math.max(
+      menuRef.current?.offsetWidth ?? MENU_MIN_WIDTH,
+      MENU_MIN_WIDTH,
+    );
     const menuHeight = menuRef.current?.offsetHeight ?? 0;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
@@ -76,7 +79,8 @@ export function ActionMenu({
     );
     const spaceBelow = viewportHeight - triggerRect.bottom - MENU_MARGIN;
     const spaceAbove = triggerRect.top - MENU_MARGIN;
-    const shouldFlip = menuHeight > 0 && spaceBelow < menuHeight && spaceAbove > spaceBelow;
+    const shouldFlip =
+      menuHeight > 0 && spaceBelow < menuHeight && spaceAbove > spaceBelow;
     const top = shouldFlip
       ? Math.max(MENU_MARGIN, triggerRect.top - menuHeight - 8)
       : Math.min(
@@ -106,7 +110,10 @@ export function ActionMenu({
 
     function handlePointerDown(event: MouseEvent) {
       const target = event.target as Node;
-      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) {
+      if (
+        rootRef.current?.contains(target) ||
+        menuRef.current?.contains(target)
+      ) {
         return;
       }
       closeMenu();
@@ -148,14 +155,20 @@ export function ActionMenu({
     );
     if (enabledItems.length === 0) return;
 
-    const currentIndex = enabledItems.findIndex((item) => item === document.activeElement);
+    const currentIndex = enabledItems.findIndex(
+      (item) => item === document.activeElement,
+    );
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      enabledItems[(currentIndex + 1 + enabledItems.length) % enabledItems.length]?.focus();
+      enabledItems[
+        (currentIndex + 1 + enabledItems.length) % enabledItems.length
+      ]?.focus();
     }
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      enabledItems[(currentIndex - 1 + enabledItems.length) % enabledItems.length]?.focus();
+      enabledItems[
+        (currentIndex - 1 + enabledItems.length) % enabledItems.length
+      ]?.focus();
     }
     if (event.key === 'Home') {
       event.preventDefault();
@@ -173,7 +186,11 @@ export function ActionMenu({
       'aria-expanded': open,
       'aria-label': label,
       onClick: (event: React.MouseEvent) => {
-        const existingOnClick = (trigger as ReactElement<{ onClick?: (event: React.MouseEvent) => void }>).props.onClick;
+        const existingOnClick = (
+          trigger as ReactElement<{
+            onClick?: (event: React.MouseEvent) => void;
+          }>
+        ).props.onClick;
         existingOnClick?.(event);
         if (!event.defaultPrevented) handleTriggerClick();
       },
@@ -230,10 +247,14 @@ export function ActionMenu({
                     : item.variant === 'success'
                       ? 'text-emerald-600 hover:bg-emerald-50'
                       : 'text-slate-700 hover:bg-slate-50',
-                  item.variant === 'danger' && idx > 0 ? 'mt-1 border-t border-slate-100 pt-3' : '',
+                  item.variant === 'danger' && idx > 0
+                    ? 'mt-1 border-t border-slate-100 pt-3'
+                    : '',
                 )}
               >
-                {item.icon && <span className="shrink-0 text-slate-400">{item.icon}</span>}
+                {item.icon && (
+                  <span className="shrink-0 text-slate-400">{item.icon}</span>
+                )}
                 <span className="min-w-0 whitespace-normal">{item.label}</span>
               </button>
             ))}

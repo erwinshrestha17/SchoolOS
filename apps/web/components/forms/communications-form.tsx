@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   formatBsDateTime,
@@ -7,64 +7,64 @@ import {
   type GuardianConsentStatus,
   type NoticeSummary,
   type NotificationDelivery,
-} from "@schoolos/core";
-import type { NoticeRecipientPreview } from "../../lib/api";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { api } from "../../lib/api";
-import { Input } from "../ui/input";
-import { Select } from "../ui/select";
-import { FormField } from "../ui/form-field";
-import { LoadingState } from "../ui/loading-state";
-import { EmptyState } from "../ui/empty-state";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { Badge } from "../ui/badge";
-import { FileUploader } from "../ui/file-uploader";
-import { FilterBar } from "../ui/filter-bar";
-import { cn } from "../../lib/utils";
-import { estimateSmsSegments } from "../../lib/sms-segments";
+} from '@schoolos/core';
+import type { NoticeRecipientPreview } from '../../lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '../../lib/api';
+import { Input } from '../ui/input';
+import { Select } from '../ui/select';
+import { FormField } from '../ui/form-field';
+import { LoadingState } from '../ui/loading-state';
+import { EmptyState } from '../ui/empty-state';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Badge } from '../ui/badge';
+import { FileUploader } from '../ui/file-uploader';
+import { FilterBar } from '../ui/filter-bar';
+import { cn } from '../../lib/utils';
+import { estimateSmsSegments } from '../../lib/sms-segments';
 import {
   formatNepalDateTimeLocalInput,
   nepalDateTimeLocalInputToUtc,
-} from "../../lib/date-utils";
+} from '../../lib/date-utils';
 import {
   RefreshCcw,
   AlertCircle,
   CheckCircle2,
   Clock,
   UsersRound,
-} from "lucide-react";
+} from 'lucide-react';
 
 const communicationSections = [
-  "Notices",
-  "Events",
-  "Delivery Records",
-  "Consent Management",
+  'Notices',
+  'Events',
+  'Delivery Records',
+  'Consent Management',
 ] as const;
 
-const noticePriorities = ["NORMAL", "URGENT", "EMERGENCY"] as const;
-const audienceTypes = ["ALL", "CLASS", "SECTION"] as const;
-const eventTypes = ["GENERAL", "EXAM", "MEETING", "HOLIDAY"] as const;
+const noticePriorities = ['NORMAL', 'URGENT', 'EMERGENCY'] as const;
+const audienceTypes = ['ALL', 'CLASS', 'SECTION'] as const;
+const eventTypes = ['GENERAL', 'EXAM', 'MEETING', 'HOLIDAY'] as const;
 const deliveryStatuses = [
-  "QUEUED",
-  "SENT",
-  "FAILED",
-  "SKIPPED",
-  "PENDING",
-  "RETRYING",
-  "RETRY_PENDING",
+  'QUEUED',
+  'SENT',
+  'FAILED',
+  'SKIPPED',
+  'PENDING',
+  'RETRYING',
+  'RETRY_PENDING',
 ] as const;
 const consentTypes = [
-  "PRIVACY",
-  "DATA_PROCESSING",
-  "MEDICAL",
-  "PHOTO_USAGE",
-  "MESSAGING",
+  'PRIVACY',
+  'DATA_PROCESSING',
+  'MEDICAL',
+  'PHOTO_USAGE',
+  'MESSAGING',
 ] as const;
 
 type CommunicationSection = (typeof communicationSections)[number];
-type CommunicationWorkspaceMode = "overview" | "composer" | "delivery";
+type CommunicationWorkspaceMode = 'overview' | 'composer' | 'delivery';
 type AudienceType = (typeof audienceTypes)[number];
 type NoticePriority = (typeof noticePriorities)[number];
 type EventType = (typeof eventTypes)[number];
@@ -76,7 +76,7 @@ type SectionSummaryForUi = {
   class?: { id: string } | null;
 };
 
-type GuardianOption = AdmissionSummary["guardians"][number] & {
+type GuardianOption = AdmissionSummary['guardians'][number] & {
   studentName: string;
   studentSystemId: string;
 };
@@ -88,7 +88,7 @@ type NoticeState = {
   audienceType: AudienceType;
   classId: string;
   sectionId: string;
-  scheduleMode: "NOW" | "LATER";
+  scheduleMode: 'NOW' | 'LATER';
   scheduledFor: string;
   attachmentFileId: string;
   attachmentFileName: string;
@@ -114,34 +114,34 @@ const sectionMeta: Record<
   }
 > = {
   Notices: {
-    title: "Notice Center",
+    title: 'Notice Center',
     description:
-      "Publish notices instantly or schedule them for selected classes, sections, or the whole school.",
-    badge: "Announcements",
+      'Publish notices instantly or schedule them for selected classes, sections, or the whole school.',
+    badge: 'Announcements',
   },
   Events: {
-    title: "Event Publisher",
+    title: 'Event Publisher',
     description:
-      "Create school events, meetings, exams, and holidays with audience-aware delivery.",
-    badge: "Calendar Updates",
+      'Create school events, meetings, exams, and holidays with audience-aware delivery.',
+    badge: 'Calendar Updates',
   },
-  "Delivery Records": {
-    title: "Delivery Records",
+  'Delivery Records': {
+    title: 'Delivery Records',
     description:
-      "Track queued, sent, skipped, failed, and retrying notification records across channels.",
-    badge: "Audit Trail",
+      'Track queued, sent, skipped, failed, and retrying notification records across channels.',
+    badge: 'Audit Trail',
   },
-  "Consent Management": {
-    title: "Consent Management",
+  'Consent Management': {
+    title: 'Consent Management',
     description:
-      "Capture and revoke guardian consent for privacy, messaging, medical, and photo usage workflows.",
-    badge: "Guardian Controls",
+      'Capture and revoke guardian consent for privacy, messaging, medical, and photo usage workflows.',
+    badge: 'Guardian Controls',
   },
 };
 
 export function CommunicationsForm({
-  initialSection = "Notices",
-  mode = "overview",
+  initialSection = 'Notices',
+  mode = 'overview',
 }: {
   initialSection?: CommunicationSection;
   mode?: CommunicationWorkspaceMode;
@@ -150,16 +150,16 @@ export function CommunicationsForm({
   const [activeSection, setActiveSection] =
     useState<CommunicationSection>(initialSection);
   const [notice, setNotice] = useState<NoticeState>({
-    title: "",
-    body: "",
-    priority: "NORMAL",
-    audienceType: "ALL",
-    classId: "",
-    sectionId: "",
-    scheduleMode: "NOW",
-    scheduledFor: "",
-    attachmentFileId: "",
-    attachmentFileName: "",
+    title: '',
+    body: '',
+    priority: 'NORMAL',
+    audienceType: 'ALL',
+    classId: '',
+    sectionId: '',
+    scheduleMode: 'NOW',
+    scheduledFor: '',
+    attachmentFileId: '',
+    attachmentFileName: '',
   });
   const [noticeError, setNoticeError] = useState<string | null>(null);
   const [noticeSuccess, setNoticeSuccess] = useState<string | null>(null);
@@ -167,66 +167,66 @@ export function CommunicationsForm({
     useState<NoticeRecipientPreview | null>(null);
   const [highImpactConfirmed, setHighImpactConfirmed] = useState(false);
   const [event, setEvent] = useState<EventState>({
-    title: "",
-    description: "",
-    eventType: "GENERAL",
-    audienceType: "ALL",
-    classId: "",
-    sectionId: "",
+    title: '',
+    description: '',
+    eventType: 'GENERAL',
+    audienceType: 'ALL',
+    classId: '',
+    sectionId: '',
     startsAt: formatNepalDateTimeLocalInput(),
-    location: "",
+    location: '',
   });
   const [eventError, setEventError] = useState<string | null>(null);
   const [eventSuccess, setEventSuccess] = useState<string | null>(null);
   const [deliveryFilters, setDeliveryFilters] = useState({
-    status: "",
-    channel: "",
-    sourceType: "",
+    status: '',
+    channel: '',
+    sourceType: '',
   });
-  const [selectedGuardianId, setSelectedGuardianId] = useState("");
-  const [selectedConsentType, setSelectedConsentType] = useState("PHOTO_USAGE");
+  const [selectedGuardianId, setSelectedGuardianId] = useState('');
+  const [selectedConsentType, setSelectedConsentType] = useState('PHOTO_USAGE');
   const visibleSections: readonly CommunicationSection[] =
-    mode === "composer"
-      ? ["Notices"]
-      : mode === "delivery"
-        ? ["Delivery Records"]
-        : ["Notices", "Events", "Consent Management"];
+    mode === 'composer'
+      ? ['Notices']
+      : mode === 'delivery'
+        ? ['Delivery Records']
+        : ['Notices', 'Events', 'Consent Management'];
   const needsClassContext =
-    (mode === "composer" && activeSection === "Notices") ||
-    activeSection === "Events";
+    (mode === 'composer' && activeSection === 'Notices') ||
+    activeSection === 'Events';
 
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
     enabled: needsClassContext,
   });
   const sectionsQuery = useQuery({
-    queryKey: ["sections"],
+    queryKey: ['sections'],
     queryFn: api.listSections,
     enabled: needsClassContext,
   });
   const deliveriesQuery = useQuery({
-    queryKey: ["notification-deliveries"],
+    queryKey: ['notification-deliveries'],
     queryFn: () => api.listNotificationDeliveries(),
-    enabled: activeSection === "Delivery Records",
+    enabled: activeSection === 'Delivery Records',
   });
   const noticesQuery = useQuery({
-    queryKey: ["notices"],
+    queryKey: ['notices'],
     queryFn: api.listNotices,
-    enabled: mode === "overview" && activeSection === "Notices",
+    enabled: mode === 'overview' && activeSection === 'Notices',
   });
   const eventsQuery = useQuery({
-    queryKey: ["events"],
+    queryKey: ['events'],
     queryFn: api.listEvents,
-    enabled: activeSection === "Events",
+    enabled: activeSection === 'Events',
   });
   const admissionsQuery = useQuery({
-    queryKey: ["admissions"],
+    queryKey: ['admissions'],
     queryFn: () => api.listAdmissions(),
-    enabled: activeSection === "Consent Management",
+    enabled: activeSection === 'Consent Management',
   });
   const guardianConsentStatusQuery = useQuery({
-    queryKey: ["guardian-consent-status", selectedGuardianId],
+    queryKey: ['guardian-consent-status', selectedGuardianId],
     queryFn: () => api.getGuardianConsentStatus(selectedGuardianId),
     enabled: Boolean(selectedGuardianId),
   });
@@ -289,7 +289,7 @@ export function CommunicationsForm({
     const deliveries = deliveriesQuery.data ?? [];
     return {
       pending: deliveries.filter((item) =>
-        ["QUEUED", "PENDING", "RETRYING"].includes(item.status),
+        ['QUEUED', 'PENDING', 'RETRYING'].includes(item.status),
       ).length,
     };
   }, [deliveriesQuery.data]);
@@ -316,30 +316,30 @@ export function CommunicationsForm({
     mutationFn: api.createNotice,
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["notification-deliveries"],
+        queryKey: ['notification-deliveries'],
       });
-      void queryClient.invalidateQueries({ queryKey: ["notices"] });
+      void queryClient.invalidateQueries({ queryKey: ['notices'] });
       setNoticeSuccess(
-        notice.scheduleMode === "LATER"
-          ? "Notice scheduled."
-          : "Notice published. Delivery records have been queued.",
+        notice.scheduleMode === 'LATER'
+          ? 'Notice scheduled.'
+          : 'Notice published. Delivery records have been queued.',
       );
       setNoticeError(null);
       setRecipientPreview(null);
       setHighImpactConfirmed(false);
       setNotice((current) => ({
         ...current,
-        title: "",
-        body: "",
+        title: '',
+        body: '',
         scheduledFor:
-          current.scheduleMode === "LATER" ? current.scheduledFor : "",
-        attachmentFileId: "",
-        attachmentFileName: "",
+          current.scheduleMode === 'LATER' ? current.scheduledFor : '',
+        attachmentFileId: '',
+        attachmentFileName: '',
       }));
     },
     onError: () => {
       setNoticeError(
-        "The notice could not be published. Check your audience and try again.",
+        'The notice could not be published. Check your audience and try again.',
       );
       setNoticeSuccess(null);
     },
@@ -356,7 +356,7 @@ export function CommunicationsForm({
       setRecipientPreview(null);
       setHighImpactConfirmed(false);
       setNoticeError(
-        "Recipient preview is unavailable right now. Review the audience and try again.",
+        'Recipient preview is unavailable right now. Review the audience and try again.',
       );
     },
   });
@@ -365,18 +365,18 @@ export function CommunicationsForm({
     mutationFn: api.createEvent,
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["notification-deliveries"],
+        queryKey: ['notification-deliveries'],
       });
-      void queryClient.invalidateQueries({ queryKey: ["events"] });
+      void queryClient.invalidateQueries({ queryKey: ['events'] });
       setEventSuccess(
-        "Event created. Delivery records were queued where audience rules apply.",
+        'Event created. Delivery records were queued where audience rules apply.',
       );
       setEventError(null);
       setEvent((current) => ({
         ...current,
-        title: "",
-        description: "",
-        location: "",
+        title: '',
+        description: '',
+        location: '',
       }));
     },
     onError: (error) => {
@@ -388,18 +388,18 @@ export function CommunicationsForm({
     mutationFn: () =>
       api.captureGuardianConsent(selectedGuardianId, {
         consentType: selectedConsentType,
-        version: "v1-admin",
+        version: 'v1-admin',
         metadata: {
-          source: "admin-web",
+          source: 'admin-web',
         },
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["guardian-consent-status"],
+        queryKey: ['guardian-consent-status'],
       });
-      void queryClient.invalidateQueries({ queryKey: ["consents"] });
+      void queryClient.invalidateQueries({ queryKey: ['consents'] });
       void queryClient.invalidateQueries({
-        queryKey: ["notification-deliveries"],
+        queryKey: ['notification-deliveries'],
       });
     },
   });
@@ -407,18 +407,18 @@ export function CommunicationsForm({
     mutationFn: () =>
       api.revokeGuardianConsent(selectedGuardianId, {
         consentType: selectedConsentType,
-        version: "v1-admin",
+        version: 'v1-admin',
         metadata: {
-          source: "admin-web",
+          source: 'admin-web',
         },
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["guardian-consent-status"],
+        queryKey: ['guardian-consent-status'],
       });
-      void queryClient.invalidateQueries({ queryKey: ["consents"] });
+      void queryClient.invalidateQueries({ queryKey: ['consents'] });
       void queryClient.invalidateQueries({
-        queryKey: ["notification-deliveries"],
+        queryKey: ['notification-deliveries'],
       });
     },
   });
@@ -431,7 +431,7 @@ export function CommunicationsForm({
       classId: notice.classId,
       sectionId: notice.sectionId,
       scheduledFor:
-        notice.scheduleMode === "LATER" ? notice.scheduledFor : null,
+        notice.scheduleMode === 'LATER' ? notice.scheduledFor : null,
     });
 
     if (validationError) {
@@ -441,11 +441,11 @@ export function CommunicationsForm({
     }
 
     const isHighImpactNotice =
-      notice.priority === "EMERGENCY" || notice.audienceType === "ALL";
+      notice.priority === 'EMERGENCY' || notice.audienceType === 'ALL';
 
     if (isHighImpactNotice && !recipientPreview) {
       setNoticeError(
-        "Preview recipients before publishing this high-impact notice.",
+        'Preview recipients before publishing this high-impact notice.',
       );
       setNoticeSuccess(null);
       return;
@@ -453,7 +453,7 @@ export function CommunicationsForm({
 
     if (isHighImpactNotice && !highImpactConfirmed) {
       setNoticeError(
-        "Confirm the recipient preview before publishing this high-impact notice.",
+        'Confirm the recipient preview before publishing this high-impact notice.',
       );
       setNoticeSuccess(null);
       return;
@@ -470,7 +470,7 @@ export function CommunicationsForm({
       classId: notice.classId,
       sectionId: notice.sectionId,
       scheduledFor:
-        notice.scheduleMode === "LATER" ? notice.scheduledFor : null,
+        notice.scheduleMode === 'LATER' ? notice.scheduledFor : null,
     });
 
     if (validationError) {
@@ -503,9 +503,9 @@ export function CommunicationsForm({
       description: event.description.trim() || null,
       eventType: event.eventType,
       audienceType: event.audienceType,
-      classId: event.audienceType === "ALL" ? null : event.classId || null,
+      classId: event.audienceType === 'ALL' ? null : event.classId || null,
       sectionId:
-        event.audienceType === "SECTION" ? event.sectionId || null : null,
+        event.audienceType === 'SECTION' ? event.sectionId || null : null,
       startsAt: nepalDateTimeLocalInputToUtc(event.startsAt),
       location: event.location.trim() || null,
     });
@@ -556,7 +556,7 @@ export function CommunicationsForm({
 
         <TabsContent value="Notices" className="mt-0">
           <NoticesSection
-            displayMode={mode === "composer" ? "compose" : "manage"}
+            displayMode={mode === 'composer' ? 'compose' : 'manage'}
             notice={notice}
             setNotice={setNotice}
             classes={classes}
@@ -565,7 +565,7 @@ export function CommunicationsForm({
             noticesLoading={noticesQuery.isLoading}
             noticesError={
               noticesQuery.isError
-                ? "Notices could not be loaded right now."
+                ? 'Notices could not be loaded right now.'
                 : null
             }
             submitNotice={submitNotice}
@@ -602,7 +602,7 @@ export function CommunicationsForm({
             isLoading={deliveriesQuery.isLoading}
             error={
               deliveriesQuery.isError
-                ? "Delivery records could not be loaded right now."
+                ? 'Delivery records could not be loaded right now.'
                 : null
             }
             filters={deliveryFilters}
@@ -662,7 +662,7 @@ function NoticesSection({
   noticeError,
   noticeSuccess,
 }: {
-  displayMode: "manage" | "compose";
+  displayMode: 'manage' | 'compose';
   notice: NoticeState;
   setNotice: Dispatch<SetStateAction<NoticeState>>;
   classes: Array<{ id: string; name: string }>;
@@ -686,7 +686,7 @@ function NoticesSection({
 
   return (
     <section>
-      {displayMode === "compose" ? (
+      {displayMode === 'compose' ? (
         <div className="shell-card rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
           <SectionHeader
             eyebrow="Notice Composer"
@@ -694,247 +694,247 @@ function NoticesSection({
             description="Create clear, audience-targeted announcements for guardians, students, and staff."
           />
 
-        <div className="mt-6 space-y-6">
-          <FormField
-            label="Title"
-            description="Give your notice a clear, actionable title."
-          >
-            <Input
-              value={notice.title}
-              onChange={(event) =>
-                setNotice((current) => ({
-                  ...current,
-                  title: event.target.value,
-                }))
-              }
-              placeholder="Example: Parent-Teacher Association Meeting"
-              className="h-12"
-            />
-          </FormField>
-
-          <FormField
-            label="Notice Content"
-            description={
-              smsEstimate.segments > 0
-                ? `${characterCount} characters · about ${smsEstimate.segments} SMS message${smsEstimate.segments === 1 ? "" : "s"} per guardian if sent by SMS (estimate only${smsEstimate.encoding === "UCS-2" ? " — Unicode text uses shorter messages" : ""})`
-                : `${characterCount} characters`
-            }
-          >
-            <textarea
-              rows={6}
-              value={notice.body}
-              onChange={(event) =>
-                setNotice((current) => ({
-                  ...current,
-                  body: event.target.value,
-                }))
-              }
-              placeholder="Write the notice body for guardians, students, or staff..."
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium transition-all focus:border-[var(--color-mod-notices-accent)] focus:outline-none focus:ring-4 focus:ring-[var(--color-mod-notices-border)]/40 min-h-[160px] resize-none"
-            />
-          </FormField>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <FormField label="Priority">
-              <Select
-                value={notice.priority}
-                onChange={(event) =>
-                  setNotice((current) => ({
-                    ...current,
-                    priority: event.target.value as NoticePriority,
-                  }))
-                }
-              >
-                {noticePriorities.map((priority) => (
-                  <option key={priority} value={priority}>
-                    {formatEnumLabel(priority)}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-            <FormField label="Audience">
-              <Select
-                value={notice.audienceType}
-                onChange={(event) =>
-                  setNotice((current) => ({
-                    ...current,
-                    audienceType: event.target.value as AudienceType,
-                    sectionId: "",
-                  }))
-                }
-              >
-                {audienceTypes.map((audienceType) => (
-                  <option key={audienceType} value={audienceType}>
-                    {formatEnumLabel(audienceType)}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-            <FormField label="Class">
-              <Select
-                value={notice.classId}
-                onChange={(event) =>
-                  setNotice((current) => ({
-                    ...current,
-                    classId: event.target.value,
-                    sectionId: "",
-                  }))
-                }
-                disabled={notice.audienceType === "ALL"}
-              >
-                <option value="">Select class</option>
-                {classes.map((classroom) => (
-                  <option key={classroom.id} value={classroom.id}>
-                    {classroom.name}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-          </div>
-
-          {notice.audienceType === "SECTION" ? (
-            <label>
-              <span className="label mb-2 block">Section</span>
-              <select
-                value={notice.sectionId}
-                onChange={(event) =>
-                  setNotice((current) => ({
-                    ...current,
-                    sectionId: event.target.value,
-                  }))
-                }
-                className="min-h-11"
-              >
-                <option value="">Select section</option>
-                {sections.map((section) => (
-                  <option key={section.id} value={section.id}>
-                    {section.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-
-          <FormField
-            label="Attachment"
-            description="Uploads use File Registry and return protected preview/download URLs."
-          >
-            <FileUploader
-              module="notices"
-              maxFiles={1}
-              accept="application/pdf,image/png,image/jpeg,image/webp"
-              onUploadComplete={(fileId, fileName) =>
-                setNotice((current) => ({
-                  ...current,
-                  attachmentFileId: fileId,
-                  attachmentFileName: fileName,
-                }))
-              }
-              onRemove={(fileId) =>
-                setNotice((current) =>
-                  current.attachmentFileId === fileId
-                    ? {
-                        ...current,
-                        attachmentFileId: "",
-                        attachmentFileName: "",
-                      }
-                    : current,
-                )
-              }
-            />
-            {notice.attachmentFileName ? (
-              <p className="mt-2 text-xs font-semibold text-slate-500">
-                Attached through File Registry: {notice.attachmentFileName}
-              </p>
-            ) : null}
-          </FormField>
-
-          <fieldset className="rounded-3xl border border-[var(--line)] bg-gray-50/70 p-4">
-            <legend className="label px-2">Schedule option</legend>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <ScheduleOption
-                title="Publish now"
-                description="Queue delivery immediately."
-                checked={notice.scheduleMode === "NOW"}
-                name="notice-schedule-mode"
-                onChange={() =>
-                  setNotice((current) => ({
-                    ...current,
-                    scheduleMode: "NOW",
-                    scheduledFor: "",
-                  }))
-                }
-              />
-              <ScheduleOption
-                title="Schedule later"
-                description="Publish at a selected date and time."
-                checked={notice.scheduleMode === "LATER"}
-                name="notice-schedule-mode"
-                onChange={() =>
-                  setNotice((current) => ({
-                    ...current,
-                    scheduleMode: "LATER",
-                  }))
-                }
-              />
-            </div>
-            {notice.scheduleMode === "LATER" ? (
+          <div className="mt-6 space-y-6">
+            <FormField
+              label="Title"
+              description="Give your notice a clear, actionable title."
+            >
               <Input
-                type="datetime-local"
-                value={notice.scheduledFor}
+                value={notice.title}
                 onChange={(event) =>
                   setNotice((current) => ({
                     ...current,
-                    scheduledFor: event.target.value,
+                    title: event.target.value,
                   }))
                 }
-                className="mt-4"
+                placeholder="Example: Parent-Teacher Association Meeting"
+                className="h-12"
+              />
+            </FormField>
+
+            <FormField
+              label="Notice Content"
+              description={
+                smsEstimate.segments > 0
+                  ? `${characterCount} characters · about ${smsEstimate.segments} SMS message${smsEstimate.segments === 1 ? '' : 's'} per guardian if sent by SMS (estimate only${smsEstimate.encoding === 'UCS-2' ? ' — Unicode text uses shorter messages' : ''})`
+                  : `${characterCount} characters`
+              }
+            >
+              <textarea
+                rows={6}
+                value={notice.body}
+                onChange={(event) =>
+                  setNotice((current) => ({
+                    ...current,
+                    body: event.target.value,
+                  }))
+                }
+                placeholder="Write the notice body for guardians, students, or staff..."
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium transition-all focus:border-[var(--color-mod-notices-accent)] focus:outline-none focus:ring-4 focus:ring-[var(--color-mod-notices-border)]/40 min-h-[160px] resize-none"
+              />
+            </FormField>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <FormField label="Priority">
+                <Select
+                  value={notice.priority}
+                  onChange={(event) =>
+                    setNotice((current) => ({
+                      ...current,
+                      priority: event.target.value as NoticePriority,
+                    }))
+                  }
+                >
+                  {noticePriorities.map((priority) => (
+                    <option key={priority} value={priority}>
+                      {formatEnumLabel(priority)}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Audience">
+                <Select
+                  value={notice.audienceType}
+                  onChange={(event) =>
+                    setNotice((current) => ({
+                      ...current,
+                      audienceType: event.target.value as AudienceType,
+                      sectionId: '',
+                    }))
+                  }
+                >
+                  {audienceTypes.map((audienceType) => (
+                    <option key={audienceType} value={audienceType}>
+                      {formatEnumLabel(audienceType)}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Class">
+                <Select
+                  value={notice.classId}
+                  onChange={(event) =>
+                    setNotice((current) => ({
+                      ...current,
+                      classId: event.target.value,
+                      sectionId: '',
+                    }))
+                  }
+                  disabled={notice.audienceType === 'ALL'}
+                >
+                  <option value="">Select class</option>
+                  {classes.map((classroom) => (
+                    <option key={classroom.id} value={classroom.id}>
+                      {classroom.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+            </div>
+
+            {notice.audienceType === 'SECTION' ? (
+              <label>
+                <span className="label mb-2 block">Section</span>
+                <select
+                  value={notice.sectionId}
+                  onChange={(event) =>
+                    setNotice((current) => ({
+                      ...current,
+                      sectionId: event.target.value,
+                    }))
+                  }
+                  className="min-h-11"
+                >
+                  <option value="">Select section</option>
+                  {sections.map((section) => (
+                    <option key={section.id} value={section.id}>
+                      {section.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            <FormField
+              label="Attachment"
+              description="Uploads use File Registry and return protected preview/download URLs."
+            >
+              <FileUploader
+                module="notices"
+                maxFiles={1}
+                accept="application/pdf,image/png,image/jpeg,image/webp"
+                onUploadComplete={(fileId, fileName) =>
+                  setNotice((current) => ({
+                    ...current,
+                    attachmentFileId: fileId,
+                    attachmentFileName: fileName,
+                  }))
+                }
+                onRemove={(fileId) =>
+                  setNotice((current) =>
+                    current.attachmentFileId === fileId
+                      ? {
+                          ...current,
+                          attachmentFileId: '',
+                          attachmentFileName: '',
+                        }
+                      : current,
+                  )
+                }
+              />
+              {notice.attachmentFileName ? (
+                <p className="mt-2 text-xs font-semibold text-slate-500">
+                  Attached through File Registry: {notice.attachmentFileName}
+                </p>
+              ) : null}
+            </FormField>
+
+            <fieldset className="rounded-3xl border border-[var(--line)] bg-gray-50/70 p-4">
+              <legend className="label px-2">Schedule option</legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <ScheduleOption
+                  title="Publish now"
+                  description="Queue delivery immediately."
+                  checked={notice.scheduleMode === 'NOW'}
+                  name="notice-schedule-mode"
+                  onChange={() =>
+                    setNotice((current) => ({
+                      ...current,
+                      scheduleMode: 'NOW',
+                      scheduledFor: '',
+                    }))
+                  }
+                />
+                <ScheduleOption
+                  title="Schedule later"
+                  description="Publish at a selected date and time."
+                  checked={notice.scheduleMode === 'LATER'}
+                  name="notice-schedule-mode"
+                  onChange={() =>
+                    setNotice((current) => ({
+                      ...current,
+                      scheduleMode: 'LATER',
+                    }))
+                  }
+                />
+              </div>
+              {notice.scheduleMode === 'LATER' ? (
+                <Input
+                  type="datetime-local"
+                  value={notice.scheduledFor}
+                  onChange={(event) =>
+                    setNotice((current) => ({
+                      ...current,
+                      scheduledFor: event.target.value,
+                    }))
+                  }
+                  className="mt-4"
+                />
+              ) : null}
+            </fieldset>
+
+            {notice.priority === 'EMERGENCY' ? (
+              <InlineMessage
+                tone="error"
+                message="Emergency notices use the configured high-impact delivery channels. Preview and confirm recipients before publishing."
+              />
+            ) : notice.audienceType === 'ALL' ? (
+              <InlineMessage
+                tone="error"
+                message="This notice goes to the whole school. Preview and confirm recipients before publishing."
               />
             ) : null}
-          </fieldset>
 
-          {notice.priority === "EMERGENCY" ? (
-            <InlineMessage
-              tone="error"
-              message="Emergency notices use the configured high-impact delivery channels. Preview and confirm recipients before publishing."
+            <RecipientPreviewPanel
+              preview={preview}
+              isPending={previewPending}
+              isHighImpact={
+                notice.priority === 'EMERGENCY' || notice.audienceType === 'ALL'
+              }
+              confirmed={highImpactConfirmed}
+              onConfirmedChange={setHighImpactConfirmed}
+              onPreview={previewRecipients}
             />
-          ) : notice.audienceType === "ALL" ? (
-            <InlineMessage
-              tone="error"
-              message="This notice goes to the whole school. Preview and confirm recipients before publishing."
-            />
-          ) : null}
+            {noticeError ? (
+              <InlineMessage tone="error" message={noticeError} />
+            ) : null}
+            {noticeSuccess ? (
+              <InlineMessage tone="success" message={noticeSuccess} />
+            ) : null}
 
-          <RecipientPreviewPanel
-            preview={preview}
-            isPending={previewPending}
-            isHighImpact={
-              notice.priority === "EMERGENCY" || notice.audienceType === "ALL"
-            }
-            confirmed={highImpactConfirmed}
-            onConfirmedChange={setHighImpactConfirmed}
-            onPreview={previewRecipients}
-          />
-          {noticeError ? (
-            <InlineMessage tone="error" message={noticeError} />
-          ) : null}
-          {noticeSuccess ? (
-            <InlineMessage tone="success" message={noticeSuccess} />
-          ) : null}
-
-          <button
-            type="button"
-            className="min-h-12 rounded-2xl bg-gradient-to-r from-slate-950 to-slate-800 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={isPending}
-            onClick={submitNotice}
-          >
-            {isPending
-              ? "Submitting..."
-              : notice.scheduleMode === "LATER"
-                ? "Schedule notice"
-                : "Publish notice"}
-          </button>
-        </div>
+            <button
+              type="button"
+              className="min-h-12 rounded-2xl bg-gradient-to-r from-slate-950 to-slate-800 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isPending}
+              onClick={submitNotice}
+            >
+              {isPending
+                ? 'Submitting...'
+                : notice.scheduleMode === 'LATER'
+                  ? 'Schedule notice'
+                  : 'Publish notice'}
+            </button>
+          </div>
         </div>
       ) : (
         <NoticeList
@@ -979,7 +979,7 @@ function NoticeList({
                 <div>
                   <p className="font-semibold text-gray-950">{item.title}</p>
                   <p className="mt-1 text-sm text-[var(--muted)]">
-                    {formatEnumLabel(item.audienceType)} /{" "}
+                    {formatEnumLabel(item.audienceType)} /{' '}
                     {resolveNoticeState(item)}
                   </p>
                 </div>
@@ -1136,7 +1136,7 @@ function EventsSection({
                   setEvent((current) => ({
                     ...current,
                     audienceType: inputEvent.target.value as AudienceType,
-                    sectionId: "",
+                    sectionId: '',
                   }))
                 }
               >
@@ -1154,10 +1154,10 @@ function EventsSection({
                   setEvent((current) => ({
                     ...current,
                     classId: inputEvent.target.value,
-                    sectionId: "",
+                    sectionId: '',
                   }))
                 }
-                disabled={event.audienceType === "ALL"}
+                disabled={event.audienceType === 'ALL'}
               >
                 <option value="">Select class</option>
                 {classes.map((cls) => (
@@ -1176,7 +1176,7 @@ function EventsSection({
                     sectionId: inputEvent.target.value,
                   }))
                 }
-                disabled={event.audienceType !== "SECTION"}
+                disabled={event.audienceType !== 'SECTION'}
               >
                 <option value="">Select section</option>
                 {sections.map((sec) => (
@@ -1218,7 +1218,7 @@ function EventsSection({
             disabled={isPending}
             onClick={submitEvent}
           >
-            {isPending ? "Creating..." : "Create event"}
+            {isPending ? 'Creating...' : 'Create event'}
           </button>
         </div>
       </div>
@@ -1264,10 +1264,10 @@ function EventList({
                 <div>
                   <p className="font-semibold text-gray-950">{item.title}</p>
                   <p className="mt-1 text-sm text-[var(--muted)]">
-                    {formatEnumLabel(item.eventType)} /{" "}
-                    {formatEnumLabel(item.audienceType)} /{" "}
+                    {formatEnumLabel(item.eventType)} /{' '}
+                    {formatEnumLabel(item.audienceType)} /{' '}
                     {formatDateTime(item.startsAt)}
-                    {item.location ? ` / ${item.location}` : ""}
+                    {item.location ? ` / ${item.location}` : ''}
                   </p>
                 </div>
                 <EventTypeBadge type={item.eventType} />
@@ -1397,7 +1397,7 @@ function DeliveryRecordsSection({
                 <p>
                   <span className="font-semibold text-gray-700">
                     {delivery.channel}
-                  </span>{" "}
+                  </span>{' '}
                   / {formatEnumLabel(delivery.audienceType)} audience
                 </p>
                 <p className="text-xs">
@@ -1494,7 +1494,7 @@ function ConsentManagementSection({
               disabled={revokePending || !selectedGuardianId}
               onClick={revokeConsent}
             >
-              {revokePending ? "Revoking..." : "Revoke consent"}
+              {revokePending ? 'Revoking...' : 'Revoke consent'}
             </button>
             <button
               type="button"
@@ -1502,14 +1502,14 @@ function ConsentManagementSection({
               disabled={capturePending || !selectedGuardianId}
               onClick={captureConsent}
             >
-              {capturePending ? "Capturing..." : "Capture consent"}
+              {capturePending ? 'Capturing...' : 'Capture consent'}
             </button>
           </div>
 
           {captureError || revokeError ? (
             <InlineMessage
               tone="error"
-              message={captureError || revokeError || ""}
+              message={captureError || revokeError || ''}
             />
           ) : null}
         </div>
@@ -1536,20 +1536,20 @@ function ConsentManagementSection({
                     {formatEnumLabel(status.consentType)}
                   </p>
                   <Badge
-                    variant={status.granted ? "success" : "destructive"}
+                    variant={status.granted ? 'success' : 'destructive'}
                     className="font-black uppercase tracking-widest text-[10px]"
                   >
-                    {status.granted ? "Granted" : "Revoked"}
+                    {status.granted ? 'Granted' : 'Revoked'}
                   </Badge>
                 </div>
                 <div className="pt-3 border-t border-slate-50 flex items-center justify-between">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Version {status.version ?? "Version not recorded"}
+                    Version {status.version ?? 'Version not recorded'}
                   </p>
                   <p className="text-[10px] font-black text-slate-400">
                     {status.capturedAt
                       ? formatDateTime(status.capturedAt)
-                      : "Never captured"}
+                      : 'Never captured'}
                   </p>
                 </div>
               </div>
@@ -1557,12 +1557,12 @@ function ConsentManagementSection({
           ) : (
             <EmptyState
               title={
-                selectedGuardianId ? "No consent records" : "Select a guardian"
+                selectedGuardianId ? 'No consent records' : 'Select a guardian'
               }
               description={
                 selectedGuardianId
-                  ? "No consent records have been captured for this guardian yet."
-                  : "Choose a guardian to review consent status."
+                  ? 'No consent records have been captured for this guardian yet.'
+                  : 'Choose a guardian to review consent status.'
               }
             />
           )}
@@ -1611,8 +1611,8 @@ function ScheduleOption({
     <label
       className={`flex min-h-20 cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${
         checked
-          ? "border-[var(--color-mod-notices-accent)] bg-white shadow-sm ring-2 ring-[var(--color-mod-notices-border)]/40"
-          : "border-[var(--line)] bg-white/70 hover:bg-white"
+          ? 'border-[var(--color-mod-notices-accent)] bg-white shadow-sm ring-2 ring-[var(--color-mod-notices-border)]/40'
+          : 'border-[var(--line)] bg-white/70 hover:bg-white'
       }`}
     >
       <input
@@ -1636,11 +1636,11 @@ function ScheduleOption({
 
 export function PriorityBadge({ priority }: { priority: string }) {
   const className =
-    priority === "EMERGENCY"
-      ? "bg-red-50 text-red-700 ring-red-100"
-      : priority === "URGENT"
-        ? "bg-amber-50 text-amber-700 ring-amber-100"
-        : "bg-emerald-50 text-emerald-700 ring-emerald-100";
+    priority === 'EMERGENCY'
+      ? 'bg-red-50 text-red-700 ring-red-100'
+      : priority === 'URGENT'
+        ? 'bg-amber-50 text-amber-700 ring-amber-100'
+        : 'bg-emerald-50 text-emerald-700 ring-emerald-100';
 
   return (
     <span
@@ -1653,13 +1653,13 @@ export function PriorityBadge({ priority }: { priority: string }) {
 
 function EventTypeBadge({ type }: { type: string }) {
   const className =
-    type === "EXAM"
-      ? "bg-indigo-50 text-indigo-700 ring-indigo-100"
-      : type === "HOLIDAY"
-        ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
-        : type === "MEETING"
-          ? "bg-amber-50 text-amber-700 ring-amber-100"
-          : "bg-gray-100 text-gray-700 ring-gray-200";
+    type === 'EXAM'
+      ? 'bg-indigo-50 text-indigo-700 ring-indigo-100'
+      : type === 'HOLIDAY'
+        ? 'bg-emerald-50 text-emerald-700 ring-emerald-100'
+        : type === 'MEETING'
+          ? 'bg-amber-50 text-amber-700 ring-amber-100'
+          : 'bg-gray-100 text-gray-700 ring-gray-200';
 
   return (
     <span
@@ -1672,15 +1672,15 @@ function EventTypeBadge({ type }: { type: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const className =
-    status === "SENT"
-      ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
-      : status === "FAILED"
-        ? "bg-red-50 text-red-700 ring-red-100"
-        : status === "SKIPPED"
-          ? "bg-gray-100 text-gray-700 ring-gray-200"
-          : status === "RETRYING"
-            ? "bg-blue-50 text-blue-700 ring-blue-100"
-            : "bg-amber-50 text-amber-700 ring-amber-100";
+    status === 'SENT'
+      ? 'bg-emerald-50 text-emerald-700 ring-emerald-100'
+      : status === 'FAILED'
+        ? 'bg-red-50 text-red-700 ring-red-100'
+        : status === 'SKIPPED'
+          ? 'bg-gray-100 text-gray-700 ring-gray-200'
+          : status === 'RETRYING'
+            ? 'bg-blue-50 text-blue-700 ring-blue-100'
+            : 'bg-amber-50 text-amber-700 ring-amber-100';
 
   return (
     <span
@@ -1695,13 +1695,13 @@ function InlineMessage({
   tone,
   message,
 }: {
-  tone: "success" | "error" | "info";
+  tone: 'success' | 'error' | 'info';
   message: string;
 }) {
   const className = {
-    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    error: "border-red-200 bg-red-50 text-red-700",
-    info: "border-blue-200 bg-blue-50 text-blue-700",
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    error: 'border-red-200 bg-red-50 text-red-700',
+    info: 'border-blue-200 bg-blue-50 text-blue-700',
   }[tone];
 
   return (
@@ -1748,12 +1748,12 @@ function buildNoticePayload(notice: NoticeState) {
     body: notice.body.trim(),
     priority: notice.priority,
     audienceType: notice.audienceType,
-    classId: notice.audienceType === "ALL" ? null : notice.classId || null,
+    classId: notice.audienceType === 'ALL' ? null : notice.classId || null,
     sectionId:
-      notice.audienceType === "SECTION" ? notice.sectionId || null : null,
+      notice.audienceType === 'SECTION' ? notice.sectionId || null : null,
     attachmentFileId: notice.attachmentFileId || null,
     scheduledFor:
-      notice.scheduleMode === "LATER" && notice.scheduledFor
+      notice.scheduleMode === 'LATER' && notice.scheduledFor
         ? nepalDateTimeLocalInputToUtc(notice.scheduledFor)
         : null,
   };
@@ -1787,8 +1787,8 @@ function RecipientPreviewPanel({
               Recipient preview
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              Confirm resolved audience and channel counts before
-              sending a high-impact notice.
+              Confirm resolved audience and channel counts before sending a
+              high-impact notice.
             </p>
           </div>
         </div>
@@ -1798,7 +1798,7 @@ function RecipientPreviewPanel({
           disabled={isPending}
           className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-[var(--color-mod-notices-border)] bg-white px-4 text-sm font-bold text-[var(--color-mod-notices-text)] disabled:opacity-50"
         >
-          {isPending ? "Checking recipients..." : "Preview recipients"}
+          {isPending ? 'Checking recipients...' : 'Preview recipients'}
         </button>
       </div>
 
@@ -1820,8 +1820,8 @@ function RecipientPreviewPanel({
             />
           </div>
           <p className="text-xs font-semibold text-slate-600">
-            Channels:{" "}
-            {preview.channels.map(formatEnumLabel).join(", ") || "Unavailable"}
+            Channels:{' '}
+            {preview.channels.map(formatEnumLabel).join(', ') || 'Unavailable'}
           </p>
           {preview.skippedRecipientCount > 0 ? (
             <InlineMessage
@@ -1871,33 +1871,33 @@ function validateAudienceFields(input: {
   scheduledFor: string | null;
 }) {
   if (!input.title.trim()) {
-    return "Title is required.";
+    return 'Title is required.';
   }
 
   if (!input.body.trim()) {
-    return "Body is required.";
+    return 'Body is required.';
   }
 
   if (
-    (input.audienceType === "CLASS" || input.audienceType === "SECTION") &&
+    (input.audienceType === 'CLASS' || input.audienceType === 'SECTION') &&
     !input.classId
   ) {
-    return "Class is required for class or section audiences.";
+    return 'Class is required for class or section audiences.';
   }
 
-  if (input.audienceType === "SECTION" && !input.sectionId) {
-    return "Section is required for section audience.";
+  if (input.audienceType === 'SECTION' && !input.sectionId) {
+    return 'Section is required for section audience.';
   }
 
   if (input.scheduledFor !== null && !input.scheduledFor) {
-    return "Scheduled date and time is required.";
+    return 'Scheduled date and time is required.';
   }
 
   if (input.scheduledFor) {
     try {
       nepalDateTimeLocalInputToUtc(input.scheduledFor);
     } catch {
-      return "Choose a valid Nepal date and time.";
+      return 'Choose a valid Nepal date and time.';
     }
   }
 
@@ -1905,11 +1905,11 @@ function validateAudienceFields(input: {
 }
 
 function resolveNoticeState(notice: NoticeSummary) {
-  if (notice.lifecycleStatus === "PUBLISHED" && notice.publishedAt) {
+  if (notice.lifecycleStatus === 'PUBLISHED' && notice.publishedAt) {
     return `Published ${formatDateTime(notice.publishedAt)}`;
   }
 
-  if (notice.lifecycleStatus === "SCHEDULED" && notice.scheduledFor) {
+  if (notice.lifecycleStatus === 'SCHEDULED' && notice.scheduledFor) {
     return `Scheduled ${formatDateTime(notice.scheduledFor)}`;
   }
 
@@ -1927,19 +1927,19 @@ function resolveNoticeState(notice: NoticeSummary) {
     return `Scheduled ${formatDateTime(notice.scheduledFor)}`;
   }
 
-  return "Draft";
+  return 'Draft';
 }
 
 function formatEnumLabel(value: string) {
   return value
-    .split("_")
+    .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(" ");
+    .join(' ');
 }
 
 function formatDateTime(value: string | Date | null | undefined) {
   if (!value) {
-    return "Not available";
+    return 'Not available';
   }
 
   return formatBsDateTime(value);

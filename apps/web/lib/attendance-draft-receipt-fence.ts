@@ -6,10 +6,10 @@ export type AttendanceDraftReceiptIdentity = {
 };
 
 export type AttendanceDraftReceiptWriteRejectionReason =
-  | "different_submission"
-  | "authoritative_outcome_required"
-  | "protected_status_downgrade"
-  | "terminal_receipt_tombstone";
+  | 'different_submission'
+  | 'authoritative_outcome_required'
+  | 'protected_status_downgrade'
+  | 'terminal_receipt_tombstone';
 
 export type AttendanceDraftAuthoritativeReceipt = {
   clientSubmissionId?: unknown;
@@ -20,7 +20,7 @@ export type AttendanceDraftReceiptDeleteDecision =
   | { allowed: true }
   | {
       allowed: false;
-      reason: "authoritative_receipt_required";
+      reason: 'authoritative_receipt_required';
     };
 
 export type AttendanceDraftReceiptWriteDecision =
@@ -31,36 +31,36 @@ export type AttendanceDraftReceiptWriteDecision =
     };
 
 const EDITABLE_ATTENDANCE_DRAFT_STATUSES = new Set([
-  "",
-  "DRAFT",
-  "SAVED_LOCAL",
-  "REJECTED",
+  '',
+  'DRAFT',
+  'SAVED_LOCAL',
+  'REJECTED',
 ]);
 
 const AUTHORITATIVE_ATTENDANCE_DRAFT_STATUSES = new Set([
-  "ACCEPTED",
-  "SYNCED",
-  "CONFLICTED",
+  'ACCEPTED',
+  'SYNCED',
+  'CONFLICTED',
 ]);
 
 const TERMINAL_ATTENDANCE_RECEIPT_TOMBSTONES = new Set([
   ...AUTHORITATIVE_ATTENDANCE_DRAFT_STATUSES,
-  "AUTHORIZATION_DENIED",
-  "ACCESS_REVALIDATION_REQUIRED",
+  'AUTHORIZATION_DENIED',
+  'ACCESS_REVALIDATION_REQUIRED',
 ]);
 
 function normalizeAttendanceDraftStatus(value: unknown) {
-  return typeof value === "string" ? value.trim().toUpperCase() : "";
+  return typeof value === 'string' ? value.trim().toUpperCase() : '';
 }
 
 function normalizeAttendanceSubmissionId(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function hasAttendanceDraftRosterData(value: unknown) {
   return (
     value !== null &&
-    typeof value === "object" &&
+    typeof value === 'object' &&
     !Array.isArray(value) &&
     Object.keys(value).length > 0
   );
@@ -80,9 +80,11 @@ function matchesAuthoritativeOutcome(
   authoritativeReceipt: AttendanceDraftAuthoritativeReceipt | undefined,
 ) {
   return (
-    normalizeAttendanceSubmissionId(draft.clientSubmissionId) !== "" &&
+    normalizeAttendanceSubmissionId(draft.clientSubmissionId) !== '' &&
     normalizeAttendanceSubmissionId(draft.clientSubmissionId) ===
-      normalizeAttendanceSubmissionId(authoritativeReceipt?.clientSubmissionId) &&
+      normalizeAttendanceSubmissionId(
+        authoritativeReceipt?.clientSubmissionId,
+      ) &&
     normalizeAttendanceDraftStatus(draft.lastSyncStatus) ===
       normalizeAttendanceDraftStatus(authoritativeReceipt?.syncStatus)
   );
@@ -128,7 +130,7 @@ export function decideAttendanceDraftReceiptWrite(
       !matchesAuthoritativeOutcome(incoming, authoritativeReceipt) ||
       !isPurposeLimitedReceiptTombstone(incoming)
     ) {
-      return { allowed: false, reason: "authoritative_outcome_required" };
+      return { allowed: false, reason: 'authoritative_outcome_required' };
     }
   }
 
@@ -148,7 +150,7 @@ export function decideAttendanceDraftReceiptWrite(
     !incomingSubmissionId ||
     existingSubmissionId !== incomingSubmissionId
   ) {
-    return { allowed: false, reason: "different_submission" };
+    return { allowed: false, reason: 'different_submission' };
   }
 
   const existingStatus = normalizeAttendanceDraftStatus(
@@ -165,18 +167,18 @@ export function decideAttendanceDraftReceiptWrite(
       return { allowed: true };
     }
 
-    return { allowed: false, reason: "terminal_receipt_tombstone" };
+    return { allowed: false, reason: 'terminal_receipt_tombstone' };
   }
 
   if (
-    incomingStatus === "REJECTED" &&
+    incomingStatus === 'REJECTED' &&
     matchesAuthoritativeOutcome(incoming, authoritativeReceipt)
   ) {
     return { allowed: true };
   }
 
   if (!isAttendanceDraftReceiptProtected(incoming)) {
-    return { allowed: false, reason: "protected_status_downgrade" };
+    return { allowed: false, reason: 'protected_status_downgrade' };
   }
 
   return { allowed: true };
@@ -192,7 +194,7 @@ export function decideAttendanceDraftReceiptDelete(
   // Protected rows transition to a purpose-limited terminal tombstone. Only
   // full session teardown clears them physically; otherwise a stale tab could
   // recreate the old final intent after deletion.
-  return { allowed: false, reason: "authoritative_receipt_required" };
+  return { allowed: false, reason: 'authoritative_receipt_required' };
 }
 
 export class AttendanceDraftReceiptFenceError extends Error {
@@ -201,7 +203,7 @@ export class AttendanceDraftReceiptFenceError extends Error {
     | Exclude<
         AttendanceDraftReceiptDeleteDecision,
         { allowed: true }
-      >["reason"];
+      >['reason'];
 
   constructor(
     reason:
@@ -209,10 +211,10 @@ export class AttendanceDraftReceiptFenceError extends Error {
       | Exclude<
           AttendanceDraftReceiptDeleteDecision,
           { allowed: true }
-        >["reason"],
+        >['reason'],
   ) {
-    super("Attendance receipt-protected draft mutation was rejected");
-    this.name = "AttendanceDraftReceiptFenceError";
+    super('Attendance receipt-protected draft mutation was rejected');
+    this.name = 'AttendanceDraftReceiptFenceError';
     this.reason = reason;
   }
 }

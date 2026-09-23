@@ -19,7 +19,7 @@ export function BlurFade({
   duration = 0.6,
   delay = 0,
   yOffset = 8,
-  blur = "6px",
+  blur = '6px',
   inView = true,
 }: BlurFadeProps) {
   const [isVisible, setIsVisible] = React.useState(false);
@@ -40,7 +40,7 @@ export function BlurFade({
       },
       {
         threshold: 0.05,
-      }
+      },
     );
 
     if (elementRef.current) {
@@ -62,7 +62,7 @@ export function BlurFade({
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0px)' : `translateY(${yOffset}px)`,
       }}
-      className={cn("transition-all ease-out", className)}
+      className={cn('transition-all ease-out', className)}
     >
       {children}
     </div>

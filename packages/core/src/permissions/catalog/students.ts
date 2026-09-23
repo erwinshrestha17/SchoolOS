@@ -22,7 +22,8 @@ export const studentsPermissions = [
   {
     resource: "students",
     action: "manage_lifecycle",
-    description: "Transfer, exit, archive, and manage student lifecycle transitions",
+    description:
+      "Transfer, exit, archive, and manage student lifecycle transitions",
   },
   {
     resource: "admission_policy",

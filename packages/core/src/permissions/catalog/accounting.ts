@@ -12,7 +12,8 @@ export const accountingPermissions = [
   {
     resource: "accounting",
     action: "reverse",
-    description: "Create reversing journal entries for posted accounting records",
+    description:
+      "Create reversing journal entries for posted accounting records",
   },
   {
     resource: "accounting:accounts",
@@ -147,7 +148,8 @@ export const accountingPermissions = [
   {
     resource: "accounting:payroll-handoff",
     action: "post",
-    description: "Post an approved payroll snapshot through the accounting boundary",
+    description:
+      "Post an approved payroll snapshot through the accounting boundary",
   },
   {
     resource: "accounting:expenses",
@@ -197,7 +199,8 @@ export const accountingPermissions = [
   {
     resource: "finance:principal",
     action: "read",
-    description: "Read server-projected Principal financial oversight summaries",
+    description:
+      "Read server-projected Principal financial oversight summaries",
   },
   {
     resource: "finance:approvals",

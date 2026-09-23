@@ -21,5 +21,7 @@ export async function fileToBase64Payload(file: File): Promise<EncodedFile> {
 }
 
 export async function filesToBase64Payloads(files: FileList | File[]) {
-  return Promise.all(Array.from(files).map((file) => fileToBase64Payload(file)));
+  return Promise.all(
+    Array.from(files).map((file) => fileToBase64Payload(file)),
+  );
 }

@@ -73,7 +73,7 @@ describe('Slice 4 payroll authorization UI', () => {
     const source = read(PAYROLL_SURFACE);
     assert.doesNotMatch(
       source,
-      /permissions\.includes\("payroll:run:review"\)/,
+      /permissions\.includes\(['"]payroll:run:review['"]\)/,
       `${PAYROLL_SURFACE} must not use raw payroll:run:review includes`,
     );
     assert.match(source, /usePayrollCapabilities/);
@@ -100,11 +100,11 @@ describe('Slice 4 header authorization UI', () => {
     const source = read(HEADER_SURFACE);
     assert.doesNotMatch(
       source,
-      /permissions\.includes\("staff:read"\)/,
+      /permissions\.includes\(['"]staff:read['"]\)/,
       `${HEADER_SURFACE} must not use raw staff:read includes`,
     );
     assert.match(source, /usePermissionAccess/);
-    assert.match(source, /checkPermission\("staff:read"\)/);
+    assert.match(source, /checkPermission\(['"]staff:read['"]\)/);
   });
 });
 
@@ -117,20 +117,20 @@ describe('Slice 4 dashboard persona routing', () => {
 
     assert.match(page, /isSupportedDashboardPersona/);
     assert.match(page, /canFetchDashboard/);
-    assert.match(page, /compositionPersona === "hr"/);
-    assert.match(page, /compositionPersona === "accountant"/);
+    assert.match(page, /compositionPersona === ['"]hr['"]/);
+    assert.match(page, /compositionPersona === ['"]accountant['"]/);
     assert.match(page, /<HrDashboard dashboard=\{projectedDashboard\} \/>/);
     assert.match(
       page,
       /<AccountantDashboard dashboard=\{projectedDashboard\} \/>/,
     );
-    assert.doesNotMatch(page, /persona="general"/);
-    assert.match(hr, /persona="hr"/);
-    assert.match(accountant, /persona="accountant"/);
+    assert.doesNotMatch(page, /persona=['"]general['"]/);
+    assert.match(hr, /persona=['"]hr['"]/);
+    assert.match(accountant, /persona=['"]accountant['"]/);
     assert.match(personaCore, /HR_DASHBOARD_MODULES/);
     assert.match(personaCore, /ACCOUNTANT_DASHBOARD_MODULES/);
     assert.match(personaCore, /isSupportedDashboardPersona/);
-    assert.doesNotMatch(personaCore, /return "general"/);
+    assert.doesNotMatch(personaCore, /return ['"]general['"]/);
   });
 
   it('does not fetch dashboard summary for unsupported personas', () => {
@@ -153,7 +153,7 @@ describe('Slice 4 institutional settings hub visibility', () => {
     assert.match(palette, /shouldShowSettingsHub\([\s\S]*schoolWebPersona/);
     assert.match(
       personaNavConfig,
-      /const principalLeadershipOnly = \['principal'\]\.includes\(persona\)/,
+      /const principalLeadershipOnly = \[['"]principal['"]\]\.includes\(persona\)/,
     );
     assert.match(
       personaNavConfig,

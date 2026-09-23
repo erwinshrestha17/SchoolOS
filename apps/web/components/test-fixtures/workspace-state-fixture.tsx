@@ -66,7 +66,9 @@ export function WorkspaceStateFixture() {
         onValueChange={(value) => setState(value as FixtureState)}
       />
       <WorkSurface
-        title={fixtureStates.find((item) => item.value === state)?.label ?? 'State'}
+        title={
+          fixtureStates.find((item) => item.value === state)?.label ?? 'State'
+        }
         description="Deterministic visual evidence for the shared state contract."
         action={
           <span className="text-xs font-medium text-slate-500">
@@ -79,10 +81,22 @@ export function WorkspaceStateFixture() {
           onAction={(message) => setLastAction(message)}
         />
       </WorkSurface>
-      <WorkSurface title="Shared interaction fixtures" description="Local UI state only; these controls do not submit school records.">
+      <WorkSurface
+        title="Shared interaction fixtures"
+        description="Local UI state only; these controls do not submit school records."
+      >
         <div className="space-y-4 p-4">
-          <Button onClick={() => { setDialogOpen(true); setValidated(false); }}>Open fixture confirmation</Button>
-          <p role="status" aria-label="Fixture result">{lastAction}</p>
+          <Button
+            onClick={() => {
+              setDialogOpen(true);
+              setValidated(false);
+            }}
+          >
+            Open fixture confirmation
+          </Button>
+          <p role="status" aria-label="Fixture result">
+            {lastAction}
+          </p>
           <DataTable
             columns={[{ header: 'Fixture record', accessorKey: 'name' }]}
             data={[{ id: 'alpha', name: 'Fixture Alpha' }]}
@@ -90,10 +104,19 @@ export function WorkspaceStateFixture() {
             onRowClick={() => setLastAction('Alpha opened by row action.')}
           />
           <PaginatedDataTable
-            columns={[{ id: 'name', header: 'Fixture record', cell: (row: { id: string; name: string }) => row.name }]}
+            columns={[
+              {
+                id: 'name',
+                header: 'Fixture record',
+                cell: (row: { id: string; name: string }) => row.name,
+              },
+            ]}
             items={[{ id: 'beta', name: 'Fixture Beta' }]}
             getRowId={(row) => row.id}
-            page={1} pageSize={10} totalItems={1} onPageChange={() => {}}
+            page={1}
+            pageSize={10}
+            totalItems={1}
+            onPageChange={() => {}}
             getRowActionLabel={(row) => `Open ${row.name}`}
             onRowClick={() => setLastAction('Beta opened by row action.')}
           />
@@ -107,13 +130,38 @@ export function WorkspaceStateFixture() {
         isConfirming={pending}
         preventCloseWhileConfirming
         onClose={() => setDialogOpen(false)}
-        onConfirm={() => { setValidated(true); if (reason.trim()) setPending(true); }}
+        onConfirm={() => {
+          setValidated(true);
+          if (reason.trim()) setPending(true);
+        }}
       >
         <div className="space-y-4 p-5">
-          <FormField label="Fixture reason" description="Enter a reason to test the pending state." error={validated && !reason.trim() ? 'Enter a fixture reason.' : undefined}>
-            <Input required value={reason} onChange={(event) => setReason(event.target.value)} />
+          <FormField
+            label="Fixture reason"
+            description="Enter a reason to test the pending state."
+            error={
+              validated && !reason.trim()
+                ? 'Enter a fixture reason.'
+                : undefined
+            }
+          >
+            <Input
+              required
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+            />
           </FormField>
-          {pending ? <Button onClick={() => { setPending(false); setDialogOpen(false); setLastAction('Fixture action completed.'); }}>Complete fixture action</Button> : null}
+          {pending ? (
+            <Button
+              onClick={() => {
+                setPending(false);
+                setDialogOpen(false);
+                setLastAction('Fixture action completed.');
+              }}
+            >
+              Complete fixture action
+            </Button>
+          ) : null}
         </div>
       </ConfirmDialog>
     </DashboardPageShell>

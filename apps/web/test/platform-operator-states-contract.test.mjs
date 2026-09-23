@@ -13,7 +13,11 @@ function read(relativePath) {
 
 describe('Platform operator state component contracts', () => {
   it('keeps shared platform state components available', () => {
-    assert.equal(existsSync(join(webRoot, componentPath)), true, 'Missing platform operator state components');
+    assert.equal(
+      existsSync(join(webRoot, componentPath)),
+      true,
+      'Missing platform operator state components',
+    );
 
     const component = read(componentPath);
 

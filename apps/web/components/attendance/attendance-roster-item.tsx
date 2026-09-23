@@ -6,7 +6,13 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
 
-type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'SICK_LEAVE' | 'EXCUSED_LEAVE' | 'UNEXCUSED_LEAVE';
+type AttendanceStatus =
+  | 'PRESENT'
+  | 'ABSENT'
+  | 'LATE'
+  | 'SICK_LEAVE'
+  | 'EXCUSED_LEAVE'
+  | 'UNEXCUSED_LEAVE';
 
 interface Student {
   id: string;
@@ -75,7 +81,9 @@ export function AttendanceRosterItem({
   const isPresent = status === 'PRESENT';
   const isAbsent = status === 'ABSENT';
   const isLate = status === 'LATE';
-  const isLeave = ['SICK_LEAVE', 'EXCUSED_LEAVE', 'UNEXCUSED_LEAVE'].includes(status);
+  const isLeave = ['SICK_LEAVE', 'EXCUSED_LEAVE', 'UNEXCUSED_LEAVE'].includes(
+    status,
+  );
 
   const initials = student.fullNameEn
     .split(' ')
@@ -85,28 +93,33 @@ export function AttendanceRosterItem({
     .join('');
 
   return (
-    <div className={cn(
-      "group relative flex flex-col rounded-xl border bg-white p-4 shadow-sm transition-all duration-300 hover:shadow-md",
-      isPresent && "border-slate-100",
-      isAbsent && "border-danger-100 bg-danger-50/10",
-      isLate && "border-warning-100 bg-warning-50/10",
-      isLeave && "border-info-100 bg-info-50/10",
-      disabled && "opacity-60"
-    )}>
-      
+    <div
+      className={cn(
+        'group relative flex flex-col rounded-xl border bg-white p-4 shadow-sm transition-all duration-300 hover:shadow-md',
+        isPresent && 'border-slate-100',
+        isAbsent && 'border-danger-100 bg-danger-50/10',
+        isLate && 'border-warning-100 bg-warning-50/10',
+        isLeave && 'border-info-100 bg-info-50/10',
+        disabled && 'opacity-60',
+      )}
+    >
       {/* Student Details and Avatar */}
       <div className="flex items-center gap-3">
         <Avatar
           alt={student.fullNameEn}
           initials={initials || 'S'}
           className={cn(
-            "h-12 w-12 text-sm font-bold shadow-sm transition-all duration-500",
-            isPresent ? "bg-success-50 text-success-600" : "bg-slate-50 text-slate-600"
+            'h-12 w-12 text-sm font-bold shadow-sm transition-all duration-500',
+            isPresent
+              ? 'bg-success-50 text-success-600'
+              : 'bg-slate-50 text-slate-600',
           )}
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h4 className="font-bold text-slate-900 truncate tracking-tight">{student.fullNameEn}</h4>
+            <h4 className="font-bold text-slate-900 truncate tracking-tight">
+              {student.fullNameEn}
+            </h4>
             {student.hasMedicalAlert && (
               <span
                 role="img"
@@ -117,13 +130,17 @@ export function AttendanceRosterItem({
             )}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
-             <span className="text-[0.62rem] font-bold text-slate-400 uppercase tracking-widest">{student.studentSystemId}</span>
-             {student.rollNumber && (
-               <>
-                 <div className="h-0.5 w-0.5 rounded-full bg-slate-300" />
-                 <span className="text-[0.62rem] font-bold text-slate-500 uppercase tracking-widest">Roll {student.rollNumber}</span>
-               </>
-             )}
+            <span className="text-[0.62rem] font-bold text-slate-400 uppercase tracking-widest">
+              {student.studentSystemId}
+            </span>
+            {student.rollNumber && (
+              <>
+                <div className="h-0.5 w-0.5 rounded-full bg-slate-300" />
+                <span className="text-[0.62rem] font-bold text-slate-500 uppercase tracking-widest">
+                  Roll {student.rollNumber}
+                </span>
+              </>
+            )}
           </div>
         </div>
         <StatusBadge status={status} className="h-6" />
@@ -166,15 +183,14 @@ export function AttendanceRosterItem({
 
       {!isPresent && (
         <div className="mt-3.5 space-y-2 border-t border-slate-100 pt-3 animate-in slide-in-from-top-2 duration-300">
-           <input
+          <input
             type="text"
             disabled={disabled}
             value={remark || ''}
             onChange={(e) => onRemarkChange(e.target.value)}
             placeholder="Write brief remark..."
             className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 text-xs font-medium outline-none transition-all placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-[var(--color-mod-attendance-border)] disabled:cursor-not-allowed"
-           />
-           
+          />
         </div>
       )}
     </div>

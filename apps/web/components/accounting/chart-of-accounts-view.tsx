@@ -24,14 +24,14 @@ export function ChartOfAccountsView() {
     tone: ToastTone;
   } | null>(null);
 
-  const accountsQuery = useQuery({ 
-    queryKey: ['chart-accounts'], 
-    queryFn: () => api.listChartAccounts() 
+  const accountsQuery = useQuery({
+    queryKey: ['chart-accounts'],
+    queryFn: () => api.listChartAccounts(),
   });
 
-  const fiscalYearsQuery = useQuery({ 
-    queryKey: ['fiscal-years'], 
-    queryFn: () => api.listFiscalYears() 
+  const fiscalYearsQuery = useQuery({
+    queryKey: ['fiscal-years'],
+    queryFn: () => api.listFiscalYears(),
   });
 
   const seedMutation = useMutation({
@@ -41,7 +41,8 @@ export function ChartOfAccountsView() {
       setSeedConfirmOpen(false);
       setNotice({
         title: 'Default accounts seeded',
-        description: 'The chart of accounts has been refreshed from system defaults.',
+        description:
+          'The chart of accounts has been refreshed from system defaults.',
         tone: 'success',
       });
     },

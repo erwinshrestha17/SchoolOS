@@ -14,13 +14,19 @@ interface FiscalPeriodActionsProps {
   label: string;
 }
 
-export function FiscalPeriodActions({ periodId, status, label }: FiscalPeriodActionsProps) {
+export function FiscalPeriodActions({
+  periodId,
+  status,
+  label,
+}: FiscalPeriodActionsProps) {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
   const canManage = hasPermissions(['accounting:fiscal:manage']);
   const canReopen = hasPermissions(['accounting:fiscal:reopen']);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [actionType, setActionType] = useState<'lock' | 'unlock' | 'close' | 'reopen' | null>(null);
+  const [actionType, setActionType] = useState<
+    'lock' | 'unlock' | 'close' | 'reopen' | null
+  >(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -31,10 +37,16 @@ export function FiscalPeriodActions({ periodId, status, label }: FiscalPeriodAct
   });
 
   const mutation = useMutation({
-    mutationFn: (data: { type: 'lock' | 'unlock' | 'close' | 'reopen'; reason: string }) => {
-      if (data.type === 'lock') return api.lockFiscalPeriod(periodId, { reason: data.reason });
-      if (data.type === 'unlock') return api.unlockFiscalPeriod(periodId, { reason: data.reason });
-      if (data.type === 'close') return api.closeFiscalPeriod(periodId, { reason: data.reason });
+    mutationFn: (data: {
+      type: 'lock' | 'unlock' | 'close' | 'reopen';
+      reason: string;
+    }) => {
+      if (data.type === 'lock')
+        return api.lockFiscalPeriod(periodId, { reason: data.reason });
+      if (data.type === 'unlock')
+        return api.unlockFiscalPeriod(periodId, { reason: data.reason });
+      if (data.type === 'close')
+        return api.closeFiscalPeriod(periodId, { reason: data.reason });
       return api.reopenFiscalPeriod(periodId, { reason: data.reason });
     },
     onSuccess: () => {
@@ -152,16 +164,24 @@ export function FiscalPeriodActions({ periodId, status, label }: FiscalPeriodAct
                 </p>
               ))}
               <p className="mt-2 text-amber-700">
-                Posting-failure and required-snapshot policy checks remain explicitly unavailable.
+                Posting-failure and required-snapshot policy checks remain
+                explicitly unavailable.
               </p>
             </div>
           )}
           {(error || readinessQuery.isError) && (
             <p className="text-xs font-semibold text-rose-700">
-              {error || readinessQuery.error?.message || 'Readiness checks failed.'}
+              {error ||
+                readinessQuery.error?.message ||
+                'Readiness checks failed.'}
             </p>
           )}
-          <label htmlFor={`fiscal-period-reason-${periodId}`} className="text-xs font-bold text-slate-500 uppercase">Reason for action</label>
+          <label
+            htmlFor={`fiscal-period-reason-${periodId}`}
+            className="text-xs font-bold text-slate-500 uppercase"
+          >
+            Reason for action
+          </label>
           <textarea
             id={`fiscal-period-reason-${periodId}`}
             value={reason}

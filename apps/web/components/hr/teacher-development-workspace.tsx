@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   formatBsDate,
   parseBsDateInput,
@@ -9,7 +9,7 @@ import {
   type StaffLookupOption,
   type TeacherDevelopmentGoalRecord,
   type TeacherObservationRecord,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   Award,
   BookOpenCheck,
@@ -17,43 +17,43 @@ import {
   ClipboardCheck,
   Plus,
   Target,
-} from "lucide-react";
-import { api } from "@/lib/api";
-import { useSession } from "@/components/session-provider";
-import { ModuleHeader } from "@/components/ui/module-header";
-import { SummaryCard, SummaryGrid } from "@/components/ui/summary-card";
-import { WorkSurface } from "@/components/ui/work-surface";
-import { Button } from "@/components/ui/button";
-import { BsDateField } from "@/components/ui/bs-date-field";
-import { FormField, Input, Select, TextArea } from "@/components/ui/form-field";
-import { LoadingState } from "@/components/ui/loading-state";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ErrorState } from "@/components/ui/error-state";
-import { PermissionDenied } from "@/components/ui/permission-denied";
-import { ProtectedFileButton } from "@/components/ui/protected-file";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { RemoteStaffSelector } from "@/components/staff/remote-staff-selector";
+} from 'lucide-react';
+import { api } from '@/lib/api';
+import { useSession } from '@/components/session-provider';
+import { ModuleHeader } from '@/components/ui/module-header';
+import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
+import { WorkSurface } from '@/components/ui/work-surface';
+import { Button } from '@/components/ui/button';
+import { BsDateField } from '@/components/ui/bs-date-field';
+import { FormField, Input, Select, TextArea } from '@/components/ui/form-field';
+import { LoadingState } from '@/components/ui/loading-state';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { PermissionDenied } from '@/components/ui/permission-denied';
+import { ProtectedFileButton } from '@/components/ui/protected-file';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { RemoteStaffSelector } from '@/components/staff/remote-staff-selector';
 
-type CreateKind = "observation" | "goal" | "training";
+type CreateKind = 'observation' | 'goal' | 'training';
 
 export function TeacherDevelopmentWorkspace() {
   const { hasPermissions } = useSession();
   const queryClient = useQueryClient();
-  const canRead = hasPermissions(["hr:read"]) || hasPermissions(["hr:manage"]);
-  const canManage = hasPermissions(["hr:manage"]);
+  const canRead = hasPermissions(['hr:read']) || hasPermissions(['hr:manage']);
+  const canManage = hasPermissions(['hr:manage']);
   const yearsQuery = useQuery({
-    queryKey: ["academic-years"],
+    queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
     enabled: Boolean(canRead),
   });
-  const [academicYearId, setAcademicYearId] = useState("");
+  const [academicYearId, setAcademicYearId] = useState('');
   const effectiveYearId =
     academicYearId ||
     yearsQuery.data?.find((year) => year.isCurrent)?.id ||
     yearsQuery.data?.[0]?.id ||
-    "";
+    '';
   const overviewQuery = useQuery({
-    queryKey: ["teacher-development-overview", effectiveYearId],
+    queryKey: ['teacher-development-overview', effectiveYearId],
     queryFn: () =>
       api.getTeacherDevelopmentOverview({
         academicYearId: effectiveYearId || undefined,
@@ -63,7 +63,7 @@ export function TeacherDevelopmentWorkspace() {
 
   const refresh = () =>
     queryClient.invalidateQueries({
-      queryKey: ["teacher-development-overview"],
+      queryKey: ['teacher-development-overview'],
     });
 
   if (!canRead) {
@@ -93,7 +93,7 @@ export function TeacherDevelopmentWorkspace() {
             {(yearsQuery.data ?? []).map((year) => (
               <option key={year.id} value={year.id}>
                 {year.name}
-                {year.isCurrent ? " • Current" : ""}
+                {year.isCurrent ? ' • Current' : ''}
               </option>
             ))}
           </Select>
@@ -103,29 +103,29 @@ export function TeacherDevelopmentWorkspace() {
       <SummaryGrid>
         <SummaryCard
           label="Follow-ups due"
-          value={overview?.metrics.observationsDue ?? "Unavailable"}
+          value={overview?.metrics.observationsDue ?? 'Unavailable'}
           icon={<CalendarClock />}
           tone={
-            (overview?.metrics.observationsDue ?? 0) > 0 ? "warning" : "success"
+            (overview?.metrics.observationsDue ?? 0) > 0 ? 'warning' : 'success'
           }
         />
         <SummaryCard
           label="Active goals"
-          value={overview?.metrics.activeGoals ?? "Unavailable"}
+          value={overview?.metrics.activeGoals ?? 'Unavailable'}
           icon={<Target />}
           tone="info"
         />
         <SummaryCard
           label="Overdue goals"
-          value={overview?.metrics.overdueGoals ?? "Unavailable"}
+          value={overview?.metrics.overdueGoals ?? 'Unavailable'}
           icon={<ClipboardCheck />}
           tone={
-            (overview?.metrics.overdueGoals ?? 0) > 0 ? "danger" : "success"
+            (overview?.metrics.overdueGoals ?? 0) > 0 ? 'danger' : 'success'
           }
         />
         <SummaryCard
           label="Training completed"
-          value={overview?.metrics.completedTraining ?? "Unavailable"}
+          value={overview?.metrics.completedTraining ?? 'Unavailable'}
           icon={<Award />}
           tone="success"
         />
@@ -185,7 +185,7 @@ export function TeacherDevelopmentWorkspace() {
                     </div>
                     <p className="mt-2 text-xs text-muted-foreground">
                       {formatBsDate(item.startsOn)}
-                      {item.endsOn ? ` – ${formatBsDate(item.endsOn)}` : ""}
+                      {item.endsOn ? ` – ${formatBsDate(item.endsOn)}` : ''}
                     </p>
                     {item.learningSummary ? (
                       <p className="mt-2 text-sm">{item.learningSummary}</p>
@@ -218,30 +218,32 @@ function TeacherDevelopmentCreateForm({
   academicYearId: string;
   onCreated: () => void;
 }) {
-  const [kind, setKind] = useState<CreateKind>("observation");
-  const [teacherStaffId, setTeacherStaffId] = useState("");
-  const [mentorStaffId, setMentorStaffId] = useState("");
-  const [teacherOption, setTeacherOption] =
-    useState<StaffLookupOption | null>(null);
-  const [mentorOption, setMentorOption] =
-    useState<StaffLookupOption | null>(null);
-  const [title, setTitle] = useState("");
-  const [primary, setPrimary] = useState("");
-  const [secondary, setSecondary] = useState("");
-  const [tertiary, setTertiary] = useState("");
-  const [startsOnBs, setStartsOnBs] = useState("");
-  const [endsOnBs, setEndsOnBs] = useState("");
-  const [certificateFileAssetId, setCertificateFileAssetId] = useState("");
-  const [certificateFileName, setCertificateFileName] = useState("");
+  const [kind, setKind] = useState<CreateKind>('observation');
+  const [teacherStaffId, setTeacherStaffId] = useState('');
+  const [mentorStaffId, setMentorStaffId] = useState('');
+  const [teacherOption, setTeacherOption] = useState<StaffLookupOption | null>(
+    null,
+  );
+  const [mentorOption, setMentorOption] = useState<StaffLookupOption | null>(
+    null,
+  );
+  const [title, setTitle] = useState('');
+  const [primary, setPrimary] = useState('');
+  const [secondary, setSecondary] = useState('');
+  const [tertiary, setTertiary] = useState('');
+  const [startsOnBs, setStartsOnBs] = useState('');
+  const [endsOnBs, setEndsOnBs] = useState('');
+  const [certificateFileAssetId, setCertificateFileAssetId] = useState('');
+  const [certificateFileName, setCertificateFileName] = useState('');
   const [uploadingCertificate, setUploadingCertificate] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   const mutation = useMutation({
     mutationFn: async () => {
       if (!academicYearId || !teacherStaffId) {
-        throw new Error("Choose an academic year and teacher.");
+        throw new Error('Choose an academic year and teacher.');
       }
-      if (kind === "observation") {
+      if (kind === 'observation') {
         return api.createTeacherObservation({
           teacherStaffId,
           academicYearId,
@@ -253,7 +255,7 @@ function TeacherDevelopmentCreateForm({
           clientRequestId: crypto.randomUUID(),
         });
       }
-      if (kind === "goal") {
+      if (kind === 'goal') {
         return api.createTeacherDevelopmentGoal({
           teacherStaffId,
           mentorStaffId: mentorStaffId || undefined,
@@ -273,27 +275,27 @@ function TeacherDevelopmentCreateForm({
         providerName: primary || undefined,
         startsOn: gregorianDateString(startsOnBs),
         endsOn: endsOnBs ? gregorianDateString(endsOnBs) : undefined,
-        status: "PLANNED",
+        status: 'PLANNED',
         learningSummary: secondary || undefined,
         certificateFileAssetId: certificateFileAssetId || undefined,
         clientRequestId: crypto.randomUUID(),
       });
     },
     onSuccess: () => {
-      setTitle("");
-      setPrimary("");
-      setSecondary("");
-      setTertiary("");
-      setStartsOnBs("");
-      setEndsOnBs("");
-      setCertificateFileAssetId("");
-      setCertificateFileName("");
-      setError("");
+      setTitle('');
+      setPrimary('');
+      setSecondary('');
+      setTertiary('');
+      setStartsOnBs('');
+      setEndsOnBs('');
+      setCertificateFileAssetId('');
+      setCertificateFileName('');
+      setError('');
       onCreated();
     },
     onError: () => {
       setError(
-        "The teacher development record could not be saved. Check the required fields and try again.",
+        'The teacher development record could not be saved. Check the required fields and try again.',
       );
     },
   });
@@ -302,25 +304,25 @@ function TeacherDevelopmentCreateForm({
     () =>
       ({
         observation: {
-          primary: "Observed strengths",
-          secondary: "Development focus",
-          tertiary: "Agreed action (optional)",
-          start: "Observed on (BS)",
-          end: "Follow-up on (BS, optional)",
+          primary: 'Observed strengths',
+          secondary: 'Development focus',
+          tertiary: 'Agreed action (optional)',
+          start: 'Observed on (BS)',
+          end: 'Follow-up on (BS, optional)',
         },
         goal: {
-          primary: "Baseline",
-          secondary: "Target",
-          tertiary: "Action plan",
-          start: "Starts on (BS)",
-          end: "Due on (BS)",
+          primary: 'Baseline',
+          secondary: 'Target',
+          tertiary: 'Action plan',
+          start: 'Starts on (BS)',
+          end: 'Due on (BS)',
         },
         training: {
-          primary: "Provider (optional)",
-          secondary: "Learning summary (optional)",
-          tertiary: "",
-          start: "Starts on (BS)",
-          end: "Ends on (BS, optional)",
+          primary: 'Provider (optional)',
+          secondary: 'Learning summary (optional)',
+          tertiary: '',
+          start: 'Starts on (BS)',
+          end: 'Ends on (BS, optional)',
         },
       })[kind],
     [kind],
@@ -337,7 +339,7 @@ function TeacherDevelopmentCreateForm({
         className="grid gap-4 lg:grid-cols-3"
         onSubmit={(event) => {
           event.preventDefault();
-          setError("");
+          setError('');
           mutation.mutate();
         }}
       >
@@ -361,7 +363,7 @@ function TeacherDevelopmentCreateForm({
           label="Teacher"
           placeholder="Search teacher"
         />
-        {kind === "goal" ? (
+        {kind === 'goal' ? (
           <RemoteStaffSelector
             value={mentorStaffId}
             selectedOption={mentorOption}
@@ -375,8 +377,8 @@ function TeacherDevelopmentCreateForm({
         ) : (
           <div />
         )}
-        {kind !== "observation" ? (
-          <FormField label={kind === "goal" ? "Goal title" : "Training title"}>
+        {kind !== 'observation' ? (
+          <FormField label={kind === 'goal' ? 'Goal title' : 'Training title'}>
             <Input
               required
               minLength={4}
@@ -386,7 +388,7 @@ function TeacherDevelopmentCreateForm({
           </FormField>
         ) : null}
         <FormField label={labels.primary}>
-          {kind === "training" ? (
+          {kind === 'training' ? (
             <Input
               value={primary}
               onChange={(event) => setPrimary(event.target.value)}
@@ -402,8 +404,8 @@ function TeacherDevelopmentCreateForm({
         </FormField>
         <FormField label={labels.secondary}>
           <TextArea
-            required={kind !== "training"}
-            minLength={kind === "training" ? undefined : 4}
+            required={kind !== 'training'}
+            minLength={kind === 'training' ? undefined : 4}
             value={secondary}
             onChange={(event) => setSecondary(event.target.value)}
           />
@@ -411,8 +413,8 @@ function TeacherDevelopmentCreateForm({
         {labels.tertiary ? (
           <FormField label={labels.tertiary}>
             <TextArea
-              required={kind === "goal"}
-              minLength={kind === "goal" ? 4 : undefined}
+              required={kind === 'goal'}
+              minLength={kind === 'goal' ? 4 : undefined}
               value={tertiary}
               onChange={(event) => setTertiary(event.target.value)}
             />
@@ -428,14 +430,14 @@ function TeacherDevelopmentCreateForm({
           label={labels.end}
           value={endsOnBs}
           onChange={setEndsOnBs}
-          required={kind === "goal"}
+          required={kind === 'goal'}
         />
-        {kind === "training" ? (
+        {kind === 'training' ? (
           <FormField label="Protected certificate (optional)">
             <label className="flex cursor-pointer items-center rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:border-[var(--primary)]">
               {uploadingCertificate
-                ? "Uploading certificate…"
-                : certificateFileName || "Choose certificate file"}
+                ? 'Uploading certificate…'
+                : certificateFileName || 'Choose certificate file'}
               <input
                 type="file"
                 className="sr-only"
@@ -444,21 +446,21 @@ function TeacherDevelopmentCreateForm({
                   const file = event.target.files?.[0];
                   if (!file) return;
                   setUploadingCertificate(true);
-                  setError("");
+                  setError('');
                   try {
                     const uploaded = await api.uploadFile(
                       file,
-                      "institutional-improvement",
+                      'institutional-improvement',
                     );
                     setCertificateFileAssetId(uploaded.id);
                     setCertificateFileName(uploaded.fileName);
                   } catch {
                     setError(
-                      "The certificate could not be uploaded. The training record has not been saved.",
+                      'The certificate could not be uploaded. The training record has not been saved.',
                     );
                   } finally {
                     setUploadingCertificate(false);
-                    event.target.value = "";
+                    event.target.value = '';
                   }
                 }}
               />
@@ -471,7 +473,7 @@ function TeacherDevelopmentCreateForm({
             className="w-full"
             disabled={mutation.isPending || uploadingCertificate}
           >
-            {mutation.isPending ? "Saving…" : "Save record"}
+            {mutation.isPending ? 'Saving…' : 'Save record'}
           </Button>
         </div>
         {error ? (
@@ -493,21 +495,21 @@ function ObservationList({
   canManage: boolean;
   onChanged: () => void;
 }) {
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState('');
   const mutation = useMutation({
     mutationFn: (item: TeacherObservationRecord) =>
       api.updateTeacherObservation(item.id, {
         expectedVersion: item.version,
         status:
-          item.status === "DRAFT"
-            ? "COMPLETED"
-            : item.status === "FOLLOW_UP_DUE"
-              ? "CLOSED"
-              : "FOLLOW_UP_DUE",
+          item.status === 'DRAFT'
+            ? 'COMPLETED'
+            : item.status === 'FOLLOW_UP_DUE'
+              ? 'CLOSED'
+              : 'FOLLOW_UP_DUE',
         reason,
       }),
     onSuccess: () => {
-      setReason("");
+      setReason('');
       onChanged();
     },
   });
@@ -516,7 +518,7 @@ function ObservationList({
       title="Classroom observations"
       description="Strengths, agreed feedback, and follow-up."
     >
-      {canManage && items.some((item) => item.status !== "CLOSED") ? (
+      {canManage && items.some((item) => item.status !== 'CLOSED') ? (
         <div className="mb-4">
           <FormField label="Reason for the next observation status change">
             <Input
@@ -555,7 +557,7 @@ function ObservationList({
                   Follow-up {formatBsDate(item.followUpOn)}
                 </p>
               ) : null}
-              {canManage && item.status !== "CLOSED" ? (
+              {canManage && item.status !== 'CLOSED' ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -563,11 +565,11 @@ function ObservationList({
                   disabled={mutation.isPending || reason.trim().length < 4}
                   onClick={() => mutation.mutate(item)}
                 >
-                  {item.status === "DRAFT"
-                    ? "Complete observation"
-                    : item.status === "FOLLOW_UP_DUE"
-                      ? "Close follow-up"
-                      : "Mark follow-up due"}
+                  {item.status === 'DRAFT'
+                    ? 'Complete observation'
+                    : item.status === 'FOLLOW_UP_DUE'
+                      ? 'Close follow-up'
+                      : 'Mark follow-up due'}
                 </Button>
               ) : null}
             </article>
@@ -587,19 +589,19 @@ function GoalList({
   canManage: boolean;
   onChanged: () => void;
 }) {
-  const [reason, setReason] = useState("");
-  const [progressNote, setProgressNote] = useState("");
+  const [reason, setReason] = useState('');
+  const [progressNote, setProgressNote] = useState('');
   const mutation = useMutation({
     mutationFn: (item: TeacherDevelopmentGoalRecord) =>
       api.updateTeacherDevelopmentGoal(item.id, {
         expectedVersion: item.version,
-        status: item.status === "DRAFT" ? "ACTIVE" : "COMPLETED",
+        status: item.status === 'DRAFT' ? 'ACTIVE' : 'COMPLETED',
         reason,
         progressNote: progressNote || undefined,
       }),
     onSuccess: () => {
-      setReason("");
-      setProgressNote("");
+      setReason('');
+      setProgressNote('');
       onChanged();
     },
   });
@@ -610,7 +612,7 @@ function GoalList({
     >
       {canManage &&
       items.some(
-        (item) => item.status === "DRAFT" || item.status === "ACTIVE",
+        (item) => item.status === 'DRAFT' || item.status === 'ACTIVE',
       ) ? (
         <div className="mb-4 grid gap-3 md:grid-cols-2">
           <FormField label="Reason for the next goal status change">
@@ -650,10 +652,10 @@ function GoalList({
               <p className="mt-2 text-sm">Target: {item.target}</p>
               <p className="mt-2 text-xs text-muted-foreground">
                 Due {formatBsDate(item.dueOn)}
-                {item.mentor ? ` • Mentor ${item.mentor.fullName}` : ""}
+                {item.mentor ? ` • Mentor ${item.mentor.fullName}` : ''}
               </p>
               {canManage &&
-              (item.status === "DRAFT" || item.status === "ACTIVE") ? (
+              (item.status === 'DRAFT' || item.status === 'ACTIVE') ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -661,7 +663,7 @@ function GoalList({
                   disabled={mutation.isPending || reason.trim().length < 4}
                   onClick={() => mutation.mutate(item)}
                 >
-                  {item.status === "DRAFT" ? "Activate goal" : "Complete goal"}
+                  {item.status === 'DRAFT' ? 'Activate goal' : 'Complete goal'}
                 </Button>
               ) : null}
             </article>
@@ -674,5 +676,5 @@ function GoalList({
 
 function gregorianDateString(value: string) {
   const gregorian = toGregorianDateFromBs(parseBsDateInput(value));
-  return `${gregorian.year}-${String(gregorian.month).padStart(2, "0")}-${String(gregorian.day).padStart(2, "0")}`;
+  return `${gregorian.year}-${String(gregorian.month).padStart(2, '0')}-${String(gregorian.day).padStart(2, '0')}`;
 }

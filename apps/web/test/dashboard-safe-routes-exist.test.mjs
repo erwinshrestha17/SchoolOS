@@ -21,9 +21,16 @@ function read(relativePath) {
  */
 function extractApprovedRoutes() {
   const source = read('components/ui/operational-summary.tsx');
-  const match = source.match(/APPROVED_DASHBOARD_ROUTES = new Set\(\[([\s\S]*?)\]\)/);
-  assert.ok(match, 'Could not find APPROVED_DASHBOARD_ROUTES in operational-summary.tsx');
-  return [...match[1].matchAll(/"(\/dashboard\/[^"]+)"/g)].map((m) => m[1]);
+  const match = source.match(
+    /APPROVED_DASHBOARD_ROUTES = new Set\(\[([\s\S]*?)\]\)/,
+  );
+  assert.ok(
+    match,
+    'Could not find APPROVED_DASHBOARD_ROUTES in operational-summary.tsx',
+  );
+  return [...match[1].matchAll(/[\'"](\/dashboard\/[^\'"]+)[\'"]/g)].map(
+    (m) => m[1],
+  );
 }
 
 function routeHasRealPage(route) {
@@ -38,14 +45,24 @@ function routeHasRealPage(route) {
 describe('dashboard safe-route allowlist points at real pages', () => {
   it('resolves every APPROVED_DASHBOARD_ROUTES entry to an existing page.tsx', () => {
     const routes = extractApprovedRoutes();
-    assert.ok(routes.length > 30, 'Expected the allowlist to have its usual full set of routes');
+    assert.ok(
+      routes.length > 30,
+      'Expected the allowlist to have its usual full set of routes',
+    );
 
     const missing = routes.filter((route) => !routeHasRealPage(route));
-    assert.deepEqual(missing, [], `These allowlisted routes have no page.tsx: ${missing.join(', ')}`);
+    assert.deepEqual(
+      missing,
+      [],
+      `These allowlisted routes have no page.tsx: ${missing.join(', ')}`,
+    );
   });
 
   it('keeps the backend operational-summary service pointing at the same corrected routes', () => {
-    const backendPath = join(apiRoot, 'src/operational-summary/operational-summary.service.ts');
+    const backendPath = join(
+      apiRoot,
+      'src/operational-summary/operational-summary.service.ts',
+    );
     const backend = readFileSync(backendPath, 'utf8');
 
     // The seven routes fixed 2026-07-10 — backend and frontend must agree,
@@ -61,7 +78,10 @@ describe('dashboard safe-route allowlist points at real pages', () => {
       '/dashboard/notifications/deliveries',
     ];
     for (const route of correctedRoutes) {
-      assert.ok(backend.includes(`'${route}'`), `Backend missing corrected route: ${route}`);
+      assert.ok(
+        backend.includes(`'${route}'`),
+        `Backend missing corrected route: ${route}`,
+      );
     }
 
     const staleRoutes = [
@@ -77,7 +97,10 @@ describe('dashboard safe-route allowlist points at real pages', () => {
       '/dashboard/notices/deliveries',
     ];
     for (const route of staleRoutes) {
-      assert.ok(!backend.includes(`'${route}'`), `Backend still has stale dead route: ${route}`);
+      assert.ok(
+        !backend.includes(`'${route}'`),
+        `Backend still has stale dead route: ${route}`,
+      );
     }
   });
 });

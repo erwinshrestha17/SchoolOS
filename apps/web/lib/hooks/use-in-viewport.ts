@@ -5,7 +5,10 @@ import { useEffect, useState, type RefObject } from 'react';
 // Reports true once the element has scrolled near the viewport, then stops
 // observing - used to lazy-trigger protected-image fetches so a long list
 // doesn't fire a request per row on first paint.
-export function useInViewport(ref: RefObject<Element | null>, options?: { rootMargin?: string }): boolean {
+export function useInViewport(
+  ref: RefObject<Element | null>,
+  options?: { rootMargin?: string },
+): boolean {
   const [visible, setVisible] = useState(false);
   const rootMargin = options?.rootMargin ?? '160px';
 

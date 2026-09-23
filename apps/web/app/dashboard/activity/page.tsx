@@ -20,7 +20,10 @@ import {
 } from 'lucide-react';
 import { activityCategoryValues, formatBsDateTime } from '@schoolos/core';
 import { api } from '../../../lib/api';
-import { TeacherCapability, useTeacherAccess } from '../../../lib/teacher-access';
+import {
+  TeacherCapability,
+  useTeacherAccess,
+} from '../../../lib/teacher-access';
 import { useTeacherAssignmentScope } from '../../../lib/hooks/use-teacher-assignment-scope';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
 import { ModuleHeader } from '../../../components/ui/module-header';
@@ -86,7 +89,9 @@ export default function ActivityPage() {
   const sections = assignmentScope.sections;
   const filteredSections = useMemo(
     () =>
-      filters.classId ? assignmentScope.sectionsForClass(filters.classId) : sections,
+      filters.classId
+        ? assignmentScope.sectionsForClass(filters.classId)
+        : sections,
     [assignmentScope, filters.classId, sections],
   );
 
@@ -114,7 +119,13 @@ export default function ActivityPage() {
 
   function resetFilters() {
     setPage(1);
-    setFilters({ classId: '', sectionId: '', category: '', status: '', month: '' });
+    setFilters({
+      classId: '',
+      sectionId: '',
+      category: '',
+      status: '',
+      month: '',
+    });
   }
 
   return (
@@ -167,7 +178,8 @@ export default function ActivityPage() {
                   {
                     key: 'pendingReview',
                     label: 'Pending review',
-                    description: 'Activity posts waiting in the moderation queue.',
+                    description:
+                      'Activity posts waiting in the moderation queue.',
                     href: '/dashboard/activity/moderation',
                     icon: <ShieldAlert />,
                     tone: 'warning',
@@ -175,7 +187,8 @@ export default function ActivityPage() {
                   {
                     key: 'consentIssues',
                     label: 'Consent attention',
-                    description: 'Photo-consent records needing staff attention.',
+                    description:
+                      'Photo-consent records needing staff attention.',
                     href: '/dashboard/activity',
                     icon: <AlertTriangle />,
                     tone: 'warning',
@@ -185,7 +198,8 @@ export default function ActivityPage() {
             {
               key: 'failedUploads',
               label: 'Media processing failed',
-              description: 'Protected activity media that did not finish processing.',
+              description:
+                'Protected activity media that did not finish processing.',
               href: '/dashboard/activity/gallery',
               icon: <FileWarning />,
               tone: 'danger',
@@ -203,7 +217,8 @@ export default function ActivityPage() {
             {
               key: 'myPublishedPostsToday',
               label: 'My posts published today',
-              description: 'Your posts published during the current school day.',
+              description:
+                'Your posts published during the current school day.',
               href: '/dashboard/activity',
               icon: <CheckCircle2 />,
               tone: 'success',
@@ -223,12 +238,36 @@ export default function ActivityPage() {
       <WorkspaceTabs
         items={[
           { href: '/dashboard/activity', label: 'Feed', icon: MessageSquare },
-          { href: '/dashboard/activity/moderation', label: 'Moderation', icon: CheckCircle2 },
-          { href: '/dashboard/activity/gallery', label: 'Gallery', icon: Images },
-          { href: '/dashboard/activity/observations', label: 'Observations', icon: Smile },
-          { href: '/dashboard/activity/milestones', label: 'Milestones', icon: Target },
-          { href: '/dashboard/activity/deliveries', label: 'Deliveries', icon: Truck },
-          { href: '/dashboard/activity/reports', label: 'Reports', icon: BarChart3 },
+          {
+            href: '/dashboard/activity/moderation',
+            label: 'Moderation',
+            icon: CheckCircle2,
+          },
+          {
+            href: '/dashboard/activity/gallery',
+            label: 'Gallery',
+            icon: Images,
+          },
+          {
+            href: '/dashboard/activity/observations',
+            label: 'Observations',
+            icon: Smile,
+          },
+          {
+            href: '/dashboard/activity/milestones',
+            label: 'Milestones',
+            icon: Target,
+          },
+          {
+            href: '/dashboard/activity/deliveries',
+            label: 'Deliveries',
+            icon: Truck,
+          },
+          {
+            href: '/dashboard/activity/reports',
+            label: 'Reports',
+            icon: BarChart3,
+          },
         ]}
       />
 
@@ -252,7 +291,9 @@ export default function ActivityPage() {
           value={filters.classId}
           onChange={(event) => updateFilter('classId', event.target.value)}
         >
-          <option value="">{assignmentScope.isScoped ? 'All my classes' : 'All classes'}</option>
+          <option value="">
+            {assignmentScope.isScoped ? 'All my classes' : 'All classes'}
+          </option>
           {classes.map((classroom) => (
             <option key={classroom.id} value={classroom.id}>
               {classroom.name}
@@ -263,7 +304,9 @@ export default function ActivityPage() {
           value={filters.sectionId}
           onChange={(event) => updateFilter('sectionId', event.target.value)}
         >
-          <option value="">{assignmentScope.isScoped ? 'All my sections' : 'All sections'}</option>
+          <option value="">
+            {assignmentScope.isScoped ? 'All my sections' : 'All sections'}
+          </option>
           {filteredSections.map((section) => (
             <option key={section.id} value={section.id}>
               {section.name}
@@ -317,7 +360,10 @@ export default function ActivityPage() {
         }
       >
         {postsQuery.isLoading ? (
-          <LoadingState label="Loading activity posts..." className="min-h-64" />
+          <LoadingState
+            label="Loading activity posts..."
+            className="min-h-64"
+          />
         ) : postsQuery.isError ? (
           <ErrorState
             title="Activity feed unavailable"
@@ -376,13 +422,19 @@ export default function ActivityPage() {
                       tone="inactive"
                     />
                   ) : (
-                    <StatusBadge status="PARENTS" label="Parents" tone="active" />
+                    <StatusBadge
+                      status="PARENTS"
+                      label="Parents"
+                      tone="active"
+                    />
                   ),
               },
               {
                 header: 'Published',
                 cell: (post) =>
-                  post.publishedAt ? formatBsDateTime(post.publishedAt) : 'Draft',
+                  post.publishedAt
+                    ? formatBsDateTime(post.publishedAt)
+                    : 'Draft',
               },
             ]}
             data={posts}

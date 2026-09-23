@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { CheckCircle2, CircleAlert, KeyRound } from "lucide-react";
-import { api, ApiRequestError } from "../../lib/api";
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { CheckCircle2, CircleAlert, KeyRound } from 'lucide-react';
+import { api, ApiRequestError } from '../../lib/api';
 
 export default function ResetPasswordPage() {
   return (
@@ -19,24 +19,24 @@ function ResetPasswordForm() {
   const searchParams = useSearchParams();
   return (
     <ResetPasswordShell
-      initialTenantSlug={searchParams.get("tenantSlug") ?? ""}
-      initialEmail={searchParams.get("email") ?? ""}
+      initialTenantSlug={searchParams.get('tenantSlug') ?? ''}
+      initialEmail={searchParams.get('email') ?? ''}
     />
   );
 }
 
 function ResetPasswordShell({
-  initialTenantSlug = "",
-  initialEmail = "",
+  initialTenantSlug = '',
+  initialEmail = '',
 }: {
   initialTenantSlug?: string;
   initialEmail?: string;
 }) {
   const [tenantSlug, setTenantSlug] = useState(initialTenantSlug);
   const [email, setEmail] = useState(initialEmail);
-  const [code, setCode] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [code, setCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [success, setSuccess] = useState(false);
 
   const mutation = useMutation({
@@ -115,7 +115,7 @@ function ResetPasswordShell({
             }
             className="h-11 rounded-2xl bg-[var(--primary)] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {mutation.isPending ? "Resetting password..." : "Set new password"}
+            {mutation.isPending ? 'Resetting password...' : 'Set new password'}
           </button>
         </form>
         {success ? (
@@ -152,12 +152,12 @@ function ResetPasswordShell({
 function TextField({
   label,
   value,
-  type = "text",
+  type = 'text',
   onChange,
 }: {
   label: string;
   value: string;
-  type?: "text" | "email" | "password";
+  type?: 'text' | 'email' | 'password';
   onChange: (value: string) => void;
 }) {
   return (
@@ -176,10 +176,10 @@ function TextField({
 function friendlyResetError(error: unknown) {
   if (error instanceof ApiRequestError) {
     if (error.statusCode === 401) {
-      return "Your reset link is invalid or expired.";
+      return 'Your reset link is invalid or expired.';
     }
-    return error.message || "Could not reset password.";
+    return error.message || 'Could not reset password.';
   }
 
-  return "Network error. Please retry when your connection is stable.";
+  return 'Network error. Please retry when your connection is stable.';
 }

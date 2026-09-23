@@ -14,7 +14,11 @@ export default function LearningResourcesPage() {
         description="Browse and manage shared resources attached to Learning activities."
       />
       <div className="mb-6">
-        <ModuleTabs items={learningWorkspaceTabs} accentColor="emerald" variant="light" />
+        <ModuleTabs
+          items={learningWorkspaceTabs}
+          accentColor="emerald"
+          variant="light"
+        />
       </div>
       <LearningWorkspace initialTab="resources" />
     </DashboardPageShell>

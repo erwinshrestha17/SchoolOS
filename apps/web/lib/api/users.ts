@@ -1,7 +1,7 @@
-import type { PermissionKey, RoleSummary } from "@schoolos/core";
-import { JsonBody, request } from "./client";
+import type { PermissionKey, RoleSummary } from '@schoolos/core';
+import { JsonBody, request } from './client';
 
-export type SchoolUserStatus = "PENDING" | "ACTIVE" | "SUSPENDED";
+export type SchoolUserStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED';
 
 export type SchoolUserSummary = {
   id: string;
@@ -9,10 +9,8 @@ export type SchoolUserSummary = {
   phone: string | null;
   status: SchoolUserStatus;
   mustChangePassword: boolean;
-  roles: Array<
-    Pick<RoleSummary, "id" | "name"> & { expiresAt: string | null }
-  >;
-  profileType: "staff" | "student" | "user";
+  roles: Array<Pick<RoleSummary, 'id' | 'name'> & { expiresAt: string | null }>;
+  profileType: 'staff' | 'student' | 'user';
   staffId: string | null;
   studentId: string | null;
   lastLoginAt: string | null;
@@ -37,28 +35,28 @@ export type PermissionCatalogItem = {
 };
 
 export const usersApi = {
-  listUsers: () => request<SchoolUserSummary[]>("/users"),
-  listRoleCatalog: () => request<TenantRoleSummary[]>("/roles"),
+  listUsers: () => request<SchoolUserSummary[]>('/users'),
+  listRoleCatalog: () => request<TenantRoleSummary[]>('/roles'),
   listPermissionCatalog: () =>
-    request<PermissionCatalogItem[]>("/roles/permissions"),
+    request<PermissionCatalogItem[]>('/roles/permissions'),
   createUser: (body: JsonBody) =>
-    request<SchoolUserSummary>("/users", { method: "POST", json: body }),
+    request<SchoolUserSummary>('/users', { method: 'POST', json: body }),
   updateUserStatus: (
     userId: string,
     body: { status: SchoolUserStatus; reason?: string },
   ) =>
     request<SchoolUserSummary>(`/users/${encodeURIComponent(userId)}/status`, {
-      method: "PATCH",
+      method: 'PATCH',
       json: body,
     }),
   resetUserPassword: (userId: string, password: string) =>
     request<{ success: true }>(
       `/users/${encodeURIComponent(userId)}/password-reset`,
-      { method: "POST", json: { password, requireChangeOnNextLogin: true } },
+      { method: 'POST', json: { password, requireChangeOnNextLogin: true } },
     ),
   forceLogoutUser: (userId: string) =>
     request<{ success: true }>(
       `/users/${encodeURIComponent(userId)}/force-logout`,
-      { method: "POST", json: {} },
+      { method: 'POST', json: {} },
     ),
 };

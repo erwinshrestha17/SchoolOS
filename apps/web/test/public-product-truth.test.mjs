@@ -42,11 +42,17 @@ describe('public SchoolOS product truth', () => {
     assert.match(landing, /Notices & Announcements/);
     assert.match(landing, /Notifications & Delivery/);
     assert.match(landing, /Parent Mobile Companion/);
-    assert.match(login, /Parents & Guardians: Please use the SchoolOS mobile app/);
+    assert.match(
+      login,
+      /Parents & Guardians: Please use the SchoolOS mobile app/,
+    );
     assert.match(requestForm, /Notifications & Delivery/);
     assert.match(requestForm, /Notices & Announcements/);
     assert.doesNotMatch(requestForm, /Parent Portal/);
-    assert.doesNotMatch(requestForm, /Multi-branch Institution|branchesCount|Number of Branches/);
+    assert.doesNotMatch(
+      requestForm,
+      /Multi-branch Institution|branchesCount|Number of Branches/,
+    );
   });
 
   it('keeps public metadata aligned with the Grade 1–12 operating-system boundary', () => {

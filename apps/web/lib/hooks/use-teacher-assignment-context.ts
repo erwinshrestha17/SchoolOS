@@ -55,13 +55,13 @@ export function useTeacherAssignmentContext() {
       responsibility: 'SUBJECT_TEACHER' as const,
     }));
 
-    const homerooms: TeacherAssignmentOption[] = (
-      context?.homerooms ?? []
-    ).map((entry) => ({
-      ...entry,
-      label: labelFor(entry),
-      responsibility: 'CLASS_TEACHER' as const,
-    }));
+    const homerooms: TeacherAssignmentOption[] = (context?.homerooms ?? []).map(
+      (entry) => ({
+        ...entry,
+        label: labelFor(entry),
+        responsibility: 'CLASS_TEACHER' as const,
+      }),
+    );
 
     return {
       loading: isTeacherPersona && query.isLoading,

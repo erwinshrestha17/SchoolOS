@@ -1,6 +1,13 @@
 'use client';
 
-import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  useDeferredValue,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -118,7 +125,11 @@ export function GeoCombobox({
     <div className="space-y-1.5" ref={containerRef}>
       <label htmlFor={baseId} className="text-sm font-semibold text-slate-700">
         {label}
-        {required && <span aria-hidden="true" className="ml-0.5 text-red-500">*</span>}
+        {required && (
+          <span aria-hidden="true" className="ml-0.5 text-red-500">
+            *
+          </span>
+        )}
       </label>
       <div className="relative">
         <button
@@ -138,9 +149,13 @@ export function GeoCombobox({
             disabled && 'cursor-not-allowed bg-slate-50 text-slate-300',
           )}
         >
-          <span className="truncate">{selected ? selected.label : placeholder}</span>
+          <span className="truncate">
+            {selected ? selected.label : placeholder}
+          </span>
           <div className="ml-2 flex shrink-0 items-center gap-1.5">
-            {isLoading && <Loader2 size={14} className="animate-spin text-slate-400" />}
+            {isLoading && (
+              <Loader2 size={14} className="animate-spin text-slate-400" />
+            )}
             {selected && !disabled && (
               <span
                 role="button"
@@ -181,7 +196,9 @@ export function GeoCombobox({
                   aria-label={`Search ${label.toLowerCase()}`}
                   aria-controls={listboxId}
                   aria-activedescendant={
-                    filtered[activeIndex] ? `${baseId}-option-${filtered[activeIndex].id}` : undefined
+                    filtered[activeIndex]
+                      ? `${baseId}-option-${filtered[activeIndex].id}`
+                      : undefined
                   }
                   className="h-10 w-full rounded-xl border border-slate-100 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-[var(--primary)] focus:bg-white"
                   placeholder="Type to search..."
@@ -191,7 +208,12 @@ export function GeoCombobox({
                 />
               </div>
             </div>
-            <ul id={listboxId} role="listbox" aria-label={label} className="space-y-1">
+            <ul
+              id={listboxId}
+              role="listbox"
+              aria-label={label}
+              className="space-y-1"
+            >
               {isLoading && (
                 <li className="px-3 py-6 text-center text-xs font-semibold text-slate-400">
                   Loading...
@@ -222,7 +244,9 @@ export function GeoCombobox({
                       )}
                     >
                       <span className="truncate">{option.label}</span>
-                      {option.id === selectedId && <Check size={14} className="ml-auto shrink-0" />}
+                      {option.id === selectedId && (
+                        <Check size={14} className="ml-auto shrink-0" />
+                      )}
                     </button>
                   </li>
                 ))}

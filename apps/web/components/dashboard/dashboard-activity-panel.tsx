@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
 import {
   formatBsDateTime,
   type OperationalRecentItem,
   type OperationalSummaryModule,
-} from "@schoolos/core";
-import { cn } from "../../lib/utils";
-import { SectionCard } from "../ui/section-card";
+} from '@schoolos/core';
+import { cn } from '../../lib/utils';
+import { SectionCard } from '../ui/section-card';
 import {
   ACTIVITY_EVENT_LABELS,
   MODULE_DEFINITIONS,
-} from "./dashboard-module-meta";
+} from './dashboard-module-meta';
 
 type DashboardRecentItem = OperationalRecentItem & {
   module: OperationalSummaryModule;
@@ -48,7 +48,7 @@ export function LatestSchoolActivityPanel({
               <li key={item.id} className="flex gap-3 px-5 py-3 lg:px-6">
                 <span
                   className={cn(
-                    "mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+                    'mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border',
                     definition.accentClass,
                   )}
                 >
@@ -82,6 +82,6 @@ export function LatestSchoolActivityPanel({
 
 function formatRecentDate(value: string) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Recently";
+  if (Number.isNaN(date.getTime())) return 'Recently';
   return formatBsDateTime(date);
 }

@@ -21,31 +21,48 @@ type AcademicsWorkspaceProps = {
 // component renders only the task content for that one route, permanently.
 // It must not add a second header, a second tab switcher, or KPIs of its own.
 const sectionMap: Record<string, WorkflowStep> = {
-  'Subjects': 'Setup',
+  Subjects: 'Setup',
   'Exam Terms': 'Setup',
   'Marks Entry': 'Entry',
   'Marks Lock': 'Lock',
   'CAS Records': 'Entry',
-  'Promotion': 'Promotion',
+  Promotion: 'Promotion',
   'Result Publishing': 'Publish',
 };
 
-export function AcademicsWorkspace({ initialSection }: AcademicsWorkspaceProps) {
+export function AcademicsWorkspace({
+  initialSection,
+}: AcademicsWorkspaceProps) {
   const step = sectionMap[initialSection ?? ''] ?? 'Setup';
   // Only the Setup step needs the subject catalogue and teacher-assignment
   // map. Teacher selection itself uses bounded remote search.
   const isSetupStep = step === 'Setup';
 
-  const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
-  const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: () => api.listSubjects() });
+  const academicYearsQuery = useQuery({
+    queryKey: ['academic-years'],
+    queryFn: api.listAcademicYears,
+  });
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: api.listClasses,
+  });
+  const sectionsQuery = useQuery({
+    queryKey: ['sections'],
+    queryFn: api.listSections,
+  });
+  const subjectsQuery = useQuery({
+    queryKey: ['subjects'],
+    queryFn: () => api.listSubjects(),
+  });
   const assignmentsQuery = useQuery({
     queryKey: ['teacher-assignments'],
     queryFn: api.listTeacherAssignments,
     enabled: isSetupStep,
   });
-  const examsQuery = useQuery({ queryKey: ['exam-terms'], queryFn: api.listExamTerms });
+  const examsQuery = useQuery({
+    queryKey: ['exam-terms'],
+    queryFn: api.listExamTerms,
+  });
 
   if (step === 'Setup') {
     return (

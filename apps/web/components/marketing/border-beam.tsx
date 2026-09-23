@@ -15,10 +15,10 @@ export function BorderBeam({
   size = 350,
   duration = 6,
   borderWidth = 2,
-  colorFrom = "#3b82f6", // Blue-500
-  colorTo = "#8b5cf6",   // Purple-500
+  colorFrom = '#3b82f6', // Blue-500
+  colorTo = '#8b5cf6', // Purple-500
 }: BorderBeamProps) {
-  const uniqueId = React.useId().replace(/:/g, "-");
+  const uniqueId = React.useId().replace(/:/g, '-');
 
   return (
     <>

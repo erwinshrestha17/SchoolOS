@@ -4,9 +4,24 @@ import { formatBsDate } from '@schoolos/core';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { FileText, Download, CheckCircle, Clock, AlertTriangle, Plus, ShieldCheck, X } from 'lucide-react';
+import {
+  FileText,
+  Download,
+  CheckCircle,
+  Clock,
+  AlertTriangle,
+  Plus,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
 import { StaffDocumentUploadDialog } from './staff-document-upload-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/dialog';
 import { Button } from '../ui/button';
 import { FormField, TextArea } from '../ui/form-field';
 import { Badge } from '../ui/badge';
@@ -20,7 +35,10 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
   const canUpdateStaff = hasPermissions(['hr:staff:update']);
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [selectedDocToVerify, setSelectedDocToVerify] = useState<{ id: string; name: string } | null>(null);
+  const [selectedDocToVerify, setSelectedDocToVerify] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [verifyNotes, setVerifyNotes] = useState('');
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
@@ -33,10 +51,16 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
 
   const verifyMutation = useMutation({
     mutationFn: (note: string) =>
-      api.verifyStaffDocument(staffId, selectedDocToVerify!.id, { notes: note }),
+      api.verifyStaffDocument(staffId, selectedDocToVerify!.id, {
+        notes: note,
+      }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['staff-documents', staffId] });
-      void queryClient.invalidateQueries({ queryKey: ['staff-detail', staffId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-documents', staffId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-detail', staffId],
+      });
       setSelectedDocToVerify(null);
       setVerifyNotes('');
     },
@@ -92,39 +116,67 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
         {documentsQuery.isLoading ? (
           <div className="py-12 flex justify-center items-center gap-3">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-[var(--color-mod-hr-accent)]" />
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hydrating records...</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Hydrating records...
+            </span>
           </div>
         ) : docs.length > 0 ? (
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/50 border-b border-slate-100">
               <tr>
-                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider">Document Details</th>
-                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider">Kind</th>
-                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider">Audit / Remarks</th>
-                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider">
+                  Document Details
+                </th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider">
+                  Kind
+                </th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider">
+                  Audit / Remarks
+                </th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-right">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {docs.map((doc: any) => (
-                <tr key={doc.id} className="hover:bg-slate-50/30 transition-all group">
+                <tr
+                  key={doc.id}
+                  className="hover:bg-slate-50/30 transition-all group"
+                >
                   <td className="px-6 py-4 font-bold text-slate-900">
                     <p className="font-bold text-slate-900">{doc.name}</p>
-                    <p className="text-[10px] text-slate-400 mt-1 font-medium">Uploaded {formatBsDate(doc.createdAt)}</p>
+                    <p className="text-[10px] text-slate-400 mt-1 font-medium">
+                      Uploaded {formatBsDate(doc.createdAt)}
+                    </p>
                   </td>
                   <td className="px-6 py-4">
-                    <Badge variant="secondary" className="font-bold text-[9px] uppercase tracking-wider">
+                    <Badge
+                      variant="secondary"
+                      className="font-bold text-[9px] uppercase tracking-wider"
+                    >
                       {doc.kind.replace('_', ' ')}
                     </Badge>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={cn(
-                      "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border inline-flex items-center gap-1",
-                      doc.status === 'VERIFIED' ? "bg-emerald-50 text-emerald-600 border-emerald-200/50" :
-                      doc.status === 'ACTIVE' || doc.status === 'PENDING' ? "bg-amber-50 text-amber-600 border-amber-200/50" :
-                      "bg-rose-50 text-rose-600 border-rose-200/50"
-                    )}>
-                      {doc.status === 'VERIFIED' ? <CheckCircle size={10} /> : <Clock size={10} />}
+                    <span
+                      className={cn(
+                        'px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border inline-flex items-center gap-1',
+                        doc.status === 'VERIFIED'
+                          ? 'bg-emerald-50 text-emerald-600 border-emerald-200/50'
+                          : doc.status === 'ACTIVE' || doc.status === 'PENDING'
+                            ? 'bg-amber-50 text-amber-600 border-amber-200/50'
+                            : 'bg-rose-50 text-rose-600 border-rose-200/50',
+                      )}
+                    >
+                      {doc.status === 'VERIFIED' ? (
+                        <CheckCircle size={10} />
+                      ) : (
+                        <Clock size={10} />
+                      )}
                       {doc.status === 'ACTIVE' ? 'PENDING' : doc.status}
                     </span>
                   </td>
@@ -135,7 +187,12 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
                     <div className="flex justify-end items-center gap-2">
                       {doc.status !== 'VERIFIED' && canUpdateStaff && (
                         <button
-                          onClick={() => setSelectedDocToVerify({ id: doc.id, name: doc.name })}
+                          onClick={() =>
+                            setSelectedDocToVerify({
+                              id: doc.id,
+                              name: doc.name,
+                            })
+                          }
                           className="px-3 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-50 text-emerald-700 font-bold text-[10px] uppercase tracking-widest transition-all"
                         >
                           Verify
@@ -177,14 +234,19 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
 
       {/* Verification Dialog */}
       {selectedDocToVerify && (
-        <Dialog open={!!selectedDocToVerify} onOpenChange={() => setSelectedDocToVerify(null)}>
+        <Dialog
+          open={!!selectedDocToVerify}
+          onOpenChange={() => setSelectedDocToVerify(null)}
+        >
           <DialogContent className="max-w-md rounded-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ShieldCheck className="text-emerald-500" />
                 Verify Document
               </DialogTitle>
-              <p className="text-xs text-slate-500 mt-1">Reviewing: {selectedDocToVerify.name}</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Reviewing: {selectedDocToVerify.name}
+              </p>
             </DialogHeader>
             <form onSubmit={handleVerifySubmit} className="p-6 space-y-4">
               <FormField label="Audit / Verification Note">
@@ -195,10 +257,16 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
                   rows={3}
                 />
               </FormField>
-              {verifyError && <p className="text-xs font-bold text-rose-500">{verifyError}</p>}
+              {verifyError && (
+                <p className="text-xs font-bold text-rose-500">{verifyError}</p>
+              )}
             </form>
             <DialogFooter className="bg-slate-50 border-t flex justify-end gap-3 p-6">
-              <Button type="button" variant="outline" onClick={() => setSelectedDocToVerify(null)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSelectedDocToVerify(null)}
+              >
                 Cancel
               </Button>
               <Button

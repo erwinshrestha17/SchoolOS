@@ -58,7 +58,10 @@ export function PermissionDenied({
       </div>
 
       <div className="mt-12 text-sm font-medium text-slate-400">
-        Reference: <span className="font-semibold text-slate-500">Platform access denied</span>
+        Reference:{' '}
+        <span className="font-semibold text-slate-500">
+          Platform access denied
+        </span>
       </div>
     </div>
   );

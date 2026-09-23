@@ -27,10 +27,14 @@ test.describe.serial('SchoolOS Academic Workflow Smoke Tests', () => {
     await login(page, schoolAdminCredentials);
   });
 
-  test('Academic Overview: Navigation and shell integrity', async ({ page }) => {
+  test('Academic Overview: Navigation and shell integrity', async ({
+    page,
+  }) => {
     await page.goto('/dashboard/academics');
     await expect(page).toHaveURL(/\/dashboard\/academics/);
-    await expect(page.getByRole('heading', { name: 'Academics', exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Academics', exact: true }),
+    ).toBeVisible();
 
     // Backend-owned KPI cards replaced the earlier decorative module-card
     // grid; verify the real overview surfaces instead of stale card labels.
@@ -47,25 +51,36 @@ test.describe.serial('SchoolOS Academic Workflow Smoke Tests', () => {
 
   test('Homework: List and creation form', async ({ page }) => {
     await page.goto('/dashboard/homework');
-    await expect(page.getByRole('heading', { name: /^Homework$/i })).toBeVisible();
-    
+    await expect(
+      page.getByRole('heading', { name: /^Homework$/i }),
+    ).toBeVisible();
+
     // Check loading state resolves
     await expect(page.getByText(/Loading homework/i)).not.toBeVisible();
-    
+
     // Navigate to create homework. The list page's action button reads "Give
     // Homework" (the /new page's own heading is still "Create Homework").
-    await page.getByRole('link', { name: /Give Homework/i }).first().click();
+    await page
+      .getByRole('link', { name: /Give Homework/i })
+      .first()
+      .click();
     await expect(page).toHaveURL(/\/dashboard\/homework\/new/);
-    await expect(page.getByRole('heading', { name: /Create Homework/i })).toBeVisible();
-    
+    await expect(
+      page.getByRole('heading', { name: /Create Homework/i }),
+    ).toBeVisible();
+
     // Verify form fields. The form's FormField component renders its label as
     // a plain sibling <label> with no htmlFor/id association to the input, so
     // getByLabel() can't resolve these — assert on the visible label text
     // instead (also: the field is "Homework Title", not "Assignment Title").
-    await expect(page.getByText('Homework Title', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('Homework Title', { exact: true }),
+    ).toBeVisible();
     await expect(page.getByText('Instructions', { exact: true })).toBeVisible();
     await expect(page.getByText('Due Date', { exact: true })).toBeVisible();
-    await expect(page.getByText('Academic Year', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('Academic Year', { exact: true }),
+    ).toBeVisible();
     await expect(page.getByText('Class', { exact: true })).toBeVisible();
     await expect(page.getByText('Subject', { exact: true })).toBeVisible();
   });
@@ -75,10 +90,18 @@ test.describe.serial('SchoolOS Academic Workflow Smoke Tests', () => {
     // The read-only weekly grid was later split out from the builder into its
     // own page; the heading and tab set below reflect that current split
     // (builder/workload live at their own dedicated routes, verified separately).
-    await expect(page.getByRole('heading', { name: /^Timetable$/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^Timetable$/i }),
+    ).toBeVisible();
 
     // Verify tabs
-    const tabs = ['Weekly Grid', 'Versions', 'Requirements', 'Conflicts', 'Substitutions'];
+    const tabs = [
+      'Weekly Grid',
+      'Versions',
+      'Requirements',
+      'Conflicts',
+      'Substitutions',
+    ];
     for (const tab of tabs) {
       const tabButton = page.getByRole('tab', { name: new RegExp(tab, 'i') });
       await expect(tabButton).toBeVisible();
@@ -88,22 +111,26 @@ test.describe.serial('SchoolOS Academic Workflow Smoke Tests', () => {
 
   test('Exams: Management and components', async ({ page }) => {
     await page.goto('/dashboard/academics/exams');
-    await expect(page.getByRole('heading', { name: /Exam Terms/i })).toBeVisible();
-    
+    await expect(
+      page.getByRole('heading', { name: /Exam Terms/i }),
+    ).toBeVisible();
+
     // Check empty state or list
-    const hasExams = await page.getByRole('row').count() > 1;
+    const hasExams = (await page.getByRole('row').count()) > 1;
     if (!hasExams) {
       await expect(page.getByText(/No exams found/i)).toBeVisible();
     }
 
     // Verify create button
-    await expect(page.getByRole('button', { name: /Create Exam Term/i })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Create Exam Term/i }),
+    ).toBeVisible();
   });
 
   test('Marks Entry: Roster filters', async ({ page }) => {
     await page.goto('/dashboard/academics/marks');
     await expect(page.getByText(/Select context to begin/i)).toBeVisible();
-    
+
     // Verify filters exist
     await expect(page.getByTestId('filter-exam-term')).toBeVisible();
     await expect(page.getByTestId('filter-class')).toBeVisible();
@@ -118,10 +145,14 @@ test.describe.serial('SchoolOS Academic Workflow Smoke Tests', () => {
 
   test('Report Cards: Generation hub', async ({ page }) => {
     await page.goto('/dashboard/academics/report-cards');
-    await expect(page.getByRole('heading', { name: /Report Cards/i })).toBeVisible();
-    
+    await expect(
+      page.getByRole('heading', { name: /Report Cards/i }),
+    ).toBeVisible();
+
     // Verify batch generation button exists
-    await expect(page.getByRole('button', { name: /Start Generation/i })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Start Generation/i }),
+    ).toBeVisible();
   });
 });
 

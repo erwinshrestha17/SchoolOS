@@ -27,7 +27,10 @@ export default function SchoolOnboardingPage() {
 
   if (checklistQuery.isLoading || !checklistQuery.data) {
     return (
-      <div className="space-y-5 p-6" aria-label="Loading school setup checklist">
+      <div
+        className="space-y-5 p-6"
+        aria-label="Loading school setup checklist"
+      >
         <div className="h-28 animate-pulse rounded-2xl bg-slate-100" />
         <div className="h-80 animate-pulse rounded-2xl bg-slate-100" />
       </div>

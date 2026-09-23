@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatBsDateTime } from "@schoolos/core";
-import Link from "next/link";
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatBsDateTime } from '@schoolos/core';
+import Link from 'next/link';
 import {
   Archive,
   Clock,
@@ -12,24 +12,24 @@ import {
   Play,
   RotateCcw,
   Users,
-} from "lucide-react";
-import { learningApi } from "../../lib/api/learning";
+} from 'lucide-react';
+import { learningApi } from '../../lib/api/learning';
 import type {
   LearningActivity,
   LearningSession,
   LearningSessionStatus,
-} from "../../lib/api/learning";
-import { api } from "../../lib/api";
-import { EmptyState } from "../ui/empty-state";
-import { LoadingState } from "../ui/loading-state";
-import { StatusBadge } from "../ui/status-badge";
+} from '../../lib/api/learning';
+import { api } from '../../lib/api';
+import { EmptyState } from '../ui/empty-state';
+import { LoadingState } from '../ui/loading-state';
+import { StatusBadge } from '../ui/status-badge';
 
-const sessionStatuses: Array<"" | LearningSessionStatus> = [
-  "",
-  "LIVE",
-  "PAUSED",
-  "ENDED",
-  "EXPIRED",
+const sessionStatuses: Array<'' | LearningSessionStatus> = [
+  '',
+  'LIVE',
+  'PAUSED',
+  'ENDED',
+  'EXPIRED',
 ];
 
 export function LearningSessionsPanel({
@@ -38,13 +38,13 @@ export function LearningSessionsPanel({
   activities: LearningActivity[];
 }) {
   const [filters, setFilters] = useState({
-    classId: "",
-    subjectId: "",
-    status: "",
-    activityId: "",
+    classId: '',
+    subjectId: '',
+    status: '',
+    activityId: '',
   });
-  const [selectedSessionId, setSelectedSessionId] = useState("");
-  const [launchActivityId, setLaunchActivityId] = useState("");
+  const [selectedSessionId, setSelectedSessionId] = useState('');
+  const [launchActivityId, setLaunchActivityId] = useState('');
   const [expiresInMinutes, setExpiresInMinutes] = useState(45);
   const [launchedSession, setLaunchedSession] = useState<
     (LearningSession & { qrToken?: string }) | null
@@ -53,15 +53,15 @@ export function LearningSessionsPanel({
   const queryClient = useQueryClient();
 
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
   const subjectsQuery = useQuery({
-    queryKey: ["subjects", filters.classId],
+    queryKey: ['subjects', filters.classId],
     queryFn: () => api.listSubjects({ classId: filters.classId || undefined }),
   });
   const sessionsQuery = useQuery({
-    queryKey: ["learning-sessions", filters],
+    queryKey: ['learning-sessions', filters],
     queryFn: () =>
       learningApi.listSessions({
         classId: filters.classId || undefined,
@@ -72,12 +72,12 @@ export function LearningSessionsPanel({
       }),
   });
   const selectedSessionQuery = useQuery({
-    queryKey: ["learning-session-detail", selectedSessionId],
+    queryKey: ['learning-session-detail', selectedSessionId],
     queryFn: () => learningApi.getSession(selectedSessionId),
     enabled: Boolean(selectedSessionId),
   });
   const participantsQuery = useQuery({
-    queryKey: ["learning-session-participants", selectedSessionId],
+    queryKey: ['learning-session-participants', selectedSessionId],
     queryFn: () => learningApi.listParticipants(selectedSessionId),
     enabled: Boolean(selectedSessionId),
   });
@@ -91,33 +91,33 @@ export function LearningSessionsPanel({
     onSuccess: (session) => {
       setLaunchedSession(session);
       setSelectedSessionId(session.id);
-      setNotice("Learning session launched.");
-      void queryClient.invalidateQueries({ queryKey: ["learning-sessions"] });
+      setNotice('Learning session launched.');
+      void queryClient.invalidateQueries({ queryKey: ['learning-sessions'] });
     },
   });
 
   const pauseMutation = useMutation({
     mutationFn: learningApi.pauseSession,
-    onSuccess: (session) => afterSessionChange(session, "Session paused."),
+    onSuccess: (session) => afterSessionChange(session, 'Session paused.'),
   });
   const resumeMutation = useMutation({
     mutationFn: learningApi.resumeSession,
-    onSuccess: (session) => afterSessionChange(session, "Session resumed."),
+    onSuccess: (session) => afterSessionChange(session, 'Session resumed.'),
   });
   const endMutation = useMutation({
     mutationFn: learningApi.endSession,
-    onSuccess: (session) => afterSessionChange(session, "Session ended."),
+    onSuccess: (session) => afterSessionChange(session, 'Session ended.'),
   });
   const heartbeatMutation = useMutation({
     mutationFn: learningApi.heartbeatSession,
-    onSuccess: (session) => afterSessionChange(session, "Heartbeat recorded."),
+    onSuccess: (session) => afterSessionChange(session, 'Heartbeat recorded.'),
   });
 
   const selectedSession = launchedSession ?? selectedSessionQuery.data ?? null;
   const selectedQrToken =
     selectedSession &&
-    "qrToken" in selectedSession &&
-    typeof selectedSession.qrToken === "string"
+    'qrToken' in selectedSession &&
+    typeof selectedSession.qrToken === 'string'
       ? selectedSession.qrToken
       : undefined;
 
@@ -125,12 +125,12 @@ export function LearningSessionsPanel({
     setLaunchedSession(session);
     setSelectedSessionId(session.id);
     setNotice(message);
-    void queryClient.invalidateQueries({ queryKey: ["learning-sessions"] });
+    void queryClient.invalidateQueries({ queryKey: ['learning-sessions'] });
     void queryClient.invalidateQueries({
-      queryKey: ["learning-session-detail", session.id],
+      queryKey: ['learning-session-detail', session.id],
     });
     void queryClient.invalidateQueries({
-      queryKey: ["learning-session-participants", session.id],
+      queryKey: ['learning-session-participants', session.id],
     });
   }
 
@@ -195,7 +195,7 @@ export function LearningSessionsPanel({
                 setFilters((current) => ({
                   ...current,
                   classId,
-                  subjectId: "",
+                  subjectId: '',
                 }))
               }
               options={(classesQuery.data ?? []).map((item) => ({
@@ -260,7 +260,7 @@ export function LearningSessionsPanel({
               >
                 <div className="col-span-5 min-w-0">
                   <p className="truncate text-sm font-black text-slate-950">
-                    {session.activity?.title ?? "Learning session"}
+                    {session.activity?.title ?? 'Learning session'}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     {session.sessionCode} · {formatDateTime(session.startedAt)}
@@ -270,7 +270,7 @@ export function LearningSessionsPanel({
                   <StatusBadge status={session.status} />
                 </div>
                 <div className="col-span-3 text-sm text-slate-600">
-                  {session.participantCount ?? 0} joined ·{" "}
+                  {session.participantCount ?? 0} joined ·{' '}
                   {session.submittedCount ?? 0} submitted
                 </div>
                 <div className="col-span-2 text-right text-xs font-bold text-slate-500">
@@ -298,7 +298,7 @@ export function LearningSessionsPanel({
                     {selectedSession.sessionCode}
                   </p>
                   <h3 className="mt-1 text-lg font-black text-slate-950">
-                    {selectedSession.activity?.title ?? "Learning session"}
+                    {selectedSession.activity?.title ?? 'Learning session'}
                   </h3>
                 </div>
                 <StatusBadge status={selectedSession.status} />
@@ -331,7 +331,7 @@ export function LearningSessionsPanel({
                   value={
                     selectedSession.teacherHeartbeatAt
                       ? formatRelative(selectedSession.teacherHeartbeatAt)
-                      : "none"
+                      : 'none'
                   }
                 />
               </div>
@@ -387,7 +387,7 @@ export function LearningSessionsPanel({
                   onClick={() =>
                     void queryClient.invalidateQueries({
                       queryKey: [
-                        "learning-session-participants",
+                        'learning-session-participants',
                         selectedSession.id,
                       ],
                     })
@@ -420,9 +420,9 @@ export function LearningSessionsPanel({
                             item.attempt?.status ?? item.participant.status
                           }
                           tone={
-                            item.attempt?.status === "SUBMITTED"
-                              ? "approved"
-                              : "pending"
+                            item.attempt?.status === 'SUBMITTED'
+                              ? 'approved'
+                              : 'pending'
                           }
                         />
                       </div>
@@ -430,7 +430,7 @@ export function LearningSessionsPanel({
                         Joined {formatDateTime(item.participant.joinedAt)}
                         {item.attempt?.submittedAt
                           ? ` · Submitted ${formatDateTime(item.attempt.submittedAt)}`
-                          : ""}
+                          : ''}
                       </p>
                     </div>
                   ))}
@@ -488,12 +488,12 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return "not set";
+  if (!value) return 'not set';
   return formatBsDateTime(value);
 }
 
 function formatRelative(value?: string | null) {
-  if (!value) return "not set";
+  if (!value) return 'not set';
   const diffMs = new Date(value).getTime() - Date.now();
   const minutes = Math.round(Math.abs(diffMs) / 60_000);
   if (diffMs < 0) return `${minutes}m ago`;
@@ -503,7 +503,7 @@ function formatRelative(value?: string | null) {
 function labelize(value: string) {
   return value
     .toLowerCase()
-    .split("_")
+    .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+    .join(' ');
 }

@@ -1,18 +1,18 @@
-"use client";
+'use client';
 
 import type {
   OperationalModuleSummary,
   OperationalSummaryModule,
-} from "@schoolos/core";
-import { ArrowRight } from "lucide-react";
-import Link from "next/link";
-import { prioritizeByAttention } from "../../lib/dashboard/prioritize-by-attention";
+} from '@schoolos/core';
+import { ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { prioritizeByAttention } from '../../lib/dashboard/prioritize-by-attention';
 import {
   operationsModulesForPersona,
   type DashboardCompositionPersona,
-} from "@/lib/dashboard-persona";
-import { cn } from "../../lib/utils";
-import { SectionCard } from "../ui/section-card";
+} from '@/lib/dashboard-persona';
+import { cn } from '../../lib/utils';
+import { SectionCard } from '../ui/section-card';
 import {
   attendanceProgress,
   formatMoneyNpr,
@@ -21,7 +21,7 @@ import {
   metricValue,
   MODULE_DEFINITIONS,
   moduleWorkspaceRoute,
-} from "./dashboard-module-meta";
+} from './dashboard-module-meta';
 
 /**
  * The compact daily-operations rows. Fixed recommended order, but a module
@@ -30,7 +30,7 @@ import {
  */
 export function TodayOperationsPanel({
   moduleMap,
-  persona = "admin",
+  persona = 'admin',
 }: {
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
   persona?: DashboardCompositionPersona;
@@ -44,26 +44,26 @@ export function TodayOperationsPanel({
       .map((module) => moduleMap.get(module))
       .filter(
         (summary): summary is OperationalModuleSummary =>
-          summary !== undefined && summary.status !== "locked",
+          summary !== undefined && summary.status !== 'locked',
       ),
   );
 
   const title =
-    persona === "principal"
-      ? "Operations oversight"
-      : persona === "hr"
-        ? "People operations"
-        : persona === "accountant"
-          ? "Finance operations"
-          : "Today’s operations";
+    persona === 'principal'
+      ? 'Operations oversight'
+      : persona === 'hr'
+        ? 'People operations'
+        : persona === 'accountant'
+          ? 'Finance operations'
+          : 'Today’s operations';
   const description =
-    persona === "principal"
-      ? "School-wide exceptions that may need your decision."
-      : persona === "hr"
-        ? "Staff, payroll, and attendance exceptions for HR follow-up."
-        : persona === "accountant"
-          ? "Fees, accounting, and payroll posting readiness."
-          : "Where each daily workflow stands right now.";
+    persona === 'principal'
+      ? 'School-wide exceptions that may need your decision.'
+      : persona === 'hr'
+        ? 'Staff, payroll, and attendance exceptions for HR follow-up.'
+        : persona === 'accountant'
+          ? 'Fees, accounting, and payroll posting readiness.'
+          : 'Where each daily workflow stands right now.';
 
   return (
     <SectionCard title={title} description={description} noPadding>
@@ -85,12 +85,12 @@ export function TodayOperationsPanel({
 }
 
 const toneDotClass: Record<RowTone, string> = {
-  ok: "bg-success-500",
-  warn: "bg-warning-500",
-  muted: "bg-slate-300",
+  ok: 'bg-success-500',
+  warn: 'bg-warning-500',
+  muted: 'bg-slate-300',
 };
 
-type RowTone = "ok" | "warn" | "muted";
+type RowTone = 'ok' | 'warn' | 'muted';
 
 type OperationsRowState = {
   text: string;
@@ -107,7 +107,7 @@ function OperationsRow({ summary }: { summary: OperationalModuleSummary }) {
     <>
       <span
         className={cn(
-          "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border",
+          'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border',
           definition.accentClass,
         )}
       >
@@ -120,14 +120,14 @@ function OperationsRow({ summary }: { summary: OperationalModuleSummary }) {
         <p className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-slate-600">
           <span
             className={cn(
-              "inline-flex h-1.5 w-1.5 shrink-0 rounded-full",
+              'inline-flex h-1.5 w-1.5 shrink-0 rounded-full',
               toneDotClass[state.tone],
             )}
             aria-hidden="true"
           />
           <span className="truncate">{state.text}</span>
         </p>
-        {summary.status === "partial" ? (
+        {summary.status === 'partial' ? (
           <p className="mt-0.5 text-xs font-medium text-slate-500">
             Some information is temporarily unavailable.
           </p>
@@ -143,7 +143,7 @@ function OperationsRow({ summary }: { summary: OperationalModuleSummary }) {
   );
 
   const className =
-    "group flex items-center gap-3 px-5 py-3 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)] focus-visible:ring-offset-2 lg:px-6";
+    'group flex items-center gap-3 px-5 py-3 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)] focus-visible:ring-offset-2 lg:px-6';
 
   return href ? (
     <Link href={href} className={className}>
@@ -163,134 +163,134 @@ function operationsRowState(
   summary: OperationalModuleSummary,
 ): OperationsRowState {
   switch (summary.module) {
-    case "m2_attendance": {
+    case 'm2_attendance': {
       const progress = attendanceProgress(summary);
-      if (progress.kind === "unavailable") {
-        return { text: "Information is not available yet.", tone: "muted" };
+      if (progress.kind === 'unavailable') {
+        return { text: 'Information is not available yet.', tone: 'muted' };
       }
-      if (progress.kind === "notStarted") {
+      if (progress.kind === 'notStarted') {
         return {
           text:
             progress.total !== null
               ? `Not started · 0 of ${formatNumber(progress.total)} registers submitted`
-              : "Attendance has not started",
-          tone: "warn",
+              : 'Attendance has not started',
+          tone: 'warn',
         };
       }
-      if (progress.kind === "completed") {
+      if (progress.kind === 'completed') {
         return {
           text: `All ${formatNumber(progress.total)} registers submitted`,
-          tone: "ok",
+          tone: 'ok',
         };
       }
       return {
         text: `${formatNumber(progress.submitted)} of ${formatNumber(progress.total)} registers submitted`,
-        tone: "warn",
+        tone: 'warn',
       };
     }
-    case "m3_fees": {
-      const collected = metricValue(summary, "collectedTodayAmount");
-      const overdue = metricNumber(summary, "overdueInvoices");
+    case 'm3_fees': {
+      const collected = metricValue(summary, 'collectedTodayAmount');
+      const overdue = metricNumber(summary, 'overdueInvoices');
       if (collected === null) {
-        return { text: "Information is not available yet.", tone: "muted" };
+        return { text: 'Information is not available yet.', tone: 'muted' };
       }
       const collectedText = `${formatMoneyNpr(collected)} collected`;
-      if (overdue === null) return { text: collectedText, tone: "ok" };
+      if (overdue === null) return { text: collectedText, tone: 'ok' };
       return overdue > 0
         ? {
-            text: `${collectedText} · ${formatNumber(overdue)} overdue invoice${overdue === 1 ? "" : "s"}`,
-            tone: "warn",
+            text: `${collectedText} · ${formatNumber(overdue)} overdue invoice${overdue === 1 ? '' : 's'}`,
+            tone: 'warn',
           }
-        : { text: `${collectedText} · No overdue invoices`, tone: "ok" };
+        : { text: `${collectedText} · No overdue invoices`, tone: 'ok' };
     }
-    case "m10_communications": {
-      const failed = metricNumber(summary, "failedDeliveries");
-      const scheduled = metricNumber(summary, "scheduledNotices");
+    case 'm10_communications': {
+      const failed = metricNumber(summary, 'failedDeliveries');
+      const scheduled = metricNumber(summary, 'scheduledNotices');
       if (failed !== null && failed > 0) {
         return {
-          text: `${formatNumber(failed)} notice deliver${failed === 1 ? "y" : "ies"} failed`,
-          tone: "warn",
+          text: `${formatNumber(failed)} notice deliver${failed === 1 ? 'y' : 'ies'} failed`,
+          tone: 'warn',
         };
       }
       if (scheduled !== null && scheduled > 0) {
         return {
-          text: `${formatNumber(scheduled)} notice${scheduled === 1 ? "" : "s"} scheduled`,
-          tone: "ok",
+          text: `${formatNumber(scheduled)} notice${scheduled === 1 ? '' : 's'} scheduled`,
+          tone: 'ok',
         };
       }
       if (failed === null && scheduled === null) {
-        return { text: "Information is not available yet.", tone: "muted" };
+        return { text: 'Information is not available yet.', tone: 'muted' };
       }
-      return { text: "No open notice issue", tone: "ok" };
+      return { text: 'No open notice issue', tone: 'ok' };
     }
-    case "m8b_transport": {
-      const delayed = metricNumber(summary, "delayedTrips");
-      const stale = metricNumber(summary, "tripsWithStaleGps");
-      const active = metricNumber(summary, "activeTripsToday");
+    case 'm8b_transport': {
+      const delayed = metricNumber(summary, 'delayedTrips');
+      const stale = metricNumber(summary, 'tripsWithStaleGps');
+      const active = metricNumber(summary, 'activeTripsToday');
       if (delayed !== null && delayed > 0) {
         return {
-          text: `${formatNumber(delayed)} delayed trip${delayed === 1 ? "" : "s"}`,
-          tone: "warn",
+          text: `${formatNumber(delayed)} delayed trip${delayed === 1 ? '' : 's'}`,
+          tone: 'warn',
         };
       }
       if (stale !== null && stale > 0) {
         return {
-          text: `${formatNumber(stale)} trip${stale === 1 ? "" : "s"} without a recent location update`,
-          tone: "warn",
+          text: `${formatNumber(stale)} trip${stale === 1 ? '' : 's'} without a recent location update`,
+          tone: 'warn',
         };
       }
       if (active !== null && active > 0) {
         return {
-          text: `No open issue · ${formatNumber(active)} active trip${active === 1 ? "" : "s"}`,
-          tone: "ok",
+          text: `No open issue · ${formatNumber(active)} active trip${active === 1 ? '' : 's'}`,
+          tone: 'ok',
         };
       }
       if (delayed === null && stale === null && active === null) {
-        return { text: "Information is not available yet.", tone: "muted" };
+        return { text: 'Information is not available yet.', tone: 'muted' };
       }
-      return { text: "No open transport issue", tone: "ok" };
+      return { text: 'No open transport issue', tone: 'ok' };
     }
-    case "m6_homework_timetable": {
-      const overdue = metricNumber(summary, "overdueHomework");
-      const dueToday = metricNumber(summary, "homeworkDueToday");
+    case 'm6_homework_timetable': {
+      const overdue = metricNumber(summary, 'overdueHomework');
+      const dueToday = metricNumber(summary, 'homeworkDueToday');
       if (overdue !== null && overdue > 0) {
         return {
-          text: `${formatNumber(overdue)} homework follow-up${overdue === 1 ? "" : "s"} overdue`,
-          tone: "warn",
+          text: `${formatNumber(overdue)} homework follow-up${overdue === 1 ? '' : 's'} overdue`,
+          tone: 'warn',
         };
       }
       if (dueToday !== null && dueToday > 0) {
         return {
           text: `${formatNumber(dueToday)} homework due today`,
-          tone: "ok",
+          tone: 'ok',
         };
       }
       if (overdue === null && dueToday === null) {
-        return { text: "Information is not available yet.", tone: "muted" };
+        return { text: 'Information is not available yet.', tone: 'muted' };
       }
-      return { text: "No homework due today", tone: "ok" };
+      return { text: 'No homework due today', tone: 'ok' };
     }
-    case "m7_hr_payroll": {
-      const leaveRequests = metricNumber(summary, "pendingLeaveRequests");
-      const anomalies = metricNumber(summary, "staffAttendanceAnomalies");
+    case 'm7_hr_payroll': {
+      const leaveRequests = metricNumber(summary, 'pendingLeaveRequests');
+      const anomalies = metricNumber(summary, 'staffAttendanceAnomalies');
       if (leaveRequests !== null && leaveRequests > 0) {
         return {
-          text: `${formatNumber(leaveRequests)} leave request${leaveRequests === 1 ? "" : "s"} waiting`,
-          tone: "warn",
+          text: `${formatNumber(leaveRequests)} leave request${leaveRequests === 1 ? '' : 's'} waiting`,
+          tone: 'warn',
         };
       }
       if (anomalies !== null && anomalies > 0) {
         return {
           text: `${formatNumber(anomalies)} staff absent or late today`,
-          tone: "warn",
+          tone: 'warn',
         };
       }
       if (leaveRequests === null && anomalies === null) {
-        return { text: "Information is not available yet.", tone: "muted" };
+        return { text: 'Information is not available yet.', tone: 'muted' };
       }
-      return { text: "No open staff issue", tone: "ok" };
+      return { text: 'No open staff issue', tone: 'ok' };
     }
     default:
-      return { text: "Information is not available yet.", tone: "muted" };
+      return { text: 'Information is not available yet.', tone: 'muted' };
   }
 }

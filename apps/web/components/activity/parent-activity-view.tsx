@@ -1,4 +1,4 @@
-import { PageState } from "../ui/page-state";
+import { PageState } from '../ui/page-state';
 
 export function ParentActivityView() {
   return (

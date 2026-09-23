@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import type { OperationalDashboardSummary } from "@schoolos/core";
-import { OperationalDashboardLayout } from "./operational-dashboard-layout";
-import { projectDashboardForPersona } from "@/lib/dashboard-persona";
+import type { OperationalDashboardSummary } from '@schoolos/core';
+import { OperationalDashboardLayout } from './operational-dashboard-layout';
+import { projectDashboardForPersona } from '@/lib/dashboard-persona';
 
 /**
  * @deprecated Prefer AdminDashboard, PrincipalDashboard, HrDashboard,
@@ -15,7 +15,7 @@ export function DashboardCommandCenter({
 }) {
   return (
     <OperationalDashboardLayout
-      dashboard={projectDashboardForPersona(dashboard, "admin")}
+      dashboard={projectDashboardForPersona(dashboard, 'admin')}
       persona="admin"
     />
   );

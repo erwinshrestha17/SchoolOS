@@ -15,12 +15,18 @@ test.describe('M12 Learning lab session', () => {
     await login(page);
   });
 
-  test('student join route exposes code/QR join controls and no fake data', async ({ page }) => {
+  test('student join route exposes code/QR join controls and no fake data', async ({
+    page,
+  }) => {
     await page.goto('/student/learning/join');
-    await expect(page.getByRole('heading', { name: /Join Learning Session/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Join Learning Session/i }),
+    ).toBeVisible();
     await expect(page.getByLabel(/Session code/i)).toBeVisible();
     await expect(page.getByLabel(/QR token/i)).toBeVisible();
-    await expect(page.locator('body')).not.toContainText(/mock|fake|placeholder/i);
+    await expect(page.locator('body')).not.toContainText(
+      /mock|fake|placeholder/i,
+    );
   });
 });
 

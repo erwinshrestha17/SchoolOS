@@ -11,13 +11,13 @@ import type {
   UpdateAdmissionPolicyVersionPayload,
   UpsertApprovalChainPayload,
   UpsertDocumentRequirementPayload,
-} from "@schoolos/core";
-import { request } from "./client";
+} from '@schoolos/core';
+import { request } from './client';
 
 export const admissionPoliciesApi = {
-  list: () => request<AdmissionPolicyListResponse>("/admissions/policies"),
+  list: () => request<AdmissionPolicyListResponse>('/admissions/policies'),
   listTemplates: () =>
-    request<AdmissionPolicyTemplate[]>("/admissions/policies/templates"),
+    request<AdmissionPolicyTemplate[]>('/admissions/policies/templates'),
   get: (policyId: string) =>
     request<AdmissionPolicyDetail>(`/admissions/policies/${policyId}`),
   listVersions: (policyId: string) =>
@@ -29,8 +29,8 @@ export const admissionPoliciesApi = {
       `/admissions/policies/${policyId}/audit`,
     ),
   create: (payload: CreateAdmissionPolicyPayload) =>
-    request<AdmissionPolicyDetail>("/admissions/policies", {
-      method: "POST",
+    request<AdmissionPolicyDetail>('/admissions/policies', {
+      method: 'POST',
       json: payload,
     }),
   updateIdentity: (
@@ -38,7 +38,7 @@ export const admissionPoliciesApi = {
     payload: UpdateAdmissionPolicyIdentityPayload,
   ) =>
     request<AdmissionPolicyDetail>(`/admissions/policies/${policyId}`, {
-      method: "PATCH",
+      method: 'PATCH',
       json: payload,
     }),
   updateDraftVersion: (
@@ -47,12 +47,12 @@ export const admissionPoliciesApi = {
   ) =>
     request<AdmissionPolicyDetail>(
       `/admissions/policies/${policyId}/draft-version`,
-      { method: "PATCH", json: payload },
+      { method: 'PATCH', json: payload },
     ),
   startDraftVersion: (policyId: string) =>
     request<AdmissionPolicyDetail>(
       `/admissions/policies/${policyId}/draft-version`,
-      { method: "POST" },
+      { method: 'POST' },
     ),
   upsertDocumentRequirement: (
     policyId: string,
@@ -61,7 +61,7 @@ export const admissionPoliciesApi = {
   ) =>
     request(
       `/admissions/policies/${policyId}/versions/${versionId}/document-requirements`,
-      { method: "POST", json: payload },
+      { method: 'POST', json: payload },
     ),
   deleteDocumentRequirement: (
     policyId: string,
@@ -70,23 +70,32 @@ export const admissionPoliciesApi = {
   ) =>
     request(
       `/admissions/policies/${policyId}/versions/${versionId}/document-requirements/${requirementId}`,
-      { method: "DELETE" },
+      { method: 'DELETE' },
     ),
   activate: (policyId: string, versionId: string) =>
-    request<AdmissionPolicyDetail>(`/admissions/policies/${policyId}/activate`, {
-      method: "POST",
-      json: { versionId },
-    }),
+    request<AdmissionPolicyDetail>(
+      `/admissions/policies/${policyId}/activate`,
+      {
+        method: 'POST',
+        json: { versionId },
+      },
+    ),
   archive: (policyId: string, payload: ArchiveAdmissionPolicyPayload) =>
     request<AdmissionPolicyDetail>(`/admissions/policies/${policyId}/archive`, {
-      method: "POST",
+      method: 'POST',
       json: payload,
     }),
-  duplicate: (policyId: string, payload: DuplicateAdmissionPolicyPayload = {}) =>
-    request<AdmissionPolicyDetail>(`/admissions/policies/${policyId}/duplicate`, {
-      method: "POST",
-      json: payload,
-    }),
+  duplicate: (
+    policyId: string,
+    payload: DuplicateAdmissionPolicyPayload = {},
+  ) =>
+    request<AdmissionPolicyDetail>(
+      `/admissions/policies/${policyId}/duplicate`,
+      {
+        method: 'POST',
+        json: payload,
+      },
+    ),
   replaceApprovalChain: (
     policyId: string,
     versionId: string,
@@ -94,11 +103,11 @@ export const admissionPoliciesApi = {
   ) =>
     request<AdmissionPolicyDetail>(
       `/admissions/policies/${policyId}/versions/${versionId}/approval-chain`,
-      { method: "PUT", json: payload },
+      { method: 'PUT', json: payload },
     ),
   deleteApprovalChain: (policyId: string, versionId: string) =>
     request<AdmissionPolicyDetail>(
       `/admissions/policies/${policyId}/versions/${versionId}/approval-chain`,
-      { method: "DELETE" },
+      { method: 'DELETE' },
     ),
 };

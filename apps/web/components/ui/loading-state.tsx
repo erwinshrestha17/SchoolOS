@@ -18,7 +18,7 @@ export function LoadingState({
       <div
         className={cn(
           'flex min-h-64 w-full flex-col items-center justify-center gap-4',
-          className
+          className,
         )}
         aria-busy="true"
         aria-live="polite"
@@ -36,7 +36,12 @@ export function LoadingState({
 
   if (variant === 'skeleton') {
     return (
-      <div className={cn('animate-pulse space-y-5', className)} aria-busy="true" role="status" aria-label={label}>
+      <div
+        className={cn('animate-pulse space-y-5', className)}
+        aria-busy="true"
+        role="status"
+        aria-label={label}
+      >
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0 space-y-2">
             <div className="h-7 w-56 max-w-full rounded-lg bg-slate-200" />

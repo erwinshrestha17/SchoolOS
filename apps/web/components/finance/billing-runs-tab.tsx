@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { api } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
-import { SectionCard } from "@/components/ui/section-card";
-import { Button } from "@/components/ui/button";
-import { PermissionDenied } from "@/components/ui/permission-denied";
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { api } from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
+import { SectionCard } from '@/components/ui/section-card';
+import { Button } from '@/components/ui/button';
+import { PermissionDenied } from '@/components/ui/permission-denied';
 import {
   Loader2,
   Plus,
@@ -15,8 +15,8 @@ import {
   AlertTriangle,
   Check,
   AlertCircle,
-} from "lucide-react";
-import { useSession } from "@/components/session-provider";
+} from 'lucide-react';
+import { useSession } from '@/components/session-provider';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   formatBsDateForInput,
   formatBsDateOnly,
@@ -32,26 +32,26 @@ import {
   toGregorianDateFromBs,
   toNepalLocalDateTime,
   zonedNepalDateTimeToUtc,
-} from "@schoolos/core";
+} from '@schoolos/core';
 
 const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ] as const;
 
 export function BillingRunsTab() {
   const { hasPermissions } = useSession();
-  const canBill = hasPermissions(["fees:bill"]);
+  const canBill = hasPermissions(['fees:bill']);
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -60,13 +60,13 @@ export function BillingRunsTab() {
   const todayBs = formatBsDateForInput(new Date());
   const billingPage = Math.max(
     1,
-    Number(searchParams.get("billingPage") ?? "1") || 1,
+    Number(searchParams.get('billingPage') ?? '1') || 1,
   );
-  const billingSearch = searchParams.get("billingSearch") ?? "";
+  const billingSearch = searchParams.get('billingSearch') ?? '';
 
   // Form State
-  const [academicYearId, setAcademicYearId] = useState("");
-  const [feePlanId, setFeePlanId] = useState("");
+  const [academicYearId, setAcademicYearId] = useState('');
+  const [feePlanId, setFeePlanId] = useState('');
   const [runMonth, setRunMonth] = useState(now.month);
   const [runYear, setRunYear] = useState(now.year);
   const [dueDateBs, setDueDateBs] = useState(todayBs);
@@ -77,17 +77,17 @@ export function BillingRunsTab() {
 
   // Queries
   const academicYearsQuery = useQuery({
-    queryKey: ["academic-years"],
+    queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
   });
 
   const feePlansQuery = useQuery({
-    queryKey: ["fee-plans"],
+    queryKey: ['fee-plans'],
     queryFn: api.listFeePlans,
   });
 
   const billingRunsQuery = useQuery({
-    queryKey: ["billing-runs", billingPage, billingSearch],
+    queryKey: ['billing-runs', billingPage, billingSearch],
     queryFn: () =>
       api.listBillingRunsPage({
         page: billingPage,
@@ -99,14 +99,14 @@ export function BillingRunsTab() {
   const updateBillingUrl = (updates: { page?: number; search?: string }) => {
     const params = new URLSearchParams(searchParams.toString());
     if (updates.page !== undefined) {
-      if (updates.page <= 1) params.delete("billingPage");
-      else params.set("billingPage", String(updates.page));
+      if (updates.page <= 1) params.delete('billingPage');
+      else params.set('billingPage', String(updates.page));
     }
     if (updates.search !== undefined) {
       const nextSearch = updates.search.trim();
-      if (nextSearch) params.set("billingSearch", nextSearch);
-      else params.delete("billingSearch");
-      params.delete("billingPage");
+      if (nextSearch) params.set('billingSearch', nextSearch);
+      else params.delete('billingSearch');
+      params.delete('billingPage');
     }
     router.replace(`${pathname}?${params.toString()}`, {
       scroll: false,
@@ -116,8 +116,8 @@ export function BillingRunsTab() {
   // Mutation
   const billingRunMutation = useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["billing-runs"] });
-      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ['billing-runs'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
       setConfirmOpen(false);
       setSuccessMsg(true);
       setTimeout(() => setSuccessMsg(false), 4000);
@@ -145,11 +145,11 @@ export function BillingRunsTab() {
   };
 
   const selectedYearName =
-    academicYearsQuery.data?.find((y) => y.id === academicYearId)?.name || "";
+    academicYearsQuery.data?.find((y) => y.id === academicYearId)?.name || '';
   const selectedPlanName = feePlanId
     ? feePlansQuery.data?.find((p) => p.id === feePlanId)?.name ||
-      "Selected Plan"
-    : "All Active Fee Plans";
+      'Selected Plan'
+    : 'All Active Fee Plans';
 
   const getMonthName = (monthNum: number) => {
     return MONTH_NAMES[monthNum - 1] ?? `Month ${monthNum}`;
@@ -181,7 +181,7 @@ export function BillingRunsTab() {
                 <div className="flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700">
                   <AlertCircle size={14} />
                   {billingRunMutation.error.message ||
-                    "Failed to start billing run."}
+                    'Failed to start billing run.'}
                 </div>
               )}
 
@@ -200,7 +200,7 @@ export function BillingRunsTab() {
                     <option value="">Select Academic Year</option>
                     {academicYearsQuery.data?.map((y) => (
                       <option key={y.id} value={y.id}>
-                        {y.name} {y.isCurrent ? "(Current)" : ""}
+                        {y.name} {y.isCurrent ? '(Current)' : ''}
                       </option>
                     ))}
                   </select>
@@ -354,7 +354,7 @@ export function BillingRunsTab() {
                               variant="neutral"
                               className="w-fit text-[9px] font-black px-1.5 py-0"
                             >
-                              {run.academicYear?.name || "Year"}
+                              {run.academicYear?.name || 'Year'}
                             </Badge>
                             {run.feePlan && (
                               <span className="text-[10px] text-slate-500 font-semibold">
@@ -366,11 +366,11 @@ export function BillingRunsTab() {
                         <td className="px-4 py-3">
                           <Badge
                             variant={
-                              run.status === "GENERATED"
-                                ? "success"
-                                : run.status === "DRAFT"
-                                  ? "phase2"
-                                  : "destructive"
+                              run.status === 'GENERATED'
+                                ? 'success'
+                                : run.status === 'DRAFT'
+                                  ? 'phase2'
+                                  : 'destructive'
                             }
                             className="text-[9px] font-black px-1.5 py-0"
                           >
@@ -395,7 +395,7 @@ export function BillingRunsTab() {
                   {Math.min(
                     billingPage * billingRunsQuery.data.limit,
                     billingRunsQuery.data.total,
-                  )}{" "}
+                  )}{' '}
                   of {billingRunsQuery.data.total}
                 </span>
                 <div className="flex gap-2">
@@ -442,25 +442,25 @@ export function BillingRunsTab() {
 
           <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4 space-y-2 text-xs font-bold text-amber-800">
             <p>
-              • Academic Year:{" "}
+              • Academic Year:{' '}
               <span className="text-slate-900 font-black">
                 {selectedYearName}
               </span>
             </p>
             <p>
-              • Plan Filter:{" "}
+              • Plan Filter:{' '}
               <span className="text-slate-900 font-black">
                 {selectedPlanName}
               </span>
             </p>
             <p>
-              • Month / Year:{" "}
+              • Month / Year:{' '}
               <span className="text-slate-900 font-black">
                 {getMonthName(runMonth)} {runYear}
               </span>
             </p>
             <p>
-              • Invoices Due:{" "}
+              • Invoices Due:{' '}
               <span className="text-slate-900 font-black">
                 {formatBsDateOnly(parseBsDateInput(dueDateBs))}
               </span>
@@ -489,7 +489,7 @@ export function BillingRunsTab() {
                   Generating...
                 </>
               ) : (
-                "Generate Invoices"
+                'Generate Invoices'
               )}
             </Button>
           </DialogFooter>

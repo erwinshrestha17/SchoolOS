@@ -77,7 +77,9 @@ export function resolveSchoolWebPersona(
     return "teacher";
   }
 
-  if (roles.some((role) => (FULL_ADMIN_ROLES as readonly string[]).includes(role))) {
+  if (
+    roles.some((role) => (FULL_ADMIN_ROLES as readonly string[]).includes(role))
+  ) {
     return "admin";
   }
 

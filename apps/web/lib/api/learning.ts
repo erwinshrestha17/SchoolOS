@@ -15,10 +15,7 @@ export type LearningMode =
   | 'HYBRID';
 export type LearningAccessType = 'SCHOOL_ONLY' | 'CLASS_ONLY';
 export type LearningLanguageMode = 'ENGLISH' | 'NEPALI' | 'MIXED';
-export type LearningActivityStatus =
-  | 'DRAFT'
-  | 'READY'
-  | 'ARCHIVED';
+export type LearningActivityStatus = 'DRAFT' | 'READY' | 'ARCHIVED';
 export type LearningSessionStatus = 'LIVE' | 'PAUSED' | 'ENDED' | 'EXPIRED';
 export type LearningAttemptStatus = 'IN_PROGRESS' | 'SUBMITTED';
 export type LearningQuestionType =
@@ -345,7 +342,10 @@ export type LearningResource = {
   archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
-  activity?: Pick<LearningActivity, 'id' | 'title' | 'classId' | 'sectionId' | 'subjectId' | 'teacherId'> | null;
+  activity?: Pick<
+    LearningActivity,
+    'id' | 'title' | 'classId' | 'sectionId' | 'subjectId' | 'teacherId'
+  > | null;
   subject?: LearningLookup | null;
   topic?: { id: string; title?: string | null } | null;
   fileAsset?: {
@@ -508,7 +508,10 @@ export const learningApi = {
     request<LearningResource>(
       `/learning/resources/${encodeURIComponent(resourceId)}`,
     ),
-  updateResource: (resourceId: string, body: Partial<LearningResourcePayload>) =>
+  updateResource: (
+    resourceId: string,
+    body: Partial<LearningResourcePayload>,
+  ) =>
     request<LearningResource>(
       `/learning/resources/${encodeURIComponent(resourceId)}`,
       { method: 'PATCH', json: body as unknown as JsonBody },

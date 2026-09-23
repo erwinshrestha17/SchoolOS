@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
+import { useEffect } from 'react';
 
 export function ServiceWorkerRegistration() {
   useEffect(() => {
     if (
-      process.env.NODE_ENV !== "production" ||
-      !("serviceWorker" in navigator)
+      process.env.NODE_ENV !== 'production' ||
+      !('serviceWorker' in navigator)
     ) {
       return;
     }
@@ -16,9 +16,9 @@ export function ServiceWorkerRegistration() {
     const register = async () => {
       try {
         if (!cancelled) {
-          await navigator.serviceWorker.register("/sw.js", {
-            scope: "/",
-            updateViaCache: "none",
+          await navigator.serviceWorker.register('/sw.js', {
+            scope: '/',
+            updateViaCache: 'none',
           });
         }
       } catch {
@@ -28,18 +28,18 @@ export function ServiceWorkerRegistration() {
       }
     };
 
-    if (document.readyState === "complete") {
+    if (document.readyState === 'complete') {
       void register();
       return () => {
         cancelled = true;
       };
     }
 
-    window.addEventListener("load", register, { once: true });
+    window.addEventListener('load', register, { once: true });
 
     return () => {
       cancelled = true;
-      window.removeEventListener("load", register);
+      window.removeEventListener('load', register);
     };
   }, []);
 

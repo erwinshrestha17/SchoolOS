@@ -35,7 +35,7 @@ export function ExamForm({
   onCancel,
 }: ExamFormProps) {
   const currentYear = academicYears.find((y) => y.isCurrent);
-  
+
   const {
     register,
     handleSubmit,
@@ -46,9 +46,15 @@ export function ExamForm({
     defaultValues: {
       academicYearId: initialData?.academicYearId || currentYear?.id || '',
       name: initialData?.name || '',
-      startsOn: initialData?.startsOn ? new Date(initialData.startsOn).toISOString().split('T')[0] : '',
-      endsOn: initialData?.endsOn ? new Date(initialData.endsOn).toISOString().split('T')[0] : '',
-      weightPercent: initialData?.weightPercent ? Number(initialData.weightPercent) : 100,
+      startsOn: initialData?.startsOn
+        ? new Date(initialData.startsOn).toISOString().split('T')[0]
+        : '',
+      endsOn: initialData?.endsOn
+        ? new Date(initialData.endsOn).toISOString().split('T')[0]
+        : '',
+      weightPercent: initialData?.weightPercent
+        ? Number(initialData.weightPercent)
+        : 100,
       status: (initialData?.status as any) || 'ACTIVE',
     },
   });
@@ -58,8 +64,12 @@ export function ExamForm({
       reset({
         academicYearId: initialData.academicYearId,
         name: initialData.name,
-        startsOn: initialData.startsOn ? new Date(initialData.startsOn).toISOString().split('T')[0] : '',
-        endsOn: initialData.endsOn ? new Date(initialData.endsOn).toISOString().split('T')[0] : '',
+        startsOn: initialData.startsOn
+          ? new Date(initialData.startsOn).toISOString().split('T')[0]
+          : '',
+        endsOn: initialData.endsOn
+          ? new Date(initialData.endsOn).toISOString().split('T')[0]
+          : '',
         weightPercent: Number(initialData.weightPercent),
         status: (initialData.status as any) || 'ACTIVE',
       });
@@ -81,7 +91,10 @@ export function ExamForm({
         </FormField>
 
         <FormField label="Exam Name" error={errors.name?.message}>
-          <Input {...register('name')} placeholder="e.g. First Terminal Examination" />
+          <Input
+            {...register('name')}
+            placeholder="e.g. First Terminal Examination"
+          />
         </FormField>
 
         <FormField label="Start Date" error={errors.startsOn?.message}>
@@ -100,8 +113,15 @@ export function ExamForm({
           />
         </FormField>
 
-        <FormField label="Weighting (%)" error={errors.weightPercent?.message} description="Influence of this exam on final grade">
-          <Input type="number" {...register('weightPercent', { valueAsNumber: true })} />
+        <FormField
+          label="Weighting (%)"
+          error={errors.weightPercent?.message}
+          description="Influence of this exam on final grade"
+        >
+          <Input
+            type="number"
+            {...register('weightPercent', { valueAsNumber: true })}
+          />
         </FormField>
 
         <FormField label="Status" error={errors.status?.message}>

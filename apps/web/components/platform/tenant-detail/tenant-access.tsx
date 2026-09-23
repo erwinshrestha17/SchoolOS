@@ -1,27 +1,27 @@
-"use client";
+'use client';
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ExternalLink,
   History,
   RefreshCw,
   Shield,
   ShieldOff,
-} from "lucide-react";
-import { useState } from "react";
+} from 'lucide-react';
+import { useState } from 'react';
 import {
   SUPPORT_OVERRIDE_SCOPE_DEFINITIONS,
   type SupportOverrideScope,
-} from "@schoolos/core";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from '@schoolos/core';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -29,30 +29,30 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { useSession } from "@/components/session-provider";
-import { platformApi } from "@/lib/api/platform";
-import { hasPermission } from "@/lib/session";
-import { useTenantDetail } from "./tenant-detail-page";
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useSession } from '@/components/session-provider';
+import { platformApi } from '@/lib/api/platform';
+import { hasPermission } from '@/lib/session';
+import { useTenantDetail } from './tenant-detail-page';
 
 export function TenantAccess() {
   const { tenant, refreshTenant } = useTenantDetail();
   const { session } = useSession();
-  const canChangeStatus = hasPermission(session, "platform:tenants:status");
+  const canChangeStatus = hasPermission(session, 'platform:tenants:status');
   const canEnterSupportMode = hasPermission(
     session,
-    "platform:support:override",
+    'platform:support:override',
   );
-  const canReadAudit = hasPermission(session, "platform:audit:read");
+  const canReadAudit = hasPermission(session, 'platform:audit:read');
   const queryClient = useQueryClient();
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
-  const [statusReason, setStatusReason] = useState("");
+  const [statusReason, setStatusReason] = useState('');
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
-  const [supportReason, setSupportReason] = useState("");
-  const [supportDuration, setSupportDuration] = useState("30");
+  const [supportReason, setSupportReason] = useState('');
+  const [supportDuration, setSupportDuration] = useState('30');
   const [supportScopes, setSupportScopes] = useState<SupportOverrideScope[]>(
     [],
   );
@@ -74,11 +74,11 @@ export function TenantAccess() {
       await refreshTenant();
       setMessage(
         tenant.isActive
-          ? "School access suspended."
-          : "School access restored.",
+          ? 'School access suspended.'
+          : 'School access restored.',
       );
       setStatusDialogOpen(false);
-      setStatusReason("");
+      setStatusReason('');
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -111,7 +111,7 @@ export function TenantAccess() {
       const entryPath = SUPPORT_OVERRIDE_SCOPE_DEFINITIONS.find(
         ({ key }) => key === supportScopes[0],
       )?.entryPath;
-      window.location.assign(entryPath ?? "/platform/schools");
+      window.location.assign(entryPath ?? '/platform/schools');
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -130,7 +130,7 @@ export function TenantAccess() {
 
       {message || error ? (
         <div
-          className={`rounded-2xl border p-4 text-sm font-bold ${error ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+          className={`rounded-2xl border p-4 text-sm font-bold ${error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}
         >
           {error ?? message}
         </div>
@@ -154,11 +154,11 @@ export function TenantAccess() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <Badge variant={tenant.isActive ? "success" : "destructive"}>
-                {tenant.isActive ? "ACTIVE" : "SUSPENDED"}
+              <Badge variant={tenant.isActive ? 'success' : 'destructive'}>
+                {tenant.isActive ? 'ACTIVE' : 'SUSPENDED'}
               </Badge>
               <Button
-                variant={tenant.isActive ? "destructive" : "default"}
+                variant={tenant.isActive ? 'destructive' : 'default'}
                 className="w-full rounded-2xl font-bold"
                 onClick={() => setStatusDialogOpen(true)}
               >
@@ -167,7 +167,7 @@ export function TenantAccess() {
                 ) : (
                   <Shield className="mr-2" size={18} />
                 )}
-                {tenant.isActive ? "Suspend school" : "Restore access"}
+                {tenant.isActive ? 'Suspend school' : 'Restore access'}
               </Button>
             </CardContent>
           </Card>
@@ -250,19 +250,21 @@ export function TenantAccess() {
                                     ({ key }) => key === scope,
                                   )?.label ?? scope,
                               )
-                              .join(", ") || "Legacy unscoped session"}
+                              .join(', ') || 'Legacy unscoped session'}
                           </span>
                         </td>
                         <td className="px-5 py-4 text-slate-600">
                           {formatDateTime(item.expiresAt)}
                         </td>
                         <td className="px-5 py-4">
-                          <Badge variant={item.isActive ? "success" : "neutral"}>
+                          <Badge
+                            variant={item.isActive ? 'success' : 'neutral'}
+                          >
                             {item.isActive
-                              ? "ACTIVE"
+                              ? 'ACTIVE'
                               : new Date(item.expiresAt).getTime() <= Date.now()
-                                ? "EXPIRED"
-                                : "ENDED"}
+                                ? 'EXPIRED'
+                                : 'ENDED'}
                           </Badge>
                         </td>
                       </tr>
@@ -290,13 +292,13 @@ export function TenantAccess() {
             <DialogHeader>
               <DialogTitle>
                 {tenant.isActive
-                  ? "Suspend school access"
-                  : "Restore school access"}
+                  ? 'Suspend school access'
+                  : 'Restore school access'}
               </DialogTitle>
               <DialogDescription>
                 {tenant.isActive
-                  ? "This immediately blocks school users. The action is reversible and audited."
-                  : "This immediately allows eligible school users to resume access. The action is audited."}
+                  ? 'This immediately blocks school users. The action is reversible and audited.'
+                  : 'This immediately allows eligible school users to resume access. The action is audited.'}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2 py-4">
@@ -316,7 +318,7 @@ export function TenantAccess() {
                 Cancel
               </Button>
               <Button
-                variant={tenant.isActive ? "destructive" : "default"}
+                variant={tenant.isActive ? 'destructive' : 'default'}
                 disabled={saving || statusReason.trim().length < 5}
                 onClick={() => void updateTenantStatus()}
               >
@@ -336,8 +338,8 @@ export function TenantAccess() {
             <DialogHeader>
               <DialogTitle>Enter support mode</DialogTitle>
               <DialogDescription>
-                The backend creates a scoped, read-only override for {tenant.name}.
-                The reason, scope, and expiry are audited.
+                The backend creates a scoped, read-only override for{' '}
+                {tenant.name}. The reason, scope, and expiry are audited.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -436,12 +438,12 @@ export function TenantAccess() {
 function formatDateTime(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
-    ? "Date not recorded"
+    ? 'Date not recorded'
     : date.toLocaleString();
 }
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
-    : "This access action could not be completed.";
+    : 'This access action could not be completed.';
 }

@@ -1,4 +1,10 @@
-import type { ParentTeacherSenderRole, ParentTeacherMessagePriority, ParentTeacherMessageStatus, ParentTeacherThreadStatus, ChatAvailabilityAppliesToRole } from './common.js';
+import type {
+  ParentTeacherSenderRole,
+  ParentTeacherMessagePriority,
+  ParentTeacherMessageStatus,
+  ParentTeacherThreadStatus,
+  ChatAvailabilityAppliesToRole,
+} from "./common.js";
 
 export type ConversationSummary = {
   id: string;

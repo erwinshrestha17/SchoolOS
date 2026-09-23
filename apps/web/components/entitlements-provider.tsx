@@ -1,6 +1,12 @@
 'use client';
 
-import { createContext, PropsWithChildren, useContext, useEffect, useState } from 'react';
+import {
+  createContext,
+  PropsWithChildren,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import { api } from '../lib/api';
 import { useSession } from './session-provider';
 
@@ -19,7 +25,9 @@ type EntitlementsContextValue = {
   hasFeature: (featureKey: string) => boolean;
 };
 
-const EntitlementsContext = createContext<EntitlementsContextValue | null>(null);
+const EntitlementsContext = createContext<EntitlementsContextValue | null>(
+  null,
+);
 
 export function EntitlementsProvider({ children }: PropsWithChildren) {
   const { status } = useSession();
@@ -71,7 +79,9 @@ export function EntitlementsProvider({ children }: PropsWithChildren) {
   };
 
   return (
-    <EntitlementsContext.Provider value={{ entitlements, loading, error, hasModule, hasFeature }}>
+    <EntitlementsContext.Provider
+      value={{ entitlements, loading, error, hasModule, hasFeature }}
+    >
       {children}
     </EntitlementsContext.Provider>
   );
@@ -80,7 +90,9 @@ export function EntitlementsProvider({ children }: PropsWithChildren) {
 export function useEntitlements() {
   const context = useContext(EntitlementsContext);
   if (!context) {
-    throw new Error('useEntitlements must be used within an EntitlementsProvider');
+    throw new Error(
+      'useEntitlements must be used within an EntitlementsProvider',
+    );
   }
   return context;
 }

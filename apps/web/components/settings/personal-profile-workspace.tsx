@@ -1,37 +1,37 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import {
   BriefcaseBusiness,
   Mail,
   School,
   ShieldCheck,
   User,
-} from "lucide-react";
-import { api } from "@/lib/api";
-import { useSession } from "@/components/session-provider";
-import { useEntitlements } from "@/components/entitlements-provider";
-import { useSettingsCapabilities } from "@/lib/permissions-ui";
-import { EmptyState } from "@/components/ui/empty-state";
-import { LoadingState } from "@/components/ui/loading-state";
-import { SectionCard } from "@/components/ui/section-card";
+} from 'lucide-react';
+import { api } from '@/lib/api';
+import { useSession } from '@/components/session-provider';
+import { useEntitlements } from '@/components/entitlements-provider';
+import { useSettingsCapabilities } from '@/lib/permissions-ui';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
+import { SectionCard } from '@/components/ui/section-card';
 import {
   SettingsPageHeader,
   SettingsPermissionNotice,
-} from "@/components/settings/settings-page-header";
+} from '@/components/settings/settings-page-header';
 
 export function PersonalProfileWorkspace() {
   const { session, status } = useSession();
   const { hasModule } = useEntitlements();
   const settingsCaps = useSettingsCapabilities();
   const profileQuery = useQuery({
-    queryKey: ["auth", "profile"],
+    queryKey: ['auth', 'profile'],
     queryFn: api.getProfile,
-    enabled: status === "authenticated",
+    enabled: status === 'authenticated',
   });
 
-  if (status === "loading") {
+  if (status === 'loading') {
     return (
       <LoadingState variant="page" label="Loading your personal profile..." />
     );
@@ -50,18 +50,16 @@ export function PersonalProfileWorkspace() {
   const primaryRole = session.user.roles[0];
   const profile = profileQuery.data;
   const canOpenMyWorkspace = Boolean(
-    profile?.staff &&
-    hasModule("hr") &&
-    settingsCaps.canViewStaffSelf,
+    profile?.staff && hasModule('hr') && settingsCaps.canViewStaffSelf,
   );
   const fullName = profile?.staff
     ? [profile.staff.firstName, profile.staff.lastName]
         .filter(Boolean)
-        .join(" ")
+        .join(' ')
     : profile?.student
       ? [profile.student.firstNameEn, profile.student.lastNameEn]
           .filter(Boolean)
-          .join(" ")
+          .join(' ')
       : null;
 
   return (
@@ -69,7 +67,7 @@ export function PersonalProfileWorkspace() {
       <SettingsPageHeader
         title="Profile"
         description="Review the personal account identity used for SchoolOS. Employment information remains in My Workspace."
-        scope={{ type: "personal", label: "Personal setting" }}
+        scope={{ type: 'personal', label: 'Personal setting' }}
         access="view-only"
       />
 
@@ -103,13 +101,13 @@ export function PersonalProfileWorkspace() {
           <ProfileDetail
             icon={<Mail className="h-4 w-4" aria-hidden="true" />}
             label="Sign-in email"
-            value={session.user.email ?? "No email recorded"}
+            value={session.user.email ?? 'No email recorded'}
           />
           <ProfileDetail
             icon={<ShieldCheck className="h-4 w-4" aria-hidden="true" />}
             label="Current role"
             value={
-              primaryRole ? formatAccountValue(primaryRole) : "No role assigned"
+              primaryRole ? formatAccountValue(primaryRole) : 'No role assigned'
             }
           />
           <ProfileDetail
@@ -122,8 +120,8 @@ export function PersonalProfileWorkspace() {
             label="Account access"
             value={
               session.user.mustChangePassword
-                ? "Password change required"
-                : "Active"
+                ? 'Password change required'
+                : 'Active'
             }
           />
         </dl>
@@ -175,7 +173,7 @@ function ProfileDetail({
 
 function formatAccountValue(value: string) {
   return value
-    .replace(/_/g, " ")
+    .replace(/_/g, ' ')
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

@@ -1,36 +1,36 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   formatBsDate,
   type BoardReadinessState,
   type BoardReadinessTrack,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
   ClipboardCheck,
   ShieldAlert,
-} from "lucide-react";
-import Link from "next/link";
-import { useSession } from "@/components/session-provider";
+} from 'lucide-react';
+import Link from 'next/link';
+import { useSession } from '@/components/session-provider';
 import {
   academicsWorkspaceOverflowTabs,
   academicsWorkspaceTabs,
-} from "@/components/academics/academics-tabs";
-import { api } from "@/lib/api";
-import { ModuleHeader } from "@/components/ui/module-header";
-import { WorkspaceTabs } from "@/components/ui/module-tabs";
-import { WorkSurface } from "@/components/ui/work-surface";
-import { SummaryCard, SummaryGrid } from "@/components/ui/summary-card";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { LoadingState } from "@/components/ui/loading-state";
-import { ErrorState } from "@/components/ui/error-state";
-import { EmptyState } from "@/components/ui/empty-state";
-import { PermissionDenied } from "@/components/ui/permission-denied";
-import { Button } from "@/components/ui/button";
+} from '@/components/academics/academics-tabs';
+import { api } from '@/lib/api';
+import { ModuleHeader } from '@/components/ui/module-header';
+import { WorkspaceTabs } from '@/components/ui/module-tabs';
+import { WorkSurface } from '@/components/ui/work-surface';
+import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { LoadingState } from '@/components/ui/loading-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PermissionDenied } from '@/components/ui/permission-denied';
+import { Button } from '@/components/ui/button';
 
 const TRACKS: Array<{
   value: BoardReadinessTrack;
@@ -38,41 +38,41 @@ const TRACKS: Array<{
   description: string;
 }> = [
   {
-    value: "GRADE_8",
-    label: "Grade 8",
-    description: "Grade 8 school and municipality examination preparation",
+    value: 'GRADE_8',
+    label: 'Grade 8',
+    description: 'Grade 8 school and municipality examination preparation',
   },
   {
-    value: "SEE",
-    label: "SEE",
-    description: "Grade 10 Secondary Education Examination preparation",
+    value: 'SEE',
+    label: 'SEE',
+    description: 'Grade 10 Secondary Education Examination preparation',
   },
   {
-    value: "GRADE_12",
-    label: "Grade 12",
-    description: "Grade 12 national board examination preparation",
+    value: 'GRADE_12',
+    label: 'Grade 12',
+    description: 'Grade 12 national board examination preparation',
   },
 ];
 
 export function BoardReadinessWorkspace() {
   const { hasPermissions } = useSession();
   const canRead =
-    hasPermissions(["academics:read"]) || hasPermissions(["academics:manage"]);
-  const [track, setTrack] = useState<BoardReadinessTrack>("GRADE_8");
+    hasPermissions(['academics:read']) || hasPermissions(['academics:manage']);
+  const [track, setTrack] = useState<BoardReadinessTrack>('GRADE_8');
   const readinessQuery = useQuery({
-    queryKey: ["board-exam-readiness", track],
+    queryKey: ['board-exam-readiness', track],
     queryFn: () => api.getBoardExamReadiness(track),
     enabled: canRead,
   });
   const readiness = readinessQuery.data;
   const readyCount =
-    readiness?.indicators.filter((item) => item.state === "READY").length ?? 0;
+    readiness?.indicators.filter((item) => item.state === 'READY').length ?? 0;
   const attentionCount =
-    readiness?.indicators.filter((item) => item.state === "NEEDS_ATTENTION")
+    readiness?.indicators.filter((item) => item.state === 'NEEDS_ATTENTION')
       .length ?? 0;
   const blockedCount =
     readiness?.indicators.filter(
-      (item) => item.state === "BLOCKED" || item.state === "UNAVAILABLE",
+      (item) => item.state === 'BLOCKED' || item.state === 'UNAVAILABLE',
     ).length ?? 0;
 
   return (
@@ -104,7 +104,7 @@ export function BoardReadinessWorkspace() {
                 <Button
                   key={item.value}
                   type="button"
-                  variant={track === item.value ? "default" : "outline"}
+                  variant={track === item.value ? 'default' : 'outline'}
                   className="h-auto min-h-20 justify-start whitespace-normal p-4 text-left"
                   onClick={() => setTrack(item.value)}
                 >
@@ -149,14 +149,14 @@ export function BoardReadinessWorkspace() {
                   label="Need attention"
                   value={attentionCount}
                   icon={<AlertTriangle />}
-                  tone={attentionCount > 0 ? "warning" : "success"}
+                  tone={attentionCount > 0 ? 'warning' : 'success'}
                   description="Incomplete operational preparation"
                 />
                 <SummaryCard
                   label="Blocked or unavailable"
                   value={blockedCount}
                   icon={<ShieldAlert />}
-                  tone={blockedCount > 0 ? "danger" : "success"}
+                  tone={blockedCount > 0 ? 'danger' : 'success'}
                   description="Configuration or source-data gap"
                 />
                 <SummaryCard
@@ -189,7 +189,7 @@ export function BoardReadinessWorkspace() {
                           <p className="mt-2 text-sm font-semibold text-slate-800">
                             {indicator.observed === null ||
                             indicator.expected === null
-                              ? "Count unavailable"
+                              ? 'Count unavailable'
                               : `${indicator.observed} of ${indicator.expected}`}
                           </p>
                         </div>
@@ -223,10 +223,10 @@ export function BoardReadinessWorkspace() {
                         className="rounded-xl border border-slate-200 p-3"
                       >
                         <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                          {source.replace(/([A-Z])/g, " $1")}
+                          {source.replace(/([A-Z])/g, ' $1')}
                         </p>
                         <p className="mt-1 font-semibold capitalize text-slate-900">
-                          {state.replace(/_/g, " ").toLowerCase()}
+                          {state.replace(/_/g, ' ').toLowerCase()}
                         </p>
                       </div>
                     ),
@@ -242,11 +242,11 @@ export function BoardReadinessWorkspace() {
 }
 
 function readinessLabel(state: BoardReadinessState) {
-  return state.replace(/_/g, " ").toLowerCase();
+  return state.replace(/_/g, ' ').toLowerCase();
 }
 
 function readinessTone(state: BoardReadinessState) {
-  if (state === "READY") return "success" as const;
-  if (state === "NEEDS_ATTENTION") return "warning" as const;
-  return "danger" as const;
+  if (state === 'READY') return 'success' as const;
+  if (state === 'NEEDS_ATTENTION') return 'warning' as const;
+  return 'danger' as const;
 }

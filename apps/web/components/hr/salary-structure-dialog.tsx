@@ -3,7 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/dialog';
 import { Button } from '../ui/button';
 import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Checkbox } from '../ui/checkbox';
@@ -52,9 +58,12 @@ export function SalaryStructureDialog({
   const isEdit = !!existingStructure;
 
   const [staffId, setStaffId] = useState(lockedStaffId ?? '');
-  const [staffOption, setStaffOption] =
-    useState<StaffLookupOption | null>(null);
-  const [effectiveFrom, setEffectiveFrom] = useState(getNepalSchoolDay().gregorianDate);
+  const [staffOption, setStaffOption] = useState<StaffLookupOption | null>(
+    null,
+  );
+  const [effectiveFrom, setEffectiveFrom] = useState(
+    getNepalSchoolDay().gregorianDate,
+  );
   const [effectiveTo, setEffectiveTo] = useState('');
   const [basicSalary, setBasicSalary] = useState<number>(0);
   const [pfEnabled, setPfEnabled] = useState(false);
@@ -69,7 +78,9 @@ export function SalaryStructureDialog({
 
   // Local component row inputs
   const [newCompName, setNewCompName] = useState('');
-  const [newCompType, setNewCompType] = useState<'EARNING' | 'DEDUCTION'>('EARNING');
+  const [newCompType, setNewCompType] = useState<'EARNING' | 'DEDUCTION'>(
+    'EARNING',
+  );
   const [newCompAmount, setNewCompAmount] = useState<number>(0);
   const [newCompTaxable, setNewCompTaxable] = useState(true);
 
@@ -77,20 +88,25 @@ export function SalaryStructureDialog({
     if (existingStructure) {
       setStaffId(existingStructure.staffId);
       setEffectiveFrom(existingStructure.effectiveFrom.slice(0, 10));
-      setEffectiveTo(existingStructure.effectiveTo ? existingStructure.effectiveTo.slice(0, 10) : '');
+      setEffectiveTo(
+        existingStructure.effectiveTo
+          ? existingStructure.effectiveTo.slice(0, 10)
+          : '',
+      );
       setBasicSalary(existingStructure.basicSalary);
       setPfEnabled(existingStructure.pfEnabled);
       setTdsEnabled(existingStructure.tdsEnabled);
       setPaymentMethod(existingStructure.paymentMethod);
       setBankName(existingStructure.bankName ?? '');
       setBankAccount(existingStructure.bankAccount ?? '');
-      
-      const loadedComponents = existingStructure.components?.map((c) => ({
-        name: c.name,
-        componentType: c.componentType as 'EARNING' | 'DEDUCTION',
-        amount: c.amount,
-        taxable: c.taxable,
-      })) ?? [];
+
+      const loadedComponents =
+        existingStructure.components?.map((c) => ({
+          name: c.name,
+          componentType: c.componentType as 'EARNING' | 'DEDUCTION',
+          amount: c.amount,
+          taxable: c.taxable,
+        })) ?? [];
       setComponents(loadedComponents);
     } else {
       // Defaults
@@ -132,7 +148,9 @@ export function SalaryStructureDialog({
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['salary-structures'] });
-      void queryClient.invalidateQueries({ queryKey: ['staff-detail', lockedStaffId || staffId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-detail', lockedStaffId || staffId],
+      });
       void queryClient.invalidateQueries({ queryKey: ['payroll-preview'] });
       onClose();
     },
@@ -200,7 +218,8 @@ export function SalaryStructureDialog({
       tdsEnabled,
       paymentMethod,
       bankName: paymentMethod === 'BANK' ? optionalTrim(bankName) : undefined,
-      bankAccount: paymentMethod === 'BANK' ? optionalTrim(bankAccount) : undefined,
+      bankAccount:
+        paymentMethod === 'BANK' ? optionalTrim(bankAccount) : undefined,
       notes: optionalTrim(notes),
       components,
     };
@@ -214,11 +233,15 @@ export function SalaryStructureDialog({
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle className="flex items-center gap-2">
-              <Calculator size={20} className="text-[var(--color-mod-hr-text)]" />
+              <Calculator
+                size={20}
+                className="text-[var(--color-mod-hr-text)]"
+              />
               {isEdit ? 'Update Salary Structure' : 'Create Salary Structure'}
             </DialogTitle>
             <p className="text-xs text-slate-500 mt-1">
-              Configure basic pay, custom allowances, deductions, and tax configurations.
+              Configure basic pay, custom allowances, deductions, and tax
+              configurations.
             </p>
           </div>
           <button
@@ -240,7 +263,10 @@ export function SalaryStructureDialog({
           />
         )}
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-8">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto p-6 space-y-8"
+        >
           <div className="grid md:grid-cols-3 gap-6">
             <div className="space-y-5 md:col-span-1">
               <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b pb-2">
@@ -297,8 +323,12 @@ export function SalaryStructureDialog({
                     className="rounded border-slate-300 text-[var(--color-mod-hr-accent)] focus:ring-[var(--color-mod-hr-border)]/50 h-4 w-4"
                   />
                   <div>
-                    <p className="text-xs font-black uppercase tracking-wider text-slate-900">PF Contribution</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Enable Provident Fund deduction</p>
+                    <p className="text-xs font-black uppercase tracking-wider text-slate-900">
+                      PF Contribution
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Enable Provident Fund deduction
+                    </p>
                   </div>
                 </label>
 
@@ -310,8 +340,12 @@ export function SalaryStructureDialog({
                     className="rounded border-slate-300 text-[var(--color-mod-hr-accent)] focus:ring-[var(--color-mod-hr-border)]/50 h-4 w-4"
                   />
                   <div>
-                    <p className="text-xs font-black uppercase tracking-wider text-slate-900">TDS Deduction</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Enable Tax Deducted at Source</p>
+                    <p className="text-xs font-black uppercase tracking-wider text-slate-900">
+                      TDS Deduction
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Enable Tax Deducted at Source
+                    </p>
                   </div>
                 </label>
               </div>
@@ -357,7 +391,9 @@ export function SalaryStructureDialog({
                   </FormField>
                 </div>
                 <div className="flex flex-col justify-center items-center h-12 pb-2">
-                  <span className="text-[9px] font-black uppercase text-slate-400 mb-2">Taxable</span>
+                  <span className="text-[9px] font-black uppercase text-slate-400 mb-2">
+                    Taxable
+                  </span>
                   <input
                     type="checkbox"
                     checked={newCompTaxable}
@@ -381,23 +417,40 @@ export function SalaryStructureDialog({
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="bg-slate-50/50 border-b border-slate-100">
                       <tr>
-                        <th className="px-4 py-3 font-bold text-slate-500">Component Name</th>
-                        <th className="px-4 py-3 font-bold text-slate-500">Type</th>
-                        <th className="px-4 py-3 font-bold text-slate-500 text-right">Amount</th>
-                        <th className="px-4 py-3 font-bold text-slate-500 text-center">Taxable</th>
-                        <th className="px-4 py-3 font-bold text-slate-500 text-right">Action</th>
+                        <th className="px-4 py-3 font-bold text-slate-500">
+                          Component Name
+                        </th>
+                        <th className="px-4 py-3 font-bold text-slate-500">
+                          Type
+                        </th>
+                        <th className="px-4 py-3 font-bold text-slate-500 text-right">
+                          Amount
+                        </th>
+                        <th className="px-4 py-3 font-bold text-slate-500 text-center">
+                          Taxable
+                        </th>
+                        <th className="px-4 py-3 font-bold text-slate-500 text-right">
+                          Action
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {components.map((c, index) => (
-                        <tr key={index} className="hover:bg-slate-50/30 transition-colors">
-                          <td className="px-4 py-3 font-bold text-slate-900">{c.name}</td>
+                        <tr
+                          key={index}
+                          className="hover:bg-slate-50/30 transition-colors"
+                        >
+                          <td className="px-4 py-3 font-bold text-slate-900">
+                            {c.name}
+                          </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[8px] font-black uppercase border ${
-                              c.componentType === 'EARNING'
-                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                : 'bg-rose-50 text-rose-600 border-rose-100'
-                            }`}>
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-[8px] font-black uppercase border ${
+                                c.componentType === 'EARNING'
+                                  ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                  : 'bg-rose-50 text-rose-600 border-rose-100'
+                              }`}
+                            >
                               {c.componentType}
                             </span>
                           </td>
@@ -405,7 +458,14 @@ export function SalaryStructureDialog({
                             NPR {c.amount.toLocaleString()}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            {c.taxable ? <Percent size={12} className="text-[var(--color-mod-hr-text)] mx-auto" /> : '-'}
+                            {c.taxable ? (
+                              <Percent
+                                size={12}
+                                className="text-[var(--color-mod-hr-text)] mx-auto"
+                              />
+                            ) : (
+                              '-'
+                            )}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <button
@@ -430,20 +490,36 @@ export function SalaryStructureDialog({
               {/* Totals Summary */}
               <div className="grid grid-cols-4 gap-3 bg-slate-50/80 p-4 border border-slate-100 rounded-2xl text-xs font-bold">
                 <div>
-                  <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Basic</p>
-                  <p className="text-slate-900 mt-1">NPR {basicSalary.toLocaleString()}</p>
+                  <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">
+                    Basic
+                  </p>
+                  <p className="text-slate-900 mt-1">
+                    NPR {basicSalary.toLocaleString()}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Allowances</p>
-                  <p className="text-emerald-600 mt-1">+ NPR {allowancesSum.toLocaleString()}</p>
+                  <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">
+                    Allowances
+                  </p>
+                  <p className="text-emerald-600 mt-1">
+                    + NPR {allowancesSum.toLocaleString()}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Deductions</p>
-                  <p className="text-rose-600 mt-1">- NPR {deductionsSum.toLocaleString()}</p>
+                  <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">
+                    Deductions
+                  </p>
+                  <p className="text-rose-600 mt-1">
+                    - NPR {deductionsSum.toLocaleString()}
+                  </p>
                 </div>
                 <div className="border-l pl-4 border-slate-200">
-                  <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Est. Net Pay</p>
-                  <p className="text-[var(--color-mod-hr-text)] text-sm mt-0.5">NPR {totalNet.toLocaleString()}</p>
+                  <p className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">
+                    Est. Net Pay
+                  </p>
+                  <p className="text-[var(--color-mod-hr-text)] text-sm mt-0.5">
+                    NPR {totalNet.toLocaleString()}
+                  </p>
                 </div>
               </div>
             </div>
@@ -452,7 +528,10 @@ export function SalaryStructureDialog({
           <div className="grid md:grid-cols-2 gap-6 pt-6 border-t">
             <FormField label="Disbursement Details">
               <div className="grid grid-cols-2 gap-4">
-                <Select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                <Select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                >
                   <option value="BANK">Bank Transfer</option>
                   <option value="CASH">Cash</option>
                   <option value="CHEQUE">Cheque</option>

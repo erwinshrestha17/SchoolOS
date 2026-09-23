@@ -67,7 +67,9 @@ export const advancedOperationsApi = {
   listApprovalRequests: () =>
     request<ApprovalRequestSummary[]>('/advanced/approvals'),
 
-  listPrincipalApprovalQueue: (input: { cursor?: string; limit?: number } = {}) => {
+  listPrincipalApprovalQueue: (
+    input: { cursor?: string; limit?: number } = {},
+  ) => {
     const search = new URLSearchParams();
     if (input.cursor) search.set('cursor', input.cursor);
     if (input.limit) search.set('limit', String(input.limit));

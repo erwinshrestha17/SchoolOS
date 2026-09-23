@@ -1,26 +1,26 @@
-"use client";
+'use client';
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatBsDateTime } from "@schoolos/core";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatBsDateTime } from '@schoolos/core';
 import {
   api,
   type NoticeDetail,
   type NoticeUnreadRecipientsResult,
-} from "@/lib/api";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { useRecentlyViewed } from "@/lib/hooks/use-recently-viewed";
-import { Button } from "@/components/ui/button";
-import { ModuleHeader } from "@/components/ui/module-header";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ProtectedFileButton } from "@/components/ui/protected-file";
-import { useNoticeCapabilities } from "@/lib/permissions-ui";
-import { NoticeAcknowledgementPanel } from "@/components/notices/notice-acknowledgement-panel";
-import { NoticeApprovalDecisionPanel } from "@/components/notices/notice-approval-decision-panel";
-import { TablePagination } from "@/components/ui/table-pagination";
-import { useSession } from "@/components/session-provider";
+} from '@/lib/api';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useRecentlyViewed } from '@/lib/hooks/use-recently-viewed';
+import { Button } from '@/components/ui/button';
+import { ModuleHeader } from '@/components/ui/module-header';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ProtectedFileButton } from '@/components/ui/protected-file';
+import { useNoticeCapabilities } from '@/lib/permissions-ui';
+import { NoticeAcknowledgementPanel } from '@/components/notices/notice-acknowledgement-panel';
+import { NoticeApprovalDecisionPanel } from '@/components/notices/notice-approval-decision-panel';
+import { TablePagination } from '@/components/ui/table-pagination';
+import { useSession } from '@/components/session-provider';
 import {
   ArrowLeft,
   Archive,
@@ -32,9 +32,9 @@ import {
   UsersRound,
   XCircle,
   Pencil,
-} from "lucide-react";
+} from 'lucide-react';
 
-type NoticeLifecycleAction = "cancel" | "archive" | "restore";
+type NoticeLifecycleAction = 'cancel' | 'archive' | 'restore';
 
 export default function NoticeDetailPage() {
   const params = useParams<{ noticeId: string }>();
@@ -46,11 +46,11 @@ export default function NoticeDetailPage() {
   const noticeCaps = useNoticeCapabilities();
   const [pendingAction, setPendingAction] =
     useState<NoticeLifecycleAction | null>(null);
-  const [actionReason, setActionReason] = useState("");
+  const [actionReason, setActionReason] = useState('');
   const [unreadPage, setUnreadPage] = useState(1);
 
   const noticeQuery = useQuery({
-    queryKey: ["notice-detail", noticeId],
+    queryKey: ['notice-detail', noticeId],
     queryFn: () => api.getNoticeDetail(noticeId),
     enabled: Boolean(noticeId) && noticeCaps.canView,
   });
@@ -59,7 +59,7 @@ export default function NoticeDetailPage() {
   const showRecipientReporting = showPublicationReporting && !isSupportOverride;
 
   const unreadRecipientsQuery = useQuery({
-    queryKey: ["notice-unread-recipients", noticeId, unreadPage],
+    queryKey: ['notice-unread-recipients', noticeId, unreadPage],
     queryFn: () =>
       api.listNoticeUnreadRecipients(noticeId, { page: unreadPage, limit: 25 }),
     enabled: Boolean(
@@ -75,20 +75,20 @@ export default function NoticeDetailPage() {
       action: NoticeLifecycleAction;
       reason: string;
     }) => {
-      if (action === "cancel") return api.cancelNotice(noticeId, reason);
-      if (action === "archive") return api.archiveNotice(noticeId, reason);
+      if (action === 'cancel') return api.cancelNotice(noticeId, reason);
+      if (action === 'archive') return api.archiveNotice(noticeId, reason);
       return api.restoreNotice(noticeId, reason);
     },
     onSuccess: async () => {
       setPendingAction(null);
-      setActionReason("");
+      setActionReason('');
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["notice-detail", noticeId],
+          queryKey: ['notice-detail', noticeId],
         }),
-        queryClient.invalidateQueries({ queryKey: ["notices"] }),
+        queryClient.invalidateQueries({ queryKey: ['notices'] }),
         queryClient.invalidateQueries({
-          queryKey: ["communications-summary"],
+          queryKey: ['communications-summary'],
         }),
       ]);
     },
@@ -99,7 +99,7 @@ export default function NoticeDetailPage() {
   useEffect(() => {
     if (!noticeQuery.data || isSupportOverride) return;
     recordRecentlyViewed({
-      kind: "notice",
+      kind: 'notice',
       id: noticeId,
       label: noticeQuery.data.title,
       href: `/dashboard/notices/${noticeId}`,
@@ -107,7 +107,7 @@ export default function NoticeDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSupportOverride, noticeId, noticeQuery.data?.title]);
 
-  if (noticeCaps.resolution === "loading") {
+  if (noticeCaps.resolution === 'loading') {
     return (
       <NoticePageShell>
         <div className="grid gap-4">
@@ -184,37 +184,37 @@ export default function NoticeDetailPage() {
     notice.attachmentFileId ?? getProtectedFileId(notice.attachmentUrl);
   const canCancel =
     noticeCaps.canCancel &&
-    ["DRAFT", "APPROVAL_PENDING", "APPROVED", "SCHEDULED"].includes(
+    ['DRAFT', 'APPROVAL_PENDING', 'APPROVED', 'SCHEDULED'].includes(
       notice.lifecycleStatus,
     );
   const canArchive =
-    noticeCaps.canArchive && notice.lifecycleStatus !== "ARCHIVED";
+    noticeCaps.canArchive && notice.lifecycleStatus !== 'ARCHIVED';
   const canRestore =
-    noticeCaps.canArchive && notice.lifecycleStatus === "ARCHIVED";
-  const canEdit = noticeCaps.canEdit && notice.lifecycleStatus === "DRAFT";
+    noticeCaps.canArchive && notice.lifecycleStatus === 'ARCHIVED';
+  const canEdit = noticeCaps.canEdit && notice.lifecycleStatus === 'DRAFT';
   const canPublish =
     noticeCaps.canPublish &&
-    ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus);
+    ['DRAFT', 'APPROVED', 'SCHEDULED'].includes(notice.lifecycleStatus);
   const canSchedule =
     noticeCaps.canSchedule &&
-    ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus);
+    ['DRAFT', 'APPROVED', 'SCHEDULED'].includes(notice.lifecycleStatus);
   const canDecideApproval =
     noticeCaps.canApprove &&
-    notice.lifecycleStatus === "APPROVAL_PENDING" &&
+    notice.lifecycleStatus === 'APPROVAL_PENDING' &&
     Boolean(notice.approvalRequestId);
-  const isDraft = notice.lifecycleStatus === "DRAFT";
+  const isDraft = notice.lifecycleStatus === 'DRAFT';
   const canReview =
     noticeCaps.canCreate &&
-    ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus) &&
-    ((notice.priority !== "NORMAL" && isDraft) || canPublish || canSchedule);
+    ['DRAFT', 'APPROVED', 'SCHEDULED'].includes(notice.lifecycleStatus) &&
+    ((notice.priority !== 'NORMAL' && isDraft) || canPublish || canSchedule);
 
   const lifecycleStatus =
     notice.lifecycleStatus ||
     (notice.publishedAt
-      ? "PUBLISHED"
+      ? 'PUBLISHED'
       : notice.scheduledFor
-        ? "SCHEDULED"
-        : "DRAFT");
+        ? 'SCHEDULED'
+        : 'DRAFT');
 
   return (
     <NoticePageShell>
@@ -245,7 +245,7 @@ export default function NoticeDetailPage() {
               }
             >
               <Send size={16} />
-              {isDraft ? "Preview & publish" : "Review & publish"}
+              {isDraft ? 'Preview & publish' : 'Review & publish'}
             </Button>
           ) : undefined
         }
@@ -267,7 +267,7 @@ export default function NoticeDetailPage() {
               <Button
                 type="button"
                 variant="destructive"
-                onClick={() => setPendingAction("cancel")}
+                onClick={() => setPendingAction('cancel')}
               >
                 <XCircle size={16} /> Cancel
               </Button>
@@ -276,7 +276,7 @@ export default function NoticeDetailPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setPendingAction("archive")}
+                onClick={() => setPendingAction('archive')}
               >
                 <Archive size={16} /> Archive
               </Button>
@@ -285,7 +285,7 @@ export default function NoticeDetailPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setPendingAction("restore")}
+                onClick={() => setPendingAction('restore')}
               >
                 <RotateCcw size={16} /> Restore
               </Button>
@@ -318,10 +318,10 @@ export default function NoticeDetailPage() {
               <p className="text-sm font-semibold text-gray-950">Notice body</p>
               <p className="text-xs text-gray-500">
                 {isDraft
-                  ? "Draft notice content"
+                  ? 'Draft notice content'
                   : showPublicationReporting
-                    ? "Published notice content"
-                    : "Notice content awaiting publication"}
+                    ? 'Published notice content'
+                    : 'Notice content awaiting publication'}
               </p>
             </div>
           </div>
@@ -359,11 +359,11 @@ export default function NoticeDetailPage() {
               icon={<Send size={18} />}
               title="Delivery summary"
               items={[
-                ["Total", String(notice.deliverySummary.total)],
-                ["Queued", String(notice.deliverySummary.queued)],
-                ["Sent", String(notice.deliverySummary.sent)],
-                ["Failed", String(notice.deliverySummary.failed)],
-                ["Skipped", String(notice.deliverySummary.skipped)],
+                ['Total', String(notice.deliverySummary.total)],
+                ['Queued', String(notice.deliverySummary.queued)],
+                ['Sent', String(notice.deliverySummary.sent)],
+                ['Failed', String(notice.deliverySummary.failed)],
+                ['Skipped', String(notice.deliverySummary.skipped)],
               ]}
             />
           ) : (
@@ -388,7 +388,7 @@ export default function NoticeDetailPage() {
             isLoading={unreadRecipientsQuery.isLoading}
             error={
               unreadRecipientsQuery.isError
-                ? "Unread recipient details could not be loaded right now."
+                ? 'Unread recipient details could not be loaded right now.'
                 : null
             }
             onPageChange={setUnreadPage}
@@ -409,7 +409,7 @@ export default function NoticeDetailPage() {
             items={notice.approvalHistory.map((item) => ({
               id: `${item.decision}-${item.createdAt}`,
               label: formatEnumLabel(item.decision),
-              detail: item.reason ?? "No reason recorded",
+              detail: item.reason ?? 'No reason recorded',
               actor: item.actorEmail,
               createdAt: item.createdAt,
             }))}
@@ -420,7 +420,7 @@ export default function NoticeDetailPage() {
             items={notice.auditHistory.map((item) => ({
               id: item.id,
               label: formatEnumLabel(item.action),
-              detail: "Tenant-scoped lifecycle audit entry",
+              detail: 'Tenant-scoped lifecycle audit entry',
               actor: item.actorEmail,
               createdAt: item.createdAt,
             }))}
@@ -430,19 +430,19 @@ export default function NoticeDetailPage() {
 
       <ConfirmDialog
         isOpen={pendingAction !== null}
-        title={`${pendingAction ? formatEnumLabel(pendingAction) : "Update"} notice?`}
+        title={`${pendingAction ? formatEnumLabel(pendingAction) : 'Update'} notice?`}
         description={noticeActionDescription(pendingAction)}
         confirmLabel={
-          pendingAction ? formatEnumLabel(pendingAction) : "Confirm"
+          pendingAction ? formatEnumLabel(pendingAction) : 'Confirm'
         }
-        cancelLabel={pendingAction === "cancel" ? "Keep notice" : undefined}
-        destructive={pendingAction === "cancel"}
+        cancelLabel={pendingAction === 'cancel' ? 'Keep notice' : undefined}
+        destructive={pendingAction === 'cancel'}
         isConfirming={lifecycleMutation.isPending}
         confirmDisabled={!actionReason.trim()}
         onClose={() => {
           if (!lifecycleMutation.isPending) {
             setPendingAction(null);
-            setActionReason("");
+            setActionReason('');
           }
         }}
         onConfirm={() => {
@@ -471,13 +471,13 @@ export default function NoticeDetailPage() {
 }
 
 function noticeActionDescription(action: NoticeLifecycleAction | null) {
-  if (action === "cancel") {
-    return "This stops a draft or scheduled notice from being published. A reason is required for the audit trail.";
+  if (action === 'cancel') {
+    return 'This stops a draft or scheduled notice from being published. A reason is required for the audit trail.';
   }
-  if (action === "archive") {
-    return "This removes the notice from active work while preserving its record and delivery evidence.";
+  if (action === 'archive') {
+    return 'This removes the notice from active work while preserving its record and delivery evidence.';
   }
-  return "This restores the notice to its previous lifecycle state without sending it again.";
+  return 'This restores the notice to its previous lifecycle state without sending it again.';
 }
 
 function NoticePageShell({ children }: { children: React.ReactNode }) {
@@ -486,7 +486,7 @@ function NoticePageShell({ children }: { children: React.ReactNode }) {
 
 function BackLink({
   light = false,
-  className = "",
+  className = '',
 }: {
   light?: boolean;
   className?: string;
@@ -496,9 +496,9 @@ function BackLink({
   return (
     <Button
       type="button"
-      variant={light ? "ghost" : "secondary"}
-      className={`${light ? "" : "mt-6"} ${className}`}
-      onClick={() => router.push("/dashboard/notices")}
+      variant={light ? 'ghost' : 'secondary'}
+      className={`${light ? '' : 'mt-6'} ${className}`}
+      onClick={() => router.push('/dashboard/notices')}
     >
       <ArrowLeft size={16} />
       Back to notices
@@ -508,11 +508,11 @@ function BackLink({
 
 function PriorityBadge({ priority }: { priority: string }) {
   const tone =
-    priority === "EMERGENCY"
-      ? "bg-danger-500 text-white"
-      : priority === "URGENT"
-        ? "bg-warning-100 text-warning-700"
-        : "bg-success-100 text-success-700";
+    priority === 'EMERGENCY'
+      ? 'bg-danger-500 text-white'
+      : priority === 'URGENT'
+        ? 'bg-warning-100 text-warning-700'
+        : 'bg-success-100 text-success-700';
 
   return (
     <span
@@ -534,9 +534,9 @@ function UnreadRecipientsPanel({
   error: string | null;
   onPageChange: (page: number) => void;
 }) {
-  const [search, setSearch] = useState("");
-  const [channelFilter, setChannelFilter] = useState("");
-  const [classFilter, setClassFilter] = useState("");
+  const [search, setSearch] = useState('');
+  const [channelFilter, setChannelFilter] = useState('');
+  const [classFilter, setClassFilter] = useState('');
   const recipients = useMemo(
     () => result?.recipients ?? [],
     [result?.recipients],
@@ -577,7 +577,7 @@ function UnreadRecipientsPanel({
     });
   }, [channelFilter, classFilter, recipients, search]);
   const failedVisible = filteredRecipients.filter(
-    (recipient) => recipient.status === "FAILED",
+    (recipient) => recipient.status === 'FAILED',
   ).length;
   const missingContactVisible = filteredRecipients.filter(
     (recipient) =>
@@ -671,9 +671,9 @@ function UnreadRecipientsPanel({
             <button
               type="button"
               onClick={() => {
-                setSearch("");
-                setChannelFilter("");
-                setClassFilter("");
+                setSearch('');
+                setChannelFilter('');
+                setClassFilter('');
               }}
               className="rounded-2xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 hover:text-gray-950"
             >
@@ -685,10 +685,10 @@ function UnreadRecipientsPanel({
             recipients.
             {failedVisible > 0
               ? ` ${failedVisible} visible delivery records failed.`
-              : ""}
+              : ''}
             {missingContactVisible > 0
               ? ` ${missingContactVisible} visible recipients need contact cleanup.`
-              : ""}
+              : ''}
           </div>
         </div>
       ) : null}
@@ -742,20 +742,20 @@ function UnreadRecipientsPanel({
                   <h3 className="mt-2 text-sm font-semibold text-gray-950">
                     {recipient.guardian?.fullName ??
                       recipient.recipientEmail ??
-                      "Recipient unavailable"}
+                      'Recipient unavailable'}
                   </h3>
                   <p className="mt-1 text-sm text-gray-500">
                     {recipient.student
                       ? `${recipient.student.fullName} (${recipient.student.studentSystemId})`
-                      : (recipient.destination ?? "No destination")}
+                      : (recipient.destination ?? 'No destination')}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
-                    Contact:{" "}
+                    Contact:{' '}
                     {recipient.guardian?.primaryPhone ??
                       recipient.guardian?.email ??
                       recipient.recipientEmail ??
                       recipient.destination ??
-                      "Not available"}
+                      'Not available'}
                   </p>
                   {recipient.errorMessage ? (
                     <p className="mt-1 text-xs text-danger-700">
@@ -764,11 +764,11 @@ function UnreadRecipientsPanel({
                   ) : null}
                 </div>
                 <div className="text-left text-xs text-gray-500 lg:text-right">
-                  <p>{recipient.student?.className ?? "Class unavailable"}</p>
+                  <p>{recipient.student?.className ?? 'Class unavailable'}</p>
                   <p>
                     {recipient.student?.sectionName
                       ? `Section ${recipient.student.sectionName}`
-                      : "All/No section"}
+                      : 'All/No section'}
                   </p>
                   <p className="mt-1">
                     Queued {formatDateTime(recipient.createdAt)}
@@ -794,16 +794,16 @@ function UnreadRecipientsPanel({
 function UnreadMetric({
   label,
   value,
-  tone = "neutral",
+  tone = 'neutral',
 }: {
   label: string;
   value: string;
-  tone?: "neutral" | "success" | "warning";
+  tone?: 'neutral' | 'success' | 'warning';
 }) {
   const toneClass = {
-    neutral: "bg-gray-50 text-gray-700",
-    success: "bg-success-50 text-success-700",
-    warning: "bg-amber-50 text-amber-700",
+    neutral: 'bg-gray-50 text-gray-700',
+    success: 'bg-success-50 text-success-700',
+    warning: 'bg-amber-50 text-amber-700',
   }[tone];
 
   return (
@@ -878,7 +878,7 @@ function HistoryCard({
               </p>
               <p className="mt-1 text-sm text-gray-600">{item.detail}</p>
               <p className="mt-1 text-xs text-gray-500">
-                {item.actor ?? "Actor unavailable"} ·{" "}
+                {item.actor ?? 'Actor unavailable'} ·{' '}
                 {formatDateTime(item.createdAt)}
               </p>
             </li>
@@ -896,81 +896,81 @@ function resolveNoticeState(notice: NoticeDetail) {
 
   // Compatibility fallback for an API instance that has not yet applied the
   // lifecycle migration during a rolling deployment.
-  if (notice.publishedAt) return "Published";
+  if (notice.publishedAt) return 'Published';
   if (notice.scheduledFor) {
-    return "Scheduled";
+    return 'Scheduled';
   }
 
-  return "Draft";
+  return 'Draft';
 }
 
 function hasPublicationReporting(notice: NoticeDetail | undefined) {
   if (!notice) return false;
   return Boolean(
     notice.publishedAt ||
-    ["PUBLISHED", "EXPIRED"].includes(notice.lifecycleStatus) ||
-    (notice.lifecycleStatus === "ARCHIVED" &&
+    ['PUBLISHED', 'EXPIRED'].includes(notice.lifecycleStatus) ||
+    (notice.lifecycleStatus === 'ARCHIVED' &&
       notice.archivedFromStatus &&
-      ["PUBLISHED", "EXPIRED"].includes(notice.archivedFromStatus)),
+      ['PUBLISHED', 'EXPIRED'].includes(notice.archivedFromStatus)),
   );
 }
 
 function getTimelineItems(notice: NoticeDetail): Array<[string, string]> {
   const items: Array<[string, string]> = [
-    ["Created", formatDateTime(notice.createdAt)],
+    ['Created', formatDateTime(notice.createdAt)],
   ];
   if (notice.scheduledFor) {
-    items.push(["Scheduled", formatDateTime(notice.scheduledFor)]);
+    items.push(['Scheduled', formatDateTime(notice.scheduledFor)]);
   }
   if (hasPublicationReporting(notice) && notice.publishedAt) {
-    items.push(["Published", formatDateTime(notice.publishedAt)]);
+    items.push(['Published', formatDateTime(notice.publishedAt)]);
   }
-  items.push(["Updated", formatDateTime(notice.updatedAt)]);
+  items.push(['Updated', formatDateTime(notice.updatedAt)]);
   return items;
 }
 
 function getAudienceItems(notice: NoticeDetail): Array<[string, string]> {
   const items: Array<[string, string]> = [
     [
-      "Scope",
-      notice.audienceType === "ALL"
-        ? "Whole school"
+      'Scope',
+      notice.audienceType === 'ALL'
+        ? 'Whole school'
         : formatEnumLabel(notice.audienceType),
     ],
   ];
-  if (notice.audienceType !== "ALL") {
-    items.push(["Class", notice.className ?? "Class unavailable"]);
+  if (notice.audienceType !== 'ALL') {
+    items.push(['Class', notice.className ?? 'Class unavailable']);
   }
-  if (notice.audienceType === "SECTION") {
-    items.push(["Section", notice.sectionName ?? "Section unavailable"]);
+  if (notice.audienceType === 'SECTION') {
+    items.push(['Section', notice.sectionName ?? 'Section unavailable']);
   }
   items.push([
-    "Created by",
-    notice.createdBy?.email ?? "System/user unavailable",
+    'Created by',
+    notice.createdBy?.email ?? 'System/user unavailable',
   ]);
   return items;
 }
 
 function getAudienceSummary(notice: NoticeDetail) {
-  if (notice.audienceType === "ALL") {
-    return "This notice is targeted to the whole school.";
+  if (notice.audienceType === 'ALL') {
+    return 'This notice is targeted to the whole school.';
   }
 
-  if (notice.audienceType === "SECTION") {
-    return `This notice is targeted to ${notice.className ?? "selected class"}${
-      notice.sectionName ? ` - Section ${notice.sectionName}` : ""
+  if (notice.audienceType === 'SECTION') {
+    return `This notice is targeted to ${notice.className ?? 'selected class'}${
+      notice.sectionName ? ` - Section ${notice.sectionName}` : ''
     }.`;
   }
 
-  return `This notice is targeted to ${notice.className ?? "selected class"}.`;
+  return `This notice is targeted to ${notice.className ?? 'selected class'}.`;
 }
 
 function formatEnumLabel(value: string) {
   return value
     .toLowerCase()
-    .split("_")
+    .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+    .join(' ');
 }
 
 function formatDateTime(value: string) {
@@ -983,7 +983,7 @@ function getProtectedFileId(url: string | null) {
   }
 
   try {
-    const pathname = new URL(url, "http://schoolos.local").pathname;
+    const pathname = new URL(url, 'http://schoolos.local').pathname;
     const match = pathname.match(/\/files\/([^/]+)\/preview\/?$/);
     return match?.[1] ? decodeURIComponent(match[1]) : null;
   } catch {

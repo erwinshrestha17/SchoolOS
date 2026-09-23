@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
 import {
   toGregorianDateFromBs,
   type AdmissionCase,
   type CreateAdmissionCasePayload,
   type ReviewAdmissionCasePayload,
-} from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+} from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -15,19 +15,19 @@ import {
   Loader2,
   ShieldAlert,
   UserRoundCheck,
-} from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
-import { api } from "../../lib/api";
-import { admissionCasesApi } from "../../lib/api/admission-cases";
-import { schoolFacingErrorMessage } from "../../lib/school-facing-error";
-import { Button } from "../ui/button";
-import { BsDateField } from "../ui/bs-date-field";
-import { ConfirmDialog } from "../ui/confirm-dialog";
-import { ErrorState } from "../ui/error-state";
-import { ProtectedFileButton } from "../ui/protected-file";
-import { SectionCard } from "../ui/section-card";
+} from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useRef, useState } from 'react';
+import { api } from '../../lib/api';
+import { admissionCasesApi } from '../../lib/api/admission-cases';
+import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
+import { Button } from '../ui/button';
+import { BsDateField } from '../ui/bs-date-field';
+import { ConfirmDialog } from '../ui/confirm-dialog';
+import { ErrorState } from '../ui/error-state';
+import { ProtectedFileButton } from '../ui/protected-file';
+import { SectionCard } from '../ui/section-card';
 
 export function AdmissionCaseDetail({
   admissionCaseId,
@@ -37,29 +37,29 @@ export function AdmissionCaseDetail({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [reviewAction, setReviewAction] = useState<Exclude<
-    ReviewAdmissionCasePayload["action"],
-    "REJECT"
+    ReviewAdmissionCasePayload['action'],
+    'REJECT'
   > | null>(null);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState('');
   const [confirmDuplicateOverride, setConfirmDuplicateOverride] =
     useState(false);
   // "Not admit" is a hard-to-reverse decision on a real applicant, so it gets
   // its own confirmation dialog and destructive styling instead of sharing
   // the inline reason panel used by the reversible review actions.
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
+  const [rejectReason, setRejectReason] = useState('');
 
   const caseQuery = useQuery({
-    queryKey: ["admission-case", admissionCaseId],
+    queryKey: ['admission-case', admissionCaseId],
     queryFn: () => admissionCasesApi.getCase(admissionCaseId),
   });
 
   const refresh = async () => {
     await queryClient.invalidateQueries({
-      queryKey: ["admission-case", admissionCaseId],
+      queryKey: ['admission-case', admissionCaseId],
     });
     await queryClient.invalidateQueries({
-      queryKey: ["admission-case-queues"],
+      queryKey: ['admission-case-queues'],
     });
   };
 
@@ -68,9 +68,9 @@ export function AdmissionCaseDetail({
       admissionCasesApi.reviewCase(admissionCaseId, payload),
     onSuccess: async () => {
       setReviewAction(null);
-      setReason("");
+      setReason('');
       setRejectDialogOpen(false);
-      setRejectReason("");
+      setRejectReason('');
       await refresh();
     },
   });
@@ -110,10 +110,10 @@ export function AdmissionCaseDetail({
   }
 
   const admissionCase = caseQuery.data;
-  const canFinalize = admissionCase.displayStatus === "APPROVED";
+  const canFinalize = admissionCase.displayStatus === 'APPROVED';
   const canDirectAdmit =
     (admissionCase.canAdmitDirectly || admissionCase.canOverrideDuplicate) &&
-    admissionCase.displayStatus !== "ADMITTED";
+    admissionCase.displayStatus !== 'ADMITTED';
   const availableReviewActions = new Set(admissionCase.review.availableActions);
   const mutationError =
     readError(reviewMutation.error) ||
@@ -126,7 +126,7 @@ export function AdmissionCaseDetail({
         <div>
           <p className="text-sm font-semibold text-slate-500">Admission case</p>
           <h2 className="mt-1 text-xl font-black text-slate-950">
-            {admissionCase.student.firstNameEn}{" "}
+            {admissionCase.student.firstNameEn}{' '}
             {admissionCase.student.lastNameEn}
           </h2>
           <p className="mt-1 text-sm text-slate-600">
@@ -155,19 +155,19 @@ export function AdmissionCaseDetail({
                 admissionCase.student.lastNameNp,
               ]
                 .filter(Boolean)
-                .join(" ") || "Not added"
+                .join(' ') || 'Not added'
             }
           />
           <Detail
             label="Date of birth"
-            value={admissionCase.student.dateOfBirth ?? "Not added"}
+            value={admissionCase.student.dateOfBirth ?? 'Not added'}
           />
           <Detail
             label="Gender"
             value={
               admissionCase.student.gender
                 ? statusLabel(admissionCase.student.gender)
-                : "Not added"
+                : 'Not added'
             }
           />
         </SectionCard>
@@ -177,37 +177,37 @@ export function AdmissionCaseDetail({
         >
           <Detail
             label="Name"
-            value={admissionCase.guardian.fullName ?? "Not added"}
+            value={admissionCase.guardian.fullName ?? 'Not added'}
           />
           <Detail
             label="Relationship"
-            value={admissionCase.guardian.relationship ?? "Not added"}
+            value={admissionCase.guardian.relationship ?? 'Not added'}
           />
           <Detail
             label="Phone"
-            value={admissionCase.guardian.phone ?? "Not added"}
+            value={admissionCase.guardian.phone ?? 'Not added'}
           />
           <Detail
             label="Email"
-            value={admissionCase.guardian.email ?? "Not added"}
+            value={admissionCase.guardian.email ?? 'Not added'}
           />
         </SectionCard>
         <SectionCard title="Placement" description="Saved academic placement">
           <Detail
             label="Academic year"
-            value={admissionCase.classSection.academicYearName ?? "Not added"}
+            value={admissionCase.classSection.academicYearName ?? 'Not added'}
           />
           <Detail
             label="Class"
-            value={admissionCase.classSection.className ?? "Not added"}
+            value={admissionCase.classSection.className ?? 'Not added'}
           />
           <Detail
             label="Section"
-            value={admissionCase.classSection.sectionName ?? "Not selected"}
+            value={admissionCase.classSection.sectionName ?? 'Not selected'}
           />
           <Detail
             label="Admission date"
-            value={admissionCase.academic.admissionDate ?? "Not added"}
+            value={admissionCase.academic.admissionDate ?? 'Not added'}
           />
         </SectionCard>
       </div>
@@ -269,7 +269,7 @@ export function AdmissionCaseDetail({
               warning
               items={admissionCase.duplicateCandidates.map(
                 (candidate) =>
-                  `${candidate.fullNameEn} · ${candidate.className}${candidate.sectionName ? ` ${candidate.sectionName}` : ""}`,
+                  `${candidate.fullNameEn} · ${candidate.className}${candidate.sectionName ? ` ${candidate.sectionName}` : ''}`,
               )}
             />
           ) : null}
@@ -279,12 +279,12 @@ export function AdmissionCaseDetail({
               warning
               items={[
                 admissionCase.requiresApproval
-                  ? "Principal approval is required before finalizing this admission."
-                  : "This admission must be reviewed before it can be finalized.",
+                  ? 'Principal approval is required before finalizing this admission.'
+                  : 'This admission must be reviewed before it can be finalized.',
               ]}
             />
           ) : null}
-          {admissionCase.capacityStatus?.state === "FULL" ? (
+          {admissionCase.capacityStatus?.state === 'FULL' ? (
             <Issue
               title="Section capacity is full"
               items={[
@@ -292,7 +292,7 @@ export function AdmissionCaseDetail({
               ]}
             />
           ) : null}
-          {admissionCase.capacityStatus?.state === "NEARLY_FULL" ? (
+          {admissionCase.capacityStatus?.state === 'NEARLY_FULL' ? (
             <Issue
               title="Section capacity is nearly full"
               warning
@@ -313,7 +313,7 @@ export function AdmissionCaseDetail({
         </div>
       </SectionCard>
 
-      {admissionCase.displayStatus === "WAITING_FOR_REVIEW" &&
+      {admissionCase.displayStatus === 'WAITING_FOR_REVIEW' &&
       admissionCase.approvalChain ? (
         <SectionCard
           title="Approval chain"
@@ -323,11 +323,11 @@ export function AdmissionCaseDetail({
             Stage {admissionCase.approvalChain.currentStageIndex ?? 1}
             {admissionCase.approvalChain.totalStages
               ? ` of ${admissionCase.approvalChain.totalStages}`
-              : ""}
-            {" — waiting on "}
+              : ''}
+            {' — waiting on '}
             {admissionCase.approvalChain.currentStageRole ??
               admissionCase.approvalChain.currentStagePermission ??
-              "principal/admin"}
+              'principal/admin'}
           </p>
         </SectionCard>
       ) : null}
@@ -393,13 +393,13 @@ export function AdmissionCaseDetail({
       {reviewAction ? (
         <SectionCard
           title={
-            reviewAction === "REQUEST_INFORMATION"
-              ? "Request information"
-              : reviewAction === "APPROVE"
-                ? "Approve this admission case"
-                : reviewAction === "WAITLIST"
-                  ? "Waitlist this applicant"
-                  : "Review this admission"
+            reviewAction === 'REQUEST_INFORMATION'
+              ? 'Request information'
+              : reviewAction === 'APPROVE'
+                ? 'Approve this admission case'
+                : reviewAction === 'WAITLIST'
+                  ? 'Waitlist this applicant'
+                  : 'Review this admission'
           }
           description="A reason is recorded in the admission audit history."
         >
@@ -418,7 +418,7 @@ export function AdmissionCaseDetail({
               variant="outline"
               onClick={() => {
                 setReviewAction(null);
-                setReason("");
+                setReason('');
               }}
             >
               Cancel
@@ -460,23 +460,23 @@ export function AdmissionCaseDetail({
           Back to admissions
         </Link>
         <div className="flex flex-wrap gap-2">
-          {availableReviewActions.has("REQUEST_INFORMATION") ? (
+          {availableReviewActions.has('REQUEST_INFORMATION') ? (
             <Button
               type="button"
               variant="outline"
-              onClick={() => setReviewAction("REQUEST_INFORMATION")}
+              onClick={() => setReviewAction('REQUEST_INFORMATION')}
             >
               <ShieldAlert className="h-4 w-4" />
               Request information
             </Button>
           ) : null}
-          {availableReviewActions.has("APPROVE") ? (
-            <Button type="button" onClick={() => setReviewAction("APPROVE")}>
+          {availableReviewActions.has('APPROVE') ? (
+            <Button type="button" onClick={() => setReviewAction('APPROVE')}>
               <ClipboardCheck className="h-4 w-4" />
               Approve
             </Button>
           ) : null}
-          {availableReviewActions.has("REJECT") ? (
+          {availableReviewActions.has('REJECT') ? (
             <Button
               type="button"
               variant="destructive"
@@ -486,22 +486,22 @@ export function AdmissionCaseDetail({
               Do not admit
             </Button>
           ) : null}
-          {availableReviewActions.has("WAITLIST") ? (
+          {availableReviewActions.has('WAITLIST') ? (
             <Button
               type="button"
               variant="outline"
-              onClick={() => setReviewAction("WAITLIST")}
+              onClick={() => setReviewAction('WAITLIST')}
             >
               <AlertTriangle className="h-4 w-4" />
               Waitlist
             </Button>
           ) : null}
-          {availableReviewActions.has("PROMOTE_FROM_WAITLIST") ? (
+          {availableReviewActions.has('PROMOTE_FROM_WAITLIST') ? (
             <Button
               type="button"
               disabled={reviewMutation.isPending}
               onClick={() =>
-                reviewMutation.mutate({ action: "PROMOTE_FROM_WAITLIST" })
+                reviewMutation.mutate({ action: 'PROMOTE_FROM_WAITLIST' })
               }
             >
               {reviewMutation.isPending ? (
@@ -542,11 +542,11 @@ export function AdmissionCaseDetail({
                 <UserRoundCheck className="h-4 w-4" />
               )}
               {admissionCase.canOverrideDuplicate
-                ? "Admit with override"
-                : "Admit student"}
+                ? 'Admit with override'
+                : 'Admit student'}
             </Button>
           ) : null}
-          {admissionCase.displayStatus === "ADMITTED" &&
+          {admissionCase.displayStatus === 'ADMITTED' &&
           admissionCase.admittedStudentId ? (
             <Link
               href={`/dashboard/students/${admissionCase.admittedStudentId}`}
@@ -568,11 +568,11 @@ export function AdmissionCaseDetail({
         confirmDisabled={rejectReason.trim().length < 5}
         onClose={() => {
           setRejectDialogOpen(false);
-          setRejectReason("");
+          setRejectReason('');
         }}
         onConfirm={() =>
           reviewMutation.mutate({
-            action: "REJECT",
+            action: 'REJECT',
             reason: rejectReason.trim(),
           })
         }
@@ -620,27 +620,27 @@ function AdmissionCaseMissingDetails({
   const [corrections, setCorrections] = useState<
     Partial<CreateAdmissionCasePayload>
   >({});
-  const [dateOfBirthBs, setDateOfBirthBs] = useState("");
-  const [admissionDateBs, setAdmissionDateBs] = useState("");
+  const [dateOfBirthBs, setDateOfBirthBs] = useState('');
+  const [admissionDateBs, setAdmissionDateBs] = useState('');
   const needsPlacement = admissionCase.missingRequiredFields.some((field) =>
-    ["academicYearId", "classId", "sectionId"].includes(field),
+    ['academicYearId', 'classId', 'sectionId'].includes(field),
   );
   const academicYears = useQuery({
-    queryKey: ["academic-years"],
+    queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
     enabled: needsPlacement,
   });
   const classes = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
     enabled: needsPlacement,
   });
   const sections = useQuery({
-    queryKey: ["sections"],
+    queryKey: ['sections'],
     queryFn: api.listSections,
     enabled: needsPlacement,
   });
-  const classId = corrections.classId ?? admissionCase.academic.classId ?? "";
+  const classId = corrections.classId ?? admissionCase.academic.classId ?? '';
   const availableSections = (sections.data ?? []).filter(
     (section) => (section.classId ?? section.class?.id) === classId,
   );
@@ -649,8 +649,8 @@ function AdmissionCaseMissingDetails({
       admissionCasesApi.updateCase(admissionCase.id, corrections),
     onSuccess: async () => {
       setCorrections({});
-      setDateOfBirthBs("");
-      setAdmissionDateBs("");
+      setDateOfBirthBs('');
+      setAdmissionDateBs('');
       await onSaved();
     },
   });
@@ -659,16 +659,16 @@ function AdmissionCaseMissingDetails({
     value: CreateAdmissionCasePayload[K],
   ) => setCorrections((current) => ({ ...current, [key]: value }));
   const updateBsDate = (
-    field: "dateOfBirth" | "admissionDate",
+    field: 'dateOfBirth' | 'admissionDate',
     value: string,
   ) => {
-    if (field === "dateOfBirth") setDateOfBirthBs(value);
+    if (field === 'dateOfBirth') setDateOfBirthBs(value);
     else setAdmissionDateBs(value);
     try {
       const date = toGregorianDateFromBs(value);
       update(
         field,
-        `${String(date.year).padStart(4, "0")}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`,
+        `${String(date.year).padStart(4, '0')}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`,
       );
     } catch {
       setCorrections((current) => {
@@ -686,71 +686,71 @@ function AdmissionCaseMissingDetails({
     >
       <div className="grid gap-4 md:grid-cols-2">
         {admissionCase.missingRequiredFields.map((field) => {
-          if (field === "firstNameEn")
+          if (field === 'firstNameEn')
             return (
               <CorrectionField key={field} label="First name (English)">
                 <input
-                  value={corrections.firstNameEn ?? ""}
+                  value={corrections.firstNameEn ?? ''}
                   onChange={(event) =>
-                    update("firstNameEn", event.target.value)
+                    update('firstNameEn', event.target.value)
                   }
                 />
               </CorrectionField>
             );
-          if (field === "lastNameEn")
+          if (field === 'lastNameEn')
             return (
               <CorrectionField key={field} label="Last name (English)">
                 <input
-                  value={corrections.lastNameEn ?? ""}
-                  onChange={(event) => update("lastNameEn", event.target.value)}
+                  value={corrections.lastNameEn ?? ''}
+                  onChange={(event) => update('lastNameEn', event.target.value)}
                 />
               </CorrectionField>
             );
-          if (field === "firstNameNp")
+          if (field === 'firstNameNp')
             return (
               <CorrectionField key={field} label="First name (Nepali)">
                 <input
-                  value={corrections.firstNameNp ?? ""}
+                  value={corrections.firstNameNp ?? ''}
                   onChange={(event) =>
-                    update("firstNameNp", event.target.value)
+                    update('firstNameNp', event.target.value)
                   }
                 />
               </CorrectionField>
             );
-          if (field === "lastNameNp")
+          if (field === 'lastNameNp')
             return (
               <CorrectionField key={field} label="Last name (Nepali)">
                 <input
-                  value={corrections.lastNameNp ?? ""}
-                  onChange={(event) => update("lastNameNp", event.target.value)}
+                  value={corrections.lastNameNp ?? ''}
+                  onChange={(event) => update('lastNameNp', event.target.value)}
                 />
               </CorrectionField>
             );
-          if (field === "dateOfBirth")
+          if (field === 'dateOfBirth')
             return (
               <BsDateField
                 key={field}
                 label="Date of birth (BS)"
                 value={dateOfBirthBs}
-                onChange={(value) => updateBsDate("dateOfBirth", value)}
+                onChange={(value) => updateBsDate('dateOfBirth', value)}
                 error={
                   dateOfBirthBs && !corrections.dateOfBirth
-                    ? "Enter a valid BS date in YYYY-MM-DD format."
+                    ? 'Enter a valid BS date in YYYY-MM-DD format.'
                     : null
                 }
                 required
               />
             );
-          if (field === "gender")
+          if (field === 'gender')
             return (
               <CorrectionField key={field} label="Gender">
                 <select
-                  value={corrections.gender ?? ""}
+                  value={corrections.gender ?? ''}
                   onChange={(event) =>
                     update(
-                      "gender",
+                      'gender',
                       event.target
-                        .value as CreateAdmissionCasePayload["gender"],
+                        .value as CreateAdmissionCasePayload['gender'],
                     )
                   }
                 >
@@ -761,59 +761,59 @@ function AdmissionCaseMissingDetails({
                 </select>
               </CorrectionField>
             );
-          if (field === "guardianFullName")
+          if (field === 'guardianFullName')
             return (
               <CorrectionField key={field} label="Guardian full name">
                 <input
-                  value={corrections.guardianFullName ?? ""}
+                  value={corrections.guardianFullName ?? ''}
                   onChange={(event) =>
-                    update("guardianFullName", event.target.value)
+                    update('guardianFullName', event.target.value)
                   }
                 />
               </CorrectionField>
             );
-          if (field === "guardianRelation")
+          if (field === 'guardianRelation')
             return (
               <CorrectionField key={field} label="Guardian relationship">
                 <input
-                  value={corrections.guardianRelation ?? ""}
+                  value={corrections.guardianRelation ?? ''}
                   onChange={(event) =>
-                    update("guardianRelation", event.target.value)
+                    update('guardianRelation', event.target.value)
                   }
                 />
               </CorrectionField>
             );
-          if (field === "guardianPhone")
+          if (field === 'guardianPhone')
             return (
               <CorrectionField key={field} label="Guardian phone">
                 <input
                   inputMode="tel"
-                  value={corrections.guardianPhone ?? ""}
+                  value={corrections.guardianPhone ?? ''}
                   onChange={(event) =>
-                    update("guardianPhone", event.target.value)
+                    update('guardianPhone', event.target.value)
                   }
                 />
               </CorrectionField>
             );
-          if (field === "guardianEmail")
+          if (field === 'guardianEmail')
             return (
               <CorrectionField key={field} label="Guardian email">
                 <input
                   type="email"
-                  value={corrections.guardianEmail ?? ""}
+                  value={corrections.guardianEmail ?? ''}
                   onChange={(event) =>
-                    update("guardianEmail", event.target.value)
+                    update('guardianEmail', event.target.value)
                   }
                 />
               </CorrectionField>
             );
-          if (field === "academicYearId")
+          if (field === 'academicYearId')
             return (
               <CorrectionField key={field} label="Academic year">
                 <select
-                  value={corrections.academicYearId ?? ""}
+                  value={corrections.academicYearId ?? ''}
                   onChange={(event) =>
-                    update("academicYearId", event.target.value)
+                    update('academicYearId', event.target.value)
                   }
                 >
                   <option value="">Select academic year</option>
@@ -825,14 +825,14 @@ function AdmissionCaseMissingDetails({
                 </select>
               </CorrectionField>
             );
-          if (field === "classId")
+          if (field === 'classId')
             return (
               <CorrectionField key={field} label="Class">
                 <select
-                  value={corrections.classId ?? ""}
+                  value={corrections.classId ?? ''}
                   onChange={(event) => {
-                    update("classId", event.target.value);
-                    update("sectionId", undefined);
+                    update('classId', event.target.value);
+                    update('sectionId', undefined);
                   }}
                 >
                   <option value="">Select class</option>
@@ -844,13 +844,13 @@ function AdmissionCaseMissingDetails({
                 </select>
               </CorrectionField>
             );
-          if (field === "sectionId")
+          if (field === 'sectionId')
             return (
               <CorrectionField key={field} label="Section">
                 <select
-                  value={corrections.sectionId ?? ""}
+                  value={corrections.sectionId ?? ''}
                   disabled={!classId}
-                  onChange={(event) => update("sectionId", event.target.value)}
+                  onChange={(event) => update('sectionId', event.target.value)}
                 >
                   <option value="">Select section</option>
                   {availableSections.map((section) => (
@@ -861,62 +861,62 @@ function AdmissionCaseMissingDetails({
                 </select>
               </CorrectionField>
             );
-          if (field === "previousSchool")
+          if (field === 'previousSchool')
             return (
               <CorrectionField key={field} label="Previous school">
                 <input
-                  value={corrections.previousSchool ?? ""}
+                  value={corrections.previousSchool ?? ''}
                   onChange={(event) =>
-                    update("previousSchool", event.target.value)
+                    update('previousSchool', event.target.value)
                   }
                 />
               </CorrectionField>
             );
-          if (field === "admissionDate")
+          if (field === 'admissionDate')
             return (
               <BsDateField
                 key={field}
                 label="Admission date (BS)"
                 value={admissionDateBs}
-                onChange={(value) => updateBsDate("admissionDate", value)}
+                onChange={(value) => updateBsDate('admissionDate', value)}
                 error={
                   admissionDateBs && !corrections.admissionDate
-                    ? "Enter a valid BS date in YYYY-MM-DD format."
+                    ? 'Enter a valid BS date in YYYY-MM-DD format.'
                     : null
                 }
                 required
               />
             );
-          if (field === "nationalStudentId")
+          if (field === 'nationalStudentId')
             return (
               <CorrectionField key={field} label="IEMIS student ID">
                 <input
-                  value={corrections.nationalStudentId ?? ""}
+                  value={corrections.nationalStudentId ?? ''}
                   onChange={(event) =>
-                    update("nationalStudentId", event.target.value)
+                    update('nationalStudentId', event.target.value)
                   }
                 />
               </CorrectionField>
             );
-          if (field === "emergencyName")
+          if (field === 'emergencyName')
             return (
               <CorrectionField key={field} label="Emergency contact name">
                 <input
-                  value={corrections.emergencyName ?? ""}
+                  value={corrections.emergencyName ?? ''}
                   onChange={(event) =>
-                    update("emergencyName", event.target.value)
+                    update('emergencyName', event.target.value)
                   }
                 />
               </CorrectionField>
             );
-          if (field === "emergencyPhone")
+          if (field === 'emergencyPhone')
             return (
               <CorrectionField key={field} label="Emergency contact phone">
                 <input
                   inputMode="tel"
-                  value={corrections.emergencyPhone ?? ""}
+                  value={corrections.emergencyPhone ?? ''}
                   onChange={(event) =>
-                    update("emergencyPhone", event.target.value)
+                    update('emergencyPhone', event.target.value)
                   }
                 />
               </CorrectionField>
@@ -982,7 +982,7 @@ function AdmissionCaseDocumentUpload({
   onSaved: () => Promise<void>;
 }) {
   const [kind, setKind] = useState(
-    admissionCase.missingRequiredDocuments[0] ?? "OTHER",
+    admissionCase.missingRequiredDocuments[0] ?? 'OTHER',
   );
   const uploadedRef = useRef<{
     fileId: string;
@@ -995,7 +995,7 @@ function AdmissionCaseDocumentUpload({
       if (!nextDocument) {
         const uploaded = await api.uploadFile(
           file,
-          "admissions",
+          'admissions',
           admissionCase.id,
         );
         nextDocument = { fileId: uploaded.id, kind, title: file.name };
@@ -1033,7 +1033,7 @@ function AdmissionCaseDocumentUpload({
           </select>
         </CorrectionField>
         <label
-          className={`inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white ${mutation.isPending ? "pointer-events-none opacity-60" : ""}`}
+          className={`inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 text-sm font-bold text-white ${mutation.isPending ? 'pointer-events-none opacity-60' : ''}`}
         >
           Upload document
           <input
@@ -1044,7 +1044,7 @@ function AdmissionCaseDocumentUpload({
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file) mutation.mutate(file);
-              event.currentTarget.value = "";
+              event.currentTarget.value = '';
             }}
           />
         </label>
@@ -1069,7 +1069,7 @@ function Issue({
 }) {
   return (
     <div
-      className={`rounded-xl border p-3 text-sm ${warning ? "border-warning-200 bg-warning-50 text-warning-900" : "border-danger-200 bg-danger-50 text-danger-900"}`}
+      className={`rounded-xl border p-3 text-sm ${warning ? 'border-warning-200 bg-warning-50 text-warning-900' : 'border-danger-200 bg-danger-50 text-danger-900'}`}
     >
       <p className="flex items-center gap-2 font-bold">
         <AlertTriangle className="h-4 w-4" />
@@ -1089,20 +1089,20 @@ function statusLabel(value: string) {
 }
 function humanize(value: string) {
   return value
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replaceAll("_", " ")
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replaceAll('_', ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 function readError(error: unknown) {
-  if (!error) return "";
+  if (!error) return '';
   return schoolFacingErrorMessage(error, {
     fallback:
-      "The admission action could not be completed. The case was not changed.",
+      'The admission action could not be completed. The case was not changed.',
     invalid:
-      "Review the action, reason, and admission requirements before continuing.",
-    forbidden: "You do not have permission to complete this admission action.",
-    notFound: "This admission case is no longer available.",
+      'Review the action, reason, and admission requirements before continuing.',
+    forbidden: 'You do not have permission to complete this admission action.',
+    notFound: 'This admission case is no longer available.',
     conflict:
-      "This admission case changed while you were working. Refresh it and try again.",
+      'This admission case changed while you were working. Refresh it and try again.',
   });
 }

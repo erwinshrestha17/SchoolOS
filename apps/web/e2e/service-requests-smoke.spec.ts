@@ -13,7 +13,9 @@ const API_BASE_URL =
 
 async function login(page: import('@playwright/test').Page) {
   await page.goto('/login');
-  await page.getByLabel(/school code|tenant slug/i).fill(credentials.tenantSlug!);
+  await page
+    .getByLabel(/school code|tenant slug/i)
+    .fill(credentials.tenantSlug!);
   await page.getByLabel(/^email$/i).fill(credentials.email!);
   await page.getByLabel(/^password$/i).fill(credentials.password!);
   await page.getByRole('button', { name: /sign in|log in/i }).click();
@@ -30,7 +32,10 @@ test.describe('Service requests Action Centre smoke', () => {
     const health = await request
       .get(`${API_BASE_URL.replace(/\/api\/v1$/, '')}/health`)
       .catch(() => null);
-    test.skip(!health?.ok(), 'API must be reachable for authenticated Action Centre smoke.');
+    test.skip(
+      !health?.ok(),
+      'API must be reachable for authenticated Action Centre smoke.',
+    );
   });
 
   test('loads the Action Centre queue from the real service-requests API', async ({
@@ -47,7 +52,9 @@ test.describe('Service requests Action Centre smoke', () => {
     await login(page);
     await page.goto('/dashboard/service-requests');
 
-    await expect(page.getByRole('heading', { name: /parent & school requests/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /parent & school requests/i }),
+    ).toBeVisible();
     await expect(page.getByText(/request queue/i)).toBeVisible();
 
     const listResponse = await listResponsePromise;

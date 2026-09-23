@@ -1,21 +1,21 @@
-import type { Browser } from "@playwright/test";
+import type { Browser } from '@playwright/test';
 import {
   expect,
   test,
   type SchoolE2eRole,
   type StorageState,
-} from "./fixtures/auth";
+} from './fixtures/auth';
 
 const API_BASE_URL =
   process.env.SCHOOLOS_E2E_API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "http://localhost:4000/api/v1";
+  'http://localhost:4000/api/v1';
 const WEB_BASE_URL =
   process.env.PLAYWRIGHT_BASE_URL ??
-  `http://localhost:${process.env.SCHOOLOS_WEB_E2E_PORT ?? "3101"}`;
+  `http://localhost:${process.env.SCHOOLOS_WEB_E2E_PORT ?? '3101'}`;
 
-test.describe.serial("M7/M11 role and tenant boundaries", () => {
-  test("separates payroll preparation, review, approval, and posting permissions", async ({
+test.describe.serial('M7/M11 role and tenant boundaries', () => {
+  test('separates payroll preparation, review, approval, and posting permissions', async ({
     authStateFor,
     browser,
   }) => {
@@ -24,10 +24,10 @@ test.describe.serial("M7/M11 role and tenant boundaries", () => {
       role: SchoolE2eRole;
       forbiddenAction: string;
     }> = [
-      { role: "payrollOfficer", forbiddenAction: "approve" },
-      { role: "payrollReviewer", forbiddenAction: "approve" },
-      { role: "payrollApprover", forbiddenAction: "review" },
-      { role: "payrollPoster", forbiddenAction: "approve" },
+      { role: 'payrollOfficer', forbiddenAction: 'approve' },
+      { role: 'payrollReviewer', forbiddenAction: 'approve' },
+      { role: 'payrollApprover', forbiddenAction: 'review' },
+      { role: 'payrollPoster', forbiddenAction: 'approve' },
     ];
 
     for (const roleCase of cases) {
@@ -38,7 +38,7 @@ test.describe.serial("M7/M11 role and tenant boundaries", () => {
       const forbidden = await context.request.post(
         `${API_BASE_URL}/payroll/runs/${runId}/${roleCase.forbiddenAction}`,
         {
-          data: { reason: "E2E permission boundary verification" },
+          data: { reason: 'E2E permission boundary verification' },
           headers: csrfHeaders(state),
         },
       );
@@ -50,7 +50,7 @@ test.describe.serial("M7/M11 role and tenant boundaries", () => {
     }
   });
 
-  test("separates accounting preparation, review, and approval permissions", async ({
+  test('separates accounting preparation, review, and approval permissions', async ({
     authStateFor,
     browser,
   }) => {
@@ -59,9 +59,9 @@ test.describe.serial("M7/M11 role and tenant boundaries", () => {
       role: SchoolE2eRole;
       forbiddenAction: string;
     }> = [
-      { role: "e2eAccountant", forbiddenAction: "approve" },
-      { role: "accountingReviewer", forbiddenAction: "approve" },
-      { role: "accountingApprover", forbiddenAction: "submit" },
+      { role: 'e2eAccountant', forbiddenAction: 'approve' },
+      { role: 'accountingReviewer', forbiddenAction: 'approve' },
+      { role: 'accountingApprover', forbiddenAction: 'submit' },
     ];
 
     for (const roleCase of cases) {
@@ -74,7 +74,7 @@ test.describe.serial("M7/M11 role and tenant boundaries", () => {
       const forbidden = await context.request.post(
         `${API_BASE_URL}/accounting/journals/${journalId}/${roleCase.forbiddenAction}`,
         {
-          data: { reason: "E2E permission boundary verification" },
+          data: { reason: 'E2E permission boundary verification' },
           headers: csrfHeaders(state),
         },
       );
@@ -86,11 +86,11 @@ test.describe.serial("M7/M11 role and tenant boundaries", () => {
     }
   });
 
-  test("keeps read-only, self-service, and unauthorized identities within scope", async ({
+  test('keeps read-only, self-service, and unauthorized identities within scope', async ({
     authStateFor,
     browser,
   }) => {
-    for (const role of ["principalReadOnly", "auditorReadOnly"] as const) {
+    for (const role of ['principalReadOnly', 'auditorReadOnly'] as const) {
       const context = await browser.newContext({
         storageState: await authStateFor(role),
       });
@@ -111,7 +111,7 @@ test.describe.serial("M7/M11 role and tenant boundaries", () => {
     }
 
     const staffContext = await browser.newContext({
-      storageState: await authStateFor("staffSelfService"),
+      storageState: await authStateFor('staffSelfService'),
     });
     expect(
       (
@@ -126,7 +126,7 @@ test.describe.serial("M7/M11 role and tenant boundaries", () => {
     await staffContext.close();
 
     const unauthorizedContext = await browser.newContext({
-      storageState: await authStateFor("unauthorized"),
+      storageState: await authStateFor('unauthorized'),
     });
     expect(
       (
@@ -143,14 +143,14 @@ test.describe.serial("M7/M11 role and tenant boundaries", () => {
     await unauthorizedContext.close();
   });
 
-  test("fails closed for cross-tenant payroll and accounting identifiers", async ({
+  test('fails closed for cross-tenant payroll and accounting identifiers', async ({
     authStateFor,
     browser,
   }) => {
     const runId = await firstPayrollRunId(authStateFor, browser);
     const journalId = await firstJournalId(authStateFor, browser);
     const context = await browser.newContext({
-      storageState: await authStateFor("otherTenant"),
+      storageState: await authStateFor('otherTenant'),
     });
 
     for (const path of [
@@ -159,27 +159,29 @@ test.describe.serial("M7/M11 role and tenant boundaries", () => {
     ]) {
       const response = await context.request.get(`${API_BASE_URL}/${path}`);
       expect([403, 404]).toContain(response.status());
-      expect(await response.text()).not.toContain("tenantId");
+      expect(await response.text()).not.toContain('tenantId');
     }
     await context.close();
   });
 
-  test("denies a suspended tenant before opening a school workspace", async ({
+  test('denies a suspended tenant before opening a school workspace', async ({
     browser,
   }) => {
-    const password = requiredEnvironmentValue("SCHOOLOS_E2E_PASSWORD");
+    const password = requiredEnvironmentValue('SCHOOLOS_E2E_PASSWORD');
     const context = await browser.newContext({ baseURL: WEB_BASE_URL });
     const page = await context.newPage();
-    await page.goto("/login");
-    await page.getByLabel(/School Code/i).fill("e2e-suspended-school");
-    await page.getByLabel(/Email/i).fill("e2e.suspended-tenant@schoolos.test");
+    await page.goto('/login');
+    await page.getByLabel(/School Code/i).fill('e2e-suspended-school');
+    await page.getByLabel(/Email/i).fill('e2e.suspended-tenant@schoolos.test');
     await page.getByLabel(/^Password$/i).fill(password);
-    await page.getByRole("button", { name: /Sign in/i }).click();
+    await page.getByRole('button', { name: /Sign in/i }).click();
 
     await expect(page).toHaveURL(/\/login/);
     // Authentication deliberately does not disclose whether the tenant or the
     // credentials caused the denial.
-    await expect(page.getByText(/Invalid tenant or credentials/i)).toBeVisible();
+    await expect(
+      page.getByText(/Invalid tenant or credentials/i),
+    ).toBeVisible();
     await expect(page).not.toHaveURL(/\/dashboard/);
     await context.close();
   });
@@ -190,7 +192,7 @@ async function firstPayrollRunId(
   browser: Browser,
 ) {
   const context = await browser.newContext({
-    storageState: await authStateFor("payrollOfficer"),
+    storageState: await authStateFor('payrollOfficer'),
   });
   const response = await context.request.get(`${API_BASE_URL}/payroll/runs`);
   expect(response.ok()).toBeTruthy();
@@ -206,7 +208,7 @@ async function firstJournalId(
   browser: Browser,
 ) {
   const context = await browser.newContext({
-    storageState: await authStateFor("e2eAccountant"),
+    storageState: await authStateFor('e2eAccountant'),
   });
   const response = await context.request.get(
     `${API_BASE_URL}/accounting/journals`,
@@ -229,9 +231,9 @@ function requiredEnvironmentValue(name: string) {
 function csrfHeaders(state: StorageState) {
   const csrfCookie = state.cookies.find(
     (cookie) =>
-      cookie.name === "__Host-schoolos_csrf" || cookie.name === "schoolos_csrf",
+      cookie.name === '__Host-schoolos_csrf' || cookie.name === 'schoolos_csrf',
   );
   if (!csrfCookie)
-    throw new Error("Authenticated E2E state is missing its CSRF cookie.");
-  return { "X-CSRF-Token": csrfCookie.value };
+    throw new Error('Authenticated E2E state is missing its CSRF cookie.');
+  return { 'X-CSRF-Token': csrfCookie.value };
 }

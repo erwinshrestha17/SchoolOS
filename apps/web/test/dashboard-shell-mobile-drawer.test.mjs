@@ -11,7 +11,10 @@ describe('mobile navigation drawer focus management', () => {
   it('returns focus to the menu trigger when the drawer closes', () => {
     const shell = read('components/layout/dashboard-shell.tsx');
 
-    assert.match(shell, /mobileMenuButtonRef = useRef<HTMLButtonElement>\(null\)/);
+    assert.match(
+      shell,
+      /mobileMenuButtonRef = useRef<HTMLButtonElement>\(null\)/,
+    );
     assert.match(shell, /closeMobileNavigation = useCallback/);
     assert.match(shell, /requestAnimationFrame/);
     assert.match(shell, /trigger\?\.getClientRects\(\)\.length/);
@@ -22,7 +25,10 @@ describe('mobile navigation drawer focus management', () => {
   it('threads the trigger ref through TopBar into the actual hamburger button', () => {
     const header = read('components/layout/header.tsx');
 
-    assert.match(header, /mobileMenuButtonRef\?: RefObject<HTMLButtonElement \| null>/);
+    assert.match(
+      header,
+      /mobileMenuButtonRef\?: RefObject<HTMLButtonElement \| null>/,
+    );
     assert.match(header, /ref=\{mobileMenuButtonRef\}/);
   });
 });

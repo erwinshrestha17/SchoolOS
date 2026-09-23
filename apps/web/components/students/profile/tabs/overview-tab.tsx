@@ -61,8 +61,7 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
   const canViewFees = !isSupportOverride && hasPermissions(['fees:read']);
   const canManageDocuments =
     !isSupportOverride && hasPermissions(['student_documents:manage']);
-  const canViewQr =
-    !isSupportOverride && hasPermissions(['students:qr:read']);
+  const canViewQr = !isSupportOverride && hasPermissions(['students:qr:read']);
   const canViewActivity = !isSupportOverride;
   const primaryGuardian =
     profile.guardians.find((guardian) => guardian.isPrimary) ??
@@ -266,68 +265,68 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
       >
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-              <div className="mb-3 flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-widest text-slate-400">
-                <GraduationCap size={15} aria-hidden="true" />
-                Current enrollment
-              </div>
-              {currentEnrollment ? (
-                <div>
-                  <p className="text-lg font-black text-slate-950">
-                    {formatClassLabel(currentEnrollment.className)}
-                    {currentEnrollment.sectionName
-                      ? ` • Section ${currentEnrollment.sectionName}`
-                      : ''}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-slate-600">
-                    {currentEnrollment.academicYear}
-                    {currentEnrollment.rollNumber
-                      ? ` • Roll ${currentEnrollment.rollNumber}`
-                      : ''}
-                  </p>
-                  <Badge className="mt-3 border-[var(--color-mod-admissions-border)] bg-white text-[var(--color-mod-admissions-text)]">
-                    {formatStatus(currentEnrollment.status)}
-                  </Badge>
-                </div>
-              ) : (
-                <p className="text-sm font-semibold text-slate-500">
-                  No enrollment record is available.
+            <div className="mb-3 flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-widest text-slate-400">
+              <GraduationCap size={15} aria-hidden="true" />
+              Current enrollment
+            </div>
+            {currentEnrollment ? (
+              <div>
+                <p className="text-lg font-black text-slate-950">
+                  {formatClassLabel(currentEnrollment.className)}
+                  {currentEnrollment.sectionName
+                    ? ` • Section ${currentEnrollment.sectionName}`
+                    : ''}
                 </p>
-              )}
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  {currentEnrollment.academicYear}
+                  {currentEnrollment.rollNumber
+                    ? ` • Roll ${currentEnrollment.rollNumber}`
+                    : ''}
+                </p>
+                <Badge className="mt-3 border-[var(--color-mod-admissions-border)] bg-white text-[var(--color-mod-admissions-text)]">
+                  {formatStatus(currentEnrollment.status)}
+                </Badge>
+              </div>
+            ) : (
+              <p className="text-sm font-semibold text-slate-500">
+                No enrollment record is available.
+              </p>
+            )}
           </div>
 
           {canViewActivity ? (
             <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-            <div className="mb-3 flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-widest text-slate-400">
-              <Clock size={15} aria-hidden="true" />
-              Recent student activity
-            </div>
-            {profile.activityPosts.length > 0 ? (
-              <div className="space-y-3">
-                {profile.activityPosts.slice(0, 3).map((post) => (
-                  <div key={post.id} className="rounded-xl bg-white p-3">
-                    <p className="line-clamp-1 text-sm font-bold text-slate-900">
-                      {post.title}
-                    </p>
-                    <p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-slate-500">
-                      {post.body ||
-                        post.caption ||
-                        'Activity details are not recorded.'}
-                    </p>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => onSelectTab('Activity')}
-                  className="text-xs font-bold text-[var(--color-mod-admissions-text)] hover:underline"
-                >
-                  View activity
-                </button>
+              <div className="mb-3 flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-widest text-slate-400">
+                <Clock size={15} aria-hidden="true" />
+                Recent student activity
               </div>
-            ) : (
-              <p className="text-sm font-semibold text-slate-500">
-                No recent student activity is available in this profile.
-              </p>
-            )}
+              {profile.activityPosts.length > 0 ? (
+                <div className="space-y-3">
+                  {profile.activityPosts.slice(0, 3).map((post) => (
+                    <div key={post.id} className="rounded-xl bg-white p-3">
+                      <p className="line-clamp-1 text-sm font-bold text-slate-900">
+                        {post.title}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-slate-500">
+                        {post.body ||
+                          post.caption ||
+                          'Activity details are not recorded.'}
+                      </p>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => onSelectTab('Activity')}
+                    className="text-xs font-bold text-[var(--color-mod-admissions-text)] hover:underline"
+                  >
+                    View activity
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm font-semibold text-slate-500">
+                  No recent student activity is available in this profile.
+                </p>
+              )}
             </div>
           ) : null}
         </div>

@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import type { PlatformTenantDetail } from "@schoolos/core";
-import { AlertTriangle, ArrowLeft } from "lucide-react";
-import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import type { PlatformTenantDetail } from '@schoolos/core';
+import { AlertTriangle, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+import { useParams, usePathname } from 'next/navigation';
 import {
   createContext,
   useCallback,
@@ -12,21 +12,21 @@ import {
   useMemo,
   useState,
   type ReactNode,
-} from "react";
+} from 'react';
 import {
   PlatformInlineError,
   PlatformSectionSkeleton,
-} from "@/app/platform/_components/platform-operator-states";
-import { Badge } from "@/components/ui/badge";
-import { PermissionDenied } from "@/components/platform/PermissionDenied";
-import { useSession } from "@/components/session-provider";
-import { platformApi } from "@/lib/api/platform";
-import { hasAnyPermission } from "@/lib/session";
+} from '@/app/platform/_components/platform-operator-states';
+import { Badge } from '@/components/ui/badge';
+import { PermissionDenied } from '@/components/platform/PermissionDenied';
+import { useSession } from '@/components/session-provider';
+import { platformApi } from '@/lib/api/platform';
+import { hasAnyPermission } from '@/lib/session';
 import {
   TENANT_SECTIONS,
   tenantSectionHref,
   type TenantDetailSection,
-} from "./tenant-detail-routes";
+} from './tenant-detail-routes';
 
 type TenantDetailContextValue = {
   tenant: PlatformTenantDetail;
@@ -45,7 +45,7 @@ export function TenantDetailPage({
   section: TenantDetailSection;
   children: ReactNode;
 }) {
-  const { tenantId = "" } = useParams<{ tenantId: string }>();
+  const { tenantId = '' } = useParams<{ tenantId: string }>();
   const pathname = usePathname();
   const { session } = useSession();
   const activeSection = TENANT_SECTIONS.find((item) => item.key === section);
@@ -98,7 +98,7 @@ export function TenantDetailPage({
     return (
       <PlatformInlineError
         title="Tenant detail unavailable"
-        message={error ?? "The requested tenant could not be loaded."}
+        message={error ?? 'The requested tenant could not be loaded.'}
         onRetry={() => void loadInitialTenant()}
       />
     );
@@ -121,8 +121,8 @@ export function TenantDetailPage({
               <h1 className="text-4xl font-black tracking-tight text-slate-900">
                 {tenant.name}
               </h1>
-              <Badge variant={tenant.isActive ? "success" : "destructive"}>
-                {tenant.isActive ? "ACTIVE" : "SUSPENDED"}
+              <Badge variant={tenant.isActive ? 'success' : 'destructive'}>
+                {tenant.isActive ? 'ACTIVE' : 'SUSPENDED'}
               </Badge>
             </div>
             <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
@@ -151,16 +151,16 @@ export function TenantDetailPage({
           ).map(({ key, label, icon: Icon }) => {
             const href = tenantSectionHref(tenant.id, key);
             const active =
-              section === key && (key !== "overview" || pathname === href);
+              section === key && (key !== 'overview' || pathname === href);
             return (
               <Link
                 key={key}
                 href={href}
-                aria-current={active ? "page" : undefined}
+                aria-current={active ? 'page' : undefined}
                 className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors ${
                   active
-                    ? "bg-white text-[var(--color-mod-platform-text)] shadow-sm"
-                    : "text-slate-500 hover:bg-white/70 hover:text-slate-900"
+                    ? 'bg-white text-[var(--color-mod-platform-text)] shadow-sm'
+                    : 'text-slate-500 hover:bg-white/70 hover:text-slate-900'
                 }`}
               >
                 <Icon size={16} />
@@ -179,7 +179,7 @@ export function TenantDetailPage({
 export function useTenantDetail() {
   const context = useContext(TenantDetailContext);
   if (!context) {
-    throw new Error("useTenantDetail must be used inside TenantDetailPage");
+    throw new Error('useTenantDetail must be used inside TenantDetailPage');
   }
   return context;
 }
@@ -187,5 +187,5 @@ export function useTenantDetail() {
 function getErrorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
-    : "This tenant detail could not be loaded. Try again.";
+    : 'This tenant detail could not be loaded. Try again.';
 }

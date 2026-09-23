@@ -157,7 +157,8 @@ export const platformPermissions = [
   {
     resource: "settings",
     action: "manage",
-    description: "Manage tenant branding, localization, and operational settings",
+    description:
+      "Manage tenant branding, localization, and operational settings",
   },
   {
     resource: "settings",

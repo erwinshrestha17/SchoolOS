@@ -26,9 +26,13 @@ import { SectionCard } from '@/components/ui/section-card';
 function ModuleUnavailableNotice({ moduleName }: { moduleName: string }) {
   return (
     <div className="flex items-start gap-3 rounded-xl border border-warning-100 bg-warning-50 p-3">
-      <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-warning-700" aria-hidden="true" />
+      <BookOpen
+        className="mt-0.5 h-4 w-4 shrink-0 text-warning-700"
+        aria-hidden="true"
+      />
       <p className="text-sm leading-5 text-warning-900">
-        {moduleName} is not enabled for your school, so this section is unavailable.
+        {moduleName} is not enabled for your school, so this section is
+        unavailable.
       </p>
     </div>
   );
@@ -58,7 +62,9 @@ export function TeacherTodayWorkspace() {
   });
 
   if (todayQuery.isLoading) {
-    return <LoadingState variant="page" label="Preparing your teaching day..." />;
+    return (
+      <LoadingState variant="page" label="Preparing your teaching day..." />
+    );
   }
 
   if (todayQuery.isError || !todayQuery.data) {
@@ -101,7 +107,9 @@ export function TeacherTodayWorkspace() {
           className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600 transition hover:border-[var(--primary)] hover:text-[var(--primary)] disabled:opacity-50"
         >
           <RefreshCcw
-            className={todayQuery.isFetching ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'}
+            className={
+              todayQuery.isFetching ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'
+            }
             aria-hidden="true"
           />
           Refresh
@@ -111,18 +119,30 @@ export function TeacherTodayWorkspace() {
       {!hasTeachingWork ? (
         <SectionCard title="No active teaching assignments">
           <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
-            <ClipboardList className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+            <ClipboardList
+              className="mt-0.5 h-4 w-4 shrink-0 text-slate-400"
+              aria-hidden="true"
+            />
             <p className="text-sm leading-5 text-slate-600">
-              You have no active Class Teacher or Subject Teacher assignment for the current
-              academic year yet. Contact your school administrator if this is unexpected.
+              You have no active Class Teacher or Subject Teacher assignment for
+              the current academic year yet. Contact your school administrator
+              if this is unexpected.
             </p>
           </div>
         </SectionCard>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
-            <PeriodCard label="Current period" period={data.currentPeriod} emptyText="No class right now" />
-            <PeriodCard label="Next period" period={data.nextPeriod} emptyText="Nothing else scheduled today" />
+            <PeriodCard
+              label="Current period"
+              period={data.currentPeriod}
+              emptyText="No class right now"
+            />
+            <PeriodCard
+              label="Next period"
+              period={data.nextPeriod}
+              emptyText="Nothing else scheduled today"
+            />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -135,7 +155,10 @@ export function TeacherTodayWorkspace() {
                     {data.pendingAttendanceCount} pending
                   </span>
                 ) : hasAttendanceClasses ? (
-                  <CheckCircle2 className="h-5 w-5 text-success-600" aria-hidden="true" />
+                  <CheckCircle2
+                    className="h-5 w-5 text-success-600"
+                    aria-hidden="true"
+                  />
                 ) : null
               }
               footer={
@@ -157,8 +180,8 @@ export function TeacherTodayWorkspace() {
                 </ul>
               ) : (
                 <p className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm leading-5 text-slate-600">
-                  Your subject or substitution periods are shown above. No homeroom attendance
-                  class is assigned for this day.
+                  Your subject or substitution periods are shown above. No
+                  homeroom attendance class is assigned for this day.
                 </p>
               )}
             </SectionCard>
@@ -172,7 +195,10 @@ export function TeacherTodayWorkspace() {
                     {data.homework.awaitingReviewCount} to review
                   </span>
                 ) : data.homework ? (
-                  <CheckCircle2 className="h-5 w-5 text-success-600" aria-hidden="true" />
+                  <CheckCircle2
+                    className="h-5 w-5 text-success-600"
+                    aria-hidden="true"
+                  />
                 ) : null
               }
               footer={
@@ -188,11 +214,16 @@ export function TeacherTodayWorkspace() {
             >
               {data.homework ? (
                 <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-                  <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                  <BookOpen
+                    className="mt-0.5 h-4 w-4 shrink-0 text-slate-400"
+                    aria-hidden="true"
+                  />
                   <p className="text-sm leading-5 text-slate-600">
-                    {data.homework.givenToday} assigned today, {data.homework.dueToday} due today,{' '}
+                    {data.homework.givenToday} assigned today,{' '}
+                    {data.homework.dueToday} due today,{' '}
                     {data.homework.awaitingReviewCount} submission
-                    {data.homework.awaitingReviewCount === 1 ? '' : 's'} not yet checked.
+                    {data.homework.awaitingReviewCount === 1 ? '' : 's'} not yet
+                    checked.
                   </p>
                 </div>
               ) : (
@@ -219,7 +250,10 @@ export function TeacherTodayWorkspace() {
                     key={substitution.id}
                     className="flex items-start gap-3 rounded-xl border border-warning-100 bg-warning-50 p-3"
                   >
-                    <Repeat className="mt-0.5 h-4 w-4 shrink-0 text-warning-700" aria-hidden="true" />
+                    <Repeat
+                      className="mt-0.5 h-4 w-4 shrink-0 text-warning-700"
+                      aria-hidden="true"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-slate-900">
                         {substitution.role === 'SUBSTITUTE'
@@ -228,8 +262,11 @@ export function TeacherTodayWorkspace() {
                       </p>
                       <p className="text-xs font-medium text-slate-600">
                         {substitution.className}
-                        {substitution.sectionName ? ` - ${substitution.sectionName}` : ''} •{' '}
-                        {substitution.subjectName} • {substitution.startsAt}-{substitution.endsAt}
+                        {substitution.sectionName
+                          ? ` - ${substitution.sectionName}`
+                          : ''}{' '}
+                        • {substitution.subjectName} • {substitution.startsAt}-
+                        {substitution.endsAt}
                       </p>
                     </div>
                   </li>
@@ -264,9 +301,14 @@ export function TeacherTodayWorkspace() {
                     key={deadline.examTermId}
                     className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3"
                   >
-                    <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                    <CalendarClock
+                      className="mt-0.5 h-4 w-4 shrink-0 text-slate-400"
+                      aria-hidden="true"
+                    />
                     <p className="text-sm leading-5 text-slate-600">
-                      <span className="font-bold text-slate-900">{deadline.examTermName}</span>{' '}
+                      <span className="font-bold text-slate-900">
+                        {deadline.examTermName}
+                      </span>{' '}
                       ends {formatBsDateTime(deadline.endsOn)}
                     </p>
                   </li>
@@ -296,14 +338,20 @@ function PeriodCard({
           <Clock className="h-5 w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            {label}
+          </p>
           {period ? (
             <>
-              <p className="truncate text-base font-bold text-slate-900">{period.subjectName}</p>
+              <p className="truncate text-base font-bold text-slate-900">
+                {period.subjectName}
+              </p>
               <p className="truncate text-xs font-medium text-slate-600">
                 {period.className} • {period.startsAt}-{period.endsAt}
               </p>
-              {['SUBSTITUTING', 'COVERED'].includes(period.coverageStatus ?? '') ? (
+              {['SUBSTITUTING', 'COVERED'].includes(
+                period.coverageStatus ?? '',
+              ) ? (
                 <p className="mt-1 text-xs font-bold text-warning-700">
                   {period.coverageStatus === 'SUBSTITUTING'
                     ? 'You are substituting for this period'
@@ -323,10 +371,19 @@ function PeriodCard({
 function ClassRow({ item }: { item: TeacherTodayAssignedClass }) {
   const { attendance } = item;
   const status = attendance.isSubmitted
-    ? { label: 'Submitted', className: 'bg-success-50 text-success-700 border-success-100' }
+    ? {
+        label: 'Submitted',
+        className: 'bg-success-50 text-success-700 border-success-100',
+      }
     : attendance.isLocked
-      ? { label: 'Locked', className: 'bg-slate-100 text-slate-600 border-slate-200' }
-      : { label: 'Pending', className: 'bg-warning-50 text-warning-700 border-warning-100' };
+      ? {
+          label: 'Locked',
+          className: 'bg-slate-100 text-slate-600 border-slate-200',
+        }
+      : {
+          label: 'Pending',
+          className: 'bg-warning-50 text-warning-700 border-warning-100',
+        };
 
   return (
     <li className="flex items-center gap-3 rounded-xl border border-slate-100 p-3">
@@ -335,7 +392,9 @@ function ClassRow({ item }: { item: TeacherTodayAssignedClass }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-slate-900">{item.name}</p>
-        <p className="truncate text-xs font-medium text-slate-600">{item.subject}</p>
+        <p className="truncate text-xs font-medium text-slate-600">
+          {item.subject}
+        </p>
       </div>
       <span
         className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide ${status.className}`}

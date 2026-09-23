@@ -1,13 +1,13 @@
-const UNSAFE_HTTP_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const UNSAFE_HTTP_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const CLEARABLE_ATTENDANCE_SYNC_STATUSES = new Set([
-  "ACCEPTED",
-  "SYNCED",
-  "CONFLICTED",
+  'ACCEPTED',
+  'SYNCED',
+  'CONFLICTED',
 ]);
 const EDITABLE_ATTENDANCE_SYNC_HTTP_STATUSES = new Set([400, 404, 422]);
 
 export const OFFLINE_MUTATION_MESSAGE =
-  "This action needs an internet connection. Nothing was sent or queued.";
+  'This action needs an internet connection. Nothing was sent or queued.';
 
 export type BrowserSessionIdentity = {
   tenantId: string;
@@ -17,7 +17,7 @@ export type BrowserSessionIdentity = {
 export function getBrowserSessionIdentity(
   session: unknown,
 ): BrowserSessionIdentity | null {
-  if (!session || typeof session !== "object") {
+  if (!session || typeof session !== 'object') {
     return null;
   }
 
@@ -29,9 +29,9 @@ export function getBrowserSessionIdentity(
   const userId = candidate.user?.id;
 
   if (
-    typeof tenantId !== "string" ||
+    typeof tenantId !== 'string' ||
     !tenantId.trim() ||
-    typeof userId !== "string" ||
+    typeof userId !== 'string' ||
     !userId.trim()
   ) {
     return null;
@@ -92,13 +92,13 @@ export function canRestoreEditableAttendanceDraftAfterSyncError(
     return true;
   }
 
-  if (!error || typeof error !== "object" || !("statusCode" in error)) {
+  if (!error || typeof error !== 'object' || !('statusCode' in error)) {
     return false;
   }
 
   const statusCode = (error as { statusCode?: unknown }).statusCode;
   return (
-    typeof statusCode === "number" &&
+    typeof statusCode === 'number' &&
     EDITABLE_ATTENDANCE_SYNC_HTTP_STATUSES.has(statusCode)
   );
 }
@@ -106,13 +106,13 @@ export function canRestoreEditableAttendanceDraftAfterSyncError(
 export class OfflineMutationError extends Error {
   constructor() {
     super(OFFLINE_MUTATION_MESSAGE);
-    this.name = "OfflineMutationError";
+    this.name = 'OfflineMutationError';
   }
 }
 
 export function assertOnlineForMutation(method: string) {
   const isOnline =
-    typeof navigator === "undefined" ? true : navigator.onLine !== false;
+    typeof navigator === 'undefined' ? true : navigator.onLine !== false;
 
   if (shouldRejectOfflineMutation(method, isOnline)) {
     throw new OfflineMutationError();

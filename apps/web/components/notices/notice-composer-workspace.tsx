@@ -1,41 +1,41 @@
-"use client";
+'use client';
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Eye, FileText, Save } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { api } from "@/lib/api";
-import { OfflineMutationError } from "@/lib/offline-policy";
-import { useSession } from "@/components/session-provider";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, Eye, FileText, Save } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { api } from '@/lib/api';
+import { OfflineMutationError } from '@/lib/offline-policy';
+import { useSession } from '@/components/session-provider';
 import {
   deleteOfflineModuleDraft,
   listOfflineModuleDrafts,
   upsertOfflineModuleDraft,
-} from "@/lib/offline-module-drafts";
-import { usersApi } from "@/lib/api/users";
+} from '@/lib/offline-module-drafts';
+import { usersApi } from '@/lib/api/users';
 import {
   communicationsApi,
   type NoticeRecipientPreview,
-} from "@/lib/api/communications";
+} from '@/lib/api/communications';
 import { Button } from '@/components/ui/button';
-import { FileUploader } from "@/components/ui/file-uploader";
-import { LoadingState } from "@/components/ui/loading-state";
-import { ErrorState } from "@/components/ui/error-state";
-import { PermissionDenied } from "@/components/ui/permission-denied";
-import { useTeacherAccess } from "@/lib/teacher-access";
+import { FileUploader } from '@/components/ui/file-uploader';
+import { LoadingState } from '@/components/ui/loading-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { PermissionDenied } from '@/components/ui/permission-denied';
+import { useTeacherAccess } from '@/lib/teacher-access';
 import {
   useNoticeCapabilities,
   type NoticeAudienceScope,
-} from "@/lib/permissions-ui";
+} from '@/lib/permissions-ui';
 
 const CATEGORY_OPTIONS = [
-  "GENERAL",
-  "HOLIDAY",
-  "EMERGENCY",
-  "FEES",
-  "EXAMS",
-  "TRANSPORT_DELAY",
-  "EVENT",
+  'GENERAL',
+  'HOLIDAY',
+  'EMERGENCY',
+  'FEES',
+  'EXAMS',
+  'TRANSPORT_DELAY',
+  'EVENT',
 ] as const;
 
 // GUARDIANS and RECIPIENTS are client-side-only audience choices. Neither
@@ -44,14 +44,14 @@ const CATEGORY_OPTIONS = [
 // resolveAudienceRecipients in communications.service.ts), so both send
 // audienceType "ALL" alongside the relevant id list.
 type ComposerAudienceType =
-  | "ALL"
-  | "CLASS"
-  | "SECTION"
-  | "ROLE"
-  | "STAFF"
-  | "STUDENT"
-  | "GUARDIANS"
-  | "RECIPIENTS";
+  | 'ALL'
+  | 'CLASS'
+  | 'SECTION'
+  | 'ROLE'
+  | 'STAFF'
+  | 'STUDENT'
+  | 'GUARDIANS'
+  | 'RECIPIENTS';
 
 type NoticeDraftForm = {
   title: string;
@@ -61,7 +61,7 @@ type NoticeDraftForm = {
   category: (typeof CATEGORY_OPTIONS)[number];
   isPinned: boolean;
   requiresAcknowledgement: boolean;
-  priority: "NORMAL" | "URGENT" | "EMERGENCY";
+  priority: 'NORMAL' | 'URGENT' | 'EMERGENCY';
   audienceType: ComposerAudienceType;
   classId: string;
   sectionId: string;
@@ -72,21 +72,21 @@ type NoticeDraftForm = {
 };
 
 const emptyDraft: NoticeDraftForm = {
-  title: "",
-  titleNe: "",
-  body: "",
-  bodyNe: "",
-  category: "GENERAL",
+  title: '',
+  titleNe: '',
+  body: '',
+  bodyNe: '',
+  category: 'GENERAL',
   isPinned: false,
   requiresAcknowledgement: false,
-  priority: "NORMAL",
-  audienceType: "ALL",
-  classId: "",
-  sectionId: "",
+  priority: 'NORMAL',
+  audienceType: 'ALL',
+  classId: '',
+  sectionId: '',
   roleNames: [],
-  idListText: "",
-  attachmentFileId: "",
-  attachmentFileName: "",
+  idListText: '',
+  attachmentFileId: '',
+  attachmentFileName: '',
 };
 
 function parseIdList(text: string): string[] {
@@ -113,28 +113,28 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
   const [formError, setFormError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const idempotencyKey = useRef<string | undefined>(undefined);
-  if (!idempotencyKey.current && typeof crypto !== "undefined") {
+  if (!idempotencyKey.current && typeof crypto !== 'undefined') {
     idempotencyKey.current = crypto.randomUUID();
   }
 
   const detailQuery = useQuery({
-    queryKey: ["notice-detail", noticeId],
+    queryKey: ['notice-detail', noticeId],
     queryFn: () => communicationsApi.getNoticeDetail(noticeId!),
     enabled: Boolean(noticeId && canEdit),
   });
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: () => api.listClasses(),
     enabled: canCreate || canEdit,
   });
   const sectionsQuery = useQuery({
-    queryKey: ["sections"],
+    queryKey: ['sections'],
     queryFn: () => api.listSections(),
-    enabled: (canCreate || canEdit) && form.audienceType === "SECTION",
+    enabled: (canCreate || canEdit) && form.audienceType === 'SECTION',
   });
 
   const rolesQuery = useQuery({
-    queryKey: ["role-catalog"],
+    queryKey: ['role-catalog'],
     queryFn: () => usersApi.listRoleCatalog(),
     enabled: canCreate || canEdit,
   });
@@ -144,35 +144,34 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
     if (!notice) return;
     let audienceType: ComposerAudienceType =
       notice.audienceType as ComposerAudienceType;
-    let idListText = "";
+    let idListText = '';
     if (notice.guardianIds.length > 0 && notice.studentIds.length === 0) {
-      audienceType = "GUARDIANS";
-      idListText = notice.guardianIds.join(", ");
+      audienceType = 'GUARDIANS';
+      idListText = notice.guardianIds.join(', ');
     } else if (notice.recipientUserIds.length > 0) {
-      audienceType = "RECIPIENTS";
-      idListText = notice.recipientUserIds.join(", ");
-    } else if (notice.audienceType === "STAFF") {
-      idListText = notice.staffIds.join(", ");
-    } else if (notice.audienceType === "STUDENT") {
-      idListText = notice.studentIds.join(", ");
+      audienceType = 'RECIPIENTS';
+      idListText = notice.recipientUserIds.join(', ');
+    } else if (notice.audienceType === 'STAFF') {
+      idListText = notice.staffIds.join(', ');
+    } else if (notice.audienceType === 'STUDENT') {
+      idListText = notice.studentIds.join(', ');
     }
     setForm({
       title: notice.title,
-      titleNe: notice.titleNe ?? "",
+      titleNe: notice.titleNe ?? '',
       body: notice.body,
-      bodyNe: notice.bodyNe ?? "",
-      category: (notice.category ??
-        "GENERAL") as NoticeDraftForm["category"],
+      bodyNe: notice.bodyNe ?? '',
+      category: (notice.category ?? 'GENERAL') as NoticeDraftForm['category'],
       isPinned: notice.isPinned ?? false,
       requiresAcknowledgement: notice.requiresAcknowledgement ?? false,
-      priority: notice.priority as NoticeDraftForm["priority"],
+      priority: notice.priority as NoticeDraftForm['priority'],
       audienceType,
-      classId: notice.classId ?? "",
-      sectionId: notice.sectionId ?? "",
+      classId: notice.classId ?? '',
+      sectionId: notice.sectionId ?? '',
       roleNames: notice.roleNames ?? [],
       idListText,
-      attachmentFileId: notice.attachmentFileId ?? "",
-      attachmentFileName: notice.attachmentFileId ? "Protected attachment" : "",
+      attachmentFileId: notice.attachmentFileId ?? '',
+      attachmentFileName: notice.attachmentFileId ? 'Protected attachment' : '',
     });
     setDirty(false);
   }, [detailQuery.data]);
@@ -180,12 +179,12 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
 
   useEffect(() => {
-    if (noticeCaps.resolution !== "granted") return;
+    if (noticeCaps.resolution !== 'granted') return;
     if (
       !noticeCaps.allowedAudienceTypes.includes(form.audienceType) &&
       noticeCaps.allowedAudienceTypes.length > 0
@@ -238,7 +237,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
     },
     onError: () =>
       setFormError(
-        "Recipient preview is unavailable. Your draft is still here; check the audience and try again.",
+        'Recipient preview is unavailable. Your draft is still here; check the audience and try again.',
       ),
   });
 
@@ -258,28 +257,26 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
       setFormError(null);
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["notice-detail", saved.id],
+          queryKey: ['notice-detail', saved.id],
         }),
-        queryClient.invalidateQueries({ queryKey: ["notices"] }),
+        queryClient.invalidateQueries({ queryKey: ['notices'] }),
       ]);
       router.push(`/dashboard/notices/${saved.id}`);
     },
     onError: async (error: unknown) => {
       if (error instanceof OfflineMutationError) {
         if (!session?.tenant.id || !session.user.id) {
-          setFormError(
-            "Sign in again before saving a local notice draft.",
-          );
+          setFormError('Sign in again before saving a local notice draft.');
           return;
         }
         const operationId = idempotencyKey.current ?? crypto.randomUUID();
         idempotencyKey.current = operationId;
         await upsertOfflineModuleDraft({
-          module: "notices",
+          module: 'notices',
           operationId,
           tenantId: session.tenant.id,
           userId: session.user.id,
-          status: "queued",
+          status: 'queued',
           savedAt: new Date().toISOString(),
           payload: {
             ...payload(form),
@@ -287,12 +284,12 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
           },
         });
         setFormError(
-          "Notice draft queued on this browser. It is not published. Reconnect to sync the draft.",
+          'Notice draft queued on this browser. It is not published. Reconnect to sync the draft.',
         );
         return;
       }
       setFormError(
-        "The draft could not be saved. Your valid form entries have been preserved.",
+        'The draft could not be saved. Your valid form entries have been preserved.',
       );
     },
   });
@@ -300,25 +297,25 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
   useEffect(() => {
     const drain = async () => {
       if (
-        typeof navigator === "undefined" ||
+        typeof navigator === 'undefined' ||
         navigator.onLine === false ||
         !session?.tenant.id ||
         !session.user.id
       ) {
         return;
       }
-      const drafts = await listOfflineModuleDrafts("notices", {
+      const drafts = await listOfflineModuleDrafts('notices', {
         tenantId: session.tenant.id,
         userId: session.user.id,
       });
       for (const draft of drafts) {
-        if (draft.status !== "queued") continue;
+        if (draft.status !== 'queued') continue;
         try {
           await communicationsApi.createNoticeDraft({
             ...draft.payload,
             idempotencyKey: draft.operationId,
           } as never);
-          await deleteOfflineModuleDraft("notices", draft.operationId);
+          await deleteOfflineModuleDraft('notices', draft.operationId);
         } catch {
           // Keep queued until a later reconnect.
         }
@@ -327,12 +324,12 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
     const handleOnline = () => {
       void drain();
     };
-    window.addEventListener("online", handleOnline);
+    window.addEventListener('online', handleOnline);
     void drain();
-    return () => window.removeEventListener("online", handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
   }, [session?.tenant.id, session?.user.id]);
 
-  if (noticeCaps.resolution === "loading") {
+  if (noticeCaps.resolution === 'loading') {
     return <LoadingState label="Checking notice permissions…" />;
   }
 
@@ -356,7 +353,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
       />
     );
   }
-  if (detailQuery.data && detailQuery.data.lifecycleStatus !== "DRAFT") {
+  if (detailQuery.data && detailQuery.data.lifecycleStatus !== 'DRAFT') {
     return (
       <ErrorState
         title="This notice is no longer editable"
@@ -378,7 +375,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             Draft first
           </p>
           <h2 className="mt-2 text-xl font-bold text-slate-950">
-            {noticeId ? "Update notice draft" : "Create notice draft"}
+            {noticeId ? 'Update notice draft' : 'Create notice draft'}
           </h2>
           <p className="mt-1 text-sm leading-6 text-slate-600">
             Saving never sends the notice. Publication and scheduling happen
@@ -391,7 +388,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             value={form.title}
             maxLength={200}
             onChange={(event) =>
-              change(setForm, setDirty, "title", event.target.value)
+              change(setForm, setDirty, 'title', event.target.value)
             }
             placeholder="A clear, actionable notice title"
             className="min-h-11"
@@ -402,7 +399,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             value={form.titleNe}
             maxLength={200}
             onChange={(event) =>
-              change(setForm, setDirty, "titleNe", event.target.value)
+              change(setForm, setDirty, 'titleNe', event.target.value)
             }
             placeholder="बिदाको सूचना"
             className="min-h-11"
@@ -414,7 +411,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             maxLength={10_000}
             rows={8}
             onChange={(event) =>
-              change(setForm, setDirty, "body", event.target.value)
+              change(setForm, setDirty, 'body', event.target.value)
             }
             placeholder="Write the school-facing message"
             className="min-h-44 rounded-xl border border-slate-200 px-3 py-2"
@@ -426,7 +423,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             maxLength={10_000}
             rows={6}
             onChange={(event) =>
-              change(setForm, setDirty, "bodyNe", event.target.value)
+              change(setForm, setDirty, 'bodyNe', event.target.value)
             }
             placeholder="विद्यालय-सम्बन्धी सन्देश नेपालीमा लेख्नुहोस्"
             className="min-h-32 rounded-xl border border-slate-200 px-3 py-2"
@@ -441,8 +438,8 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
                 change(
                   setForm,
                   setDirty,
-                  "priority",
-                  event.target.value as NoticeDraftForm["priority"],
+                  'priority',
+                  event.target.value as NoticeDraftForm['priority'],
                 )
               }
               className="min-h-11"
@@ -459,8 +456,8 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
                 change(
                   setForm,
                   setDirty,
-                  "category",
-                  event.target.value as NoticeDraftForm["category"],
+                  'category',
+                  event.target.value as NoticeDraftForm['category'],
                 )
               }
               className="min-h-11"
@@ -477,7 +474,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
               type="checkbox"
               checked={form.isPinned}
               onChange={(event) =>
-                change(setForm, setDirty, "isPinned", event.target.checked)
+                change(setForm, setDirty, 'isPinned', event.target.checked)
               }
               className="h-4 w-4"
             />
@@ -491,7 +488,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
                 change(
                   setForm,
                   setDirty,
-                  "requiresAcknowledgement",
+                  'requiresAcknowledgement',
                   event.target.checked,
                 )
               }
@@ -506,15 +503,14 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             <select
               value={form.audienceType}
               onChange={(event) => {
-                const audienceType = event.target
-                  .value as ComposerAudienceType;
+                const audienceType = event.target.value as ComposerAudienceType;
                 setForm((current) => ({
                   ...current,
                   audienceType,
-                  classId: "",
-                  sectionId: "",
+                  classId: '',
+                  sectionId: '',
                   roleNames: [],
-                  idListText: "",
+                  idListText: '',
                 }));
                 setDirty(true);
               }}
@@ -527,7 +523,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
               ))}
             </select>
           </Field>
-          {form.audienceType === "CLASS" || form.audienceType === "SECTION" ? (
+          {form.audienceType === 'CLASS' || form.audienceType === 'SECTION' ? (
             <Field label="Class">
               <select
                 value={form.classId}
@@ -535,7 +531,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
                   setForm((current) => ({
                     ...current,
                     classId: event.target.value,
-                    sectionId: "",
+                    sectionId: '',
                   }));
                   setDirty(true);
                 }}
@@ -550,12 +546,12 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
               </select>
             </Field>
           ) : null}
-          {form.audienceType === "SECTION" ? (
+          {form.audienceType === 'SECTION' ? (
             <Field label="Section">
               <select
                 value={form.sectionId}
                 onChange={(event) =>
-                  change(setForm, setDirty, "sectionId", event.target.value)
+                  change(setForm, setDirty, 'sectionId', event.target.value)
                 }
                 className="min-h-11"
               >
@@ -570,7 +566,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
           ) : null}
         </div>
 
-        {form.audienceType === "ROLE" ? (
+        {form.audienceType === 'ROLE' ? (
           <Field label="Roles to notify">
             <select
               multiple
@@ -580,7 +576,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
                   event.target.selectedOptions,
                   (option) => option.value,
                 );
-                change(setForm, setDirty, "roleNames", selected);
+                change(setForm, setDirty, 'roleNames', selected);
               }}
               className="min-h-28 rounded-xl border border-slate-200 px-3 py-2"
             >
@@ -596,23 +592,23 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
           </Field>
         ) : null}
 
-        {form.audienceType === "STAFF" ||
-        form.audienceType === "STUDENT" ||
-        form.audienceType === "GUARDIANS" ||
-        form.audienceType === "RECIPIENTS" ? (
+        {form.audienceType === 'STAFF' ||
+        form.audienceType === 'STUDENT' ||
+        form.audienceType === 'GUARDIANS' ||
+        form.audienceType === 'RECIPIENTS' ? (
           <Field label={idListLabel(form.audienceType)}>
             <textarea
               value={form.idListText}
               rows={3}
               onChange={(event) =>
-                change(setForm, setDirty, "idListText", event.target.value)
+                change(setForm, setDirty, 'idListText', event.target.value)
               }
               placeholder="Paste IDs separated by commas or new lines"
               className="min-h-20 rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs"
             />
             <p className="text-xs font-normal text-slate-500">
               {parseIdList(form.idListText).length} ID
-              {parseIdList(form.idListText).length === 1 ? "" : "s"} entered.
+              {parseIdList(form.idListText).length === 1 ? '' : 's'} entered.
             </p>
           </Field>
         ) : null}
@@ -634,15 +630,15 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
               if (fileId !== form.attachmentFileId) return;
               setForm((current) => ({
                 ...current,
-                attachmentFileId: "",
-                attachmentFileName: "",
+                attachmentFileId: '',
+                attachmentFileName: '',
               }));
               setDirty(true);
             }}
           />
           {form.attachmentFileName ? (
             <p className="mt-2 text-xs font-semibold text-slate-500">
-              <FileText className="mr-1 inline h-4 w-4" />{" "}
+              <FileText className="mr-1 inline h-4 w-4" />{' '}
               {form.attachmentFileName}
             </p>
           ) : null}
@@ -670,10 +666,10 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             disabled={Boolean(validationError) || previewMutation.isPending}
             isLoading={previewMutation.isPending}
           >
-            <Eye size={16} />{" "}
+            <Eye size={16} />{' '}
             {previewMutation.isPending
-              ? "Resolving audience..."
-              : "Preview recipients"}
+              ? 'Resolving audience...'
+              : 'Preview recipients'}
           </Button>
           <Button
             type="button"
@@ -681,8 +677,8 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             disabled={Boolean(validationError) || saveMutation.isPending}
             isLoading={saveMutation.isPending}
           >
-            <Save size={16} />{" "}
-            {saveMutation.isPending ? "Saving draft..." : "Save draft"}
+            <Save size={16} />{' '}
+            {saveMutation.isPending ? 'Saving draft...' : 'Save draft'}
           </Button>
         </div>
       </section>
@@ -704,7 +700,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
                   Selected delivery channels
                 </dt>
                 <dd className="mt-1 font-semibold text-slate-800">
-                  {preview.channels.join(", ") || "Unavailable"}
+                  {preview.channels.join(', ') || 'Unavailable'}
                 </dd>
               </div>
             </dl>
@@ -715,7 +711,7 @@ export function NoticeComposerWorkspace({ noticeId }: { noticeId?: string }) {
             </p>
           )}
         </section>
-        {form.priority !== "NORMAL" ? (
+        {form.priority !== 'NORMAL' ? (
           <section className="rounded-2xl border border-warning-200 bg-warning-50 p-5 text-sm text-warning-900">
             <div className="flex gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -737,8 +733,8 @@ function payload(form: NoticeDraftForm) {
   // resolver targets guardianIds/recipientUserIds directly whenever they're
   // present, regardless of audienceType, so both send audienceType "ALL".
   const audienceType =
-    form.audienceType === "GUARDIANS" || form.audienceType === "RECIPIENTS"
-      ? "ALL"
+    form.audienceType === 'GUARDIANS' || form.audienceType === 'RECIPIENTS'
+      ? 'ALL'
       : form.audienceType;
 
   return {
@@ -752,60 +748,60 @@ function payload(form: NoticeDraftForm) {
     priority: form.priority,
     audienceType,
     classId:
-      form.audienceType === "CLASS" || form.audienceType === "SECTION"
+      form.audienceType === 'CLASS' || form.audienceType === 'SECTION'
         ? form.classId || null
         : null,
-    sectionId: form.audienceType === "SECTION" ? form.sectionId || null : null,
-    roleNames: form.audienceType === "ROLE" ? form.roleNames : undefined,
-    staffIds: form.audienceType === "STAFF" ? ids : undefined,
-    studentIds: form.audienceType === "STUDENT" ? ids : undefined,
-    guardianIds: form.audienceType === "GUARDIANS" ? ids : undefined,
-    recipientUserIds: form.audienceType === "RECIPIENTS" ? ids : undefined,
+    sectionId: form.audienceType === 'SECTION' ? form.sectionId || null : null,
+    roleNames: form.audienceType === 'ROLE' ? form.roleNames : undefined,
+    staffIds: form.audienceType === 'STAFF' ? ids : undefined,
+    studentIds: form.audienceType === 'STUDENT' ? ids : undefined,
+    guardianIds: form.audienceType === 'GUARDIANS' ? ids : undefined,
+    recipientUserIds: form.audienceType === 'RECIPIENTS' ? ids : undefined,
     attachmentFileId: form.attachmentFileId || undefined,
   };
 }
 
 function validate(form: NoticeDraftForm) {
-  if (!form.title.trim()) return "Enter a notice title.";
-  if (!form.body.trim()) return "Enter a concise notice message.";
+  if (!form.title.trim()) return 'Enter a notice title.';
+  if (!form.body.trim()) return 'Enter a concise notice message.';
   if (
-    (form.audienceType === "CLASS" || form.audienceType === "SECTION") &&
+    (form.audienceType === 'CLASS' || form.audienceType === 'SECTION') &&
     !form.classId
   )
-    return "Select a class for this audience.";
-  if (form.audienceType === "SECTION" && !form.sectionId)
-    return "Select a section for this audience.";
-  if (form.audienceType === "ROLE" && form.roleNames.length === 0)
-    return "Select at least one role for this audience.";
+    return 'Select a class for this audience.';
+  if (form.audienceType === 'SECTION' && !form.sectionId)
+    return 'Select a section for this audience.';
+  if (form.audienceType === 'ROLE' && form.roleNames.length === 0)
+    return 'Select at least one role for this audience.';
   if (
-    (form.audienceType === "STAFF" ||
-      form.audienceType === "STUDENT" ||
-      form.audienceType === "GUARDIANS" ||
-      form.audienceType === "RECIPIENTS") &&
+    (form.audienceType === 'STAFF' ||
+      form.audienceType === 'STUDENT' ||
+      form.audienceType === 'GUARDIANS' ||
+      form.audienceType === 'RECIPIENTS') &&
     parseIdList(form.idListText).length === 0
   )
-    return "Enter at least one ID for this audience.";
+    return 'Enter at least one ID for this audience.';
   return null;
 }
 
 function audienceOptionLabel(option: NoticeAudienceScope) {
   switch (option) {
-    case "ALL":
-      return "Whole school";
-    case "CLASS":
-      return "Class";
-    case "SECTION":
-      return "Section";
-    case "ROLE":
-      return "Role";
-    case "STAFF":
-      return "Specific staff";
-    case "STUDENT":
-      return "Specific students";
-    case "GUARDIANS":
-      return "Specific guardians (linked parents)";
-    case "RECIPIENTS":
-      return "Specific people";
+    case 'ALL':
+      return 'Whole school';
+    case 'CLASS':
+      return 'Class';
+    case 'SECTION':
+      return 'Section';
+    case 'ROLE':
+      return 'Role';
+    case 'STAFF':
+      return 'Specific staff';
+    case 'STUDENT':
+      return 'Specific students';
+    case 'GUARDIANS':
+      return 'Specific guardians (linked parents)';
+    case 'RECIPIENTS':
+      return 'Specific people';
     default:
       return option;
   }
@@ -814,21 +810,21 @@ function audienceOptionLabel(option: NoticeAudienceScope) {
 function formatCategoryLabel(category: string) {
   return category
     .toLowerCase()
-    .split("_")
+    .split('_')
     .map((word) => word[0]?.toUpperCase() + word.slice(1))
-    .join(" ");
+    .join(' ');
 }
 
 function idListLabel(audienceType: ComposerAudienceType) {
   switch (audienceType) {
-    case "STAFF":
-      return "Staff IDs";
-    case "STUDENT":
-      return "Student IDs";
-    case "GUARDIANS":
-      return "Guardian IDs";
+    case 'STAFF':
+      return 'Staff IDs';
+    case 'STUDENT':
+      return 'Student IDs';
+    case 'GUARDIANS':
+      return 'Guardian IDs';
     default:
-      return "Recipient user IDs";
+      return 'Recipient user IDs';
   }
 }
 

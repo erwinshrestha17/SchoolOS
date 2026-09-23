@@ -4,13 +4,31 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/dialog';
 import { Button } from '../ui/button';
 import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
 import { X, Shield } from 'lucide-react';
-import { getNepalSchoolDay, isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
-import { NepalAddressSelector, type NepalAddressValue } from '../geography/nepal-address-selector';
+import {
+  getNepalSchoolDay,
+  isValidDateOfBirth,
+  isValidEmail,
+  isValidPersonName,
+  normalizeEmail,
+  normalizeNepalPhone,
+  normalizePersonName,
+  tryNormalizeNepalPhone,
+} from '@schoolos/core';
+import {
+  NepalAddressSelector,
+  type NepalAddressValue,
+} from '../geography/nepal-address-selector';
 
 type StaffCreateDialogProps = {
   isOpen: boolean;
@@ -97,7 +115,13 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
       formData.password,
       formData.address,
     ];
-    if (requiredText.some((value) => value.trim().length === 0) || !formData.dateOfBirth || !formData.gender || !formData.joiningDate || !formData.contractType) {
+    if (
+      requiredText.some((value) => value.trim().length === 0) ||
+      !formData.dateOfBirth ||
+      !formData.gender ||
+      !formData.joiningDate ||
+      !formData.contractType
+    ) {
       setToastError('Please fill out all required fields.');
       return;
     }
@@ -105,13 +129,27 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
       setToastError('Password must be at least 8 characters long.');
       return;
     }
-    if (!isValidPersonName(formData.firstName) || !isValidPersonName(formData.lastName)) {
+    if (
+      !isValidPersonName(formData.firstName) ||
+      !isValidPersonName(formData.lastName)
+    ) {
       setToastError('Enter valid staff names using Nepali or English letters.');
       return;
     }
-    if (!isValidEmail(formData.email)) { setToastError('Enter a valid email address.'); return; }
-    if (!isValidDateOfBirth(formData.dateOfBirth)) { setToastError('Date of birth cannot be future or more than 120 years ago.'); return; }
-    if (formData.phone && !tryNormalizeNepalPhone(formData.phone)) { setToastError('Enter a valid NTC or Ncell mobile number.'); return; }
+    if (!isValidEmail(formData.email)) {
+      setToastError('Enter a valid email address.');
+      return;
+    }
+    if (!isValidDateOfBirth(formData.dateOfBirth)) {
+      setToastError(
+        'Date of birth cannot be future or more than 120 years ago.',
+      );
+      return;
+    }
+    if (formData.phone && !tryNormalizeNepalPhone(formData.phone)) {
+      setToastError('Enter a valid NTC or Ncell mobile number.');
+      return;
+    }
     if (formData.roleIds.length === 0) {
       setToastError('Please assign at least one role to the staff member.');
       return;
@@ -153,7 +191,9 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle>Add New Staff Member</DialogTitle>
-            <p className="text-xs text-slate-500 mt-1">Create user credentials and configure initial HR profiles.</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Create user credentials and configure initial HR profiles.
+            </p>
           </div>
           <button
             type="button"
@@ -174,7 +214,10 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
           />
         )}
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-8">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto p-6 space-y-8"
+        >
           {/* Section: Credentials */}
           <div className="space-y-4">
             <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b pb-2 flex items-center gap-2">
@@ -217,7 +260,10 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
               Personal Information
             </h4>
             <div className="grid md:grid-cols-4 gap-4">
-              <FormField label="First Name (Required)" className="md:col-span-2">
+              <FormField
+                label="First Name (Required)"
+                className="md:col-span-2"
+              >
                 <Input
                   type="text"
                   value={formData.firstName}
@@ -262,7 +308,10 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                   placeholder="Contact phone"
                 />
               </FormField>
-              <FormField label="Residential Address (Required)" className="md:col-span-4">
+              <FormField
+                label="Residential Address (Required)"
+                className="md:col-span-4"
+              >
                 <Input
                   type="text"
                   value={formData.address}
@@ -313,7 +362,9 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                 <Input
                   type="text"
                   value={formData.teacherRegistryId}
-                  onChange={(e) => handleChange('teacherRegistryId', e.target.value)}
+                  onChange={(e) =>
+                    handleChange('teacherRegistryId', e.target.value)
+                  }
                   placeholder="If teaching staff"
                 />
               </FormField>
@@ -321,7 +372,9 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                 <Input
                   type="text"
                   value={formData.citizenshipNo}
-                  onChange={(e) => handleChange('citizenshipNo', e.target.value)}
+                  onChange={(e) =>
+                    handleChange('citizenshipNo', e.target.value)
+                  }
                   placeholder="National ID / Citizenship number"
                 />
               </FormField>
@@ -337,7 +390,9 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                 <Input
                   type="date"
                   value={formData.probationEndDate}
-                  onChange={(e) => handleChange('probationEndDate', e.target.value)}
+                  onChange={(e) =>
+                    handleChange('probationEndDate', e.target.value)
+                  }
                 />
               </FormField>
             </div>
@@ -394,12 +449,15 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                       onChange={() => handleRoleToggle(role.id)}
                       className="h-4 w-4 rounded border-slate-300 text-[var(--color-mod-hr-accent)] focus:ring-[var(--color-mod-hr-border)]/50"
                     />
-                    <span className="text-xs font-medium uppercase tracking-tight">{role.name}</span>
+                    <span className="text-xs font-medium uppercase tracking-tight">
+                      {role.name}
+                    </span>
                   </label>
                 ))
               ) : (
                 <div className="col-span-full text-xs text-rose-500 font-bold">
-                  No security roles found. Ensure role configurations are synced.
+                  No security roles found. Ensure role configurations are
+                  synced.
                 </div>
               )}
             </div>
@@ -414,7 +472,9 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
               <FormField label="Academic Qualifications">
                 <TextArea
                   value={formData.qualifications}
-                  onChange={(e) => handleChange('qualifications', e.target.value)}
+                  onChange={(e) =>
+                    handleChange('qualifications', e.target.value)
+                  }
                   placeholder="Degrees, certifications, etc."
                 />
               </FormField>

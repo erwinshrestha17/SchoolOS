@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import type { CreateAdmissionCasePayload } from "@schoolos/core";
+import type { CreateAdmissionCasePayload } from '@schoolos/core';
 import {
   formatBsDateForInput,
   getNepalSchoolDay,
@@ -12,51 +12,51 @@ import {
   normalizePersonName,
   toGregorianDateFromBs,
   tryNormalizeNepalPhone,
-} from "@schoolos/core";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { ClipboardCheck, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
-import { api } from "../../lib/api";
-import { admissionCasesApi } from "../../lib/api/admission-cases";
-import { classOptionLabel } from "../../lib/education-program";
-import { schoolFacingErrorMessage } from "../../lib/school-facing-error";
-import { Button } from "../ui/button";
-import { ErrorState } from "../ui/error-state";
-import { SectionCard } from "../ui/section-card";
+} from '@schoolos/core';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { ClipboardCheck, Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useMemo, useRef, useState } from 'react';
+import { api } from '../../lib/api';
+import { admissionCasesApi } from '../../lib/api/admission-cases';
+import { classOptionLabel } from '../../lib/education-program';
+import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
+import { Button } from '../ui/button';
+import { ErrorState } from '../ui/error-state';
+import { SectionCard } from '../ui/section-card';
 
 const emptyForm: CreateAdmissionCasePayload = {
-  firstNameEn: "",
-  lastNameEn: "",
-  dateOfBirth: "",
+  firstNameEn: '',
+  lastNameEn: '',
+  dateOfBirth: '',
   gender: undefined,
-  guardianFullName: "",
-  guardianRelation: "",
-  guardianPhone: "",
-  academicYearId: "",
-  classId: "",
-  sectionId: "",
-  source: "PARENT_ONLINE",
+  guardianFullName: '',
+  guardianRelation: '',
+  guardianPhone: '',
+  academicYearId: '',
+  classId: '',
+  sectionId: '',
+  source: 'PARENT_ONLINE',
   admissionDate: getNepalSchoolDay().gregorianDate,
-  notes: "",
+  notes: '',
 };
 
 export function AdmissionReviewCaseForm() {
   const router = useRouter();
   const admissionCaseIdRef = useRef<string | null>(null);
   const [form, setForm] = useState<CreateAdmissionCasePayload>(emptyForm);
-  const [dateOfBirthBs, setDateOfBirthBs] = useState("");
+  const [dateOfBirthBs, setDateOfBirthBs] = useState('');
   const [admissionDateBs, setAdmissionDateBs] = useState(() =>
     formatBsDateForInput(new Date()),
   );
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const years = useQuery({
-    queryKey: ["academic-years"],
+    queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
   });
-  const classes = useQuery({ queryKey: ["classes"], queryFn: api.listClasses });
+  const classes = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sections = useQuery({
-    queryKey: ["sections"],
+    queryKey: ['sections'],
     queryFn: api.listSections,
   });
   const sectionOptions = useMemo(
@@ -78,14 +78,14 @@ export function AdmissionReviewCaseForm() {
           lastNameEn: normalizePersonName(form.lastNameEn),
           guardianFullName: form.guardianFullName
             ? normalizePersonName(form.guardianFullName)
-            : "",
+            : '',
           guardianPhone: form.guardianPhone
             ? normalizeNepalPhone(form.guardianPhone)
-            : "",
+            : '',
           guardianEmail: form.guardianEmail
             ? normalizeEmail(form.guardianEmail)
-            : "",
-        }).filter(([, value]) => value !== "" && value !== undefined),
+            : '',
+        }).filter(([, value]) => value !== '' && value !== undefined),
       ) as CreateAdmissionCasePayload;
       const admissionCase = admissionCaseIdRef.current
         ? await admissionCasesApi.updateCase(
@@ -95,11 +95,11 @@ export function AdmissionReviewCaseForm() {
         : await admissionCasesApi.createCase(payload);
       admissionCaseIdRef.current = admissionCase.id;
       if (
-        admissionCase.review.availableActions.includes("MARK_READY_FOR_REVIEW")
+        admissionCase.review.availableActions.includes('MARK_READY_FOR_REVIEW')
       ) {
         await admissionCasesApi.reviewCase(admissionCase.id, {
-          action: "MARK_READY_FOR_REVIEW",
-          reason: "Admission review requested from the school admission desk.",
+          action: 'MARK_READY_FOR_REVIEW',
+          reason: 'Admission review requested from the school admission desk.',
         });
       }
       return admissionCase;
@@ -110,13 +110,13 @@ export function AdmissionReviewCaseForm() {
       setError(
         schoolFacingErrorMessage(cause, {
           fallback:
-            "The admission review case could not be created. No student was enrolled. Try again.",
+            'The admission review case could not be created. No student was enrolled. Try again.',
           invalid:
-            "Review the applicant, guardian, and academic placement details before continuing.",
+            'Review the applicant, guardian, and academic placement details before continuing.',
           forbidden:
-            "You do not have permission to create an admission review case.",
+            'You do not have permission to create an admission review case.',
           conflict:
-            "A matching admission record changed while this case was being prepared. Refresh and try again.",
+            'A matching admission record changed while this case was being prepared. Refresh and try again.',
         }),
       ),
   });
@@ -140,7 +140,7 @@ export function AdmissionReviewCaseForm() {
     value: CreateAdmissionCasePayload[K],
   ) => {
     setForm((current) => ({ ...current, [key]: value }));
-    setError("");
+    setError('');
   };
   const validate = () => {
     if (
@@ -148,23 +148,23 @@ export function AdmissionReviewCaseForm() {
       !isValidPersonName(form.lastNameEn) ||
       !form.dateOfBirth
     )
-      return "Enter a valid student name and date of birth.";
+      return 'Enter a valid student name and date of birth.';
     if (!isValidDateOfBirth(form.dateOfBirth))
-      return "Enter a valid date of birth.";
+      return 'Enter a valid date of birth.';
     if (
       !form.guardianFullName ||
       !isValidPersonName(form.guardianFullName) ||
       !form.guardianRelation?.trim() ||
       !form.guardianPhone
     )
-      return "Enter a valid guardian name, relationship, and phone.";
+      return 'Enter a valid guardian name, relationship, and phone.';
     if (!tryNormalizeNepalPhone(form.guardianPhone))
-      return "Enter a valid NTC or Ncell guardian number.";
+      return 'Enter a valid NTC or Ncell guardian number.';
     if (form.guardianEmail && !isValidEmail(form.guardianEmail))
-      return "Enter a valid guardian email.";
+      return 'Enter a valid guardian email.';
     if (!form.academicYearId || !form.classId || !form.admissionDate)
-      return "Choose academic year, class, and admission date.";
-    return "";
+      return 'Choose academic year, class, and admission date.';
+    return '';
   };
 
   return (
@@ -188,13 +188,13 @@ export function AdmissionReviewCaseForm() {
           <Field label="First name (English)" required>
             <input
               value={form.firstNameEn}
-              onChange={(event) => update("firstNameEn", event.target.value)}
+              onChange={(event) => update('firstNameEn', event.target.value)}
             />
           </Field>
           <Field label="Last name (English)" required>
             <input
               value={form.lastNameEn}
-              onChange={(event) => update("lastNameEn", event.target.value)}
+              onChange={(event) => update('lastNameEn', event.target.value)}
             />
           </Field>
           <Field label="Date of birth (BS)" required>
@@ -206,20 +206,20 @@ export function AdmissionReviewCaseForm() {
               onChange={(event) => {
                 const value = event.target.value;
                 setDateOfBirthBs(value);
-                update("dateOfBirth", toGregorianDateInput(value));
+                update('dateOfBirth', toGregorianDateInput(value));
               }}
             />
           </Field>
           <Field label="Gender" required>
             <select
               required
-              value={form.gender ?? ""}
+              value={form.gender ?? ''}
               onChange={(event) =>
                 update(
-                  "gender",
+                  'gender',
                   event.target.value
                     ? (event.target
-                        .value as CreateAdmissionCasePayload["gender"])
+                        .value as CreateAdmissionCasePayload['gender'])
                     : undefined,
                 )
               }
@@ -232,30 +232,30 @@ export function AdmissionReviewCaseForm() {
           </Field>
           <Field label="Guardian full name" required>
             <input
-              value={form.guardianFullName ?? ""}
+              value={form.guardianFullName ?? ''}
               onChange={(event) =>
-                update("guardianFullName", event.target.value)
+                update('guardianFullName', event.target.value)
               }
             />
           </Field>
           <Field label="Guardian relationship" required>
             <RelationshipSelect
-              value={form.guardianRelation ?? ""}
-              onChange={(value) => update("guardianRelation", value)}
+              value={form.guardianRelation ?? ''}
+              onChange={(value) => update('guardianRelation', value)}
             />
           </Field>
           <Field label="Guardian phone" required>
             <input
-              value={form.guardianPhone ?? ""}
-              onChange={(event) => update("guardianPhone", event.target.value)}
+              value={form.guardianPhone ?? ''}
+              onChange={(event) => update('guardianPhone', event.target.value)}
               inputMode="tel"
             />
           </Field>
           <Field label="Guardian email">
             <input
               type="email"
-              value={form.guardianEmail ?? ""}
-              onChange={(event) => update("guardianEmail", event.target.value)}
+              value={form.guardianEmail ?? ''}
+              onChange={(event) => update('guardianEmail', event.target.value)}
             />
           </Field>
         </div>
@@ -266,25 +266,25 @@ export function AdmissionReviewCaseForm() {
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <Field label="IEMIS student ID">
               <input
-                value={form.nationalStudentId ?? ""}
+                value={form.nationalStudentId ?? ''}
                 onChange={(event) =>
-                  update("nationalStudentId", event.target.value)
+                  update('nationalStudentId', event.target.value)
                 }
               />
             </Field>
             <Field label="Emergency contact name">
               <input
-                value={form.emergencyName ?? ""}
+                value={form.emergencyName ?? ''}
                 onChange={(event) =>
-                  update("emergencyName", event.target.value)
+                  update('emergencyName', event.target.value)
                 }
               />
             </Field>
             <Field label="Emergency contact phone">
               <input
-                value={form.emergencyPhone ?? ""}
+                value={form.emergencyPhone ?? ''}
                 onChange={(event) =>
-                  update("emergencyPhone", event.target.value)
+                  update('emergencyPhone', event.target.value)
                 }
                 inputMode="tel"
               />
@@ -302,8 +302,8 @@ export function AdmissionReviewCaseForm() {
               value={form.source}
               onChange={(event) =>
                 update(
-                  "source",
-                  event.target.value as CreateAdmissionCasePayload["source"],
+                  'source',
+                  event.target.value as CreateAdmissionCasePayload['source'],
                 )
               }
             >
@@ -316,8 +316,8 @@ export function AdmissionReviewCaseForm() {
           </Field>
           <Field label="Academic year" required>
             <select
-              value={form.academicYearId ?? ""}
-              onChange={(event) => update("academicYearId", event.target.value)}
+              value={form.academicYearId ?? ''}
+              onChange={(event) => update('academicYearId', event.target.value)}
             >
               <option value="">Select academic year</option>
               {(years.data ?? []).map((year) => (
@@ -329,10 +329,10 @@ export function AdmissionReviewCaseForm() {
           </Field>
           <Field label="Requested class" required>
             <select
-              value={form.classId ?? ""}
+              value={form.classId ?? ''}
               onChange={(event) => {
-                update("classId", event.target.value);
-                update("sectionId", "");
+                update('classId', event.target.value);
+                update('sectionId', '');
               }}
             >
               <option value="">Select class</option>
@@ -345,8 +345,8 @@ export function AdmissionReviewCaseForm() {
           </Field>
           <Field label="Requested section">
             <select
-              value={form.sectionId ?? ""}
-              onChange={(event) => update("sectionId", event.target.value)}
+              value={form.sectionId ?? ''}
+              onChange={(event) => update('sectionId', event.target.value)}
             >
               <option value="">Select section</option>
               {sectionOptions.map((section) => (
@@ -365,21 +365,21 @@ export function AdmissionReviewCaseForm() {
               onChange={(event) => {
                 const value = event.target.value;
                 setAdmissionDateBs(value);
-                update("admissionDate", toGregorianDateInput(value));
+                update('admissionDate', toGregorianDateInput(value));
               }}
             />
           </Field>
           <Field label="Previous school">
             <input
-              value={form.previousSchool ?? ""}
-              onChange={(event) => update("previousSchool", event.target.value)}
+              value={form.previousSchool ?? ''}
+              onChange={(event) => update('previousSchool', event.target.value)}
             />
           </Field>
           <Field label="Review note" className="md:col-span-2">
             <textarea
               rows={4}
-              value={form.notes ?? ""}
-              onChange={(event) => update("notes", event.target.value)}
+              value={form.notes ?? ''}
+              onChange={(event) => update('notes', event.target.value)}
               placeholder="Scholarship, interview, Grade 11 marks, or transfer review."
             />
           </Field>
@@ -407,7 +407,7 @@ export function AdmissionReviewCaseForm() {
 function Field({
   label,
   required = false,
-  className = "",
+  className = '',
   children,
 }: {
   label: string;
@@ -436,12 +436,12 @@ function RelationshipSelect({
   onChange: (value: string) => void;
 }) {
   const options = [
-    "Mother",
-    "Father",
-    "Guardian",
-    "Grandparent",
-    "Sibling",
-    "Other",
+    'Mother',
+    'Father',
+    'Guardian',
+    'Grandparent',
+    'Sibling',
+    'Other',
   ];
   return (
     <select
@@ -462,8 +462,8 @@ function RelationshipSelect({
 function toGregorianDateInput(bsDate: string) {
   try {
     const date = toGregorianDateFromBs(bsDate);
-    return `${String(date.year).padStart(4, "0")}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+    return `${String(date.year).padStart(4, '0')}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
   } catch {
-    return "";
+    return '';
   }
 }

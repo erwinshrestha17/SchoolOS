@@ -10,7 +10,9 @@ const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 describe('Student profile edit controls', () => {
   it('loads student photos through the protected binary endpoint', () => {
     const api = read('lib/api/students.ts');
-    const preview = read('components/students/profile/student-photo-preview.tsx');
+    const preview = read(
+      'components/students/profile/student-photo-preview.tsx',
+    );
     const protectedImageHook = read('lib/hooks/use-protected-image.ts');
     const edit = read('components/students/profile/student-edit-card.tsx');
     assert.match(api, /photo\/content/);
@@ -27,10 +29,10 @@ describe('Student profile edit controls', () => {
   it('uses clean accessible disability option controls instead of native radio inputs', () => {
     const edit = read('components/students/profile/student-edit-card.tsx');
     assert.match(edit, /DisabilityOption/);
-    assert.match(edit, /role="radiogroup"/);
+    assert.match(edit, /role=['"]radiogroup['"]/);
     assert.match(edit, /No known disability/);
     assert.match(edit, /Disability support recorded/);
-    assert.doesNotMatch(edit, /type="radio"/);
+    assert.doesNotMatch(edit, /type=['"]radio['"]/);
   });
 
   it('only submits authoritative enrollment placement when the operator changes it', () => {
@@ -52,7 +54,9 @@ describe('Student profile edit controls', () => {
 
   it('provides purpose-limited guardian authority, recovery, and revocation administration', () => {
     const detail = read('components/students/student-detail-page.tsx');
-    const guardians = read('components/students/profile/tabs/guardians-tab.tsx');
+    const guardians = read(
+      'components/students/profile/tabs/guardians-tab.tsx',
+    );
     const api = read('lib/api/students.ts');
 
     assert.match(detail, /studentId=\{studentId\}/);
@@ -87,16 +91,24 @@ describe('Student profile edit controls', () => {
   });
 
   it('keeps generated document revocation reasoned and backend-backed', () => {
-    const documents = read('components/students/profile/tabs/documents-tab.tsx');
+    const documents = read(
+      'components/students/profile/tabs/documents-tab.tsx',
+    );
     const api = read('lib/api/students.ts');
 
     assert.match(api, /revokeGeneratedStudentDocument:/);
-    assert.match(documents, /api\.revokeGeneratedStudentDocument\(studentId, documentId, \{ reason \}\)/);
-    assert.match(documents, /generatedDocumentRevokeReason\.trim\(\)\.length < 5/);
+    assert.match(
+      documents,
+      /api\.revokeGeneratedStudentDocument\(studentId, documentId, \{ reason \}\)/,
+    );
+    assert.match(
+      documents,
+      /generatedDocumentRevokeReason\.trim\(\)\.length < 5/,
+    );
     assert.match(documents, /Revoke generated document/);
     assert.match(documents, /Version history/);
     assert.match(documents, /revokedAt/);
-    assert.match(documents, /queryKey: \['student-profile', studentId\]/);
+    assert.match(documents, /queryKey: \[['"]student-profile['"], studentId\]/);
     assert.match(documents, /keep its audit history/);
     assert.doesNotMatch(documents, /window\.confirm|confirm\(/);
     assert.doesNotMatch(documents, /storageObjectKey|pdfUrl/);

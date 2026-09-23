@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
 import type {
   OperationalDashboardSummary,
   OperationalModuleSummary,
   OperationalSummaryModule,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   ArrowRight,
   CalendarClock,
@@ -13,10 +13,10 @@ import {
   UserCheck,
   Wallet,
   type LucideIcon,
-} from "lucide-react";
-import Link from "next/link";
-import { cn } from "../../lib/utils";
-import type { DashboardCompositionPersona } from "@/lib/dashboard-persona";
+} from 'lucide-react';
+import Link from 'next/link';
+import { cn } from '../../lib/utils';
+import type { DashboardCompositionPersona } from '@/lib/dashboard-persona';
 import {
   attentionKind,
   attendanceProgress,
@@ -25,7 +25,7 @@ import {
   metricNumber,
   metricValue,
   moduleWorkspaceRoute,
-} from "./dashboard-module-meta";
+} from './dashboard-module-meta';
 
 type SummaryCardModel = {
   key: string;
@@ -46,7 +46,7 @@ type SummaryCardModel = {
 export function DashboardSummaryStrip({
   dashboard,
   moduleMap,
-  persona = "admin",
+  persona = 'admin',
 }: {
   dashboard: OperationalDashboardSummary;
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
@@ -69,7 +69,9 @@ function SummaryStripCard({ card }: { card: SummaryCardModel }) {
   const content = (
     <>
       <div className="flex items-center justify-between gap-3">
-        <span className={cn("inline-flex rounded-xl border p-2", card.iconClass)}>
+        <span
+          className={cn('inline-flex rounded-xl border p-2', card.iconClass)}
+        >
           <Icon className="h-4 w-4" aria-hidden="true" />
         </span>
         {card.href ? (
@@ -92,7 +94,7 @@ function SummaryStripCard({ card }: { card: SummaryCardModel }) {
   );
 
   const className =
-    "group rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2";
+    'group rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2';
 
   return card.href ? (
     <Link href={card.href} className={className}>
@@ -110,58 +112,58 @@ function buildSummaryCards(
 ): SummaryCardModel[] {
   const cards: SummaryCardModel[] = [];
 
-  const includeFees = persona === "admin" || persona === "accountant";
+  const includeFees = persona === 'admin' || persona === 'accountant';
   const includeStaff =
-    persona === "admin" || persona === "hr" || persona === "principal";
+    persona === 'admin' || persona === 'hr' || persona === 'principal';
 
-  const attendance = visibleModule(moduleMap, "m2_attendance");
+  const attendance = visibleModule(moduleMap, 'm2_attendance');
   if (attendance) {
     const progress = attendanceProgress(attendance);
-    const attendanceCard: Omit<SummaryCardModel, "value" | "description"> = {
-      key: "attendance",
-      label: "Attendance",
+    const attendanceCard: Omit<SummaryCardModel, 'value' | 'description'> = {
+      key: 'attendance',
+      label: 'Attendance',
       icon: CalendarClock,
-      iconClass: "border-teal-100 bg-teal-50 text-teal-700",
+      iconClass: 'border-teal-100 bg-teal-50 text-teal-700',
       href:
-        persona === "principal"
-          ? "/dashboard/attendance/overview"
-          : moduleWorkspaceRoute("m2_attendance"),
+        persona === 'principal'
+          ? '/dashboard/attendance/overview'
+          : moduleWorkspaceRoute('m2_attendance'),
     };
-    if (progress.kind === "unavailable") {
+    if (progress.kind === 'unavailable') {
       cards.push({
         ...attendanceCard,
-        value: "Unavailable",
-        description: "Information is not available yet.",
+        value: 'Unavailable',
+        description: 'Information is not available yet.',
       });
-    } else if (progress.kind === "notStarted") {
+    } else if (progress.kind === 'notStarted') {
       cards.push({
         ...attendanceCard,
-        value: "Not started",
+        value: 'Not started',
         description:
           progress.total !== null
             ? `0 of ${formatNumber(progress.total)} registers submitted.`
-            : "Attendance has not started.",
+            : 'Attendance has not started.',
       });
-    } else if (progress.kind === "completed") {
+    } else if (progress.kind === 'completed') {
       cards.push({
         ...attendanceCard,
-        value: "Completed",
+        value: 'Completed',
         description: `All ${formatNumber(progress.total)} registers submitted.`,
       });
     } else {
       cards.push({
         ...attendanceCard,
         value: `${formatNumber(progress.submitted)} of ${formatNumber(progress.total)}`,
-        description: "Registers submitted so far today.",
+        description: 'Registers submitted so far today.',
       });
     }
   }
 
-  if (persona === "principal") {
-    const accounting = visibleModule(moduleMap, "m11_accounting");
+  if (persona === 'principal') {
+    const accounting = visibleModule(moduleMap, 'm11_accounting');
     if (accounting) {
-      const unreconciled = metricNumber(accounting, "unreconciledStatements");
-      const unposted = metricNumber(accounting, "unpostedJournals");
+      const unreconciled = metricNumber(accounting, 'unreconciledStatements');
+      const unposted = metricNumber(accounting, 'unpostedJournals');
       const knownCounts = [unreconciled, unposted].filter(
         (value): value is number => value !== null,
       );
@@ -169,72 +171,75 @@ function buildSummaryCards(
         ? knownCounts.reduce((sum, value) => sum + value, 0)
         : null;
       const breakdown = [
-        unreconciled !== null ? `${formatNumber(unreconciled)} unreconciled` : null,
+        unreconciled !== null
+          ? `${formatNumber(unreconciled)} unreconciled`
+          : null,
         unposted !== null ? `${formatNumber(unposted)} unposted` : null,
       ].filter(Boolean);
       cards.push({
-        key: "finance-health",
-        label: "Finance health",
+        key: 'finance-health',
+        label: 'Finance health',
         icon: Landmark,
-        iconClass: "border-amber-100 bg-amber-50 text-amber-700",
-        href: "/dashboard/finance-overview",
+        iconClass: 'border-amber-100 bg-amber-50 text-amber-700',
+        href: '/dashboard/finance-overview',
         value:
           issueCount === null
-            ? "Unavailable"
+            ? 'Unavailable'
             : issueCount === 0
-              ? "All clear"
-              : `${formatNumber(issueCount)} issue${issueCount === 1 ? "" : "s"}`,
+              ? 'All clear'
+              : `${formatNumber(issueCount)} issue${issueCount === 1 ? '' : 's'}`,
         description:
           issueCount === null
-            ? "Information is not available yet."
+            ? 'Information is not available yet.'
             : issueCount === 0
-              ? "No reconciliation or posting exceptions reported."
-              : breakdown.join(" · "),
+              ? 'No reconciliation or posting exceptions reported.'
+              : breakdown.join(' · '),
       });
     }
   }
 
-  const fees = visibleModule(moduleMap, "m3_fees");
+  const fees = visibleModule(moduleMap, 'm3_fees');
   if (fees && includeFees) {
-    const collected = metricValue(fees, "collectedTodayAmount");
-    const paymentCount = metricNumber(fees, "paymentCountToday");
+    const collected = metricValue(fees, 'collectedTodayAmount');
+    const paymentCount = metricNumber(fees, 'paymentCountToday');
     cards.push({
-      key: "collections",
-      label: "Collections today",
+      key: 'collections',
+      label: 'Collections today',
       icon: Wallet,
-      iconClass: "border-amber-100 bg-amber-50 text-amber-700",
-      href: moduleWorkspaceRoute("m3_fees"),
-      value: collected !== null ? formatMoneyNpr(collected) : "Unavailable",
+      iconClass: 'border-amber-100 bg-amber-50 text-amber-700',
+      href: moduleWorkspaceRoute('m3_fees'),
+      value: collected !== null ? formatMoneyNpr(collected) : 'Unavailable',
       description:
         collected === null
-          ? "Information is not available yet."
+          ? 'Information is not available yet.'
           : paymentCount === null
-            ? "Collected today."
+            ? 'Collected today.'
             : paymentCount === 0
-              ? "No confirmed payments yet."
-              : `${formatNumber(paymentCount)} confirmed payment${paymentCount === 1 ? "" : "s"}.`,
+              ? 'No confirmed payments yet.'
+              : `${formatNumber(paymentCount)} confirmed payment${paymentCount === 1 ? '' : 's'}.`,
     });
   }
 
-  const hr = visibleModule(moduleMap, "m7_hr_payroll");
+  const hr = visibleModule(moduleMap, 'm7_hr_payroll');
   if (hr && includeStaff) {
-    const present = metricNumber(hr, "staffPresentToday");
-    const onLeave = metricNumber(hr, "staffOnApprovedLeaveToday");
+    const present = metricNumber(hr, 'staffPresentToday');
+    const onLeave = metricNumber(hr, 'staffOnApprovedLeaveToday');
     cards.push({
-      key: "staff",
-      label: "Staff availability",
+      key: 'staff',
+      label: 'Staff availability',
       icon: UserCheck,
-      iconClass: "border-slate-200 bg-slate-50 text-slate-700",
+      iconClass: 'border-slate-200 bg-slate-50 text-slate-700',
       href:
-        persona === "principal"
-          ? "/dashboard/hr/overview"
-          : moduleWorkspaceRoute("m7_hr_payroll"),
-      value: present !== null ? `${formatNumber(present)} present` : "Unavailable",
+        persona === 'principal'
+          ? '/dashboard/hr/overview'
+          : moduleWorkspaceRoute('m7_hr_payroll'),
+      value:
+        present !== null ? `${formatNumber(present)} present` : 'Unavailable',
       description:
         present === null
-          ? "Information is not available yet."
+          ? 'Information is not available yet.'
           : onLeave === null
-            ? "Staff attendance recorded today."
+            ? 'Staff attendance recorded today.'
             : `${formatNumber(onLeave)} on approved leave today.`,
     });
   }
@@ -247,37 +252,37 @@ function buildSummaryCards(
     (item) => item.count > 0,
   );
   const approvals = attentionItems.filter(
-    (item) => attentionKind(item) === "approval",
+    (item) => attentionKind(item) === 'approval',
   ).length;
   const warnings = attentionItems.filter(
-    (item) => attentionKind(item) === "warning",
+    (item) => attentionKind(item) === 'warning',
   ).length;
   const followUps = attentionItems.length - approvals - warnings;
   const breakdown = [
-    approvals > 0 ? `${approvals} approval${approvals === 1 ? "" : "s"}` : null,
-    warnings > 0 ? `${warnings} warning${warnings === 1 ? "" : "s"}` : null,
+    approvals > 0 ? `${approvals} approval${approvals === 1 ? '' : 's'}` : null,
+    warnings > 0 ? `${warnings} warning${warnings === 1 ? '' : 's'}` : null,
     followUps > 0
-      ? `${followUps} follow-up${followUps === 1 ? "" : "s"}`
+      ? `${followUps} follow-up${followUps === 1 ? '' : 's'}`
       : null,
   ].filter(Boolean);
   cards.push({
-    key: "attention",
-    label: "Needs attention",
+    key: 'attention',
+    label: 'Needs attention',
     icon: ClipboardCheck,
     iconClass: attentionItems.length
-      ? "border-warning-100 bg-warning-50 text-warning-700"
-      : "border-success-100 bg-success-50 text-success-600",
+      ? 'border-warning-100 bg-warning-50 text-warning-700'
+      : 'border-success-100 bg-success-50 text-success-600',
     href: attentionItems.length
-      ? persona === "principal"
-        ? "/dashboard/attention"
-        : "#needs-attention"
+      ? persona === 'principal'
+        ? '/dashboard/attention'
+        : '#needs-attention'
       : null,
     value: attentionItems.length
-      ? `${formatNumber(attentionItems.length)} item${attentionItems.length === 1 ? "" : "s"}`
-      : "All clear",
+      ? `${formatNumber(attentionItems.length)} item${attentionItems.length === 1 ? '' : 's'}`
+      : 'All clear',
     description: attentionItems.length
-      ? breakdown.join(" · ")
-      : "Nothing is waiting for your review.",
+      ? breakdown.join(' · ')
+      : 'Nothing is waiting for your review.',
   });
 
   return cards;
@@ -289,7 +294,7 @@ function visibleModule(
 ): OperationalModuleSummary | null {
   const summary = moduleMap.get(module);
   if (!summary) return null;
-  if (summary.status === "locked" || summary.status === "permissionDenied") {
+  if (summary.status === 'locked' || summary.status === 'permissionDenied') {
     return null;
   }
   return summary;

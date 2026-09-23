@@ -47,7 +47,10 @@ describe('M12 and M15 rendered web workspaces', () => {
     assert.match(legacyLogs, /\/dashboard\/notifications\/deliveries/);
     assert.match(legacyFailures, /redirectWithSearchParams/);
     assert.match(legacyFailures, /\/dashboard\/notifications\/failures/);
-    assert.doesNotMatch(delivery, /\/dashboard\/notices\/(deliveries|failures)/);
+    assert.doesNotMatch(
+      delivery,
+      /\/dashboard\/notices\/(deliveries|failures)/,
+    );
   });
 
   it('gates the notification shell by M12 entitlement and routes unread state to Notifications', () => {

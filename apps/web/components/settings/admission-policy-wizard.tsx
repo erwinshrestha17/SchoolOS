@@ -1,6 +1,11 @@
 'use client';
 
-import type { AdmissionPolicyApplicantType, AdmissionPolicyDetail, AdmissionPolicyRequiredField, AdmissionPolicyTemplate } from '@schoolos/core';
+import type {
+  AdmissionPolicyApplicantType,
+  AdmissionPolicyDetail,
+  AdmissionPolicyRequiredField,
+  AdmissionPolicyTemplate,
+} from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -13,7 +18,14 @@ import { Button } from '../ui/button';
 import { ApprovalChainBuilder } from './approval-chain-builder';
 import { DocumentChecklistBuilder } from './document-checklist-builder';
 
-const STEPS = ['Basic Information', 'Who Can Apply', 'Required Information', 'Required Documents', 'Assessment & Decision', 'Review & Activate'];
+const STEPS = [
+  'Basic Information',
+  'Who Can Apply',
+  'Required Information',
+  'Required Documents',
+  'Assessment & Decision',
+  'Review & Activate',
+];
 
 const REQUIRED_FIELD_OPTIONS = [
   { value: 'previousSchool', label: 'Previous school' },
@@ -26,32 +38,52 @@ const REQUIRED_FIELD_OPTIONS = [
   label: string;
 }>;
 
-export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?: string }) {
+export function AdmissionPolicyWizard({
+  policyId: initialPolicyId,
+}: {
+  policyId?: string;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [step, setStep] = useState(0);
-  const [policyId, setPolicyId] = useState<string | null>(initialPolicyId ?? null);
+  const [policyId, setPolicyId] = useState<string | null>(
+    initialPolicyId ?? null,
+  );
   const [name, setName] = useState('');
   const [academicYearId, setAcademicYearId] = useState('');
   const [classId, setClassId] = useState('');
   const [gradeBand, setGradeBand] = useState('');
-  const [applicantType, setApplicantType] = useState<AdmissionPolicyApplicantType>('BOTH');
+  const [applicantType, setApplicantType] =
+    useState<AdmissionPolicyApplicantType>('BOTH');
   const [source, setSource] = useState('');
-  const [requiredFields, setRequiredFields] = useState<AdmissionPolicyRequiredField[]>([]);
+  const [requiredFields, setRequiredFields] = useState<
+    AdmissionPolicyRequiredField[]
+  >([]);
   const [requireSection, setRequireSection] = useState(false);
-  const [admissionMode, setAdmissionMode] = useState<'DIRECT_ALLOWED' | 'REVIEW_REQUIRED'>('DIRECT_ALLOWED');
+  const [admissionMode, setAdmissionMode] = useState<
+    'DIRECT_ALLOWED' | 'REVIEW_REQUIRED'
+  >('DIRECT_ALLOWED');
   const [requireDocumentReview, setRequireDocumentReview] = useState(false);
   const [requireInterview, setRequireInterview] = useState(false);
-  const [requirePrincipalApproval, setRequirePrincipalApproval] = useState(false);
-  const [requireTransferCertificate, setRequireTransferCertificate] = useState(false);
+  const [requirePrincipalApproval, setRequirePrincipalApproval] =
+    useState(false);
+  const [requireTransferCertificate, setRequireTransferCertificate] =
+    useState(false);
   const [requirePriorMarksheet, setRequirePriorMarksheet] = useState(false);
-  const [requireStreamOrMarksReview, setRequireStreamOrMarksReview] = useState(false);
-  const [allowAdmissionWithDocumentsPending, setAllowAdmissionWithDocumentsPending] = useState(true);
-  const [enforceCapacityWhenAvailable, setEnforceCapacityWhenAvailable] = useState(false);
+  const [requireStreamOrMarksReview, setRequireStreamOrMarksReview] =
+    useState(false);
+  const [
+    allowAdmissionWithDocumentsPending,
+    setAllowAdmissionWithDocumentsPending,
+  ] = useState(true);
+  const [enforceCapacityWhenAvailable, setEnforceCapacityWhenAvailable] =
+    useState(false);
   const [notesForOffice, setNotesForOffice] = useState('');
   const [hydrated, setHydrated] = useState(false);
   const [localError, setLocalError] = useState('');
-  const [selectedTemplateId, setSelectedTemplateId] = useState<AdmissionPolicyTemplate['id'] | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<
+    AdmissionPolicyTemplate['id'] | null
+  >(null);
 
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -90,7 +122,9 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
       setRequireTransferCertificate(version.requireTransferCertificate);
       setRequirePriorMarksheet(version.requirePriorMarksheet);
       setRequireStreamOrMarksReview(version.requireStreamOrMarksReview);
-      setAllowAdmissionWithDocumentsPending(version.allowAdmissionWithDocumentsPending);
+      setAllowAdmissionWithDocumentsPending(
+        version.allowAdmissionWithDocumentsPending,
+      );
       setEnforceCapacityWhenAvailable(version.enforceCapacityWhenAvailable);
       setNotesForOffice(version.notesForOffice ?? '');
     }
@@ -114,7 +148,12 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
   });
 
   useEffect(() => {
-    if (initialPolicyId && hydrated && policyQuery.data && !policyQuery.data.draftVersion) {
+    if (
+      initialPolicyId &&
+      hydrated &&
+      policyQuery.data &&
+      !policyQuery.data.draftVersion
+    ) {
       startDraftMutation.mutate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,8 +193,12 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
     setRequireTransferCertificate(template.version.requireTransferCertificate);
     setRequirePriorMarksheet(template.version.requirePriorMarksheet);
     setRequireStreamOrMarksReview(template.version.requireStreamOrMarksReview);
-    setAllowAdmissionWithDocumentsPending(template.version.allowAdmissionWithDocumentsPending);
-    setEnforceCapacityWhenAvailable(template.version.enforceCapacityWhenAvailable);
+    setAllowAdmissionWithDocumentsPending(
+      template.version.allowAdmissionWithDocumentsPending,
+    );
+    setEnforceCapacityWhenAvailable(
+      template.version.enforceCapacityWhenAvailable,
+    );
     setNotesForOffice(template.version.notesForOffice ?? '');
   }
 
@@ -216,8 +259,18 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
     onSuccess: () => router.push(`/dashboard/settings/admissions/${policyId}`),
   });
 
-  const setupLoading = academicYearsQuery.isLoading || classesQuery.isLoading || templatesQuery.isLoading || (Boolean(policyId) && policyQuery.isLoading) || startDraftMutation.isPending;
-  const setupError = academicYearsQuery.isError || classesQuery.isError || templatesQuery.isError || policyQuery.isError || startDraftMutation.isError;
+  const setupLoading =
+    academicYearsQuery.isLoading ||
+    classesQuery.isLoading ||
+    templatesQuery.isLoading ||
+    (Boolean(policyId) && policyQuery.isLoading) ||
+    startDraftMutation.isPending;
+  const setupError =
+    academicYearsQuery.isError ||
+    classesQuery.isError ||
+    templatesQuery.isError ||
+    policyQuery.isError ||
+    startDraftMutation.isError;
 
   if (setupLoading) {
     return (
@@ -274,7 +327,11 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
 
   const draftVersion = policyQuery.data?.draftVersion ?? null;
   const documentRequirements = draftVersion?.documentRequirements ?? [];
-  const mutationError = createMutation.error || updateIdentityMutation.error || updateVersionMutation.error || activateMutation.error;
+  const mutationError =
+    createMutation.error ||
+    updateIdentityMutation.error ||
+    updateVersionMutation.error ||
+    activateMutation.error;
 
   return (
     <div className="space-y-5">
@@ -284,51 +341,95 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
         </p>
         <p className="mt-1 text-sm text-slate-600">{STEPS[step]}</p>
       </div>
-      <ol className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6" aria-label="Admission policy steps">
+      <ol
+        className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6"
+        aria-label="Admission policy steps"
+      >
         {STEPS.map((label, index) => (
-          <li key={label} aria-current={index === step ? 'step' : undefined} className={`flex items-center gap-2 rounded-xl border p-3 text-xs font-bold ${index === step ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50 text-slate-900' : index < step ? 'border-success-200 bg-success-50 text-success-800' : 'border-slate-200 bg-white text-slate-500'}`}>
-            <span className="flex h-6 w-6 items-center justify-center rounded-full border bg-white text-[0.65rem]">{index + 1}</span>
+          <li
+            key={label}
+            aria-current={index === step ? 'step' : undefined}
+            className={`flex items-center gap-2 rounded-xl border p-3 text-xs font-bold ${index === step ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50 text-slate-900' : index < step ? 'border-success-200 bg-success-50 text-success-800' : 'border-slate-200 bg-white text-slate-500'}`}
+          >
+            <span className="flex h-6 w-6 items-center justify-center rounded-full border bg-white text-[0.65rem]">
+              {index + 1}
+            </span>
             {label}
           </li>
         ))}
       </ol>
 
-      {localError || mutationError ? <p className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800">{localError || 'This step could not be saved. Please try again.'}</p> : null}
+      {localError || mutationError ? (
+        <p className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800">
+          {localError || 'This step could not be saved. Please try again.'}
+        </p>
+      ) : null}
 
       {step === 0 ? (
         <div className="space-y-5">
           {!initialPolicyId && !policyId ? (
-            <SectionCard title="Start from a template" description="Pick the closest match to pre-fill scope, documents, and decision defaults. Every field stays editable in the steps that follow.">
+            <SectionCard
+              title="Start from a template"
+              description="Pick the closest match to pre-fill scope, documents, and decision defaults. Every field stays editable in the steps that follow."
+            >
               <div className="grid gap-3 sm:grid-cols-2">
                 {(templatesQuery.data ?? []).map((template) => (
-                  <button key={template.id} type="button" onClick={() => applyTemplate(template)} className={`rounded-xl border p-4 text-left transition ${selectedTemplateId === template.id ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => applyTemplate(template)}
+                    className={`rounded-xl border p-4 text-left transition ${selectedTemplateId === template.id ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                  >
                     <p className="font-bold text-slate-900">{template.label}</p>
-                    <p className="mt-1 text-xs text-slate-500">{template.description}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {template.description}
+                    </p>
                   </button>
                 ))}
-                <button type="button" onClick={clearTemplate} className={`rounded-xl border p-4 text-left transition ${selectedTemplateId === null ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+                <button
+                  type="button"
+                  onClick={clearTemplate}
+                  className={`rounded-xl border p-4 text-left transition ${selectedTemplateId === null ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                >
                   <p className="font-bold text-slate-900">Blank Policy</p>
-                  <p className="mt-1 text-xs text-slate-500">Start with no defaults and configure every step yourself.</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Start with no defaults and configure every step yourself.
+                  </p>
                 </button>
               </div>
             </SectionCard>
           ) : null}
 
-          <SectionCard title="Policy name" description="Give staff a plain-language name for this policy, e.g. Grade 1 Admission 2083.">
+          <SectionCard
+            title="Policy name"
+            description="Give staff a plain-language name for this policy, e.g. Grade 1 Admission 2083."
+          >
             <label className="block space-y-2 text-sm font-bold text-slate-700">
               <span>Policy name</span>
-              <input className="block w-full max-w-lg rounded-lg border border-slate-200 px-3 py-2 text-sm" value={name} onChange={(event) => setName(event.target.value)} placeholder="Grade 11 Science Admission 2083" />
+              <input
+                className="block w-full max-w-lg rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Grade 11 Science Admission 2083"
+              />
             </label>
           </SectionCard>
         </div>
       ) : null}
 
       {step === 1 ? (
-        <SectionCard title="Who can apply" description="Scope this policy to a class, year, or applicant type. Leave a field blank to apply more broadly.">
+        <SectionCard
+          title="Who can apply"
+          description="Scope this policy to a class, year, or applicant type. Leave a field blank to apply more broadly."
+        >
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block space-y-2 text-sm font-bold text-slate-700">
               <span>Academic year</span>
-              <select className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={academicYearId} onChange={(event) => setAcademicYearId(event.target.value)}>
+              <select
+                className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                value={academicYearId}
+                onChange={(event) => setAcademicYearId(event.target.value)}
+              >
                 <option value="">Any academic year</option>
                 {(academicYearsQuery.data ?? []).map((year) => (
                   <option key={year.id} value={year.id}>
@@ -339,7 +440,11 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
             </label>
             <label className="block space-y-2 text-sm font-bold text-slate-700">
               <span>Class</span>
-              <select className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={classId} onChange={(event) => setClassId(event.target.value)}>
+              <select
+                className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                value={classId}
+                onChange={(event) => setClassId(event.target.value)}
+              >
                 <option value="">Any class</option>
                 {(classesQuery.data ?? []).map((schoolClass) => (
                   <option key={schoolClass.id} value={schoolClass.id}>
@@ -350,7 +455,11 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
             </label>
             <label className="block space-y-2 text-sm font-bold text-slate-700">
               <span>Grade band</span>
-              <select className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={gradeBand} onChange={(event) => setGradeBand(event.target.value)}>
+              <select
+                className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                value={gradeBand}
+                onChange={(event) => setGradeBand(event.target.value)}
+              >
                 <option value="">Any grade band</option>
                 <option value="PRIMARY">Primary (Grades 1-5)</option>
                 <option value="BASIC_SECONDARY">Grades 6-10</option>
@@ -359,7 +468,15 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
             </label>
             <label className="block space-y-2 text-sm font-bold text-slate-700">
               <span>Applicant type</span>
-              <select className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={applicantType} onChange={(event) => setApplicantType(event.target.value as AdmissionPolicyApplicantType)}>
+              <select
+                className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                value={applicantType}
+                onChange={(event) =>
+                  setApplicantType(
+                    event.target.value as AdmissionPolicyApplicantType,
+                  )
+                }
+              >
                 <option value="BOTH">New admission and transfer</option>
                 <option value="NEW">New admission only</option>
                 <option value="TRANSFER">Transfer only</option>
@@ -367,7 +484,11 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
             </label>
             <label className="block space-y-2 text-sm font-bold text-slate-700">
               <span>Admission source</span>
-              <select className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={source} onChange={(event) => setSource(event.target.value)}>
+              <select
+                className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                value={source}
+                onChange={(event) => setSource(event.target.value)}
+              >
                 <option value="">Any source</option>
                 <option value="OFFICE_WALK_IN">Office / walk-in</option>
                 <option value="PARENT_ONLINE">Parent online</option>
@@ -381,15 +502,25 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
       ) : null}
 
       {step === 2 ? (
-        <SectionCard title="Required information" description="Choose what additional information staff must collect for this policy.">
+        <SectionCard
+          title="Required information"
+          description="Choose what additional information staff must collect for this policy."
+        >
           <div className="flex flex-wrap gap-2">
             {REQUIRED_FIELD_OPTIONS.map((option) => (
-              <label key={option.value} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
+              <label
+                key={option.value}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+              >
                 <input
                   type="checkbox"
                   checked={requiredFields.includes(option.value)}
                   onChange={(event) => {
-                    setRequiredFields((current) => (event.target.checked ? [...current, option.value] : current.filter((value) => value !== option.value)));
+                    setRequiredFields((current) =>
+                      event.target.checked
+                        ? [...current, option.value]
+                        : current.filter((value) => value !== option.value),
+                    );
                   }}
                 />
                 {option.label}
@@ -397,7 +528,11 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
             ))}
           </div>
           <label className="mt-4 flex items-center gap-2 text-sm font-bold text-slate-700">
-            <input type="checkbox" checked={requireSection} onChange={(event) => setRequireSection(event.target.checked)} />
+            <input
+              type="checkbox"
+              checked={requireSection}
+              onChange={(event) => setRequireSection(event.target.checked)}
+            />
             Require a section when the class has sections
           </label>
         </SectionCard>
@@ -405,54 +540,145 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
 
       {step === 3 ? (
         policyId && draftVersion ? (
-          <SectionCard title="Required documents" description="Build the document checklist for this policy.">
-            <DocumentChecklistBuilder policyId={policyId} versionId={draftVersion.id} documentRequirements={documentRequirements} />
+          <SectionCard
+            title="Required documents"
+            description="Build the document checklist for this policy."
+          >
+            <DocumentChecklistBuilder
+              policyId={policyId}
+              versionId={draftVersion.id}
+              documentRequirements={documentRequirements}
+            />
           </SectionCard>
         ) : (
-          <p className="text-sm text-slate-500">Save the basic information step first.</p>
+          <p className="text-sm text-slate-500">
+            Save the basic information step first.
+          </p>
         )
       ) : null}
 
       {step === 4 ? (
-        <SectionCard title="Assessment, capacity, and decision" description="Configure whether applicants need evaluation or approval.">
+        <SectionCard
+          title="Assessment, capacity, and decision"
+          description="Configure whether applicants need evaluation or approval."
+        >
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block space-y-2 text-sm font-bold text-slate-700">
               <span>Admission mode</span>
-              <select className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={admissionMode} onChange={(event) => setAdmissionMode(event.target.value as 'DIRECT_ALLOWED' | 'REVIEW_REQUIRED')}>
+              <select
+                className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                value={admissionMode}
+                onChange={(event) =>
+                  setAdmissionMode(
+                    event.target.value as 'DIRECT_ALLOWED' | 'REVIEW_REQUIRED',
+                  )
+                }
+              >
                 <option value="DIRECT_ALLOWED">Direct admission allowed</option>
                 <option value="REVIEW_REQUIRED">Review required</option>
               </select>
             </label>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <Toggle checked={requireDocumentReview} label="Require document review" onChange={setRequireDocumentReview} />
-            <Toggle checked={requireInterview} label="Require interview" onChange={setRequireInterview} />
-            <Toggle checked={requirePrincipalApproval} label="Require principal approval" onChange={setRequirePrincipalApproval} />
-            <Toggle checked={requireTransferCertificate} label="Require transfer certificate for transfers" onChange={setRequireTransferCertificate} />
-            <Toggle checked={requirePriorMarksheet} label="Require prior marksheet" onChange={setRequirePriorMarksheet} />
-            <Toggle checked={requireStreamOrMarksReview} label="Require Grade 11-12 stream or marks review" onChange={setRequireStreamOrMarksReview} />
-            <Toggle checked={allowAdmissionWithDocumentsPending} label="Allow admission with documents pending" onChange={setAllowAdmissionWithDocumentsPending} />
-            <Toggle checked={enforceCapacityWhenAvailable} label="Check section capacity when configured" onChange={setEnforceCapacityWhenAvailable} />
+            <Toggle
+              checked={requireDocumentReview}
+              label="Require document review"
+              onChange={setRequireDocumentReview}
+            />
+            <Toggle
+              checked={requireInterview}
+              label="Require interview"
+              onChange={setRequireInterview}
+            />
+            <Toggle
+              checked={requirePrincipalApproval}
+              label="Require principal approval"
+              onChange={setRequirePrincipalApproval}
+            />
+            <Toggle
+              checked={requireTransferCertificate}
+              label="Require transfer certificate for transfers"
+              onChange={setRequireTransferCertificate}
+            />
+            <Toggle
+              checked={requirePriorMarksheet}
+              label="Require prior marksheet"
+              onChange={setRequirePriorMarksheet}
+            />
+            <Toggle
+              checked={requireStreamOrMarksReview}
+              label="Require Grade 11-12 stream or marks review"
+              onChange={setRequireStreamOrMarksReview}
+            />
+            <Toggle
+              checked={allowAdmissionWithDocumentsPending}
+              label="Allow admission with documents pending"
+              onChange={setAllowAdmissionWithDocumentsPending}
+            />
+            <Toggle
+              checked={enforceCapacityWhenAvailable}
+              label="Check section capacity when configured"
+              onChange={setEnforceCapacityWhenAvailable}
+            />
           </div>
           <label className="mt-4 block space-y-2 text-sm font-bold text-slate-700">
             <span>Notes for office staff</span>
-            <textarea className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" rows={3} value={notesForOffice} onChange={(event) => setNotesForOffice(event.target.value)} />
+            <textarea
+              className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              rows={3}
+              value={notesForOffice}
+              onChange={(event) => setNotesForOffice(event.target.value)}
+            />
           </label>
           {policyId && draftVersion ? (
             <div className="mt-5 border-t border-slate-100 pt-4">
-              <ApprovalChainBuilder policyId={policyId} versionId={draftVersion.id} chain={draftVersion.approvalChain} />
+              <ApprovalChainBuilder
+                policyId={policyId}
+                versionId={draftVersion.id}
+                chain={draftVersion.approvalChain}
+              />
             </div>
           ) : null}
         </SectionCard>
       ) : null}
 
       {step === 5 ? (
-        <SectionCard title="Review and activate" description="Confirm this policy before it applies to new admissions.">
+        <SectionCard
+          title="Review and activate"
+          description="Confirm this policy before it applies to new admissions."
+        >
           <dl className="grid gap-3 sm:grid-cols-2">
             <Summary label="Policy name" value={name} />
-            <Summary label="Applies to" value={[classId && (classesQuery.data ?? []).find((c) => c.id === classId)?.name, academicYearId && (academicYearsQuery.data ?? []).find((y) => y.id === academicYearId)?.name, gradeBand, applicantType !== 'BOTH' ? applicantType : null].filter(Boolean).join(', ') || 'All admissions'} />
-            <Summary label="Required documents" value={`${documentRequirements.length} required`} />
-            <Summary label="Admission mode" value={admissionMode === 'DIRECT_ALLOWED' ? 'Direct admission allowed' : 'Review required'} />
+            <Summary
+              label="Applies to"
+              value={
+                [
+                  classId &&
+                    (classesQuery.data ?? []).find((c) => c.id === classId)
+                      ?.name,
+                  academicYearId &&
+                    (academicYearsQuery.data ?? []).find(
+                      (y) => y.id === academicYearId,
+                    )?.name,
+                  gradeBand,
+                  applicantType !== 'BOTH' ? applicantType : null,
+                ]
+                  .filter(Boolean)
+                  .join(', ') || 'All admissions'
+              }
+            />
+            <Summary
+              label="Required documents"
+              value={`${documentRequirements.length} required`}
+            />
+            <Summary
+              label="Admission mode"
+              value={
+                admissionMode === 'DIRECT_ALLOWED'
+                  ? 'Direct admission allowed'
+                  : 'Review required'
+              }
+            />
           </dl>
           {activateMutation.isSuccess ? (
             <p className="mt-4 flex items-center gap-2 rounded-xl border border-success-200 bg-success-50 p-3 text-sm font-semibold text-success-800">
@@ -461,11 +687,21 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
             </p>
           ) : null}
           <div className="mt-5 flex flex-wrap gap-3">
-            <Button type="button" variant="outline" onClick={() => router.push('/dashboard/settings/admissions')}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push('/dashboard/settings/admissions')}
+            >
               Save as Draft
             </Button>
-            <Button type="button" onClick={() => activateMutation.mutate()} disabled={activateMutation.isPending}>
-              {activateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            <Button
+              type="button"
+              onClick={() => activateMutation.mutate()}
+              disabled={activateMutation.isPending}
+            >
+              {activateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : null}
               Activate Policy
             </Button>
           </div>
@@ -474,11 +710,28 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
 
       {step < 5 ? (
         <div className="flex justify-between">
-          <Button type="button" variant="outline" onClick={() => setStep((current) => Math.max(0, current - 1))} disabled={step === 0}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setStep((current) => Math.max(0, current - 1))}
+            disabled={step === 0}
+          >
             Back
           </Button>
-          <Button type="button" onClick={continueStep} disabled={createMutation.isPending || updateIdentityMutation.isPending || updateVersionMutation.isPending}>
-            {createMutation.isPending || updateIdentityMutation.isPending || updateVersionMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          <Button
+            type="button"
+            onClick={continueStep}
+            disabled={
+              createMutation.isPending ||
+              updateIdentityMutation.isPending ||
+              updateVersionMutation.isPending
+            }
+          >
+            {createMutation.isPending ||
+            updateIdentityMutation.isPending ||
+            updateVersionMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : null}
             Continue
           </Button>
         </div>
@@ -487,11 +740,23 @@ export function AdmissionPolicyWizard({ policyId: initialPolicyId }: { policyId?
   );
 }
 
-function Toggle({ checked, label, onChange }: { checked: boolean; label: string; onChange: (value: boolean) => void }) {
+function Toggle({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: (value: boolean) => void;
+}) {
   return (
     <label className="flex min-h-12 cursor-pointer items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
       <span>{label}</span>
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
     </label>
   );
 }
@@ -499,7 +764,9 @@ function Toggle({ checked, label, onChange }: { checked: boolean; label: string;
 function Summary({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </dt>
       <dd className="mt-1 text-sm font-semibold text-slate-900">{value}</dd>
     </div>
   );

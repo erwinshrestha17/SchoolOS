@@ -1,22 +1,22 @@
-"use client";
+'use client';
 
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react';
 import {
   academicsWorkspaceOverflowTabs,
   academicsWorkspaceTabs,
-} from "@/components/academics/academics-tabs";
-import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
+} from '@/components/academics/academics-tabs';
+import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
 import {
   ModuleHeader,
   type ModuleHeaderProps,
-} from "@/components/ui/module-header";
-import { WorkspaceTabs } from "@/components/ui/module-tabs";
+} from '@/components/ui/module-header';
+import { WorkspaceTabs } from '@/components/ui/module-tabs';
 
 type AcademicsSectionPageProps = {
   title: string;
   description: string;
-  primaryAction?: ModuleHeaderProps["primaryAction"];
-  moreActionItems?: ModuleHeaderProps["moreActionItems"];
+  primaryAction?: ModuleHeaderProps['primaryAction'];
+  moreActionItems?: ModuleHeaderProps['moreActionItems'];
   showTabs?: boolean;
   children: ReactNode;
 };

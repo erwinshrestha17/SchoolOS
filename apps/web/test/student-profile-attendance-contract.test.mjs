@@ -1,24 +1,24 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import test from "node:test";
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
 
 const attendanceTab = readFileSync(
   new URL(
-    "../components/students/profile/tabs/attendance-tab.tsx",
+    '../components/students/profile/tabs/attendance-tab.tsx',
     import.meta.url,
   ),
-  "utf8",
+  'utf8',
 );
 const attendanceApi = readFileSync(
-  new URL("../lib/api/attendance.ts", import.meta.url),
-  "utf8",
+  new URL('../lib/api/attendance.ts', import.meta.url),
+  'utf8',
 );
 const studentDetail = readFileSync(
-  new URL("../components/students/student-detail-page.tsx", import.meta.url),
-  "utf8",
+  new URL('../components/students/student-detail-page.tsx', import.meta.url),
+  'utf8',
 );
 
-test("student profile attendance loads one selected month and never starts twelve parallel requests", () => {
+test('student profile attendance loads one selected month and never starts twelve parallel requests', () => {
   assert.match(attendanceApi, /monthly-register/);
   assert.doesNotMatch(attendanceApi, /academic-year-summary/);
   assert.equal(
@@ -29,7 +29,7 @@ test("student profile attendance loads one selected month and never starts twelv
   assert.doesNotMatch(attendanceTab, /data\.months\.map\([^)]*useQuery/);
 });
 
-test("attendance restores academic year and BS month URL state and resets month on year change", () => {
+test('attendance restores academic year and BS month URL state and resets month on year change', () => {
   assert.match(attendanceTab, /ACADEMIC_YEAR_PARAM = ["']academicYearId["']/);
   assert.match(attendanceTab, /MONTH_PARAM = ["']month["']/);
   assert.match(attendanceTab, /searchParams\.get\(ACADEMIC_YEAR_PARAM\)/);
@@ -44,7 +44,7 @@ test("attendance restores academic year and BS month URL state and resets month 
   );
 });
 
-test("current-month navigation follows backend boundaries", () => {
+test('current-month navigation follows backend boundaries', () => {
   assert.match(attendanceTab, /disabled=\{!data\.previousMonthKey\}/);
   assert.match(attendanceTab, /disabled=\{!data\.nextMonthKey\}/);
   assert.match(attendanceTab, /data\.previousMonthKey && onSelectMonth/);
@@ -54,7 +54,7 @@ test("current-month navigation follows backend boundaries", () => {
   assert.match(attendanceTab, /month\.isAvailable/);
 });
 
-test("calendar uses Sunday-first BS labels and keeps day classes distinct", () => {
+test('calendar uses Sunday-first BS labels and keeps day classes distinct', () => {
   assert.match(
     attendanceTab,
     /WEEKDAYS = \[[\s\S]*["']Sun["'],[\s\S]*["']Mon["']/,
@@ -62,14 +62,14 @@ test("calendar uses Sunday-first BS labels and keeps day classes distinct", () =
   assert.match(attendanceTab, /day\.dateBs\.slice\(-2\)/);
   assert.match(attendanceTab, /data\.days\[0\]\?\.weekday/);
   for (const state of [
-    "SCHOOL_DAY",
-    "HOLIDAY",
-    "WEEKEND",
-    "EXAM_DAY",
-    "NOT_MARKED",
-    "PRESENT",
-    "ABSENT",
-    "LATE",
+    'SCHOOL_DAY',
+    'HOLIDAY',
+    'WEEKEND',
+    'EXAM_DAY',
+    'NOT_MARKED',
+    'PRESENT',
+    'ABSENT',
+    'LATE',
   ]) {
     assert.match(attendanceTab, new RegExp(state));
   }
@@ -77,14 +77,14 @@ test("calendar uses Sunday-first BS labels and keeps day classes distinct", () =
   assert.match(attendanceTab, /aria-pressed=\{selected\}/);
 });
 
-test("monthly totals and percentage render directly from the selected-month response", () => {
+test('monthly totals and percentage render directly from the selected-month response', () => {
   for (const label of [
-    "School Days",
-    "Present",
-    "Absent",
-    "Late",
-    "Leave",
-    "Attendance",
+    'School Days',
+    'Present',
+    'Absent',
+    'Late',
+    'Leave',
+    'Attendance',
   ]) {
     assert.match(attendanceTab, new RegExp(label));
   }
@@ -96,37 +96,37 @@ test("monthly totals and percentage render directly from the selected-month resp
   );
 });
 
-test("loading, empty, partial, error, permission, locked, and expired-session states are explicit", () => {
+test('loading, empty, partial, error, permission, locked, and expired-session states are explicit', () => {
   for (const copy of [
-    "Loading attendance month",
-    "Academic calendar unavailable",
-    "No attendance month available",
-    "Partial attendance data",
-    "Selected month could not be loaded",
-    "Permission denied",
-    "Attendance module locked",
-    "Session expired",
+    'Loading attendance month',
+    'Academic calendar unavailable',
+    'No attendance month available',
+    'Partial attendance data',
+    'Selected month could not be loaded',
+    'Permission denied',
+    'Attendance module locked',
+    'Session expired',
   ]) {
     assert.match(attendanceTab, new RegExp(copy));
   }
   assert.match(attendanceTab, /No previous-month data is[\s\S]*being shown/);
 });
 
-test("attendance uses installed shadcn composition, semantic tokens, and contained responsive surfaces", () => {
+test('attendance uses installed shadcn composition, semantic tokens, and contained responsive surfaces', () => {
   for (const primitive of [
-    "primitives/card",
-    "primitives/button",
-    "primitives/select",
-    "primitives/badge",
-    "primitives/tooltip",
-    "primitives/separator",
-    "primitives/skeleton",
-    "primitives/alert",
-    "primitives/table",
-    "primitives/scroll-area",
-    "primitives/empty",
+    'primitives/card',
+    'primitives/button',
+    'primitives/select',
+    'primitives/badge',
+    'primitives/tooltip',
+    'primitives/separator',
+    'primitives/skeleton',
+    'primitives/alert',
+    'primitives/table',
+    'primitives/scroll-area',
+    'primitives/empty',
   ]) {
-    assert.match(attendanceTab, new RegExp(primitive.replace("/", "\\/")));
+    assert.match(attendanceTab, new RegExp(primitive.replace('/', '\\/')));
   }
   assert.match(attendanceTab, /min-w-\[640px\]/);
   assert.match(attendanceTab, /min-w-\[760px\]/);

@@ -11,11 +11,11 @@ describe('Student profile overview layout contract', () => {
   it('uses independently sized rows and school-friendly overview copy', () => {
     const overview = read('components/students/profile/tabs/overview-tab.tsx');
 
-    assert.match(overview, /className="space-y-6"/);
+    assert.match(overview, /className=['"]space-y-6['"]/);
     assert.ok(
       (
         overview.match(
-          /<section className="grid items-start gap-6 xl:grid-cols-/g,
+          /<section className=['"]grid items-start gap-6 xl:grid-cols-/g,
         ) ?? []
       ).length >= 3,
     );
@@ -26,7 +26,7 @@ describe('Student profile overview layout contract', () => {
     );
     assert.match(
       overview,
-      /Key information from this student's current school record\./,
+      /Key information from this student['"]s current school record\./,
     );
     assert.match(overview, /Current enrollment and recent student activity\./);
     assert.doesNotMatch(

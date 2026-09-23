@@ -1,14 +1,11 @@
-"use client";
+'use client';
 
-import { useCallback } from "react";
-import type { RemoteLookupPage } from "@schoolos/core";
-import {
-  canteenApi,
-  type CanteenSupplier,
-} from "../../lib/canteen-api";
-import { RemoteCombobox } from "../ui/remote-combobox";
+import { useCallback } from 'react';
+import type { RemoteLookupPage } from '@schoolos/core';
+import { canteenApi, type CanteenSupplier } from '../../lib/canteen-api';
+import { RemoteCombobox } from '../ui/remote-combobox';
 
-const SUPPLIER_OPTIONS_QUERY_KEY = ["remote-canteen-suppliers"] as const;
+const SUPPLIER_OPTIONS_QUERY_KEY = ['remote-canteen-suppliers'] as const;
 
 type RemoteCanteenSupplierSelectorProps = {
   value: string;
@@ -25,7 +22,7 @@ export function RemoteCanteenSupplierSelector({
   onChange,
   selectedOption,
   selectedLabel,
-  label = "Supplier",
+  label = 'Supplier',
   disabled,
   clearable,
 }: RemoteCanteenSupplierSelectorProps) {
@@ -69,7 +66,7 @@ export function RemoteCanteenSupplierSelector({
       loadPage={loadPage}
       getOptionLabel={(option) => option.name}
       getOptionDescription={(option) =>
-        [option.contactName, option.phone].filter(Boolean).join(" · ")
+        [option.contactName, option.phone].filter(Boolean).join(' · ')
       }
       label={label}
       placeholder="Search for a supplier"

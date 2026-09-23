@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   ADMISSION_CASE_DISPLAY_STATUSES,
@@ -9,8 +9,8 @@ import {
   type AdmissionApplication,
   type AdmissionApplicationStatus,
   type LegacyAdmissionApplicationStatus,
-} from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+} from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
   ChevronRight,
@@ -18,15 +18,15 @@ import {
   FileWarning,
   Loader2,
   Search,
-} from "lucide-react";
-import Link from "next/link";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { api } from "../../lib/api";
-import { Button } from "../ui/button";
-import { EmptyState } from "../ui/empty-state";
-import { ErrorState } from "../ui/error-state";
-import { LoadingState } from "../ui/loading-state";
-import { StatusBadge } from "../ui/status-badge";
+} from 'lucide-react';
+import Link from 'next/link';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { api } from '../../lib/api';
+import { Button } from '../ui/button';
+import { EmptyState } from '../ui/empty-state';
+import { ErrorState } from '../ui/error-state';
+import { LoadingState } from '../ui/loading-state';
+import { StatusBadge } from '../ui/status-badge';
 
 const PAGE_SIZE = 25;
 
@@ -34,67 +34,67 @@ const APPLICATION_STATUSES: Array<{
   value: AdmissionApplicationStatus;
   label: string;
 }> = [
-  { value: "DRAFT", label: "Draft" },
-  { value: "NEEDS_INFORMATION", label: "Needs Information" },
-  { value: "WAITING_FOR_REVIEW", label: "Waiting Review" },
-  { value: "READY_TO_ADMIT", label: "Ready to Admit" },
-  { value: "APPROVED", label: "Approved" },
-  { value: "ADMITTED", label: "Admitted" },
-  { value: "NOT_ADMITTED", label: "Not Admitted" },
-  { value: "CLOSED", label: "Closed" },
-  { value: "INQUIRY", label: "Inquiry" },
-  { value: "APPLICATION", label: "Application" },
-  { value: "DOCUMENT_PENDING", label: "Documents Pending" },
-  { value: "ENTRANCE_INTERVIEW", label: "Entrance / Interview" },
-  { value: "ACCEPTED", label: "Accepted" },
-  { value: "ENROLLED", label: "Enrolled" },
-  { value: "REJECTED", label: "Rejected" },
+  { value: 'DRAFT', label: 'Draft' },
+  { value: 'NEEDS_INFORMATION', label: 'Needs Information' },
+  { value: 'WAITING_FOR_REVIEW', label: 'Waiting Review' },
+  { value: 'READY_TO_ADMIT', label: 'Ready to Admit' },
+  { value: 'APPROVED', label: 'Approved' },
+  { value: 'ADMITTED', label: 'Admitted' },
+  { value: 'NOT_ADMITTED', label: 'Not Admitted' },
+  { value: 'CLOSED', label: 'Closed' },
+  { value: 'INQUIRY', label: 'Inquiry' },
+  { value: 'APPLICATION', label: 'Application' },
+  { value: 'DOCUMENT_PENDING', label: 'Documents Pending' },
+  { value: 'ENTRANCE_INTERVIEW', label: 'Entrance / Interview' },
+  { value: 'ACCEPTED', label: 'Accepted' },
+  { value: 'ENROLLED', label: 'Enrolled' },
+  { value: 'REJECTED', label: 'Rejected' },
 ];
 
 const NEXT_STATUSES: Record<
   LegacyAdmissionApplicationStatus,
   LegacyAdmissionApplicationStatus[]
 > = {
-  INQUIRY: ["APPLICATION", "DOCUMENT_PENDING", "REJECTED"],
+  INQUIRY: ['APPLICATION', 'DOCUMENT_PENDING', 'REJECTED'],
   APPLICATION: [
-    "DOCUMENT_PENDING",
-    "ENTRANCE_INTERVIEW",
-    "ACCEPTED",
-    "REJECTED",
+    'DOCUMENT_PENDING',
+    'ENTRANCE_INTERVIEW',
+    'ACCEPTED',
+    'REJECTED',
   ],
   DOCUMENT_PENDING: [
-    "APPLICATION",
-    "ENTRANCE_INTERVIEW",
-    "ACCEPTED",
-    "REJECTED",
+    'APPLICATION',
+    'ENTRANCE_INTERVIEW',
+    'ACCEPTED',
+    'REJECTED',
   ],
-  ENTRANCE_INTERVIEW: ["DOCUMENT_PENDING", "ACCEPTED", "REJECTED"],
-  ACCEPTED: ["REJECTED"],
+  ENTRANCE_INTERVIEW: ['DOCUMENT_PENDING', 'ACCEPTED', 'REJECTED'],
+  ACCEPTED: ['REJECTED'],
   ENROLLED: [],
   REJECTED: [],
 };
 
 export function AdmissionsPipeline() {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
-  const [classId, setClassId] = useState("");
-  const [status, setStatus] = useState<AdmissionApplicationStatus | "">("");
+  const [classId, setClassId] = useState('');
+  const [status, setStatus] = useState<AdmissionApplicationStatus | ''>('');
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [actionError, setActionError] = useState("");
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [actionError, setActionError] = useState('');
 
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
   const academicYearsQuery = useQuery({
-    queryKey: ["academic-years"],
+    queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
   });
   const applicationsQuery = useQuery({
-    queryKey: ["admission-applications", deferredSearch, classId, status, page],
+    queryKey: ['admission-applications', deferredSearch, classId, status, page],
     queryFn: () =>
       api.listAdmissionApplications({
         search: deferredSearch || undefined,
@@ -133,13 +133,13 @@ export function AdmissionsPipeline() {
         ...(reason ? { reason } : {}),
       }),
     onSuccess: (updated) => {
-      setRejectionReason("");
-      setActionError("");
+      setRejectionReason('');
+      setActionError('');
       void queryClient.invalidateQueries({
-        queryKey: ["admission-applications"],
+        queryKey: ['admission-applications'],
       });
       queryClient.setQueriesData(
-        { queryKey: ["admission-applications"] },
+        { queryKey: ['admission-applications'] },
         (current: unknown) => replaceApplication(current, updated),
       );
     },
@@ -147,7 +147,7 @@ export function AdmissionsPipeline() {
       setActionError(
         error instanceof Error
           ? error.message
-          : "Application status could not be changed.",
+          : 'Application status could not be changed.',
       );
     },
   });
@@ -204,7 +204,7 @@ export function AdmissionsPipeline() {
                 value={status}
                 onChange={(event) => {
                   setStatus(
-                    event.target.value as AdmissionApplicationStatus | "",
+                    event.target.value as AdmissionApplicationStatus | '',
                   );
                   setPage(1);
                 }}
@@ -236,8 +236,8 @@ export function AdmissionsPipeline() {
               title="No applications found"
               description={
                 search || classId || status
-                  ? "No application matches the current filters."
-                  : "Create the first inquiry/application to start the review pipeline."
+                  ? 'No application matches the current filters.'
+                  : 'Create the first inquiry/application to start the review pipeline.'
               }
               action={
                 <Link
@@ -271,8 +271,8 @@ export function AdmissionsPipeline() {
                         key={application.id}
                         className={
                           active
-                            ? "bg-[var(--color-mod-admissions-soft)]"
-                            : "hover:bg-slate-50"
+                            ? 'bg-[var(--color-mod-admissions-soft)]'
+                            : 'hover:bg-slate-50'
                         }
                       >
                         <td className="px-4 py-3">
@@ -281,8 +281,8 @@ export function AdmissionsPipeline() {
                             className="group min-h-11 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-admissions-border)]"
                             onClick={() => {
                               setSelectedId(application.id);
-                              setActionError("");
-                              setRejectionReason("");
+                              setActionError('');
+                              setRejectionReason('');
                             }}
                           >
                             <strong className="flex items-center gap-1 text-slate-900 group-hover:text-[var(--color-mod-admissions-text)]">
@@ -300,10 +300,10 @@ export function AdmissionsPipeline() {
                         <td className="px-4 py-3">
                           <span className="block font-semibold text-slate-700">
                             {application.guardianFullName ||
-                              "Guardian not recorded"}
+                              'Guardian not recorded'}
                           </span>
                           <span className="text-xs text-slate-500">
-                            {application.guardianPhone || "Phone not recorded"}
+                            {application.guardianPhone || 'Phone not recorded'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-slate-600">
@@ -338,7 +338,7 @@ export function AdmissionsPipeline() {
 
           <div className="flex items-center justify-between border-t border-slate-100 p-4">
             <p className="text-xs font-semibold text-slate-500">
-              Page {applicationsQuery.data?.page ?? page} · {filteredCount}{" "}
+              Page {applicationsQuery.data?.page ?? page} · {filteredCount}{' '}
               matching applications
             </p>
             <div className="flex gap-2">
@@ -391,11 +391,11 @@ export function AdmissionsPipeline() {
               mutationPending={statusMutation.isPending}
               onTransition={(nextStatus) => {
                 if (
-                  nextStatus === "REJECTED" &&
+                  nextStatus === 'REJECTED' &&
                   rejectionReason.trim().length < 5
                 ) {
                   setActionError(
-                    "Enter a rejection reason of at least five characters.",
+                    'Enter a rejection reason of at least five characters.',
                   );
                   return;
                 }
@@ -403,18 +403,18 @@ export function AdmissionsPipeline() {
                   applicationId: selected.id,
                   nextStatus,
                   reason:
-                    nextStatus === "REJECTED"
+                    nextStatus === 'REJECTED'
                       ? rejectionReason.trim()
                       : undefined,
                 });
               }}
               onEnrolled={() => {
                 void queryClient.invalidateQueries({
-                  queryKey: ["admission-applications"],
+                  queryKey: ['admission-applications'],
                 });
-                void queryClient.invalidateQueries({ queryKey: ["students"] });
+                void queryClient.invalidateQueries({ queryKey: ['students'] });
                 void queryClient.invalidateQueries({
-                  queryKey: ["admissions"],
+                  queryKey: ['admissions'],
                 });
               }}
             />
@@ -477,22 +477,22 @@ function ApplicationInspector({
         />
         <InspectorRow
           label="Guardian"
-          value={application.guardianFullName || "Guardian not recorded"}
+          value={application.guardianFullName || 'Guardian not recorded'}
         />
         <InspectorRow
           label="Guardian phone"
-          value={application.guardianPhone || "Guardian phone not entered"}
+          value={application.guardianPhone || 'Guardian phone not entered'}
         />
         <InspectorRow
           label="Previous school"
-          value={application.previousSchool || "Previous school not recorded"}
+          value={application.previousSchool || 'Previous school not recorded'}
         />
         <InspectorRow
           label="Date of birth"
           value={
             application.dateOfBirth
               ? formatBsDate(application.dateOfBirth)
-              : "Date of birth not entered"
+              : 'Date of birth not entered'
           }
         />
       </dl>
@@ -517,9 +517,9 @@ function ApplicationInspector({
             status={
               duplicateMatches.length
                 ? `${duplicateMatches.length} WARNING`
-                : "NO WARNING"
+                : 'NO WARNING'
             }
-            tone={duplicateMatches.length ? "pending" : "approved"}
+            tone={duplicateMatches.length ? 'pending' : 'approved'}
           />
         </div>
         {duplicateMatches.length ? (
@@ -533,7 +533,7 @@ function ApplicationInspector({
                   {match.fullNameEn} · {match.studentSystemId}
                 </p>
                 <p className="mt-1 text-xs text-warning-800">
-                  {match.matchTypes.join(", ") || "Possible duplicate"}
+                  {match.matchTypes.join(', ') || 'Possible duplicate'}
                 </p>
               </div>
             ))}
@@ -560,15 +560,15 @@ function ApplicationInspector({
         </Link>
       ) : null}
 
-      {application.status === "ACCEPTED" ? (
+      {application.status === 'ACCEPTED' ? (
         <EnrollmentConversion
           application={application}
           onEnrolled={onEnrolled}
         />
       ) : null}
 
-      {(application.status === "ENROLLED" ||
-        application.status === "ADMITTED") &&
+      {(application.status === 'ENROLLED' ||
+        application.status === 'ADMITTED') &&
       application.convertedStudentId ? (
         <div className="rounded-xl border border-success-200 bg-success-50 p-4">
           <div className="flex items-center gap-2 text-success-800">
@@ -589,7 +589,7 @@ function ApplicationInspector({
           <h3 className="text-xs font-black uppercase tracking-wide text-slate-500">
             Allowed workflow actions
           </h3>
-          {nextStatuses.includes("REJECTED") ? (
+          {nextStatuses.includes('REJECTED') ? (
             <label className="mt-3 block space-y-2 text-xs font-bold text-slate-700">
               Rejection reason
               <textarea
@@ -605,13 +605,13 @@ function ApplicationInspector({
               <Button
                 key={nextStatus}
                 type="button"
-                variant={nextStatus === "REJECTED" ? "outline" : "default"}
+                variant={nextStatus === 'REJECTED' ? 'outline' : 'default'}
                 disabled={mutationPending}
                 onClick={() => onTransition(nextStatus)}
                 className={
-                  nextStatus === "REJECTED"
-                    ? "border-danger-200 text-danger-700 hover:bg-danger-50"
-                    : ""
+                  nextStatus === 'REJECTED'
+                    ? 'border-danger-200 text-danger-700 hover:bg-danger-50'
+                    : ''
                 }
               >
                 {mutationPending ? (
@@ -624,8 +624,8 @@ function ApplicationInspector({
         </div>
       ) : null}
 
-      {(application.status === "REJECTED" ||
-        application.status === "NOT_ADMITTED") &&
+      {(application.status === 'REJECTED' ||
+        application.status === 'NOT_ADMITTED') &&
       application.rejectedReason ? (
         <div className="rounded-xl border border-danger-200 bg-danger-50 p-3">
           <p className="text-xs font-black uppercase tracking-wide text-danger-700">
@@ -657,33 +657,33 @@ function EnrollmentConversion({
   onEnrolled: () => void;
 }) {
   const academicYearsQuery = useQuery({
-    queryKey: ["academic-years"],
+    queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
   });
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
   const sectionsQuery = useQuery({
-    queryKey: ["sections"],
+    queryKey: ['sections'],
     queryFn: api.listSections,
   });
 
   const [form, setForm] = useState({
-    dateOfBirth: application.dateOfBirth?.slice(0, 10) ?? "",
-    gender: application.gender ?? "FEMALE",
+    dateOfBirth: application.dateOfBirth?.slice(0, 10) ?? '',
+    gender: application.gender ?? 'FEMALE',
     admissionDate: getNepalSchoolDay().gregorianDate,
-    academicYearId: application.academicYearId ?? "",
-    classId: application.classId ?? "",
-    sectionId: application.sectionId ?? "",
-    guardianFullName: application.guardianFullName ?? "",
-    guardianRelation: application.guardianRelation ?? "guardian",
-    guardianPhone: application.guardianPhone ?? "",
-    mediumOfInstruction: "English",
-    disabilityFlag: "",
+    academicYearId: application.academicYearId ?? '',
+    classId: application.classId ?? '',
+    sectionId: application.sectionId ?? '',
+    guardianFullName: application.guardianFullName ?? '',
+    guardianRelation: application.guardianRelation ?? 'guardian',
+    guardianPhone: application.guardianPhone ?? '',
+    mediumOfInstruction: 'English',
+    disabilityFlag: '',
     confirmNoDisability: false,
   });
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   const availableSections = useMemo(
     () =>
@@ -726,14 +726,14 @@ function EnrollmentConversion({
         documents: [],
       }),
     onSuccess: () => {
-      setError("");
+      setError('');
       onEnrolled();
     },
     onError: (mutationError) => {
       setError(
         mutationError instanceof Error
           ? mutationError.message
-          : "Application could not be enrolled.",
+          : 'Application could not be enrolled.',
       );
     },
   });
@@ -743,7 +743,7 @@ function EnrollmentConversion({
   }
 
   function submit() {
-    setError("");
+    setError('');
     if (
       !form.dateOfBirth ||
       !form.admissionDate ||
@@ -753,12 +753,12 @@ function EnrollmentConversion({
       !form.guardianRelation.trim() ||
       !form.guardianPhone.trim()
     ) {
-      setError("Complete all required enrollment and guardian fields.");
+      setError('Complete all required enrollment and guardian fields.');
       return;
     }
     if (!form.confirmNoDisability && !form.disabilityFlag.trim()) {
       setError(
-        "Confirm no known disability or record the applicable disability information.",
+        'Confirm no known disability or record the applicable disability information.',
       );
       return;
     }
@@ -774,20 +774,21 @@ function EnrollmentConversion({
         </h3>
       </div>
       <p className="mt-1 text-xs text-success-800">
-        The student, enrollment, and guardian records are created together when you confirm.
+        The student, enrollment, and guardian records are created together when
+        you confirm.
       </p>
       <div className="mt-4 grid gap-3">
         <CompactField label="Date of birth">
           <input
             type="date"
             value={form.dateOfBirth}
-            onChange={(event) => update("dateOfBirth", event.target.value)}
+            onChange={(event) => update('dateOfBirth', event.target.value)}
           />
         </CompactField>
         <CompactField label="Gender">
           <select
             value={form.gender}
-            onChange={(event) => update("gender", event.target.value)}
+            onChange={(event) => update('gender', event.target.value)}
           >
             <option value="FEMALE">Female</option>
             <option value="MALE">Male</option>
@@ -798,13 +799,13 @@ function EnrollmentConversion({
           <input
             type="date"
             value={form.admissionDate}
-            onChange={(event) => update("admissionDate", event.target.value)}
+            onChange={(event) => update('admissionDate', event.target.value)}
           />
         </CompactField>
         <CompactField label="Academic year">
           <select
             value={form.academicYearId}
-            onChange={(event) => update("academicYearId", event.target.value)}
+            onChange={(event) => update('academicYearId', event.target.value)}
           >
             <option value="">Select academic year</option>
             {(academicYearsQuery.data ?? []).map((year) => (
@@ -818,8 +819,8 @@ function EnrollmentConversion({
           <select
             value={form.classId}
             onChange={(event) => {
-              update("classId", event.target.value);
-              update("sectionId", "");
+              update('classId', event.target.value);
+              update('sectionId', '');
             }}
           >
             <option value="">Select class</option>
@@ -833,7 +834,7 @@ function EnrollmentConversion({
         <CompactField label="Section">
           <select
             value={form.sectionId}
-            onChange={(event) => update("sectionId", event.target.value)}
+            onChange={(event) => update('sectionId', event.target.value)}
           >
             <option value="">No section</option>
             {availableSections.map((section) => (
@@ -846,19 +847,19 @@ function EnrollmentConversion({
         <CompactField label="Guardian name">
           <input
             value={form.guardianFullName}
-            onChange={(event) => update("guardianFullName", event.target.value)}
+            onChange={(event) => update('guardianFullName', event.target.value)}
           />
         </CompactField>
         <CompactField label="Guardian relationship">
           <input
             value={form.guardianRelation}
-            onChange={(event) => update("guardianRelation", event.target.value)}
+            onChange={(event) => update('guardianRelation', event.target.value)}
           />
         </CompactField>
         <CompactField label="Guardian phone">
           <input
             value={form.guardianPhone}
-            onChange={(event) => update("guardianPhone", event.target.value)}
+            onChange={(event) => update('guardianPhone', event.target.value)}
             inputMode="tel"
           />
         </CompactField>
@@ -866,14 +867,14 @@ function EnrollmentConversion({
           <input
             value={form.mediumOfInstruction}
             onChange={(event) =>
-              update("mediumOfInstruction", event.target.value)
+              update('mediumOfInstruction', event.target.value)
             }
           />
         </CompactField>
         <CompactField label="Disability information">
           <input
             value={form.disabilityFlag}
-            onChange={(event) => update("disabilityFlag", event.target.value)}
+            onChange={(event) => update('disabilityFlag', event.target.value)}
             disabled={form.confirmNoDisability}
             placeholder="Record only when applicable"
           />
@@ -883,8 +884,8 @@ function EnrollmentConversion({
             type="checkbox"
             checked={form.confirmNoDisability}
             onChange={(event) => {
-              update("confirmNoDisability", event.target.checked);
-              if (event.target.checked) update("disabilityFlag", "");
+              update('confirmNoDisability', event.target.checked);
+              if (event.target.checked) update('disabilityFlag', '');
             }}
             className="mt-0.5 h-4 w-4"
           />
@@ -949,42 +950,42 @@ function classNameFor(
   classId: string | null,
   classes: Array<{ id: string; name: string }>,
 ) {
-  if (!classId) return "Class not selected";
-  return classes.find((item) => item.id === classId)?.name ?? "Unavailable";
+  if (!classId) return 'Class not selected';
+  return classes.find((item) => item.id === classId)?.name ?? 'Unavailable';
 }
 
 function academicYearNameFor(
   academicYearId: string | null,
   academicYears: Array<{ id: string; name: string }>,
 ) {
-  if (!academicYearId) return "Academic year not assigned";
+  if (!academicYearId) return 'Academic year not assigned';
   return (
     academicYears.find((item) => item.id === academicYearId)?.name ??
-    "Academic year unavailable"
+    'Academic year unavailable'
   );
 }
 
 function applicationSourceLabel(source: string | null) {
-  if (!source) return "Source not recorded";
+  if (!source) return 'Source not recorded';
   const labels: Record<string, string> = {
-    OFFICE_WALK_IN: "Office walk-in",
-    PARENT_ONLINE: "Parent online",
-    PHONE_INQUIRY: "Phone inquiry",
-    TRANSFER_REQUEST: "Transfer request",
-    IMPORT: "Import",
+    OFFICE_WALK_IN: 'Office walk-in',
+    PARENT_ONLINE: 'Parent online',
+    PHONE_INQUIRY: 'Phone inquiry',
+    TRANSFER_REQUEST: 'Transfer request',
+    IMPORT: 'Import',
   };
   return labels[source] ?? source;
 }
 
 function transitionLabel(status: LegacyAdmissionApplicationStatus) {
   const labels: Record<LegacyAdmissionApplicationStatus, string> = {
-    INQUIRY: "Move to inquiry",
-    APPLICATION: "Move to application",
-    DOCUMENT_PENDING: "Mark documents pending",
-    ENTRANCE_INTERVIEW: "Move to entrance / interview",
-    ACCEPTED: "Accept application",
-    ENROLLED: "Enroll student",
-    REJECTED: "Reject application",
+    INQUIRY: 'Move to inquiry',
+    APPLICATION: 'Move to application',
+    DOCUMENT_PENDING: 'Mark documents pending',
+    ENTRANCE_INTERVIEW: 'Move to entrance / interview',
+    ACCEPTED: 'Accept application',
+    ENROLLED: 'Enroll student',
+    REJECTED: 'Reject application',
   };
   return labels[status];
 }
@@ -1007,7 +1008,7 @@ function replaceApplication(
   current: unknown,
   updated: AdmissionApplication,
 ): unknown {
-  if (!current || typeof current !== "object" || !("items" in current)) {
+  if (!current || typeof current !== 'object' || !('items' in current)) {
     return current;
   }
   const result = current as {

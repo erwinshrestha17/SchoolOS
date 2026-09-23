@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { formatBsDate } from "@schoolos/core";
+import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { formatBsDate } from '@schoolos/core';
 import {
   AlertCircle,
   ArrowRight,
@@ -15,65 +15,65 @@ import {
   ShieldCheck,
   UserX,
   Users,
-} from "lucide-react";
-import Link from "next/link";
-import { api } from "../../../lib/api";
-import { cn } from "../../../lib/utils";
-import { ModuleHeader } from "../../../components/ui/module-header";
-import { DashboardPageShell } from "../../../components/dashboard/dashboard-page-shell";
-import { SummaryCard, SummaryGrid } from "../../../components/ui/summary-card";
-import { WorkspaceTabs } from "../../../components/ui/module-tabs";
-import { WorkSurface } from "../../../components/ui/work-surface";
-import { StatusBadge } from "../../../components/ui/status-badge";
-import { LoadingState } from "../../../components/ui/loading-state";
-import { EmptyState } from "../../../components/ui/empty-state";
-import { ErrorState } from "../../../components/ui/error-state";
+} from 'lucide-react';
+import Link from 'next/link';
+import { api } from '../../../lib/api';
+import { cn } from '../../../lib/utils';
+import { ModuleHeader } from '../../../components/ui/module-header';
+import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
+import { SummaryCard, SummaryGrid } from '../../../components/ui/summary-card';
+import { WorkspaceTabs } from '../../../components/ui/module-tabs';
+import { WorkSurface } from '../../../components/ui/work-surface';
+import { StatusBadge } from '../../../components/ui/status-badge';
+import { LoadingState } from '../../../components/ui/loading-state';
+import { EmptyState } from '../../../components/ui/empty-state';
+import { ErrorState } from '../../../components/ui/error-state';
 
 const moduleTabs = [
-  { href: "/dashboard/hr/staff", label: "Staff", icon: Users },
-  { href: "/dashboard/hr/contracts", label: "Contracts", icon: Briefcase },
-  { href: "/dashboard/hr/leave", label: "Leave", icon: CalendarDays },
+  { href: '/dashboard/hr/staff', label: 'Staff', icon: Users },
+  { href: '/dashboard/hr/contracts', label: 'Contracts', icon: Briefcase },
+  { href: '/dashboard/hr/leave', label: 'Leave', icon: CalendarDays },
   {
-    href: "/dashboard/hr/attendance",
-    label: "Attendance",
+    href: '/dashboard/hr/attendance',
+    label: 'Attendance',
     icon: ClipboardCheck,
   },
-  { href: "/dashboard/payroll/runs", label: "Payroll", icon: History },
+  { href: '/dashboard/payroll/runs', label: 'Payroll', icon: History },
   {
-    href: "/dashboard/payroll/readiness",
-    label: "Readiness",
+    href: '/dashboard/payroll/readiness',
+    label: 'Readiness',
     icon: ShieldCheck,
   },
-  { href: "/dashboard/payroll/payslips", label: "Payslips", icon: FileText },
-  { href: "/dashboard/payroll/reports", label: "Reports", icon: BadgeCheck },
+  { href: '/dashboard/payroll/payslips', label: 'Payslips', icon: FileText },
+  { href: '/dashboard/payroll/reports', label: 'Reports', icon: BadgeCheck },
 ];
 
 function formatDate(value?: string | null) {
-  if (!value) return "Not scheduled";
+  if (!value) return 'Not scheduled';
   return formatBsDate(value);
 }
 
 function unavailable(isError: boolean, value?: number | null) {
-  if (isError) return "Unavailable";
+  if (isError) return 'Unavailable';
   return value ?? 0;
 }
 
 export default function HRDashboardPage() {
   const router = useRouter();
   const leaveQueueQuery = useQuery({
-    queryKey: ["hr-leave-queue-depth", 7],
+    queryKey: ['hr-leave-queue-depth', 7],
     queryFn: () => api.getLeaveQueueDepth({ staleDays: 7 }),
   });
   const contractRemindersQuery = useQuery({
-    queryKey: ["hr-contract-expiry-reminders", 30],
+    queryKey: ['hr-contract-expiry-reminders', 30],
     queryFn: () => api.listContractExpiryReminders({ days: 30 }),
   });
   const payrollSummaryQuery = useQuery({
-    queryKey: ["payroll-dashboard-summary", "hr-page"],
+    queryKey: ['payroll-dashboard-summary', 'hr-page'],
     queryFn: () => api.getPayrollDashboardSummary({ contractWindowDays: 30 }),
   });
   const coverageQuery = useQuery({
-    queryKey: ["hr-staff-coverage-summary"],
+    queryKey: ['hr-staff-coverage-summary'],
     queryFn: () => api.getStaffCoverageSummary(),
   });
 
@@ -82,10 +82,10 @@ export default function HRDashboardPage() {
   const payrollSummary = payrollSummaryQuery.data;
   const coverage = coverageQuery.data;
   const postingBacklog = [
-    "GENERATED",
-    "UNDER_REVIEW",
-    "REVIEWED",
-    "APPROVED",
+    'GENERATED',
+    'UNDER_REVIEW',
+    'REVIEWED',
+    'APPROVED',
   ].reduce(
     (total, status) =>
       total + (payrollSummary?.payrollRunsByStatus?.[status] ?? 0),
@@ -94,7 +94,7 @@ export default function HRDashboardPage() {
   const latestRun = payrollSummary?.latestPayrollRun ?? null;
   const selectedRun = payrollSummary?.selectedPayrollRun ?? null;
   const remainingIssues = [
-    "Payroll posting creates accounting accrual journals only; bank settlement remains intentionally unsupported.",
+    'Payroll posting creates accounting accrual journals only; bank settlement remains intentionally unsupported.',
   ];
 
   return (
@@ -114,24 +114,24 @@ export default function HRDashboardPage() {
         }
         moreActionItems={[
           {
-            label: "Leave Queue",
+            label: 'Leave Queue',
             icon: <CalendarDays className="h-4 w-4" />,
-            onClick: () => router.push("/dashboard/hr/leave"),
+            onClick: () => router.push('/dashboard/hr/leave'),
           },
           {
-            label: "Payroll Runs",
+            label: 'Payroll Runs',
             icon: <History className="h-4 w-4" />,
-            onClick: () => router.push("/dashboard/payroll/runs"),
+            onClick: () => router.push('/dashboard/payroll/runs'),
           },
           {
-            label: "Payslips",
+            label: 'Payslips',
             icon: <FileText className="h-4 w-4" />,
-            onClick: () => router.push("/dashboard/payroll/payslips"),
+            onClick: () => router.push('/dashboard/payroll/payslips'),
           },
           {
-            label: "Payroll Reports",
+            label: 'Payroll Reports',
             icon: <BadgeCheck className="h-4 w-4" />,
-            onClick: () => router.push("/dashboard/payroll/reports"),
+            onClick: () => router.push('/dashboard/payroll/reports'),
           },
         ]}
       />
@@ -141,7 +141,7 @@ export default function HRDashboardPage() {
           label="Active Staff"
           value={
             payrollSummaryQuery.isError
-              ? "Unavailable"
+              ? 'Unavailable'
               : (payrollSummary?.activeStaffCount ?? 0)
           }
           icon={<Users className="h-5 w-5" />}
@@ -153,7 +153,7 @@ export default function HRDashboardPage() {
           label="On Leave Today"
           value={
             payrollSummaryQuery.isError
-              ? "Unavailable"
+              ? 'Unavailable'
               : (payrollSummary?.onLeaveTodayCount ?? 0)
           }
           icon={<ClipboardCheck className="h-5 w-5" />}
@@ -167,7 +167,7 @@ export default function HRDashboardPage() {
           icon={<AlertCircle className="h-5 w-5" />}
           loading={leaveQueueQuery.isLoading}
           href="/dashboard/hr/leave"
-          tone={(leaveQueue?.pending ?? 0) > 0 ? "warning" : "success"}
+          tone={(leaveQueue?.pending ?? 0) > 0 ? 'warning' : 'success'}
           description={`${leaveQueue?.stalePending ?? 0} stale beyond ${leaveQueue?.staleDays ?? 7} days`}
         />
         <SummaryCard
@@ -176,7 +176,7 @@ export default function HRDashboardPage() {
           icon={<Briefcase className="h-5 w-5" />}
           loading={contractRemindersQuery.isLoading}
           href="/dashboard/hr/contracts"
-          tone={(reminders?.total ?? 0) > 0 ? "warning" : "success"}
+          tone={(reminders?.total ?? 0) > 0 ? 'warning' : 'success'}
           description={`Next ${reminders?.windowDays ?? 30} days`}
         />
       </SummaryGrid>
@@ -226,17 +226,17 @@ export default function HRDashboardPage() {
                             {request.staffName}
                           </p>
                           <p className="text-xs text-slate-500">
-                            {request.employeeId ?? "No employee ID"}
+                            {request.employeeId ?? 'No employee ID'}
                           </p>
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge
                             status={request.leaveType}
-                            tone={request.isPaid ? "info" : "partial"}
+                            tone={request.isPaid ? 'info' : 'partial'}
                           />
                         </td>
                         <td className="px-4 py-3 text-slate-600">
-                          {formatDate(request.startsOn)} -{" "}
+                          {formatDate(request.startsOn)} -{' '}
                           {formatDate(request.endsOn)}
                         </td>
                         <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-900">
@@ -287,7 +287,7 @@ export default function HRDashboardPage() {
               <div className="space-y-3">
                 {reminders.items.slice(0, 6).map((item) => (
                   <div
-                    key={`${item.type}-${item.staffId}-${item.contractId ?? "probation"}`}
+                    key={`${item.type}-${item.staffId}-${item.contractId ?? 'probation'}`}
                     className="rounded-2xl border border-slate-200 bg-white p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -296,21 +296,21 @@ export default function HRDashboardPage() {
                           {item.staffName}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
-                          {item.employeeId ?? "No employee ID"} ·{" "}
-                          {item.position ?? "No position"}
+                          {item.employeeId ?? 'No employee ID'} ·{' '}
+                          {item.position ?? 'No position'}
                         </p>
                       </div>
                       <StatusBadge
                         status={item.type}
                         label={
-                          item.type === "PROBATION_END"
-                            ? "Probation"
-                            : "Contract"
+                          item.type === 'PROBATION_END'
+                            ? 'Probation'
+                            : 'Contract'
                         }
                         tone={
                           item.daysRemaining !== null && item.daysRemaining <= 7
-                            ? "conflict"
-                            : "pending"
+                            ? 'conflict'
+                            : 'pending'
                         }
                       />
                     </div>
@@ -320,13 +320,13 @@ export default function HRDashboardPage() {
                       </span>
                       <span
                         className={cn(
-                          "font-bold tabular-nums",
+                          'font-bold tabular-nums',
                           item.daysRemaining !== null && item.daysRemaining <= 7
-                            ? "text-danger-700"
-                            : "text-warning-700",
+                            ? 'text-danger-700'
+                            : 'text-warning-700',
                         )}
                       >
-                        {item.daysRemaining ?? "No"} days remaining
+                        {item.daysRemaining ?? 'No'} days remaining
                       </span>
                     </div>
                   </div>
@@ -378,11 +378,11 @@ export default function HRDashboardPage() {
                       <span className="text-sm font-bold text-slate-900">
                         {latestRun
                           ? `${latestRun.periodMonth}/${latestRun.periodYear}`
-                          : "No runs"}
+                          : 'No runs'}
                       </span>
                       <StatusBadge
-                        status={latestRun?.status ?? "DRAFT"}
-                        tone={latestRun ? undefined : "inactive"}
+                        status={latestRun?.status ?? 'DRAFT'}
+                        tone={latestRun ? undefined : 'inactive'}
                       />
                     </div>
                   </div>
@@ -412,8 +412,8 @@ export default function HRDashboardPage() {
                             </p>
                             <p className="text-xs text-slate-500">
                               {run.postingReadiness.accountingJournalId
-                                ? "Accounting journal linked"
-                                : "No accounting journal linked"}
+                                ? 'Accounting journal linked'
+                                : 'No accounting journal linked'}
                             </p>
                           </div>
                           <StatusBadge status={run.status} />
@@ -451,12 +451,15 @@ export default function HRDashboardPage() {
         description={
           coverage
             ? `As of ${formatBsDate(coverage.asOf)}`
-            : "Staffing gaps that could block payroll or leave a class uncovered."
+            : 'Staffing gaps that could block payroll or leave a class uncovered.'
         }
         variant="monitoring"
       >
         {coverageQuery.isLoading ? (
-          <LoadingState variant="spinner" label="Loading staffing coverage..." />
+          <LoadingState
+            variant="spinner"
+            label="Loading staffing coverage..."
+          />
         ) : coverageQuery.isError ? (
           <ErrorState
             title="Staffing coverage unavailable"
@@ -503,7 +506,7 @@ export default function HRDashboardPage() {
               <p className="mt-2 text-2xl font-black tabular-nums text-slate-950">
                 {coverage.payrollReadiness.available
                   ? coverage.payrollReadiness.blockingCount
-                  : "N/A"}
+                  : 'N/A'}
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 {coverage.payrollReadiness.available
@@ -518,7 +521,7 @@ export default function HRDashboardPage() {
               <p className="mt-2 text-2xl font-black tabular-nums text-slate-950">
                 {coverage.classCoverage.available
                   ? coverage.classCoverage.uncoveredPeriods
-                  : "N/A"}
+                  : 'N/A'}
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 {coverage.classCoverage.available

@@ -4,7 +4,15 @@ import { formatBsDate, type ExamTermSummary } from '@schoolos/core';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Lock, Unlock, MoreVertical, Edit2, Trash2, ListChecks } from 'lucide-react';
+import {
+  Calendar,
+  Lock,
+  Unlock,
+  MoreVertical,
+  Edit2,
+  Trash2,
+  ListChecks,
+} from 'lucide-react';
 import { ActionMenu } from '@/components/ui/action-menu';
 
 interface ExamListProps {
@@ -29,7 +37,9 @@ export function ExamList({
       cell: (exam: ExamTermSummary) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">{exam.name}</span>
-          <span className="text-xs text-slate-500">{(exam as any).academicYear?.name}</span>
+          <span className="text-xs text-slate-500">
+            {(exam as any).academicYear?.name}
+          </span>
         </div>
       ),
     },
@@ -39,8 +49,7 @@ export function ExamList({
         <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
           <Calendar size={12} />
           <span>
-            {formatBsDate(exam.startsOn)} -{' '}
-            {formatBsDate(exam.endsOn)}
+            {formatBsDate(exam.startsOn)} - {formatBsDate(exam.endsOn)}
           </span>
         </div>
       ),
@@ -78,7 +87,7 @@ export function ExamList({
       header: 'Components',
       cell: (exam: ExamTermSummary) => (
         <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600">
-          {(exam.components?.length ?? 0)} Components
+          {exam.components?.length ?? 0} Components
         </span>
       ),
     },

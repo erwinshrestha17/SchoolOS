@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
   ArrowRight,
@@ -13,50 +13,50 @@ import {
   History,
   Wallet,
   ShieldCheck,
-} from "lucide-react";
-import { api } from "../../../lib/api";
-import { cn } from "../../../lib/utils";
-import { ModuleHeader } from "../../../components/ui/module-header";
-import { DashboardPageShell } from "../../../components/dashboard/dashboard-page-shell";
-import { SummaryCard, SummaryGrid } from "../../../components/ui/summary-card";
-import { WorkspaceTabs } from "../../../components/ui/module-tabs";
-import { WorkSurface } from "../../../components/ui/work-surface";
-import { LoadingState } from "../../../components/ui/loading-state";
-import { ErrorState } from "../../../components/ui/error-state";
-import { EmptyState } from "../../../components/ui/empty-state";
+} from 'lucide-react';
+import { api } from '../../../lib/api';
+import { cn } from '../../../lib/utils';
+import { ModuleHeader } from '../../../components/ui/module-header';
+import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
+import { SummaryCard, SummaryGrid } from '../../../components/ui/summary-card';
+import { WorkspaceTabs } from '../../../components/ui/module-tabs';
+import { WorkSurface } from '../../../components/ui/work-surface';
+import { LoadingState } from '../../../components/ui/loading-state';
+import { ErrorState } from '../../../components/ui/error-state';
+import { EmptyState } from '../../../components/ui/empty-state';
 
-const moneyFormatter = new Intl.NumberFormat("en-NP", {
-  style: "currency",
-  currency: "NPR",
+const moneyFormatter = new Intl.NumberFormat('en-NP', {
+  style: 'currency',
+  currency: 'NPR',
   maximumFractionDigits: 0,
 });
 
 const moduleTabs = [
-  { href: "/dashboard/payroll/runs", label: "Runs", icon: History },
+  { href: '/dashboard/payroll/runs', label: 'Runs', icon: History },
   {
-    href: "/dashboard/payroll/salary-structures",
-    label: "Salary Structures",
+    href: '/dashboard/payroll/salary-structures',
+    label: 'Salary Structures',
     icon: Calculator,
   },
   {
-    href: "/dashboard/payroll/readiness",
-    label: "Readiness",
+    href: '/dashboard/payroll/readiness',
+    label: 'Readiness',
     icon: ShieldCheck,
   },
-  { href: "/dashboard/payroll/payslips", label: "Payslips", icon: FileText },
-  { href: "/dashboard/payroll/reports", label: "Reports", icon: BarChart3 },
-  { href: "/dashboard/hr/staff", label: "Staff", icon: Wallet },
+  { href: '/dashboard/payroll/payslips', label: 'Payslips', icon: FileText },
+  { href: '/dashboard/payroll/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/dashboard/hr/staff', label: 'Staff', icon: Wallet },
 ];
 
 function formatMoney(value?: number | string | null) {
-  if (value === undefined || value === null) return "Unavailable";
+  if (value === undefined || value === null) return 'Unavailable';
   return moneyFormatter.format(Number(value));
 }
 
 export default function PayrollDashboardPage() {
   const router = useRouter();
   const summaryQuery = useQuery({
-    queryKey: ["payroll-dashboard-summary"],
+    queryKey: ['payroll-dashboard-summary'],
     queryFn: () => api.getPayrollDashboardSummary(),
   });
 
@@ -65,19 +65,19 @@ export default function PayrollDashboardPage() {
   const latestRun = summary?.latestPayrollRun ?? null;
   const workflowSteps = [
     {
-      label: "Draft",
-      statuses: ["DRAFT", "GENERATED", "UNDER_REVIEW", "REVIEWED"],
-      description: "Generated or under review",
+      label: 'Draft',
+      statuses: ['DRAFT', 'GENERATED', 'UNDER_REVIEW', 'REVIEWED'],
+      description: 'Generated or under review',
     },
     {
-      label: "Approved",
-      statuses: ["APPROVED"],
-      description: "Ready for posting",
+      label: 'Approved',
+      statuses: ['APPROVED'],
+      description: 'Ready for posting',
     },
     {
-      label: "Posted",
-      statuses: ["POSTED"],
-      description: "Accrued in accounting",
+      label: 'Posted',
+      statuses: ['POSTED'],
+      description: 'Accrued in accounting',
     },
   ].map((step) => ({
     ...step,
@@ -87,7 +87,7 @@ export default function PayrollDashboardPage() {
     ),
   }));
   const awaitingAction = workflowSteps
-    .filter((step) => step.label !== "Posted")
+    .filter((step) => step.label !== 'Posted')
     .reduce((total, step) => total + step.count, 0);
 
   return (
@@ -107,19 +107,19 @@ export default function PayrollDashboardPage() {
         }
         moreActionItems={[
           {
-            label: "Salary Structures",
+            label: 'Salary Structures',
             icon: <Calculator className="h-4 w-4" />,
-            onClick: () => router.push("/dashboard/payroll/salary-structures"),
+            onClick: () => router.push('/dashboard/payroll/salary-structures'),
           },
           {
-            label: "Payslips",
+            label: 'Payslips',
             icon: <FileText className="h-4 w-4" />,
-            onClick: () => router.push("/dashboard/payroll/payslips"),
+            onClick: () => router.push('/dashboard/payroll/payslips'),
           },
           {
-            label: "Reports",
+            label: 'Reports',
             icon: <BarChart3 className="h-4 w-4" />,
-            onClick: () => router.push("/dashboard/payroll/reports"),
+            onClick: () => router.push('/dashboard/payroll/reports'),
           },
         ]}
       />
@@ -151,10 +151,10 @@ export default function PayrollDashboardPage() {
         />
         <SummaryCard
           label="Approval Queue"
-          value={summaryQuery.isError ? "Unavailable" : awaitingAction}
+          value={summaryQuery.isError ? 'Unavailable' : awaitingAction}
           icon={<AlertCircle className="h-5 w-5" />}
           loading={summaryQuery.isLoading}
-          tone={awaitingAction > 0 ? "warning" : "success"}
+          tone={awaitingAction > 0 ? 'warning' : 'success'}
           description="Runs awaiting review or posting"
         />
       </SummaryGrid>
@@ -227,38 +227,40 @@ export default function PayrollDashboardPage() {
           <div className="space-y-3">
             {[
               {
-                label: "Latest Run",
-                status: latestRun?.status?.replaceAll("_", " ") ?? "No runs",
+                label: 'Latest Run',
+                status: latestRun?.status?.replaceAll('_', ' ') ?? 'No runs',
                 tone: latestRun
-                  ? "text-[var(--primary-dark)]"
-                  : "text-slate-500",
+                  ? 'text-[var(--primary-dark)]'
+                  : 'text-slate-500',
               },
               {
-                label: "Selected Run Journal",
+                label: 'Selected Run Journal',
                 status: selectedRun?.postingReadiness.accountingJournalId
-                  ? "Linked"
-                  : "Not posted",
+                  ? 'Linked'
+                  : 'Not posted',
                 tone: selectedRun?.postingReadiness.accountingJournalId
-                  ? "text-success-700"
-                  : "text-warning-700",
+                  ? 'text-success-700'
+                  : 'text-warning-700',
               },
               {
-                label: "Runs Awaiting Review or Posting",
+                label: 'Runs Awaiting Review or Posting',
                 status: String(awaitingAction),
                 tone:
-                  awaitingAction > 0 ? "text-warning-700" : "text-success-700",
+                  awaitingAction > 0 ? 'text-warning-700' : 'text-success-700',
               },
               {
-                label: "Readiness Exceptions",
+                label: 'Readiness Exceptions',
                 status: summaryQuery.isError
-                  ? "Unavailable"
+                  ? 'Unavailable'
                   : String(selectedRun?.validationExceptionCount ?? 0),
                 tone:
-                  (selectedRun?.validationExceptionsBySeverity.BLOCKING ?? 0) > 0
-                    ? "text-danger-700"
-                    : (selectedRun?.validationExceptionsBySeverity.WARNING ?? 0) > 0
-                      ? "text-warning-700"
-                      : "text-success-700",
+                  (selectedRun?.validationExceptionsBySeverity.BLOCKING ?? 0) >
+                  0
+                    ? 'text-danger-700'
+                    : (selectedRun?.validationExceptionsBySeverity.WARNING ??
+                          0) > 0
+                      ? 'text-warning-700'
+                      : 'text-success-700',
               },
             ].map((item) => (
               <div
@@ -270,7 +272,7 @@ export default function PayrollDashboardPage() {
                 </span>
                 <span
                   className={cn(
-                    "text-xs font-bold uppercase tracking-wide",
+                    'text-xs font-bold uppercase tracking-wide',
                     item.tone,
                   )}
                 >
@@ -289,23 +291,23 @@ export default function PayrollDashboardPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             {[
               {
-                label: "Payslips",
-                href: "/dashboard/payroll/payslips",
+                label: 'Payslips',
+                href: '/dashboard/payroll/payslips',
                 icon: FileText,
               },
               {
-                label: "Payroll Reports",
-                href: "/dashboard/payroll/reports",
+                label: 'Payroll Reports',
+                href: '/dashboard/payroll/reports',
                 icon: BarChart3,
               },
               {
-                label: "Salary Structures",
-                href: "/dashboard/payroll/salary-structures",
+                label: 'Salary Structures',
+                href: '/dashboard/payroll/salary-structures',
                 icon: Calculator,
               },
               {
-                label: "Staff Contracts",
-                href: "/dashboard/hr/contracts",
+                label: 'Staff Contracts',
+                href: '/dashboard/hr/contracts',
                 icon: Wallet,
               },
             ].map((item) => (

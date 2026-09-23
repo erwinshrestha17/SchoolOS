@@ -1,144 +1,144 @@
-"use client";
+'use client';
 
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, BarChart3, Calculator, Plus, Settings } from "lucide-react";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect } from "react";
-import { BillingRunsTab } from "@/components/finance/billing-runs-tab";
-import { CashierCloseSection } from "@/components/finance/cashier-close-section";
-import { CollectionSection } from "@/components/finance/collection-section";
-import { CollectionStudentDiscovery } from "@/components/finance/collection-student-discovery";
-import { DiscountsWaiversTab } from "@/components/finance/discounts-waivers-tab";
-import { FeeOverview } from "@/components/finance/fee-overview";
-import { FeeSetupTab } from "@/components/finance/fee-setup-tab";
-import { FeesModuleShell } from "@/components/finance/fees-module-shell";
-import { FinanceApprovalQueue } from "@/components/finance/finance-approval-queue";
-import { FinanceReportWorkspace } from "@/components/finance/finance-report-workspace";
-import { LedgerSection } from "@/components/finance/ledger-section";
-import { StudentLedgerWorkspace } from "@/components/finance/student-ledger-workspace";
-import { useSession } from "@/components/session-provider";
-import { ErrorState } from "@/components/ui/error-state";
-import { PermissionDenied } from "@/components/ui/permission-denied";
-import { Button } from "@/components/ui/primitives/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/api";
-import { useRecentlyViewed } from "@/lib/hooks/use-recently-viewed";
+import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, BarChart3, Calculator, Plus, Settings } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect } from 'react';
+import { BillingRunsTab } from '@/components/finance/billing-runs-tab';
+import { CashierCloseSection } from '@/components/finance/cashier-close-section';
+import { CollectionSection } from '@/components/finance/collection-section';
+import { CollectionStudentDiscovery } from '@/components/finance/collection-student-discovery';
+import { DiscountsWaiversTab } from '@/components/finance/discounts-waivers-tab';
+import { FeeOverview } from '@/components/finance/fee-overview';
+import { FeeSetupTab } from '@/components/finance/fee-setup-tab';
+import { FeesModuleShell } from '@/components/finance/fees-module-shell';
+import { FinanceApprovalQueue } from '@/components/finance/finance-approval-queue';
+import { FinanceReportWorkspace } from '@/components/finance/finance-report-workspace';
+import { LedgerSection } from '@/components/finance/ledger-section';
+import { StudentLedgerWorkspace } from '@/components/finance/student-ledger-workspace';
+import { useSession } from '@/components/session-provider';
+import { ErrorState } from '@/components/ui/error-state';
+import { PermissionDenied } from '@/components/ui/permission-denied';
+import { Button } from '@/components/ui/primitives/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { api } from '@/lib/api';
+import { useRecentlyViewed } from '@/lib/hooks/use-recently-viewed';
 
 export type FeesSection =
-  | "overview"
-  | "collect"
-  | "billing"
-  | "invoices"
-  | "ledgers"
-  | "receipts"
-  | "adjustments"
-  | "cashier-close"
-  | "reports"
-  | "setup";
+  | 'overview'
+  | 'collect'
+  | 'billing'
+  | 'invoices'
+  | 'ledgers'
+  | 'receipts'
+  | 'adjustments'
+  | 'cashier-close'
+  | 'reports'
+  | 'setup';
 
 const sectionCopy: Record<FeesSection, { title: string; description: string }> =
   {
     overview: {
-      title: "Fees & Receipts",
+      title: 'Fees & Receipts',
       description:
-        "Collect fees, issue protected receipts, follow up dues, and close the cashier with an auditable trail.",
+        'Collect fees, issue protected receipts, follow up dues, and close the cashier with an auditable trail.',
     },
     collect: {
-      title: "Collect payment",
+      title: 'Collect payment',
       description:
-        "Find a student or invoice, review the due, and confirm one payment safely.",
+        'Find a student or invoice, review the due, and confirm one payment safely.',
     },
     billing: {
-      title: "Billing runs",
+      title: 'Billing runs',
       description:
-        "Generate invoices from existing fee plans and follow each billing-run state.",
+        'Generate invoices from existing fee plans and follow each billing-run state.',
     },
     invoices: {
-      title: "Invoices",
+      title: 'Invoices',
       description:
-        "Search the invoice register and review current payment status.",
+        'Search the invoice register and review current payment status.',
     },
     ledgers: {
-      title: "Student ledgers",
+      title: 'Student ledgers',
       description:
         "Explain one student's official billed, paid, waived, refunded, and outstanding position.",
     },
     receipts: {
-      title: "Receipt center",
+      title: 'Receipt center',
       description:
-        "Open confirmed protected receipts, verify receipt numbers, and prepare audited reprints.",
+        'Open confirmed protected receipts, verify receipt numbers, and prepare audited reprints.',
     },
     adjustments: {
-      title: "Adjustments",
+      title: 'Adjustments',
       description:
-        "Request and review refunds or reversals without editing confirmed payment records.",
+        'Request and review refunds or reversals without editing confirmed payment records.',
     },
-    "cashier-close": {
-      title: "Cashier close",
+    'cashier-close': {
+      title: 'Cashier close',
       description:
-        "Review official totals, explain variance, and confirm an immutable school-day close.",
+        'Review official totals, explain variance, and confirm an immutable school-day close.',
     },
-  reports: {
-    title: "Fees reports",
-    description:
-      "Run one permission-safe collections, dues, aging, methods, close, adjustment, or receipt view at a time.",
-  },
+    reports: {
+      title: 'Fees reports',
+      description:
+        'Run one permission-safe collections, dues, aging, methods, close, adjustment, or receipt view at a time.',
+    },
     setup: {
-      title: "Fees setup",
+      title: 'Fees setup',
       description:
-        "Maintain fee heads, plans, discount rules, and billing configuration within existing contracts.",
+        'Maintain fee heads, plans, discount rules, and billing configuration within existing contracts.',
     },
   };
 
 export function FeesWorkspace({ section }: { section: FeesSection }) {
   const { hasPermissions } = useSession();
-  const canCollect = hasPermissions(["payments:collect"]);
-  const canManage = hasPermissions(["fees:manage"]);
-  const canBill = hasPermissions(["fees:bill"]);
-  const canReadReceipts = hasPermissions(["receipts:read"]);
-  const canReadLedger = hasPermissions(["ledger:read"]);
-  const canClose = hasPermissions(["payments:close"]);
+  const canCollect = hasPermissions(['payments:collect']);
+  const canManage = hasPermissions(['fees:manage']);
+  const canBill = hasPermissions(['fees:bill']);
+  const canReadReceipts = hasPermissions(['receipts:read']);
+  const canReadLedger = hasPermissions(['ledger:read']);
+  const canClose = hasPermissions(['payments:close']);
   const canUseCorrectionWorkflow =
     canCollect ||
-    hasPermissions(["payments:refund"]) ||
-    hasPermissions(["payments:reverse"]);
+    hasPermissions(['payments:refund']) ||
+    hasPermissions(['payments:reverse']);
   const copy = sectionCopy[section];
 
   const allowed =
-    section === "overview" ||
-    (section === "collect" && canCollect) ||
-    (section === "billing" && canBill) ||
-    (section === "invoices" && canCollect) ||
-    (section === "ledgers" && canReadLedger) ||
-    (section === "receipts" && canReadReceipts) ||
-    (section === "adjustments" && canUseCorrectionWorkflow) ||
-    (section === "cashier-close" && canClose) ||
-    (section === "reports" && canManage) ||
-    (section === "setup" && canManage);
+    section === 'overview' ||
+    (section === 'collect' && canCollect) ||
+    (section === 'billing' && canBill) ||
+    (section === 'invoices' && canCollect) ||
+    (section === 'ledgers' && canReadLedger) ||
+    (section === 'receipts' && canReadReceipts) ||
+    (section === 'adjustments' && canUseCorrectionWorkflow) ||
+    (section === 'cashier-close' && canClose) ||
+    (section === 'reports' && canManage) ||
+    (section === 'setup' && canManage);
 
   const primaryAction =
-    section === "overview" && canCollect ? (
+    section === 'overview' && canCollect ? (
       <PrimaryLink
         href="/dashboard/fees/collect"
         icon={<Calculator className="h-4 w-4" />}
       >
         Collect payment
       </PrimaryLink>
-    ) : section === "collect" ? (
+    ) : section === 'collect' ? (
       <SecondaryLink
         href="/dashboard/fees"
         icon={<ArrowLeft className="h-4 w-4" />}
       >
         Back to overview
       </SecondaryLink>
-    ) : section === "billing" && canBill ? (
+    ) : section === 'billing' && canBill ? (
       <Button asChild>
         <a href="#new-billing-run">
           <Plus data-icon="inline-start" /> New billing run
         </a>
       </Button>
-    ) : section === "reports" ? (
+    ) : section === 'reports' ? (
       <SecondaryLink
         href="/dashboard/fees/setup"
         icon={<Settings className="h-4 w-4" />}
@@ -168,29 +168,29 @@ export function FeesWorkspace({ section }: { section: FeesSection }) {
 
 function FeesSectionContent({ section }: { section: FeesSection }) {
   switch (section) {
-    case "overview":
+    case 'overview':
       return <FeeOverview />;
-    case "collect":
+    case 'collect':
       return <CollectionRouteWorkspace />;
-    case "billing":
+    case 'billing':
       return (
         <div id="new-billing-run">
           <BillingRunsTab />
         </div>
       );
-    case "invoices":
+    case 'invoices':
       return <LedgerSection mode="invoices" />;
-    case "ledgers":
+    case 'ledgers':
       return <StudentLedgerWorkspace />;
-    case "receipts":
+    case 'receipts':
       return <LedgerSection mode="receipts" />;
-    case "adjustments":
+    case 'adjustments':
       return <AdjustmentsWorkspace />;
-    case "cashier-close":
+    case 'cashier-close':
       return <CashierCloseSection />;
-    case "reports":
+    case 'reports':
       return <FinanceReportWorkspace />;
-    case "setup":
+    case 'setup':
       return <SetupWorkspace />;
   }
 }
@@ -203,14 +203,14 @@ function useSectionView(defaultView: string, allowedViews: string[]) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const requested = searchParams.get("view");
+  const requested = searchParams.get('view');
   const view =
     requested && allowedViews.includes(requested) ? requested : defaultView;
   const setView = useCallback(
     (next: string) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (next === defaultView) params.delete("view");
-      else params.set("view", next);
+      if (next === defaultView) params.delete('view');
+      else params.set('view', next);
       const query = params.toString();
       router.replace(query ? `${pathname}?${query}` : pathname, {
         scroll: false,
@@ -222,7 +222,7 @@ function useSectionView(defaultView: string, allowedViews: string[]) {
 }
 
 function AdjustmentsWorkspace() {
-  const { view, setView } = useSectionView("refunds", ["refunds", "waivers"]);
+  const { view, setView } = useSectionView('refunds', ['refunds', 'waivers']);
   return (
     <div className="space-y-6">
       <Tabs value={view} onValueChange={setView}>
@@ -231,7 +231,7 @@ function AdjustmentsWorkspace() {
           <TabsTrigger value="waivers">Waivers</TabsTrigger>
         </TabsList>
       </Tabs>
-      {view === "waivers" ? (
+      {view === 'waivers' ? (
         <DiscountsWaiversTab mode="waivers" />
       ) : (
         <FinanceApprovalQueue />
@@ -241,9 +241,9 @@ function AdjustmentsWorkspace() {
 }
 
 function SetupWorkspace() {
-  const { view, setView } = useSectionView("structure", [
-    "structure",
-    "discounts",
+  const { view, setView } = useSectionView('structure', [
+    'structure',
+    'discounts',
   ]);
   return (
     <div className="space-y-6">
@@ -253,7 +253,7 @@ function SetupWorkspace() {
           <TabsTrigger value="discounts">Discount rules</TabsTrigger>
         </TabsList>
       </Tabs>
-      {view === "discounts" ? (
+      {view === 'discounts' ? (
         <DiscountsWaiversTab mode="discounts" />
       ) : (
         <FeeSetupTab />
@@ -266,9 +266,9 @@ function CollectionRouteWorkspace() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const initialInvoiceId = searchParams.get("invoiceId");
-  const studentId = searchParams.get("studentId");
-  const search = searchParams.get("search")?.trim() ?? "";
+  const initialInvoiceId = searchParams.get('invoiceId');
+  const studentId = searchParams.get('studentId');
+  const search = searchParams.get('search')?.trim() ?? '';
   const updateUrl = useCallback(
     (updates: Record<string, string | number | null>) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -276,7 +276,7 @@ function CollectionRouteWorkspace() {
         if (!value || value === 1) params.delete(key);
         else params.set(key, String(value));
       });
-      if ("search" in updates) params.delete("page");
+      if ('search' in updates) params.delete('page');
       const query = params.toString();
       router.replace(query ? `${pathname}?${query}` : pathname, {
         scroll: false,
@@ -285,22 +285,22 @@ function CollectionRouteWorkspace() {
     [pathname, router, searchParams],
   );
   const studentSearchQuery = useQuery({
-    queryKey: ["collection-students", search],
+    queryKey: ['collection-students', search],
     queryFn: () => api.searchCollectionStudents(search),
     enabled: !studentId && !initialInvoiceId && search.length >= 2,
   });
   const studentContextQuery = useQuery({
-    queryKey: ["student-collection-context", studentId],
+    queryKey: ['student-collection-context', studentId],
     queryFn: () => {
-      if (!studentId) throw new Error("Student context is unavailable.");
+      if (!studentId) throw new Error('Student context is unavailable.');
       return api.getStudentCollectionContext(studentId);
     },
     enabled: Boolean(studentId),
   });
   const invoiceDetailQuery = useQuery({
-    queryKey: ["invoice-detail", "collection-deep-link", initialInvoiceId],
+    queryKey: ['invoice-detail', 'collection-deep-link', initialInvoiceId],
     queryFn: () => {
-      if (!initialInvoiceId) throw new Error("Invoice context is unavailable.");
+      if (!initialInvoiceId) throw new Error('Invoice context is unavailable.');
       return api.getInvoiceDetail(initialInvoiceId);
     },
     enabled: Boolean(initialInvoiceId && !studentId),
@@ -320,10 +320,10 @@ function CollectionRouteWorkspace() {
   useEffect(() => {
     if (!initialInvoiceId || !viewedInvoice) return;
     recordRecentlyViewed({
-      kind: "invoice",
+      kind: 'invoice',
       id: initialInvoiceId,
       label: viewedInvoice.invoiceNumber,
-      href: `/dashboard/fees/collect?invoiceId=${encodeURIComponent(initialInvoiceId)}${studentId ? `&studentId=${encodeURIComponent(studentId)}` : ""}`,
+      href: `/dashboard/fees/collect?invoiceId=${encodeURIComponent(initialInvoiceId)}${studentId ? `&studentId=${encodeURIComponent(studentId)}` : ''}`,
     });
   }, [initialInvoiceId, recordRecentlyViewed, studentId, viewedInvoice]);
 
@@ -376,7 +376,7 @@ function CollectionRouteWorkspace() {
       initialInvoiceId={initialInvoiceId}
       studentCollectionContext={studentContextQuery.data ?? null}
       hasStudentCollectionContextRequest={Boolean(studentId)}
-      isStudentProfileSource={searchParams.get("source") === "student-profile"}
+      isStudentProfileSource={searchParams.get('source') === 'student-profile'}
       onChangeStudent={() =>
         updateUrl({ studentId: null, source: null, invoiceId: null })
       }

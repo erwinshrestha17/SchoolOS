@@ -28,7 +28,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${notoSansDevanagari.variable} font-sans antialiased`}>
+      <body
+        className={`${inter.variable} ${notoSansDevanagari.variable} font-sans antialiased`}
+      >
         <Providers>{children}</Providers>
       </body>
     </html>

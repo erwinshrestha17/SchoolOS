@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { redirect } from 'next/navigation';
 
 export default async function StudentLedgerCompatibilityPage({
   params,
@@ -6,5 +6,7 @@ export default async function StudentLedgerCompatibilityPage({
   params: Promise<{ studentId: string }>;
 }) {
   const { studentId } = await params;
-  redirect(`/dashboard/fees/ledgers?studentId=${encodeURIComponent(studentId)}`);
+  redirect(
+    `/dashboard/fees/ledgers?studentId=${encodeURIComponent(studentId)}`,
+  );
 }

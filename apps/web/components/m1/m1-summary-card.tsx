@@ -1,11 +1,12 @@
-import type { ComponentType, ReactNode } from "react";
-import {
-  SummaryCard,
-  SummaryGrid,
-} from "@/components/ui/summary-card";
+import type { ComponentType, ReactNode } from 'react';
+import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
 
 export function M1SummaryGrid({ children }: { children: ReactNode }) {
-  return <SummaryGrid className="gap-3" data-testid="m1-summary-grid">{children}</SummaryGrid>;
+  return (
+    <SummaryGrid className="gap-3" data-testid="m1-summary-grid">
+      {children}
+    </SummaryGrid>
+  );
 }
 
 export function M1SummaryCard({
@@ -18,9 +19,9 @@ export function M1SummaryCard({
 }: {
   title: string;
   description: string;
-  value: number | "Unavailable";
+  value: number | 'Unavailable';
   href: string;
-  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
   loading?: boolean;
 }) {
   return (

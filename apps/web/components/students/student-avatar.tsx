@@ -4,7 +4,10 @@ import { useRef } from 'react';
 import { studentsApi } from '../../lib/api/students';
 import { useInViewport } from '../../lib/hooks/use-in-viewport';
 import { useProtectedImage } from '../../lib/hooks/use-protected-image';
-import { ProtectedAvatar, type ProtectedAvatarSize } from '../ui/protected-avatar';
+import {
+  ProtectedAvatar,
+  type ProtectedAvatarSize,
+} from '../ui/protected-avatar';
 
 // Renders a student's photo through the authenticated /students/:id/photo/content
 // endpoint, lazily (only once scrolled near-visible) and cached/deduped by

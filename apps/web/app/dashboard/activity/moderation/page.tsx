@@ -61,7 +61,10 @@ export default function ActivityModerationPage() {
         limit: 50,
       }),
   });
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: api.listClasses,
+  });
 
   const posts = useMemo(() => postsQuery.data ?? [], [postsQuery.data]);
   const selectedPost = posts.find((post) => post.id === selectedPostId) ?? null;
@@ -82,7 +85,10 @@ export default function ActivityModerationPage() {
         description="Review pending activity posts. Approve, reject, archive, hide, or restore with an audited reason where required."
       />
 
-      <FilterBar label="Queue filters" description="Server-filtered moderation queue.">
+      <FilterBar
+        label="Queue filters"
+        description="Server-filtered moderation queue."
+      >
         <Select
           value={filters.status}
           onChange={(event) =>
@@ -101,7 +107,10 @@ export default function ActivityModerationPage() {
         <Select
           value={filters.classId}
           onChange={(event) =>
-            setFilters((current) => ({ ...current, classId: event.target.value }))
+            setFilters((current) => ({
+              ...current,
+              classId: event.target.value,
+            }))
           }
         >
           <option value="">All classes</option>
@@ -114,7 +123,10 @@ export default function ActivityModerationPage() {
         <Select
           value={filters.category}
           onChange={(event) =>
-            setFilters((current) => ({ ...current, category: event.target.value }))
+            setFilters((current) => ({
+              ...current,
+              category: event.target.value,
+            }))
           }
         >
           <option value="">All categories</option>
@@ -169,7 +181,9 @@ export default function ActivityModerationPage() {
           post={selectedPost}
           onClose={() => setSelectedPostId(null)}
           onMutated={() =>
-            void queryClient.invalidateQueries({ queryKey: ['activity-moderation-queue'] })
+            void queryClient.invalidateQueries({
+              queryKey: ['activity-moderation-queue'],
+            })
           }
         />
       ) : null}
@@ -187,7 +201,9 @@ function ModerationDrawer({
   onMutated: () => void;
 }) {
   const [editTitle, setEditTitle] = useState(post.title);
-  const [editCaption, setEditCaption] = useState(post.caption ?? post.body ?? '');
+  const [editCaption, setEditCaption] = useState(
+    post.caption ?? post.body ?? '',
+  );
   const [moderationReason, setModerationReason] = useState('');
   const [deleteReason, setDeleteReason] = useState('');
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -224,7 +240,8 @@ function ModerationDrawer({
     },
   });
   const deleteMutation = useMutation({
-    mutationFn: () => api.deleteActivityPost(post.id, { reason: deleteReason.trim() }),
+    mutationFn: () =>
+      api.deleteActivityPost(post.id, { reason: deleteReason.trim() }),
     onSuccess: () => {
       setActionMessage('Post hidden from the feed.');
       onMutated();
@@ -239,7 +256,13 @@ function ModerationDrawer({
   });
 
   return (
-    <Drawer isOpen title={post.title} description="Moderation and content review" onClose={onClose} width="lg">
+    <Drawer
+      isOpen
+      title={post.title}
+      description="Moderation and content review"
+      onClose={onClose}
+      width="lg"
+    >
       <LifecyclePanel
         post={post}
         editTitle={editTitle}

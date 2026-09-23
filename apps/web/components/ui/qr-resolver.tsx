@@ -53,7 +53,7 @@ export function QRResolver({
 
   async function handleResolve(submittedToken: string) {
     if (!submittedToken.trim()) return;
-    
+
     setIsResolving(true);
     setError(null);
     setSuccess(false);
@@ -89,7 +89,10 @@ export function QRResolver({
   return (
     <form onSubmit={handleSubmit} className={cn('space-y-3', className)}>
       <div className="relative">
-        <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+        <QrCode
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          size={18}
+        />
         <input
           ref={inputRef}
           type="text"
@@ -99,7 +102,8 @@ export function QRResolver({
           className={cn(
             'h-12 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-28 text-sm font-bold shadow-sm transition outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--primary-soft)]',
             error && 'border-red-300 focus:border-red-400 focus:ring-red-100',
-            success && 'border-emerald-300 focus:border-emerald-400 focus:ring-emerald-100'
+            success &&
+              'border-emerald-300 focus:border-emerald-400 focus:ring-emerald-100',
           )}
           value={token}
           onChange={(e) => setToken(e.target.value)}
@@ -121,7 +125,9 @@ export function QRResolver({
         </div>
       </div>
       {helperText && !error && !success ? (
-        <p className="px-2 text-xs font-semibold text-slate-500">{helperText}</p>
+        <p className="px-2 text-xs font-semibold text-slate-500">
+          {helperText}
+        </p>
       ) : null}
       {error && (
         <div className="flex items-center gap-2 px-2 text-xs font-bold text-red-600 animate-in fade-in slide-in-from-top-1">

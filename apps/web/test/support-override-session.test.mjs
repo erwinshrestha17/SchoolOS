@@ -1,13 +1,13 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
-const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 function read(relativePath) {
-  return readFileSync(join(webRoot, relativePath), "utf8");
+  return readFileSync(join(webRoot, relativePath), 'utf8');
 }
 
 function assertBefore(source, earlier, later, message) {
@@ -18,9 +18,9 @@ function assertBefore(source, earlier, later, message) {
   assert.ok(earlierIndex < laterIndex, message);
 }
 
-describe("structured read-only support override", () => {
-  it("stores one tab-local versioned context and rejects malformed or expired state", () => {
-    const session = read("lib/session.ts");
+describe('structured read-only support override', () => {
+  it('stores one tab-local versioned context and rejects malformed or expired state', () => {
+    const session = read('lib/session.ts');
 
     assert.match(
       session,
@@ -67,8 +67,8 @@ describe("structured read-only support override", () => {
     );
   });
 
-  it("binds the complete override tuple to reads and blocks writes before fetch", () => {
-    const client = read("lib/api/client.ts");
+  it('binds the complete override tuple to reads and blocks writes before fetch', () => {
+    const client = read('lib/api/client.ts');
 
     assert.match(client, /supportOverride\?: ["']include["'] \| ["']omit["']/);
     assert.match(
@@ -93,15 +93,15 @@ describe("structured read-only support override", () => {
     );
     assertBefore(
       client,
-      "This support session is read-only",
-      "const response = await fetch",
-      "Support-mode mutations must fail before any request is sent",
+      'This support session is read-only',
+      'const response = await fetch',
+      'Support-mode mutations must fail before any request is sent',
     );
   });
 
-  it("stores the authoritative enter result and clears only after a successful exit", () => {
-    const platformApi = read("lib/api/platform.ts");
-    const authApi = read("lib/api/auth.ts");
+  it('stores the authoritative enter result and clears only after a successful exit', () => {
+    const platformApi = read('lib/api/platform.ts');
+    const authApi = read('lib/api/auth.ts');
 
     assert.match(
       platformApi,
@@ -117,9 +117,9 @@ describe("structured read-only support override", () => {
     );
     assertBefore(
       platformApi,
-      "const res = await request<{ success: true }>",
-      "clearSupportOverride();",
-      "The local override must remain available when backend exit fails",
+      'const res = await request<{ success: true }>',
+      'clearSupportOverride();',
+      'The local override must remain available when backend exit fails',
     );
     assert.match(
       authApi,
@@ -128,8 +128,8 @@ describe("structured read-only support override", () => {
     assert.match(authApi, /logout[\s\S]{0,220}supportOverride: ["']omit["']/);
   });
 
-  it("accepts only a server-confirmed Platform projection and keeps it tab-local", () => {
-    const provider = read("components/session-provider.tsx");
+  it('accepts only a server-confirmed Platform projection and keeps it tab-local', () => {
+    const provider = read('components/session-provider.tsx');
 
     for (const binding of [
       /nextSession\.user\.id === currentSession\.user\.id/,
@@ -160,8 +160,8 @@ describe("structured read-only support override", () => {
     );
   });
 
-  it("uses exact projected permissions without aliases during support override", () => {
-    const session = read("lib/session.ts");
+  it('uses exact projected permissions without aliases during support override', () => {
+    const session = read('lib/session.ts');
 
     assert.match(
       session,
@@ -181,15 +181,15 @@ describe("structured read-only support override", () => {
     );
     assertBefore(
       session,
-      "if (session?.user.isSupportOverride)",
-      "return hasEffectivePermission(grantedPermissions, permission);",
-      "Support overrides must take the exact-permission branch before alias evaluation",
+      'if (session?.user.isSupportOverride)',
+      'return hasEffectivePermission(grantedPermissions, permission);',
+      'Support overrides must take the exact-permission branch before alias evaluation',
     );
   });
 
-  it("requires explicit scopes and exposes the active read-only boundary", () => {
-    const access = read("components/platform/tenant-detail/tenant-access.tsx");
-    const banner = read("components/platform/SupportOverrideBanner.tsx");
+  it('requires explicit scopes and exposes the active read-only boundary', () => {
+    const access = read('components/platform/tenant-detail/tenant-access.tsx');
+    const banner = read('components/platform/SupportOverrideBanner.tsx');
 
     assert.match(access, /SUPPORT_OVERRIDE_SCOPE_DEFINITIONS\.map/);
     assert.match(access, /useState<SupportOverrideScope\[\]>\(\s*\[\],?\s*\)/);
@@ -206,26 +206,26 @@ describe("structured read-only support override", () => {
     assert.match(banner, /Support mode could not be exited/);
   });
 
-  it("removes write-only school controls from scoped read-only workspaces", () => {
-    const layout = read("app/dashboard/layout.tsx");
+  it('removes write-only school controls from scoped read-only workspaces', () => {
+    const layout = read('app/dashboard/layout.tsx');
     const attendance = read(
-      "components/attendance/attendance-m2-workspaces.tsx",
+      'components/attendance/attendance-m2-workspaces.tsx',
     );
-    const students = read("app/dashboard/students/page.tsx");
-    const directory = read("components/forms/student-directory.tsx");
-    const protectedFile = read("components/ui/protected-file.tsx");
+    const students = read('app/dashboard/students/page.tsx');
+    const directory = read('components/forms/student-directory.tsx');
+    const protectedFile = read('components/ui/protected-file.tsx');
     const schoolProfile = read(
-      "components/settings/school-profile-workspace.tsx",
+      'components/settings/school-profile-workspace.tsx',
     );
-    const studentDetail = read("components/students/student-detail-page.tsx");
+    const studentDetail = read('components/students/student-detail-page.tsx');
     const studentHeader = read(
-      "components/students/profile/profile-header.tsx",
+      'components/students/profile/profile-header.tsx',
     );
     const studentOverview = read(
-      "components/students/profile/tabs/overview-tab.tsx",
+      'components/students/profile/tabs/overview-tab.tsx',
     );
     const guardiansTab = read(
-      "components/students/profile/tabs/guardians-tab.tsx",
+      'components/students/profile/tabs/guardians-tab.tsx',
     );
 
     assert.match(

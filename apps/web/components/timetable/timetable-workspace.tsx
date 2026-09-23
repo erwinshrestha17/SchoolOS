@@ -15,9 +15,7 @@ const adminSections = [
   'Substitutions',
 ] as const;
 
-const studentSections = [
-  'My Timetable',
-] as const;
+const studentSections = ['My Timetable'] as const;
 
 type AdminSection = (typeof adminSections)[number];
 type StudentSection = (typeof studentSections)[number];
@@ -32,7 +30,9 @@ type TimetableWorkspaceProps = {
 // It must not add a second header, a second tab switcher, or KPIs of its own
 // (per the M6 KPI design rule: never on the builder, substitutions, or
 // homework composer/review screens).
-export function TimetableWorkspace({ initialSection }: TimetableWorkspaceProps = {}) {
+export function TimetableWorkspace({
+  initialSection,
+}: TimetableWorkspaceProps = {}) {
   const { session } = useSession();
   const isStudent = session?.user.roles.includes('student');
   const sections = isStudent ? studentSections : adminSections;
@@ -44,14 +44,30 @@ export function TimetableWorkspace({ initialSection }: TimetableWorkspaceProps =
   const [workloadPage, setWorkloadPage] = useState(1);
   const WORKLOAD_PAGE_SIZE = 25;
 
-  const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
-  const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: () => api.listSubjects() });
+  const academicYearsQuery = useQuery({
+    queryKey: ['academic-years'],
+    queryFn: api.listAcademicYears,
+  });
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: api.listClasses,
+  });
+  const sectionsQuery = useQuery({
+    queryKey: ['sections'],
+    queryFn: api.listSections,
+  });
+  const subjectsQuery = useQuery({
+    queryKey: ['subjects'],
+    queryFn: () => api.listSubjects(),
+  });
 
   const workloadQuery = useQuery({
     queryKey: ['teacher-workload', workloadPage],
-    queryFn: () => api.listTeacherWorkload({ page: workloadPage, limit: WORKLOAD_PAGE_SIZE }),
+    queryFn: () =>
+      api.listTeacherWorkload({
+        page: workloadPage,
+        limit: WORKLOAD_PAGE_SIZE,
+      }),
     enabled: !isStudent && section === 'Teacher Workload',
   });
 

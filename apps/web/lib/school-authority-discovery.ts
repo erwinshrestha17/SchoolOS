@@ -1,9 +1,9 @@
-import type { SchoolAuthorityFence } from "@schoolos/core";
+import type { SchoolAuthorityFence } from '@schoolos/core';
 
-const STORAGE_KEY = "schoolos.school-authority-fence.v1";
+const STORAGE_KEY = 'schoolos.school-authority-fence.v1';
 
 function canUseStorage() {
-  return typeof window !== "undefined" && typeof sessionStorage !== "undefined";
+  return typeof window !== 'undefined' && typeof sessionStorage !== 'undefined';
 }
 
 export function storeSchoolAuthorityFence(fence: SchoolAuthorityFence) {
@@ -24,8 +24,8 @@ export function readSchoolAuthorityFence(): SchoolAuthorityFence | null {
   try {
     const parsed = JSON.parse(raw) as SchoolAuthorityFence;
     if (
-      typeof parsed.authorityNodeId !== "string" ||
-      typeof parsed.authorityEpoch !== "number"
+      typeof parsed.authorityNodeId !== 'string' ||
+      typeof parsed.authorityEpoch !== 'number'
     ) {
       return null;
     }

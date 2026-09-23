@@ -187,7 +187,9 @@ export interface TeacherHomeroom {
 
 export const teacherWorkspaceApi = {
   getTeacherToday: (date?: string) =>
-    request<TeacherTodaySummary>(withQuery('/teacher-workspace/today', { date })),
+    request<TeacherTodaySummary>(
+      withQuery('/teacher-workspace/today', { date }),
+    ),
   getMyAssignmentContext: () =>
     request<TeacherAssignmentContext>('/teacher-workspace/assignments'),
   getMyHomerooms: () =>
@@ -200,11 +202,13 @@ export const teacherWorkspaceApi = {
     request<HomeroomAcademicSummary>(
       withQuery('/teacher-workspace/homeroom/academic-summary', params),
     ),
-  getTeacherSchedule: (params: {
-    date?: string;
-    weekStart?: string;
-    days?: number;
-  } = {}) =>
+  getTeacherSchedule: (
+    params: {
+      date?: string;
+      weekStart?: string;
+      days?: number;
+    } = {},
+  ) =>
     request<TeacherSchedule>(
       withQuery('/teacher-workspace/schedule', {
         date: params.date,

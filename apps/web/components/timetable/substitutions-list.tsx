@@ -1,48 +1,48 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { TimetableSubstitutionModal } from "@/components/timetable/substitution-modal";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { ActionMenu } from "@/components/ui/action-menu";
-import { Plus, Users, CheckCircle2, XCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Toast, type ToastTone } from "@/components/ui/toast";
-import { formatBsDate } from "@schoolos/core";
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { TimetableSubstitutionModal } from '@/components/timetable/substitution-modal';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { ActionMenu } from '@/components/ui/action-menu';
+import { Plus, Users, CheckCircle2, XCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Toast, type ToastTone } from '@/components/ui/toast';
+import { formatBsDate } from '@schoolos/core';
 import {
   PaginatedDataTable,
   type PaginatedDataTableColumn,
-} from "@/components/schoolos/data/paginated-data-table";
+} from '@/components/schoolos/data/paginated-data-table';
 
 type TimetableSubstitutionRow = Awaited<
   ReturnType<typeof api.listSubstitutions>
->["items"][number];
+>['items'][number];
 type TimetableTeacherIdentity = NonNullable<
-  TimetableSubstitutionRow["absentTeacher"]
+  TimetableSubstitutionRow['absentTeacher']
 >;
 
 const PAGE_SIZE = 20;
 
 function formatSubstitutionDate(value: string | null | undefined) {
-  if (!value) return "Date not set";
+  if (!value) return 'Date not set';
   try {
     return formatBsDate(value);
   } catch {
-    return "Date unavailable";
+    return 'Date unavailable';
   }
 }
 
 function formatTeacherName(
   teacher: TimetableTeacherIdentity | null | undefined,
 ) {
-  if (!teacher) return "Teacher not assigned";
+  if (!teacher) return 'Teacher not assigned';
   return (
     [teacher.firstName, teacher.lastName]
       .map((part) => part?.trim())
       .filter(Boolean)
-      .join(" ") || "Teacher name not set"
+      .join(' ') || 'Teacher name not set'
   );
 }
 
@@ -65,12 +65,12 @@ export function SubstitutionsList({ filters }: { filters: any }) {
   }, [filtersKey]);
 
   const substitutionsQuery = useQuery({
-    queryKey: ["timetable-substitutions", filters, page],
+    queryKey: ['timetable-substitutions', filters, page],
     queryFn: () =>
       api.listSubstitutions({ ...filters, page, limit: PAGE_SIZE }),
   });
   const slotQuery = useQuery({
-    queryKey: ["timetable-substitution-slots", filters.classId],
+    queryKey: ['timetable-substitution-slots', filters.classId],
     queryFn: () => api.listTimetable({ classId: filters.classId }),
     enabled: Boolean(filters.classId),
   });
@@ -81,20 +81,20 @@ export function SubstitutionsList({ filters }: { filters: any }) {
     onSuccess: () => {
       setConfirmingCancelId(null);
       setNotice({
-        title: "Substitution cancelled",
+        title: 'Substitution cancelled',
         description:
-          "The substitution record has been cancelled and refreshed.",
-        tone: "success",
+          'The substitution record has been cancelled and refreshed.',
+        tone: 'success',
       });
       void queryClient.invalidateQueries({
-        queryKey: ["timetable-substitutions"],
+        queryKey: ['timetable-substitutions'],
       });
     },
     onError: (error: Error) => {
       setNotice({
-        title: "Cancellation failed",
+        title: 'Cancellation failed',
         description: error.message,
-        tone: "danger",
+        tone: 'danger',
       });
     },
   });
@@ -103,48 +103,48 @@ export function SubstitutionsList({ filters }: { filters: any }) {
     mutationFn: (id: string) => api.completeSubstitution(id),
     onSuccess: () => {
       setNotice({
-        title: "Substitution completed",
-        description: "The substitution has been marked complete.",
-        tone: "success",
+        title: 'Substitution completed',
+        description: 'The substitution has been marked complete.',
+        tone: 'success',
       });
       void queryClient.invalidateQueries({
-        queryKey: ["timetable-substitutions"],
+        queryKey: ['timetable-substitutions'],
       });
     },
     onError: (error: Error) => {
       setNotice({
-        title: "Completion failed",
+        title: 'Completion failed',
         description: error.message,
-        tone: "danger",
+        tone: 'danger',
       });
     },
   });
 
   const columns: PaginatedDataTableColumn<TimetableSubstitutionRow>[] = [
     {
-      id: "date",
-      header: "Date",
+      id: 'date',
+      header: 'Date',
       cell: (row) => formatSubstitutionDate(row.date),
     },
     {
-      id: "slot",
-      header: "Class / Slot",
+      id: 'slot',
+      header: 'Class / Slot',
       cell: (row) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">
-            {row.timetableSlot?.subject?.name?.trim() || "Subject not set"}
+            {row.timetableSlot?.subject?.name?.trim() || 'Subject not set'}
           </span>
           <span className="text-xs text-slate-500">
             {row.timetableSlot?.startsAt && row.timetableSlot?.endsAt
               ? `${row.timetableSlot.startsAt} - ${row.timetableSlot.endsAt}`
-              : "Slot time not set"}
+              : 'Slot time not set'}
           </span>
         </div>
       ),
     },
     {
-      id: "absentTeacher",
-      header: "Absent Teacher",
+      id: 'absentTeacher',
+      header: 'Absent Teacher',
       cell: (row) => (
         <span className="text-sm font-medium text-slate-700">
           {formatTeacherName(row.absentTeacher)}
@@ -152,8 +152,8 @@ export function SubstitutionsList({ filters }: { filters: any }) {
       ),
     },
     {
-      id: "substituteTeacher",
-      header: "Substitute Teacher",
+      id: 'substituteTeacher',
+      header: 'Substitute Teacher',
       cell: (row) => (
         <span className="text-sm font-bold text-slate-700">
           {formatTeacherName(row.substituteTeacher)}
@@ -161,8 +161,8 @@ export function SubstitutionsList({ filters }: { filters: any }) {
       ),
     },
     {
-      id: "status",
-      header: "Status",
+      id: 'status',
+      header: 'Status',
       cell: (row) => <StatusBadge status={row.status} />,
     },
   ];
@@ -172,25 +172,25 @@ export function SubstitutionsList({ filters }: { filters: any }) {
       <ActionMenu
         items={[
           {
-            label: "Assign Substitute",
+            label: 'Assign Substitute',
             icon: <Users className="h-4 w-4" />,
             onClick: () => {
               setSelectedSub(row);
               setIsModalOpen(true);
             },
-            disabled: row.status === "CANCELLED" || row.status === "COMPLETED",
+            disabled: row.status === 'CANCELLED' || row.status === 'COMPLETED',
           },
           {
-            label: "Complete",
+            label: 'Complete',
             icon: <CheckCircle2 className="h-4 w-4" />,
             onClick: () => completeMutation.mutate(row.id),
-            disabled: row.status !== "ASSIGNED",
+            disabled: row.status !== 'ASSIGNED',
           },
           {
-            label: "Cancel",
+            label: 'Cancel',
             icon: <XCircle className="h-4 w-4" />,
             onClick: () => setConfirmingCancelId(row.id),
-            disabled: row.status === "CANCELLED" || row.status === "COMPLETED",
+            disabled: row.status === 'CANCELLED' || row.status === 'COMPLETED',
           },
         ]}
       />
@@ -225,9 +225,9 @@ export function SubstitutionsList({ filters }: { filters: any }) {
           }
           title={
             !filters.classId
-              ? "Select a class before recording an absence."
+              ? 'Select a class before recording an absence.'
               : slotOptions.length === 0
-                ? "No timetable slots are available for the selected class."
+                ? 'No timetable slots are available for the selected class.'
                 : undefined
           }
           onClick={() => {
@@ -236,7 +236,7 @@ export function SubstitutionsList({ filters }: { filters: any }) {
           }}
         >
           <Plus className="mr-2 h-4 w-4" />
-          {slotQuery.isLoading ? "Loading slots..." : "Record Absence"}
+          {slotQuery.isLoading ? 'Loading slots...' : 'Record Absence'}
         </Button>
       </div>
       {!filters.classId ? (
@@ -252,10 +252,10 @@ export function SubstitutionsList({ filters }: { filters: any }) {
         getRowId={(row) => row.id}
         status={
           substitutionsQuery.isError
-            ? "error"
+            ? 'error'
             : substitutionsQuery.isLoading
-              ? "loading"
-              : "ready"
+              ? 'loading'
+              : 'ready'
         }
         page={page}
         pageSize={PAGE_SIZE}
@@ -276,7 +276,7 @@ export function SubstitutionsList({ filters }: { filters: any }) {
         }}
         slots={slotOptions}
         substitution={selectedSub}
-        mode={selectedSub ? "assign" : "create"}
+        mode={selectedSub ? 'assign' : 'create'}
       />
 
       <ConfirmDialog

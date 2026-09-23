@@ -8,11 +8,7 @@ import { ErrorState } from './error-state';
 import { LoadingState } from './loading-state';
 import { ModuleLockedState } from './module-locked-state';
 import { PermissionDenied } from './permission-denied';
-import {
-  SummaryCard,
-  SummaryGrid,
-  type SummaryTone,
-} from './summary-card';
+import { SummaryCard, SummaryGrid, type SummaryTone } from './summary-card';
 
 export type OperationalSummaryCardDefinition = {
   key: string;
@@ -39,7 +35,12 @@ export function OperationalSummaryGrid({
   });
 
   if (summaryQuery.isLoading) {
-    return <LoadingState variant="skeleton" label={`Loading ${moduleName} summary...`} />;
+    return (
+      <LoadingState
+        variant="skeleton"
+        label={`Loading ${moduleName} summary...`}
+      />
+    );
   }
   if (summaryQuery.isError) {
     return (
@@ -67,7 +68,9 @@ export function OperationalSummaryGrid({
   }
 
   const visibleCards = cards
-    .filter((card) => Object.prototype.hasOwnProperty.call(summary.summary, card.key))
+    .filter((card) =>
+      Object.prototype.hasOwnProperty.call(summary.summary, card.key),
+    )
     .slice(0, 4);
 
   if (visibleCards.length === 0) return null;

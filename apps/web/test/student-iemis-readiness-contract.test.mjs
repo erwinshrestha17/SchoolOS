@@ -26,7 +26,7 @@ describe('Student iEMIS readiness contract', () => {
     );
     assert.doesNotMatch(overview, /Review iEMIS fields/);
     assert.doesNotMatch(overview, /\{query\.data\.score\}%/);
-    assert.doesNotMatch(overview, /key: 'iemis'/);
+    assert.doesNotMatch(overview, /key: ['"]iemis['"]/);
   });
 
   it('renders every readiness and issue severity state with visible text', () => {
@@ -77,7 +77,10 @@ describe('Student iEMIS readiness contract', () => {
       /queryKey: \[['"]student-iemis-readiness['"], studentId\]/,
     );
     assert.match(detail, /student-iemis-readiness-list/);
-    assert.doesNotMatch(detail, /setQueryData\(\['student-iemis-readiness'/);
+    assert.doesNotMatch(
+      detail,
+      /setQueryData\(\[['"]student-iemis-readiness['"]/,
+    );
     assert.match(detail, /hasPermissions\(\[["']students:update["']\]\)/);
     assert.match(header, /canEdit \? \(/);
     assert.match(

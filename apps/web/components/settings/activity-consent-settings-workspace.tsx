@@ -20,8 +20,7 @@ export function ActivityConsentSettingsWorkspace() {
   const storedSettingsQuery = useQuery({
     queryKey: ['school-settings', 'all'],
     queryFn: api.getTenantSettings,
-    enabled:
-      settingsCaps.resolution === 'granted' && canReviewStoredPreference,
+    enabled: settingsCaps.resolution === 'granted' && canReviewStoredPreference,
   });
 
   const storedSetting = storedSettingsQuery.data?.find(

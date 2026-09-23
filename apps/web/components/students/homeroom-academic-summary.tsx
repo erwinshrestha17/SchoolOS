@@ -19,7 +19,8 @@ function ModuleUnavailableNotice({ moduleName }: { moduleName: string }) {
     <div className="flex items-start gap-2.5 rounded-xl border border-warning-100 bg-warning-50 px-3.5 py-2.5 text-sm text-warning-900">
       <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
       <span>
-        {moduleName} is not enabled for your school, so this section is unavailable.
+        {moduleName} is not enabled for your school, so this section is
+        unavailable.
       </span>
     </div>
   );
@@ -197,9 +198,15 @@ export function HomeroomAcademicSummary() {
                   </caption>
                   <thead>
                     <tr className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-500">
-                      <th scope="col" className="py-2 pr-3">Subject</th>
-                      <th scope="col" className="py-2 pr-3">Reported entries</th>
-                      <th scope="col" className="py-2 pr-3">Status</th>
+                      <th scope="col" className="py-2 pr-3">
+                        Subject
+                      </th>
+                      <th scope="col" className="py-2 pr-3">
+                        Reported entries
+                      </th>
+                      <th scope="col" className="py-2 pr-3">
+                        Status
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -268,7 +275,9 @@ export function HomeroomAcademicSummary() {
                           : 'text-slate-500',
                       )}
                     >
-                      {item.isMine ? 'Set by you' : `Set by ${item.setBy ?? 'another teacher'}`}
+                      {item.isMine
+                        ? 'Set by you'
+                        : `Set by ${item.setBy ?? 'another teacher'}`}
                     </span>
                   </li>
                 ))}

@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useQuery } from "@tanstack/react-query";
-import { useSession } from "../session-provider";
-import { useEntitlements } from "../entitlements-provider";
-import { api } from "../../lib/api";
-import { GlobalStudentSearch } from "./global-student-search";
-import { NotificationBell } from "./notification-bell";
+import { useQuery } from '@tanstack/react-query';
+import { useSession } from '../session-provider';
+import { useEntitlements } from '../entitlements-provider';
+import { api } from '../../lib/api';
+import { GlobalStudentSearch } from './global-student-search';
+import { NotificationBell } from './notification-bell';
 import {
   BriefcaseBusiness,
   ChevronDown,
@@ -13,14 +13,14 @@ import {
   Menu,
   School,
   Settings,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState, type RefObject } from "react";
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState, type RefObject } from 'react';
 
-import { Avatar } from "../ui/avatar";
-import { usePermissionAccess } from "../../lib/permissions-ui";
-import { cn } from "../../lib/utils";
-import { Badge } from "../ui/badge";
+import { Avatar } from '../ui/avatar';
+import { usePermissionAccess } from '../../lib/permissions-ui';
+import { cn } from '../../lib/utils';
+import { Badge } from '../ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +28,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../ui/primitives/dropdown-menu";
+} from '../ui/primitives/dropdown-menu';
 
 export type HeaderProps = {
   onMobileMenuToggle: () => void;
@@ -46,57 +46,55 @@ export function Header({
   const { hasModule } = useEntitlements();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  const canReadAcademicYears = hasPermissions(["academic_years:read"]);
+  const canReadAcademicYears = hasPermissions(['academic_years:read']);
   const canReadNotifications =
-    hasModule("notifications") &&
-    hasPermissions(["notifications:view_own"]);
+    hasModule('notifications') && hasPermissions(['notifications:view_own']);
 
   const academicYearsQuery = useQuery({
-    queryKey: ["layout-academic-years"],
+    queryKey: ['layout-academic-years'],
     queryFn: api.listAcademicYears,
-    enabled: status === "authenticated" && canReadAcademicYears,
+    enabled: status === 'authenticated' && canReadAcademicYears,
   });
   const profileQuery = useQuery({
-    queryKey: ["auth", "profile"],
+    queryKey: ['auth', 'profile'],
     queryFn: api.getProfile,
-    enabled: status === "authenticated",
+    enabled: status === 'authenticated',
   });
 
   const academicYears = academicYearsQuery.data ?? [];
-  const currentAcademicYear =
-    academicYears.find((year) => year.isCurrent);
+  const currentAcademicYear = academicYears.find((year) => year.isCurrent);
 
   const authenticatedName = profileQuery.data?.staff
     ? [profileQuery.data.staff.firstName, profileQuery.data.staff.lastName]
         .filter(Boolean)
-        .join(" ")
+        .join(' ')
     : profileQuery.data?.student
       ? [
           profileQuery.data.student.firstNameEn,
           profileQuery.data.student.lastNameEn,
         ]
           .filter(Boolean)
-          .join(" ")
+          .join(' ')
       : null;
   const displayName =
-    authenticatedName || session?.user.email?.split("@")[0] || "User";
+    authenticatedName || session?.user.email?.split('@')[0] || 'User';
   const initials = displayName
     ? displayName
         .split(/[\s._-]+/)
         .map((p) => p[0]?.toUpperCase())
-        .join("")
+        .join('')
         .slice(0, 2)
-    : "U";
+    : 'U';
 
-  const primaryRole = session?.user.roles[0]?.replace(/_/g, " ") ?? "User";
-  const tenantName = session?.tenant.name ?? "SchoolOS";
+  const primaryRole = session?.user.roles[0]?.replace(/_/g, ' ') ?? 'User';
+  const tenantName = session?.tenant.name ?? 'SchoolOS';
   const { resolution: permissionResolution, hasPermission: checkPermission } =
     usePermissionAccess();
-  const canViewStaffSelf = checkPermission("staff:read");
+  const canViewStaffSelf = checkPermission('staff:read');
   const canOpenMyWorkspace = Boolean(
-    permissionResolution === "granted" &&
+    permissionResolution === 'granted' &&
     profileQuery.data?.staff &&
-    hasModule("hr") &&
+    hasModule('hr') &&
     canViewStaffSelf,
   );
 
@@ -130,7 +128,10 @@ export function Header({
         </div>
       </div>
 
-      <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--ink)] md:hidden" title={tenantName}>
+      <p
+        className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--ink)] md:hidden"
+        title={tenantName}
+      >
         {tenantName}
       </p>
 
@@ -142,16 +143,22 @@ export function Header({
         {canReadAcademicYears ? (
           <div
             className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm sm:flex"
-            title={currentAcademicYear ? "Active academic year. Change it in School Settings." : "Academic year context"}
+            title={
+              currentAcademicYear
+                ? 'Active academic year. Change it in School Settings.'
+                : 'Academic year context'
+            }
           >
             <span className="text-xs font-bold uppercase tracking-wide text-slate-400">
               AY
             </span>
-            <span>{academicYearsQuery.isPending
-              ? "Loading year…"
-              : academicYearsQuery.isError
-                ? "Year unavailable"
-                : currentAcademicYear?.name ?? "No current year"}</span>
+            <span>
+              {academicYearsQuery.isPending
+                ? 'Loading year…'
+                : academicYearsQuery.isError
+                  ? 'Year unavailable'
+                  : (currentAcademicYear?.name ?? 'No current year')}
+            </span>
             {currentAcademicYear ? (
               <Badge variant="success" className="h-4.5 px-1.5 text-[0.6rem]">
                 Current
@@ -187,8 +194,8 @@ export function Header({
               <ChevronDown
                 size={14}
                 className={cn(
-                  "hidden text-slate-400 transition-transform duration-200 sm:block",
-                  userMenuOpen && "rotate-180",
+                  'hidden text-slate-400 transition-transform duration-200 sm:block',
+                  userMenuOpen && 'rotate-180',
                 )}
                 aria-hidden="true"
               />
@@ -212,7 +219,7 @@ export function Header({
                     {displayName}
                   </p>
                   <p className="truncate text-xs text-slate-500">
-                    {session?.user.email ?? "No email available"}
+                    {session?.user.email ?? 'No email available'}
                   </p>
                 </div>
               </div>
@@ -232,7 +239,7 @@ export function Header({
               {canOpenMyWorkspace ? (
                 <DropdownMenuItem
                   className="cursor-pointer rounded-lg px-3 py-2.5 font-semibold text-slate-700 focus:bg-slate-100 focus:text-slate-950"
-                  onSelect={() => router.push("/dashboard/my-workspace")}
+                  onSelect={() => router.push('/dashboard/my-workspace')}
                 >
                   <BriefcaseBusiness
                     className="h-4 w-4 text-slate-400"
@@ -244,7 +251,7 @@ export function Header({
               <DropdownMenuItem
                 className="cursor-pointer rounded-lg px-3 py-2.5 font-semibold text-slate-700 focus:bg-slate-100 focus:text-slate-950"
                 onSelect={() =>
-                  router.push("/dashboard/settings/personal/profile")
+                  router.push('/dashboard/settings/personal/profile')
                 }
               >
                 <Settings

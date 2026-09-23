@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import React, { useEffect, useMemo, useState } from "react";
-import { SectionCard } from "@/components/ui/section-card";
-import { StatusBadge } from "@/components/ui/status-badge";
+import React, { useEffect, useMemo, useState } from 'react';
+import { SectionCard } from '@/components/ui/section-card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
   Wallet,
   Search,
@@ -18,27 +18,27 @@ import {
   Loader2,
   ArrowLeft,
   ShieldCheck,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useSession } from "@/components/session-provider";
-import { Input } from "../ui/input";
-import { EmptyState } from "../ui/empty-state";
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useSession } from '@/components/session-provider';
+import { Input } from '../ui/input';
+import { EmptyState } from '../ui/empty-state';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "../ui/dialog";
-import { Button } from "@/components/ui/button";
-import { PermissionDenied } from "@/components/ui/permission-denied";
-import { api } from "@/lib/api";
-import { useQuery } from "@tanstack/react-query";
+} from '../ui/dialog';
+import { Button } from '@/components/ui/button';
+import { PermissionDenied } from '@/components/ui/permission-denied';
+import { api } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 import type {
   InvoiceDetailLine,
   InvoiceSummary,
   StudentCollectionContext,
-} from "@schoolos/core";
-import { formatBsDate } from "@schoolos/core";
+} from '@schoolos/core';
+import { formatBsDate } from '@schoolos/core';
 
 interface CollectionCounterProps {
   onSearch: (query: string) => void;
@@ -54,7 +54,7 @@ interface CollectionCounterProps {
   isLoading?: boolean;
   isSubmitting?: boolean;
   initialInvoiceId?: string | null;
-  studentContext?: StudentCollectionContext["student"] | null;
+  studentContext?: StudentCollectionContext['student'] | null;
   isStudentProfileSource?: boolean;
   onChangeStudent?: () => void;
   disableSearch?: boolean;
@@ -65,9 +65,9 @@ interface CollectionCounterProps {
 }
 
 const formatCurrency = (amount: string) => {
-  return new Intl.NumberFormat("en-NP", {
-    style: "currency",
-    currency: "NPR",
+  return new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
     maximumFractionDigits: 0,
   }).format(Number(amount));
 };
@@ -75,15 +75,15 @@ const formatCurrency = (amount: string) => {
 const formatDate = (value: string) => formatBsDate(value);
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  CASH: "Cash",
-  BANK: "Bank deposit",
-  TRANSFER: "Online transfer",
-  MOBILE: "Mobile wallet",
+  CASH: 'Cash',
+  BANK: 'Bank deposit',
+  TRANSFER: 'Online transfer',
+  MOBILE: 'Mobile wallet',
 };
 
 export function CollectionCounter({
   onSearch,
-  searchQuery = "",
+  searchQuery = '',
   invoices,
   onCollect,
   isLoading,
@@ -99,14 +99,14 @@ export function CollectionCounter({
   onPageChange,
 }: CollectionCounterProps) {
   const { hasPermissions } = useSession();
-  const canCollect = hasPermissions(["payments:collect"]);
+  const canCollect = hasPermissions(['payments:collect']);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
     null,
   );
   const [amount, setAmount] = useState<number>(0);
-  const [method, setMethod] = useState("CASH");
-  const [reference, setReference] = useState("");
-  const [remarks, setRemarks] = useState("");
+  const [method, setMethod] = useState('CASH');
+  const [reference, setReference] = useState('');
+  const [remarks, setRemarks] = useState('');
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [searchInput, setSearchInput] = useState(searchQuery);
 
@@ -128,7 +128,7 @@ export function CollectionCounter({
   );
 
   const invoiceDetailQuery = useQuery({
-    queryKey: ["invoice-detail", selectedInvoiceId],
+    queryKey: ['invoice-detail', selectedInvoiceId],
     queryFn: () => api.getInvoiceDetail(selectedInvoiceId!),
     enabled: !!selectedInvoiceId,
   });
@@ -136,15 +136,15 @@ export function CollectionCounter({
   const handleSelectInvoice = (inv: InvoiceSummary) => {
     setSelectedInvoiceId(inv.id);
     setAmount(0);
-    setReference("");
-    setRemarks("");
+    setReference('');
+    setRemarks('');
   };
 
   useEffect(() => {
     setSelectedInvoiceId(null);
     setAmount(0);
-    setReference("");
-    setRemarks("");
+    setReference('');
+    setRemarks('');
   }, [studentContext?.id]);
 
   useEffect(() => {
@@ -158,8 +158,8 @@ export function CollectionCounter({
 
     setSelectedInvoiceId(linkedInvoice.id);
     setAmount(0);
-    setReference("");
-    setRemarks("");
+    setReference('');
+    setRemarks('');
   }, [initialInvoiceId, invoices, selectedInvoiceId]);
 
   useEffect(() => {
@@ -168,8 +168,8 @@ export function CollectionCounter({
     if (invoices.length === 1 && selectedInvoiceId !== invoices[0].id) {
       setSelectedInvoiceId(invoices[0].id);
       setAmount(0);
-      setReference("");
-      setRemarks("");
+      setReference('');
+      setRemarks('');
       return;
     }
 
@@ -180,8 +180,8 @@ export function CollectionCounter({
     ) {
       setSelectedInvoiceId(null);
       setAmount(0);
-      setReference("");
-      setRemarks("");
+      setReference('');
+      setRemarks('');
     }
   }, [invoices, selectedInvoiceId, studentContext]);
 
@@ -199,7 +199,7 @@ export function CollectionCounter({
               Student profile handoff
             </p>
             <p className="text-sm font-black">
-              Collecting fees for: {studentContext.name} ·{" "}
+              Collecting fees for: {studentContext.name} ·{' '}
               {studentContext.studentSystemId}
             </p>
           </div>
@@ -218,11 +218,11 @@ export function CollectionCounter({
 
       <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
         <SectionCard
-          title={studentContext ? "Selected Student" : "Student Discovery"}
+          title={studentContext ? 'Selected Student' : 'Student Discovery'}
           description={
             studentContext
-              ? "Outstanding invoices for this student only"
-              : "Search by student name, student ID or invoice number"
+              ? 'Outstanding invoices for this student only'
+              : 'Search by student name, student ID or invoice number'
           }
         >
           <div className="space-y-6">
@@ -259,19 +259,19 @@ export function CollectionCounter({
                   variant="ghost"
                   onClick={() => handleSelectInvoice(inv)}
                   className={cn(
-                    "group flex h-auto w-full items-start justify-between rounded-xl border p-4 transition-colors",
+                    'group flex h-auto w-full items-start justify-between rounded-xl border p-4 transition-colors',
                     selectedInvoiceId === inv.id
-                      ? "border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)] text-[var(--color-mod-fees-text)]"
-                      : "border-slate-100 bg-white text-slate-900 hover:border-[var(--color-mod-fees-border)] hover:bg-[var(--color-mod-fees-bg)]",
+                      ? 'border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)] text-[var(--color-mod-fees-text)]'
+                      : 'border-slate-100 bg-white text-slate-900 hover:border-[var(--color-mod-fees-border)] hover:bg-[var(--color-mod-fees-bg)]',
                   )}
                 >
                   <div className="flex gap-4">
                     <div
                       className={cn(
-                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors",
+                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors',
                         selectedInvoiceId === inv.id
-                          ? "bg-white text-[var(--color-mod-fees-accent)]"
-                          : "bg-slate-50 text-slate-400 group-hover:bg-white",
+                          ? 'bg-white text-[var(--color-mod-fees-accent)]'
+                          : 'bg-slate-50 text-slate-400 group-hover:bg-white',
                       )}
                     >
                       <User size={20} />
@@ -280,19 +280,19 @@ export function CollectionCounter({
                       <p className="text-sm font-black truncate max-w-[160px] tracking-tight">
                         {studentContext?.name ||
                           inv.student?.name ||
-                          "Student name not set"}
+                          'Student name not set'}
                       </p>
                       <p
                         className={cn(
-                          "text-[0.65rem] font-bold uppercase tracking-widest mt-1",
+                          'text-[0.65rem] font-bold uppercase tracking-widest mt-1',
                           selectedInvoiceId === inv.id
-                            ? "text-[var(--color-mod-fees-text)]/70"
-                            : "text-slate-500",
+                            ? 'text-[var(--color-mod-fees-text)]/70'
+                            : 'text-slate-500',
                         )}
                       >
                         {inv.invoiceNumber}
                       </p>
-                      {typeof inv.outstandingAmount === "number" ? (
+                      {typeof inv.outstandingAmount === 'number' ? (
                         <p className="mt-2 text-xs font-black text-danger-600">
                           {formatCurrency(inv.outstandingAmount)} outstanding
                         </p>
@@ -365,12 +365,12 @@ export function CollectionCounter({
                     invoiceDetailQuery.data?.student.name ||
                     studentContext?.name ||
                     selectedInvoice.student?.name ||
-                    "Student name not set"
+                    'Student name not set'
                   }
                   sub={
                     invoiceDetailQuery.data?.student.studentSystemId ||
                     studentContext?.studentSystemId ||
-                    "Student ID loading"
+                    'Student ID loading'
                   }
                 />
                 <SummaryCard
@@ -378,11 +378,11 @@ export function CollectionCounter({
                   label="Class / Section"
                   value={
                     invoiceDetailQuery.data?.student.className ||
-                    "Class not set"
+                    'Class not set'
                   }
                   sub={
                     invoiceDetailQuery.data?.student.sectionName ||
-                    "Section not set"
+                    'Section not set'
                   }
                 />
                 <SummaryCard
@@ -390,11 +390,11 @@ export function CollectionCounter({
                   label="Primary Guardian"
                   value={
                     invoiceDetailQuery.data?.student.guardianName ||
-                    "Guardian not recorded"
+                    'Guardian not recorded'
                   }
                   sub={
                     invoiceDetailQuery.data?.student.guardianPhone ||
-                    "Guardian phone not recorded"
+                    'Guardian phone not recorded'
                   }
                 />
               </div>
@@ -436,7 +436,7 @@ export function CollectionCounter({
                             ? formatCurrency(
                                 invoiceDetailQuery.data.totalAmount,
                               )
-                            : "Unavailable"
+                            : 'Unavailable'
                         }
                         loading={invoiceDetailQuery.isLoading}
                       />
@@ -445,7 +445,7 @@ export function CollectionCounter({
                         value={
                           invoiceDetailQuery.data
                             ? formatCurrency(invoiceDetailQuery.data.paidAmount)
-                            : "Unavailable"
+                            : 'Unavailable'
                         }
                         color="text-emerald-600"
                         loading={invoiceDetailQuery.isLoading}
@@ -457,7 +457,7 @@ export function CollectionCounter({
                             ? formatCurrency(
                                 invoiceDetailQuery.data.outstandingAmount,
                               )
-                            : "Unavailable"
+                            : 'Unavailable'
                         }
                         color="text-danger-600 font-black"
                         loading={invoiceDetailQuery.isLoading}
@@ -482,7 +482,7 @@ export function CollectionCounter({
                                 className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3.5"
                               >
                                 <span className="text-xs font-bold text-slate-700">
-                                  {item.feeHeadName || "Fee head not set"}
+                                  {item.feeHeadName || 'Fee head not set'}
                                 </span>
                                 <span className="text-xs font-black text-slate-900">
                                   {formatCurrency(item.netAmount)}
@@ -553,24 +553,24 @@ export function CollectionCounter({
                         <div className="grid grid-cols-2 gap-3">
                           {[
                             {
-                              id: "CASH",
+                              id: 'CASH',
                               icon: <Banknote size={18} />,
-                              label: "Cash",
+                              label: 'Cash',
                             },
                             {
-                              id: "BANK",
+                              id: 'BANK',
                               icon: <CreditCard size={18} />,
-                              label: "Bank",
+                              label: 'Bank',
                             },
                             {
-                              id: "TRANSFER",
+                              id: 'TRANSFER',
                               icon: <History size={18} />,
-                              label: "Transfer",
+                              label: 'Transfer',
                             },
                             {
-                              id: "MOBILE",
+                              id: 'MOBILE',
                               icon: <CreditCard size={18} />,
-                              label: "Wallet",
+                              label: 'Wallet',
                             },
                           ].map((m) => (
                             <Button
@@ -580,16 +580,16 @@ export function CollectionCounter({
                               onClick={() => setMethod(m.id)}
                               aria-pressed={method === m.id}
                               className={cn(
-                                "flex h-auto min-h-11 items-center gap-2 rounded-lg border p-2.5 transition-colors",
+                                'flex h-auto min-h-11 items-center gap-2 rounded-lg border p-2.5 transition-colors',
                                 method === m.id
-                                  ? "border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)] text-[var(--color-mod-fees-text)] shadow-sm"
-                                  : "border-slate-100 bg-white text-slate-600 hover:border-[var(--color-mod-fees-border)]",
+                                  ? 'border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)] text-[var(--color-mod-fees-text)] shadow-sm'
+                                  : 'border-slate-100 bg-white text-slate-600 hover:border-[var(--color-mod-fees-border)]',
                               )}
                             >
                               <div
                                 className={cn(
-                                  "h-8 w-8 shrink-0 rounded-lg flex items-center justify-center",
-                                  method === m.id ? "bg-white" : "bg-slate-50",
+                                  'h-8 w-8 shrink-0 rounded-lg flex items-center justify-center',
+                                  method === m.id ? 'bg-white' : 'bg-slate-50',
                                 )}
                               >
                                 {m.icon}
@@ -635,8 +635,8 @@ export function CollectionCounter({
                         >
                           <CheckSquare size={20} />
                           {isSubmitting
-                            ? "Recording payment..."
-                            : "Review payment"}
+                            ? 'Recording payment...'
+                            : 'Review payment'}
                         </Button>
                       </div>
                     </div>
@@ -654,10 +654,10 @@ export function CollectionCounter({
               </h4>
               <p className="text-sm text-slate-500 mt-3 max-w-[320px] leading-relaxed">
                 {studentContext && invoices.length > 1
-                  ? "Choose an invoice to collect payment."
+                  ? 'Choose an invoice to collect payment.'
                   : studentContext && invoices.length === 0
-                    ? "This student has no outstanding invoices."
-                    : "Select an outstanding invoice from the search results to load student details and process payment."}
+                    ? 'This student has no outstanding invoices.'
+                    : 'Select an outstanding invoice from the search results to load student details and process payment.'}
               </p>
               {studentContext && invoices.length === 0 && onChangeStudent ? (
                 <Button
@@ -703,20 +703,20 @@ export function CollectionCounter({
                     {invoiceDetailQuery.data?.student.name ||
                       studentContext?.name ||
                       selectedInvoice?.student?.name ||
-                      "Student name not set"}
+                      'Student name not set'}
                   </p>
                 </div>
                 <p className="shrink-0 text-sm font-semibold text-slate-600">
                   {invoiceDetailQuery.data?.student.studentSystemId ||
                     studentContext?.studentSystemId ||
-                    "Student ID not set"}
+                    'Student ID not set'}
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2">
                 <PaymentReviewItem
                   label="Invoice"
-                  value={selectedInvoice?.invoiceNumber || "Not selected"}
+                  value={selectedInvoice?.invoiceNumber || 'Not selected'}
                 />
                 <PaymentReviewItem
                   label="Payment method"
@@ -731,7 +731,7 @@ export function CollectionCounter({
                 />
                 <PaymentReviewItem
                   label="Reference"
-                  value={reference.trim() || "Not provided"}
+                  value={reference.trim() || 'Not provided'}
                   className="border-t border-slate-200 sm:border-l"
                 />
                 <PaymentReviewItem
@@ -741,7 +741,7 @@ export function CollectionCounter({
                       ? formatCurrency(
                           invoiceDetailQuery.data.outstandingAmount,
                         )
-                      : "Unavailable"
+                      : 'Unavailable'
                   }
                   className="border-t border-slate-200"
                 />
@@ -813,15 +813,15 @@ function PaymentReviewItem({
   emphasized?: boolean;
 }) {
   return (
-    <div className={cn("min-w-0 px-4 py-3.5 sm:px-5 sm:py-4", className)}>
+    <div className={cn('min-w-0 px-4 py-3.5 sm:px-5 sm:py-4', className)}>
       <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
         {label}
       </p>
       <p
         className={cn(
-          "mt-1.5 break-words text-sm font-bold text-slate-950",
+          'mt-1.5 break-words text-sm font-bold text-slate-950',
           emphasized &&
-            "text-xl tracking-tight text-[var(--color-mod-fees-text)]",
+            'text-xl tracking-tight text-[var(--color-mod-fees-text)]',
         )}
       >
         {value}
@@ -866,7 +866,7 @@ function SummaryCard({
 function StatItem({
   label,
   value,
-  color = "text-slate-900",
+  color = 'text-slate-900',
   loading = false,
 }: {
   label: string;
@@ -882,7 +882,7 @@ function StatItem({
       {loading ? (
         <div className="h-6 w-20 animate-pulse rounded-md bg-slate-200" />
       ) : (
-        <span className={cn("text-lg font-black tracking-tight", color)}>
+        <span className={cn('text-lg font-black tracking-tight', color)}>
           {value}
         </span>
       )}
@@ -894,12 +894,12 @@ function StudentContextSummary({
   student,
   onChangeStudent,
 }: {
-  student: StudentCollectionContext["student"];
+  student: StudentCollectionContext['student'];
   onChangeStudent?: () => void;
 }) {
   const classSection = [student.className, student.sectionName]
     .filter(Boolean)
-    .join(" / ");
+    .join(' / ');
 
   return (
     <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
@@ -926,13 +926,13 @@ function StudentContextSummary({
       <div className="mt-4 grid gap-3 text-xs font-bold text-slate-600">
         <div className="flex items-center gap-2">
           <GraduationCap size={14} className="text-slate-400" />
-          <span>{classSection || "Class not set"}</span>
+          <span>{classSection || 'Class not set'}</span>
         </div>
         <div className="flex items-center gap-2">
           <Phone size={14} className="text-slate-400" />
           <span>
-            {student.guardianName || "Guardian not recorded"}
-            {student.guardianPhone ? ` · ${student.guardianPhone}` : ""}
+            {student.guardianName || 'Guardian not recorded'}
+            {student.guardianPhone ? ` · ${student.guardianPhone}` : ''}
           </span>
         </div>
       </div>

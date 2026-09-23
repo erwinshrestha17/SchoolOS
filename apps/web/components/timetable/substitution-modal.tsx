@@ -5,7 +5,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -31,14 +37,18 @@ export function TimetableSubstitutionModal({
   mode,
 }: TimetableSubstitutionModalProps) {
   const queryClient = useQueryClient();
-  const [substituteTeacherId, setSubstituteTeacherId] = useState(substitution?.substituteTeacherId ?? '');
+  const [substituteTeacherId, setSubstituteTeacherId] = useState(
+    substitution?.substituteTeacherId ?? '',
+  );
   const [selectedSlotId, setSelectedSlotId] = useState(slot?.id ?? '');
   const [reason, setReason] = useState(substitution?.reason ?? '');
   const [date, setDate] = useState(getNepalSchoolDay().gregorianDate);
   const [error, setError] = useState<string | null>(null);
   const selectedSlot = slot ?? slots.find((item) => item.id === selectedSlotId);
-  const selectedSubjectName = selectedSlot?.subject?.name?.trim() || 'Subject not set';
-  const selectedClassName = selectedSlot?.class?.name?.trim() || 'Class not set';
+  const selectedSubjectName =
+    selectedSlot?.subject?.name?.trim() || 'Subject not set';
+  const selectedClassName =
+    selectedSlot?.class?.name?.trim() || 'Class not set';
   const selectedSectionName = selectedSlot?.section?.name?.trim();
 
   const createMutation = useMutation({
@@ -47,7 +57,8 @@ export function TimetableSubstitutionModal({
       queryClient.invalidateQueries({ queryKey: ['timetable-substitutions'] });
       onClose();
     },
-    onError: (err: any) => setError(err.message || 'Failed to create substitution'),
+    onError: (err: any) =>
+      setError(err.message || 'Failed to create substitution'),
   });
 
   const assignMutation = useMutation({
@@ -56,7 +67,8 @@ export function TimetableSubstitutionModal({
       queryClient.invalidateQueries({ queryKey: ['timetable-substitutions'] });
       onClose();
     },
-    onError: (err: any) => setError(err.message || 'Failed to assign substitute'),
+    onError: (err: any) =>
+      setError(err.message || 'Failed to assign substitute'),
   });
 
   const handleAction = () => {
@@ -110,7 +122,8 @@ export function TimetableSubstitutionModal({
                 <option value="">Select a published class slot</option>
                 {slots.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.subject?.name?.trim() || 'Subject not set'} / {item.startsAt} - {item.endsAt}
+                    {item.subject?.name?.trim() || 'Subject not set'} /{' '}
+                    {item.startsAt} - {item.endsAt}
                   </option>
                 ))}
               </Select>
@@ -119,21 +132,29 @@ export function TimetableSubstitutionModal({
 
           {mode === 'create' && selectedSlot && (
             <div className="space-y-2 rounded-2xl border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-soft)]/40 p-4">
-              <p className="text-xs font-black uppercase tracking-widest text-[var(--color-mod-homework-text)]">Selected Slot</p>
+              <p className="text-xs font-black uppercase tracking-widest text-[var(--color-mod-homework-text)]">
+                Selected Slot
+              </p>
               <div className="flex justify-between items-center">
-                <span className="text-sm font-bold text-slate-900">{selectedSubjectName}</span>
-                <span className="text-xs font-medium text-slate-600">{selectedSlot.startsAt} - {selectedSlot.endsAt}</span>
+                <span className="text-sm font-bold text-slate-900">
+                  {selectedSubjectName}
+                </span>
+                <span className="text-xs font-medium text-slate-600">
+                  {selectedSlot.startsAt} - {selectedSlot.endsAt}
+                </span>
               </div>
               <p className="text-xs text-slate-500">
                 {selectedClassName}
-                {selectedSectionName ? ` - ${selectedSectionName}` : ' - All sections'}
+                {selectedSectionName
+                  ? ` - ${selectedSectionName}`
+                  : ' - All sections'}
               </p>
             </div>
           )}
 
           {mode === 'create' && (
             <FormField label="Absence Date">
-              <Input 
+              <Input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
@@ -142,7 +163,7 @@ export function TimetableSubstitutionModal({
             </FormField>
           )}
 
-          <StaffSelector 
+          <StaffSelector
             label="Substitute Teacher"
             value={substituteTeacherId}
             onChange={setSubstituteTeacherId}
@@ -159,9 +180,15 @@ export function TimetableSubstitutionModal({
             placeholder="Select a replacement teacher"
           />
 
-          <FormField label={mode === 'create' ? 'Absence Reason' : 'Assignment Notes'}>
-            <Textarea 
-              placeholder={mode === 'create' ? 'Record the approved absence reason' : 'Optional assignment note'}
+          <FormField
+            label={mode === 'create' ? 'Absence Reason' : 'Assignment Notes'}
+          >
+            <Textarea
+              placeholder={
+                mode === 'create'
+                  ? 'Record the approved absence reason'
+                  : 'Optional assignment note'
+              }
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={3}
@@ -178,15 +205,23 @@ export function TimetableSubstitutionModal({
         </div>
 
         <DialogFooter className="mt-8 flex gap-3 sm:justify-end">
-          <Button variant="ghost" onClick={onClose} className="rounded-xl font-bold">
+          <Button
+            variant="ghost"
+            onClick={onClose}
+            className="rounded-xl font-bold"
+          >
             Cancel
           </Button>
-          <Button 
-            onClick={handleAction} 
+          <Button
+            onClick={handleAction}
             className="rounded-xl bg-[var(--color-mod-homework-accent)] px-8 font-bold text-white shadow-sm hover:bg-[var(--color-mod-homework-text)]"
             disabled={createMutation.isPending || assignMutation.isPending}
           >
-            {createMutation.isPending || assignMutation.isPending ? 'Processing...' : mode === 'create' ? 'Record & Assign' : 'Assign Now'}
+            {createMutation.isPending || assignMutation.isPending
+              ? 'Processing...'
+              : mode === 'create'
+                ? 'Record & Assign'
+                : 'Assign Now'}
           </Button>
         </DialogFooter>
       </DialogContent>

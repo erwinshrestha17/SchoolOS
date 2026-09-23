@@ -1,30 +1,30 @@
 export type TeacherObservationStatus =
-  | 'DRAFT'
-  | 'COMPLETED'
-  | 'ACKNOWLEDGED'
-  | 'FOLLOW_UP_DUE'
-  | 'CLOSED';
+  | "DRAFT"
+  | "COMPLETED"
+  | "ACKNOWLEDGED"
+  | "FOLLOW_UP_DUE"
+  | "CLOSED";
 
 export type TeacherDevelopmentGoalStatus =
-  | 'DRAFT'
-  | 'ACTIVE'
-  | 'COMPLETED'
-  | 'CANCELLED';
+  | "DRAFT"
+  | "ACTIVE"
+  | "COMPLETED"
+  | "CANCELLED";
 
-export type TeacherTrainingStatus = 'PLANNED' | 'COMPLETED' | 'CANCELLED';
+export type TeacherTrainingStatus = "PLANNED" | "COMPLETED" | "CANCELLED";
 
 export type SchoolImprovementPlanStatus =
-  | 'DRAFT'
-  | 'ACTIVE'
-  | 'COMPLETED'
-  | 'ARCHIVED';
+  | "DRAFT"
+  | "ACTIVE"
+  | "COMPLETED"
+  | "ARCHIVED";
 
 export type SchoolImprovementActionStatus =
-  | 'NOT_STARTED'
-  | 'IN_PROGRESS'
-  | 'BLOCKED'
-  | 'COMPLETED'
-  | 'CANCELLED';
+  | "NOT_STARTED"
+  | "IN_PROGRESS"
+  | "BLOCKED"
+  | "COMPLETED"
+  | "CANCELLED";
 
 export type InstitutionalImprovementPage<T> = {
   items: T[];
@@ -105,9 +105,9 @@ export type TeacherDevelopmentOverview = {
     completedTraining: number;
   };
   sourceStates: {
-    observations: 'available' | 'empty';
-    goals: 'available' | 'empty';
-    training: 'available' | 'empty';
+    observations: "available" | "empty";
+    goals: "available" | "empty";
+    training: "available" | "empty";
   };
   observations: TeacherObservationRecord[];
   goals: TeacherDevelopmentGoalRecord[];
@@ -171,12 +171,12 @@ export type SchoolImprovementPlanRecord = {
   updatedAt: string;
 };
 
-export type BoardReadinessTrack = 'GRADE_8' | 'SEE' | 'GRADE_12';
+export type BoardReadinessTrack = "GRADE_8" | "SEE" | "GRADE_12";
 export type BoardReadinessState =
-  | 'READY'
-  | 'NEEDS_ATTENTION'
-  | 'BLOCKED'
-  | 'UNAVAILABLE';
+  | "READY"
+  | "NEEDS_ATTENTION"
+  | "BLOCKED"
+  | "UNAVAILABLE";
 
 export type BoardReadinessIndicator = {
   code: string;
@@ -196,11 +196,11 @@ export type BoardExamReadiness = {
   state: BoardReadinessState;
   nonPredictive: true;
   sourceStates: {
-    students: 'available' | 'empty' | 'unavailable';
-    examTerms: 'available' | 'empty' | 'unavailable';
-    marks: 'available' | 'empty' | 'unavailable';
-    reportCards: 'available' | 'empty' | 'unavailable';
-    iemis: 'available' | 'empty' | 'unavailable';
+    students: "available" | "empty" | "unavailable";
+    examTerms: "available" | "empty" | "unavailable";
+    marks: "available" | "empty" | "unavailable";
+    reportCards: "available" | "empty" | "unavailable";
+    iemis: "available" | "empty" | "unavailable";
   };
   indicators: BoardReadinessIndicator[];
 };

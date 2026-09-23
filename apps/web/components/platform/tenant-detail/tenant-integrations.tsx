@@ -1,26 +1,26 @@
-"use client";
+'use client';
 
-import { KeyRound, Link2, Settings } from "lucide-react";
-import Link from "next/link";
-import { PlatformEmptyState } from "@/app/platform/_components/platform-operator-states";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { KeyRound, Link2, Settings } from 'lucide-react';
+import Link from 'next/link';
+import { PlatformEmptyState } from '@/app/platform/_components/platform-operator-states';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { useSession } from "@/components/session-provider";
-import { hasPermission } from "@/lib/session";
-import { useTenantDetail } from "./tenant-detail-page";
-import { tenantSectionHref } from "./tenant-detail-routes";
+} from '@/components/ui/card';
+import { useSession } from '@/components/session-provider';
+import { hasPermission } from '@/lib/session';
+import { useTenantDetail } from './tenant-detail-page';
+import { tenantSectionHref } from './tenant-detail-routes';
 
 export function TenantIntegrations() {
   const { tenant } = useTenantDetail();
   const { session } = useSession();
-  const canReadApiKeys = hasPermission(session, "platform:api-keys:read");
+  const canReadApiKeys = hasPermission(session, 'platform:api-keys:read');
   const readiness = tenant.providerReadiness ?? [];
 
   return (
@@ -34,7 +34,7 @@ export function TenantIntegrations() {
         </div>
         <div className="flex flex-wrap gap-2">
           {canReadApiKeys ? (
-            <Link href={tenantSectionHref(tenant.id, "api-keys")}>
+            <Link href={tenantSectionHref(tenant.id, 'api-keys')}>
               <Button variant="outline" className="rounded-2xl font-bold">
                 <KeyRound className="mr-2" size={17} />
                 Tenant API keys
@@ -79,14 +79,14 @@ export function TenantIntegrations() {
                     </div>
                     <Badge
                       variant={
-                        provider.status === "ready"
-                          ? "success"
-                          : provider.status === "failed"
-                            ? "destructive"
-                            : "warning"
+                        provider.status === 'ready'
+                          ? 'success'
+                          : provider.status === 'failed'
+                            ? 'destructive'
+                            : 'warning'
                       }
                     >
-                      {provider.status.replaceAll("_", " ").toUpperCase()}
+                      {provider.status.replaceAll('_', ' ').toUpperCase()}
                     </Badge>
                   </div>
                   <p className="mt-4 text-sm leading-6 text-slate-600">

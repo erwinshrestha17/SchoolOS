@@ -35,7 +35,9 @@ describe('Slice 2 attendance authorization UI', () => {
       );
     }
 
-    const workspaces = read('components/attendance/attendance-m2-workspaces.tsx');
+    const workspaces = read(
+      'components/attendance/attendance-m2-workspaces.tsx',
+    );
     assert.match(workspaces, /useAttendanceCapabilities/);
     assert.match(workspaces, /attendance\.canManageAll/);
   });
@@ -68,8 +70,14 @@ describe('Slice 2 notices authorization UI', () => {
 
     assert.match(composer, /useNoticeCapabilities\(\{ isTeacherPersona \}\)/);
     assert.match(composer, /noticeCaps\.allowedAudienceTypes\.map/);
-    assert.match(composer, /!noticeCaps\.allowedAudienceTypes\.includes\(form\.audienceType\)/);
-    assert.doesNotMatch(composer, /<option value="ALL">Whole school<\/option>/);
+    assert.match(
+      composer,
+      /!noticeCaps\.allowedAudienceTypes\.includes\(form\.audienceType\)/,
+    );
+    assert.doesNotMatch(
+      composer,
+      /<option value=['"]ALL['"]>Whole school<\/option>/,
+    );
   });
 
   it('keeps approval and publication actions on separate capabilities', () => {
@@ -89,9 +97,9 @@ describe('Slice 2 notices authorization UI', () => {
     const composer = read('components/notices/notice-composer-workspace.tsx');
     const review = read('components/notices/notice-review-workspace.tsx');
 
-    assert.match(detail, /noticeCaps\.resolution === "loading"/);
+    assert.match(detail, /noticeCaps\.resolution === ['"]loading['"]/);
     assert.match(detail, /!noticeCaps\.canView/);
-    assert.match(composer, /noticeCaps\.resolution === "loading"/);
-    assert.match(review, /noticeCaps\.resolution === "loading"/);
+    assert.match(composer, /noticeCaps\.resolution === ['"]loading['"]/);
+    assert.match(review, /noticeCaps\.resolution === ['"]loading['"]/);
   });
 });

@@ -1,32 +1,32 @@
-"use client";
+'use client';
 
-import type { PaginatedResult, PlatformAuditLog } from "@schoolos/core";
-import { Download, History, RefreshCw, Search } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import type { PaginatedResult, PlatformAuditLog } from '@schoolos/core';
+import { Download, History, RefreshCw, Search } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   PlatformInlineError,
   PlatformSectionSkeleton,
-} from "@/app/platform/_components/platform-operator-states";
-import { Button } from "@/components/ui/button";
+} from '@/app/platform/_components/platform-operator-states';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { TablePagination } from "@/components/ui/table-pagination";
-import { platformApi } from "@/lib/api/platform";
-import { useTenantDetail } from "./tenant-detail-page";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { TablePagination } from '@/components/ui/table-pagination';
+import { platformApi } from '@/lib/api/platform';
+import { useTenantDetail } from './tenant-detail-page';
 
 type AuditFilters = {
   action: string;
@@ -38,12 +38,12 @@ type AuditFilters = {
 };
 
 const EMPTY_FILTERS: AuditFilters = {
-  action: "",
-  resource: "",
-  resourceId: "",
-  userId: "",
-  startDate: "",
-  endDate: "",
+  action: '',
+  resource: '',
+  resourceId: '',
+  userId: '',
+  startDate: '',
+  endDate: '',
 };
 
 const AUDIT_PAGE_SIZE = 20;
@@ -88,7 +88,7 @@ export function TenantAudit() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Tenant audit logs could not be loaded.",
+          : 'Tenant audit logs could not be loaded.',
       );
     } finally {
       setLoading(false);
@@ -173,15 +173,15 @@ export function TenantAudit() {
                 >
                   <div>
                     <p className="font-black text-slate-900">
-                      {log.action.replaceAll("_", " ")}
+                      {log.action.replaceAll('_', ' ')}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {log.resource} · {log.resourceId || "No resource ID"}
+                      {log.resource} · {log.resourceId || 'No resource ID'}
                     </p>
                   </div>
                   <div className="text-left sm:text-right">
                     <p className="text-sm font-bold text-slate-900">
-                      {log.user?.email ?? "System"}
+                      {log.user?.email ?? 'System'}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
                       {formatDateTime(log.createdAt)}
@@ -278,14 +278,14 @@ function Field({
   label,
   value,
   onChange,
-  type = "text",
+  type = 'text',
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
 }) {
-  const id = `audit-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const id = `audit-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
@@ -301,24 +301,24 @@ function Field({
 
 function exportAuditCsv(logs: PlatformAuditLog[], fileName: string) {
   const headers = [
-    "createdAt",
-    "action",
-    "resource",
-    "resourceId",
-    "tenantId",
-    "userId",
+    'createdAt',
+    'action',
+    'resource',
+    'resourceId',
+    'tenantId',
+    'userId',
   ] as const;
   const rows = logs.map((log) =>
     headers
-      .map((key) => `"${String(log[key] ?? "").replaceAll('"', '""')}"`)
-      .join(","),
+      .map((key) => `"${String(log[key] ?? '').replaceAll('"', '""')}"`)
+      .join(','),
   );
   const url = URL.createObjectURL(
-    new Blob([[headers.join(","), ...rows].join("\n")], {
-      type: "text/csv;charset=utf-8",
+    new Blob([[headers.join(','), ...rows].join('\n')], {
+      type: 'text/csv;charset=utf-8',
     }),
   );
-  const anchor = document.createElement("a");
+  const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = fileName;
   anchor.click();
@@ -328,6 +328,6 @@ function exportAuditCsv(logs: PlatformAuditLog[], fileName: string) {
 function formatDateTime(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
-    ? "Date not recorded"
+    ? 'Date not recorded'
     : date.toLocaleString();
 }

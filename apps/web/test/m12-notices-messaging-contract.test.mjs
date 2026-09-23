@@ -14,11 +14,11 @@ describe('M12 notifications and M15 notices boundary', () => {
     assert.match(workspace, /<SummaryGrid/);
     assert.match(workspace, /<WorkspaceTabs/);
     assert.match(workspace, /<WorkSurface/);
-    assert.doesNotMatch(workspace, /title="Escalated Chats"/);
-    assert.doesNotMatch(workspace, /title="Provider Status"/);
-    assert.doesNotMatch(workspace, /label: 'Recipient Preview'/);
-    assert.doesNotMatch(workspace, /label: 'Compose'/);
-    assert.match(workspace, /label: 'Notification Settings'/);
+    assert.doesNotMatch(workspace, /title=['"]Escalated Chats['"]/);
+    assert.doesNotMatch(workspace, /title=['"]Provider Status['"]/);
+    assert.doesNotMatch(workspace, /label: ['"]Recipient Preview['"]/);
+    assert.doesNotMatch(workspace, /label: ['"]Compose['"]/);
+    assert.match(workspace, /label: ['"]Notification Settings['"]/);
     assert.match(workspace, /Notices & Announcements/);
     assert.doesNotMatch(workspace, /Parent-Teacher Chat/);
 
@@ -26,8 +26,8 @@ describe('M12 notifications and M15 notices boundary', () => {
     assert.match(workspace, /<NoticeComposerWorkspace/);
     assert.doesNotMatch(workspace, /<DeliveryRetryPanel/);
 
-    assert.doesNotMatch(shell, /'\/dashboard\/notices':/);
-    assert.doesNotMatch(shell, /'\/dashboard\/messages':/);
+    assert.doesNotMatch(shell, /['"]\/dashboard\/notices['"]:/);
+    assert.doesNotMatch(shell, /['"]\/dashboard\/messages['"]:/);
   });
 
   it('requires a recipient-preview confirmation for whole-school notices, not just emergencies', () => {
@@ -38,7 +38,7 @@ describe('M12 notifications and M15 notices boundary', () => {
     // impactful to send by mistake as an emergency one.
     assert.match(
       form,
-      /isHighImpactNotice\s*=\s*\n?\s*notice\.priority === "EMERGENCY" \|\| notice\.audienceType === "ALL"/,
+      /isHighImpactNotice\s*=\s*\n?\s*notice\.priority === ['"]EMERGENCY['"] \|\| notice\.audienceType === ['"]ALL['"]/,
     );
     assert.match(form, /isHighImpactNotice && !recipientPreview/);
     assert.match(form, /isHighImpactNotice && !highImpactConfirmed/);
@@ -57,7 +57,7 @@ describe('M12 notifications and M15 notices boundary', () => {
     const removed = read('components/messaging/chat-removed-state.tsx');
     const messagesPage = read('app/dashboard/messages/page.tsx');
 
-    assert.doesNotMatch(sidebar, /label: 'Messages'/);
+    assert.doesNotMatch(sidebar, /label: ['"]Messages['"]/);
     assert.doesNotMatch(sidebar, /messaging:create/);
     assert.doesNotMatch(personaNav, /Messages & Announcements/);
     assert.match(personaNav, /Notices & Announcements/);
@@ -75,7 +75,7 @@ describe('M12 notifications and M15 notices boundary', () => {
         new RegExp(`/notices/.*\\$\\{.*noticeId.*\\}/${action}`),
       );
     }
-    assert.match(detail, /pendingAction === "cancel"/);
+    assert.match(detail, /pendingAction === ['"]cancel['"]/);
     assert.match(detail, /!actionReason\.trim\(\)/);
     assert.match(detail, /A reason is required for the audit trail/);
     assert.match(detail, /without sending it again/);

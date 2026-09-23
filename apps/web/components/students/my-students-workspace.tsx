@@ -96,7 +96,9 @@ export function MyStudentsWorkspace() {
     (sum, group) => sum + group.students.length,
     0,
   );
-  const hasFilters = Boolean(search.trim() || groupFilter || onlyNeedsAttention);
+  const hasFilters = Boolean(
+    search.trim() || groupFilter || onlyNeedsAttention,
+  );
 
   if (query.isLoading) {
     return (
@@ -123,8 +125,8 @@ export function MyStudentsWorkspace() {
             aria-hidden="true"
           />
           <p className="text-sm leading-5 text-slate-600">
-            You have no active Class Teacher or Subject Teacher assignment with a
-            section for the current academic year yet. Ask the academic
+            You have no active Class Teacher or Subject Teacher assignment with
+            a section for the current academic year yet. Ask the academic
             coordinator if you expected one.
           </p>
         </div>

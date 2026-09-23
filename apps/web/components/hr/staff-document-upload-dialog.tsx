@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/dialog';
 import { Button } from '../ui/button';
 import { FormField, Input, Select } from '../ui/form-field';
 import { Toast } from '../ui/toast';
@@ -32,8 +38,12 @@ export function StaffDocumentUploadDialog({
   const addDocumentMutation = useMutation({
     mutationFn: (payload: any) => api.addStaffDocument(staffId, payload),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['staff-documents', staffId] });
-      void queryClient.invalidateQueries({ queryKey: ['staff-detail', staffId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-documents', staffId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-detail', staffId],
+      });
       onClose();
       // Reset form
       setKind('CITIZENSHIP');
@@ -86,7 +96,9 @@ export function StaffDocumentUploadDialog({
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle>Upload Document</DialogTitle>
-            <p className="text-xs text-slate-500 mt-1">Upload verified files for staff records.</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Upload verified files for staff records.
+            </p>
           </div>
           <button
             type="button"

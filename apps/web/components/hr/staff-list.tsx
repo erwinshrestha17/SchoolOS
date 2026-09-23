@@ -16,15 +16,19 @@ import {
   type PaginatedDataTableColumn,
 } from '../schoolos/data/paginated-data-table';
 
-type StaffDirectoryRow = Awaited<ReturnType<typeof api.listStaffDirectory>>['items'][number];
+type StaffDirectoryRow = Awaited<
+  ReturnType<typeof api.listStaffDirectory>
+>['items'][number];
 
 const staffColumns: PaginatedDataTableColumn<StaffDirectoryRow>[] = [
   {
     id: 'employee',
     header: 'Employee',
     cell: (staff) => {
-      const formatAssignedText = (value: string | null | undefined, fallback: string) =>
-        value?.trim() || fallback;
+      const formatAssignedText = (
+        value: string | null | undefined,
+        fallback: string,
+      ) => value?.trim() || fallback;
       return (
         <div className="flex items-center gap-5">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 text-lg font-black text-slate-400 shadow-inner">
@@ -53,7 +57,8 @@ const staffColumns: PaginatedDataTableColumn<StaffDirectoryRow>[] = [
               )}
               {(staff.department || staff.designation) && (
                 <span className="text-slate-400">
-                  {formatAssignedText(staff.designation, 'Designation not set')} &bull;{' '}
+                  {formatAssignedText(staff.designation, 'Designation not set')}{' '}
+                  &bull;{' '}
                   {formatAssignedText(staff.department, 'Department not set')}
                 </span>
               )}
@@ -126,7 +131,10 @@ export function StaffList() {
       {/* Search & Action Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            size={18}
+          />
           <Input
             type="text"
             placeholder="Search staff by name or ID..."
@@ -153,7 +161,13 @@ export function StaffList() {
           <label className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 block mb-1.5 ml-1">
             Status
           </label>
-          <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+          <Select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+          >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
@@ -164,7 +178,13 @@ export function StaffList() {
           <label className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400 block mb-1.5 ml-1">
             Contract Type
           </label>
-          <Select value={contractFilter} onChange={(e) => { setContractFilter(e.target.value); setPage(1); }}>
+          <Select
+            value={contractFilter}
+            onChange={(e) => {
+              setContractFilter(e.target.value);
+              setPage(1);
+            }}
+          >
             <option value="ALL">All Contracts</option>
             <option value="PERMANENT">Permanent</option>
             <option value="TEMPORARY">Temporary</option>
@@ -206,7 +226,13 @@ export function StaffList() {
         columns={staffColumns}
         items={paginatedStaff}
         getRowId={(staff) => staff.id}
-        status={staffQuery.isError ? 'error' : staffQuery.isLoading ? 'loading' : 'ready'}
+        status={
+          staffQuery.isError
+            ? 'error'
+            : staffQuery.isLoading
+              ? 'loading'
+              : 'ready'
+        }
         page={page}
         pageSize={limit}
         totalItems={totalItems}
@@ -216,10 +242,18 @@ export function StaffList() {
         emptyTitle="No staff members yet"
         emptyDescription="Add your first staff member to build the directory."
         hasActiveFilters={Boolean(
-          search || statusFilter !== 'ALL' || contractFilter !== 'ALL' || deptFilter || desigFilter,
+          search ||
+          statusFilter !== 'ALL' ||
+          contractFilter !== 'ALL' ||
+          deptFilter ||
+          desigFilter,
         )}
         noResultsTitle="No staff members found"
-        noResultsDescription={search ? `No results matching "${search}"` : 'Try modifying filters to find staff members.'}
+        noResultsDescription={
+          search
+            ? `No results matching "${search}"`
+            : 'Try modifying filters to find staff members.'
+        }
         rowActions={(staff) => (
           <Button type="button" size="sm" asChild>
             <Link href={`/dashboard/hr/staff/${staff.id}`}>Profile</Link>
@@ -227,7 +261,10 @@ export function StaffList() {
         )}
       />
 
-      <StaffCreateDialog isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
+      <StaffCreateDialog
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+      />
     </div>
   );
 }

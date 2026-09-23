@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
 import type {
   AdmissionCaseQueueItem,
   AdmissionWaitlistCapacity,
-} from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+} from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -12,24 +12,24 @@ import {
   ClipboardCheck,
   Loader2,
   Search,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { formatBsDate } from "@schoolos/core";
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { formatBsDate } from '@schoolos/core';
 import {
   admissionCasesApi,
   type AdmissionCaseQueue,
-} from "../../lib/api/admission-cases";
-import { schoolFacingErrorMessage } from "../../lib/school-facing-error";
-import { useSession } from "../session-provider";
-import { ConfirmDialog } from "../ui/confirm-dialog";
-import { EmptyState } from "../ui/empty-state";
-import { ErrorState } from "../ui/error-state";
-import { LoadingState } from "../ui/loading-state";
-import { TablePagination } from "../ui/table-pagination";
-import { Badge } from "../ui/primitives/badge";
-import { Button } from "@/components/ui/button";
-import { WorkSurface } from "../ui/work-surface";
+} from '../../lib/api/admission-cases';
+import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
+import { useSession } from '../session-provider';
+import { ConfirmDialog } from '../ui/confirm-dialog';
+import { EmptyState } from '../ui/empty-state';
+import { ErrorState } from '../ui/error-state';
+import { LoadingState } from '../ui/loading-state';
+import { TablePagination } from '../ui/table-pagination';
+import { Badge } from '../ui/primitives/badge';
+import { Button } from '@/components/ui/button';
+import { WorkSurface } from '../ui/work-surface';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,12 +37,12 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-} from "../ui/primitives/dropdown-menu";
+} from '../ui/primitives/dropdown-menu';
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-} from "../ui/primitives/input-group";
+} from '../ui/primitives/input-group';
 import {
   Table,
   TableBody,
@@ -50,9 +50,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../ui/primitives/table";
-import { WorkspaceTabs } from "../ui/module-tabs";
-import { useUrlFilters } from "../../lib/hooks/use-url-filters";
+} from '../ui/primitives/table';
+import { WorkspaceTabs } from '../ui/module-tabs';
+import { useUrlFilters } from '../../lib/hooks/use-url-filters';
 
 const QUEUES: Array<{
   id: AdmissionCaseQueue;
@@ -60,87 +60,87 @@ const QUEUES: Array<{
   description: string;
 }> = [
   {
-    id: "NEEDS_INFORMATION",
-    label: "Needs Information",
+    id: 'NEEDS_INFORMATION',
+    label: 'Needs Information',
     description:
-      "These admission cases are missing required details or documents. Contact the applicant and complete the missing information.",
+      'These admission cases are missing required details or documents. Contact the applicant and complete the missing information.',
   },
   {
-    id: "WAITING_FOR_REVIEW",
-    label: "Waiting for Review",
+    id: 'WAITING_FOR_REVIEW',
+    label: 'Waiting for Review',
     description:
-      "These admission cases are ready for a staff review. Check the information, warnings, and school policy before deciding the next step.",
+      'These admission cases are ready for a staff review. Check the information, warnings, and school policy before deciding the next step.',
   },
   {
-    id: "READY_TO_ADMIT",
-    label: "Ready to Admit",
+    id: 'READY_TO_ADMIT',
+    label: 'Ready to Admit',
     description:
-      "These admission cases passed the current checks. Review the final placement and admit the student when everything is correct.",
+      'These admission cases passed the current checks. Review the final placement and admit the student when everything is correct.',
   },
   {
-    id: "DUPLICATE_WARNINGS",
-    label: "Duplicate Warnings",
+    id: 'DUPLICATE_WARNINGS',
+    label: 'Duplicate Warnings',
     description:
-      "These admission cases may match an existing student. Review the possible match before creating another student record.",
+      'These admission cases may match an existing student. Review the possible match before creating another student record.',
   },
   {
-    id: "COMPLETED",
-    label: "Completed",
+    id: 'COMPLETED',
+    label: 'Completed',
     description:
-      "These admissions were finalized and have a linked student record. Open the student profile to continue school operations.",
+      'These admissions were finalized and have a linked student record. Open the student profile to continue school operations.',
   },
   {
-    id: "WAITLISTED",
-    label: "Waitlisted",
+    id: 'WAITLISTED',
+    label: 'Waitlisted',
     description:
-      "Review oldest applications first, check current section capacity, and return a case to review when a place becomes available.",
+      'Review oldest applications first, check current section capacity, and return a case to review when a place becomes available.',
   },
   {
-    id: "APPROVED",
-    label: "Approved",
+    id: 'APPROVED',
+    label: 'Approved',
     description:
-      "These admission cases have approval but still need final admission completion.",
+      'These admission cases have approval but still need final admission completion.',
   },
   {
-    id: "NOT_ADMITTED",
-    label: "Not Admitted",
+    id: 'NOT_ADMITTED',
+    label: 'Not Admitted',
     description:
-      "These admission cases have a recorded decision not to admit. Open a case to review its history.",
+      'These admission cases have a recorded decision not to admit. Open a case to review its history.',
   },
   {
-    id: "DOCUMENTS_PENDING",
-    label: "Documents Pending",
+    id: 'DOCUMENTS_PENDING',
+    label: 'Documents Pending',
     description:
-      "These admitted students still have document follow-up work recorded on the original admission case.",
+      'These admitted students still have document follow-up work recorded on the original admission case.',
   },
 ];
 
 const PRIMARY_QUEUE_IDS = new Set<AdmissionCaseQueue>([
-  "NEEDS_INFORMATION",
-  "WAITING_FOR_REVIEW",
-  "READY_TO_ADMIT",
-  "DUPLICATE_WARNINGS",
-  "COMPLETED",
+  'NEEDS_INFORMATION',
+  'WAITING_FOR_REVIEW',
+  'READY_TO_ADMIT',
+  'DUPLICATE_WARNINGS',
+  'COMPLETED',
 ]);
 
 const PRIMARY_QUEUE_TAB_LABELS: Partial<Record<AdmissionCaseQueue, string>> = {
-  NEEDS_INFORMATION: "Needs info",
-  WAITING_FOR_REVIEW: "Review",
-  READY_TO_ADMIT: "Ready",
-  DUPLICATE_WARNINGS: "Duplicates",
-  COMPLETED: "Completed",
+  NEEDS_INFORMATION: 'Needs info',
+  WAITING_FOR_REVIEW: 'Review',
+  READY_TO_ADMIT: 'Ready',
+  DUPLICATE_WARNINGS: 'Duplicates',
+  COMPLETED: 'Completed',
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Draft",
-  NEEDS_INFORMATION: "Needs Information",
-  READY_TO_ADMIT: "Ready to Admit",
-  WAITING_FOR_REVIEW: "Waiting for Review",
-  WAITLISTED: "Waitlisted",
-  APPROVED: "Approved",
-  ADMITTED: "Completed",
-  NOT_ADMITTED: "Not Admitted",
-  CLOSED: "Closed",
+  DRAFT: 'Draft',
+  NEEDS_INFORMATION: 'Needs Information',
+  READY_TO_ADMIT: 'Ready to Admit',
+  WAITING_FOR_REVIEW: 'Waiting for Review',
+  WAITLISTED: 'Waitlisted',
+  APPROVED: 'Approved',
+  ADMITTED: 'Completed',
+  NOT_ADMITTED: 'Not Admitted',
+  CLOSED: 'Closed',
 };
 
 export function AdmissionCaseQueues() {
@@ -152,26 +152,26 @@ export function AdmissionCaseQueues() {
     page: number;
     search: string;
   }>({
-    queue: "NEEDS_INFORMATION",
+    queue: 'NEEDS_INFORMATION',
     page: 1,
-    search: "",
+    search: '',
   });
   const queue = QUEUES.some((item) => item.id === filters.queue)
     ? filters.queue
-    : "NEEDS_INFORMATION";
+    : 'NEEDS_INFORMATION';
   const page = filters.page;
   const submittedSearch = filters.search;
   const [search, setSearch] = useState(submittedSearch);
   const [promotionCandidate, setPromotionCandidate] =
     useState<AdmissionCaseQueueItem | null>(null);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState('');
   const canCreateAdmission = hasPermissions([
-    "enrollments:create",
-    "students:create",
-    "guardians:create",
+    'enrollments:create',
+    'students:create',
+    'guardians:create',
   ]);
   const canManageAdmissionLifecycle = hasPermissions([
-    "students:manage_lifecycle",
+    'students:manage_lifecycle',
   ]);
 
   useEffect(() => {
@@ -182,7 +182,7 @@ export function AdmissionCaseQueues() {
   // class, or date filters. Keep those out of the URL and request until the
   // backend contract defines their exact semantics.
   const query = useQuery({
-    queryKey: ["admission-case-queues", queue, page, submittedSearch],
+    queryKey: ['admission-case-queues', queue, page, submittedSearch],
     queryFn: () =>
       admissionCasesApi.listQueues({
         queue,
@@ -195,7 +195,7 @@ export function AdmissionCaseQueues() {
   const promoteMutation = useMutation({
     mutationFn: (item: AdmissionCaseQueueItem) =>
       admissionCasesApi.reviewCase(item.id, {
-        action: "PROMOTE_FROM_WAITLIST",
+        action: 'PROMOTE_FROM_WAITLIST',
       }),
     onSuccess: async (_result, item) => {
       setPromotionCandidate(null);
@@ -203,10 +203,10 @@ export function AdmissionCaseQueues() {
         `${item.fullNameEn} was returned to the admission review workflow.`,
       );
       await queryClient.invalidateQueries({
-        queryKey: ["admission-case-queues"],
+        queryKey: ['admission-case-queues'],
       });
       await queryClient.invalidateQueries({
-        queryKey: ["admission-case", item.id],
+        queryKey: ['admission-case', item.id],
       });
     },
   });
@@ -234,7 +234,7 @@ export function AdmissionCaseQueues() {
           onValueChange={(value) =>
             setFilters(
               { queue: value as AdmissionCaseQueue, page: 1 },
-              { history: "push" },
+              { history: 'push' },
             )
           }
           className="min-w-0 flex-1"
@@ -264,7 +264,7 @@ export function AdmissionCaseQueues() {
                     onSelect={() =>
                       setFilters(
                         { queue: item.id, page: 1 },
-                        { history: "push" },
+                        { history: 'push' },
                       )
                     }
                   >
@@ -283,7 +283,7 @@ export function AdmissionCaseQueues() {
         action={
           query.data ? (
             <Badge variant="secondary">
-              {query.data.total === 1 ? "1 case" : query.data.total + " cases"}
+              {query.data.total === 1 ? '1 case' : query.data.total + ' cases'}
             </Badge>
           ) : undefined
         }
@@ -291,7 +291,7 @@ export function AdmissionCaseQueues() {
         flush
         data-testid="admission-queue-workspace"
       >
-        {queue === "WAITLISTED" && successMessage ? (
+        {queue === 'WAITLISTED' && successMessage ? (
           <div
             className="flex items-start gap-2 border-b border-success-200 bg-success-50 px-4 py-3 text-sm font-medium text-success-900"
             role="status"
@@ -305,7 +305,7 @@ export function AdmissionCaseQueues() {
           className="flex flex-col gap-2 border-b border-border bg-muted/20 p-4 sm:flex-row sm:items-center"
           onSubmit={(event) => {
             event.preventDefault();
-            setFilters({ search, page: 1 }, { history: "push" });
+            setFilters({ search, page: 1 }, { history: 'push' });
           }}
         >
           <label className="sr-only" htmlFor="admission-queue-search">
@@ -337,7 +337,7 @@ export function AdmissionCaseQueues() {
                 <TableRow>
                   <TableHead className="px-4">Student</TableHead>
                   <TableHead className="px-4">Guardian</TableHead>
-                  {queue === "WAITLISTED" ? (
+                  {queue === 'WAITLISTED' ? (
                     <>
                       <TableHead className="px-4">Placement</TableHead>
                       <TableHead className="px-4">Current capacity</TableHead>
@@ -364,9 +364,9 @@ export function AdmissionCaseQueues() {
                         {item.fullNameEn}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {queue === "WAITLISTED" ? "Applied" : "Updated"}{" "}
+                        {queue === 'WAITLISTED' ? 'Applied' : 'Updated'}{' '}
                         {formatBsDate(
-                          queue === "WAITLISTED"
+                          queue === 'WAITLISTED'
                             ? item.createdAt
                             : item.updatedAt,
                         )}
@@ -374,22 +374,22 @@ export function AdmissionCaseQueues() {
                     </TableCell>
                     <TableCell className="px-4 py-3 whitespace-normal">
                       <p className="font-medium text-foreground">
-                        {item.guardianFullName ?? "Not added"}
+                        {item.guardianFullName ?? 'Not added'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {item.guardianPhone ?? "No phone"}
+                        {item.guardianPhone ?? 'No phone'}
                       </p>
                     </TableCell>
-                    {queue === "WAITLISTED" ? (
+                    {queue === 'WAITLISTED' ? (
                       <>
                         <TableCell className="px-4 py-3 whitespace-normal">
                           <p className="font-medium text-foreground">
-                            {item.className ?? "Class not selected"}
+                            {item.className ?? 'Class not selected'}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {item.sectionName
                               ? `Section ${item.sectionName}`
-                              : "Section not selected"}
+                              : 'Section not selected'}
                           </p>
                         </TableCell>
                         <TableCell className="px-4 py-3 whitespace-normal">
@@ -424,7 +424,7 @@ export function AdmissionCaseQueues() {
                     )}
                     <TableCell className="px-4 py-3 text-right">
                       <div className="flex min-w-max items-center justify-end gap-2">
-                        {queue === "WAITLISTED" &&
+                        {queue === 'WAITLISTED' &&
                         canManageAdmissionLifecycle &&
                         item.canPromoteFromWaitlist ? (
                           <Button
@@ -432,7 +432,7 @@ export function AdmissionCaseQueues() {
                             size="sm"
                             disabled={promoteMutation.isPending}
                             onClick={() => {
-                              setSuccessMessage("");
+                              setSuccessMessage('');
                               promoteMutation.reset();
                               setPromotionCandidate(item);
                             }}
@@ -449,14 +449,14 @@ export function AdmissionCaseQueues() {
                             Return to review
                           </Button>
                         ) : null}
-                        {queue === "WAITLISTED" &&
+                        {queue === 'WAITLISTED' &&
                         item.waitlistCapacity?.enforced &&
-                        item.waitlistCapacity.state === "FULL" ? (
+                        item.waitlistCapacity.state === 'FULL' ? (
                           <span className="text-xs font-medium text-muted-foreground">
                             Waiting for a seat
                           </span>
                         ) : null}
-                        {queue === "COMPLETED" && item.admittedStudentId ? (
+                        {queue === 'COMPLETED' && item.admittedStudentId ? (
                           <Button
                             type="button"
                             variant="outline"
@@ -496,13 +496,13 @@ export function AdmissionCaseQueues() {
             icon={<ClipboardCheck aria-hidden size={28} />}
             title={
               submittedSearch
-                ? "No admissions match this search"
+                ? 'No admissions match this search'
                 : `No admissions in ${activeQueue.label}`
             }
             description={
               submittedSearch
-                ? "Clear the search or try another student, guardian, phone, or application ID."
-                : "There are no cases in this queue. Choose another queue or start a new admission."
+                ? 'Clear the search or try another student, guardian, phone, or application ID.'
+                : 'There are no cases in this queue. Choose another queue or start a new admission.'
             }
             action={
               submittedSearch ? (
@@ -510,8 +510,8 @@ export function AdmissionCaseQueues() {
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    setSearch("");
-                    setFilters({ search: "", page: 1 });
+                    setSearch('');
+                    setFilters({ search: '', page: 1 });
                   }}
                 >
                   Clear search
@@ -519,18 +519,18 @@ export function AdmissionCaseQueues() {
               ) : canCreateAdmission ? (
                 <Button
                   type="button"
-                  onClick={() => router.push("/dashboard/admissions/new")}
+                  onClick={() => router.push('/dashboard/admissions/new')}
                 >
                   New admission
                 </Button>
-              ) : queue !== "NEEDS_INFORMATION" ? (
+              ) : queue !== 'NEEDS_INFORMATION' ? (
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() =>
                     setFilters(
-                      { queue: "NEEDS_INFORMATION", page: 1 },
-                      { history: "push" },
+                      { queue: 'NEEDS_INFORMATION', page: 1 },
+                      { history: 'push' },
                     )
                   }
                 >
@@ -593,7 +593,7 @@ function WaitlistCapacity({
 }: {
   capacity: AdmissionWaitlistCapacity | null;
 }) {
-  if (!capacity || capacity.state === "NOT_CONFIGURED") {
+  if (!capacity || capacity.state === 'NOT_CONFIGURED') {
     return (
       <div className="space-y-1">
         <Badge variant="outline">Not configured</Badge>
@@ -604,11 +604,11 @@ function WaitlistCapacity({
     );
   }
 
-  if (capacity.state === "FULL") {
+  if (capacity.state === 'FULL') {
     return (
       <div className="space-y-1">
-        <Badge variant={capacity.enforced ? "destructive" : "outline"}>
-          {capacity.enforced ? "Full" : "Full · advisory"}
+        <Badge variant={capacity.enforced ? 'destructive' : 'outline'}>
+          {capacity.enforced ? 'Full' : 'Full · advisory'}
         </Badge>
         <p className="text-xs text-muted-foreground">
           {capacity.enrolled} of {capacity.capacity} enrolled
@@ -621,20 +621,20 @@ function WaitlistCapacity({
   return (
     <div className="space-y-1">
       <Badge
-        variant={capacity.state === "NEARLY_FULL" ? "secondary" : "outline"}
+        variant={capacity.state === 'NEARLY_FULL' ? 'secondary' : 'outline'}
       >
-        {seats === 1 ? "1 seat available" : `${seats} seats available`}
+        {seats === 1 ? '1 seat available' : `${seats} seats available`}
       </Badge>
       <p className="text-xs text-muted-foreground">
         {capacity.enrolled} of {capacity.capacity} enrolled
-        {!capacity.enforced ? " · advisory" : ""}
+        {!capacity.enforced ? ' · advisory' : ''}
       </p>
     </div>
   );
 }
 
 function placementLabel(item: AdmissionCaseQueueItem) {
-  if (!item.className) return "Placement still needs to be selected.";
+  if (!item.className) return 'Placement still needs to be selected.';
   return item.sectionName
     ? `${item.className}, Section ${item.sectionName}`
     : `${item.className}, section not selected`;
@@ -643,23 +643,23 @@ function placementLabel(item: AdmissionCaseQueueItem) {
 function promotionError(error: unknown) {
   return schoolFacingErrorMessage(error, {
     fallback:
-      "The waitlist could not be updated. No admission details were changed. Try again.",
+      'The waitlist could not be updated. No admission details were changed. Try again.',
     invalid:
-      "The latest admission checks do not allow this case to leave the waitlist yet.",
+      'The latest admission checks do not allow this case to leave the waitlist yet.',
     forbidden:
-      "You do not have permission to move admission cases out of the waitlist.",
-    notFound: "This admission case is no longer available.",
+      'You do not have permission to move admission cases out of the waitlist.',
+    notFound: 'This admission case is no longer available.',
     conflict:
-      "This admission case changed before the update finished. Refresh and try again.",
+      'This admission case changed before the update finished. Refresh and try again.',
   });
 }
 
 function sourceLabel(source: string) {
   return source
-    .replaceAll("_", " ")
+    .replaceAll('_', ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function statusLabel(status: string) {
-  return STATUS_LABELS[status] ?? "Status unavailable";
+  return STATUS_LABELS[status] ?? 'Status unavailable';
 }

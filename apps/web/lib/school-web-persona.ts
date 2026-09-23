@@ -1,12 +1,9 @@
-"use client";
+'use client';
 
-import {
-  resolveSchoolWebPersona,
-  type SchoolWebPersona,
-} from "@schoolos/core";
-import { useMemo } from "react";
-import { useSession } from "../components/session-provider";
-import { useTeacherAccess } from "./teacher-access";
+import { resolveSchoolWebPersona, type SchoolWebPersona } from '@schoolos/core';
+import { useMemo } from 'react';
+import { useSession } from '../components/session-provider';
+import { useTeacherAccess } from './teacher-access';
 
 export type { SchoolWebPersona };
 
@@ -20,7 +17,7 @@ export function useSchoolWebPersona(): SchoolWebPersona {
   const { isTeacherPersona } = useTeacherAccess();
 
   return useMemo(() => {
-    if (isTeacherPersona) return "teacher";
+    if (isTeacherPersona) return 'teacher';
     return resolveSchoolWebPersona({
       roles: session?.user.roles ?? [],
       permissions: session?.user.permissions ?? [],

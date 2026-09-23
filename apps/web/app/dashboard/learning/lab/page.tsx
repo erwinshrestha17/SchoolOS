@@ -14,7 +14,11 @@ export default function LearningLabPage() {
         description="Open student join and individual attempt flows for launched Learning sessions."
       />
       <div className="mb-6">
-        <ModuleTabs items={learningWorkspaceTabs} accentColor="emerald" variant="light" />
+        <ModuleTabs
+          items={learningWorkspaceTabs}
+          accentColor="emerald"
+          variant="light"
+        />
       </div>
       <LearningWorkspace initialTab="lab" />
     </DashboardPageShell>

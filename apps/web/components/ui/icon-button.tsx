@@ -9,7 +9,10 @@ export type IconButtonProps = Omit<ButtonProps, 'size' | 'children'> & {
   tooltipSide?: 'top' | 'bottom' | 'left' | 'right';
 };
 
-const iconOnlySizeClasses: Record<NonNullable<IconButtonProps['size']>, string> = {
+const iconOnlySizeClasses: Record<
+  NonNullable<IconButtonProps['size']>,
+  string
+> = {
   sm: 'h-8 w-8',
   default: 'h-10 w-10',
   lg: 'h-11 w-11',

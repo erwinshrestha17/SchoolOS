@@ -8,7 +8,17 @@ interface MarketingCardProps {
   icon?: React.ComponentType<{ className?: string; size?: number }>;
   initials?: string;
   badge?: string;
-  badgeVariant?: 'default' | 'secondary' | 'outline' | 'destructive' | 'success' | 'warning' | 'info' | 'neutral' | 'phase2' | 'later';
+  badgeVariant?:
+    | 'default'
+    | 'secondary'
+    | 'outline'
+    | 'destructive'
+    | 'success'
+    | 'warning'
+    | 'info'
+    | 'neutral'
+    | 'phase2'
+    | 'later';
   children?: React.ReactNode;
   className?: string;
 }
@@ -24,10 +34,12 @@ export function MarketingCard({
   className,
 }: MarketingCardProps) {
   return (
-    <div className={cn(
-      "rounded-2xl border border-slate-250 bg-white p-5 shadow-xs hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 transition-all duration-300 flex flex-col justify-between h-full space-y-4",
-      className
-    )}>
+    <div
+      className={cn(
+        'rounded-2xl border border-slate-250 bg-white p-5 shadow-xs hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 transition-all duration-300 flex flex-col justify-between h-full space-y-4',
+        className,
+      )}
+    >
       <div className="space-y-3">
         {(Icon || initials || badge) && (
           <div className="flex justify-between items-start">
@@ -42,14 +54,21 @@ export function MarketingCard({
               </span>
             )}
             {badge && (
-              <Badge variant={badgeVariant} className="text-[9px] uppercase tracking-wider font-bold">
+              <Badge
+                variant={badgeVariant}
+                className="text-[9px] uppercase tracking-wider font-bold"
+              >
                 {badge}
               </Badge>
             )}
           </div>
         )}
         <h3 className="text-sm font-bold text-slate-900">{title}</h3>
-        {description && <p className="text-xs text-slate-500 leading-relaxed">{description}</p>}
+        {description && (
+          <p className="text-xs text-slate-500 leading-relaxed">
+            {description}
+          </p>
+        )}
       </div>
       {children}
     </div>

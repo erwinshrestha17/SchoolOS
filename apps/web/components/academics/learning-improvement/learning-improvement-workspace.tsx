@@ -347,7 +347,9 @@ export function LearningImprovementWorkspace() {
                     }}
                     options={(yearsQuery.data ?? []).map((year) => ({
                       value: year.id,
-                      label: year.isCurrent ? `${year.name} · Current` : year.name,
+                      label: year.isCurrent
+                        ? `${year.name} · Current`
+                        : year.name,
                     }))}
                   />
                   <FilterSelect
@@ -549,12 +551,17 @@ function FilterSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <Select value={value || (includeAll ? 'all' : undefined)} onValueChange={(next) => onChange(next === 'all' ? '' : next)}>
+    <Select
+      value={value || (includeAll ? 'all' : undefined)}
+      onValueChange={(next) => onChange(next === 'all' ? '' : next)}
+    >
       <SelectTrigger className="min-w-40" aria-label={label}>
         <SelectValue placeholder={label} />
       </SelectTrigger>
       <SelectContent>
-        {includeAll ? <SelectItem value="all">All {label.toLowerCase()}s</SelectItem> : null}
+        {includeAll ? (
+          <SelectItem value="all">All {label.toLowerCase()}s</SelectItem>
+        ) : null}
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value}>
             {option.label}
@@ -645,7 +652,13 @@ function AttentionView({
                       key={source}
                       status={state}
                       label={`${sourceLabel(source)} · ${state}`}
-                      tone={state === 'available' ? 'approved' : state === 'empty' ? 'inactive' : 'partial'}
+                      tone={
+                        state === 'available'
+                          ? 'approved'
+                          : state === 'empty'
+                            ? 'inactive'
+                            : 'partial'
+                      }
                     />
                   ))}
                 </div>
@@ -944,7 +957,9 @@ function RemedialView({
               <TableCell>
                 <p>{formatBsDate(item.startsOn)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {item.endsOn ? `to ${formatBsDate(item.endsOn)}` : 'No end set'}
+                  {item.endsOn
+                    ? `to ${formatBsDate(item.endsOn)}`
+                    : 'No end set'}
                 </p>
               </TableCell>
               <TableCell>{item.members.length}</TableCell>

@@ -35,8 +35,8 @@ describe('School Settings redesign', () => {
     ])
       assert.match(frame, new RegExp(destination));
     assert.match(frame, /MIGRATED_LEGACY_SECTIONS/);
-    assert.match(frame, /remaining\.delete\('section'\)/);
-    assert.match(frame, /remaining\.delete\('tab'\)/);
+    assert.match(frame, /remaining\.delete\(['"]section['"]\)/);
+    assert.match(frame, /remaining\.delete\(['"]tab['"]\)/);
   });
 
   it('projects authenticated visibility onto one shared settings catalog', () => {
@@ -79,7 +79,12 @@ describe('School Settings redesign', () => {
     ]) {
       assert.match(header, new RegExp(label));
     }
-    for (const label of ['Can manage', 'View-only', 'Platform managed', 'Personal']) {
+    for (const label of [
+      'Can manage',
+      'View-only',
+      'Platform managed',
+      'Personal',
+    ]) {
       assert.match(hub, new RegExp(label));
     }
     assert.match(catalog, /canEditSchoolSettings/);

@@ -23,7 +23,7 @@ interface PermissionDeniedProps {
 
 export function PermissionDenied({
   title = 'Access restricted',
-  description = "You do not have permission to open this page or perform this action. Contact your school administrator if you need access.",
+  description = 'You do not have permission to open this page or perform this action. Contact your school administrator if you need access.',
   resource,
   action,
   className,
@@ -40,7 +40,11 @@ export function PermissionDenied({
       secondaryAction={
         showNavigation ? (
           <>
-            <Button type="button" variant="outline" onClick={() => router.back()}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+            >
               <ArrowLeft className="h-4 w-4" />
               Go Back
             </Button>

@@ -1,6 +1,6 @@
-import { DashboardPageShell } from "../../../../../components/dashboard/dashboard-page-shell";
-import { ApplicationReviewWorkspace } from "../../../../../components/m1/application-review-workspace";
-import { M1PageHeader } from "../../../../../components/m1/m1-page-header";
+import { DashboardPageShell } from '../../../../../components/dashboard/dashboard-page-shell';
+import { ApplicationReviewWorkspace } from '../../../../../components/m1/application-review-workspace';
+import { M1PageHeader } from '../../../../../components/m1/m1-page-header';
 
 export default async function AdmissionApplicationReviewPage({
   params,

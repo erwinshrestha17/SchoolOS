@@ -53,9 +53,7 @@ export const activityApi = {
     limit?: number | null;
     offset?: number | null;
   }) =>
-    request<ActivityPost[]>(
-      withQuery('/activity-feed/posts', params ?? {}),
-    ),
+    request<ActivityPost[]>(withQuery('/activity-feed/posts', params ?? {})),
   listActivityGallery: (params?: {
     studentId?: string | null;
     classId?: string | null;

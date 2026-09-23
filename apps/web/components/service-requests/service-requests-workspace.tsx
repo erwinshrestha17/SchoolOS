@@ -53,10 +53,7 @@ const STATUS_TABS: Array<{
   { value: 'ALL', label: 'All' },
 ];
 
-function hasPermission(
-  granted: Set<PermissionKey>,
-  permission: PermissionKey,
-) {
+function hasPermission(granted: Set<PermissionKey>, permission: PermissionKey) {
   return granted.has(permission);
 }
 
@@ -110,8 +107,9 @@ export function ServiceRequestsQueueWorkspace() {
   const canRead = hasPermission(grantedPermissions, 'service_requests:read');
   const [statusTab, setStatusTab] = useState('OPEN');
   const [page, setPage] = useState(1);
-  const selectedStatus = STATUS_TABS.find((tab) => tab.value === statusTab)
-    ?.status;
+  const selectedStatus = STATUS_TABS.find(
+    (tab) => tab.value === statusTab,
+  )?.status;
 
   const listQuery = useQuery({
     queryKey: ['service-requests', selectedStatus, page],
@@ -167,7 +165,9 @@ export function ServiceRequestsQueueWorkspace() {
       id: 'status',
       header: 'Status',
       cell: (row: SchoolServiceRequestSummary) => (
-        <Badge variant={statusTone(row.status)}>{formatStatus(row.status)}</Badge>
+        <Badge variant={statusTone(row.status)}>
+          {formatStatus(row.status)}
+        </Badge>
       ),
     },
     {
@@ -179,9 +179,7 @@ export function ServiceRequestsQueueWorkspace() {
           <p className="text-sm text-slate-700">
             {formatDateTime(row.responseDeadline)}
           </p>
-          {row.isOverdue ? (
-            <Badge variant="warning">Overdue</Badge>
-          ) : null}
+          {row.isOverdue ? <Badge variant="warning">Overdue</Badge> : null}
         </div>
       ),
     },
@@ -264,9 +262,18 @@ export function ServiceRequestsQueueWorkspace() {
   );
 }
 
-type DialogMode = 'resolve' | 'escalate' | 'note-parent' | 'note-internal' | null;
+type DialogMode =
+  | 'resolve'
+  | 'escalate'
+  | 'note-parent'
+  | 'note-internal'
+  | null;
 
-export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string }) {
+export function ServiceRequestDetailWorkspace({
+  requestId,
+}: {
+  requestId: string;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { session } = useSession();
@@ -274,7 +281,10 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
     session?.user.permissions ?? [],
   );
   const canRead = hasPermission(grantedPermissions, 'service_requests:read');
-  const canManage = hasPermission(grantedPermissions, 'service_requests:manage');
+  const canManage = hasPermission(
+    grantedPermissions,
+    'service_requests:manage',
+  );
   const currentUserId = session?.user.id ?? null;
 
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
@@ -319,7 +329,9 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
 
   const invalidate = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['service-request', requestId] }),
+      queryClient.invalidateQueries({
+        queryKey: ['service-request', requestId],
+      }),
       queryClient.invalidateQueries({ queryKey: ['service-requests'] }),
     ]);
   };
@@ -344,7 +356,9 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
     },
     onError: (error) => {
       setActionError(
-        error instanceof Error ? error.message : 'Assignment could not be saved.',
+        error instanceof Error
+          ? error.message
+          : 'Assignment could not be saved.',
       );
     },
   });
@@ -356,7 +370,8 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
     }: {
       body: string;
       visibility: 'PARENT' | 'INTERNAL';
-    }) => serviceRequestsApi.addServiceRequestNote(requestId, { body, visibility }),
+    }) =>
+      serviceRequestsApi.addServiceRequestNote(requestId, { body, visibility }),
     onSuccess: async () => {
       setDialogMode(null);
       setActionError(null);
@@ -371,7 +386,9 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
 
   const resolveMutation = useMutation({
     mutationFn: (resolutionSummary: string) =>
-      serviceRequestsApi.resolveServiceRequest(requestId, { resolutionSummary }),
+      serviceRequestsApi.resolveServiceRequest(requestId, {
+        resolutionSummary,
+      }),
     onSuccess: async () => {
       setDialogMode(null);
       setActionError(null);
@@ -379,13 +396,21 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
     },
     onError: (error) => {
       setActionError(
-        error instanceof Error ? error.message : 'Resolution could not be saved.',
+        error instanceof Error
+          ? error.message
+          : 'Resolution could not be saved.',
       );
     },
   });
 
   const escalateMutation = useMutation({
-    mutationFn: ({ reason, assignedToUserId }: { reason: string; assignedToUserId: string }) =>
+    mutationFn: ({
+      reason,
+      assignedToUserId,
+    }: {
+      reason: string;
+      assignedToUserId: string;
+    }) =>
       serviceRequestsApi.escalateServiceRequest(requestId, {
         reason,
         assignedToUserId,
@@ -398,7 +423,9 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
     },
     onError: (error) => {
       setActionError(
-        error instanceof Error ? error.message : 'Escalation could not be saved.',
+        error instanceof Error
+          ? error.message
+          : 'Escalation could not be saved.',
       );
     },
   });
@@ -436,7 +463,10 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
       </div>
 
       {detailQuery.isLoading ? (
-        <SectionCard title="Loading request" description="Fetching case details.">
+        <SectionCard
+          title="Loading request"
+          description="Fetching case details."
+        >
           <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
         </SectionCard>
       ) : detailQuery.isError || !request ? (
@@ -490,7 +520,9 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
                 {formatStatus(request.status)}
               </Badge>
               <Badge variant={priorityTone(request.priority)}>
-                {request.priority === 'HIGH' ? 'High priority' : 'Normal priority'}
+                {request.priority === 'HIGH'
+                  ? 'High priority'
+                  : 'Normal priority'}
               </Badge>
               {request.isOverdue ? (
                 <Badge variant="warning">Response overdue</Badge>
@@ -505,11 +537,22 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
           ) : null}
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <SectionCard title="Case details" description="Parent-visible request context and school response state.">
-              <p className="text-sm leading-6 text-slate-700">{request.description}</p>
+            <SectionCard
+              title="Case details"
+              description="Parent-visible request context and school response state."
+            >
+              <p className="text-sm leading-6 text-slate-700">
+                {request.description}
+              </p>
               <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-                <DetailItem label="Child" value={`${request.student.name} • ${request.student.classSection}`} />
-                <DetailItem label="Requested by" value={request.requestedBy.name} />
+                <DetailItem
+                  label="Child"
+                  value={`${request.student.name} • ${request.student.classSection}`}
+                />
+                <DetailItem
+                  label="Requested by"
+                  value={request.requestedBy.name}
+                />
                 <DetailItem
                   label="Assigned to"
                   value={request.assignedTo?.name ?? 'Unassigned'}
@@ -518,8 +561,14 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
                   label="Response deadline"
                   value={formatDateTime(request.responseDeadline)}
                 />
-                <DetailItem label="Opened" value={formatDateTime(request.createdAt)} />
-                <DetailItem label="Last updated" value={formatDateTime(request.updatedAt)} />
+                <DetailItem
+                  label="Opened"
+                  value={formatDateTime(request.createdAt)}
+                />
+                <DetailItem
+                  label="Last updated"
+                  value={formatDateTime(request.updatedAt)}
+                />
               </dl>
 
               {request.invoice ? (
@@ -531,7 +580,8 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
                     {request.invoice.invoiceNumber}
                   </p>
                   <p className="text-sm text-slate-600">
-                    {request.invoice.status} • due {formatDate(request.invoice.dueDate)}
+                    {request.invoice.status} • due{' '}
+                    {formatDate(request.invoice.dueDate)}
                   </p>
                   <Link
                     href={`/dashboard/fees/ledgers?invoiceId=${encodeURIComponent(request.invoice.id)}`}
@@ -559,7 +609,8 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
                     Escalated
                   </p>
                   <p className="mt-2 text-sm leading-6 text-warning-900">
-                    {request.escalation.reason ?? 'Escalated for urgent follow-up.'}
+                    {request.escalation.reason ??
+                      'Escalated for urgent follow-up.'}
                   </p>
                   <p className="mt-1 text-xs text-warning-700">
                     {formatDateTime(request.escalation.at)}
@@ -570,7 +621,10 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
 
             <div className="space-y-6">
               {canManage && isActive ? (
-                <SectionCard title="Actions" description="Independent review rules apply to resolve and escalate.">
+                <SectionCard
+                  title="Actions"
+                  description="Independent review rules apply to resolve and escalate."
+                >
                   <div className="flex flex-col gap-3">
                     <Button
                       type="button"
@@ -581,7 +635,9 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
                     </Button>
                     {cannotResolve ? (
                       <p className="text-xs leading-5 text-slate-500">
-                        Independent review required: the requester or current assignee cannot close this case. Escalate to another manager first.
+                        Independent review required: the requester or current
+                        assignee cannot close this case. Escalate to another
+                        manager first.
                       </p>
                     ) : null}
                     <Button
@@ -596,11 +652,21 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
                 </SectionCard>
               ) : null}
 
-              <NotesSection title="Parent-visible updates" notes={request.notes} />
-              <NotesSection title="Internal notes" notes={request.internalNotes} internal />
+              <NotesSection
+                title="Parent-visible updates"
+                notes={request.notes}
+              />
+              <NotesSection
+                title="Internal notes"
+                notes={request.internalNotes}
+                internal
+              />
 
               {request.attachments.length > 0 ? (
-                <SectionCard title="Protected evidence" description="Downloads require your signed-in SchoolOS access.">
+                <SectionCard
+                  title="Protected evidence"
+                  description="Downloads require your signed-in SchoolOS access."
+                >
                   <ul className="space-y-3">
                     {request.attachments.map((attachment) => (
                       <li
@@ -611,7 +677,9 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
                           <p className="font-semibold text-slate-900">
                             {attachment.label ?? attachment.fileName}
                           </p>
-                          <p className="text-xs text-slate-500">{attachment.mimeType}</p>
+                          <p className="text-xs text-slate-500">
+                            {attachment.mimeType}
+                          </p>
                         </div>
                         <Button
                           type="button"
@@ -693,9 +761,12 @@ export function ServiceRequestDetailWorkspace({ requestId }: { requestId: string
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 text-warning-600" />
               <div className="flex-1">
-                <h2 className="text-lg font-black text-slate-950">Escalate & reassign</h2>
+                <h2 className="text-lg font-black text-slate-950">
+                  Escalate & reassign
+                </h2>
                 <p className="mt-1 text-sm text-slate-600">
-                  Escalation sets high priority and requires an independent manager with service-request manage access.
+                  Escalation sets high priority and requires an independent
+                  manager with service-request manage access.
                 </p>
               </div>
             </div>
@@ -761,14 +832,28 @@ function NotesSection({
 }) {
   if (notes.length === 0) {
     return (
-      <SectionCard title={title} description={internal ? 'Internal school notes only.' : 'Updates shared with the parent.'}>
+      <SectionCard
+        title={title}
+        description={
+          internal
+            ? 'Internal school notes only.'
+            : 'Updates shared with the parent.'
+        }
+      >
         <p className="text-sm text-slate-500">No notes yet.</p>
       </SectionCard>
     );
   }
 
   return (
-    <SectionCard title={title} description={internal ? 'Internal school notes only.' : 'Updates shared with the parent.'}>
+    <SectionCard
+      title={title}
+      description={
+        internal
+          ? 'Internal school notes only.'
+          : 'Updates shared with the parent.'
+      }
+    >
       <ul className="space-y-3">
         {notes.map((note) => (
           <li key={note.id} className="rounded-xl border border-slate-100 p-3">

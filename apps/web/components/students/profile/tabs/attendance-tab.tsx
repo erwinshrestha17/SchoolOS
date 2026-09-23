@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   formatBsDateTime,
   formatNepalTime,
   type StudentAttendanceMonthlyRegister,
   type StudentAttendanceMonthlyRegisterDay,
   type StudentProfileDetail,
-} from "@schoolos/core";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+} from '@schoolos/core';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertCircle,
   CalendarDays,
@@ -18,32 +18,32 @@ import {
   Clock3,
   RefreshCcw,
   ShieldAlert,
-} from "lucide-react";
-import { api, ApiRequestError } from "@/lib/api";
-import { cn } from "@/lib/utils";
+} from 'lucide-react';
+import { api, ApiRequestError } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import {
   Alert,
   AlertDescription,
   AlertTitle,
-} from "@/components/ui/primitives/alert";
-import { Badge } from "@/components/ui/primitives/badge";
-import { Button } from "@/components/ui/primitives/button";
+} from '@/components/ui/primitives/alert';
+import { Badge } from '@/components/ui/primitives/badge';
+import { Button } from '@/components/ui/primitives/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/primitives/card";
+} from '@/components/ui/primitives/card';
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/primitives/empty";
-import { Progress } from "@/components/ui/primitives/progress";
-import { ScrollArea, ScrollBar } from "@/components/ui/primitives/scroll-area";
+} from '@/components/ui/primitives/empty';
+import { Progress } from '@/components/ui/primitives/progress';
+import { ScrollArea, ScrollBar } from '@/components/ui/primitives/scroll-area';
 import {
   Select,
   SelectContent,
@@ -51,9 +51,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/primitives/select";
-import { Separator } from "@/components/ui/primitives/separator";
-import { Skeleton } from "@/components/ui/primitives/skeleton";
+} from '@/components/ui/primitives/select';
+import { Separator } from '@/components/ui/primitives/separator';
+import { Skeleton } from '@/components/ui/primitives/skeleton';
 import {
   Table,
   TableBody,
@@ -61,19 +61,19 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/primitives/table";
+} from '@/components/ui/primitives/table';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/primitives/tooltip";
+} from '@/components/ui/primitives/tooltip';
 
 type AttendanceTabProps = { profile: StudentProfileDetail };
 
-const ACADEMIC_YEAR_PARAM = "academicYearId";
-const MONTH_PARAM = "month";
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const ACADEMIC_YEAR_PARAM = 'academicYearId';
+const MONTH_PARAM = 'month';
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function AttendanceTab({ profile }: AttendanceTabProps) {
   const studentId = profile.student.id;
@@ -87,10 +87,10 @@ export function AttendanceTab({ profile }: AttendanceTabProps) {
   const updateUrlState = useCallback(
     (
       updates: Record<string, string | null>,
-      navigation: "push" | "replace" = "push",
+      navigation: 'push' | 'replace' = 'push',
     ) => {
       const next = new URLSearchParams(searchParams.toString());
-      next.set("tab", "attendance");
+      next.set('tab', 'attendance');
       for (const [key, value] of Object.entries(updates)) {
         if (value) next.set(key, value);
         else next.delete(key);
@@ -102,10 +102,10 @@ export function AttendanceTab({ profile }: AttendanceTabProps) {
 
   const monthQuery = useQuery({
     queryKey: [
-      "student-attendance-month",
+      'student-attendance-month',
       studentId,
-      requestedAcademicYearId ?? "default",
-      requestedMonth ?? "default",
+      requestedAcademicYearId ?? 'default',
+      requestedMonth ?? 'default',
     ],
     queryFn: () =>
       api.getStudentAttendanceMonthlyRegister(studentId, {
@@ -124,8 +124,8 @@ export function AttendanceTab({ profile }: AttendanceTabProps) {
     }
     if (requestedMonth !== data.month.key)
       updates[MONTH_PARAM] = data.month.key;
-    if (searchParams.get("tab") !== "attendance") updates.tab = "attendance";
-    if (Object.keys(updates).length > 0) updateUrlState(updates, "replace");
+    if (searchParams.get('tab') !== 'attendance') updates.tab = 'attendance';
+    if (Object.keys(updates).length > 0) updateUrlState(updates, 'replace');
   }, [
     monthQuery.data,
     requestedAcademicYearId,
@@ -159,7 +159,7 @@ export function AttendanceTab({ profile }: AttendanceTabProps) {
   const data = monthQuery.data;
   if (
     !data ||
-    data.calendarState === "UNAVAILABLE" ||
+    data.calendarState === 'UNAVAILABLE' ||
     !data.selectedAcademicYear
   ) {
     return <AcademicCalendarUnavailable />;
@@ -209,7 +209,7 @@ export function AttendanceTab({ profile }: AttendanceTabProps) {
                     {data.academicYears.map((year) => (
                       <SelectItem key={year.id} value={year.id}>
                         {year.name}
-                        {year.isCurrent ? " · Current" : ""}
+                        {year.isCurrent ? ' · Current' : ''}
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -227,7 +227,7 @@ export function AttendanceTab({ profile }: AttendanceTabProps) {
             canReturnToCurrent={Boolean(currentAcademicYear)}
           />
 
-          {data.dataState === "PARTIAL" ? (
+          {data.dataState === 'PARTIAL' ? (
             <Alert className="border-warning-100 bg-warning-50 text-warning-900">
               <AlertCircle />
               <AlertTitle>Partial attendance data</AlertTitle>
@@ -247,7 +247,7 @@ export function AttendanceTab({ profile }: AttendanceTabProps) {
             onFocusDate={(date) => {
               setFocusedDate(date);
               const row = document.getElementById(registerRowId(date));
-              row?.scrollIntoView({ behavior: "smooth", block: "center" });
+              row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
               row?.focus({ preventScroll: true });
             }}
           />
@@ -309,7 +309,7 @@ function MonthNavigator({
                   disabled={!month.isAvailable}
                 >
                   {month.label}
-                  {month.isCurrent ? " · Current" : ""}
+                  {month.isCurrent ? ' · Current' : ''}
                 </SelectItem>
               ))}
             </SelectGroup>
@@ -358,11 +358,11 @@ function MonthlySummary({ data }: { data: StudentAttendanceMonthlyRegister }) {
   const month = data.month;
   if (!month) return null;
   const summaryItems = [
-    ["School Days", month.totalSchoolDays],
-    ["Present", month.present],
-    ["Absent", month.absent],
-    ["Late", month.late],
-    ...(data.leaveSupported ? [["Leave", month.leave] as const] : []),
+    ['School Days', month.totalSchoolDays],
+    ['Present', month.present],
+    ['Absent', month.absent],
+    ['Late', month.late],
+    ...(data.leaveSupported ? [['Leave', month.leave] as const] : []),
   ];
   return (
     <section
@@ -382,7 +382,7 @@ function MonthlySummary({ data }: { data: StudentAttendanceMonthlyRegister }) {
           <Clock3 className="size-4" aria-hidden="true" />
           {data.lastUpdatedAt
             ? `Updated ${formatBsDateTime(data.lastUpdatedAt)}`
-            : "No submitted update"}
+            : 'No submitted update'}
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
@@ -399,7 +399,7 @@ function MonthlySummary({ data }: { data: StudentAttendanceMonthlyRegister }) {
             </p>
             <p className="font-semibold tabular-nums">
               {month.attendancePercentage === null
-                ? "Not calculated"
+                ? 'Not calculated'
                 : `${month.attendancePercentage}%`}
             </p>
           </div>
@@ -494,7 +494,7 @@ function CalendarDay({
     day.remark,
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(' · ');
 
   return (
     <Tooltip>
@@ -506,11 +506,11 @@ function CalendarDay({
           aria-pressed={selected}
           onClick={onSelect}
           className={cn(
-            "flex min-h-24 flex-col gap-2 border-b border-r p-2 text-left outline-none transition-colors focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring",
+            'flex min-h-24 flex-col gap-2 border-b border-r p-2 text-left outline-none transition-colors focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring',
             visual.className,
-            day.isToday && "ring-1 ring-inset ring-primary bg-primary/5",
-            selected && "z-10 ring-2 ring-inset ring-primary",
-            day.isFuture && "cursor-not-allowed opacity-60",
+            day.isToday && 'ring-1 ring-inset ring-primary bg-primary/5',
+            selected && 'z-10 ring-2 ring-inset ring-primary',
+            day.isFuture && 'cursor-not-allowed opacity-60',
           )}
         >
           <span className="font-semibold tabular-nums">{dayNumber}</span>
@@ -529,12 +529,12 @@ function CalendarDay({
 
 function AttendanceLegend() {
   const items = [
-    ["Present", "bg-success-500"],
-    ["Absent", "bg-danger-500"],
-    ["Late", "bg-warning-500"],
-    ["Leave / excused", "bg-info-500"],
-    ["Holiday / weekend", "bg-secondary"],
-    ["Not marked", "bg-muted-foreground"],
+    ['Present', 'bg-success-500'],
+    ['Absent', 'bg-danger-500'],
+    ['Late', 'bg-warning-500'],
+    ['Leave / excused', 'bg-info-500'],
+    ['Holiday / weekend', 'bg-secondary'],
+    ['Not marked', 'bg-muted-foreground'],
   ];
   return (
     <div
@@ -547,7 +547,7 @@ function AttendanceLegend() {
           className="inline-flex items-center gap-2 text-xs text-muted-foreground"
         >
           <span
-            className={cn("size-2.5 rounded-full", className)}
+            className={cn('size-2.5 rounded-full', className)}
             aria-hidden="true"
           />
           {label}
@@ -598,7 +598,7 @@ function MonthlyRegister({
                   key={day.dateBs}
                   id={registerRowId(day.dateBs)}
                   tabIndex={-1}
-                  className={cn(focusedDate === day.dateBs && "bg-primary/5")}
+                  className={cn(focusedDate === day.dateBs && 'bg-primary/5')}
                 >
                   <TableCell className="font-medium">{day.dateLabel}</TableCell>
                   <TableCell>{day.dayLabel}</TableCell>
@@ -616,10 +616,10 @@ function MonthlyRegister({
                     <Badge variant={visual.badgeVariant}>{visual.label}</Badge>
                   </TableCell>
                   <TableCell>
-                    {day.arrivalAt ? formatNepalTime(day.arrivalAt) : "—"}
+                    {day.arrivalAt ? formatNepalTime(day.arrivalAt) : '—'}
                   </TableCell>
                   <TableCell className="max-w-72 whitespace-normal">
-                    {day.remark ?? day.holidayName ?? "—"}
+                    {day.remark ?? day.holidayName ?? '—'}
                   </TableCell>
                 </TableRow>
               );
@@ -634,105 +634,105 @@ function MonthlyRegister({
 type DayVisual = {
   label: string;
   className: string;
-  badgeVariant: "default" | "secondary" | "destructive" | "outline";
+  badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline';
 };
 
 function getDayVisual(day: StudentAttendanceMonthlyRegisterDay): DayVisual {
   if (day.isFuture)
     return {
-      label: "Future",
-      className: "bg-muted/30 text-muted-foreground",
-      badgeVariant: "secondary",
+      label: 'Future',
+      className: 'bg-muted/30 text-muted-foreground',
+      badgeVariant: 'secondary',
     };
-  if (day.dayType === "HOLIDAY")
+  if (day.dayType === 'HOLIDAY')
     return {
-      label: "Holiday",
-      className: "bg-secondary text-secondary-foreground",
-      badgeVariant: "secondary",
+      label: 'Holiday',
+      className: 'bg-secondary text-secondary-foreground',
+      badgeVariant: 'secondary',
     };
-  if (day.dayType === "WEEKEND")
+  if (day.dayType === 'WEEKEND')
     return {
-      label: "Weekend",
-      className: "bg-secondary text-secondary-foreground",
-      badgeVariant: "secondary",
+      label: 'Weekend',
+      className: 'bg-secondary text-secondary-foreground',
+      badgeVariant: 'secondary',
     };
-  if (day.attendanceStatus === "PRESENT")
+  if (day.attendanceStatus === 'PRESENT')
     return {
-      label: "Present",
-      className: "bg-success-50 text-success-700",
-      badgeVariant: "outline",
+      label: 'Present',
+      className: 'bg-success-50 text-success-700',
+      badgeVariant: 'outline',
     };
-  if (day.attendanceStatus === "ABSENT")
+  if (day.attendanceStatus === 'ABSENT')
     return {
-      label: "Absent",
-      className: "bg-danger-50 text-danger-700",
-      badgeVariant: "destructive",
+      label: 'Absent',
+      className: 'bg-danger-50 text-danger-700',
+      badgeVariant: 'destructive',
     };
-  if (day.attendanceStatus === "LATE")
+  if (day.attendanceStatus === 'LATE')
     return {
-      label: "Late",
-      className: "bg-warning-50 text-warning-700",
-      badgeVariant: "outline",
+      label: 'Late',
+      className: 'bg-warning-50 text-warning-700',
+      badgeVariant: 'outline',
     };
   if (isLeaveStatus(day.attendanceStatus))
     return {
-      label: "Leave",
-      className: "bg-info-50 text-info-700",
-      badgeVariant: "outline",
+      label: 'Leave',
+      className: 'bg-info-50 text-info-700',
+      badgeVariant: 'outline',
     };
-  if (day.attendanceStatus === "HALF_DAY")
+  if (day.attendanceStatus === 'HALF_DAY')
     return {
-      label: "Half day",
-      className: "bg-warning-50 text-warning-700",
-      badgeVariant: "outline",
+      label: 'Half day',
+      className: 'bg-warning-50 text-warning-700',
+      badgeVariant: 'outline',
     };
-  if (day.attendanceStatus === "NOT_MARKED")
+  if (day.attendanceStatus === 'NOT_MARKED')
     return {
-      label: "Not marked",
-      className: "bg-muted text-muted-foreground",
-      badgeVariant: "outline",
+      label: 'Not marked',
+      className: 'bg-muted text-muted-foreground',
+      badgeVariant: 'outline',
     };
-  if (day.dayType === "EXAM_DAY")
+  if (day.dayType === 'EXAM_DAY')
     return {
-      label: "Exam day",
-      className: "bg-info-50 text-info-700",
-      badgeVariant: "outline",
+      label: 'Exam day',
+      className: 'bg-info-50 text-info-700',
+      badgeVariant: 'outline',
     };
   return {
-    label: "No record",
-    className: "bg-muted/30 text-muted-foreground",
-    badgeVariant: "outline",
+    label: 'No record',
+    className: 'bg-muted/30 text-muted-foreground',
+    badgeVariant: 'outline',
   };
 }
 
 function isLeaveStatus(
-  status: StudentAttendanceMonthlyRegisterDay["attendanceStatus"],
+  status: StudentAttendanceMonthlyRegisterDay['attendanceStatus'],
 ) {
   return (
-    status === "LEAVE" ||
-    status === "SICK_LEAVE" ||
-    status === "EXCUSED_LEAVE" ||
-    status === "UNEXCUSED_LEAVE" ||
-    status === "ON_LEAVE"
+    status === 'LEAVE' ||
+    status === 'SICK_LEAVE' ||
+    status === 'EXCUSED_LEAVE' ||
+    status === 'UNEXCUSED_LEAVE' ||
+    status === 'ON_LEAVE'
   );
 }
 
-function dayTypeLabel(dayType: StudentAttendanceMonthlyRegisterDay["dayType"]) {
-  if (dayType === "SCHOOL_DAY") return "School day";
-  if (dayType === "EXAM_DAY") return "Exam day";
-  if (dayType === "HOLIDAY") return "Holiday";
-  return "Weekend / non-working";
+function dayTypeLabel(dayType: StudentAttendanceMonthlyRegisterDay['dayType']) {
+  if (dayType === 'SCHOOL_DAY') return 'School day';
+  if (dayType === 'EXAM_DAY') return 'Exam day';
+  if (dayType === 'HOLIDAY') return 'Holiday';
+  return 'Weekend / non-working';
 }
 
 function MonthStateBadge({
   state,
 }: {
-  state: NonNullable<StudentAttendanceMonthlyRegister["month"]>["state"];
+  state: NonNullable<StudentAttendanceMonthlyRegister['month']>['state'];
 }) {
-  if (state === "CURRENT") return <Badge>Current month</Badge>;
-  if (state === "PARTIAL") return <Badge variant="outline">Partial</Badge>;
-  if (state === "NO_DATA") return <Badge variant="outline">No register</Badge>;
-  if (state === "UPCOMING") return <Badge variant="secondary">Upcoming</Badge>;
+  if (state === 'CURRENT') return <Badge>Current month</Badge>;
+  if (state === 'PARTIAL') return <Badge variant="outline">Partial</Badge>;
+  if (state === 'NO_DATA') return <Badge variant="outline">No register</Badge>;
+  if (state === 'UPCOMING') return <Badge variant="secondary">Upcoming</Badge>;
   return <Badge variant="secondary">Completed</Badge>;
 }
 
@@ -777,7 +777,7 @@ function AttendanceRequestError({
   }
   if (
     apiError?.statusCode === 403 &&
-    (message.includes("module") || message.includes("entitlement"))
+    (message.includes('module') || message.includes('entitlement'))
   ) {
     return (
       <StateAlert

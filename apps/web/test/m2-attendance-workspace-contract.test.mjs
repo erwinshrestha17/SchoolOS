@@ -1,17 +1,17 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { describe, it } from "node:test";
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { describe, it } from 'node:test';
 
-const webRoot = new URL("../", import.meta.url);
-const read = (path) => readFileSync(new URL(path, webRoot), "utf8");
+const webRoot = new URL('../', import.meta.url);
+const read = (path) => readFileSync(new URL(path, webRoot), 'utf8');
 
-describe("M2 attendance workspace contract", () => {
-  it("uses the shared Button component with consistent risk styling for correction approve/reject", () => {
+describe('M2 attendance workspace contract', () => {
+  it('uses the shared Button component with consistent risk styling for correction approve/reject', () => {
     const inlineReview = read(
-      "components/attendance/attendance-correction-review.tsx",
+      'components/attendance/attendance-correction-review.tsx',
     );
     const detailWorkspace = read(
-      "components/attendance/attendance-m2-workspaces.tsx",
+      'components/attendance/attendance-m2-workspaces.tsx',
     );
 
     // Both surfaces review the exact same underlying action — they must use
@@ -19,17 +19,20 @@ describe("M2 attendance workspace contract", () => {
     // colors) and agree on which variant signals "this is destructive".
     assert.match(
       inlineReview,
-      /import \{ Button \} from '@\/components\/ui\/button'/,
+      /import \{ Button \} from ['"]@\/components\/ui\/button['"]/,
     );
     assert.doesNotMatch(
       inlineReview,
-      /className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600/,
+      /className=['"]inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600/,
     );
     assert.doesNotMatch(
       inlineReview,
-      /className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-danger-100 bg-danger-50/,
+      /className=['"]inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-danger-100 bg-danger-50/,
     );
-    assert.match(inlineReview, /<Button[\s\S]{0,80}variant="destructive"/);
+    assert.match(
+      inlineReview,
+      /<Button[\s\S]{0,80}variant=['"]destructive['"]/,
+    );
 
     // Wording must agree across both surfaces for the same action —
     // shortened to the 1-3 word convention, not "Approve Request"/"Reject
@@ -38,80 +41,83 @@ describe("M2 attendance workspace contract", () => {
     assert.doesNotMatch(detailWorkspace, /Reject Request/);
     assert.match(
       inlineReview,
-      /\{activeReview\?\.action === 'APPROVED'[\s\S]{0,100}: 'Approve'\}/,
+      /\{activeReview\?\.action === ['"]APPROVED['"][\s\S]{0,100}: ['"]Approve['"]\}/,
     );
   });
 
-  it("uses the shared Button for conflict resolution instead of a hand-styled button", () => {
+  it('uses the shared Button for conflict resolution instead of a hand-styled button', () => {
     const conflictReview = read(
-      "components/attendance/attendance-conflict-review.tsx",
+      'components/attendance/attendance-conflict-review.tsx',
     );
 
     assert.match(
       conflictReview,
-      /import \{ Button \} from '@\/components\/ui\/button'/,
+      /import \{ Button \} from ['"]@\/components\/ui\/button['"]/,
     );
     assert.doesNotMatch(
       conflictReview,
-      /className="flex items-center justify-center gap-2 rounded-xl bg-\[var\(--color-mod-attendance-accent\)\]/,
+      /className=['"]flex items-center justify-center gap-2 rounded-xl bg-\[var\(--color-mod-attendance-accent\)\]/,
     );
   });
 
-  it("gives the medical-alert indicator an accessible name, not color alone", () => {
-    const rosterItem = read("components/attendance/attendance-roster-item.tsx");
+  it('gives the medical-alert indicator an accessible name, not color alone', () => {
+    const rosterItem = read('components/attendance/attendance-roster-item.tsx');
 
-    assert.match(rosterItem, /role="img"/);
-    assert.match(rosterItem, /aria-label="Medical alert"/);
+    assert.match(rosterItem, /role=['"]img['"]/);
+    assert.match(rosterItem, /aria-label=['"]Medical alert['"]/);
   });
 
-  it("does not present a non-functional export button as an active primary action", () => {
+  it('does not present a non-functional export button as an active primary action', () => {
     const workspaces = read(
-      "components/attendance/attendance-m2-workspaces.tsx",
+      'components/attendance/attendance-m2-workspaces.tsx',
     );
 
     // This button has no onClick and no backend export contract — it must
     // be honestly disabled with an explanatory tooltip, not look clickable.
     assert.match(
       workspaces,
-      /Tooltip content="No export contract for this queue yet"[\s\S]{0,80}<Button variant="outline" disabled>/,
+      /Tooltip content=['"]No export contract for this queue yet['"][\s\S]{0,80}<Button variant=['"]outline['"] disabled>/,
     );
   });
 
-  it("keeps the practical attendance workspace to five main sections", () => {
+  it('keeps the practical attendance workspace to five main sections', () => {
     const workspaces = read(
-      "components/attendance/attendance-m2-workspaces.tsx",
+      'components/attendance/attendance-m2-workspaces.tsx',
     );
 
-    assert.match(workspaces, /label: "Overview"/);
-    assert.match(workspaces, /label: "Mark Attendance"/);
-    assert.match(workspaces, /label: "Monthly Register"/);
-    assert.match(workspaces, /label: "Corrections"/);
-    assert.match(workspaces, /label: "Reports"/);
-    assert.doesNotMatch(workspaces, /label: "Anomalies"/);
-    assert.doesNotMatch(workspaces, /label: "Follow-ups"/);
+    assert.match(workspaces, /label: ['"]Overview['"]/);
+    assert.match(workspaces, /label: ['"]Mark Attendance['"]/);
+    assert.match(workspaces, /label: ['"]Monthly Register['"]/);
+    assert.match(workspaces, /label: ['"]Corrections['"]/);
+    assert.match(workspaces, /label: ['"]Reports['"]/);
+    assert.doesNotMatch(workspaces, /label: ['"]Anomalies['"]/);
+    assert.doesNotMatch(workspaces, /label: ['"]Follow-ups['"]/);
   });
 
-  it("uses the four pilot statuses and filters teacher choices to assignments", () => {
-    const form = read("components/forms/attendance-form.tsx");
-    const rosterItem = read("components/attendance/attendance-roster-item.tsx");
+  it('uses the four pilot statuses and filters teacher choices to assignments', () => {
+    const form = read('components/forms/attendance-form.tsx');
+    const rosterItem = read('components/attendance/attendance-roster-item.tsx');
 
-    assert.match(form, /<option value="PRESENT">Present<\/option>/);
-    assert.match(form, /<option value="ABSENT">Absent<\/option>/);
-    assert.match(form, /<option value="LATE">Late<\/option>/);
-    assert.match(form, /<option value="LEAVE">Leave \/ Excused<\/option>/);
-    assert.doesNotMatch(form, /<option value="SICK_LEAVE">/);
+    assert.match(form, /<option value=['"]PRESENT['"]>Present<\/option>/);
+    assert.match(form, /<option value=['"]ABSENT['"]>Absent<\/option>/);
+    assert.match(form, /<option value=['"]LATE['"]>Late<\/option>/);
+    assert.match(
+      form,
+      /<option value=['"]LEAVE['"]>Leave \/ Excused<\/option>/,
+    );
+    assert.doesNotMatch(form, /<option value=['"]SICK_LEAVE['"]>/);
     assert.match(
       form,
       /isTeacherPersona[\s\S]*assignedSections[\s\S]*availableClasses/,
     );
-    assert.match(rosterItem, /onStatusChange\('EXCUSED_LEAVE'\)/);
-    assert.doesNotMatch(rosterItem, /label: 'Unexcused'/);
+    assert.match(rosterItem, /onStatusChange\(['"]EXCUSED_LEAVE['"]\)/);
+    assert.doesNotMatch(rosterItem, /label: ['"]Unexcused['"]/);
   });
 
-  it("keeps submitted attendance read-only and exposes all weak-network states", () => {
-    const form = read("components/forms/attendance-form.tsx");
-    const guardStart = form.indexOf("const finalizationReadOnly =");
-    const guardEnd = form.indexOf("const overrideChanges =", guardStart);
+  it('keeps submitted attendance read-only and exposes all weak-network states', () => {
+    const form = read('components/forms/attendance-form.tsx');
+    const guardStart = form.indexOf('const finalizationReadOnly =');
+    const guardEnd = form.indexOf('const overrideChanges =', guardStart);
     assert.notEqual(guardStart, -1);
     assert.notEqual(guardEnd, -1);
     const finalizationGuard = form.slice(guardStart, guardEnd);
@@ -137,24 +143,24 @@ describe("M2 attendance workspace contract", () => {
     assert.match(form, /No authoritative attendance was accepted/);
     assert.match(
       finalizationGuard,
-      /unresolvedFinalizationReadOnly[\s\S]{0,120}\["accepted", "recorded_conflict"\]\.includes/,
+      /unresolvedFinalizationReadOnly[\s\S]{0,120}\[['"]accepted['"], ['"]recorded_conflict['"]\]\.includes/,
     );
     assert.match(
       form,
-      /const unresolvedFinalizationReadOnly = \[[\s\S]{0,120}"queued",[\s\S]{0,120}"server_check",[\s\S]{0,120}"authorization_denied"/,
+      /const unresolvedFinalizationReadOnly = \[[\s\S]{0,120}['"]queued['"],[\s\S]{0,120}['"]server_check['"],[\s\S]{0,120}['"]authorization_denied['"]/,
     );
     assert.doesNotMatch(finalizationGuard, /=\s*false/);
     assert.match(
       form,
-      /disabled=\{[\s\S]{0,600}finalizationReadOnly[\s\S]{0,160}visibleDraftSyncState === "rejected"/,
+      /disabled=\{[\s\S]{0,600}finalizationReadOnly[\s\S]{0,160}visibleDraftSyncState === ['"]rejected['"]/,
     );
   });
 
-  it("prints backend-owned monthly register totals and never opens protected exports directly", () => {
+  it('prints backend-owned monthly register totals and never opens protected exports directly', () => {
     const workspaces = read(
-      "components/attendance/attendance-m2-workspaces.tsx",
+      'components/attendance/attendance-m2-workspaces.tsx',
     );
-    const styles = read("app/globals.css");
+    const styles = read('app/globals.css');
 
     assert.match(workspaces, /register\.summary/);
     assert.match(workspaces, /window\.print\(\)/);
@@ -165,9 +171,9 @@ describe("M2 attendance workspace contract", () => {
     assert.match(styles, /attendance-register-print/);
   });
 
-  it("shows write-producing register exports only with report export authority", () => {
+  it('shows write-producing register exports only with report export authority', () => {
     const workspaces = read(
-      "components/attendance/attendance-m2-workspaces.tsx",
+      'components/attendance/attendance-m2-workspaces.tsx',
     );
 
     assert.match(

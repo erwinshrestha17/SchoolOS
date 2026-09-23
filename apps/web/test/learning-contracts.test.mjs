@@ -36,13 +36,22 @@ describe('M13 Learning frontend contracts', () => {
       'app/parent/learning/progress/page.tsx',
     ]) {
       const source = read(parentRoute);
-      assert.match(source, /redirect\(['"]\/login\?notice=parent-mobile-only['"]\)/);
+      assert.match(
+        source,
+        /redirect\(['"]\/login\?notice=parent-mobile-only['"]\)/,
+      );
       assert.doesNotMatch(source, /ParentLearningSummaryView|learningApi\./);
     }
 
     const dashboardLayout = read('app/dashboard/layout.tsx');
-    assert.match(dashboardLayout, /roles\.every\(\(role\) => role === ["']parent["']\)/);
-    assert.match(dashboardLayout, /router\.replace\(["']\/login\?notice=parent-mobile-only["']\)/);
+    assert.match(
+      dashboardLayout,
+      /roles\.every\(\(role\) => role === ["']parent["']\)/,
+    );
+    assert.match(
+      dashboardLayout,
+      /router\.replace\(["']\/login\?notice=parent-mobile-only["']\)/,
+    );
   });
 
   it('wires Learning through dashboard permissions and module entitlements', () => {
@@ -63,8 +72,8 @@ describe('M13 Learning frontend contracts', () => {
       /prefix: ["']\/dashboard\/learning["'], module: ["']learning["']/,
     );
 
-    assert.match(personaNav, /label:\s*'Learning'/);
-    assert.match(personaNav, /href:\s*'\/dashboard\/learning'/);
+    assert.match(personaNav, /label:\s*['"]Learning['"]/);
+    assert.match(personaNav, /href:\s*['"]\/dashboard\/learning['"]/);
     assert.match(personaNav, /learningPermissions/);
     assert.match(sidebar, /getRequiredModuleForHref/);
   });
@@ -122,14 +131,17 @@ describe('M13 Learning frontend contracts', () => {
       assert.match(client, new RegExp(endpoint.replaceAll('/', '\\/')));
     }
 
-    assert.match(client, /LearningActivityStatus[\s\S]*'READY'/);
-    assert.match(client, /LearningQuestionType[\s\S]*'MATCHING'/);
-    assert.match(client, /LearningQuestionType[\s\S]*'ORDERING'/);
-    assert.match(client, /LearningResourceStatus[\s\S]*'ARCHIVED'/);
+    assert.match(client, /LearningActivityStatus[\s\S]*['"]READY['"]/);
+    assert.match(client, /LearningQuestionType[\s\S]*['"]MATCHING['"]/);
+    assert.match(client, /LearningQuestionType[\s\S]*['"]ORDERING['"]/);
+    assert.match(client, /LearningResourceStatus[\s\S]*['"]ARCHIVED['"]/);
     assert.doesNotMatch(client, /PUBLISHED/);
-    assert.match(barrel, /export \* from '\.\/learning'/);
-    assert.match(legacyAggregate, /export \* from '\.\/api\/learning'/);
-    assert.match(legacyAggregate, /import \{ learningApi \} from '\.\/api\/learning'/);
+    assert.match(barrel, /export \* from ['"]\.\/learning['"]/);
+    assert.match(legacyAggregate, /export \* from ['"]\.\/api\/learning['"]/);
+    assert.match(
+      legacyAggregate,
+      /import \{ learningApi \} from ['"]\.\/api\/learning['"]/,
+    );
     assert.match(legacyAggregate, /\.\.\.learningApi/);
   });
 
@@ -186,7 +198,7 @@ describe('M13 Learning frontend contracts', () => {
 
     assert.match(workspace, /EmptyState/);
     assert.match(workspace, /LoadingState/);
-    assert.match(resourcesPage, /initialTab="resources"/);
+    assert.match(resourcesPage, /initialTab=['"]resources['"]/);
     assert.match(resources, /ProtectedFileButton/);
     assert.match(resources, /learning-resources/);
     assert.match(resources, /Protected file metadata unavailable/);

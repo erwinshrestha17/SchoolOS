@@ -37,7 +37,9 @@ test.describe('P0/P1 responsive and keyboard hardening', () => {
     }
   });
 
-  test('keeps the remote student selector keyboard-operable', async ({ page }) => {
+  test('keeps the remote student selector keyboard-operable', async ({
+    page,
+  }) => {
     await login(page);
     await page.goto('/dashboard/activity/milestones');
 
@@ -64,7 +66,9 @@ test.describe('P0/P1 responsive and keyboard hardening', () => {
     await expect(
       page.locator('h1:visible, h2:visible, [role="heading"]:visible').first(),
     ).toBeVisible();
-    await expect(page.getByRole('link', { name: /Issue \/ Return/i }).first()).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: /Issue \/ Return/i }).first(),
+    ).toBeVisible();
   });
 });
 

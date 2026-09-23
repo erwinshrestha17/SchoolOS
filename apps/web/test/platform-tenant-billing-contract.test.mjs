@@ -36,9 +36,12 @@ describe('Platform tenant SaaS billing page contracts', () => {
       'PlatformEmptyState',
       'PlatformInlineError',
       'PlatformBoundaryNote',
-      'from "@/app/platform/_components/platform-operator-states"',
+      "from '@/app/platform/_components/platform-operator-states'",
     ]) {
-      assert.match(page, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      assert.match(
+        page,
+        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      );
     }
   });
 
@@ -71,7 +74,10 @@ describe('Platform tenant SaaS billing page contracts', () => {
       assert.match(page, new RegExp(expected));
     }
 
-    assert.doesNotMatch(page, /bg-slate-900|bg-slate-950|shadow-xl|shadow-2xl|N\/A|Unknown failure|SO-2024-00124/);
+    assert.doesNotMatch(
+      page,
+      /bg-slate-900|bg-slate-950|shadow-xl|shadow-2xl|N\/A|Unknown failure|SO-2024-00124/,
+    );
   });
 
   it('keeps billing writes behind the existing manage permission', () => {

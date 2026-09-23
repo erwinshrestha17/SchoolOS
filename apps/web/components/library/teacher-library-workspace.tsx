@@ -91,7 +91,11 @@ export function TeacherLibraryWorkspace() {
           loading={myIssuesQuery.isLoading}
           value={myIssuesQuery.isError ? 'Unavailable' : dueSoonLoans.length}
           icon={<Clock3 size={20} />}
-          tone={!myIssuesQuery.isError && dueSoonLoans.length > 0 ? 'info' : 'module'}
+          tone={
+            !myIssuesQuery.isError && dueSoonLoans.length > 0
+              ? 'info'
+              : 'module'
+          }
           description="Return or ask the library desk to renew."
         />
         <SummaryCard
@@ -120,7 +124,10 @@ export function TeacherLibraryWorkspace() {
 
       {tab === 'loans' ? (
         myIssuesQuery.isLoading ? (
-          <LoadingState variant="page" label="Loading your borrowing record..." />
+          <LoadingState
+            variant="page"
+            label="Loading your borrowing record..."
+          />
         ) : noStaffProfile ? (
           // Validation scenario: an account with no active Staff row (new
           // joiner not yet onboarded, or an ended employment record). The
@@ -157,10 +164,18 @@ export function TeacherLibraryWorkspace() {
                 </caption>
                 <thead>
                   <tr className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-500">
-                    <th scope="col" className="py-2 pr-3">Title</th>
-                    <th scope="col" className="py-2 pr-3">Issued</th>
-                    <th scope="col" className="py-2 pr-3">Due</th>
-                    <th scope="col" className="py-2 pr-3">Status</th>
+                    <th scope="col" className="py-2 pr-3">
+                      Title
+                    </th>
+                    <th scope="col" className="py-2 pr-3">
+                      Issued
+                    </th>
+                    <th scope="col" className="py-2 pr-3">
+                      Due
+                    </th>
+                    <th scope="col" className="py-2 pr-3">
+                      Status
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -247,7 +262,10 @@ export function TeacherLibraryWorkspace() {
           ) : (
             <ul className="divide-y divide-slate-100">
               {catalogQuery.data?.items.map((book) => (
-                <li key={book.id} className="flex flex-wrap gap-x-4 gap-y-1 py-3">
+                <li
+                  key={book.id}
+                  className="flex flex-wrap gap-x-4 gap-y-1 py-3"
+                >
                   <span className="font-bold text-slate-900">{book.title}</span>
                   {book.author ? (
                     <span className="text-slate-600">{book.author}</span>

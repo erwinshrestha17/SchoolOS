@@ -27,8 +27,8 @@ import type {
   FinancialAuditLogSummary,
   JournalEntryView,
   PaginatedResult,
-} from "@schoolos/core";
-import { getNepalSchoolDay } from "@schoolos/core";
+} from '@schoolos/core';
+import { getNepalSchoolDay } from '@schoolos/core';
 import {
   API_BASE_URL,
   JsonBody,
@@ -36,11 +36,11 @@ import {
   parseApiErrorMessage,
   request,
   withQuery,
-} from "./client";
+} from './client';
 
 export const accountingApi = {
   getAccountingDashboardSummary: () =>
-    request<AccountingDashboardSummary>("/accounting/dashboard-summary"),
+    request<AccountingDashboardSummary>('/accounting/dashboard-summary'),
   listLedgerEntriesPage: (params?: {
     page?: number;
     limit?: number;
@@ -55,11 +55,11 @@ export const accountingApi = {
       page: number;
       limit: number;
       hasNextPage: boolean;
-    }>(withQuery("/ledger/entries", params ?? {})),
+    }>(withQuery('/ledger/entries', params ?? {})),
   listLedgerEntries: async () =>
     (await accountingApi.listLedgerEntriesPage({ limit: 25 })).items,
   listAccountingPeriods: () =>
-    request<AccountingPeriodSummary[]>("/accounting/periods"),
+    request<AccountingPeriodSummary[]>('/accounting/periods'),
   listPostingBatches: (params?: {
     page?: number;
     limit?: number;
@@ -67,44 +67,44 @@ export const accountingApi = {
     sourceModule?: string;
   }) =>
     request<PaginatedResult<AccountingPostingBatchSummary>>(
-      withQuery("/accounting/posting-batches", params ?? {}),
+      withQuery('/accounting/posting-batches', params ?? {}),
     ),
   retryPostingBatch: (id: string) =>
     request<AccountingPostingBatchSummary>(
       `/accounting/posting-batches/${encodeURIComponent(id)}/retry`,
-      { method: "POST", json: {} },
+      { method: 'POST', json: {} },
     ),
   listChartAccounts: () =>
-    request<ChartAccountSummary[]>("/accounting/accounts"),
+    request<ChartAccountSummary[]>('/accounting/accounts'),
   listChartAccountTree: () =>
-    request<ChartAccountSummary[]>("/accounting/accounts/tree"),
+    request<ChartAccountSummary[]>('/accounting/accounts/tree'),
   createChartAccount: (body: JsonBody) =>
-    request<ChartAccountSummary>("/accounting/accounts", {
-      method: "POST",
+    request<ChartAccountSummary>('/accounting/accounts', {
+      method: 'POST',
       json: body,
     }),
   archiveChartAccount: (id: string) =>
     request<ChartAccountSummary>(
       `/accounting/accounts/${encodeURIComponent(id)}/archive`,
-      { method: "POST", json: {} },
+      { method: 'POST', json: {} },
     ),
   seedDefaultChartAccounts: () =>
-    request<ChartAccountSummary[]>("/accounting/accounts/seed-defaults", {
-      method: "POST",
+    request<ChartAccountSummary[]>('/accounting/accounts/seed-defaults', {
+      method: 'POST',
       json: {},
     }),
   createAccountingPeriod: (body: JsonBody) =>
-    request<AccountingPeriodSummary>("/accounting/periods", {
-      method: "POST",
+    request<AccountingPeriodSummary>('/accounting/periods', {
+      method: 'POST',
       json: body,
     }),
   createFiscalYear: (body: JsonBody) =>
-    request<FiscalYearSummary>("/accounting/fiscal-years", {
-      method: "POST",
+    request<FiscalYearSummary>('/accounting/fiscal-years', {
+      method: 'POST',
       json: body,
     }),
   listFiscalYears: () =>
-    request<FiscalYearSummary[]>("/accounting/fiscal-years"),
+    request<FiscalYearSummary[]>('/accounting/fiscal-years'),
   listFiscalPeriods: (id: string) =>
     request<FiscalPeriodSummary[]>(
       `/accounting/fiscal-years/${encodeURIComponent(id)}/periods`,
@@ -112,12 +112,12 @@ export const accountingApi = {
   lockFiscalPeriod: (id: string, body: JsonBody) =>
     request<FiscalPeriodSummary>(
       `/accounting/fiscal-periods/${encodeURIComponent(id)}/lock`,
-      { method: "POST", json: body },
+      { method: 'POST', json: body },
     ),
   unlockFiscalPeriod: (id: string, body: JsonBody) =>
     request<FiscalPeriodSummary>(
       `/accounting/fiscal-periods/${encodeURIComponent(id)}/unlock`,
-      { method: "POST", json: body },
+      { method: 'POST', json: body },
     ),
   getFiscalPeriodCloseReadiness: (id: string) =>
     request<FiscalPeriodCloseReadiness>(
@@ -126,30 +126,30 @@ export const accountingApi = {
   closeFiscalPeriod: (id: string, body: JsonBody) =>
     request<FiscalPeriodSummary>(
       `/accounting/fiscal-periods/${encodeURIComponent(id)}/close`,
-      { method: "POST", json: body },
+      { method: 'POST', json: body },
     ),
   reopenFiscalPeriod: (id: string, body: JsonBody) =>
     request<FiscalPeriodSummary>(
       `/accounting/fiscal-periods/${encodeURIComponent(id)}/reopen`,
-      { method: "POST", json: body },
+      { method: 'POST', json: body },
     ),
   listAccountingReports: (params?: JsonBody) =>
-    request<AccountingReport>(withQuery("/accounting/reports", params ?? {})),
+    request<AccountingReport>(withQuery('/accounting/reports', params ?? {})),
   listTrialBalance: (params: AccountingReportFilters) =>
     request<AccountingTrialBalanceResponse>(
-      withQuery("/accounting/reports/trial-balance", params ?? {}),
+      withQuery('/accounting/reports/trial-balance', params ?? {}),
     ),
   listGeneralLedger: (params: AccountingReportFilters) =>
     request<AccountingGeneralLedgerResponse>(
-      withQuery("/accounting/reports/general-ledger", params ?? {}),
+      withQuery('/accounting/reports/general-ledger', params ?? {}),
     ),
   listIncomeStatement: (params: AccountingReportFilters) =>
     request<AccountingIncomeStatementResponse>(
-      withQuery("/accounting/reports/income-statement", params ?? {}),
+      withQuery('/accounting/reports/income-statement', params ?? {}),
     ),
   listBalanceSheet: (params: AccountingReportFilters) =>
     request<AccountingBalanceSheetResponse>(
-      withQuery("/accounting/reports/balance-sheet", {
+      withQuery('/accounting/reports/balance-sheet', {
         fiscalYearId: params.fiscalYearId,
         fiscalPeriodId: params.fiscalPeriodId,
         asOfDate: params.toDate,
@@ -157,39 +157,41 @@ export const accountingApi = {
     ),
   listCashBook: (params: AccountingReportFilters) =>
     request<AccountingCashBookResponse>(
-      withQuery("/accounting/reports/cash-book", params ?? {}),
+      withQuery('/accounting/reports/cash-book', params ?? {}),
     ),
   listBankBook: (params: AccountingReportFilters) =>
     request<AccountingCashBookResponse>(
-      withQuery("/accounting/reports/bank-book", params ?? {}),
+      withQuery('/accounting/reports/bank-book', params ?? {}),
     ),
-  listJournalRegister: (params: AccountingReportFilters & { voucherType?: string }) =>
+  listJournalRegister: (
+    params: AccountingReportFilters & { voucherType?: string },
+  ) =>
     request<unknown>(
       withQuery(
         params.voucherType
-          ? "/accounting/reports/voucher-register"
-          : "/accounting/reports/journal-register",
+          ? '/accounting/reports/voucher-register'
+          : '/accounting/reports/journal-register',
         params ?? {},
       ),
     ),
   listFailedUnpostedTransactions: () =>
-    request<unknown>("/accounting/reports/failed-unposted"),
+    request<unknown>('/accounting/reports/failed-unposted'),
   listCashFlowStatement: (params: AccountingReportFilters) =>
     request<unknown>(
-      withQuery("/accounting/reports/cash-flow-statement", params ?? {}),
+      withQuery('/accounting/reports/cash-flow-statement', params ?? {}),
     ),
   listBudgetVsActual: (
     params: AccountingReportFilters & { budgetId?: string },
   ) =>
     request<unknown>(
-      withQuery("/accounting/reports/budget-vs-actual", params ?? {}),
+      withQuery('/accounting/reports/budget-vs-actual', params ?? {}),
     ),
   listFiscalBudgets: (fiscalYearId?: string) =>
     request<unknown>(
-      withQuery("/accounting/budgets", fiscalYearId ? { fiscalYearId } : {}),
+      withQuery('/accounting/budgets', fiscalYearId ? { fiscalYearId } : {}),
     ),
   createFiscalBudget: (body: { fiscalYearId: string; name: string }) =>
-    request<unknown>("/accounting/budgets", { method: "POST", json: body }),
+    request<unknown>('/accounting/budgets', { method: 'POST', json: body }),
   upsertFiscalBudgetLines: (
     budgetId: string,
     body: {
@@ -200,14 +202,17 @@ export const accountingApi = {
       }>;
     },
   ) =>
-    request<unknown>(`/accounting/budgets/${encodeURIComponent(budgetId)}/lines`, {
-      method: "PUT",
-      json: body,
-    }),
+    request<unknown>(
+      `/accounting/budgets/${encodeURIComponent(budgetId)}/lines`,
+      {
+        method: 'PUT',
+        json: body,
+      },
+    ),
   approveFiscalBudget: (budgetId: string, reason: string) =>
     request<unknown>(
       `/accounting/budgets/${encodeURIComponent(budgetId)}/approve`,
-      { method: "POST", json: { reason } },
+      { method: 'POST', json: { reason } },
     ),
   listFinancialAuditTrail: (params?: {
     fromDate?: string;
@@ -219,31 +224,32 @@ export const accountingApi = {
     limit?: number;
   }) =>
     request<PaginatedResult<FinancialAuditLogSummary>>(
-      withQuery("/accounting/reports/financial-audit-trail", params ?? {}),
+      withQuery('/accounting/reports/financial-audit-trail', params ?? {}),
     ),
   listTaxSummary: (params: AccountingReportFilters) =>
     request<unknown>(
-      withQuery("/accounting/reports/tax-summary", params ?? {}),
+      withQuery('/accounting/reports/tax-summary', params ?? {}),
     ),
-  listTdsSummary: () => request<any>("/accounting/reports/tds-summary"),
-  listPfSummary: () => request<any>("/accounting/reports/pf-summary"),
-  exportAccountingCsv: async (report: string, params?: Record<string, string>) => {
-    const query = params
-      ? `?${new URLSearchParams(params).toString()}`
-      : "";
+  listTdsSummary: () => request<any>('/accounting/reports/tds-summary'),
+  listPfSummary: () => request<any>('/accounting/reports/pf-summary'),
+  exportAccountingCsv: async (
+    report: string,
+    params?: Record<string, string>,
+  ) => {
+    const query = params ? `?${new URLSearchParams(params).toString()}` : '';
     const response = await fetch(
       `${API_BASE_URL}/accounting/reports/${encodeURIComponent(report)}/export${query}`,
-      { credentials: "include" },
+      { credentials: 'include' },
     );
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(parseApiErrorMessage(text) || "Export failed");
+      throw new Error(parseApiErrorMessage(text) || 'Export failed');
     }
 
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
     a.download = `${report}-${getNepalSchoolDay().gregorianDate}.csv`;
     document.body.appendChild(a);
@@ -251,13 +257,14 @@ export const accountingApi = {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   },
-  exportAccountingPdf: async (report: string, params?: Record<string, string>) => {
-    const query = params
-      ? `?${new URLSearchParams(params).toString()}`
-      : "";
+  exportAccountingPdf: async (
+    report: string,
+    params?: Record<string, string>,
+  ) => {
+    const query = params ? `?${new URLSearchParams(params).toString()}` : '';
     const response = await fetch(
       `${API_BASE_URL}/accounting/reports/${encodeURIComponent(report)}/export.pdf${query}`,
-      { credentials: "include" },
+      { credentials: 'include' },
     );
 
     await openPdfBlob(response);
@@ -265,38 +272,38 @@ export const accountingApi = {
   exportBankReconciliationPdf: async (accountId: string) => {
     const response = await fetch(
       `${API_BASE_URL}/accounting/reports/bank-reconciliation/${encodeURIComponent(accountId)}/export.pdf`,
-      { credentials: "include" },
+      { credentials: 'include' },
     );
 
     await openPdfBlob(response);
   },
   closeAccountingPeriod: (id: string) =>
     request<AccountingPeriodSummary>(`/accounting/closing/${id}`, {
-      method: "POST",
+      method: 'POST',
       json: {},
     }),
   createOpeningBalance: (body: JsonBody) =>
-    request<any>("/accounting/opening-balance", { method: "POST", json: body }),
+    request<any>('/accounting/opening-balance', { method: 'POST', json: body }),
   getOpeningBalance: (fiscalYearId: string) =>
     request<any>(`/accounting/opening-balance/${fiscalYearId}`),
   createExpenseVoucher: (body: JsonBody) =>
-    request<JournalEntryView>("/accounting/vouchers/expense", {
-      method: "POST",
+    request<JournalEntryView>('/accounting/vouchers/expense', {
+      method: 'POST',
       json: body,
     }),
   createPaymentVoucher: (body: JsonBody) =>
-    request<JournalEntryView>("/accounting/vouchers/payment", {
-      method: "POST",
+    request<JournalEntryView>('/accounting/vouchers/payment', {
+      method: 'POST',
       json: body,
     }),
   createReceiptVoucher: (body: JsonBody) =>
-    request<JournalEntryView>("/accounting/vouchers/receipt", {
-      method: "POST",
+    request<JournalEntryView>('/accounting/vouchers/receipt', {
+      method: 'POST',
       json: body,
     }),
   createContraVoucher: (body: JsonBody) =>
-    request<JournalEntryView>("/accounting/vouchers/contra", {
-      method: "POST",
+    request<JournalEntryView>('/accounting/vouchers/contra', {
+      method: 'POST',
       json: body,
     }),
   getFiscalYearCloseReadiness: (id: string) =>
@@ -305,12 +312,12 @@ export const accountingApi = {
     ),
   closeFiscalYear: (id: string, body: JsonBody) =>
     request<any>(`/accounting/fiscal-years/${id}/close-year`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   reopenFiscalYear: (id: string, body: JsonBody) =>
     request<any>(`/accounting/fiscal-years/${id}/reopen-year`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   previewBankStatementImport: (
@@ -319,7 +326,7 @@ export const accountingApi = {
   ) =>
     request<BankStatementImportPreview>(
       `/accounting/bank-reconciliation/${accountId}/import-preview`,
-      { method: "POST", json: { lines } },
+      { method: 'POST', json: { lines } },
     ),
   importBankStatement: (
     accountId: string,
@@ -329,7 +336,7 @@ export const accountingApi = {
     request<BankStatementImportResult>(
       `/accounting/bank-reconciliation/${accountId}/import`,
       {
-      method: "POST",
+        method: 'POST',
         json: { lines, fingerprint },
       },
     ),
@@ -339,7 +346,7 @@ export const accountingApi = {
   ) =>
     request<BankStatementImportJobQueuedResult>(
       `/accounting/bank-reconciliation/${accountId}/import-queue`,
-      { method: "POST", json: { lines } },
+      { method: 'POST', json: { lines } },
     ),
   listBankImportJobs: (accountId: string) =>
     request<BankStatementImportJobStatus[]>(
@@ -358,54 +365,57 @@ export const accountingApi = {
       `/accounting/bank-reconciliation/${accountId}/auto-match`,
     ),
   reconcileStatement: (statementId: string, journalLineId: string) =>
-    request<BankStatementLineSummary>("/accounting/bank-reconciliation/reconcile", {
-      method: "POST",
-      json: { statementId, journalLineId },
-    }),
+    request<BankStatementLineSummary>(
+      '/accounting/bank-reconciliation/reconcile',
+      {
+        method: 'POST',
+        json: { statementId, journalLineId },
+      },
+    ),
   unreconcileStatement: (statementId: string, reason: string) =>
     request<BankStatementLineSummary>(
-      "/accounting/bank-reconciliation/unreconcile",
-      { method: "POST", json: { statementId, reason } },
+      '/accounting/bank-reconciliation/unreconcile',
+      { method: 'POST', json: { statementId, reason } },
     ),
   getReconciliationSummary: (accountId: string) =>
     request<BankReconciliationSummary>(
       `/accounting/bank-reconciliation/${accountId}/summary`,
     ),
-  listJournalEntries: () => request<JournalEntryView[]>("/accounting/journals"),
+  listJournalEntries: () => request<JournalEntryView[]>('/accounting/journals'),
   listAccountingSourceMappings: (params?: {
     page?: number;
     limit?: number;
     sourceModule?: string;
-    status?: "ACTIVE" | "ARCHIVED";
+    status?: 'ACTIVE' | 'ARCHIVED';
     search?: string;
   }) =>
     request<PaginatedResult<AccountingSourceMappingSummary>>(
-      withQuery("/accounting/source-mappings", params ?? {}),
+      withQuery('/accounting/source-mappings', params ?? {}),
     ),
   getAccountingSourceMappingHealth: () =>
     request<AccountingSourceMappingHealth>(
-      "/accounting/source-mappings/health",
+      '/accounting/source-mappings/health',
     ),
   createAccountingSourceMapping: (body: JsonBody) =>
-    request<AccountingSourceMappingSummary>("/accounting/source-mappings", {
-      method: "POST",
+    request<AccountingSourceMappingSummary>('/accounting/source-mappings', {
+      method: 'POST',
       json: body,
     }),
   archiveAccountingSourceMapping: (id: string, reason: string) =>
     request<AccountingSourceMappingSummary>(
       `/accounting/source-mappings/${encodeURIComponent(id)}/archive`,
-      { method: "POST", json: { reason } },
+      { method: 'POST', json: { reason } },
     ),
   createManualJournal: (body: JsonBody) =>
-    request<JournalEntryView>("/accounting/journals", {
-      method: "POST",
+    request<JournalEntryView>('/accounting/journals', {
+      method: 'POST',
       json: body,
     }),
   submitJournal: (id: string, body: JsonBody) =>
     request<JournalEntryView>(
       `/accounting/journals/${encodeURIComponent(id)}/submit`,
       {
-        method: "POST",
+        method: 'POST',
         json: body,
       },
     ),
@@ -413,7 +423,7 @@ export const accountingApi = {
     request<JournalEntryView>(
       `/accounting/journals/${encodeURIComponent(id)}/approve`,
       {
-        method: "POST",
+        method: 'POST',
         json: body,
       },
     ),
@@ -421,7 +431,7 @@ export const accountingApi = {
     request<JournalEntryView>(
       `/accounting/journals/${encodeURIComponent(id)}/post`,
       {
-        method: "POST",
+        method: 'POST',
         json: {},
       },
     ),
@@ -429,7 +439,7 @@ export const accountingApi = {
     request<JournalEntryView>(
       `/accounting/journals/${encodeURIComponent(id)}/reverse`,
       {
-        method: "POST",
+        method: 'POST',
         json: body,
       },
     ),
@@ -437,7 +447,7 @@ export const accountingApi = {
     request<JournalEntryView>(
       `/accounting/journals/${encodeURIComponent(id)}/correct`,
       {
-        method: "POST",
+        method: 'POST',
         json: body,
       },
     ),
@@ -450,7 +460,7 @@ export const accountingApi = {
     limit?: number;
   }) =>
     request<PaginatedResult<any>>(
-      withQuery("/accounting/reports/audit-trail", {
+      withQuery('/accounting/reports/audit-trail', {
         ...params,
         page: params?.page?.toString(),
         limit: params?.limit?.toString(),

@@ -30,11 +30,17 @@ describe('Phase 3B Library frontend contracts', () => {
       read('components/layout/sidebar-persona-nav.base.ts'),
     ].join('\n');
 
-    assert.match(personaNav, /label: 'Library'/);
-    assert.match(personaNav, /href: '\/dashboard\/library'/);
+    assert.match(personaNav, /label: ['"]Library['"]/);
+    assert.match(personaNav, /href: ['"]\/dashboard\/library['"]/);
     assert.doesNotMatch(personaNav, /#library-coming-soon/);
-    assert.match(personaNav, /href: '\/dashboard\/transport'[\s\S]*label: 'Transport'/);
-    assert.match(personaNav, /href: '\/dashboard\/canteen'[\s\S]*label: 'Canteen'/);
+    assert.match(
+      personaNav,
+      /href: ['"]\/dashboard\/transport['"][\s\S]*label: ['"]Transport['"]/,
+    );
+    assert.match(
+      personaNav,
+      /href: ['"]\/dashboard\/canteen['"][\s\S]*label: ['"]Canteen['"]/,
+    );
   });
 
   it('adds Library API client methods for the Phase 3A backend endpoints', () => {
@@ -98,7 +104,9 @@ describe('Phase 3B Library frontend contracts', () => {
   it('builds Library UI sections with real API calls and production states', () => {
     const workspace = read('components/library/library-workspace.tsx');
     const page = read('app/dashboard/library/layout.tsx');
-    const reservationsPage = read('app/dashboard/library/reservations/page.tsx');
+    const reservationsPage = read(
+      'app/dashboard/library/reservations/page.tsx',
+    );
 
     assert.match(page, /<ModuleHeader/);
     assert.match(page, /primaryAction=/);
@@ -107,7 +115,7 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(page, /\/dashboard\/library\/catalog/);
     assert.match(page, /\/dashboard\/library\/copies/);
     assert.match(page, /\/dashboard\/library\/reservations/);
-    assert.match(page, /eyebrow="School Operations"/);
+    assert.match(page, /eyebrow=['"]School Operations['"]/);
     assert.doesNotMatch(page, /M8A/);
 
     for (const section of [
@@ -133,7 +141,7 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(workspace, /<SummaryGrid/);
     assert.match(workspace, /<SummaryCard/);
     assert.match(workspace, /<WorkSurface/);
-    assert.match(workspace, /status: "ISSUED"/);
+    assert.match(workspace, /status: ['"]ISSUED['"]/);
     assert.match(workspace, /activeLoansQuery\.data\?\.meta\.total/);
     assert.match(workspace, /reservationsQuery\.data\?\.meta\.total/);
     assert.doesNotMatch(workspace, /needs summary API/);
@@ -182,7 +190,7 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(workspace, /cleanFulfillmentPayload/);
     assert.match(workspace, /ReservationRow/);
     assert.match(workspace, /library-reservations/);
-    assert.match(reservationsPage, /section="reservations"/);
+    assert.match(reservationsPage, /section=['"]reservations['"]/);
     assert.match(workspace, /Audit reason/);
     assert.match(workspace, /onArchiveCopy/);
     assert.match(workspace, /Archive library copy/);
@@ -211,15 +219,24 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.doesNotMatch(workspace, /limit:\s*1000|api\.listStaff/);
     assert.match(workspace, /RemoteStudentSelector/);
     assert.match(workspace, /RemoteStaffSelector/);
-    assert.match(workspace, /activeTab === "overview"[\s\S]*overviewError/);
-    assert.match(workspace, /activeTab === "reports"[\s\S]*reportsError/);
+    assert.match(
+      workspace,
+      /activeTab === ['"]overview['"][\s\S]*overviewError/,
+    );
+    assert.match(workspace, /activeTab === ['"]reports['"][\s\S]*reportsError/);
     assert.match(layout, /\/dashboard\/library\/issue-return/);
-    assert.doesNotMatch(layout, /label: 'Borrowers'/);
+    assert.doesNotMatch(layout, /label: ['"]Borrowers['"]/);
 
     for (const [path, destination] of [
       ['app/dashboard/library/books/page.tsx', '/dashboard/library/catalog'],
-      ['app/dashboard/library/issues/page.tsx', '/dashboard/library/issue-return'],
-      ['app/dashboard/library/borrowers/page.tsx', '/dashboard/library/issue-return'],
+      [
+        'app/dashboard/library/issues/page.tsx',
+        '/dashboard/library/issue-return',
+      ],
+      [
+        'app/dashboard/library/borrowers/page.tsx',
+        '/dashboard/library/issue-return',
+      ],
     ]) {
       assert.match(read(path), new RegExp(`redirect\\(['\"]${destination}`));
     }
@@ -236,7 +253,10 @@ describe('Phase 3B Library frontend contracts', () => {
 
     for (const source of [workspace, selector]) {
       assert.doesNotMatch(source, /\bN\/A\b|\bUnknown\b/);
-      assert.doesNotMatch(source, /shadow-xl|rounded-\[2rem\]|rounded-\[2\.5rem\]|rounded-\[30px\]/);
+      assert.doesNotMatch(
+        source,
+        /shadow-xl|rounded-\[2rem\]|rounded-\[2\.5rem\]|rounded-\[30px\]/,
+      );
     }
   });
 
@@ -273,8 +293,11 @@ describe('Phase 3B Library frontend contracts', () => {
 
     assert.match(resolver, /id: data\.id \?\? data\.studentId/);
     assert.match(resolver, /normalizeQrPurpose/);
-    assert.match(resolver, /purpose === 'CANTEEN_POS' \|\| purpose === 'CANTEEN_SERVE'/);
-    assert.match(resolver, /return 'CANTEEN'/);
+    assert.match(
+      resolver,
+      /purpose === ['"]CANTEEN_POS['"] \|\| purpose === ['"]CANTEEN_SERVE['"]/,
+    );
+    assert.match(resolver, /return ['"]CANTEEN['"]/);
     assert.match(resolver, /inputRef\.current\?\.focus/);
   });
 });

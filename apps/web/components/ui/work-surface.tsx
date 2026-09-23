@@ -50,13 +50,19 @@ export function WorkSurface({
         <CardHeader className="gap-1 border-b border-border px-5 py-4">
           {title ? <CardTitle className="text-base">{title}</CardTitle> : null}
           {description ? (
-            <CardDescription className="max-w-3xl">{description}</CardDescription>
+            <CardDescription className="max-w-3xl">
+              {description}
+            </CardDescription>
           ) : null}
           {action ? <CardAction>{action}</CardAction> : null}
         </CardHeader>
       ) : null}
-      <CardContent className={cn(flush ? 'p-0' : 'p-5')}>{children}</CardContent>
-      {footer ? <CardFooter className="border-t p-4">{footer}</CardFooter> : null}
+      <CardContent className={cn(flush ? 'p-0' : 'p-5')}>
+        {children}
+      </CardContent>
+      {footer ? (
+        <CardFooter className="border-t p-4">{footer}</CardFooter>
+      ) : null}
     </Card>
   );
 }

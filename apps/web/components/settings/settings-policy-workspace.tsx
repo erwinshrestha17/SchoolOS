@@ -43,9 +43,10 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
     kind: 'success' | 'error';
     text: string;
   } | null>(null);
-  const lastAttemptRef = useRef<{ signature: string; idempotencyKey: string } | null>(
-    null,
-  );
+  const lastAttemptRef = useRef<{
+    signature: string;
+    idempotencyKey: string;
+  } | null>(null);
 
   const settingsQuery = useQuery({
     queryKey: ['school-settings', 'all'],
@@ -110,7 +111,9 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
       });
       const prior = lastAttemptRef.current;
       const idempotencyKey =
-        prior?.signature === signature ? prior.idempotencyKey : crypto.randomUUID();
+        prior?.signature === signature
+          ? prior.idempotencyKey
+          : crypto.randomUUID();
       lastAttemptRef.current = { signature, idempotencyKey };
 
       return schoolSettingsApi.updateSchoolSettingsDomain(policy.domain, {
@@ -131,7 +134,9 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
       await Promise.all([
         client.invalidateQueries({ queryKey: ['school-settings', 'all'] }),
         client.invalidateQueries({ queryKey: ['school-settings', 'overview'] }),
-        client.invalidateQueries({ queryKey: ['school-settings', 'navigation'] }),
+        client.invalidateQueries({
+          queryKey: ['school-settings', 'navigation'],
+        }),
       ]);
     },
     onError: (error) => {
@@ -321,7 +326,10 @@ export function SettingsPolicyWorkspace({ policyId }: { policyId: string }) {
           if (!saveMutation.isPending) setConfirmOpen(false);
         }}
       >
-        <label className="block" htmlFor={`settings-change-reason-${policy.id}`}>
+        <label
+          className="block"
+          htmlFor={`settings-change-reason-${policy.id}`}
+        >
           <span className="text-sm font-semibold text-slate-900">
             Reason for change
           </span>
@@ -549,7 +557,11 @@ function GradingScaleField({
 }) {
   const rows = toGradingBands(value, field.defaultValue);
   const update = (index: number, patch: Partial<GradingBand>) =>
-    onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+    onChange(
+      rows.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, ...patch } : row,
+      ),
+    );
 
   return (
     <fieldset className="lg:col-span-2 rounded-xl border border-slate-200 p-4">
@@ -581,7 +593,9 @@ function GradingScaleField({
                 aria-label={`Grade ${index + 1}`}
                 value={row.grade}
                 disabled={disabled}
-                onChange={(event) => update(index, { grade: event.target.value })}
+                onChange={(event) =>
+                  update(index, { grade: event.target.value })
+                }
                 className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
               />
               <input
@@ -625,7 +639,9 @@ function GradingScaleField({
                 aria-label={`Grade label ${index + 1}`}
                 value={row.label}
                 disabled={disabled}
-                onChange={(event) => update(index, { label: event.target.value })}
+                onChange={(event) =>
+                  update(index, { label: event.target.value })
+                }
                 className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
               />
               <select
@@ -644,7 +660,9 @@ function GradingScaleField({
                 type="button"
                 aria-label={`Remove grade band ${index + 1}`}
                 disabled={disabled || rows.length <= 1}
-                onClick={() => onChange(rows.filter((_, rowIndex) => rowIndex !== index))}
+                onClick={() =>
+                  onChange(rows.filter((_, rowIndex) => rowIndex !== index))
+                }
                 className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />

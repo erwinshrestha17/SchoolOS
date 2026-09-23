@@ -22,10 +22,13 @@ describe('Payroll Runs UI contracts', () => {
       existsSync(join(webRoot, 'components/hr/payroll-runs.tsx')),
       true,
     );
-    assert.match(workspace, /import \{ PayrollRuns \} from '\.\/payroll-runs'/);
-    assert.match(workspace, /label: 'Payroll Runs'/);
+    assert.match(
+      workspace,
+      /import \{ PayrollRuns \} from ['"]\.\/payroll-runs['"]/,
+    );
+    assert.match(workspace, /label: ['"]Payroll Runs['"]/);
     assert.match(workspace, /<PayrollRuns \/>/);
-    assert.doesNotMatch(workspace, /label: 'Payroll Preview'/);
+    assert.doesNotMatch(workspace, /label: ['"]Payroll Preview['"]/);
     assert.doesNotMatch(workspace, /<PayrollPreview \/>/);
   });
 
@@ -60,7 +63,7 @@ describe('Payroll Runs UI contracts', () => {
     assert.match(apiClient, /salary-slip\.pdf/);
     assert.match(apiClient, /%PDF-/);
     assert.match(payrollRuns, /openApprovedSalarySlipPdf/);
-    assert.match(payrollRuns, /selectedRun\.status === 'APPROVED'/);
+    assert.match(payrollRuns, /selectedRun\.status === ['"]APPROVED['"]/);
     assert.match(payrollRuns, /Download Salary Slip PDF/);
     assert.match(payrollRuns, /Post to M11 Accounting/);
 
@@ -90,8 +93,8 @@ describe('Payroll Runs UI contracts', () => {
       payrollRuns,
       /posted runs remain\s+immutable|allow editing posted runs|enable editing posted runs/i,
     );
-    assert.match(payrollRuns, /selectedRun\.status === 'APPROVED'/);
-    assert.match(payrollRuns, /selectedRun\.status === 'POSTED'/);
+    assert.match(payrollRuns, /selectedRun\.status === ['"]APPROVED['"]/);
+    assert.match(payrollRuns, /selectedRun\.status === ['"]POSTED['"]/);
 
     assert.doesNotMatch(payrollRuns, /createJournalEntry/);
     assert.doesNotMatch(payrollRuns, /AccountingPostingService/);
@@ -117,7 +120,7 @@ describe('Payroll Runs UI contracts', () => {
     const apiClient = readMany(['lib/api/payroll.ts', 'lib/api/client.ts']);
     const payrollRuns = read('components/hr/payroll-runs.tsx');
 
-    assert.match(payrollRuns, /hasPermissions\(\['payroll:manage'\]\)/);
+    assert.match(payrollRuns, /hasPermissions\(\[['"]payroll:manage['"]\]\)/);
     assert.match(payrollRuns, /payroll:read/);
     assert.match(payrollRuns, /payroll:manage/);
     assert.doesNotMatch(payrollRuns, /tenantId/);
@@ -151,9 +154,12 @@ describe('Payroll Runs UI contracts', () => {
     const adminPayslips = read('components/hr/payslip-list.tsx');
     const myPayslips = read('components/staff/my-payslips.tsx');
 
-    assert.match(payrollDashboard, /label: "Readiness Exceptions"/);
+    assert.match(payrollDashboard, /label: ['"]Readiness Exceptions['"]/);
     assert.match(payrollDashboard, /selectedRun\?\.validationExceptionCount/);
-    assert.match(payrollDashboard, /href: "\/dashboard\/payroll\/readiness"/);
+    assert.match(
+      payrollDashboard,
+      /href: ['"]\/dashboard\/payroll\/readiness['"]/,
+    );
     assert.match(payrollDashboard, /<WorkSurface/);
     assert.match(client, /throw new ApiRequestError\(/);
     assert.match(adminPayslips, /error instanceof ApiRequestError/);
@@ -176,20 +182,20 @@ describe('Payroll Runs UI contracts', () => {
       '../../packages/core/src/permissions/roles.ts',
     ]);
 
-    assert.match(permissionCatalog, /resource: "payroll:payslip"/);
-    assert.match(permissionCatalog, /action: "generate"/);
-    assert.match(permissionCatalog, /"payroll:payslip:generate"/);
+    assert.match(permissionCatalog, /resource: ['"]payroll:payslip['"]/);
+    assert.match(permissionCatalog, /action: ['"]generate['"]/);
+    assert.match(permissionCatalog, /['"]payroll:payslip:generate['"]/);
     assert.match(
       payrollController,
-      /@Post\('runs\/:runId\/payslips\/:payslipId\/regeneration-jobs'\)/,
+      /@Post\(['"]runs\/:runId\/payslips\/:payslipId\/regeneration-jobs['"]\)/,
     );
     assert.match(
       payrollController,
-      /@Get\('runs\/:runId\/payslips\/:payslipId\/regeneration-jobs\/:jobId'\)/,
+      /@Get\(['"]runs\/:runId\/payslips\/:payslipId\/regeneration-jobs\/:jobId['"]\)/,
     );
     assert.match(
       payrollController,
-      /@Permissions\('payroll:payslip:generate'\)/,
+      /@Permissions\(['"]payroll:payslip:generate['"]\)/,
     );
     assert.match(payrollController, /PayslipRegenerationJobSummaryDto/);
     assert.match(

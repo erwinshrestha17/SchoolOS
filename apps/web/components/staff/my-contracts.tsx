@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { formatBsDate } from "@schoolos/core";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { formatBsDate } from '@schoolos/core';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -10,8 +10,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { FileText } from "lucide-react";
+} from '@/components/ui/table';
+import { FileText } from 'lucide-react';
 
 interface MyContractsProps {
   contracts: any[];
@@ -58,7 +58,7 @@ export function MyContracts({ contracts = [] }: MyContractsProps) {
                 <TableCell>
                   {contract.endDate
                     ? formatBsDate(contract.endDate)
-                    : "Ongoing"}
+                    : 'Ongoing'}
                 </TableCell>
                 <TableCell>
                   Rs {Number(contract.baseSalary).toLocaleString()}
@@ -68,14 +68,14 @@ export function MyContracts({ contracts = [] }: MyContractsProps) {
                     variant={
                       !contract.endDate ||
                       new Date(contract.endDate) > new Date()
-                        ? ("success" as any)
-                        : "secondary"
+                        ? ('success' as any)
+                        : 'secondary'
                     }
                   >
                     {!contract.endDate ||
                     new Date(contract.endDate) > new Date()
-                      ? "Active"
-                      : "Expired"}
+                      ? 'Active'
+                      : 'Expired'}
                   </Badge>
                 </TableCell>
               </TableRow>

@@ -11,6 +11,18 @@ interface PageHeaderProps {
   className?: string;
 }
 
-export function PageHeader({ title, description, actions, className }: PageHeaderProps) {
-  return <ModuleHeader title={title} description={description} secondaryActions={actions} className={cn('mb-5', className)} />;
+export function PageHeader({
+  title,
+  description,
+  actions,
+  className,
+}: PageHeaderProps) {
+  return (
+    <ModuleHeader
+      title={title}
+      description={description}
+      secondaryActions={actions}
+      className={cn('mb-5', className)}
+    />
+  );
 }

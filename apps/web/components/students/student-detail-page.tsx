@@ -1,21 +1,21 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
-import { MoreHorizontal, QrCode, ShieldCheck } from "lucide-react";
-import { api } from "@/lib/api";
-import { useRecentlyViewed } from "@/lib/hooks/use-recently-viewed";
-import { LoadingState } from "@/components/ui/loading-state";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ActionMenu } from "@/components/ui/action-menu";
-import { useBreadcrumbLabel } from "@/components/schoolos/navigation/breadcrumb-label-context";
-import { useSession } from "@/components/session-provider";
-import { ProfileHeader } from "./profile/profile-header";
-import { LifecyclePanel } from "./profile/lifecycle-panel";
-import { StudentEditCard } from "./profile/student-edit-card";
-import * as ProfileTabs from "./profile/tabs";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { MoreHorizontal, QrCode, ShieldCheck } from 'lucide-react';
+import { api } from '@/lib/api';
+import { useRecentlyViewed } from '@/lib/hooks/use-recently-viewed';
+import { LoadingState } from '@/components/ui/loading-state';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ActionMenu } from '@/components/ui/action-menu';
+import { useBreadcrumbLabel } from '@/components/schoolos/navigation/breadcrumb-label-context';
+import { useSession } from '@/components/session-provider';
+import { ProfileHeader } from './profile/profile-header';
+import { LifecyclePanel } from './profile/lifecycle-panel';
+import { StudentEditCard } from './profile/student-edit-card';
+import * as ProfileTabs from './profile/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   UpdateStudentProfilePayload,
   UpdateStudentGuardianPayload,
@@ -23,57 +23,57 @@ import {
   StudentTransferPayload,
   StudentArchivePayload,
   StudentDeletePayload,
-} from "@schoolos/core";
+} from '@schoolos/core';
 
-type LifecycleAction = "transfer" | "archive" | "alumni" | "delete";
+type LifecycleAction = 'transfer' | 'archive' | 'alumni' | 'delete';
 type LifecycleRequest =
-  | { action: "transfer"; body: StudentTransferPayload }
-  | { action: "archive"; body: StudentArchivePayload }
-  | { action: "alumni"; body: StudentArchivePayload }
-  | { action: "delete"; body: StudentDeletePayload };
+  | { action: 'transfer'; body: StudentTransferPayload }
+  | { action: 'archive'; body: StudentArchivePayload }
+  | { action: 'alumni'; body: StudentArchivePayload }
+  | { action: 'delete'; body: StudentDeletePayload };
 
 const detailTabs = [
-  "Overview",
-  "Profile",
-  "Attendance",
-  "Fees",
-  "Health",
-  "Documents",
-  "Activity",
-  "Academics",
-  "Guardians",
-  "History",
+  'Overview',
+  'Profile',
+  'Attendance',
+  'Fees',
+  'Health',
+  'Documents',
+  'Activity',
+  'Academics',
+  'Guardians',
+  'History',
 ] as const;
 
 type DetailTab = (typeof detailTabs)[number];
 
 const primaryTabs: Array<{ value: DetailTab; label: string }> = [
-  { value: "Overview", label: "Overview" },
-  { value: "Profile", label: "Profile" },
-  { value: "Academics", label: "Academic" },
-  { value: "Attendance", label: "Attendance" },
-  { value: "Fees", label: "Fees" },
-  { value: "Documents", label: "Documents" },
-  { value: "Guardians", label: "Guardians" },
-  { value: "History", label: "Timeline" },
+  { value: 'Overview', label: 'Overview' },
+  { value: 'Profile', label: 'Profile' },
+  { value: 'Academics', label: 'Academic' },
+  { value: 'Attendance', label: 'Attendance' },
+  { value: 'Fees', label: 'Fees' },
+  { value: 'Documents', label: 'Documents' },
+  { value: 'Guardians', label: 'Guardians' },
+  { value: 'History', label: 'Timeline' },
 ];
 
 const overflowTabs: Array<{ value: DetailTab; label: string }> = [
-  { value: "Activity", label: "Activity" },
-  { value: "Health", label: "Support & safety" },
+  { value: 'Activity', label: 'Activity' },
+  { value: 'Health', label: 'Support & safety' },
 ];
 
 const requestedTabAliases: Record<string, DetailTab> = {
-  attendance: "Attendance",
-  Profile: "Profile",
-  Academic: "Academics",
-  Timeline: "History",
-  "Support & Safety": "Health",
-  "Support & safety": "Health",
+  attendance: 'Attendance',
+  Profile: 'Profile',
+  Academic: 'Academics',
+  Timeline: 'History',
+  'Support & Safety': 'Health',
+  'Support & safety': 'Health',
 };
 
 export function StudentDetailPage({ studentId }: { studentId: string }) {
-  const [pdfError, setPdfError] = useState("");
+  const [pdfError, setPdfError] = useState('');
   const [isEditingStudent, setIsEditingStudent] = useState(false);
   const [editingGuardianId, setEditingGuardianId] = useState<string | null>(
     null,
@@ -82,44 +82,44 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const [isLifecycleOpen, setIsLifecycleOpen] = useState(false);
   const [lifecycleAction, setLifecycleAction] =
     useState<LifecycleAction | null>(null);
-  const [lifecycleMessage, setLifecycleMessage] = useState("");
-  const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>("Overview");
+  const [lifecycleMessage, setLifecycleMessage] = useState('');
+  const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('Overview');
 
   const queryClient = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const focusTarget = searchParams.get("focus");
+  const focusTarget = searchParams.get('focus');
   const { session, hasPermissions } = useSession();
   const isSupportOverride = session?.user.isSupportOverride === true;
   const canEditStudent =
-    !isSupportOverride && hasPermissions(["students:update"]);
+    !isSupportOverride && hasPermissions(['students:update']);
   const canViewAttendance =
-    !isSupportOverride && hasPermissions(["attendance:read"]);
-  const canViewFees = !isSupportOverride && hasPermissions(["fees:read"]);
+    !isSupportOverride && hasPermissions(['attendance:read']);
+  const canViewFees = !isSupportOverride && hasPermissions(['fees:read']);
   const canManageDocuments =
-    !isSupportOverride && hasPermissions(["student_documents:manage"]);
-  const canViewQr = !isSupportOverride && hasPermissions(["students:qr:read"]);
+    !isSupportOverride && hasPermissions(['student_documents:manage']);
+  const canViewQr = !isSupportOverride && hasPermissions(['students:qr:read']);
   const canManageLifecycle =
-    !isSupportOverride && hasPermissions(["students:manage_lifecycle"]);
+    !isSupportOverride && hasPermissions(['students:manage_lifecycle']);
   const { record: recordRecentlyViewed } = useRecentlyViewed();
 
   useEffect(() => {
-    if (searchParams.get("edit") === "true" && canEditStudent) {
+    if (searchParams.get('edit') === 'true' && canEditStudent) {
       setIsEditingStudent(true);
     }
 
-    const requestedTab = searchParams.get("tab");
+    const requestedTab = searchParams.get('tab');
     if (!requestedTab) return;
 
     const normalizedTab = requestedTabAliases[requestedTab] ?? requestedTab;
     const isAvailable =
       detailTabs.includes(normalizedTab as DetailTab) &&
-      (normalizedTab !== "Attendance" || canViewAttendance) &&
-      (normalizedTab !== "Fees" || canViewFees) &&
-      (normalizedTab !== "Documents" || canManageDocuments) &&
-      (normalizedTab !== "Health" || !isSupportOverride) &&
-      (normalizedTab !== "Activity" || !isSupportOverride) &&
-      (normalizedTab !== "History" || !isSupportOverride);
+      (normalizedTab !== 'Attendance' || canViewAttendance) &&
+      (normalizedTab !== 'Fees' || canViewFees) &&
+      (normalizedTab !== 'Documents' || canManageDocuments) &&
+      (normalizedTab !== 'Health' || !isSupportOverride) &&
+      (normalizedTab !== 'Activity' || !isSupportOverride) &&
+      (normalizedTab !== 'History' || !isSupportOverride);
     if (isAvailable) {
       setActiveDetailTab(normalizedTab as DetailTab);
     }
@@ -133,7 +133,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   ]);
 
   const profileQuery = useQuery({
-    queryKey: ["student-profile", studentId],
+    queryKey: ['student-profile', studentId],
     queryFn: () => api.getStudentProfile(studentId),
     enabled: Boolean(studentId),
   });
@@ -141,8 +141,8 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const loadedStudent = profileQuery.data?.student;
   const loadedStudentLabel = loadedStudent
     ? loadedStudent.fullNameEn ||
-      `${loadedStudent.firstNameEn ?? ""} ${loadedStudent.lastNameEn ?? ""}`.trim() ||
-      "Student"
+      `${loadedStudent.firstNameEn ?? ''} ${loadedStudent.lastNameEn ?? ''}`.trim() ||
+      'Student'
     : null;
 
   useBreadcrumbLabel(loadedStudentLabel);
@@ -150,7 +150,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   useEffect(() => {
     if (!loadedStudent || !loadedStudentLabel) return;
     recordRecentlyViewed({
-      kind: "student",
+      kind: 'student',
       id: studentId,
       label: loadedStudentLabel,
       href: `/dashboard/students/${studentId}`,
@@ -161,7 +161,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   }, [studentId, profileQuery.data?.student.fullNameEn]);
 
   const feeClearanceQuery = useQuery({
-    queryKey: ["student-fee-clearance", studentId],
+    queryKey: ['student-fee-clearance', studentId],
     queryFn: () => api.getStudentFeeClearance(studentId),
     enabled: Boolean(studentId) && canViewFees,
   });
@@ -170,12 +170,12 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     mutationFn: (body: UpdateStudentProfilePayload) =>
       api.updateStudent(studentId, body),
     onSuccess: (profile) => {
-      queryClient.setQueryData(["student-profile", studentId], profile);
+      queryClient.setQueryData(['student-profile', studentId], profile);
       void queryClient.invalidateQueries({
-        queryKey: ["student-iemis-readiness", studentId],
+        queryKey: ['student-iemis-readiness', studentId],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["student-iemis-readiness-list"],
+        queryKey: ['student-iemis-readiness-list'],
       });
       setIsEditingStudent(false);
     },
@@ -190,12 +190,12 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
       body: UpdateStudentGuardianPayload;
     }) => api.updateStudentGuardian(studentId, guardianId, body),
     onSuccess: (profile) => {
-      queryClient.setQueryData(["student-profile", studentId], profile);
+      queryClient.setQueryData(['student-profile', studentId], profile);
       void queryClient.invalidateQueries({
-        queryKey: ["student-iemis-readiness", studentId],
+        queryKey: ['student-iemis-readiness', studentId],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["student-iemis-readiness-list"],
+        queryKey: ['student-iemis-readiness-list'],
       });
       setEditingGuardianId(null);
     },
@@ -205,12 +205,12 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     mutationFn: (body: CreateStudentGuardianPayload) =>
       api.addStudentGuardian(studentId, body),
     onSuccess: (profile) => {
-      queryClient.setQueryData(["student-profile", studentId], profile);
+      queryClient.setQueryData(['student-profile', studentId], profile);
       void queryClient.invalidateQueries({
-        queryKey: ["student-iemis-readiness", studentId],
+        queryKey: ['student-iemis-readiness', studentId],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["student-iemis-readiness-list"],
+        queryKey: ['student-iemis-readiness-list'],
       });
       setIsAddingGuardian(false);
     },
@@ -218,9 +218,9 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
 
   const lifecycleMutation = useMutation({
     mutationFn: ({ action, body }: LifecycleRequest) => {
-      if (action === "transfer") return api.transferStudent(studentId, body);
-      if (action === "archive") return api.archiveStudent(studentId, body);
-      if (action === "alumni")
+      if (action === 'transfer') return api.transferStudent(studentId, body);
+      if (action === 'archive') return api.archiveStudent(studentId, body);
+      if (action === 'alumni')
         return api.archiveStudentAsAlumni(studentId, body);
       return api.softDeleteStudent(studentId, body);
     },
@@ -230,16 +230,16 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
         `Student status updated to ${result.lifecycleStatus}.`,
       );
       void queryClient.invalidateQueries({
-        queryKey: ["student-profile", studentId],
+        queryKey: ['student-profile', studentId],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["student-fee-clearance", studentId],
+        queryKey: ['student-fee-clearance', studentId],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["student-iemis-readiness", studentId],
+        queryKey: ['student-iemis-readiness', studentId],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["student-iemis-readiness-list"],
+        queryKey: ['student-iemis-readiness-list'],
       });
     },
   });
@@ -248,9 +248,9 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     mutationFn: (file: File) => api.uploadStudentPhoto(studentId, file),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["student-profile", studentId],
+        queryKey: ['student-profile', studentId],
       });
-      void queryClient.invalidateQueries({ queryKey: ["students"] });
+      void queryClient.invalidateQueries({ queryKey: ['students'] });
     },
   });
 
@@ -258,22 +258,22 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     mutationFn: () => api.removeStudentPhoto(studentId),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["student-profile", studentId],
+        queryKey: ['student-profile', studentId],
       });
-      void queryClient.invalidateQueries({ queryKey: ["students"] });
+      void queryClient.invalidateQueries({ queryKey: ['students'] });
     },
   });
 
   async function openStudentPdf(kind: string) {
-    setPdfError("");
+    setPdfError('');
     try {
       await api.openStudentDocumentPdf(studentId, kind);
       await queryClient.invalidateQueries({
-        queryKey: ["student-profile", studentId],
+        queryKey: ['student-profile', studentId],
       });
     } catch {
       setPdfError(
-        "The school-issued document could not be generated. Please try again.",
+        'The school-issued document could not be generated. Please try again.',
       );
     }
   }
@@ -295,10 +295,10 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   );
   const visiblePrimaryTabs = primaryTabs.filter(
     (tab) =>
-      (tab.value !== "Attendance" || canViewAttendance) &&
-      (tab.value !== "Fees" || canViewFees) &&
-      (tab.value !== "Documents" || canManageDocuments) &&
-      (tab.value !== "History" || !isSupportOverride),
+      (tab.value !== 'Attendance' || canViewAttendance) &&
+      (tab.value !== 'Fees' || canViewFees) &&
+      (tab.value !== 'Documents' || canManageDocuments) &&
+      (tab.value !== 'History' || !isSupportOverride),
   );
   const visibleOverflowTabs = isSupportOverride ? [] : overflowTabs;
 
@@ -314,10 +314,10 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
         canManageLifecycle={canManageLifecycle}
         isSupportOverride={isSupportOverride}
         onEdit={() => setIsEditingStudent(true)}
-        onOpenIdCard={() => void openStudentPdf("id-card")}
+        onOpenIdCard={() => void openStudentPdf('id-card')}
         onSelectTab={(tab) => setActiveDetailTab(tab)}
         onManageLifecycle={() => {
-          setLifecycleMessage("");
+          setLifecycleMessage('');
           setLifecycleAction(null);
           setIsLifecycleOpen(true);
         }}
@@ -390,19 +390,19 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                     type="button"
                     className={`flex min-h-11 flex-none items-center gap-1 rounded-t-lg border-b-2 px-4 text-sm font-bold transition ${
                       activeOverflowTab
-                        ? "border-[var(--color-mod-admissions-accent)] text-[var(--color-mod-admissions-text)]"
-                        : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        ? 'border-[var(--color-mod-admissions-accent)] text-[var(--color-mod-admissions-text)]'
+                        : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                     }`}
                   >
                     <MoreHorizontal size={17} aria-hidden="true" />
-                    {activeOverflowTab?.label ?? "More"}
+                    {activeOverflowTab?.label ?? 'More'}
                   </button>
                 }
                 items={visibleOverflowTabs
                   .map((tab) => ({
                     label: tab.label,
                     icon:
-                      tab.value === "Health" ? (
+                      tab.value === 'Health' ? (
                         <ShieldCheck size={16} />
                       ) : undefined,
                     onClick: () => setActiveDetailTab(tab.value),
@@ -411,7 +411,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
                     canViewQr
                       ? [
                           {
-                            label: "Identity & QR",
+                            label: 'Identity & QR',
                             icon: <QrCode size={16} />,
                             onClick: () =>
                               router.push(

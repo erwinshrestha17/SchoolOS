@@ -12,13 +12,13 @@ import type {
   NotificationDeliveryOperationSummary,
   NotificationDeliveryFailureSummary,
   PaginatedResponse,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   JsonBody,
   NotificationCenterSummary,
   request,
   withQuery,
-} from "./client";
+} from './client';
 
 export type NotificationDeliveryRetryResult = {
   deliveryId: string;
@@ -152,7 +152,7 @@ export type NoticeAcknowledgementRecipient = {
   acknowledgementId: string | null;
   firstAcknowledgedAt: string | null;
   recipientLabel: string;
-  recipientType: "GUARDIAN" | "STUDENT" | "USER";
+  recipientType: 'GUARDIAN' | 'STUDENT' | 'USER';
 };
 
 export type NoticeAcknowledgementPage =
@@ -167,10 +167,10 @@ export type NoticeAcknowledgementFollowUpResult = {
 };
 
 export type NotificationPreferenceCategory =
-  import("@schoolos/core").NotificationPreferenceCategory;
+  import('@schoolos/core').NotificationPreferenceCategory;
 
 export type NotificationPreferenceChannel =
-  import("@schoolos/core").NotificationChannel;
+  import('@schoolos/core').NotificationChannel;
 
 export type NotificationPreferenceOverride = {
   id: string;
@@ -184,7 +184,7 @@ export type NotificationPreferenceOverride = {
 
 export type NotificationPreferenceSummary = {
   tenantDefaults: {
-    timezone: "Asia/Kathmandu";
+    timezone: 'Asia/Kathmandu';
     quietHoursEnabled: boolean;
     quietHoursStart: string;
     quietHoursEnd: string;
@@ -208,37 +208,37 @@ export type NotificationDeliveryAnalytics = {
 
 export const communicationsApi = {
   getCommunicationsSummary: () =>
-    request<CommunicationsSummary>("/communications/summary"),
+    request<CommunicationsSummary>('/communications/summary'),
   getCommunicationsProviderDiagnostics: () =>
     request<CommunicationsProviderDiagnostics>(
-      "/communications/provider-diagnostics",
+      '/communications/provider-diagnostics',
     ),
   listCommunicationTemplates: (params?: { page?: number; limit?: number }) =>
     request<CommunicationTemplatePage>(
-      withQuery("/communications/templates", params ?? {}),
+      withQuery('/communications/templates', params ?? {}),
     ),
   createCommunicationTemplate: (body: JsonBody) =>
-    request<CommunicationTemplateSummary>("/communications/templates", {
-      method: "POST",
+    request<CommunicationTemplateSummary>('/communications/templates', {
+      method: 'POST',
       json: body,
     }),
   updateCommunicationTemplate: (templateId: string, body: JsonBody) =>
     request<CommunicationTemplateSummary>(
       `/communications/templates/${encodeURIComponent(templateId)}`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         json: body,
       },
     ),
   publishCommunicationTemplate: (templateId: string) =>
     request<CommunicationTemplateSummary>(
       `/communications/templates/${encodeURIComponent(templateId)}/publish`,
-      { method: "POST" },
+      { method: 'POST' },
     ),
   archiveCommunicationTemplate: (templateId: string) =>
     request<CommunicationTemplateSummary>(
       `/communications/templates/${encodeURIComponent(templateId)}/archive`,
-      { method: "POST" },
+      { method: 'POST' },
     ),
   listNoticePage: (params?: {
     page?: number;
@@ -249,11 +249,11 @@ export const communicationsApi = {
     search?: string;
   }) =>
     request<PaginatedResponse<NoticeSummary>>(
-      withQuery("/notices", params ?? {}),
+      withQuery('/notices', params ?? {}),
     ),
   listNotices: () =>
     request<PaginatedResponse<NoticeSummary>>(
-      withQuery("/notices", { page: 1, limit: 100 }),
+      withQuery('/notices', { page: 1, limit: 100 }),
     ).then((page) => page.items),
   getNoticeDetail: (noticeId: string) =>
     request<NoticeDetail>(`/notices/${encodeURIComponent(noticeId)}`),
@@ -273,14 +273,14 @@ export const communicationsApi = {
       noticeId: string;
       firstAcknowledgedAt: string;
     }>(`/notices/${encodeURIComponent(noticeId)}/acknowledge`, {
-      method: "POST",
+      method: 'POST',
     }),
   listNoticeAcknowledgements: (
     noticeId: string,
     params?: {
       page?: number;
       limit?: number;
-      status?: "PENDING" | "ACKNOWLEDGED";
+      status?: 'PENDING' | 'ACKNOWLEDGED';
     },
   ) =>
     request<NoticeAcknowledgementPage>(
@@ -299,26 +299,26 @@ export const communicationsApi = {
   ) =>
     request<NoticeAcknowledgementFollowUpResult>(
       `/notices/${encodeURIComponent(noticeId)}/acknowledgements/follow-up`,
-      { method: "POST", json: body },
+      { method: 'POST', json: body },
     ),
   createNotice: (body: JsonBody) =>
-    request<NoticeSummary>("/notices", { method: "POST", json: body }),
+    request<NoticeSummary>('/notices', { method: 'POST', json: body }),
   createNoticeDraft: (body: JsonBody) =>
-    request<NoticeSummary>("/notices/drafts", { method: "POST", json: body }),
+    request<NoticeSummary>('/notices/drafts', { method: 'POST', json: body }),
   updateNoticeDraft: (noticeId: string, body: JsonBody) =>
     request<NoticeSummary>(`/notices/${encodeURIComponent(noticeId)}`, {
-      method: "PATCH",
+      method: 'PATCH',
       json: body,
     }),
   publishNotice: (noticeId: string) =>
     request<{ notice: NoticeSummary }>(
       `/notices/${encodeURIComponent(noticeId)}/publish`,
-      { method: "POST" },
+      { method: 'POST' },
     ),
   scheduleNotice: (noticeId: string, scheduledFor: string) =>
     request<NoticeSummary>(
       `/notices/${encodeURIComponent(noticeId)}/schedule`,
-      { method: "POST", json: { scheduledFor } },
+      { method: 'POST', json: { scheduledFor } },
     ),
   requestNoticeApproval: (
     noticeId: string,
@@ -329,32 +329,32 @@ export const communicationsApi = {
       approvalRequestId: string;
       replayed: boolean;
     }>(`/notices/${encodeURIComponent(noticeId)}/approval`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   cancelNotice: (noticeId: string, reason: string) =>
     request<NoticeSummary>(`/notices/${encodeURIComponent(noticeId)}/cancel`, {
-      method: "POST",
+      method: 'POST',
       json: { reason },
     }),
   archiveNotice: (noticeId: string, reason: string) =>
     request<NoticeSummary>(`/notices/${encodeURIComponent(noticeId)}/archive`, {
-      method: "POST",
+      method: 'POST',
       json: { reason },
     }),
   restoreNotice: (noticeId: string, reason: string) =>
     request<NoticeSummary>(`/notices/${encodeURIComponent(noticeId)}/restore`, {
-      method: "POST",
+      method: 'POST',
       json: { reason },
     }),
   previewNoticeRecipients: (body: JsonBody) =>
-    request<NoticeRecipientPreview>("/notices/recipient-preview", {
-      method: "POST",
+    request<NoticeRecipientPreview>('/notices/recipient-preview', {
+      method: 'POST',
       json: body,
     }),
-  listEvents: () => request<EventSummary[]>("/events"),
+  listEvents: () => request<EventSummary[]>('/events'),
   createEvent: (body: JsonBody) =>
-    request<EventSummary>("/events", { method: "POST", json: body }),
+    request<EventSummary>('/events', { method: 'POST', json: body }),
   listNotificationDeliveryPage: (params?: {
     page?: number;
     limit?: number;
@@ -364,7 +364,7 @@ export const communicationsApi = {
     channel?: string | null;
   }) =>
     request<NotificationDeliveryPage>(
-      withQuery("/communications/deliveries", {
+      withQuery('/communications/deliveries', {
         ...(params ?? {}),
       }),
     ),
@@ -376,7 +376,7 @@ export const communicationsApi = {
     channel?: string | null;
   }) =>
     request<NotificationDeliveryOperationPage>(
-      withQuery("/communications/deliveries/operations", params ?? {}),
+      withQuery('/communications/deliveries/operations', params ?? {}),
     ),
   listNotificationDeliveries: (params?: {
     sourceType?: string | null;
@@ -387,9 +387,9 @@ export const communicationsApi = {
       .then((page) => page.items),
   getNotificationDeliveryAnalytics: () =>
     request<NotificationDeliveryAnalytics>(
-      "/communications/deliveries/analytics",
+      '/communications/deliveries/analytics',
     ),
-  listConsents: () => request<ConsentRecord[]>("/consents"),
+  listConsents: () => request<ConsentRecord[]>('/consents'),
   getGuardianConsentStatus: (guardianId: string) =>
     request<GuardianConsentStatus[]>(
       `/consents/guardians/${encodeURIComponent(guardianId)}/status`,
@@ -397,33 +397,33 @@ export const communicationsApi = {
   captureGuardianConsent: (guardianId: string, body: JsonBody) =>
     request<ConsentRecord>(
       `/consents/guardians/${encodeURIComponent(guardianId)}/capture`,
-      { method: "POST", json: body },
+      { method: 'POST', json: body },
     ),
   revokeGuardianConsent: (guardianId: string, body: JsonBody) =>
     request<ConsentRecord>(
       `/consents/guardians/${encodeURIComponent(guardianId)}/revoke`,
-      { method: "POST", json: body },
+      { method: 'POST', json: body },
     ),
   getNotificationCenterPage: (params?: {
     page?: number;
     limit?: number;
-    readStatus?: "ALL" | "READ" | "UNREAD";
+    readStatus?: 'ALL' | 'READ' | 'UNREAD';
     category?: NotificationPreferenceCategory;
   }) =>
     request<NotificationCenterSummary>(
-      withQuery("/communications/notifications", params ?? {}),
+      withQuery('/communications/notifications', params ?? {}),
     ),
   getNotificationCenter: () =>
     communicationsApi.getNotificationCenterPage({ page: 1, limit: 25 }),
   markNotificationRead: (id: string) =>
     request<{ success: true }>(
       `/communications/notifications/${encodeURIComponent(id)}/read`,
-      { method: "POST" },
+      { method: 'POST' },
     ),
   markAllNotificationsRead: () =>
     request<{ success: true; markedCount: number }>(
-      "/communications/notifications/mark-all-read",
-      { method: "POST" },
+      '/communications/notifications/mark-all-read',
+      { method: 'POST' },
     ),
 
   // Academics - Assessment Components
@@ -431,7 +431,7 @@ export const communicationsApi = {
     request<NotificationDeliveryRetryResult>(
       `/communications/deliveries/${encodeURIComponent(deliveryId)}/retry`,
       {
-        method: "POST",
+        method: 'POST',
         json: body ?? {},
       },
     ),
@@ -443,7 +443,7 @@ export const communicationsApi = {
     channel?: string | null;
   }) =>
     request<NotificationDeliveryFailurePage>(
-      withQuery("/communications/deliveries/failures", params ?? {}),
+      withQuery('/communications/deliveries/failures', params ?? {}),
     ),
   listNotificationDeliveryFailures: () =>
     communicationsApi.listNotificationDeliveryFailurePage({
@@ -452,23 +452,23 @@ export const communicationsApi = {
     }),
   retryFailedNotificationDeliveries: (body?: { reason?: string }) =>
     request<NotificationDeliveryBulkRetryResult>(
-      "/communications/deliveries/retry-failed",
+      '/communications/deliveries/retry-failed',
       {
-        method: "POST",
+        method: 'POST',
         json: body ?? {},
       },
     ),
 
   getOwnNotificationPreferences: () =>
-    request<NotificationPreferenceSummary>("/notifications/preferences/me"),
+    request<NotificationPreferenceSummary>('/notifications/preferences/me'),
   updateOwnNotificationPreference: (body: {
     category: NotificationPreferenceCategory;
     channel: NotificationPreferenceChannel;
     enabled: boolean;
     quietHoursEnabled?: boolean;
   }) =>
-    request<NotificationPreferenceOverride>("/notifications/preferences/me", {
-      method: "PATCH",
+    request<NotificationPreferenceOverride>('/notifications/preferences/me', {
+      method: 'PATCH',
       json: body,
     }),
   resetOwnNotificationPreference: (
@@ -477,7 +477,7 @@ export const communicationsApi = {
   ) =>
     request<{ success: true }>(
       `/notifications/preferences/me/${encodeURIComponent(category)}/${encodeURIComponent(channel)}`,
-      { method: "DELETE" },
+      { method: 'DELETE' },
     ),
 
   // Payroll - PDFs

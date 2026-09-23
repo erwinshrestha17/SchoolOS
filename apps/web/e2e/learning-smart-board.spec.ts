@@ -15,12 +15,20 @@ test.describe('M12 Learning smart board', () => {
     await login(page);
   });
 
-  test('smart-board launch surface loads and links to safe board runtime', async ({ page }) => {
+  test('smart-board launch surface loads and links to safe board runtime', async ({
+    page,
+  }) => {
     await page.goto('/dashboard/learning/smart-board/launch');
-    await expect(page.getByRole('heading', { name: /Smart Board Launch/i })).toBeVisible();
-    await expect(page.locator('body')).toContainText(/safe|answer keys|session/i);
     await expect(
-      page.getByText(/Application error|Unhandled Runtime Error|This page could not be found|Internal Server Error/i),
+      page.getByRole('heading', { name: /Smart Board Launch/i }),
+    ).toBeVisible();
+    await expect(page.locator('body')).toContainText(
+      /safe|answer keys|session/i,
+    );
+    await expect(
+      page.getByText(
+        /Application error|Unhandled Runtime Error|This page could not be found|Internal Server Error/i,
+      ),
     ).toHaveCount(0);
   });
 });

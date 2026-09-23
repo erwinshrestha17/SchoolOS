@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  useMemo,
-  useState,
-  type ComponentProps,
-  type FormEvent,
-} from 'react';
+import { useMemo, useState, type ComponentProps, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   formatBsDateForInput,
@@ -107,9 +102,7 @@ function CreateForm({
 }: Props & { kind: CreateKind }) {
   const queryClient = useQueryClient();
   const todayBs = formatBsDateForInput(new Date());
-  const [academicYearId, setAcademicYearId] = useState(
-    effectiveAcademicYearId,
-  );
+  const [academicYearId, setAcademicYearId] = useState(effectiveAcademicYearId);
   const [classId, setClassId] = useState(context.classId ?? defaultClassId);
   const [sectionId, setSectionId] = useState(
     context.sectionId ?? defaultSectionId,
@@ -153,10 +146,7 @@ function CreateForm({
   const [error, setError] = useState('');
 
   const availableSections = useMemo(
-    () =>
-      sections.filter(
-        (section) => !classId || section.classId === classId,
-      ),
+    () => sections.filter((section) => !classId || section.classId === classId),
     [classId, sections],
   );
   const availableSubjects = useMemo(
@@ -183,9 +173,7 @@ function CreateForm({
       }),
     enabled:
       Boolean(classId && academicYearId) &&
-      (kind === 'assessment' ||
-        kind === 'intervention' ||
-        kind === 'guidance'),
+      (kind === 'assessment' || kind === 'intervention' || kind === 'guidance'),
   });
   const outcomesQuery = useQuery({
     queryKey: [
@@ -233,8 +221,7 @@ function CreateForm({
         limit: 100,
       }),
     enabled:
-      kind === 'guidance' &&
-      Boolean(academicYearId && classId && studentId),
+      kind === 'guidance' && Boolean(academicYearId && classId && studentId),
   });
 
   const mutation = useMutation({
@@ -278,8 +265,7 @@ function CreateForm({
           studentId,
           academicYearId,
           ...(context.signalKey ? { sourceSignalKey: context.signalKey } : {}),
-          priority:
-            priority as CreateStudentInterventionPayload['priority'],
+          priority: priority as CreateStudentInterventionPayload['priority'],
           title: title.trim(),
           concernSummary: concernSummary.trim(),
           ...(parentSummary.trim()
@@ -302,9 +288,7 @@ function CreateForm({
           purpose: purpose.trim(),
           startsOn: gregorianDateString(startsOnBs),
           ...(endsOnBs ? { endsOn: gregorianDateString(endsOnBs) } : {}),
-          ...(scheduleNote.trim()
-            ? { scheduleNote: scheduleNote.trim() }
-            : {}),
+          ...(scheduleNote.trim() ? { scheduleNote: scheduleNote.trim() } : {}),
           ...(parentSummary.trim()
             ? { parentSummary: parentSummary.trim() }
             : {}),
@@ -319,15 +303,12 @@ function CreateForm({
           subjectId,
           ...(outcomeId ? { outcomeId } : {}),
           title: title.trim(),
-          status:
-            progressStatus as CreateCurriculumProgressPayload['status'],
+          status: progressStatus as CreateCurriculumProgressPayload['status'],
           plannedOn: gregorianDateString(plannedOnBs),
           ...(completedOnBs
             ? { completedOn: gregorianDateString(completedOnBs) }
             : {}),
-          ...(missedReason.trim()
-            ? { missedReason: missedReason.trim() }
-            : {}),
+          ...(missedReason.trim() ? { missedReason: missedReason.trim() } : {}),
           ...(reteachPlan.trim() ? { reteachPlan: reteachPlan.trim() } : {}),
           ...(resourceUrl.trim() ? { resourceUrl: resourceUrl.trim() } : {}),
           ...(note.trim() ? { note: note.trim() } : {}),
@@ -409,10 +390,7 @@ function CreateForm({
     ) {
       return 'Select a subject.';
     }
-    if (
-      (kind === 'assessment' || kind === 'intervention') &&
-      !classId
-    ) {
+    if ((kind === 'assessment' || kind === 'intervention') && !classId) {
       return 'Select a class before selecting a student.';
     }
     if (kind === 'outcome' && (!code.trim() || title.trim().length < 3)) {
@@ -421,10 +399,7 @@ function CreateForm({
     if (kind === 'assessment' && !outcomeId) {
       return 'Select a learning outcome.';
     }
-    if (
-      kind === 'assessment' &&
-      Boolean(score) !== Boolean(maxScore)
-    ) {
+    if (kind === 'assessment' && Boolean(score) !== Boolean(maxScore)) {
       return 'Enter both score and maximum score, or leave both blank.';
     }
     if (
@@ -459,8 +434,7 @@ function CreateForm({
     }
     if (
       kind === 'curriculum' &&
-      (progressStatus === 'MISSED' ||
-        progressStatus === 'RETEACH_REQUIRED') &&
+      (progressStatus === 'MISSED' || progressStatus === 'RETEACH_REQUIRED') &&
       missedReason.trim().length < 4
     ) {
       return 'Explain why this item was missed or needs reteaching.';
@@ -527,9 +501,7 @@ function CreateForm({
             value: item.id,
             label: item.name,
           }))}
-          required={
-            kind !== 'intervention' || !Boolean(context.studentId)
-          }
+          required={kind !== 'intervention' || !Boolean(context.studentId)}
         />
         {(kind === 'assessment' ||
           kind === 'remedial' ||
@@ -961,7 +933,11 @@ function SelectField({
         className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 disabled:bg-slate-100"
       >
         <option value="">
-          {loading ? 'Loading…' : allowBlank ? 'None' : `Select ${label.toLowerCase()}`}
+          {loading
+            ? 'Loading…'
+            : allowBlank
+              ? 'None'
+              : `Select ${label.toLowerCase()}`}
         </option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -1020,7 +996,10 @@ function TextAreaField({
 function enumOptions(values: string[]) {
   return values.map((value) => ({
     value,
-    label: value.replace(/_/g, ' ').toLowerCase().replace(/^./, (letter) => letter.toUpperCase()),
+    label: value
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/^./, (letter) => letter.toUpperCase()),
   }));
 }
 

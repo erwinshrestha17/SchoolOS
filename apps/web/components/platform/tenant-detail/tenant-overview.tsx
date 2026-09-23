@@ -1,35 +1,35 @@
-"use client";
+'use client';
 
-import { formatBsDate } from "@schoolos/core";
-import { AlertTriangle, ArrowRight, Database, Users } from "lucide-react";
-import Link from "next/link";
-import { useSession } from "@/components/session-provider";
-import { Badge } from "@/components/ui/badge";
+import { formatBsDate } from '@schoolos/core';
+import { AlertTriangle, ArrowRight, Database, Users } from 'lucide-react';
+import Link from 'next/link';
+import { useSession } from '@/components/session-provider';
+import { Badge } from '@/components/ui/badge';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { hasAllPermissions, hasPermission } from "@/lib/session";
-import { useTenantDetail } from "./tenant-detail-page";
-import { tenantSectionHref } from "./tenant-detail-routes";
+} from '@/components/ui/card';
+import { hasAllPermissions, hasPermission } from '@/lib/session';
+import { useTenantDetail } from './tenant-detail-page';
+import { tenantSectionHref } from './tenant-detail-routes';
 
 export function TenantOverview() {
   const { tenant } = useTenantDetail();
   const { session } = useSession();
-  const canReadUsage = hasPermission(session, "platform:usage:read");
+  const canReadUsage = hasPermission(session, 'platform:usage:read');
   const canReadSubscriptions = hasPermission(
     session,
-    "platform:subscriptions:read",
+    'platform:subscriptions:read',
   );
-  const canReadBilling = hasPermission(session, "platform:billing:read");
-  const canReadOnboarding = hasPermission(session, "platform:onboarding:read");
-  const canReadProviders = hasPermission(session, "platform:providers:read");
+  const canReadBilling = hasPermission(session, 'platform:billing:read');
+  const canReadOnboarding = hasPermission(session, 'platform:onboarding:read');
+  const canReadProviders = hasPermission(session, 'platform:providers:read');
   const canReadPlanLimits = hasAllPermissions(session, [
-    "platform:subscriptions:read",
-    "platform:usage:read",
+    'platform:subscriptions:read',
+    'platform:usage:read',
   ]);
   const usageWarnings = (
     canReadUsage ? (tenant.usageCounters ?? []) : []
@@ -38,7 +38,7 @@ export function TenantOverview() {
   );
   const providerIssues = (
     canReadProviders ? (tenant.providerReadiness ?? []) : []
-  ).filter((provider) => provider.status !== "ready");
+  ).filter((provider) => provider.status !== 'ready');
   const onboardingOpen = (
     canReadOnboarding ? (tenant.onboarding?.items ?? []) : []
   ).filter((item) => item.required && !item.completed).length;
@@ -73,7 +73,7 @@ export function TenantOverview() {
               label="Storage used"
               value={
                 tenant.usage?.storageSizeBytes == null
-                  ? "Unavailable"
+                  ? 'Unavailable'
                   : formatBytes(tenant.usage.storageSizeBytes)
               }
               icon={Database}
@@ -86,14 +86,14 @@ export function TenantOverview() {
         {canReadSubscriptions ? (
           <AttentionCard
             title="Subscription"
-            status={tenant.subscription?.status ?? "UNASSIGNED"}
+            status={tenant.subscription?.status ?? 'UNASSIGNED'}
             description={
-              tenant.subscription?.planName ?? "No SchoolOS plan assigned"
+              tenant.subscription?.planName ?? 'No SchoolOS plan assigned'
             }
-            href={tenantSectionHref(tenant.id, "subscription")}
+            href={tenantSectionHref(tenant.id, 'subscription')}
             needsAttention={
               !tenant.subscription ||
-              !["ACTIVE", "TRIAL"].includes(tenant.subscription.status)
+              !['ACTIVE', 'TRIAL'].includes(tenant.subscription.status)
             }
           />
         ) : null}
@@ -103,10 +103,10 @@ export function TenantOverview() {
             status={`${tenant.onboarding?.progressPercent ?? 0}% complete`}
             description={
               onboardingOpen
-                ? `${onboardingOpen} required item${onboardingOpen === 1 ? "" : "s"} open`
-                : "Required checks complete"
+                ? `${onboardingOpen} required item${onboardingOpen === 1 ? '' : 's'} open`
+                : 'Required checks complete'
             }
-            href={tenantSectionHref(tenant.id, "onboarding")}
+            href={tenantSectionHref(tenant.id, 'onboarding')}
             needsAttention={onboardingOpen > 0}
           />
         ) : null}
@@ -116,10 +116,10 @@ export function TenantOverview() {
             status={
               providerIssues.length
                 ? `${providerIssues.length} need review`
-                : "No reported issues"
+                : 'No reported issues'
             }
             description="Backend-reported provider readiness for this tenant"
-            href={tenantSectionHref(tenant.id, "integrations")}
+            href={tenantSectionHref(tenant.id, 'integrations')}
             needsAttention={providerIssues.length > 0}
           />
         ) : null}
@@ -129,10 +129,10 @@ export function TenantOverview() {
             status={
               usageWarnings.length
                 ? `${usageWarnings.length} near limit`
-                : "Within reported limits"
+                : 'Within reported limits'
             }
             description="Usage counters at or above 90% of their configured limit"
-            href={tenantSectionHref(tenant.id, "subscription")}
+            href={tenantSectionHref(tenant.id, 'subscription')}
             needsAttention={usageWarnings.length > 0}
           />
         ) : null}
@@ -146,11 +146,11 @@ export function TenantOverview() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-3">
-          <RecordValue label="Plan key" value={tenant.plan || "Not assigned"} />
+          <RecordValue label="Plan key" value={tenant.plan || 'Not assigned'} />
           {canReadBilling ? (
             <RecordValue
               label="PAN / VAT"
-              value={tenant.panNumber || "Not provided"}
+              value={tenant.panNumber || 'Not provided'}
             />
           ) : null}
           <RecordValue
@@ -200,13 +200,13 @@ function AttentionCard({
 }) {
   return (
     <Card
-      className={`rounded-3xl shadow-sm ${needsAttention ? "border-amber-200" : "border-slate-100"}`}
+      className={`rounded-3xl shadow-sm ${needsAttention ? 'border-amber-200' : 'border-slate-100'}`}
     >
       <CardContent className="flex items-start justify-between gap-5 p-6">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-black text-slate-900">{title}</h3>
-            <Badge variant={needsAttention ? "warning" : "success"}>
+            <Badge variant={needsAttention ? 'warning' : 'success'}>
               {status}
             </Badge>
           </div>
@@ -244,13 +244,13 @@ function RecordValue({ label, value }: { label: string; value: string }) {
 function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
-    ? "Date not recorded"
+    ? 'Date not recorded'
     : formatBsDate(date);
 }
 
 function formatBytes(value: number) {
-  if (!value) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
+  if (!value) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const index = Math.min(
     Math.floor(Math.log(value) / Math.log(1024)),
     units.length - 1,

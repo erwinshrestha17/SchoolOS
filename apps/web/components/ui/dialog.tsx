@@ -16,8 +16,13 @@ export const Dialog = PrimitiveDialog;
 
 function hasDescription(children: React.ReactNode): boolean {
   return React.Children.toArray(children).some((child) => {
-    if (!React.isValidElement<{ children?: React.ReactNode }>(child)) return false;
-    return child.type === DialogDescription || child.type === PrimitiveDialogDescription || hasDescription(child.props.children);
+    if (!React.isValidElement<{ children?: React.ReactNode }>(child))
+      return false;
+    return (
+      child.type === DialogDescription ||
+      child.type === PrimitiveDialogDescription ||
+      hasDescription(child.props.children)
+    );
   });
 }
 
@@ -43,7 +48,10 @@ export function DialogContent({
       {...(!hasDescription(children) ? { 'aria-describedby': undefined } : {})}
       {...props}
       onOpenAutoFocus={(event) => {
-        returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        returnFocusRef.current =
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
         onOpenAutoFocus?.(event);
       }}
       onCloseAutoFocus={(event) => {
@@ -65,18 +73,56 @@ export function DialogContent({
   );
 }
 
-export function DialogHeader({ className, ...props }: React.ComponentProps<typeof PrimitiveDialogHeader>) {
-  return <PrimitiveDialogHeader className={cn('shrink-0 border-b border-border p-5 text-left', className)} {...props} />;
+export function DialogHeader({
+  className,
+  ...props
+}: React.ComponentProps<typeof PrimitiveDialogHeader>) {
+  return (
+    <PrimitiveDialogHeader
+      className={cn('shrink-0 border-b border-border p-5 text-left', className)}
+      {...props}
+    />
+  );
 }
 
-export function DialogTitle({ className, ...props }: React.ComponentProps<typeof PrimitiveDialogTitle>) {
-  return <PrimitiveDialogTitle className={cn('text-lg font-semibold leading-6 text-foreground', className)} {...props} />;
+export function DialogTitle({
+  className,
+  ...props
+}: React.ComponentProps<typeof PrimitiveDialogTitle>) {
+  return (
+    <PrimitiveDialogTitle
+      className={cn(
+        'text-lg font-semibold leading-6 text-foreground',
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
-export function DialogDescription({ className, ...props }: React.ComponentProps<typeof PrimitiveDialogDescription>) {
-  return <PrimitiveDialogDescription className={cn('text-sm leading-6 text-muted-foreground', className)} {...props} />;
+export function DialogDescription({
+  className,
+  ...props
+}: React.ComponentProps<typeof PrimitiveDialogDescription>) {
+  return (
+    <PrimitiveDialogDescription
+      className={cn('text-sm leading-6 text-muted-foreground', className)}
+      {...props}
+    />
+  );
 }
 
-export function DialogFooter({ className, ...props }: React.ComponentProps<typeof PrimitiveDialogFooter>) {
-  return <PrimitiveDialogFooter className={cn('shrink-0 border-t border-border bg-[var(--hover-subtle)] p-5', className)} {...props} />;
+export function DialogFooter({
+  className,
+  ...props
+}: React.ComponentProps<typeof PrimitiveDialogFooter>) {
+  return (
+    <PrimitiveDialogFooter
+      className={cn(
+        'shrink-0 border-t border-border bg-[var(--hover-subtle)] p-5',
+        className,
+      )}
+      {...props}
+    />
+  );
 }

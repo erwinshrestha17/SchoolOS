@@ -34,11 +34,30 @@ export function StudentPhotoPreview({
   if (state === 'ready' && src) {
     // Blob URLs are generated from an authenticated protected-file response.
     // next/image cannot optimise this private in-memory URL safely.
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={alt} className={`${className} rounded-2xl object-cover ring-4 ring-white`} />;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt}
+        className={`${className} rounded-2xl object-cover ring-4 ring-white`}
+      />
+    );
   }
 
-  return <div className={`${className} flex shrink-0 items-center justify-center rounded-2xl bg-white text-slate-300 ring-4 ring-white`} aria-label={state === 'error' ? 'Student photo could not be displayed' : 'Student photo preview'}>
-    {state === 'loading' ? <Loader2 className="h-6 w-6 animate-spin" /> : <ImageOff className="h-7 w-7" />}
-  </div>;
+  return (
+    <div
+      className={`${className} flex shrink-0 items-center justify-center rounded-2xl bg-white text-slate-300 ring-4 ring-white`}
+      aria-label={
+        state === 'error'
+          ? 'Student photo could not be displayed'
+          : 'Student photo preview'
+      }
+    >
+      {state === 'loading' ? (
+        <Loader2 className="h-6 w-6 animate-spin" />
+      ) : (
+        <ImageOff className="h-7 w-7" />
+      )}
+    </div>
+  );
 }

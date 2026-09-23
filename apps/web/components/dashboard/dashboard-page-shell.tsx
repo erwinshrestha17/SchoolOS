@@ -8,7 +8,10 @@ interface DashboardPageShellProps {
   className?: string;
 }
 
-export function DashboardPageShell({ children, className }: DashboardPageShellProps) {
+export function DashboardPageShell({
+  children,
+  className,
+}: DashboardPageShellProps) {
   return (
     <div
       className={cn('flex flex-col gap-5 lg:gap-6', className)}

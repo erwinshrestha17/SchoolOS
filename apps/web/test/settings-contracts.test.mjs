@@ -109,20 +109,25 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.match(policy, /Change history/);
     assert.match(policy, /operationalImpact/);
     assert.match(policy, /buildSchoolSettingsDomainVersion/);
-    assert.match(catalog, /domain: 'academic'/);
+    assert.match(catalog, /domain: ['"]academic['"]/);
     assert.match(catalog, /navigationItemId:/);
     assert.match(catalog, /operationalImpact:/);
   });
 
   it('keeps removed Chat settings out of the active school policy UI', () => {
     const catalog = read('components/settings/settings-policy-catalog.ts');
-    const navigation = read('components/settings/settings-navigation.config.ts');
+    const navigation = read(
+      'components/settings/settings-navigation.config.ts',
+    );
 
     assert.doesNotMatch(catalog, /parent-teacher chat/i);
     assert.doesNotMatch(catalog, /key:\s*['"]chat_/);
     assert.match(catalog, /Notices \(M15\)/);
     assert.match(catalog, /Notifications \(M12\)/);
-    assert.match(navigation, /href: ['"]\/dashboard\/settings\/communication['"]/);
+    assert.match(
+      navigation,
+      /href: ['"]\/dashboard\/settings\/communication['"]/,
+    );
     assert.match(navigation, /backendItemId: ['"]communication['"]/);
   });
 

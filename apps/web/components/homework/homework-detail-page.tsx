@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen,
   Calendar,
@@ -16,29 +16,29 @@ import {
   ClipboardCheck,
   FileText,
   Download,
-} from "lucide-react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+} from 'lucide-react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-import { api, type HomeworkRegisterRow } from "@/lib/api";
-import { useSession } from "@/components/session-provider";
-import { LoadingState } from "@/components/ui/loading-state";
-import { EmptyState } from "@/components/ui/empty-state";
-import { SectionCard } from "@/components/ui/section-card";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { DataTable } from "@/components/ui/data-table";
-import { ActionMenu } from "@/components/ui/action-menu";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Toast, ToastTone } from "@/components/ui/toast";
-import { Select } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { HomeworkReviewModal } from "@/components/homework/homework-review-modal";
-import { formatBsDate, formatBsDateTime } from "@schoolos/core";
-import { FormField, TextArea } from "@/components/ui/form-field";
+import { api, type HomeworkRegisterRow } from '@/lib/api';
+import { useSession } from '@/components/session-provider';
+import { LoadingState } from '@/components/ui/loading-state';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SectionCard } from '@/components/ui/section-card';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { DataTable } from '@/components/ui/data-table';
+import { ActionMenu } from '@/components/ui/action-menu';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Toast, ToastTone } from '@/components/ui/toast';
+import { Select } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { HomeworkReviewModal } from '@/components/homework/homework-review-modal';
+import { formatBsDate, formatBsDateTime } from '@schoolos/core';
+import { FormField, TextArea } from '@/components/ui/form-field';
 
 type HomeworkNotice = {
   title: string;
@@ -51,17 +51,17 @@ type HomeworkNotice = {
 // checking (as opposed to the digital SUBMITTED/LATE/REVIEWED/NEEDS_CORRECTION
 // flow handled by HomeworkReviewModal for ONLINE_ATTACHMENT homework).
 const REGISTER_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "COMPLETED", label: "Completed" },
-  { value: "INCOMPLETE", label: "Incomplete" },
-  { value: "ABSENT", label: "Absent" },
-  { value: "NOT_SUBMITTED", label: "Not submitted" },
-  { value: "PARTIALLY_COMPLETED", label: "Partially completed" },
-  { value: "EXCUSED", label: "Excused" },
+  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'INCOMPLETE', label: 'Incomplete' },
+  { value: 'ABSENT', label: 'Absent' },
+  { value: 'NOT_SUBMITTED', label: 'Not submitted' },
+  { value: 'PARTIALLY_COMPLETED', label: 'Partially completed' },
+  { value: 'EXCUSED', label: 'Excused' },
 ];
 
 // Single neutral label used for every flagged follow-up row. Do not swap in
 // language like "lazy"/"weak"/"poor performer"/"high risk" here.
-const FOLLOW_UP_LABEL = "Needs follow-up";
+const FOLLOW_UP_LABEL = 'Needs follow-up';
 
 export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const router = useRouter();
@@ -82,7 +82,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
 
   const homeworkQuery = useQuery({
-    queryKey: ["homework-detail", homeworkId],
+    queryKey: ['homework-detail', homeworkId],
     queryFn: () => api.getHomework(homeworkId),
     enabled: Boolean(homeworkId),
   });
@@ -90,27 +90,27 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const homeworkData = homeworkQuery.data as any;
   const isRegisterMode = Boolean(
     homeworkData?.submissionMethod &&
-      homeworkData.submissionMethod !== "ONLINE_ATTACHMENT",
+    homeworkData.submissionMethod !== 'ONLINE_ATTACHMENT',
   );
   const isStudentOrParentSession = Boolean(
-    session?.user.roles.includes("student") ||
-      session?.user.roles.includes("parent"),
+    session?.user.roles.includes('student') ||
+    session?.user.roles.includes('parent'),
   );
   // The register is a teacher/admin tool; student and parent sessions never
   // see it even if they somehow land on this route for physical homework.
   const showRegister = isRegisterMode && !isStudentOrParentSession;
 
   const activeTab =
-    searchParams.get("tab") || (showRegister ? "register" : "submissions");
+    searchParams.get('tab') || (showRegister ? 'register' : 'submissions');
 
   const submissionsQuery = useQuery({
-    queryKey: ["homework-submissions", homeworkId],
+    queryKey: ['homework-submissions', homeworkId],
     queryFn: () => api.listHomeworkAssignmentSubmissions(homeworkId),
     enabled: Boolean(homeworkId),
   });
 
   const registerQuery = useQuery({
-    queryKey: ["homework-register", homeworkId],
+    queryKey: ['homework-register', homeworkId],
     queryFn: () => api.getHomeworkRegister(homeworkId),
     enabled: Boolean(homeworkId) && showRegister,
   });
@@ -118,21 +118,22 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const bulkCompleteMutation = useMutation({
     mutationFn: () => api.bulkCompleteHomeworkRegister(homeworkId, {}),
     onSuccess: (data) => {
-      queryClient.setQueryData(["homework-register", homeworkId], data);
+      queryClient.setQueryData(['homework-register', homeworkId], data);
       setShowMarkAllDialog(false);
       setNotice({
-        title: "Marked all students completed",
+        title: 'Marked all students completed',
         description:
-          "Adjust individual rows below for any exceptions (absent, incomplete, etc.).",
-        tone: "success",
+          'Adjust individual rows below for any exceptions (absent, incomplete, etc.).',
+        tone: 'success',
       });
     },
     onError: (error: any) => {
       setShowMarkAllDialog(false);
       setNotice({
-        title: "Could not mark all completed",
-        description: error.message || "Failed to update the completion register",
-        tone: "danger",
+        title: 'Could not mark all completed',
+        description:
+          error.message || 'Failed to update the completion register',
+        tone: 'danger',
       });
     },
   });
@@ -153,15 +154,14 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["homework-register", homeworkId],
+        queryKey: ['homework-register', homeworkId],
       });
     },
     onError: (error: any) => {
       setNotice({
-        title: "Could not update status",
-        description:
-          error.message || "Failed to update this student's status",
-        tone: "danger",
+        title: 'Could not update status',
+        description: error.message || "Failed to update this student's status",
+        tone: 'danger',
       });
     },
   });
@@ -170,16 +170,16 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
     mutationFn: () => api.cancelHomework(homeworkId),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["homework-detail", homeworkId],
+        queryKey: ['homework-detail', homeworkId],
       });
       setShowCancelDialog(false);
-      setNotice({ title: "Homework cancelled", tone: "success" });
+      setNotice({ title: 'Homework cancelled', tone: 'success' });
     },
     onError: (error: any) => {
       setNotice({
-        title: "Could not cancel homework",
-        description: error.message || "Failed to cancel homework",
-        tone: "danger",
+        title: 'Could not cancel homework',
+        description: error.message || 'Failed to cancel homework',
+        tone: 'danger',
       });
     },
   });
@@ -187,15 +187,15 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const deleteMutation = useMutation({
     mutationFn: () => api.deleteHomework(homeworkId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["homework-list"] });
-      router.push("/dashboard/homework");
+      void queryClient.invalidateQueries({ queryKey: ['homework-list'] });
+      router.push('/dashboard/homework');
     },
     onError: (error: any) => {
       setShowDeleteDialog(false);
       setNotice({
-        title: "Could not delete draft",
-        description: error.message || "Failed to delete this draft",
-        tone: "danger",
+        title: 'Could not delete draft',
+        description: error.message || 'Failed to delete this draft',
+        tone: 'danger',
       });
     },
   });
@@ -205,16 +205,16 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
     onSuccess: () => {
       setShowReminderDialog(false);
       setNotice({
-        title: "Reminders sent",
-        description: "Student reminder notifications were queued.",
-        tone: "success",
+        title: 'Reminders sent',
+        description: 'Student reminder notifications were queued.',
+        tone: 'success',
       });
     },
     onError: (error: any) => {
       setNotice({
-        title: "Could not send reminders",
-        description: error.message || "Failed to send reminders",
-        tone: "danger",
+        title: 'Could not send reminders',
+        description: error.message || 'Failed to send reminders',
+        tone: 'danger',
       });
     },
   });
@@ -240,16 +240,21 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const homework = homeworkQuery.data as any;
 
   if (isStudentOrParentSession) {
-    return <StudentHomeworkSubmissionView homeworkId={homeworkId} homework={homework} />;
+    return (
+      <StudentHomeworkSubmissionView
+        homeworkId={homeworkId}
+        homework={homework}
+      />
+    );
   }
 
   function noteValueFor(row: HomeworkRegisterRow): string {
-    return noteDrafts[row.submissionId] ?? row.teacherRemarks ?? "";
+    return noteDrafts[row.submissionId] ?? row.teacherRemarks ?? '';
   }
 
   function commitNoteDraft(row: HomeworkRegisterRow, value: string) {
     setNoteDrafts((prev) => ({ ...prev, [row.submissionId]: value }));
-    if (value === (row.teacherRemarks ?? "")) return;
+    if (value === (row.teacherRemarks ?? '')) return;
     statusMutation.mutate({
       submissionId: row.submissionId,
       status: row.status,
@@ -259,24 +264,24 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
 
   const registerColumns = [
     {
-      header: "Roll",
-      accessorKey: "rollNumber",
+      header: 'Roll',
+      accessorKey: 'rollNumber',
       cell: (row: HomeworkRegisterRow) => (
         <span className="text-sm font-medium text-slate-700">
-          {row.rollNumber ?? "—"}
+          {row.rollNumber ?? '—'}
         </span>
       ),
     },
     {
-      header: "Student",
-      accessorKey: "studentName",
+      header: 'Student',
+      accessorKey: 'studentName',
       cell: (row: HomeworkRegisterRow) => (
         <span className="font-bold text-slate-900">{row.studentName}</span>
       ),
     },
     {
-      header: "Status",
-      accessorKey: "status",
+      header: 'Status',
+      accessorKey: 'status',
       cell: (row: HomeworkRegisterRow) => {
         const isRowUpdating =
           statusMutation.isPending &&
@@ -311,8 +316,8 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
       },
     },
     {
-      header: "Teacher note",
-      accessorKey: "teacherRemarks",
+      header: 'Teacher note',
+      accessorKey: 'teacherRemarks',
       cell: (row: HomeworkRegisterRow) => (
         <Input
           aria-label={`Teacher note for ${row.studentName}`}
@@ -324,7 +329,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
       ),
     },
     {
-      header: "Follow-up",
+      header: 'Follow-up',
       cell: (row: HomeworkRegisterRow) =>
         row.followUp?.flagged ? (
           <Tooltip
@@ -340,8 +345,8 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
 
   const submissionColumns = [
     {
-      header: "Student",
-      accessorKey: "student.fullNameEn",
+      header: 'Student',
+      accessorKey: 'student.fullNameEn',
       cell: (row: any) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">
@@ -354,32 +359,32 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
       ),
     },
     {
-      header: "Status",
-      accessorKey: "status",
+      header: 'Status',
+      accessorKey: 'status',
       cell: (row: any) => <StatusBadge status={row.status} />,
     },
     {
-      header: "Submitted At",
-      accessorKey: "submittedAt",
+      header: 'Submitted At',
+      accessorKey: 'submittedAt',
       cell: (row: any) =>
-        row.submittedAt ? formatBsDateTime(row.submittedAt) : "—",
+        row.submittedAt ? formatBsDateTime(row.submittedAt) : '—',
     },
     {
-      header: "Score",
-      accessorKey: "score",
+      header: 'Score',
+      accessorKey: 'score',
       cell: (row: any) => (
         <span className="font-medium">
-          {row.score !== null ? `${row.score} / ${homework.maxScore}` : "—"}
+          {row.score !== null ? `${row.score} / ${homework.maxScore}` : '—'}
         </span>
       ),
     },
     {
-      header: "Actions",
+      header: 'Actions',
       cell: (row: any) => (
         <ActionMenu
           items={[
             {
-              label: "Review",
+              label: 'Review',
               icon: <FileCheck2 className="h-4 w-4" />,
               onClick: () => {
                 setSelectedSubmission(row);
@@ -428,7 +433,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
         </div>
 
         <div className="flex items-center gap-3">
-          {homework.status === "DRAFT" ? (
+          {homework.status === 'DRAFT' ? (
             <Button
               variant="outline"
               className="rounded-2xl font-bold"
@@ -442,7 +447,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
               variant="outline"
               className="rounded-2xl font-bold"
               onClick={() => setShowCancelDialog(true)}
-              disabled={homework.status === "CANCELLED"}
+              disabled={homework.status === 'CANCELLED'}
             >
               <Trash2 className="mr-2 h-5 w-5 text-red-500" />
               Cancel Assignment
@@ -455,7 +460,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
         <div className="lg:col-span-2 space-y-6">
           <SectionCard
             title={homework.title}
-            headerAction={<StatusBadge status={homework.status || "DRAFT"} />}
+            headerAction={<StatusBadge status={homework.status || 'DRAFT'} />}
           >
             <div className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-3">
@@ -466,7 +471,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                   <span className="text-sm font-bold text-slate-900">
                     {homework.dueAt
                       ? formatBsDateTime(homework.dueAt)
-                      : "Due date not set"}
+                      : 'Due date not set'}
                   </span>
                 </div>
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
@@ -474,7 +479,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                     Subject
                   </span>
                   <span className="text-sm font-bold text-slate-900">
-                    {homework.subject?.name?.trim() || "Subject not set"}
+                    {homework.subject?.name?.trim() || 'Subject not set'}
                   </span>
                 </div>
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
@@ -482,10 +487,10 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                     Class
                   </span>
                   <span className="text-sm font-bold text-slate-900">
-                    {homework.class?.name?.trim() || "Class not set"}
+                    {homework.class?.name?.trim() || 'Class not set'}
                     {homework.section?.name?.trim()
                       ? ` - ${homework.section.name.trim()}`
-                      : " - All sections"}
+                      : ' - All sections'}
                   </span>
                 </div>
               </div>
@@ -495,7 +500,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                   Instructions
                 </h3>
                 <div className="p-6 rounded-2xl bg-slate-50 text-slate-700 whitespace-pre-wrap leading-relaxed">
-                  {homework.instructions?.trim() || "Instructions not set"}
+                  {homework.instructions?.trim() || 'Instructions not set'}
                 </div>
               </div>
 
@@ -518,12 +523,12 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                           <div className="flex flex-col">
                             <span className="text-sm font-bold text-slate-900 truncate max-w-[150px]">
                               {attachment.fileAsset?.originalFilename?.trim() ||
-                                "File name not set"}
+                                'File name not set'}
                             </span>
                             <span className="text-[10px] text-slate-500 font-medium">
                               {Math.round(
                                 (attachment.fileAsset?.sizeBytes || 0) / 1024,
-                              )}{" "}
+                              )}{' '}
                               KB
                             </span>
                           </div>
@@ -539,10 +544,10 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                               );
                             } catch (err) {
                               setNotice({
-                                title: "Could not open attachment",
+                                title: 'Could not open attachment',
                                 description:
-                                  "The file view link could not be created.",
-                                tone: "danger",
+                                  'The file view link could not be created.',
+                                tone: 'danger',
                               });
                             }
                           }}
@@ -609,8 +614,8 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                       >
                         <ClipboardCheck className="mr-2 h-5 w-5" />
                         {bulkCompleteMutation.isPending
-                          ? "Marking..."
-                          : "Mark All Completed"}
+                          ? 'Marking...'
+                          : 'Mark All Completed'}
                       </Button>
                     </div>
 
@@ -672,7 +677,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                       <Clock className="h-8 w-8 text-[var(--color-mod-homework-text)] mb-2 opacity-30" />
                       <span className="text-2xl font-black text-slate-900">
                         {submissionsQuery.data?.items.filter(
-                          (s) => s.status === "NOT_SUBMITTED",
+                          (s) => s.status === 'NOT_SUBMITTED',
                         ).length ?? 0}
                       </span>
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -684,7 +689,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                       <span className="text-2xl font-black text-slate-900">
                         {homework.dueAt && new Date(homework.dueAt) < new Date()
                           ? (submissionsQuery.data?.items.filter(
-                              (s) => s.status === "NOT_SUBMITTED",
+                              (s) => s.status === 'NOT_SUBMITTED',
                             ).length ?? 0)
                           : 0}
                       </span>
@@ -697,7 +702,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                       <span className="text-2xl font-black text-slate-900">
                         {submissionsQuery.data?.items.filter(
                           (s) =>
-                            s.status === "SUBMITTED" || s.status === "REVIEWED",
+                            s.status === 'SUBMITTED' || s.status === 'REVIEWED',
                         ).length ?? 0}
                       </span>
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -713,13 +718,13 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                       onClick={() => setShowReminderDialog(true)}
                       disabled={
                         sendReminderMutation.isPending ||
-                        homework.status === "CLOSED"
+                        homework.status === 'CLOSED'
                       }
                     >
                       <Bell className="mr-2 h-5 w-5" />
                       {sendReminderMutation.isPending
-                        ? "Sending..."
-                        : "Send Reminders Now"}
+                        ? 'Sending...'
+                        : 'Send Reminders Now'}
                     </Button>
                   </div>
                 </div>
@@ -747,7 +752,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                   {submissionsQuery.data?.items.length
                     ? Math.round(
                         (submissionsQuery.data.items.filter(
-                          (s) => s.status !== "NOT_SUBMITTED",
+                          (s) => s.status !== 'NOT_SUBMITTED',
                         ).length /
                           submissionsQuery.data.items.length) *
                           100,
@@ -771,7 +776,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                 <span className="text-sm font-bold text-slate-900">
                   {homework.assignedDate
                     ? formatBsDate(homework.assignedDate)
-                    : "—"}
+                    : '—'}
                 </span>
               </div>
             </div>
@@ -790,7 +795,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                   <p className="text-[10px] text-slate-500">
                     {homework.assignedDate
                       ? formatBsDateTime(homework.assignedDate)
-                      : "—"}
+                      : '—'}
                   </p>
                 </div>
               </div>
@@ -868,12 +873,12 @@ function StudentHomeworkSubmissionView({
 }) {
   const queryClient = useQueryClient();
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const [openingAttachmentId, setOpeningAttachmentId] = useState<
-    string | null
-  >(null);
+  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(
+    null,
+  );
 
   const submissionsQuery = useQuery({
-    queryKey: ["homework-submissions", "mine", homeworkId],
+    queryKey: ['homework-submissions', 'mine', homeworkId],
     queryFn: () => api.listHomeworkAssignmentSubmissions(homeworkId),
     enabled: Boolean(homeworkId),
   });
@@ -889,7 +894,7 @@ function StudentHomeworkSubmissionView({
       setAttachmentError(
         err instanceof Error
           ? err.message
-          : "Failed to open the homework attachment.",
+          : 'Failed to open the homework attachment.',
       );
     } finally {
       setOpeningAttachmentId(null);
@@ -897,12 +902,12 @@ function StudentHomeworkSubmissionView({
   }
 
   const pendingStatuses = new Set([
-    "NOT_SUBMITTED",
-    "LATE",
-    "NEEDS_CORRECTION",
+    'NOT_SUBMITTED',
+    'LATE',
+    'NEEDS_CORRECTION',
   ]);
   const canSubmitOnline =
-    homework?.submissionMethod === "ONLINE_ATTACHMENT" &&
+    homework?.submissionMethod === 'ONLINE_ATTACHMENT' &&
     mySubmission &&
     pendingStatuses.has(mySubmission.status);
 
@@ -915,10 +920,10 @@ function StudentHomeworkSubmissionView({
         </Button>
       </Link>
 
-      <SectionCard title={homework?.title?.trim() || "Homework"}>
+      <SectionCard title={homework?.title?.trim() || 'Homework'}>
         <div className="space-y-4">
           <p className="whitespace-pre-wrap rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
-            {homework?.instructions?.trim() || "Instructions not set"}
+            {homework?.instructions?.trim() || 'Instructions not set'}
           </p>
           {homework?.parentInstructions ? (
             <div className="rounded-2xl border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] p-4 text-sm text-[var(--color-mod-homework-text)]">
@@ -948,7 +953,7 @@ function StudentHomeworkSubmissionView({
             submissionId={mySubmission!.id}
             onSuccess={() =>
               queryClient.invalidateQueries({
-                queryKey: ["homework-submissions", "mine"],
+                queryKey: ['homework-submissions', 'mine'],
               })
             }
           />
@@ -957,7 +962,7 @@ function StudentHomeworkSubmissionView({
         <SectionCard title="My Submission">
           <div className="space-y-4">
             <p className="whitespace-pre-wrap rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-700">
-              {mySubmission.submissionContent || "No text content provided."}
+              {mySubmission.submissionContent || 'No text content provided.'}
             </p>
             {mySubmission.attachments && mySubmission.attachments.length > 0 ? (
               <div className="space-y-3">
@@ -979,8 +984,8 @@ function StudentHomeworkSubmissionView({
                     >
                       <FileText className="h-3.5 w-3.5" />
                       {openingAttachmentId === a.id
-                        ? "Opening..."
-                        : a.fileAsset?.originalFilename?.trim() || "File"}
+                        ? 'Opening...'
+                        : a.fileAsset?.originalFilename?.trim() || 'File'}
                     </button>
                   ))}
                 </div>
@@ -1013,7 +1018,7 @@ function StudentSubmissionForm({
   submissionId: string;
   onSuccess: () => void;
 }) {
-  const [content, setContent] = useState("");
+  const [content, setContent] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [attachments, setAttachments] = useState<
@@ -1028,7 +1033,7 @@ function StudentSubmissionForm({
     }) => api.submitHomework(data),
     onSuccess,
     onError: (err: Error) =>
-      setError(err.message || "Failed to submit homework"),
+      setError(err.message || 'Failed to submit homework'),
   });
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1036,13 +1041,13 @@ function StudentSubmissionForm({
     if (!file) return;
     setIsUploading(true);
     try {
-      const result = await api.uploadFile(file, "homework-submission");
+      const result = await api.uploadFile(file, 'homework-submission');
       setAttachments((prev) => [
         ...prev,
         { id: result.id, fileName: result.fileName },
       ]);
     } catch (err: any) {
-      setError(err.message || "Failed to upload file");
+      setError(err.message || 'Failed to upload file');
     } finally {
       setIsUploading(false);
     }
@@ -1056,7 +1061,7 @@ function StudentSubmissionForm({
     e.preventDefault();
     setError(null);
     if (!content.trim()) {
-      setError("Please enter your submission text");
+      setError('Please enter your submission text');
       return;
     }
     mutation.mutate({
@@ -1131,7 +1136,7 @@ function StudentSubmissionForm({
         disabled={mutation.isPending || isUploading}
         className="rounded-xl bg-[var(--color-mod-homework-accent)] font-bold text-white"
       >
-        {mutation.isPending ? "Submitting..." : "Submit Assignment"}
+        {mutation.isPending ? 'Submitting...' : 'Submit Assignment'}
       </Button>
     </form>
   );

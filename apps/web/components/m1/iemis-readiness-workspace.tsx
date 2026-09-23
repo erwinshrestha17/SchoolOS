@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   formatBsDate,
@@ -6,8 +6,8 @@ import {
   type BulkAdmissionImportResult,
   type IemisExportResult,
   type StudentIemisReadinessSummary,
-} from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+} from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -16,19 +16,19 @@ import {
   Loader2,
   Play,
   Upload,
-} from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { api, ApiRequestError } from "../../lib/api";
-import { useSession } from "../session-provider";
-import { Button } from "../ui/button";
-import { ConfirmDialog } from "../ui/confirm-dialog";
-import { EmptyState } from "../ui/empty-state";
-import { ErrorState } from "../ui/error-state";
-import { KpiCard, KpiGrid } from "../ui/kpi-card";
-import { LoadingState } from "../ui/loading-state";
-import { ProtectedFileButton } from "../ui/protected-file";
-import { StatusBadge } from "../ui/status-badge";
-import { Toast } from "../ui/toast";
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { api, ApiRequestError } from '../../lib/api';
+import { useSession } from '../session-provider';
+import { Button } from '../ui/button';
+import { ConfirmDialog } from '../ui/confirm-dialog';
+import { EmptyState } from '../ui/empty-state';
+import { ErrorState } from '../ui/error-state';
+import { KpiCard, KpiGrid } from '../ui/kpi-card';
+import { LoadingState } from '../ui/loading-state';
+import { ProtectedFileButton } from '../ui/protected-file';
+import { StatusBadge } from '../ui/status-badge';
+import { Toast } from '../ui/toast';
 
 type IssueRow = {
   key: string;
@@ -49,8 +49,8 @@ export function IemisReadinessWorkspace() {
   const queryClient = useQueryClient();
   const { hasPermissions, session } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [status, setStatus] = useState<"all" | "ready" | "has_issues">(
-    "has_issues",
+  const [status, setStatus] = useState<'all' | 'ready' | 'has_issues'>(
+    'has_issues',
   );
   const [exportResult, setExportResult] = useState<IemisExportResult | null>(
     null,
@@ -71,36 +71,36 @@ export function IemisReadinessWorkspace() {
   const [toast, setToast] = useState<{
     title: string;
     description: string;
-    tone: "success" | "danger" | "info";
+    tone: 'success' | 'danger' | 'info';
   } | null>(null);
   const canImportAdmissions = hasPermissions([
-    "enrollments:create",
-    "students:create",
-    "guardians:create",
+    'enrollments:create',
+    'students:create',
+    'guardians:create',
   ]);
   const canPrepareReportingCsv =
     session?.user.isSupportOverride !== true &&
-    hasPermissions(["students:manage_lifecycle", "reports:export"]);
+    hasPermissions(['students:manage_lifecycle', 'reports:export']);
   const canReadImportDetails =
     session?.user.isSupportOverride !== true &&
-    hasPermissions(["enrollments:read", "students:read"]);
+    hasPermissions(['enrollments:read', 'students:read']);
 
   const readinessQuery = useQuery({
-    queryKey: ["student-iemis-readiness-list", "workspace", status],
+    queryKey: ['student-iemis-readiness-list', 'workspace', status],
     queryFn: () => api.listIemisReadiness({ status }),
   });
   const importBatchesQuery = useQuery({
-    queryKey: ["admission-import-batches", importPage],
+    queryKey: ['admission-import-batches', importPage],
     queryFn: () =>
       api.listAdmissionImportBatches({ page: importPage, limit: 10 }),
   });
   const importDetailQuery = useQuery({
-    queryKey: ["admission-import-batch", selectedBatchId],
+    queryKey: ['admission-import-batch', selectedBatchId],
     queryFn: () => api.getAdmissionImportBatch(selectedBatchId!),
     enabled: canReadImportDetails && selectedBatchId !== null,
   });
   const importReviewQuery = useQuery({
-    queryKey: ["admission-import-review-queue", reviewPage],
+    queryKey: ['admission-import-review-queue', reviewPage],
     queryFn: () =>
       api.listAdmissionImportReviewQueue({ page: reviewPage, limit: 25 }),
   });
@@ -110,26 +110,26 @@ export function IemisReadinessWorkspace() {
     onSuccess: (result) => {
       setExportResult(result);
       setToast({
-        title: "Reporting-readiness CSV prepared",
+        title: 'Reporting-readiness CSV prepared',
         description:
-          result.artifactStatus === "BLOCKED_CONFIGURATION"
+          result.artifactStatus === 'BLOCKED_CONFIGURATION'
             ? `${result.validRecords} of ${result.totalRecords} student records passed, but school configuration still blocks government handoff.`
             : `${result.validRecords} of ${result.totalRecords} student records passed the SchoolOS checks. Authorized review is still required.`,
-        tone: "info",
+        tone: 'info',
       });
     },
     onError: (error) =>
       setToast({
-        title: "Export failed",
-        description: transferFailureMessage(error, "export"),
-        tone: "danger",
+        title: 'Export failed',
+        description: transferFailureMessage(error, 'export'),
+        tone: 'danger',
       }),
   });
 
   const validateImportMutation = useMutation({
     mutationFn: async (file: File) => {
       if (file.size > MAX_ADMISSION_IMPORT_FILE_BYTES) {
-        throw new Error("Admission CSV exceeds the one-megabyte limit.");
+        throw new Error('Admission CSV exceeds the one-megabyte limit.');
       }
       const csvContent = await file.text();
       const preview = await api.bulkImportAdmissions({
@@ -144,22 +144,22 @@ export function IemisReadinessWorkspace() {
       setPendingImport(pending);
       setImportDialogOpen(true);
       setToast({
-        title: "Admission CSV validated",
+        title: 'Admission CSV validated',
         description: `${pending.preview.validated} rows are ready and ${pending.preview.failed} need attention. No student records were created.`,
-        tone: pending.preview.failed ? "info" : "success",
+        tone: pending.preview.failed ? 'info' : 'success',
       });
       void queryClient.invalidateQueries({
-        queryKey: ["admission-import-batches"],
+        queryKey: ['admission-import-batches'],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["admission-import-review-queue"],
+        queryKey: ['admission-import-review-queue'],
       });
     },
     onError: (error) =>
       setToast({
-        title: "CSV validation failed",
-        description: transferFailureMessage(error, "import"),
-        tone: "danger",
+        title: 'CSV validation failed',
+        description: transferFailureMessage(error, 'import'),
+        tone: 'danger',
       }),
   });
 
@@ -177,41 +177,41 @@ export function IemisReadinessWorkspace() {
       setPendingImport(null);
       setImportDialogOpen(false);
       setToast({
-        title: "Import processed",
+        title: 'Import processed',
         description: `${result.created} completed, ${result.failed} need review, ${result.validated} validated. Some rows needing review may already have a student record; check the row details.`,
-        tone: result.failed ? "info" : "success",
+        tone: result.failed ? 'info' : 'success',
       });
-      void queryClient.invalidateQueries({ queryKey: ["students"] });
+      void queryClient.invalidateQueries({ queryKey: ['students'] });
       void queryClient.invalidateQueries({
-        queryKey: ["student-iemis-readiness-list"],
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ["admission-import-batches"],
+        queryKey: ['student-iemis-readiness-list'],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["admission-import-review-queue"],
+        queryKey: ['admission-import-batches'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['admission-import-review-queue'],
       });
     },
     onError: (error) => {
       setToast({
-        title: "Import failed",
-        description: transferFailureMessage(error, "import"),
-        tone: "danger",
+        title: 'Import failed',
+        description: transferFailureMessage(error, 'import'),
+        tone: 'danger',
       });
       // Failure can follow committed admissions; refresh evidence without
       // retrying the mutation or discarding the operator's source CSV.
-      void queryClient.invalidateQueries({ queryKey: ["students"] });
+      void queryClient.invalidateQueries({ queryKey: ['students'] });
       void queryClient.invalidateQueries({
-        queryKey: ["student-iemis-readiness-list"],
+        queryKey: ['student-iemis-readiness-list'],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["admission-import-batches"],
+        queryKey: ['admission-import-batches'],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["admission-import-batch"],
+        queryKey: ['admission-import-batch'],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["admission-import-review-queue"],
+        queryKey: ['admission-import-review-queue'],
       });
     },
   });
@@ -260,7 +260,7 @@ export function IemisReadinessWorkspace() {
             setImportDialogOpen(false);
             validateImportMutation.mutate(file);
           }
-          event.currentTarget.value = "";
+          event.currentTarget.value = '';
         }}
       />
 
@@ -276,14 +276,14 @@ export function IemisReadinessWorkspace() {
           title="Validation Errors"
           value={issueRows.length}
           icon={<AlertTriangle size={19} />}
-          tone={issueRows.length ? "danger" : "success"}
+          tone={issueRows.length ? 'danger' : 'success'}
           description="Current readiness result"
         />
         <KpiCard
           title="Missing Fields"
           value={missingFields}
           icon={<FileSpreadsheet size={19} />}
-          tone={missingFields ? "warning" : "success"}
+          tone={missingFields ? 'warning' : 'success'}
           description="From validation messages"
         />
         <KpiCard
@@ -295,7 +295,7 @@ export function IemisReadinessWorkspace() {
         />
         <KpiCard
           title="Last Export"
-          value={exportResult ? formatBsDate(exportResult.exportedAt) : "—"}
+          value={exportResult ? formatBsDate(exportResult.exportedAt) : '—'}
           icon={<Download size={19} />}
           tone="info"
           description="Latest export requested here"
@@ -304,14 +304,14 @@ export function IemisReadinessWorkspace() {
           title="Import Jobs"
           value={
             importMutation.isPending || validateImportMutation.isPending
-              ? "Running"
-              : (importBatchesQuery.data?.total ?? "Unavailable")
+              ? 'Running'
+              : (importBatchesQuery.data?.total ?? 'Unavailable')
           }
           icon={<Upload size={19} />}
           tone={
             importMutation.isPending || validateImportMutation.isPending
-              ? "warning"
-              : "info"
+              ? 'warning'
+              : 'info'
           }
           description="Persisted admission import batches"
         />
@@ -344,9 +344,9 @@ export function IemisReadinessWorkspace() {
           {issueRows.length === 0 ? (
             <EmptyState
               title={
-                status === "ready"
-                  ? "Ready records have no validation issues"
-                  : "No validation issues"
+                status === 'ready'
+                  ? 'Ready records have no validation issues'
+                  : 'No validation issues'
               }
               description="The selected server validation set has no issues to review."
             />
@@ -375,7 +375,7 @@ export function IemisReadinessWorkspace() {
                           {row.student.className}
                           {row.student.sectionName
                             ? ` / ${row.student.sectionName}`
-                            : ""}
+                            : ''}
                         </span>
                       </td>
                       <td className="px-4 py-3 font-semibold text-slate-600">
@@ -391,13 +391,13 @@ export function IemisReadinessWorkspace() {
                         <StatusBadge
                           status={
                             /missing|required/i.test(row.message)
-                              ? "HIGH"
-                              : "MEDIUM"
+                              ? 'HIGH'
+                              : 'MEDIUM'
                           }
                           tone={
                             /missing|required/i.test(row.message)
-                              ? "rejected"
-                              : "pending"
+                              ? 'rejected'
+                              : 'pending'
                           }
                         />
                       </td>
@@ -427,16 +427,16 @@ export function IemisReadinessWorkspace() {
               <p className="mt-3 flex items-center gap-2 text-sm text-slate-600">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 {validateImportMutation.isPending
-                  ? "Validating CSV without creating records…"
-                  : "Creating the confirmed admission records…"}
+                  ? 'Validating CSV without creating records…'
+                  : 'Creating the confirmed admission records…'}
               </p>
             ) : importResult ? (
               <div className="mt-3 grid gap-3 sm:grid-cols-4">
                 {[
-                  ["Rows", importResult.totalRows],
-                  ["Completed", importResult.created],
-                  ["Validated", importResult.validated],
-                  ["Failed", importResult.failed],
+                  ['Rows', importResult.totalRows],
+                  ['Completed', importResult.created],
+                  ['Validated', importResult.validated],
+                  ['Failed', importResult.failed],
                 ].map(([label, value]) => (
                   <div
                     key={String(label)}
@@ -449,7 +449,7 @@ export function IemisReadinessWorkspace() {
                   </div>
                 ))}
                 {importResult.results
-                  .filter((row) => row.status === "failed" && row.studentId)
+                  .filter((row) => row.status === 'failed' && row.studentId)
                   .map((row) => (
                     <div
                       key={row.rowNumber}
@@ -491,7 +491,7 @@ export function IemisReadinessWorkspace() {
                 status={
                   importBatchesQuery.data
                     ? `${importBatchesQuery.data.total} jobs`
-                    : "Unavailable"
+                    : 'Unavailable'
                 }
                 tone="info"
               />
@@ -528,7 +528,7 @@ export function IemisReadinessWorkspace() {
                     {importBatchesQuery.data?.items.map((batch) => (
                       <tr key={batch.id}>
                         <td className="max-w-56 truncate px-3 py-3 font-bold text-slate-800">
-                          {batch.sourceFileName ?? "Unnamed import"}
+                          {batch.sourceFileName ?? 'Unnamed import'}
                         </td>
                         <td className="px-3 py-3 text-slate-600">
                           {formatBsDateTime(batch.startedAt)}
@@ -624,16 +624,16 @@ export function IemisReadinessWorkspace() {
                   <>
                     <p className="mt-2 text-sm text-slate-600">
                       {importDetailQuery.data.sourceFileName ??
-                        "Unnamed import"}{" "}
-                      · {formatBsDateTime(importDetailQuery.data.startedAt)} ·{" "}
+                        'Unnamed import'}{' '}
+                      · {formatBsDateTime(importDetailQuery.data.startedAt)} ·{' '}
                       {importDetailQuery.data.dryRun
-                        ? "Validation only"
-                        : "Confirmed import"}
+                        ? 'Validation only'
+                        : 'Confirmed import'}
                     </p>
                     <StatusBadge status={importDetailQuery.data.status} />
                     <p className="mt-2 text-sm text-slate-600">
-                      {importDetailQuery.data.created} completed ·{" "}
-                      {importDetailQuery.data.validated} validated ·{" "}
+                      {importDetailQuery.data.created} completed ·{' '}
+                      {importDetailQuery.data.validated} validated ·{' '}
                       {importDetailQuery.data.failed} need review
                     </p>
                     {importDetailQuery.data.rows.length === 0 ? (
@@ -650,21 +650,21 @@ export function IemisReadinessWorkspace() {
                             className="rounded-lg border border-slate-200 p-3 text-sm"
                           >
                             <p>
-                              Row {row.rowNumber} ·{" "}
+                              Row {row.rowNumber} ·{' '}
                               <StatusBadge status={row.status} />
                             </p>
-                            {row.status === "failed" ? (
+                            {row.status === 'failed' ? (
                               <p className="mt-2 text-warning-900">
                                 {row.studentId
-                                  ? "Student and enrollment were created, but follow-up processing needs review. Do not import this row again."
-                                  : "This row needs review before another import. Check the original CSV and duplicate-review queue."}
+                                  ? 'Student and enrollment were created, but follow-up processing needs review. Do not import this row again.'
+                                  : 'This row needs review before another import. Check the original CSV and duplicate-review queue.'}
                               </p>
                             ) : null}
-                            {row.status === "processing" ? (
+                            {row.status === 'processing' ? (
                               <p className="mt-2 text-warning-900">
                                 {row.studentId
-                                  ? "Student and enrollment are recorded. Follow-up processing is not yet confirmed. Do not import this row again."
-                                  : "This row has no confirmed outcome yet. Review the batch before attempting another import."}
+                                  ? 'Student and enrollment are recorded. Follow-up processing is not yet confirmed. Do not import this row again.'
+                                  : 'This row has no confirmed outcome yet. Review the batch before attempting another import.'}
                               </p>
                             ) : null}
                             {row.studentId ? (
@@ -672,7 +672,7 @@ export function IemisReadinessWorkspace() {
                                 className="mt-2 inline-block underline"
                                 href={`/dashboard/students/${encodeURIComponent(row.studentId)}`}
                               >
-                                Review student {row.studentSystemId ?? "record"}
+                                Review student {row.studentSystemId ?? 'record'}
                               </a>
                             ) : null}
                           </li>
@@ -686,8 +686,8 @@ export function IemisReadinessWorkspace() {
                       onClick={() => void importDetailQuery.refetch()}
                     >
                       {importDetailQuery.isFetching
-                        ? "Refreshing results…"
-                        : "Refresh saved results"}
+                        ? 'Refreshing results…'
+                        : 'Refresh saved results'}
                     </Button>
                   </>
                 ) : null}
@@ -708,15 +708,15 @@ export function IemisReadinessWorkspace() {
               <StatusBadge
                 status={
                   importReviewQuery.isError || !importReviewQuery.data
-                    ? "Unavailable"
+                    ? 'Unavailable'
                     : `${importReviewQuery.data.total} rows`
                 }
                 tone={
                   importReviewQuery.isError || !importReviewQuery.data
-                    ? "info"
+                    ? 'info'
                     : importReviewQuery.data.total > 0
-                      ? "pending"
-                      : "approved"
+                      ? 'pending'
+                      : 'approved'
                 }
               />
             </div>
@@ -741,13 +741,13 @@ export function IemisReadinessWorkspace() {
             ) : (importReviewQuery.data?.items.length ?? 0) === 0 ? (
               <p className="mt-3 text-sm text-slate-500">
                 {reviewPage === 1
-                  ? "No import rows currently require review."
-                  : "No review rows on this page. Return to a previous page."}
+                  ? 'No import rows currently require review.'
+                  : 'No review rows on this page. Return to a previous page.'}
               </p>
             ) : (
               <div className="mt-3 space-y-2">
                 <p className="text-sm text-slate-600">
-                  Showing {importReviewQuery.data?.items.length} of{" "}
+                  Showing {importReviewQuery.data?.items.length} of{' '}
                   {importReviewQuery.data?.total} rows · Page {reviewPage}.
                 </p>
                 {importReviewQuery.data?.items.map((row) => (
@@ -760,7 +760,7 @@ export function IemisReadinessWorkspace() {
                         {row.sourceFileName} · row {row.rowNumber}
                       </p>
                       <p className="mt-1 text-xs text-slate-600">
-                        {row.workflowLabel} · {row.errors.length} errors ·{" "}
+                        {row.workflowLabel} · {row.errors.length} errors ·{' '}
                         {row.duplicates.length} duplicate candidates
                       </p>
                     </div>
@@ -768,7 +768,7 @@ export function IemisReadinessWorkspace() {
                     {canReadImportDetails ? (
                       <Button
                         variant="outline"
-                        aria-label={`Review batch ${row.sourceFileName ?? "Unnamed import"}, row ${row.rowNumber}`}
+                        aria-label={`Review batch ${row.sourceFileName ?? 'Unnamed import'}, row ${row.rowNumber}`}
                         aria-controls="admission-import-details"
                         onClick={() => {
                           setSelectedBatchId(row.batchId);
@@ -836,7 +836,7 @@ export function IemisReadinessWorkspace() {
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Play className="h-4 w-4" />
-              )}{" "}
+              )}{' '}
               Run validation
             </Button>
           </div>
@@ -859,7 +859,7 @@ export function IemisReadinessWorkspace() {
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Download className="h-4 w-4" />
-                )}{" "}
+                )}{' '}
                 Prepare reporting-readiness CSV
               </Button>
               <Button
@@ -884,7 +884,7 @@ export function IemisReadinessWorkspace() {
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Upload className="h-4 w-4" />
-                )}{" "}
+                )}{' '}
                 Validate admission CSV
               </Button>
               <ProtectedFileButton
@@ -906,7 +906,7 @@ export function IemisReadinessWorkspace() {
               <div className="mt-4 rounded-xl border border-info-100 bg-info-50 p-3 text-sm text-info-900">
                 <p className="font-bold">Validation ready</p>
                 <p className="mt-1 text-xs">
-                  {pendingImport.preview.validated} ready ·{" "}
+                  {pendingImport.preview.validated} ready ·{' '}
                   {pendingImport.preview.failed} need attention
                 </p>
                 <Button
@@ -941,9 +941,9 @@ export function IemisReadinessWorkspace() {
                 <div className="flex justify-between gap-3">
                   <dt className="text-slate-500">Government handoff</dt>
                   <dd className="text-right font-bold">
-                    {exportResult.artifactStatus === "BLOCKED_CONFIGURATION"
-                      ? "Blocked by configuration"
-                      : "Authorized review required"}
+                    {exportResult.artifactStatus === 'BLOCKED_CONFIGURATION'
+                      ? 'Blocked by configuration'
+                      : 'Authorized review required'}
                   </dd>
                 </div>
                 <div className="flex justify-between">
@@ -972,8 +972,8 @@ export function IemisReadinessWorkspace() {
         description="Only rows that passed the server validation will be attempted. Rows with errors or possible duplicates stay in the review queue. SchoolOS rechecks the one-time validation receipt before creating any records."
         confirmLabel={
           pendingImport
-            ? `Create ${pendingImport.preview.validated} admission${pendingImport.preview.validated === 1 ? "" : "s"}`
-            : "Create admissions"
+            ? `Create ${pendingImport.preview.validated} admission${pendingImport.preview.validated === 1 ? '' : 's'}`
+            : 'Create admissions'
         }
         isConfirming={importMutation.isPending}
         preventCloseWhileConfirming
@@ -1024,7 +1024,7 @@ export function IemisReadinessWorkspace() {
         ) : null}
         {importMutation.isError ? (
           <p className="text-sm font-semibold text-danger-700" role="alert">
-            {transferFailureMessage(importMutation.error, "import")}
+            {transferFailureMessage(importMutation.error, 'import')}
           </p>
         ) : null}
       </ConfirmDialog>
@@ -1049,31 +1049,31 @@ function ImportPreviewMetric({
 
 function transferFailureMessage(
   error: unknown,
-  operation: "import" | "export",
+  operation: 'import' | 'export',
 ) {
   if (error instanceof ApiRequestError) {
     if (error.statusCode === 401) {
-      return "Your session expired. Sign in again before continuing.";
+      return 'Your session expired. Sign in again before continuing.';
     }
     if (error.statusCode === 403) {
       return `You do not have permission to ${operation} student records.`;
     }
     if ([400, 413, 422].includes(error.statusCode)) {
-      return operation === "import"
-        ? "The selected CSV was not accepted. Review its headers, row values, and file size, then try again."
-        : "The export filters were not accepted. Refresh the readiness list and try again.";
+      return operation === 'import'
+        ? 'The selected CSV was not accepted. Review its headers, row values, and file size, then try again.'
+        : 'The export filters were not accepted. Refresh the readiness list and try again.';
     }
     if (error.statusCode === 409) {
-      return operation === "import"
-        ? "The import conflicts with current student records. Review the import queue before retrying."
-        : "Student records changed while the export was prepared. Refresh and try again.";
+      return operation === 'import'
+        ? 'The import conflicts with current student records. Review the import queue before retrying.'
+        : 'Student records changed while the export was prepared. Refresh and try again.';
     }
     if (error.statusCode === 429) {
-      return "Too many requests were submitted. Wait a moment and try again.";
+      return 'Too many requests were submitted. Wait a moment and try again.';
     }
   }
 
-  return operation === "import"
-    ? "The import outcome could not be confirmed. Student records may already exist. Do not import these rows again until you review CSV Import History and reconcile any unfinished batch. Contact support with the request time if the outcome remains unclear."
-    : "The export could not be prepared. Student records were not changed. Try again, or contact support with the request time.";
+  return operation === 'import'
+    ? 'The import outcome could not be confirmed. Student records may already exist. Do not import these rows again until you review CSV Import History and reconcile any unfinished batch. Contact support with the request time if the outcome remains unclear.'
+    : 'The export could not be prepared. Student records were not changed. Try again, or contact support with the request time.';
 }

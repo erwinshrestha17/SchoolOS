@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
 import {
   resolveTeacherPersona,
   resolveTeacherRouteRestriction,
   TeacherCapability,
   type TeacherRestrictedRoute,
-} from "@schoolos/core";
-import { useMemo } from "react";
-import { useSession } from "../components/session-provider";
+} from '@schoolos/core';
+import { useMemo } from 'react';
+import { useSession } from '../components/session-provider';
 
 export { TeacherCapability };
 export type { TeacherRestrictedRoute };

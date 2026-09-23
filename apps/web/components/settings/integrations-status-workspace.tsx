@@ -132,7 +132,8 @@ export function IntegrationsStatusWorkspace() {
             {attentionCount}
           </p>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Provider areas that require configuration and verification before live use.
+            Provider areas that require configuration and verification before
+            live use.
           </p>
         </div>
       </section>

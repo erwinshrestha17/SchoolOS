@@ -1,6 +1,6 @@
-import { DashboardPageShell } from "../../../../components/dashboard/dashboard-page-shell";
-import { AssessmentInterviewWorkspace } from "../../../../components/m1/assessment-interview-workspace";
-import { M1PageHeader } from "../../../../components/m1/m1-page-header";
+import { DashboardPageShell } from '../../../../components/dashboard/dashboard-page-shell';
+import { AssessmentInterviewWorkspace } from '../../../../components/m1/assessment-interview-workspace';
+import { M1PageHeader } from '../../../../components/m1/m1-page-header';
 
 export default function AdmissionAssessmentPage() {
   return (

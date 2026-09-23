@@ -1,26 +1,26 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   formatBsDate,
   getNepalSchoolDay,
   moodLogFormSchema,
-} from "@schoolos/core";
-import { api } from "../../../../lib/api";
-import { DashboardPageShell } from "../../../../components/dashboard/dashboard-page-shell";
-import { PageHeader } from "../../../../components/ui/page-header";
-import { EmptyState } from "../../../../components/ui/empty-state";
+} from '@schoolos/core';
+import { api } from '../../../../lib/api';
+import { DashboardPageShell } from '../../../../components/dashboard/dashboard-page-shell';
+import { PageHeader } from '../../../../components/ui/page-header';
+import { EmptyState } from '../../../../components/ui/empty-state';
 import {
   FormField,
   Input,
   Select,
   TextArea,
-} from "../../../../components/ui/form-field";
-import { RemoteStudentSelector } from "../../../../components/students/remote-student-selector";
+} from '../../../../components/ui/form-field';
+import { RemoteStudentSelector } from '../../../../components/students/remote-student-selector';
 
 const today = getNepalSchoolDay().gregorianDate;
-const moods = ["CALM", "ENGAGED", "EXCITED", "UNSETTLED", "TIRED"] as const;
+const moods = ['CALM', 'ENGAGED', 'EXCITED', 'UNSETTLED', 'TIRED'] as const;
 
 type SectionSummaryForUi = {
   id: string;
@@ -40,33 +40,33 @@ type ObservationState = {
 export default function ActivityObservationsPage() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<ObservationState>({
-    classId: "",
-    sectionId: "",
-    studentId: "",
-    mood: "ENGAGED",
-    note: "",
+    classId: '',
+    sectionId: '',
+    studentId: '',
+    mood: 'ENGAGED',
+    note: '',
     logDate: today,
   });
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
   const sectionsQuery = useQuery({
-    queryKey: ["sections"],
+    queryKey: ['sections'],
     queryFn: api.listSections,
   });
   const logsQuery = useQuery({
-    queryKey: ["mood-logs"],
+    queryKey: ['mood-logs'],
     queryFn: api.listMoodLogs,
   });
 
   const mutation = useMutation({
     mutationFn: api.createMoodLog,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["mood-logs"] });
-      setForm((current) => ({ ...current, note: "" }));
+      void queryClient.invalidateQueries({ queryKey: ['mood-logs'] });
+      setForm((current) => ({ ...current, note: '' }));
     },
   });
 
@@ -90,7 +90,7 @@ export default function ActivityObservationsPage() {
 
     if (!result.success) {
       setValidationError(
-        result.error.issues[0]?.message ?? "Check the observation fields.",
+        result.error.issues[0]?.message ?? 'Check the observation fields.',
       );
       return;
     }
@@ -134,8 +134,8 @@ export default function ActivityObservationsPage() {
                     setForm((current) => ({
                       ...current,
                       classId: event.target.value,
-                      sectionId: "",
-                      studentId: "",
+                      sectionId: '',
+                      studentId: '',
                     }))
                   }
                 >
@@ -154,7 +154,7 @@ export default function ActivityObservationsPage() {
                     setForm((current) => ({
                       ...current,
                       sectionId: event.target.value,
-                      studentId: "",
+                      studentId: '',
                     }))
                   }
                 >
@@ -177,7 +177,7 @@ export default function ActivityObservationsPage() {
               sectionId={form.sectionId || undefined}
               label="Student (optional exception)"
               placeholder={
-                form.classId ? "Whole-class mood" : "Select a class first"
+                form.classId ? 'Whole-class mood' : 'Select a class first'
               }
               disabled={!form.classId}
             />
@@ -189,7 +189,7 @@ export default function ActivityObservationsPage() {
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,
-                      mood: event.target.value as ObservationState["mood"],
+                      mood: event.target.value as ObservationState['mood'],
                     }))
                   }
                 >
@@ -245,7 +245,7 @@ export default function ActivityObservationsPage() {
                 onClick={save}
                 className="h-14 w-full rounded-2xl bg-[var(--color-mod-activity-accent)] text-xs font-black uppercase tracking-[0.2em] text-white shadow-sm transition-all hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
               >
-                {mutation.isPending ? "Saving..." : "Save observation"}
+                {mutation.isPending ? 'Saving...' : 'Save observation'}
               </button>
             </div>
           </div>
@@ -269,7 +269,7 @@ export default function ActivityObservationsPage() {
                       <span className="ml-2 text-slate-600">
                         {log.student
                           ? `${log.student.firstNameEn} ${log.student.lastNameEn}`
-                          : "Whole class"}
+                          : 'Whole class'}
                       </span>
                     </p>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
@@ -295,7 +295,7 @@ export default function ActivityObservationsPage() {
 
 function formatEnumLabel(value: string) {
   return value
-    .split("_")
+    .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(" ");
+    .join(' ');
 }

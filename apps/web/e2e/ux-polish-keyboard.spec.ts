@@ -14,12 +14,20 @@ test.describe('SchoolOS UX Polish: Keyboard Navigation', () => {
 
   test('Marks Entry: Keyboard navigation between cells', async ({ page }) => {
     await page.goto('/dashboard/academics/marks');
-    
+
     // Select context to load data (using data from seed)
-    await page.locator('[data-testid="filter-exam-term"]').selectOption({ label: 'First Term' });
-    await page.locator('[data-testid="filter-class"]').selectOption({ label: 'Class 1' });
-    await page.locator('[data-testid="filter-subject"]').selectOption({ label: 'English' });
-    await page.locator('[data-testid="filter-component"]').selectOption({ index: 1 });
+    await page
+      .locator('[data-testid="filter-exam-term"]')
+      .selectOption({ label: 'First Term' });
+    await page
+      .locator('[data-testid="filter-class"]')
+      .selectOption({ label: 'Class 1' });
+    await page
+      .locator('[data-testid="filter-subject"]')
+      .selectOption({ label: 'English' });
+    await page
+      .locator('[data-testid="filter-component"]')
+      .selectOption({ index: 1 });
 
     // Wait for table to load
     const firstInput = page.locator('[data-row="0"][data-col="0"]');
@@ -48,11 +56,11 @@ test.describe('SchoolOS UX Polish: Keyboard Navigation', () => {
 
   test('CAS Records: Keyboard navigation in batch roster', async ({ page }) => {
     await page.goto('/dashboard/academics/cas');
-    
+
     // Select class to load roster
     await page.locator('select').first().selectOption({ index: 1 }); // Academic Year
     await page.locator('select').nth(1).selectOption({ index: 1 }); // Class
-    
+
     // Find the batch roster input
     const firstCasInput = page.locator('[data-cas-row="0"][data-cas-col="0"]');
     await expect(firstCasInput).toBeVisible({ timeout: 10000 });
@@ -60,10 +68,14 @@ test.describe('SchoolOS UX Polish: Keyboard Navigation', () => {
     // Test navigation
     await firstCasInput.focus();
     await page.keyboard.press('ArrowDown');
-    await expect(page.locator('[data-cas-row="1"][data-cas-col="0"]')).toBeFocused();
+    await expect(
+      page.locator('[data-cas-row="1"][data-cas-col="0"]'),
+    ).toBeFocused();
 
     await page.keyboard.press('ArrowRight');
-    await expect(page.locator('[data-cas-row="1"][data-cas-col="1"]')).toBeFocused();
+    await expect(
+      page.locator('[data-cas-row="1"][data-cas-col="1"]'),
+    ).toBeFocused();
   });
 });
 

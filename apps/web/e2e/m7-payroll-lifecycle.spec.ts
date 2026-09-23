@@ -42,10 +42,14 @@ test.describe.serial('M7 payroll lifecycle', () => {
 
     // --- Preview + create the fresh draft run. ---
     await page.goto('/dashboard/payroll/runs');
-    await expect(page.getByText(/Payroll Runs — Phase 2 accounting boundary/i)).toBeVisible();
+    await expect(
+      page.getByText(/Payroll Runs — Phase 2 accounting boundary/i),
+    ).toBeVisible();
 
     await page.getByRole('button', { name: 'New Draft Run' }).click();
-    await expect(page.getByRole('heading', { name: 'Create Draft from Preview' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Create Draft from Preview' }),
+    ).toBeVisible();
     const draftSelects = page.locator('select');
     await draftSelects.nth(0).selectOption(String(year));
     await draftSelects.nth(1).selectOption(String(month));
@@ -66,10 +70,18 @@ test.describe.serial('M7 payroll lifecycle', () => {
     ).toBeVisible({ timeout: 20_000 });
 
     // --- Draft/Generated: only Submit for Review is available from backend allowedActions. ---
-    await expect(page.getByRole('button', { name: 'Submit for Review' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Approve Run' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Post to M11 Accounting' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Reverse Payroll' })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Submit for Review' }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Approve Run' })).toHaveCount(
+      0,
+    );
+    await expect(
+      page.getByRole('button', { name: 'Post to M11 Accounting' }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Reverse Payroll' }),
+    ).toHaveCount(0);
 
     const directApprove = await page.request.post(
       `${API_BASE_URL}/payroll/runs/${runId}/approve`,
@@ -88,8 +100,12 @@ test.describe.serial('M7 payroll lifecycle', () => {
     const errorToast = page.getByText('Action Error').first();
     await submitConfirm.click();
     await Promise.race([
-      submitConfirm.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => undefined),
-      errorToast.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined),
+      submitConfirm
+        .waitFor({ state: 'hidden', timeout: 10_000 })
+        .catch(() => undefined),
+      errorToast
+        .waitFor({ state: 'visible', timeout: 10_000 })
+        .catch(() => undefined),
     ]);
 
     if (await errorToast.isVisible().catch(() => false)) {
@@ -104,40 +120,62 @@ test.describe.serial('M7 payroll lifecycle', () => {
       await performAction(page, 'Submit for Review', 'Submit Review');
     }
     await expectPayrollStatus(page, 'UNDER_REVIEW');
-    await expect(page.getByRole('button', { name: 'Complete Review' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Return for Correction' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Approve Run' })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Complete Review' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Return for Correction' }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Approve Run' })).toHaveCount(
+      0,
+    );
 
     // --- Actually exercise Return for Correction: it requires an audited
     // reason and returns the run to a correctable pre-review state. ---
     await page.getByRole('button', { name: 'Return for Correction' }).click();
-    await expect(page.getByRole('heading', { name: 'Return Payroll for Correction' })).toBeVisible();
-    const rejectConfirm = page.locator('button[type="submit"]').filter({ hasText: 'Return for Correction' });
+    await expect(
+      page.getByRole('heading', { name: 'Return Payroll for Correction' }),
+    ).toBeVisible();
+    const rejectConfirm = page
+      .locator('button[type="submit"]')
+      .filter({ hasText: 'Return for Correction' });
     await rejectConfirm.click();
     await expect(
       page.getByText('Please provide a reason or remarks for this action.'),
     ).toBeVisible();
     await page
-      .getByPlaceholder(/Provide reason for this return payroll for correction/i)
-      .fill('Fresh-period lifecycle verification: exercising the correction path.');
+      .getByPlaceholder(
+        /Provide reason for this return payroll for correction/i,
+      )
+      .fill(
+        'Fresh-period lifecycle verification: exercising the correction path.',
+      );
     await rejectConfirm.click();
     await expect(rejectConfirm).not.toBeVisible();
     await expect(
       page.getByText(/Payroll Status: (DRAFT|GENERATED)/),
     ).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole('button', { name: 'Submit for Review' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Submit for Review' }),
+    ).toBeVisible();
 
     await performAction(page, 'Submit for Review', 'Submit Review');
     await expectPayrollStatus(page, 'UNDER_REVIEW');
 
     await performAction(page, 'Complete Review', 'Complete Review');
     await expectPayrollStatus(page, 'REVIEWED');
-    await expect(page.getByRole('button', { name: 'Approve Run' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Post to M11 Accounting' })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Approve Run' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Post to M11 Accounting' }),
+    ).toHaveCount(0);
 
     await performAction(page, 'Approve Run', 'Approve');
     await expectPayrollStatus(page, 'APPROVED');
-    await expect(page.getByRole('button', { name: 'Post to M11 Accounting' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Post to M11 Accounting' }),
+    ).toBeVisible();
 
     // openApprovedSalarySlipPdf() now opens the PDF through the shared
     // openPdfBlob() helper (magic-byte/content-type validated, same as
@@ -147,7 +185,10 @@ test.describe.serial('M7 payroll lifecycle', () => {
     // browser-assigned filename, so assert on the real PDF bytes instead of
     // a filename pattern that no longer applies.
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Download Salary Slip PDF' }).first().click();
+    await page
+      .getByRole('button', { name: 'Download Salary Slip PDF' })
+      .first()
+      .click();
     const download = await downloadPromise;
     const downloadPath = await download.path();
     expect(downloadPath).not.toBeNull();
@@ -156,8 +197,12 @@ test.describe.serial('M7 payroll lifecycle', () => {
 
     await performAction(page, 'Post to M11 Accounting', 'Post to M11');
     await expectPayrollStatus(page, 'POSTED');
-    await expect(page.getByRole('button', { name: 'Post to M11 Accounting' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'View Journal' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Post to M11 Accounting' }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'View Journal' }),
+    ).toBeVisible();
 
     // Duplicate posting must not be reachable even via a direct backend call.
     const duplicatePost = await page.request.post(
@@ -174,28 +219,44 @@ test.describe.serial('M7 payroll lifecycle', () => {
 
     await page.reload();
     await expectPayrollStatus(page, 'POSTED');
-    await expect(page.getByRole('button', { name: 'Reverse Payroll' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Post to M11 Accounting' })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Reverse Payroll' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Post to M11 Accounting' }),
+    ).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Reverse Payroll' }).click();
-    await expect(page.getByRole('heading', { name: 'Reverse Payroll' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Reverse Payroll' }),
+    ).toBeVisible();
     await page
       .getByPlaceholder(/Provide reason for this reverse payroll/i)
       .fill('Authenticated lifecycle reversal verification');
-    await page.getByRole('button', { name: 'Reverse Payroll', exact: true }).last().click();
+    await page
+      .getByRole('button', { name: 'Reverse Payroll', exact: true })
+      .last()
+      .click();
     await expectPayrollStatus(page, 'CANCELLED');
-    await expect(page.getByRole('button', { name: 'Reverse Payroll' })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Reverse Payroll' }),
+    ).toHaveCount(0);
   });
 });
 
 async function csrfHeaders(page: Page): Promise<Record<string, string>> {
   const csrfCookie = (await page.context().cookies()).find(
-    (cookie) => cookie.name === 'schoolos_csrf' || cookie.name === '__Host-schoolos_csrf',
+    (cookie) =>
+      cookie.name === 'schoolos_csrf' || cookie.name === '__Host-schoolos_csrf',
   );
   return csrfCookie ? { 'X-CSRF-Token': csrfCookie.value } : {};
 }
 
-async function performAction(page: Page, openLabel: string, confirmLabel: string) {
+async function performAction(
+  page: Page,
+  openLabel: string,
+  confirmLabel: string,
+) {
   await page.getByRole('button', { name: openLabel }).click();
   const confirm = page
     .locator('button[type="submit"]')

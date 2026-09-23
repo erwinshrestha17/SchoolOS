@@ -6,7 +6,9 @@ test.describe('Public route smoke', () => {
     await context.clearPermissions();
   });
 
-  test('home page renders the public SchoolOS landing page', async ({ page }) => {
+  test('home page renders the public SchoolOS landing page', async ({
+    page,
+  }) => {
     await page.goto('/');
 
     await expect(page).toHaveURL(/\/$/);
@@ -36,7 +38,9 @@ test.describe('Public route smoke', () => {
       page.getByRole('navigation').getByRole('link', { name: /^Modules$/i }),
     ).toBeVisible();
     await expect(
-      page.getByRole('navigation').getByRole('link', { name: /^For Schools$/i }),
+      page
+        .getByRole('navigation')
+        .getByRole('link', { name: /^For Schools$/i }),
     ).toBeVisible();
     await expect(
       page.getByRole('navigation').getByRole('link', { name: /^Onboarding$/i }),
@@ -83,7 +87,9 @@ test.describe('Public route smoke', () => {
     await expect(page).toHaveURL(/\/request-demo(?:$|[?#])/);
   });
 
-  test('request-demo page renders expected UI and can be submitted', async ({ page }) => {
+  test('request-demo page renders expected UI and can be submitted', async ({
+    page,
+  }) => {
     await page.route('**/api/v1/demo-requests', async (route) => {
       const request = route.request();
       expect(request.method()).toBe('POST');
@@ -143,9 +149,7 @@ test.describe('Public route smoke', () => {
     await page.getByLabel(/Role \/ Designation/i).fill('Principal');
     await page.getByLabel(/School Location/i).fill('Pokhara, Gandaki');
     await page.getByLabel(/Phone Number/i).fill('9801234567');
-    await page
-      .getByLabel(/Email Address/i)
-      .fill('ram@janataschool.edu.np');
+    await page.getByLabel(/Email Address/i).fill('ram@janataschool.edu.np');
     await page.getByLabel(/School Type/i).selectOption('Secondary School');
     await page.getByLabel(/Number of Students/i).selectOption('1,000–2,000');
     await page.getByLabel(/Current System Used/i).fill('Ledger Books');
@@ -155,23 +159,29 @@ test.describe('Public route smoke', () => {
     await page.getByLabel(/Preferred Contact Method/i).selectOption('Phone');
 
     // Click module buttons (toggles)
-    await page.getByRole('button', { name: /Admissions/i }).first().click();
+    await page
+      .getByRole('button', { name: /Admissions/i })
+      .first()
+      .click();
     await page
       .getByRole('button', { name: /Fees & Receipts/i })
       .first()
       .click();
-    await page.getByRole('button', { name: /Accounting/i }).first().click();
+    await page
+      .getByRole('button', { name: /Accounting/i })
+      .first()
+      .click();
 
     // Submit form
-    await page
-      .getByRole('button', { name: /^Submit Demo Request$/i })
-      .click();
+    await page.getByRole('button', { name: /^Submit Demo Request$/i }).click();
 
     // Verify API-backed B2B success state
     await expect(
       page.getByRole('heading', { name: /^Demo request submitted\.$/i }),
     ).toBeVisible();
-    await expect(page.getByText(/Shree Janata Secondary School/i)).toBeVisible();
+    await expect(
+      page.getByText(/Shree Janata Secondary School/i),
+    ).toBeVisible();
     await expect(page.getByText(/Ram Bahadur/i)).toBeVisible();
     await expect(page.getByText(/demo-request-e2e/i)).toBeVisible();
   });

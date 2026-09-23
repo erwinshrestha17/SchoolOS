@@ -14,7 +14,11 @@ export default function LearningSessionsPage() {
         description="Launch, pause, resume, end, and open school-only smart-board and computer-lab sessions."
       />
       <div className="mb-6">
-        <ModuleTabs items={learningWorkspaceTabs} accentColor="emerald" variant="light" />
+        <ModuleTabs
+          items={learningWorkspaceTabs}
+          accentColor="emerald"
+          variant="light"
+        />
       </div>
       <LearningWorkspace initialTab="sessions" />
     </DashboardPageShell>

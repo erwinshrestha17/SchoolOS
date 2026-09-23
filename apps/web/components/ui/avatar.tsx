@@ -18,22 +18,23 @@ const sizeMap = {
   xl: 'h-16 w-16 text-lg',
 };
 
-export function Avatar({ src, alt, initials, size = 'md', className }: AvatarProps) {
+export function Avatar({
+  src,
+  alt,
+  initials,
+  size = 'md',
+  className,
+}: AvatarProps) {
   return (
     <div
       className={cn(
         'relative flex shrink-0 overflow-hidden rounded-full',
         sizeMap[size],
-        className
+        className,
       )}
     >
       {src ? (
-        <Image
-          src={src}
-          alt={alt ?? 'Avatar'}
-          fill
-          className="object-cover"
-        />
+        <Image src={src} alt={alt ?? 'Avatar'} fill className="object-cover" />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,var(--primary),var(--primary-dark))] font-bold text-white">
           {initials ?? 'U'}

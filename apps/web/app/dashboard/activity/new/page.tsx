@@ -3,7 +3,15 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Camera, HelpCircle, Lock, ShieldAlert, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Camera,
+  HelpCircle,
+  Lock,
+  ShieldAlert,
+  X,
+} from 'lucide-react';
 import { api } from '../../../../lib/api';
 import { filesToBase64Payloads } from '../../../../lib/files';
 import { cn } from '../../../../lib/utils';
@@ -12,7 +20,12 @@ import { PageHeader } from '../../../../components/ui/page-header';
 import { Badge } from '../../../../components/ui/badge';
 import { EmptyState } from '../../../../components/ui/empty-state';
 import { LoadingState } from '../../../../components/ui/loading-state';
-import { FormField, Input, Select, TextArea } from '../../../../components/ui/form-field';
+import {
+  FormField,
+  Input,
+  Select,
+  TextArea,
+} from '../../../../components/ui/form-field';
 import type { ActivityAudiencePreview } from '../../../../lib/api/activity';
 import { getNepalSchoolDay } from '@schoolos/core';
 
@@ -46,7 +59,11 @@ type AudienceMode = (typeof audienceModes)[number];
 
 const categoriesRequiringApproval = new Set(['COMPETITION', 'ACHIEVEMENT']);
 
-const steps = ['Audience & consent', 'Content & media', 'Review & submit'] as const;
+const steps = [
+  'Audience & consent',
+  'Content & media',
+  'Review & submit',
+] as const;
 type Step = 0 | 1 | 2;
 const maxImageBytes = 10 * 1024 * 1024;
 
@@ -71,7 +88,12 @@ type ComposerState = {
   studentIds: string[];
 };
 
-type SectionSummaryForUi = { id: string; name: string; classId?: string | null; class?: { id: string } | null };
+type SectionSummaryForUi = {
+  id: string;
+  name: string;
+  classId?: string | null;
+  class?: { id: string } | null;
+};
 
 function newClientSubmissionId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -101,8 +123,14 @@ export default function ActivityComposerPage() {
   const [fileWarning, setFileWarning] = useState<string | null>(null);
   const [clientSubmissionId] = useState(newClientSubmissionId);
 
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
-  const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: api.listClasses,
+  });
+  const sectionsQuery = useQuery({
+    queryKey: ['sections'],
+    queryFn: api.listSections,
+  });
   const audiencePreviewQuery = useQuery({
     queryKey: ['activity-audience-preview', post.classId, post.sectionId],
     queryFn: () =>
@@ -119,9 +147,13 @@ export default function ActivityComposerPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['activity-posts'] }),
         queryClient.invalidateQueries({ queryKey: ['activity-gallery'] }),
-        queryClient.invalidateQueries({ queryKey: ['activity-moderation-queue'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['activity-moderation-queue'],
+        }),
         queryClient.invalidateQueries({ queryKey: ['parent-activity-posts'] }),
-        queryClient.invalidateQueries({ queryKey: ['dashboard-activity-posts'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['dashboard-activity-posts'],
+        }),
       ]);
       router.push(`/dashboard/activity/${created.id}`);
     },
@@ -158,7 +190,9 @@ export default function ActivityComposerPage() {
     const combined = candidateFiles.slice(0, 6);
     setFiles(combined);
 
-    const firstNonImage = combined.find((file) => !file.type.startsWith('image/'));
+    const firstNonImage = combined.find(
+      (file) => !file.type.startsWith('image/'),
+    );
     const firstLargeImage = combined.find((file) => file.size > maxImageBytes);
     if (candidateFiles.length > 6) {
       setFileWarning('Please attach 1 to 6 images only.');
@@ -289,14 +323,20 @@ export default function ActivityComposerPage() {
           post={post}
           selectedStudents={selectedStudents}
           consentBlockedSelected={consentBlockedSelected}
-          className={classes.find((item) => item.id === post.classId)?.name ?? 'Not selected'}
+          className={
+            classes.find((item) => item.id === post.classId)?.name ??
+            'Not selected'
+          }
           sectionName={
-            postSections.find((item) => item.id === post.sectionId)?.name ?? 'Whole class'
+            postSections.find((item) => item.id === post.sectionId)?.name ??
+            'Whole class'
           }
           fileCount={files.length}
           willRequireApproval={willRequireApproval}
           isPending={postMutation.isPending}
-          mutationError={postMutation.isError ? postMutation.error.message : null}
+          mutationError={
+            postMutation.isError ? postMutation.error.message : null
+          }
           canSubmit={audienceValid && contentValid && !postMutation.isPending}
           onSubmit={() => void submit()}
         />
@@ -316,7 +356,9 @@ export default function ActivityComposerPage() {
           <button
             type="button"
             disabled={step === 0 ? !audienceValid : !contentValid}
-            onClick={() => setStep((current) => Math.min(2, current + 1) as Step)}
+            onClick={() =>
+              setStep((current) => Math.min(2, current + 1) as Step)
+            }
             className="inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--color-mod-activity-accent)] px-5 text-sm font-bold text-white hover:bg-[var(--color-mod-activity-text)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Next
@@ -352,10 +394,12 @@ function AudienceStep({
   return (
     <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
       <div>
-        <h2 className="text-lg font-black text-slate-950">Audience and consent</h2>
+        <h2 className="text-lg font-black text-slate-950">
+          Audience and consent
+        </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Most updates go to the whole class or section. Tag individual students only for
-          achievements, competitions, or student-specific notes.
+          Most updates go to the whole class or section. Tag individual students
+          only for achievements, competitions, or student-specific notes.
         </p>
       </div>
 
@@ -364,7 +408,9 @@ function AudienceStep({
           <button
             key={mode}
             type="button"
-            onClick={() => setPost((current) => ({ ...current, audienceMode: mode }))}
+            onClick={() =>
+              setPost((current) => ({ ...current, audienceMode: mode }))
+            }
             className={cn(
               'inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-xs font-black uppercase tracking-widest transition-colors',
               post.audienceMode === mode
@@ -422,11 +468,18 @@ function AudienceStep({
       {post.audienceMode === 'whole' ? (
         <div className="space-y-2 rounded-xl border border-slate-100 bg-slate-50 p-6">
           <p className="text-sm font-bold text-slate-900">
-            {Boolean(post.classId) ? 'Posting to the whole class/section' : 'Select a class to continue'}
+            {Boolean(post.classId)
+              ? 'Posting to the whole class/section'
+              : 'Select a class to continue'}
           </p>
           {isLoading ? (
             <LoadingState />
-          ) : mediaConsent && mediaConsent.allowedCount + mediaConsent.notAllowedCount + mediaConsent.restrictedCount + mediaConsent.notRecordedCount > 0 ? (
+          ) : mediaConsent &&
+            mediaConsent.allowedCount +
+              mediaConsent.notAllowedCount +
+              mediaConsent.restrictedCount +
+              mediaConsent.notRecordedCount >
+              0 ? (
             <div className="space-y-1">
               <p className="text-xs font-medium text-slate-600">
                 {mediaConsent.allowedCount} of{' '}
@@ -436,7 +489,9 @@ function AudienceStep({
                   mediaConsent.notRecordedCount}{' '}
                 students have active, unrestricted photo consent.
               </p>
-              {mediaConsent.notAllowedCount || mediaConsent.restrictedCount || mediaConsent.notRecordedCount ? (
+              {mediaConsent.notAllowedCount ||
+              mediaConsent.restrictedCount ||
+              mediaConsent.notRecordedCount ? (
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                   {mediaConsent.notAllowedCount > 0
                     ? `${mediaConsent.notAllowedCount} not allowed · `
@@ -446,9 +501,9 @@ function AudienceStep({
                     : ''}
                   {mediaConsent.notRecordedCount > 0
                     ? `${mediaConsent.notRecordedCount} not recorded`
-                    : ''}
-                  {' '}— none of these students will see media in this post; switch to
-                  &quot;Selected students&quot; to tag individuals directly.
+                    : ''}{' '}
+                  — none of these students will see media in this post; switch
+                  to &quot;Selected students&quot; to tag individuals directly.
                 </p>
               ) : null}
             </div>
@@ -468,7 +523,9 @@ function AudienceStep({
             ) : students.length > 0 ? (
               students.map((student) => {
                 const selected = post.studentIds.includes(student.id);
-                const consentMeta = consentStatusMeta(student.mediaConsentStatus);
+                const consentMeta = consentStatusMeta(
+                  student.mediaConsentStatus,
+                );
                 const ConsentIcon = consentMeta?.icon;
                 return (
                   <button
@@ -485,7 +542,12 @@ function AudienceStep({
                     )}
                   >
                     {ConsentIcon ? (
-                      <ConsentIcon className={cn('h-3.5 w-3.5', !selected && consentMeta?.className)} />
+                      <ConsentIcon
+                        className={cn(
+                          'h-3.5 w-3.5',
+                          !selected && consentMeta?.className,
+                        )}
+                      />
                     ) : null}
                     {student.fullName}
                   </button>
@@ -502,8 +564,8 @@ function AudienceStep({
           {consentBlockedSelected.length > 0 ? (
             <p className="rounded-lg border border-danger-100 bg-danger-50 px-4 py-3 text-xs font-bold text-danger-700">
               {consentBlockedSelected.length} tagged student
-              {consentBlockedSelected.length === 1 ? '' : 's'} lack active photo consent and must be
-              removed before publishing.
+              {consentBlockedSelected.length === 1 ? '' : 's'} lack active photo
+              consent and must be removed before publishing.
             </p>
           ) : null}
         </div>
@@ -532,9 +594,12 @@ function ContentStep({
   return (
     <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
       <div>
-        <h2 className="text-lg font-black text-slate-950">Content and protected media</h2>
+        <h2 className="text-lg font-black text-slate-950">
+          Content and protected media
+        </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Media uploads go through the File Registry — no permanent public URLs are exposed.
+          Media uploads go through the File Registry — no permanent public URLs
+          are exposed.
         </p>
       </div>
 
@@ -559,7 +624,9 @@ function ContentStep({
         <FormField label="Title" className="md:col-span-2">
           <Input
             value={post.title}
-            onChange={(event) => setPost((current) => ({ ...current, title: event.target.value }))}
+            onChange={(event) =>
+              setPost((current) => ({ ...current, title: event.target.value }))
+            }
             placeholder="Post title"
           />
         </FormField>
@@ -571,7 +638,10 @@ function ContentStep({
             type="date"
             value={post.activityDate}
             onChange={(event) =>
-              setPost((current) => ({ ...current, activityDate: event.target.value }))
+              setPost((current) => ({
+                ...current,
+                activityDate: event.target.value,
+              }))
             }
           />
         </FormField>
@@ -598,7 +668,10 @@ function ContentStep({
               type="checkbox"
               checked={post.parentVisible}
               onChange={(event) =>
-                setPost((current) => ({ ...current, parentVisible: event.target.checked }))
+                setPost((current) => ({
+                  ...current,
+                  parentVisible: event.target.checked,
+                }))
               }
               className="h-4 w-4 rounded border-slate-300"
             />
@@ -611,7 +684,9 @@ function ContentStep({
         <TextArea
           rows={4}
           value={post.caption}
-          onChange={(event) => setPost((current) => ({ ...current, caption: event.target.value }))}
+          onChange={(event) =>
+            setPost((current) => ({ ...current, caption: event.target.value }))
+          }
           placeholder={
             post.language === 'BOTH'
               ? 'Today our students participated in ________.\nआज विद्यार्थीहरूले ________ गतिविधिमा सहभागिता जनाए।'
@@ -627,7 +702,10 @@ function ContentStep({
           rows={2}
           value={post.askAtHome}
           onChange={(event) =>
-            setPost((current) => ({ ...current, askAtHome: event.target.value }))
+            setPost((current) => ({
+              ...current,
+              askAtHome: event.target.value,
+            }))
           }
           placeholder="e.g. Ask your child to explain one thing they learned in class today."
           maxLength={280}
@@ -650,7 +728,8 @@ function ContentStep({
             className="file:mr-4 file:rounded-full file:border-0 file:bg-slate-100 file:px-4 file:text-[10px] file:font-black file:uppercase file:tracking-widest"
           />
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            Attach 1 to 6 images, 10MB or smaller each. Previews use signed access only.
+            Attach 1 to 6 images, 10MB or smaller each. Previews use signed
+            access only.
           </p>
 
           {files.length > 0 ? (
@@ -665,7 +744,10 @@ function ContentStep({
                     <span className="truncate text-xs font-black uppercase tracking-tight text-slate-900">
                       {file.name}
                     </span>
-                    <Badge variant="outline" className="shrink-0 text-[10px] font-black uppercase">
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 text-[10px] font-black uppercase"
+                    >
                       {formatFileSize(file.size)}
                     </Badge>
                   </div>
@@ -750,11 +832,17 @@ function ReviewStep({
       </div>
 
       <dl className="grid gap-4 sm:grid-cols-2">
-        <ReviewFact label="Class / Section" value={`${className} / ${sectionName}`} />
+        <ReviewFact
+          label="Class / Section"
+          value={`${className} / ${sectionName}`}
+        />
         <ReviewFact label="Category" value={formatEnumLabel(post.category)} />
         <ReviewFact label="Title" value={post.title || 'Not set'} />
         <ReviewFact label="Date" value={post.activityDate || 'Not set'} />
-        <ReviewFact label="Photos" value={`${fileCount} image${fileCount === 1 ? '' : 's'}`} />
+        <ReviewFact
+          label="Photos"
+          value={`${fileCount} image${fileCount === 1 ? '' : 's'}`}
+        />
         <ReviewFact
           label="Parent visibility"
           value={post.parentVisible ? 'Visible to parents' : 'Staff only'}
@@ -775,15 +863,20 @@ function ReviewStep({
 
       {post.askAtHome.trim() ? (
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-          <p className="mb-2 text-xs font-bold text-slate-500">Ask your child about...</p>
-          <p className="text-xs font-medium leading-relaxed text-slate-700">{post.askAtHome}</p>
+          <p className="mb-2 text-xs font-bold text-slate-500">
+            Ask your child about...
+          </p>
+          <p className="text-xs font-medium leading-relaxed text-slate-700">
+            {post.askAtHome}
+          </p>
         </div>
       ) : null}
 
       {consentBlockedSelected.length > 0 ? (
         <p className="rounded-lg border border-danger-100 bg-danger-50 px-4 py-3 text-xs font-bold text-danger-700">
-          Publish is blocked: {consentBlockedSelected.map((s) => s.fullName).join(', ')} lack
-          active photo consent.
+          Publish is blocked:{' '}
+          {consentBlockedSelected.map((s) => s.fullName).join(', ')} lack active
+          photo consent.
         </p>
       ) : null}
 
@@ -799,7 +892,11 @@ function ReviewStep({
         onClick={onSubmit}
         className="h-14 w-full rounded-xl bg-[var(--color-mod-activity-accent)] text-xs font-bold uppercase tracking-widest text-white shadow-sm transition-all hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
       >
-        {isPending ? 'Submitting...' : willRequireApproval ? 'Submit for approval' : 'Publish'}
+        {isPending
+          ? 'Submitting...'
+          : willRequireApproval
+            ? 'Submit for approval'
+            : 'Publish'}
       </button>
     </section>
   );
@@ -808,8 +905,12 @@ function ReviewStep({
 function ReviewFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between border-b border-slate-100 py-1 last:border-0">
-      <dt className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</dt>
-      <dd className="text-right text-[11px] font-bold text-slate-800">{value}</dd>
+      <dt className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+        {label}
+      </dt>
+      <dd className="text-right text-[11px] font-bold text-slate-800">
+        {value}
+      </dd>
     </div>
   );
 }
@@ -821,14 +922,24 @@ function formatEnumLabel(value: string) {
     .join(' ');
 }
 
-function consentStatusMeta(status: ActivityAudiencePreview['students'][number]['mediaConsentStatus']) {
+function consentStatusMeta(
+  status: ActivityAudiencePreview['students'][number]['mediaConsentStatus'],
+) {
   switch (status) {
     case 'NOT_ALLOWED':
       return { label: 'Not allowed', icon: Lock, className: 'text-danger-600' };
     case 'RESTRICTED':
-      return { label: 'Restricted', icon: ShieldAlert, className: 'text-warning-600' };
+      return {
+        label: 'Restricted',
+        icon: ShieldAlert,
+        className: 'text-warning-600',
+      };
     case 'NOT_RECORDED':
-      return { label: 'Not recorded', icon: HelpCircle, className: 'text-slate-400' };
+      return {
+        label: 'Not recorded',
+        icon: HelpCircle,
+        className: 'text-slate-400',
+      };
     default:
       return null;
   }

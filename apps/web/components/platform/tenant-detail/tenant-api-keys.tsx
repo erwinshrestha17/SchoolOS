@@ -1,25 +1,25 @@
-"use client";
+'use client';
 
 import {
   formatBsDate,
   type PlatformApiKeyCreated,
   type PlatformApiKeySummary,
-} from "@schoolos/core";
-import { Copy, KeyRound, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+} from '@schoolos/core';
+import { Copy, KeyRound, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   PlatformInlineError,
   PlatformSectionSkeleton,
-} from "@/app/platform/_components/platform-operator-states";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from '@/app/platform/_components/platform-operator-states';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -27,19 +27,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useSession } from "@/components/session-provider";
-import { platformApi } from "@/lib/api/platform";
-import { hasPermission } from "@/lib/session";
-import { useTenantDetail } from "./tenant-detail-page";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useSession } from '@/components/session-provider';
+import { platformApi } from '@/lib/api/platform';
+import { hasPermission } from '@/lib/session';
+import { useTenantDetail } from './tenant-detail-page';
 
 export function TenantApiKeys() {
   const { tenant } = useTenantDetail();
   const { session } = useSession();
-  const canManageApiKeys = hasPermission(session, "platform:api-keys:manage");
+  const canManageApiKeys = hasPermission(session, 'platform:api-keys:manage');
   const [keys, setKeys] = useState<PlatformApiKeySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export function TenantApiKeys() {
   );
   const [revokeTarget, setRevokeTarget] =
     useState<PlatformApiKeySummary | null>(null);
-  const [revokeReason, setRevokeReason] = useState("");
+  const [revokeReason, setRevokeReason] = useState('');
   const [saving, setSaving] = useState(false);
 
   const loadKeys = useCallback(async () => {
@@ -81,7 +81,7 @@ export function TenantApiKeys() {
       const created = await platformApi.createPlatformApiKey(tenant.id, {
         name: form.name.trim(),
         scopes: form.scopes
-          .split(",")
+          .split(',')
           .map((scope) => scope.trim())
           .filter(Boolean),
         ...(form.expiresAt
@@ -97,7 +97,7 @@ export function TenantApiKeys() {
       setForm(makeDefaultForm());
       await loadKeys();
       setMessage(
-        "API key created. Copy the one-time secret now; it will not be shown again.",
+        'API key created. Copy the one-time secret now; it will not be shown again.',
       );
     } catch (caught) {
       setActionError(getErrorMessage(caught));
@@ -118,10 +118,10 @@ export function TenantApiKeys() {
         reason: revokeReason.trim(),
       });
       setRevokeTarget(null);
-      setRevokeReason("");
+      setRevokeReason('');
       setCreatedKey(null);
       await loadKeys();
-      setMessage("API key revoked.");
+      setMessage('API key revoked.');
     } catch (caught) {
       setActionError(getErrorMessage(caught));
     } finally {
@@ -132,7 +132,7 @@ export function TenantApiKeys() {
   async function copySecret() {
     if (!canManageApiKeys || !createdKey) return;
     await navigator.clipboard.writeText(createdKey.secret);
-    setMessage("API key secret copied.");
+    setMessage('API key secret copied.');
   }
 
   return (
@@ -161,7 +161,7 @@ export function TenantApiKeys() {
 
       {message || actionError ? (
         <div
-          className={`rounded-2xl border p-4 text-sm font-bold ${actionError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+          className={`rounded-2xl border p-4 text-sm font-bold ${actionError ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}
         >
           {actionError ?? message}
         </div>
@@ -194,8 +194,8 @@ export function TenantApiKeys() {
               {createdKey.secret}
             </div>
             <p className="mt-3 text-xs font-bold text-emerald-900">
-              {createdKey.name} · {createdKey.keyPreview} ·{" "}
-              {createdKey.scopes.join(", ") || "default scopes"}
+              {createdKey.name} · {createdKey.keyPreview} ·{' '}
+              {createdKey.scopes.join(', ') || 'default scopes'}
             </p>
           </CardContent>
         </Card>
@@ -257,12 +257,12 @@ export function TenantApiKeys() {
                           {key.keyPreview}
                         </td>
                         <td className="px-5 py-4 text-xs text-slate-600">
-                          {key.scopes.join(", ") || "default"}
+                          {key.scopes.join(', ') || 'default'}
                         </td>
                         <td className="px-5 py-4">
                           <Badge
                             variant={
-                              key.status === "ACTIVE" ? "success" : "neutral"
+                              key.status === 'ACTIVE' ? 'success' : 'neutral'
                             }
                           >
                             {key.status}
@@ -274,7 +274,7 @@ export function TenantApiKeys() {
                               variant="ghost"
                               size="sm"
                               className="text-rose-700"
-                              disabled={key.status === "REVOKED"}
+                              disabled={key.status === 'REVOKED'}
                               onClick={() => setRevokeTarget(key)}
                             >
                               <Trash2 className="mr-2" size={15} />
@@ -400,14 +400,14 @@ function Field({
   label,
   value,
   onChange,
-  type = "text",
+  type = 'text',
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
 }) {
-  const id = `api-key-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const id = `api-key-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
@@ -422,19 +422,19 @@ function Field({
 }
 
 function makeDefaultForm() {
-  return { name: "", scopes: "students:read, attendance:read", expiresAt: "" };
+  return { name: '', scopes: 'students:read, attendance:read', expiresAt: '' };
 }
 
 function formatDate(value: string) {
   try {
     return formatBsDate(value);
   } catch {
-    return "Date not recorded";
+    return 'Date not recorded';
   }
 }
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
-    : "Tenant API keys could not be loaded.";
+    : 'Tenant API keys could not be loaded.';
 }

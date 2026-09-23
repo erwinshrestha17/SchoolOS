@@ -117,48 +117,56 @@ export default function PayrollReportsPage() {
   });
   const summaryQuery = useQuery({
     queryKey: ['payroll-report-summary', queryFilters],
-    queryFn: () => api.getPayrollReportSummary(queryFilters) as Promise<PayrollSummary>,
+    queryFn: () =>
+      api.getPayrollReportSummary(queryFilters) as Promise<PayrollSummary>,
     enabled: status === 'authenticated' && canReadReports,
   });
   const pfQuery = useQuery({
     queryKey: ['payroll-report-pf', queryFilters],
-    queryFn: () => api.getPayrollPfSummary(queryFilters) as Promise<PayrollPfSummary>,
+    queryFn: () =>
+      api.getPayrollPfSummary(queryFilters) as Promise<PayrollPfSummary>,
     enabled: status === 'authenticated' && canReadReports,
   });
   const tdsQuery = useQuery({
     queryKey: ['payroll-report-tds', queryFilters],
-    queryFn: () => api.getPayrollTdsSummary(queryFilters) as Promise<PayrollTdsSummary>,
+    queryFn: () =>
+      api.getPayrollTdsSummary(queryFilters) as Promise<PayrollTdsSummary>,
     enabled: status === 'authenticated' && canReadReports,
   });
   const componentsQuery = useQuery({
     queryKey: ['payroll-report-components', queryFilters],
     queryFn: () =>
-      api.getPayrollSalaryComponentSummary(queryFilters) as Promise<PayrollComponentSummary>,
+      api.getPayrollSalaryComponentSummary(
+        queryFilters,
+      ) as Promise<PayrollComponentSummary>,
     enabled: status === 'authenticated' && canReadReports,
   });
   const leaveQuery = useQuery({
     queryKey: ['payroll-report-leave', queryFilters],
     queryFn: () =>
-      api.getPayrollLeaveDeductionSummary(queryFilters) as Promise<PayrollLeaveSummary>,
+      api.getPayrollLeaveDeductionSummary(
+        queryFilters,
+      ) as Promise<PayrollLeaveSummary>,
     enabled: status === 'authenticated' && canReadReports,
   });
   const glReconciliationQuery = useQuery({
     queryKey: ['payroll-report-gl-reconciliation', queryFilters],
-    queryFn: () => api.getPayrollGlReconciliation(queryFilters) as Promise<{
-      rows: Array<{
-        periodYear: number;
-        periodMonth: number;
-        status: string;
-        isReconciled: boolean;
-        journalEntryNumber: string | null;
-        issues: string[];
-      }>;
-      summary: {
-        totalRuns: number;
-        reconciledRuns: number;
-        unreconciledRuns: number;
-      };
-    }>,
+    queryFn: () =>
+      api.getPayrollGlReconciliation(queryFilters) as Promise<{
+        rows: Array<{
+          periodYear: number;
+          periodMonth: number;
+          status: string;
+          isReconciled: boolean;
+          journalEntryNumber: string | null;
+          issues: string[];
+        }>;
+        summary: {
+          totalRuns: number;
+          reconciledRuns: number;
+          unreconciledRuns: number;
+        };
+      }>,
     enabled: status === 'authenticated' && canReadReports,
   });
 
@@ -191,7 +199,8 @@ export default function PayrollReportsPage() {
   const reportCards = [
     {
       title: 'Payroll Register',
-      description: 'Official line-item payroll register for the selected period or run.',
+      description:
+        'Official line-item payroll register for the selected period or run.',
       icon: FileSpreadsheet,
       value: formatMoney(summaryQuery.data?.netPayable ?? 0),
       meta: `${summaryQuery.data?.staffCount ?? 0} staff lines`,
@@ -245,28 +254,42 @@ export default function PayrollReportsPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Payroll Reports</h2>
+            <h2 className="text-lg font-bold text-slate-900">
+              Payroll Reports
+            </h2>
             <p className="text-sm text-slate-500">
-              Totals come from official payroll reports. Posted accounting remains controlled by M11.
+              Totals come from official payroll reports. Posted accounting
+              remains controlled by M11.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <FilterSelect
               label="Run"
               value={filters.payrollRunId ?? ''}
-              onChange={(value) => setFilters((prev) => ({ ...prev, payrollRunId: value || undefined }))}
+              onChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  payrollRunId: value || undefined,
+                }))
+              }
             >
               <option value="">All runs</option>
               {(runsQuery.data ?? []).map((run) => (
                 <option key={run.id} value={run.id}>
-                  {monthLabels[run.periodMonth - 1]} {run.periodYear} - {run.status}
+                  {monthLabels[run.periodMonth - 1]} {run.periodYear} -{' '}
+                  {run.status}
                 </option>
               ))}
             </FilterSelect>
             <FilterSelect
               label="Month"
               value={filters.month ? String(filters.month) : ''}
-              onChange={(value) => setFilters((prev) => ({ ...prev, month: value ? Number(value) : undefined }))}
+              onChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  month: value ? Number(value) : undefined,
+                }))
+              }
             >
               <option value="">All months</option>
               {monthLabels.map((label, index) => (
@@ -285,7 +308,9 @@ export default function PayrollReportsPage() {
                 onChange={(event) =>
                   setFilters((prev) => ({
                     ...prev,
-                    year: event.target.value ? Number(event.target.value) : undefined,
+                    year: event.target.value
+                      ? Number(event.target.value)
+                      : undefined,
                   }))
                 }
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-slate-700"
@@ -294,7 +319,9 @@ export default function PayrollReportsPage() {
             <FilterSelect
               label="Status"
               value={filters.status ?? ''}
-              onChange={(value) => setFilters((prev) => ({ ...prev, status: value || undefined }))}
+              onChange={(value) =>
+                setFilters((prev) => ({ ...prev, status: value || undefined }))
+              }
             >
               <option value="">All statuses</option>
               {statusOptions.map((option) => (
@@ -308,7 +335,10 @@ export default function PayrollReportsPage() {
               <input
                 value={filters.department ?? ''}
                 onChange={(event) =>
-                  setFilters((prev) => ({ ...prev, department: event.target.value || undefined }))
+                  setFilters((prev) => ({
+                    ...prev,
+                    department: event.target.value || undefined,
+                  }))
                 }
                 placeholder="All"
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-slate-700"
@@ -321,29 +351,46 @@ export default function PayrollReportsPage() {
       {hasError && (
         <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
           <AlertCircle size={18} />
-          <p>Payroll reports could not be loaded. Please check permissions or try again.</p>
+          <p>
+            Payroll reports could not be loaded. Please check permissions or try
+            again.
+          </p>
         </div>
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {reportCards.map((report) => (
-          <section key={report.title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section
+            key={report.title}
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+          >
             <div className="flex items-start gap-4">
-              <div className={cn('flex h-11 w-11 items-center justify-center rounded-xl', report.color)}>
+              <div
+                className={cn(
+                  'flex h-11 w-11 items-center justify-center rounded-xl',
+                  report.color,
+                )}
+              >
                 <report.icon size={22} />
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="font-bold text-slate-900">{report.title}</h3>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">{report.description}</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  {report.description}
+                </p>
               </div>
             </div>
             <div className="mt-5">
               {isLoading ? (
                 <div className="h-8 w-32 animate-pulse rounded bg-slate-100" />
               ) : (
-                <p className="text-2xl font-black text-slate-900">{report.value}</p>
+                <p className="text-2xl font-black text-slate-900">
+                  {report.value}
+                </p>
               )}
-              <p className="mt-1 text-xs font-semibold text-slate-500">{report.meta}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                {report.meta}
+              </p>
             </div>
             {report.action && (
               <button
@@ -352,7 +399,11 @@ export default function PayrollReportsPage() {
                 onClick={report.action}
                 className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-mod-hr-accent)] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[var(--color-mod-hr-text)] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {exportMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                {exportMutation.isPending ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Download size={16} />
+                )}
                 Export CSV
               </button>
             )}
@@ -363,9 +414,12 @@ export default function PayrollReportsPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Official Totals</h3>
+            <h3 className="text-lg font-bold text-slate-900">
+              Official Totals
+            </h3>
             <p className="text-sm text-slate-500">
-              Salary, deduction, PF, TDS, and net pay totals for the selected filters.
+              Salary, deduction, PF, TDS, and net pay totals for the selected
+              filters.
             </p>
           </div>
           <BarChart3 className="text-slate-300" size={22} />
@@ -373,17 +427,39 @@ export default function PayrollReportsPage() {
         {isLoading ? (
           <div className="grid gap-3 py-5 md:grid-cols-4">
             {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-20 animate-pulse rounded-xl bg-slate-50" />
+              <div
+                key={index}
+                className="h-20 animate-pulse rounded-xl bg-slate-50"
+              />
             ))}
           </div>
         ) : (summaryQuery.data?.staffCount ?? 0) === 0 ? (
-          <EmptyState title="No payroll data found" description="No payroll lines match the selected filters." />
+          <EmptyState
+            title="No payroll data found"
+            description="No payroll lines match the selected filters."
+          />
         ) : (
           <div className="grid gap-3 py-5 md:grid-cols-4">
-            <Metric label="Gross Pay" value={formatMoney(componentsQuery.data?.grossSalary ?? 0)} />
-            <Metric label="Total Deductions" value={formatMoney(componentsQuery.data?.deductions ?? 0)} />
-            <Metric label="PF Total" value={formatMoney((componentsQuery.data?.pfEmployee ?? 0) + (componentsQuery.data?.pfEmployer ?? 0))} />
-            <Metric label="Net Payable" value={formatMoney(componentsQuery.data?.netPayable ?? 0)} tone="strong" />
+            <Metric
+              label="Gross Pay"
+              value={formatMoney(componentsQuery.data?.grossSalary ?? 0)}
+            />
+            <Metric
+              label="Total Deductions"
+              value={formatMoney(componentsQuery.data?.deductions ?? 0)}
+            />
+            <Metric
+              label="PF Total"
+              value={formatMoney(
+                (componentsQuery.data?.pfEmployee ?? 0) +
+                  (componentsQuery.data?.pfEmployer ?? 0),
+              )}
+            />
+            <Metric
+              label="Net Payable"
+              value={formatMoney(componentsQuery.data?.netPayable ?? 0)}
+              tone="strong"
+            />
           </div>
         )}
       </section>
@@ -393,7 +469,9 @@ export default function PayrollReportsPage() {
           <div>
             <h3 className="text-xl font-bold">Accounting Posting Status</h3>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Payroll posting is still a separate approved action. After posting, payroll cannot be edited directly. Use reversal/correction.
+              Payroll posting is still a separate approved action. After
+              posting, payroll cannot be edited directly. Use
+              reversal/correction.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <div className="flex items-center gap-2 rounded-xl border border-[var(--color-mod-hr-border)] bg-white px-4 py-2 text-sm font-bold">
@@ -401,17 +479,25 @@ export default function PayrollReportsPage() {
                 M11 posting boundary
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-[var(--color-mod-hr-border)] bg-white px-4 py-2 text-sm font-bold">
-                <BarChart3 size={18} className="text-[var(--color-mod-hr-text)]" />
+                <BarChart3
+                  size={18}
+                  className="text-[var(--color-mod-hr-text)]"
+                />
                 Official report totals
               </div>
             </div>
           </div>
           <div className="rounded-2xl border border-[var(--color-mod-hr-border)] bg-white p-4">
-            <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-500">Posted Payroll Runs</h4>
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-500">
+              Posted Payroll Runs
+            </h4>
             {runsQuery.isLoading ? (
               <div className="space-y-2">
                 {Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="h-12 animate-pulse rounded-xl bg-slate-100" />
+                  <div
+                    key={index}
+                    className="h-12 animate-pulse rounded-xl bg-slate-100"
+                  />
                 ))}
               </div>
             ) : postedRuns.length === 0 ? (
@@ -421,7 +507,10 @@ export default function PayrollReportsPage() {
             ) : (
               <div className="space-y-2">
                 {postedRuns.map((run) => (
-                  <div key={run.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                  <div
+                    key={run.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3"
+                  >
                     <div>
                       <p className="text-sm font-bold">
                         {monthLabels[run.periodMonth - 1]} {run.periodYear}
@@ -444,9 +533,12 @@ export default function PayrollReportsPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Payroll-to-GL Reconciliation</h3>
+            <h3 className="text-lg font-bold text-slate-900">
+              Payroll-to-GL Reconciliation
+            </h3>
             <p className="text-sm text-slate-500">
-              Compare posted payroll runs against linked accrual and disbursement journals.
+              Compare posted payroll runs against linked accrual and
+              disbursement journals.
             </p>
           </div>
           <ShieldCheck className="text-slate-300" size={22} />
@@ -468,12 +560,28 @@ export default function PayrollReportsPage() {
         ) : (
           <div className="space-y-4 py-5">
             <div className="grid gap-3 sm:grid-cols-3">
-              <Metric label="Runs checked" value={String(glReconciliationQuery.data?.summary.totalRuns ?? 0)} />
-              <Metric label="Reconciled" value={String(glReconciliationQuery.data?.summary.reconciledRuns ?? 0)} />
+              <Metric
+                label="Runs checked"
+                value={String(
+                  glReconciliationQuery.data?.summary.totalRuns ?? 0,
+                )}
+              />
+              <Metric
+                label="Reconciled"
+                value={String(
+                  glReconciliationQuery.data?.summary.reconciledRuns ?? 0,
+                )}
+              />
               <Metric
                 label="Needs review"
-                value={String(glReconciliationQuery.data?.summary.unreconciledRuns ?? 0)}
-                tone={glReconciliationQuery.data?.summary.unreconciledRuns ? 'strong' : undefined}
+                value={String(
+                  glReconciliationQuery.data?.summary.unreconciledRuns ?? 0,
+                )}
+                tone={
+                  glReconciliationQuery.data?.summary.unreconciledRuns
+                    ? 'strong'
+                    : undefined
+                }
               />
             </div>
             <div className="space-y-2">
@@ -541,15 +649,28 @@ function Metric({
 }) {
   return (
     <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
-      <p className={cn('mt-2 text-lg font-black', tone === 'strong' ? 'text-emerald-700' : 'text-slate-900')}>
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
+      <p
+        className={cn(
+          'mt-2 text-lg font-black',
+          tone === 'strong' ? 'text-emerald-700' : 'text-slate-900',
+        )}
+      >
         {value}
       </p>
     </div>
   );
 }
 
-function EmptyState({ title, description }: { title: string; description: string }) {
+function EmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
       <p className="font-bold text-slate-900">{title}</p>
@@ -558,10 +679,11 @@ function EmptyState({ title, description }: { title: string; description: string
   );
 }
 
-
 function compactFilters(filters: PayrollReportFilters) {
   return Object.fromEntries(
-    Object.entries(filters).filter(([, value]) => value !== undefined && value !== ''),
+    Object.entries(filters).filter(
+      ([, value]) => value !== undefined && value !== '',
+    ),
   );
 }
 

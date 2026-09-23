@@ -2,7 +2,12 @@
 
 import { LeaveRequestList } from '../../../../components/hr/leave-request-list';
 import { LeaveBalanceList } from '../../../../components/hr/leave-balance-list';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../../components/ui/tabs';
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from '../../../../components/ui/tabs';
 import { CalendarDays, Scale } from 'lucide-react';
 
 export default function LeaveManagementPage() {

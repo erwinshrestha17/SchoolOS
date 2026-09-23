@@ -1,6 +1,6 @@
-import { paceCredentialAttempt } from "./fixtures/credential-pacing";
-import { expect, test, type Page } from "@playwright/test";
-import { formatBsDateForInput, toNepalLocalDateTime } from "@schoolos/core";
+import { paceCredentialAttempt } from './fixtures/credential-pacing';
+import { expect, test, type Page } from '@playwright/test';
+import { formatBsDateForInput, toNepalLocalDateTime } from '@schoolos/core';
 
 const credentials = {
   tenantSlug: process.env.SCHOOLOS_E2E_TENANT_SLUG,
@@ -9,59 +9,59 @@ const credentials = {
 };
 const qrMutationStudentSearch =
   process.env.SCHOOLOS_E2E_M1_QR_STUDENT_SEARCH?.trim();
-const m1MutationsEnabled = process.env.SCHOOLOS_E2E_M1_MUTATIONS === "true";
+const m1MutationsEnabled = process.env.SCHOOLOS_E2E_M1_MUTATIONS === 'true';
 const m1ReminderFixturesEnabled =
-  process.env.SCHOOLOS_E2E_M1_REMINDER_FIXTURES === "true";
+  process.env.SCHOOLOS_E2E_M1_REMINDER_FIXTURES === 'true';
 const m1WaitlistFixturesEnabled =
-  process.env.SCHOOLOS_E2E_M1_WAITLIST_FIXTURES === "true";
-const m1BulkImportEnabled = process.env.SCHOOLOS_E2E_M1_BULK_IMPORT === "true";
+  process.env.SCHOOLOS_E2E_M1_WAITLIST_FIXTURES === 'true';
+const m1BulkImportEnabled = process.env.SCHOOLOS_E2E_M1_BULK_IMPORT === 'true';
 const m1AssessmentFixturesEnabled =
-  process.env.SCHOOLOS_E2E_M1_ASSESSMENT_FIXTURES === "true";
+  process.env.SCHOOLOS_E2E_M1_ASSESSMENT_FIXTURES === 'true';
 // Match apps/api/prisma/seed-m1-assessment-e2e.ts's fixed IDs; the schedule ID
 // only selects the seeded option, the result ID only verifies via the API.
-const M1_ASSESSMENT_SCHEDULE_CASE_ID = "a13f2e04-8f41-4b7a-9c2a-51e6d3c8b903";
-const M1_ASSESSMENT_RESULT_CASE_ID = "a13f2e04-8f41-4b7a-9c2a-51e6d3c8b904";
+const M1_ASSESSMENT_SCHEDULE_CASE_ID = 'a13f2e04-8f41-4b7a-9c2a-51e6d3c8b903';
+const M1_ASSESSMENT_RESULT_CASE_ID = 'a13f2e04-8f41-4b7a-9c2a-51e6d3c8b904';
 const apiBaseUrl =
   process.env.SCHOOLOS_E2E_API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "http://localhost:4000/api/v1";
+  'http://localhost:4000/api/v1';
 
-test.describe("Students & Admissions Workflow Smoke", () => {
+test.describe('Students & Admissions Workflow Smoke', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(
       !credentials.tenantSlug || !credentials.email || !credentials.password,
-      "Set E2E credentials to run student/admissions smoke tests.",
+      'Set E2E credentials to run student/admissions smoke tests.',
     );
     await login(page);
   });
 
-  test("keeps Admissions selected and exposes server-backed queues", async ({
+  test('keeps Admissions selected and exposes server-backed queues', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/dashboard/admissions");
+    await page.goto('/dashboard/admissions');
 
     await expect(
-      page.getByRole("heading", { name: "Admissions", exact: true }),
+      page.getByRole('heading', { name: 'Admissions', exact: true }),
     ).toBeVisible();
-    await expect(sidebarLink(page, "Admissions")).toHaveAttribute(
-      "aria-current",
-      "page",
+    await expect(sidebarLink(page, 'Admissions')).toHaveAttribute(
+      'aria-current',
+      'page',
     );
-    await expect(sidebarLink(page, "Students")).not.toHaveAttribute(
-      "aria-current",
-      "page",
+    await expect(sidebarLink(page, 'Students')).not.toHaveAttribute(
+      'aria-current',
+      'page',
     );
-    await expect(page.getByRole("tab", { name: "Needs info" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Completed" })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Needs info' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Completed' })).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "New admission" }).first(),
+      page.getByRole('link', { name: 'New admission' }).first(),
     ).toBeVisible();
 
     await expectDesktopSummaryRow(page);
-    await expectNoHorizontalTabOverflow(page, "Admission queue views");
+    await expectNoHorizontalTabOverflow(page, 'Admission queue views');
 
-    const queueWorkspace = page.getByTestId("admission-queue-workspace");
+    const queueWorkspace = page.getByTestId('admission-queue-workspace');
     await expect(queueWorkspace).toBeVisible();
     const workspaceBox = await queueWorkspace.boundingBox();
     expect(workspaceBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(900);
@@ -76,223 +76,223 @@ test.describe("Students & Admissions Workflow Smoke", () => {
 
     await expectResponsiveWorkspace(
       page,
-      "admission-queue-workspace",
-      "Admission queue views",
+      'admission-queue-workspace',
+      'Admission queue views',
     );
 
-    await page.getByRole("tab", { name: "Review", exact: true }).click();
+    await page.getByRole('tab', { name: 'Review', exact: true }).click();
     await expect(page).toHaveURL(/queue=WAITING_FOR_REVIEW/);
     await page.goBack();
-    await expect(page.getByRole("tab", { name: "Needs info" })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    await expect(page.getByRole('tab', { name: 'Needs info' })).toHaveAttribute(
+      'aria-selected',
+      'true',
     );
   });
 
-  test("keeps Students selected, preserves lifecycle state, and opens the admission workflow", async ({
+  test('keeps Students selected, preserves lifecycle state, and opens the admission workflow', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/dashboard/students");
+    await page.goto('/dashboard/students');
 
     await expect(
-      page.getByRole("heading", { name: "Students", exact: true }),
+      page.getByRole('heading', { name: 'Students', exact: true }),
     ).toBeVisible();
-    await expect(sidebarLink(page, "Students")).toHaveAttribute(
-      "aria-current",
-      "page",
+    await expect(sidebarLink(page, 'Students')).toHaveAttribute(
+      'aria-current',
+      'page',
     );
-    await expect(sidebarLink(page, "Admissions")).not.toHaveAttribute(
-      "aria-current",
-      "page",
+    await expect(sidebarLink(page, 'Admissions')).not.toHaveAttribute(
+      'aria-current',
+      'page',
     );
     await expect(
-      page.getByRole("group", { name: "Directory filters" }),
+      page.getByRole('group', { name: 'Directory filters' }),
     ).toBeVisible();
-    await expect(page.getByTestId("student-roster-workspace")).toBeVisible();
+    await expect(page.getByTestId('student-roster-workspace')).toBeVisible();
     await expectDesktopSummaryRow(page);
-    await expectNoHorizontalTabOverflow(page, "Student lifecycle views");
+    await expectNoHorizontalTabOverflow(page, 'Student lifecycle views');
 
     const rosterBox = await page
-      .getByTestId("student-roster-workspace")
+      .getByTestId('student-roster-workspace')
       .boundingBox();
     expect(rosterBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(900);
     await expectResponsiveWorkspace(
       page,
-      "student-roster-workspace",
-      "Student lifecycle views",
+      'student-roster-workspace',
+      'Student lifecycle views',
     );
-    await page.getByRole("tab", { name: "Transferred" }).click();
+    await page.getByRole('tab', { name: 'Transferred' }).click();
     await expect(page).toHaveURL(/status=TRANSFERRED/);
     await page.reload();
     await expect(
-      page.getByRole("tab", { name: "Transferred" }),
-    ).toHaveAttribute("aria-selected", "true");
+      page.getByRole('tab', { name: 'Transferred' }),
+    ).toHaveAttribute('aria-selected', 'true');
 
-    await page.getByRole("link", { name: "New admission" }).click();
+    await page.getByRole('link', { name: 'New admission' }).click();
     await expect(page).toHaveURL(/\/dashboard\/admissions\/new/);
-    await expect(sidebarLink(page, "Admissions")).toHaveAttribute(
-      "aria-current",
-      "page",
+    await expect(sidebarLink(page, 'Admissions')).toHaveAttribute(
+      'aria-current',
+      'page',
     );
   });
 
-  test("rotates, revokes, and restores a dedicated seeded student QR credential", async ({
+  test('rotates, revokes, and restores a dedicated seeded student QR credential', async ({
     page,
   }) => {
     test.skip(
       !m1MutationsEnabled || !qrMutationStudentSearch,
-      "Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_QR_STUDENT_SEARCH to run the state-changing M1 QR lifecycle smoke.",
+      'Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_QR_STUDENT_SEARCH to run the state-changing M1 QR lifecycle smoke.',
     );
 
-    await page.goto("/dashboard/admissions/qr");
+    await page.goto('/dashboard/admissions/qr');
     await expect(
-      page.getByRole("heading", { name: "QR / ID Cards", exact: true }),
+      page.getByRole('heading', { name: 'QR / ID Cards', exact: true }),
     ).toBeVisible();
 
     await page
-      .getByRole("textbox", { name: "Search QR card records" })
-      .fill(qrMutationStudentSearch ?? "");
+      .getByRole('textbox', { name: 'Search QR card records' })
+      .fill(qrMutationStudentSearch ?? '');
 
-    const studentRow = page.getByRole("row").filter({
-      has: page.getByText(qrMutationStudentSearch ?? "", { exact: true }),
+    const studentRow = page.getByRole('row').filter({
+      has: page.getByText(qrMutationStudentSearch ?? '', { exact: true }),
     });
     await expect(studentRow).toHaveCount(1);
-    await studentRow.getByRole("button", { name: "Manage" }).click();
+    await studentRow.getByRole('button', { name: 'Manage' }).click();
     await expect(
-      page.getByRole("heading", { name: "Student Identity QR" }),
+      page.getByRole('heading', { name: 'Student Identity QR' }),
     ).toBeVisible();
 
     await ensureActiveQrCredential(page);
 
-    await page.getByRole("button", { name: "Rotate (Lost Card)" }).click();
-    const rotateDialog = page.getByRole("dialog");
+    await page.getByRole('button', { name: 'Rotate (Lost Card)' }).click();
+    const rotateDialog = page.getByRole('dialog');
     await expect(rotateDialog).toBeVisible();
     await expect(
-      rotateDialog.getByRole("heading", {
-        name: "Rotate student QR credential?",
+      rotateDialog.getByRole('heading', {
+        name: 'Rotate student QR credential?',
       }),
     ).toBeVisible();
     await page
-      .locator("#student-qr-rotate-reason")
-      .fill("Automated seeded QR rotation verification");
+      .locator('#student-qr-rotate-reason')
+      .fill('Automated seeded QR rotation verification');
     await page
-      .getByRole("button", { name: "Rotate credential", exact: true })
+      .getByRole('button', { name: 'Rotate credential', exact: true })
       .click();
     await expect(rotateDialog).toBeHidden();
-    await expect(page.getByText("Protected ID card generated")).toBeVisible();
-    await page.getByRole("button", { name: "Done" }).click();
+    await expect(page.getByText('Protected ID card generated')).toBeVisible();
+    await page.getByRole('button', { name: 'Done' }).click();
     await expect(
-      page.getByRole("button", { name: "Revoke Access" }),
+      page.getByRole('button', { name: 'Revoke Access' }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Revoke Access" }).click();
-    const revokeDialog = page.getByRole("dialog");
+    await page.getByRole('button', { name: 'Revoke Access' }).click();
+    const revokeDialog = page.getByRole('dialog');
     await expect(revokeDialog).toBeVisible();
     await expect(
-      revokeDialog.getByRole("heading", {
-        name: "Revoke student QR credential?",
+      revokeDialog.getByRole('heading', {
+        name: 'Revoke student QR credential?',
       }),
     ).toBeVisible();
     await page
-      .locator("#student-qr-revoke-reason")
-      .fill("Automated seeded QR revocation verification");
+      .locator('#student-qr-revoke-reason')
+      .fill('Automated seeded QR revocation verification');
     await page
-      .getByRole("button", { name: "Revoke credential", exact: true })
+      .getByRole('button', { name: 'Revoke credential', exact: true })
       .click();
     await expect(revokeDialog).toBeHidden();
     await expect(
-      page.getByRole("button", { name: "Generate Identity" }),
+      page.getByRole('button', { name: 'Generate Identity' }),
     ).toBeVisible();
 
     await ensureActiveQrCredential(page);
     await expect(
-      page.getByText("ACTIVE", { exact: true }).last(),
+      page.getByText('ACTIVE', { exact: true }).last(),
     ).toBeVisible();
   });
 
-  test("checks dedicated seeded admission document reminders with honest delivery state", async ({
+  test('checks dedicated seeded admission document reminders with honest delivery state', async ({
     page,
   }) => {
     test.skip(
       !m1MutationsEnabled || !m1ReminderFixturesEnabled,
-      "Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_REMINDER_FIXTURES=true after seeding the dedicated reminder cases.",
+      'Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_REMINDER_FIXTURES=true after seeding the dedicated reminder cases.',
     );
 
-    await page.goto("/dashboard/admissions/documents");
+    await page.goto('/dashboard/admissions/documents');
     await expect(
-      page.getByRole("heading", { name: "Document Request Center" }),
+      page.getByRole('heading', { name: 'Document Request Center' }),
     ).toBeVisible();
 
     await expect(
-      page.getByText("Mira Adhikari", { exact: true }),
+      page.getByText('Mira Adhikari', { exact: true }),
     ).toBeVisible();
-    await expect(page.getByText("Nima Gurung", { exact: true })).toBeVisible();
-    await page.getByRole("checkbox", { name: "Select Mira Adhikari" }).check();
-    await page.getByRole("checkbox", { name: "Select Nima Gurung" }).check();
+    await expect(page.getByText('Nima Gurung', { exact: true })).toBeVisible();
+    await page.getByRole('checkbox', { name: 'Select Mira Adhikari' }).check();
+    await page.getByRole('checkbox', { name: 'Select Nima Gurung' }).check();
 
-    await page.getByRole("button", { name: "Queue reminders" }).click();
-    const dialog = page.getByRole("dialog");
+    await page.getByRole('button', { name: 'Queue reminders' }).click();
+    const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText(
-      "1 of 2 selected cases currently have a guardian phone.",
+      '1 of 2 selected cases currently have a guardian phone.',
     );
     await dialog
-      .getByRole("button", { name: "Queue reminders", exact: true })
+      .getByRole('button', { name: 'Queue reminders', exact: true })
       .click();
 
-    const result = page.getByRole("status");
-    await expect(result).toContainText("Reminder requests checked");
-    await expect(result).toContainText("out of 2 selected");
-    await expect(result).toContainText("No guardian phone: 1");
+    const result = page.getByRole('status');
+    await expect(result).toContainText('Reminder requests checked');
+    await expect(result).toContainText('out of 2 selected');
+    await expect(result).toContainText('No guardian phone: 1');
     await expect(result).toContainText(
       /1 (queued|already queued)|Delivery unavailable: 1/,
     );
   });
 
-  test("returns a dedicated seeded waitlist case to review after a live capacity check", async ({
+  test('returns a dedicated seeded waitlist case to review after a live capacity check', async ({
     page,
   }) => {
     test.skip(
       !m1MutationsEnabled || !m1WaitlistFixturesEnabled,
-      "Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_WAITLIST_FIXTURES=true after seeding the dedicated waitlist case.",
+      'Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_WAITLIST_FIXTURES=true after seeding the dedicated waitlist case.',
     );
 
-    await page.goto("/dashboard/admissions");
-    await page.getByRole("button", { name: "More queues" }).click();
-    await page.getByRole("menuitem", { name: "Waitlisted" }).click();
+    await page.goto('/dashboard/admissions');
+    await page.getByRole('button', { name: 'More queues' }).click();
+    await page.getByRole('menuitem', { name: 'Waitlisted' }).click();
     await expect(page).toHaveURL(/queue=WAITLISTED/);
 
-    const waitlistRow = page.getByRole("row").filter({
-      has: page.getByText("Aarushi Karki", { exact: true }),
+    const waitlistRow = page.getByRole('row').filter({
+      has: page.getByText('Aarushi Karki', { exact: true }),
     });
     await expect(waitlistRow).toHaveCount(1);
-    await expect(waitlistRow).toContainText("5 seats available");
-    await expect(waitlistRow).toContainText("Class 5");
-    await expect(waitlistRow).toContainText("Section Annapurna E2E");
+    await expect(waitlistRow).toContainText('5 seats available');
+    await expect(waitlistRow).toContainText('Class 5');
+    await expect(waitlistRow).toContainText('Section Annapurna E2E');
 
-    await waitlistRow.getByRole("button", { name: "Return to review" }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toContainText("Return this applicant to review?");
-    await expect(dialog).toContainText("Class 5, Section Annapurna E2E");
+    await waitlistRow.getByRole('button', { name: 'Return to review' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toContainText('Return this applicant to review?');
+    await expect(dialog).toContainText('Class 5, Section Annapurna E2E');
     await dialog
-      .getByRole("button", { name: "Return to review", exact: true })
+      .getByRole('button', { name: 'Return to review', exact: true })
       .click();
 
     await expect(
-      page.getByRole("status").filter({
-        hasText: "Aarushi Karki was returned to the admission review workflow.",
+      page.getByRole('status').filter({
+        hasText: 'Aarushi Karki was returned to the admission review workflow.',
       }),
     ).toBeVisible();
     await expect(waitlistRow).toHaveCount(0);
   });
 
-  test("validates and creates a tenant-scoped admission from CSV", async ({
+  test('validates and creates a tenant-scoped admission from CSV', async ({
     page,
   }) => {
     test.skip(
       !m1MutationsEnabled || !m1BulkImportEnabled,
-      "Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_BULK_IMPORT=true to run the state-changing M1 admission CSV smoke.",
+      'Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_BULK_IMPORT=true to run the state-changing M1 admission CSV smoke.',
     );
 
     const [academicYearsResponse, classesResponse] = await Promise.all([
@@ -316,7 +316,7 @@ test.describe("Students & Admissions Workflow Smoke", () => {
 
     if (!academicYear || !classroom) {
       throw new Error(
-        "The authenticated E2E tenant requires an academic year and class.",
+        'The authenticated E2E tenant requires an academic year and class.',
       );
     }
 
@@ -325,92 +325,92 @@ test.describe("Students & Admissions Workflow Smoke", () => {
     const guardianPhone = `984${String(Date.now()).slice(-7)}`;
     const admissionDate = academicYear.startsOn.slice(0, 10);
     const csvContent = [
-      "firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,guardianFullName,guardianRelation,guardianPhone,confirmNoDisability",
+      'firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,guardianFullName,guardianRelation,guardianPhone,confirmNoDisability',
       [
-        "Aditi",
+        'Aditi',
         `Karki ${uniqueSuffix}`,
-        "2015-05-12",
-        "FEMALE",
+        '2015-05-12',
+        'FEMALE',
         admissionDate,
         academicYear.id,
         classroom.id,
         `Maya Karki ${uniqueSuffix}`,
-        "mother",
+        'mother',
         guardianPhone,
-        "true",
-      ].join(","),
-    ].join("\n");
+        'true',
+      ].join(','),
+    ].join('\n');
 
-    await page.goto("/dashboard/admissions/iemis");
+    await page.goto('/dashboard/admissions/iemis');
     await expect(
-      page.getByRole("heading", { name: "iEMIS Readiness", exact: true }),
+      page.getByRole('heading', { name: 'iEMIS Readiness', exact: true }),
     ).toBeVisible();
 
     await page.locator('input[type="file"][accept*="csv"]').setInputFiles({
-      name: "m1-bulk-import-e2e.csv",
-      mimeType: "text/csv",
+      name: 'm1-bulk-import-e2e.csv',
+      mimeType: 'text/csv',
       buffer: Buffer.from(csvContent),
     });
 
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole('dialog');
     await expect(dialog).toContainText(
-      "Create the validated admission records?",
+      'Create the validated admission records?',
     );
-    await expect(dialog).toContainText("Ready");
-    await expect(dialog).toContainText("Need attention");
+    await expect(dialog).toContainText('Ready');
+    await expect(dialog).toContainText('Need attention');
     await expect(
       dialog
-        .locator("dt")
+        .locator('dt')
         .filter({ hasText: /^Ready$/ })
-        .locator("..")
-        .locator("dd"),
-    ).toHaveText("1");
+        .locator('..')
+        .locator('dd'),
+    ).toHaveText('1');
     await expect(
       dialog
-        .locator("dt")
+        .locator('dt')
         .filter({ hasText: /^Need attention$/ })
-        .locator("..")
-        .locator("dd"),
-    ).toHaveText("0");
+        .locator('..')
+        .locator('dd'),
+    ).toHaveText('0');
     await dialog
-      .getByRole("button", { name: "Create 1 admission", exact: true })
+      .getByRole('button', { name: 'Create 1 admission', exact: true })
       .click();
 
-    await expect(page.getByRole("status")).toContainText("Import processed");
-    await expect(page.getByRole("status")).toContainText(
-      "1 completed, 0 need review, 0 validated.",
+    await expect(page.getByRole('status')).toContainText('Import processed');
+    await expect(page.getByRole('status')).toContainText(
+      '1 completed, 0 need review, 0 validated.',
     );
 
-    await page.goto("/dashboard/students");
+    await page.goto('/dashboard/students');
     await page
-      .getByRole("textbox", {
-        name: "Search students by name, student code, guardian name, or phone",
+      .getByRole('textbox', {
+        name: 'Search students by name, student code, guardian name, or phone',
       })
       .fill(studentName);
-    const roster = page.getByTestId("student-roster-workspace");
+    const roster = page.getByTestId('student-roster-workspace');
     await expect(roster.getByText(studentName, { exact: true })).toHaveCount(1);
     await expect(roster).toContainText(classroom.name);
   });
 
-  test("schedules a dedicated seeded interview-required admission case", async ({
+  test('schedules a dedicated seeded interview-required admission case', async ({
     page,
   }) => {
     test.skip(
       !m1MutationsEnabled || !m1AssessmentFixturesEnabled,
-      "Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_ASSESSMENT_FIXTURES=true to run the M1 assessment scheduling smoke.",
+      'Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_ASSESSMENT_FIXTURES=true to run the M1 assessment scheduling smoke.',
     );
 
-    await page.goto("/dashboard/admissions/assessments");
+    await page.goto('/dashboard/admissions/assessments');
     await expect(
-      page.getByRole("heading", {
-        name: "Assessment & Interview",
+      page.getByRole('heading', {
+        name: 'Assessment & Interview',
         exact: true,
       }),
     ).toBeVisible();
 
-    const caseSelect = page.getByLabel("Case");
+    const caseSelect = page.getByLabel('Case');
     await expect(
-      caseSelect.locator("option", { hasText: "Priya Gurung E2E" }),
+      caseSelect.locator('option', { hasText: 'Priya Gurung E2E' }),
     ).toHaveCount(1);
     await caseSelect.selectOption(M1_ASSESSMENT_SCHEDULE_CASE_ID);
 
@@ -418,18 +418,18 @@ test.describe("Students & Admissions Workflow Smoke", () => {
     const nepalTime = toNepalLocalDateTime(scheduledAt);
     const startTime = `${pad2(nepalTime.hour)}:${pad2(nepalTime.minute)}`;
 
-    await page.getByLabel("BS date").fill(formatBsDateForInput(scheduledAt));
-    await page.getByLabel("NPT time").fill(startTime);
-    await page.getByLabel("Mode").selectOption("IN_PERSON");
-    await page.getByLabel("Location").fill("Front office");
-    await page.getByLabel("Notes").fill("E2E scheduling smoke.");
+    await page.getByLabel('BS date').fill(formatBsDateForInput(scheduledAt));
+    await page.getByLabel('NPT time').fill(startTime);
+    await page.getByLabel('Mode').selectOption('IN_PERSON');
+    await page.getByLabel('Location').fill('Front office');
+    await page.getByLabel('Notes').fill('E2E scheduling smoke.');
 
-    await page.getByRole("button", { name: "Schedule", exact: true }).click();
+    await page.getByRole('button', { name: 'Schedule', exact: true }).click();
 
     // The candidate must drop out of the "needs scheduling" list once its
     // assessment session is created (assessmentSessions: { none: {} } filter).
     await expect(
-      caseSelect.locator("option", { hasText: "Priya Gurung E2E" }),
+      caseSelect.locator('option', { hasText: 'Priya Gurung E2E' }),
     ).toHaveCount(0);
 
     const sessionsResponse = await page.request.get(
@@ -445,47 +445,47 @@ test.describe("Students & Admissions Workflow Smoke", () => {
       }>;
     }>(await sessionsResponse.json());
     const scheduled = sessions.items.find(
-      (item) => item.applicantName === "Priya Gurung E2E",
+      (item) => item.applicantName === 'Priya Gurung E2E',
     );
     expect(scheduled).toBeTruthy();
-    expect(scheduled?.mode).toBe("IN_PERSON");
-    expect(scheduled?.location).toBe("Front office");
+    expect(scheduled?.mode).toBe('IN_PERSON');
+    expect(scheduled?.location).toBe('Front office');
     expect(new Date(scheduled!.scheduledAt).getTime()).toBeGreaterThan(
       Date.now() - 60_000,
     );
   });
 
-  test("records a result for a dedicated seeded past-due assessment session", async ({
+  test('records a result for a dedicated seeded past-due assessment session', async ({
     page,
   }) => {
     test.skip(
       !m1MutationsEnabled || !m1AssessmentFixturesEnabled,
-      "Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_ASSESSMENT_FIXTURES=true to run the M1 assessment result smoke.",
+      'Set SCHOOLOS_E2E_M1_MUTATIONS=true and SCHOOLOS_E2E_M1_ASSESSMENT_FIXTURES=true to run the M1 assessment result smoke.',
     );
 
-    await page.goto("/dashboard/admissions/assessments?tab=AWAITING_RESULTS");
+    await page.goto('/dashboard/admissions/assessments?tab=AWAITING_RESULTS');
     await expect(
-      page.getByRole("heading", {
-        name: "Assessment & Interview",
+      page.getByRole('heading', {
+        name: 'Assessment & Interview',
         exact: true,
       }),
     ).toBeVisible();
 
-    const row = page.locator("tr").filter({ hasText: "Rohan Thapa E2E" });
+    const row = page.locator('tr').filter({ hasText: 'Rohan Thapa E2E' });
     await expect(row).toBeVisible();
-    await expect(row).toContainText("Pending");
-    await row.getByRole("button", { name: "Record result" }).click();
+    await expect(row).toContainText('Pending');
+    await row.getByRole('button', { name: 'Record result' }).click();
 
-    const saveButton = page.getByRole("button", {
-      name: "Save result",
+    const saveButton = page.getByRole('button', {
+      name: 'Save result',
       exact: true,
     });
-    const resultFields = saveButton.locator("xpath=..");
-    await resultFields.getByLabel("Result").selectOption("PASSED");
-    await resultFields.getByLabel("Score").fill("82");
+    const resultFields = saveButton.locator('xpath=..');
+    await resultFields.getByLabel('Result').selectOption('PASSED');
+    await resultFields.getByLabel('Score').fill('82');
     await resultFields
-      .getByLabel("Notes")
-      .fill("Confident responses; recommend admission.");
+      .getByLabel('Notes')
+      .fill('Confident responses; recommend admission.');
     await saveButton.click();
 
     // A recorded result flips the session's status away from SCHEDULED, so it
@@ -504,14 +504,14 @@ test.describe("Students & Admissions Workflow Smoke", () => {
         resultScore: number | null;
       } | null;
     }>(await caseResponse.json());
-    expect(evaluation.assessmentSession?.status).toBe("COMPLETED");
-    expect(evaluation.assessmentSession?.result).toBe("PASSED");
+    expect(evaluation.assessmentSession?.status).toBe('COMPLETED');
+    expect(evaluation.assessmentSession?.result).toBe('PASSED');
     expect(evaluation.assessmentSession?.resultScore).toBe(82);
   });
 });
 
 function unwrapApiData<T>(payload: unknown): T {
-  if (typeof payload === "object" && payload !== null && "data" in payload) {
+  if (typeof payload === 'object' && payload !== null && 'data' in payload) {
     return (payload as { data: T }).data;
   }
   return payload as T;
@@ -519,30 +519,30 @@ function unwrapApiData<T>(payload: unknown): T {
 
 function alphabeticSuffix(value: number) {
   let remaining = value;
-  let result = "";
+  let result = '';
   while (remaining > 0) {
     result = String.fromCharCode(97 + (remaining % 26)) + result;
     remaining = Math.floor(remaining / 26);
   }
-  return result || "a";
+  return result || 'a';
 }
 
 function pad2(value: number) {
-  return String(value).padStart(2, "0");
+  return String(value).padStart(2, '0');
 }
 
 async function ensureActiveQrCredential(page: Page) {
-  const generateButton = page.getByRole("button", {
-    name: "Generate Identity",
+  const generateButton = page.getByRole('button', {
+    name: 'Generate Identity',
   });
   if (await generateButton.isVisible()) {
     await generateButton.click();
-    await expect(page.getByText("Protected ID card generated")).toBeVisible();
-    await page.getByRole("button", { name: "Done" }).click();
+    await expect(page.getByText('Protected ID card generated')).toBeVisible();
+    await page.getByRole('button', { name: 'Done' }).click();
   }
 
   await expect(
-    page.getByRole("button", { name: "Rotate (Lost Card)" }),
+    page.getByRole('button', { name: 'Rotate (Lost Card)' }),
   ).toBeVisible();
 }
 
@@ -550,7 +550,7 @@ async function expectDesktopSummaryRow(page: Page) {
   const cards = page
     .locator('[data-schoolos-ui="summary-grid"]')
     .first()
-    .locator(":scope > a");
+    .locator(':scope > a');
   await expect(cards).toHaveCount(4);
   const first = await cards.nth(0).boundingBox();
   const last = await cards.nth(3).boundingBox();
@@ -558,7 +558,7 @@ async function expectDesktopSummaryRow(page: Page) {
 }
 
 async function expectNoHorizontalTabOverflow(page: Page, name: string) {
-  const tabs = page.getByRole("tablist", { name });
+  const tabs = page.getByRole('tablist', { name });
   const dimensions = await tabs.evaluate((element) => ({
     clientWidth: element.clientWidth,
     scrollWidth: element.scrollWidth,
@@ -581,23 +581,23 @@ async function expectResponsiveWorkspace(
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByTestId(workspaceTestId)).toBeVisible();
-  await expect(page.getByRole("tablist", { name: tabListName })).toBeVisible();
+  await expect(page.getByRole('tablist', { name: tabListName })).toBeVisible();
 
   await page.setViewportSize({ width: 1440, height: 900 });
 }
 
 function sidebarLink(page: Page, name: string) {
   return page
-    .getByRole("complementary")
-    .getByRole("link", { name, exact: true });
+    .getByRole('complementary')
+    .getByRole('link', { name, exact: true });
 }
 
 async function login(page: Page) {
   await paceCredentialAttempt();
-  await page.goto("/login");
-  await page.getByLabel(/School Code/i).fill(credentials.tenantSlug ?? "");
-  await page.getByLabel(/Email/i).fill(credentials.email ?? "");
-  await page.getByLabel(/^Password$/i).fill(credentials.password ?? "");
-  await page.getByRole("button", { name: /Sign in/i }).click();
-  await page.waitForURL("**/dashboard*", { timeout: 20_000 });
+  await page.goto('/login');
+  await page.getByLabel(/School Code/i).fill(credentials.tenantSlug ?? '');
+  await page.getByLabel(/Email/i).fill(credentials.email ?? '');
+  await page.getByLabel(/^Password$/i).fill(credentials.password ?? '');
+  await page.getByRole('button', { name: /Sign in/i }).click();
+  await page.waitForURL('**/dashboard*', { timeout: 20_000 });
 }

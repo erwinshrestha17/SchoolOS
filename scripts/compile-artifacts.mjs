@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { format, resolveConfig } from 'prettier';
 
 function getImportSource(importBlock) {
   const fromMatch = importBlock.match(/\bfrom\s+['"]([^'"]+)['"]/);
@@ -264,4 +265,21 @@ import { z } from 'zod';
 
   fs.writeFileSync(valOut, combinedVal, 'utf8');
   console.log(`Compiled validation to: ${valOut}`);
+}
+
+// Generated TypeScript must satisfy the same formatting gate as its split
+// sources. Format here so regeneration cannot reintroduce artifact-only drift.
+for (const generatedFile of [
+  'packages/core/src/permissions/catalog.ts',
+  permsOut,
+  typesOut,
+  valOut,
+]) {
+  if (!fs.existsSync(generatedFile)) continue;
+  const options = await resolveConfig(generatedFile);
+  const formatted = await format(fs.readFileSync(generatedFile, 'utf8'), {
+    ...options,
+    filepath: generatedFile,
+  });
+  fs.writeFileSync(generatedFile, formatted, 'utf8');
 }

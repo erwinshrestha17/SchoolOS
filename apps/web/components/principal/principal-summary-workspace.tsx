@@ -1,22 +1,22 @@
-"use client";
+'use client';
 
 import type {
   OperationalModuleSummary,
   OperationalSummaryMetricValue,
   OperationalSummaryRouteModule,
-} from "@schoolos/core";
-import { useQueries, type UseQueryResult } from "@tanstack/react-query";
-import Link from "next/link";
-import { ArrowRight, CheckCircle2 } from "lucide-react";
-import { api } from "../../lib/api";
-import { useSchoolWebPersona } from "../../lib/school-web-persona";
-import { ModuleHeader } from "../ui/module-header";
-import { LoadingState } from "../ui/loading-state";
-import { ErrorState } from "../ui/error-state";
-import { PermissionDenied } from "../ui/permission-denied";
-import { ModuleLockedState } from "../ui/module-locked-state";
-import { SectionCard } from "../ui/section-card";
-import { SummaryStatusBadge } from "../ui/operational-summary";
+} from '@schoolos/core';
+import { useQueries, type UseQueryResult } from '@tanstack/react-query';
+import Link from 'next/link';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { api } from '../../lib/api';
+import { useSchoolWebPersona } from '../../lib/school-web-persona';
+import { ModuleHeader } from '../ui/module-header';
+import { LoadingState } from '../ui/loading-state';
+import { ErrorState } from '../ui/error-state';
+import { PermissionDenied } from '../ui/permission-denied';
+import { ModuleLockedState } from '../ui/module-locked-state';
+import { SectionCard } from '../ui/section-card';
+import { SummaryStatusBadge } from '../ui/operational-summary';
 
 export type PrincipalMetricDefinition = {
   key: string;
@@ -33,11 +33,11 @@ export type PrincipalSummaryDefinition = {
 };
 
 export function PrincipalSummaryWorkspace({
-  eyebrow = "Leadership oversight",
+  eyebrow = 'Leadership oversight',
   title,
   description,
   definitions,
-  attentionHref = "/dashboard/attention",
+  attentionHref = '/dashboard/attention',
 }: {
   eyebrow?: string;
   title: string;
@@ -48,14 +48,14 @@ export function PrincipalSummaryWorkspace({
   const persona = useSchoolWebPersona();
   const queries = useQueries({
     queries: definitions.map((definition) => ({
-      queryKey: ["principal-summary", definition.module],
+      queryKey: ['principal-summary', definition.module],
       queryFn: () => api.getModuleSummary(definition.module),
-      enabled: persona === "principal",
+      enabled: persona === 'principal',
       staleTime: 30_000,
     })),
   });
 
-  if (persona !== "principal") {
+  if (persona !== 'principal') {
     return (
       <PermissionDenied
         title={`${title} unavailable`}
@@ -110,7 +110,7 @@ function PrincipalSummarySection({
   }
 
   const summary = query.data as OperationalModuleSummary;
-  if (summary.status === "locked") {
+  if (summary.status === 'locked') {
     return (
       <ModuleLockedState
         moduleName={definition.moduleName}
@@ -118,7 +118,7 @@ function PrincipalSummarySection({
       />
     );
   }
-  if (summary.status === "permissionDenied") {
+  if (summary.status === 'permissionDenied') {
     return (
       <PermissionDenied
         title={`${definition.moduleName} summary unavailable`}
@@ -152,7 +152,10 @@ function PrincipalSummarySection({
     >
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {visibleMetrics.map((metric) => (
-          <article key={metric.key} className="rounded-xl border border-slate-200 bg-white p-4">
+          <article
+            key={metric.key}
+            className="rounded-xl border border-slate-200 bg-white p-4"
+          >
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
               {metric.label}
             </p>
@@ -168,15 +171,18 @@ function PrincipalSummarySection({
         ))}
       </div>
 
-      {summary.status === "partial" ? (
+      {summary.status === 'partial' ? (
         <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-600">
-          Some information is temporarily unavailable. Available backend data is shown above.
+          Some information is temporarily unavailable. Available backend data is
+          shown above.
         </p>
       ) : null}
 
       {openAttention.length ? (
         <div className="mt-5 border-t border-slate-100 pt-4">
-          <p className="text-sm font-bold text-slate-950">Exceptions reported</p>
+          <p className="text-sm font-bold text-slate-950">
+            Exceptions reported
+          </p>
           <ul className="mt-2 space-y-2">
             {openAttention.slice(0, 4).map((item) => (
               <li
@@ -195,7 +201,10 @@ function PrincipalSummarySection({
         </div>
       ) : (
         <div className="mt-5 flex items-start gap-2 border-t border-slate-100 pt-4 text-sm text-slate-600">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+          <CheckCircle2
+            className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+            aria-hidden="true"
+          />
           No exceptions are reported in this summary.
         </div>
       )}
@@ -210,10 +219,13 @@ function metricValue(summary: OperationalModuleSummary, key: string) {
 }
 
 function formatMetric(value: OperationalSummaryMetricValue) {
-  if (value === null || value === undefined) return "Unavailable";
-  if (typeof value === "number") return new Intl.NumberFormat("en-NP").format(value);
+  if (value === null || value === undefined) return 'Unavailable';
+  if (typeof value === 'number')
+    return new Intl.NumberFormat('en-NP').format(value);
   if (/^-?\d+(\.\d+)?$/.test(value)) {
-    return new Intl.NumberFormat("en-NP", { maximumFractionDigits: 2 }).format(Number(value));
+    return new Intl.NumberFormat('en-NP', { maximumFractionDigits: 2 }).format(
+      Number(value),
+    );
   }
   return value;
 }

@@ -11,7 +11,7 @@ describe('canonical permissions UI layer', () => {
   it('evaluates permissions through alias-aware session helpers', () => {
     const permissionsUi = read('lib/permissions-ui.ts');
 
-    assert.match(permissionsUi, /from "@\/lib\/session"/);
+    assert.match(permissionsUi, /from ['"]@\/lib\/session['"]/);
     assert.match(permissionsUi, /hasPermission\(session, permission\)/);
     assert.match(permissionsUi, /hasAnyPermission\(session, permissions\)/);
     assert.match(permissionsUi, /export function resolveSessionPermissions/);
@@ -25,13 +25,16 @@ describe('canonical permissions UI layer', () => {
 
     assert.match(
       permissionsUi,
-      /export type PermissionResolution = "loading" \| "denied" \| "granted"/,
+      /export type PermissionResolution = ['"]loading['"] \| ['"]denied['"] \| ['"]granted['"]/,
     );
-    assert.match(permissionsUi, /if \(sessionStatus === "loading"\)/);
-    assert.match(permissionsUi, /if \(access\.resolution !== "granted"\)/);
-    assert.match(dashboardPage, /permissionResolution === "loading"/);
+    assert.match(permissionsUi, /if \(sessionStatus === ['"]loading['"]\)/);
+    assert.match(
+      permissionsUi,
+      /if \(access\.resolution !== ['"]granted['"]\)/,
+    );
+    assert.match(dashboardPage, /permissionResolution === ['"]loading['"]/);
     assert.match(dashboardPage, /canFetchDashboard/);
-    assert.match(dashboardPage, /permissionResolution === "granted"/);
+    assert.match(dashboardPage, /permissionResolution === ['"]granted['"]/);
   });
 
   it('separates notice approval from publication capabilities', () => {
@@ -40,8 +43,8 @@ describe('canonical permissions UI layer', () => {
     assert.match(permissionsUi, /canApprove:/);
     assert.match(permissionsUi, /canPublish:/);
     assert.match(permissionsUi, /canSchedule:/);
-    assert.match(permissionsUi, /"notices:approve"/);
-    assert.match(permissionsUi, /"advanced:approvals:decide"/);
+    assert.match(permissionsUi, /['"]notices:approve['"]/);
+    assert.match(permissionsUi, /['"]advanced:approvals:decide['"]/);
     assert.match(permissionsUi, /canTargetWholeSchool/);
     assert.match(permissionsUi, /TEACHER_NOTICE_AUDIENCE/);
   });
@@ -54,10 +57,10 @@ describe('canonical permissions UI layer', () => {
     assert.match(permissionsUi, /canManageAll:/);
     assert.match(permissionsUi, /canReviewConflicts:/);
     assert.match(permissionsUi, /canOverrideLock:/);
-    assert.match(permissionsUi, /"attendance:override_lock"/);
+    assert.match(permissionsUi, /['"]attendance:override_lock['"]/);
     assert.match(
       permissionsUi,
-      /const canExport = canView && hasPermission\(session, "reports:export"\)/,
+      /const canExport = canView && hasPermission\(session, ['"]reports:export['"]\)/,
     );
   });
 });

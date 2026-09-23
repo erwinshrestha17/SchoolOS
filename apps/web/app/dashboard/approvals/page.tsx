@@ -1,38 +1,38 @@
-"use client";
+'use client';
 
-import { formatBsDateTime } from "@schoolos/core";
+import { formatBsDateTime } from '@schoolos/core';
 import {
   useInfiniteQuery,
   useMutation,
   useQueryClient,
-} from "@tanstack/react-query";
-import { CheckCircle2, Clock3, ShieldCheck, XCircle } from "lucide-react";
-import { useMemo, useState } from "react";
-import { ModuleHeader } from "../../../components/ui/module-header";
-import { Button } from "../../../components/ui/button";
-import { EmptyState } from "../../../components/ui/empty-state";
-import { ErrorState } from "../../../components/ui/error-state";
-import { LoadingState } from "../../../components/ui/loading-state";
-import { PermissionDenied } from "../../../components/ui/permission-denied";
-import { SectionCard } from "../../../components/ui/section-card";
-import { api, type ApprovalDecision } from "../../../lib/api";
-import { usePermissionAccess } from "../../../lib/permissions-ui";
-import { useSchoolWebPersona } from "../../../lib/school-web-persona";
+} from '@tanstack/react-query';
+import { CheckCircle2, Clock3, ShieldCheck, XCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ModuleHeader } from '../../../components/ui/module-header';
+import { Button } from '../../../components/ui/button';
+import { EmptyState } from '../../../components/ui/empty-state';
+import { ErrorState } from '../../../components/ui/error-state';
+import { LoadingState } from '../../../components/ui/loading-state';
+import { PermissionDenied } from '../../../components/ui/permission-denied';
+import { SectionCard } from '../../../components/ui/section-card';
+import { api, type ApprovalDecision } from '../../../lib/api';
+import { usePermissionAccess } from '../../../lib/permissions-ui';
+import { useSchoolWebPersona } from '../../../lib/school-web-persona';
 
 export default function PrincipalApprovalCentrePage() {
   const schoolWebPersona = useSchoolWebPersona();
   const access = usePermissionAccess();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState('');
   const [confirmDecision, setConfirmDecision] =
     useState<ApprovalDecision | null>(null);
-  const isPrincipal = schoolWebPersona === "principal";
-  const canRead = access.hasPermission("advanced:approvals:read");
-  const canDecide = access.hasPermission("advanced:approvals:decide");
+  const isPrincipal = schoolWebPersona === 'principal';
+  const canRead = access.hasPermission('advanced:approvals:read');
+  const canDecide = access.hasPermission('advanced:approvals:decide');
 
   const approvalQuery = useInfiniteQuery({
-    queryKey: ["principal-approval-centre"],
+    queryKey: ['principal-approval-centre'],
     queryFn: ({ pageParam }) =>
       api.listPrincipalApprovalQueue({
         cursor: pageParam ?? undefined,
@@ -55,9 +55,9 @@ export default function PrincipalApprovalCentrePage() {
 
   const decisionMutation = useMutation({
     mutationFn: async (decision: ApprovalDecision) => {
-      if (!selected) throw new Error("No approval request selected");
-      if (decision === "REJECT" && !reason.trim()) {
-        throw new Error("Rejection reason is required");
+      if (!selected) throw new Error('No approval request selected');
+      if (decision === 'REJECT' && !reason.trim()) {
+        throw new Error('Rejection reason is required');
       }
       return api.decideApprovalRequest(selected.id, {
         decision,
@@ -66,19 +66,19 @@ export default function PrincipalApprovalCentrePage() {
       });
     },
     onSuccess: async () => {
-      setReason("");
+      setReason('');
       setConfirmDecision(null);
       setSelectedId(null);
       await queryClient.invalidateQueries({
-        queryKey: ["principal-approval-centre"],
+        queryKey: ['principal-approval-centre'],
       });
       await queryClient.invalidateQueries({
-        queryKey: ["operational-dashboard-summary"],
+        queryKey: ['operational-dashboard-summary'],
       });
     },
   });
 
-  if (access.resolution === "loading") {
+  if (access.resolution === 'loading') {
     return <LoadingState variant="page" label="Checking approval access…" />;
   }
   if (!isPrincipal || !canRead) {
@@ -119,7 +119,7 @@ export default function PrincipalApprovalCentrePage() {
         <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           <SectionCard
             title="Waiting for your decision"
-            description={`${reviewable.length} loaded request${reviewable.length === 1 ? "" : "s"} assigned to your current role, permission, or delegation.`}
+            description={`${reviewable.length} loaded request${reviewable.length === 1 ? '' : 's'} assigned to your current role, permission, or delegation.`}
           >
             <div className="space-y-2">
               {reviewable.map((request) => {
@@ -130,14 +130,14 @@ export default function PrincipalApprovalCentrePage() {
                     type="button"
                     onClick={() => {
                       setSelectedId(request.id);
-                      setReason("");
+                      setReason('');
                       setConfirmDecision(null);
                       decisionMutation.reset();
                     }}
                     className={`w-full rounded-xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 ${
                       active
-                        ? "border-[var(--primary)] bg-[var(--primary-soft)]/35"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                        ? 'border-[var(--primary)] bg-[var(--primary-soft)]/35'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -146,7 +146,8 @@ export default function PrincipalApprovalCentrePage() {
                           {request.title}
                         </p>
                         <p className="mt-1 text-xs font-medium text-slate-600">
-                          {workflowLabel(request.workflowType)} · {moduleLabel(request.targetModule)}
+                          {workflowLabel(request.workflowType)} ·{' '}
+                          {moduleLabel(request.targetModule)}
                         </p>
                       </div>
                       <span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-amber-700">
@@ -213,7 +214,7 @@ export default function PrincipalApprovalCentrePage() {
                       value={
                         selected.deadlineAt
                           ? formatBsDateTime(selected.deadlineAt)
-                          : "No deadline set"
+                          : 'No deadline set'
                       }
                     />
                   </dl>
@@ -229,7 +230,8 @@ export default function PrincipalApprovalCentrePage() {
                     Decision note
                   </label>
                   <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Required when rejecting. Add a short reason for approvals when it helps the audit trail.
+                    Required when rejecting. Add a short reason for approvals
+                    when it helps the audit trail.
                   </p>
                   <textarea
                     id="approval-reason"
@@ -247,16 +249,16 @@ export default function PrincipalApprovalCentrePage() {
                     className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800"
                     role="alert"
                   >
-                    {confirmDecision === "REJECT" && !reason.trim()
-                      ? "Enter a rejection reason before confirming."
-                      : "The decision could not be saved. Nothing was changed. Please retry."}
+                    {confirmDecision === 'REJECT' && !reason.trim()
+                      ? 'Enter a rejection reason before confirming.'
+                      : 'The decision could not be saved. Nothing was changed. Please retry.'}
                   </div>
                 ) : null}
 
                 {confirmDecision ? (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-start gap-3">
-                      {confirmDecision === "APPROVE" ? (
+                      {confirmDecision === 'APPROVE' ? (
                         <CheckCircle2
                           className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700"
                           aria-hidden="true"
@@ -269,10 +271,14 @@ export default function PrincipalApprovalCentrePage() {
                       )}
                       <div>
                         <p className="font-bold text-slate-950">
-                          Confirm {confirmDecision === "APPROVE" ? "approval" : "rejection"}
+                          Confirm{' '}
+                          {confirmDecision === 'APPROVE'
+                            ? 'approval'
+                            : 'rejection'}
                         </p>
                         <p className="mt-1 text-sm leading-5 text-slate-600">
-                          This creates an audited decision and may immediately apply the module&apos;s registered final action.
+                          This creates an audited decision and may immediately
+                          apply the module&apos;s registered final action.
                         </p>
                       </div>
                     </div>
@@ -290,17 +296,20 @@ export default function PrincipalApprovalCentrePage() {
                       <Button
                         type="button"
                         variant={
-                          confirmDecision === "REJECT"
-                            ? "destructive"
-                            : "default"
+                          confirmDecision === 'REJECT'
+                            ? 'destructive'
+                            : 'default'
                         }
                         isLoading={decisionMutation.isPending}
                         disabled={
-                          confirmDecision === "REJECT" && !reason.trim()
+                          confirmDecision === 'REJECT' && !reason.trim()
                         }
                         onClick={() => decisionMutation.mutate(confirmDecision)}
                       >
-                        Confirm {confirmDecision === "APPROVE" ? "approval" : "rejection"}
+                        Confirm{' '}
+                        {confirmDecision === 'APPROVE'
+                          ? 'approval'
+                          : 'rejection'}
                       </Button>
                     </div>
                   </div>
@@ -311,7 +320,7 @@ export default function PrincipalApprovalCentrePage() {
                       variant="outline"
                       onClick={() => {
                         decisionMutation.reset();
-                        setConfirmDecision("REJECT");
+                        setConfirmDecision('REJECT');
                       }}
                     >
                       Reject
@@ -320,7 +329,7 @@ export default function PrincipalApprovalCentrePage() {
                       type="button"
                       onClick={() => {
                         decisionMutation.reset();
-                        setConfirmDecision("APPROVE");
+                        setConfirmDecision('APPROVE');
                       }}
                     >
                       <ShieldCheck
@@ -332,7 +341,8 @@ export default function PrincipalApprovalCentrePage() {
                   </div>
                 ) : (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                    You can review this request, but your current access does not allow decisions.
+                    You can review this request, but your current access does
+                    not allow decisions.
                   </div>
                 )}
               </div>
@@ -348,9 +358,9 @@ function SafeContext({ context }: { context: Record<string, unknown> | null }) {
   const entries = Object.entries(context ?? {}).filter(
     ([, value]) =>
       value === null ||
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean",
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean',
   );
   if (!entries.length) {
     return (
@@ -371,7 +381,7 @@ function SafeContext({ context }: { context: Record<string, unknown> | null }) {
           <ReviewFact
             key={key}
             label={humanize(key)}
-            value={String(value ?? "Not provided")}
+            value={String(value ?? 'Not provided')}
           />
         ))}
       </dl>
@@ -392,41 +402,41 @@ function ReviewFact({ label, value }: { label: string; value: string }) {
 
 function workflowLabel(value: string) {
   const labels: Record<string, string> = {
-    FEE_REVERSAL_REFUND: "Fee reversal or refund",
-    SCHOLARSHIP_DISCOUNT: "Scholarship or discount",
-    MARKS_CORRECTION: "Marks correction",
-    ATTENDANCE_CORRECTION: "Attendance correction",
-    LEAVE_REQUEST: "Leave request",
-    PAYROLL_POSTING_REVERSAL: "Payroll posting or reversal",
-    STUDENT_TRANSFER_WITHDRAWAL: "Student transfer or withdrawal",
-    DOCUMENT_DELETION_ARCHIVE: "Document deletion or archive",
-    EMERGENCY_HIGH_IMPACT_NOTICE: "High-impact notice",
-    PLATFORM_SUPPORT_OVERRIDE: "Platform support override",
-    ADMISSION_CASE: "Admission case",
-    FISCAL_PERIOD_REOPEN: "Fiscal period reopen",
+    FEE_REVERSAL_REFUND: 'Fee reversal or refund',
+    SCHOLARSHIP_DISCOUNT: 'Scholarship or discount',
+    MARKS_CORRECTION: 'Marks correction',
+    ATTENDANCE_CORRECTION: 'Attendance correction',
+    LEAVE_REQUEST: 'Leave request',
+    PAYROLL_POSTING_REVERSAL: 'Payroll posting or reversal',
+    STUDENT_TRANSFER_WITHDRAWAL: 'Student transfer or withdrawal',
+    DOCUMENT_DELETION_ARCHIVE: 'Document deletion or archive',
+    EMERGENCY_HIGH_IMPACT_NOTICE: 'High-impact notice',
+    PLATFORM_SUPPORT_OVERRIDE: 'Platform support override',
+    ADMISSION_CASE: 'Admission case',
+    FISCAL_PERIOD_REOPEN: 'Fiscal period reopen',
   };
   return labels[value] ?? humanize(value);
 }
 
 function moduleLabel(value: string) {
   const labels: Record<string, string> = {
-    attendance: "Attendance",
-    academics: "Academics",
-    fees: "Fees & receipts",
-    finance: "Finance",
-    hr: "Staff & HR",
-    payroll: "Payroll",
-    admissions: "Admissions",
-    students: "Students",
-    notices: "Notices",
-    communications: "Communication",
-    accounting: "Accounting",
+    attendance: 'Attendance',
+    academics: 'Academics',
+    fees: 'Fees & receipts',
+    finance: 'Finance',
+    hr: 'Staff & HR',
+    payroll: 'Payroll',
+    admissions: 'Admissions',
+    students: 'Students',
+    notices: 'Notices',
+    communications: 'Communication',
+    accounting: 'Accounting',
   };
   return labels[value.toLowerCase()] ?? humanize(value);
 }
 
 function humanize(value: string) {
   return value
-    .replace(/[_:-]+/g, " ")
+    .replace(/[_:-]+/g, ' ')
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }

@@ -5,10 +5,7 @@ import { useState } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import {
-  showErrorFromUnknown,
-  showSuccess,
-} from '@/lib/toast';
+import { showErrorFromUnknown, showSuccess } from '@/lib/toast';
 
 export function NoticeApprovalDecisionPanel({
   noticeId,
@@ -38,7 +35,9 @@ export function NoticeApprovalDecisionPanel({
           : 'Notice rejected. The author can revise and resubmit.',
       );
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['notice-detail', noticeId] }),
+        queryClient.invalidateQueries({
+          queryKey: ['notice-detail', noticeId],
+        }),
         queryClient.invalidateQueries({ queryKey: ['notices'] }),
       ]);
     },
@@ -107,7 +106,8 @@ export function NoticeApprovalDecisionPanel({
         </label>
         {decisionMutation.isError ? (
           <p className="mt-2 text-sm text-danger-700">
-            Could not record the approval decision. Try again or contact support.
+            Could not record the approval decision. Try again or contact
+            support.
           </p>
         ) : null}
       </ConfirmDialog>

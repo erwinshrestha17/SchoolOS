@@ -25,13 +25,19 @@ export function ModuleOperationalSummary({
 
   if (summaryQuery.isLoading) return <OperationalSummaryLoading />;
   if (summaryQuery.isError) {
-    return <OperationalSummaryError onRetry={() => void summaryQuery.refetch()} />;
+    return (
+      <OperationalSummaryError onRetry={() => void summaryQuery.refetch()} />
+    );
   }
   if (!summaryQuery.data) return null;
 
   return (
     <div className="mb-6">
-      <OperationalSummaryPanel summary={summaryQuery.data} module={module} compact={compact} />
+      <OperationalSummaryPanel
+        summary={summaryQuery.data}
+        module={module}
+        compact={compact}
+      />
       <div className="mt-2 flex justify-end">
         <RefreshSummaryButton onClick={() => void summaryQuery.refetch()} />
       </div>

@@ -1,14 +1,17 @@
 export const ATTENDANCE_ROSTER_VERSION_PATTERN = /^[a-f0-9]{64}$/;
 
 export type AttendanceRosterReplayDecision =
-  | { allowed: true; mode: "current_roster" | "original_receipt" }
+  | { allowed: true; mode: 'current_roster' | 'original_receipt' }
   | {
       allowed: false;
-      reason: "missing_draft_version" | "current_roster_unavailable" | "roster_changed";
+      reason:
+        | 'missing_draft_version'
+        | 'current_roster_unavailable'
+        | 'roster_changed';
     };
 
 export function normalizeAttendanceRosterVersion(value: unknown) {
-  return typeof value === "string" &&
+  return typeof value === 'string' &&
     ATTENDANCE_ROSTER_VERSION_PATTERN.test(value)
     ? value
     : null;
@@ -26,26 +29,26 @@ export function decideAttendanceRosterReplay(input: {
   isProtectedReceiptReplay: boolean;
 }): AttendanceRosterReplayDecision {
   if (input.isProtectedReceiptReplay) {
-    return { allowed: true, mode: "original_receipt" };
+    return { allowed: true, mode: 'original_receipt' };
   }
 
   const draftRosterVersion = normalizeAttendanceRosterVersion(
     input.draftRosterVersion,
   );
   if (!draftRosterVersion) {
-    return { allowed: false, reason: "missing_draft_version" };
+    return { allowed: false, reason: 'missing_draft_version' };
   }
 
   const currentRosterVersion = normalizeAttendanceRosterVersion(
     input.currentRosterVersion,
   );
   if (!currentRosterVersion) {
-    return { allowed: false, reason: "current_roster_unavailable" };
+    return { allowed: false, reason: 'current_roster_unavailable' };
   }
 
   if (draftRosterVersion !== currentRosterVersion) {
-    return { allowed: false, reason: "roster_changed" };
+    return { allowed: false, reason: 'roster_changed' };
   }
 
-  return { allowed: true, mode: "current_roster" };
+  return { allowed: true, mode: 'current_roster' };
 }

@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useQuery } from "@tanstack/react-query";
-import { FileText, X } from "lucide-react";
-import { api } from "../../lib/api";
-import { LoadingState } from "../ui/loading-state";
-import { Button } from "../ui/button";
-import { formatBsDate } from "@schoolos/core";
+import { useQuery } from '@tanstack/react-query';
+import { FileText, X } from 'lucide-react';
+import { api } from '../../lib/api';
+import { LoadingState } from '../ui/loading-state';
+import { Button } from '../ui/button';
+import { formatBsDate } from '@schoolos/core';
 
 interface JournalEntryDialogProps {
   id: string | null;
@@ -19,7 +19,7 @@ export function JournalEntryDialog({
   onOpenChange,
 }: JournalEntryDialogProps) {
   const { data: entry, isLoading } = useQuery({
-    queryKey: ["journal-entry", id],
+    queryKey: ['journal-entry', id],
     queryFn: () => (id ? api.getJournalEntry(id) : null),
     enabled: !!id && open,
   });
@@ -37,12 +37,12 @@ export function JournalEntryDialog({
               </div>
               {entry?.entryNumber
                 ? `Entry ${entry.entryNumber}`
-                : "Loading entry"}
+                : 'Loading entry'}
             </h3>
             <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mt-2 ml-[3.25rem]">
               {entry
                 ? `Recorded on ${formatBsDate(entry.entryDate)}`
-                : "Loading ledger details"}
+                : 'Loading ledger details'}
             </p>
           </div>
           <Button
@@ -79,9 +79,9 @@ export function JournalEntryDialog({
                     Source
                   </span>
                   <span className="font-bold text-[var(--color-mod-accounting-text)]">
-                    {entry.sourceType}{" "}
+                    {entry.sourceType}{' '}
                     <span className="text-[10px] opacity-70">
-                      #{entry.sourceId || "Source ID not set"}
+                      #{entry.sourceId || 'Source ID not set'}
                     </span>
                   </span>
                 </p>
@@ -117,18 +117,18 @@ export function JournalEntryDialog({
                           </p>
                         </td>
                         <td className="px-6 py-4 text-right font-black text-slate-900 tabular-nums">
-                          {line.side === "DEBIT"
+                          {line.side === 'DEBIT'
                             ? Number(line.amount).toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
                               })
-                            : "-"}
+                            : '-'}
                         </td>
                         <td className="px-6 py-4 text-right font-black text-slate-900 tabular-nums">
-                          {line.side === "CREDIT"
+                          {line.side === 'CREDIT'
                             ? Number(line.amount).toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
                               })
-                            : "-"}
+                            : '-'}
                         </td>
                       </tr>
                     ))}

@@ -1,31 +1,31 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { api } from "../../lib/api";
-import { SectionCard } from "../ui/section-card";
-import { ReportTable } from "./report-table";
-import { Select } from "../ui/select";
-import { Search, History, Eye, FileSpreadsheet } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
-import { EmptyState } from "../ui/empty-state";
-import { LoadingState } from "../ui/loading-state";
-import { Button } from "@/components/ui/button";
-import { formatBsDateTime } from "@schoolos/core";
-import type { FinancialAuditLogSummary } from "@schoolos/core";
+import { useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { api } from '../../lib/api';
+import { SectionCard } from '../ui/section-card';
+import { ReportTable } from './report-table';
+import { Select } from '../ui/select';
+import { Search, History, Eye, FileSpreadsheet } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { EmptyState } from '../ui/empty-state';
+import { LoadingState } from '../ui/loading-state';
+import { Button } from '@/components/ui/button';
+import { formatBsDateTime } from '@schoolos/core';
+import type { FinancialAuditLogSummary } from '@schoolos/core';
 
 export function AccountingAuditWorkspace() {
-  const [resourceFilter, setResourceFilter] = useState<string>("");
-  const [actionFilter, setActionFilter] = useState<string>("");
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
+  const [resourceFilter, setResourceFilter] = useState<string>('');
+  const [actionFilter, setActionFilter] = useState<string>('');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
   const [page, setPage] = useState(1);
   const [selectedLog, setSelectedLog] =
     useState<FinancialAuditLogSummary | null>(null);
 
   const query = useQuery({
     queryKey: [
-      "financial-audit-trail",
+      'financial-audit-trail',
       resourceFilter,
       actionFilter,
       fromDate,
@@ -45,8 +45,8 @@ export function AccountingAuditWorkspace() {
 
   const exportMutation = useMutation({
     mutationFn: () =>
-      api.exportReport("financial-audit-trail-report", {
-        format: "csv",
+      api.exportReport('financial-audit-trail-report', {
+        format: 'csv',
         filters: {
           resource: resourceFilter || undefined,
           action: actionFilter || undefined,
@@ -60,7 +60,7 @@ export function AccountingAuditWorkspace() {
   const activeFilterLabel =
     [resourceFilter || null, actionFilter || null]
       .filter(Boolean)
-      .join(" / ") || "All financial events";
+      .join(' / ') || 'All financial events';
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -76,7 +76,7 @@ export function AccountingAuditWorkspace() {
             className="bg-emerald-600 hover:bg-emerald-700"
           >
             <FileSpreadsheet size={16} />
-            {exportMutation.isPending ? "Exporting..." : "Export CSV"}
+            {exportMutation.isPending ? 'Exporting...' : 'Export CSV'}
           </Button>
         }
       >
@@ -179,11 +179,11 @@ export function AccountingAuditWorkspace() {
           <div className="space-y-4">
             <ReportTable
               columns={[
-                { id: "createdAt", label: "Timestamp", width: 180 },
-                { id: "action", label: "Action" },
-                { id: "resource", label: "Resource", width: 220 },
-                { id: "actorId", label: "Actor ID", width: 200 },
-                { id: "details", label: "Details", width: 120 },
+                { id: 'createdAt', label: 'Timestamp', width: 180 },
+                { id: 'action', label: 'Action' },
+                { id: 'resource', label: 'Resource', width: 220 },
+                { id: 'actorId', label: 'Actor ID', width: 200 },
+                { id: 'details', label: 'Details', width: 120 },
               ]}
               rows={(query.data?.items ?? []).map((log) => ({
                 id: log.id,
@@ -195,16 +195,16 @@ export function AccountingAuditWorkspace() {
                     value: log.action.toUpperCase(),
                     bold: true,
                     className:
-                      log.action === "create"
-                        ? "text-emerald-600"
-                        : log.action === "delete"
-                          ? "text-rose-600"
-                          : "text-[var(--color-mod-accounting-accent)]",
+                      log.action === 'create'
+                        ? 'text-emerald-600'
+                        : log.action === 'delete'
+                          ? 'text-rose-600'
+                          : 'text-[var(--color-mod-accounting-accent)]',
                   },
                   resource: {
-                    value: `${log.resource} (${log.resourceId || "Resource ID not recorded"})`,
+                    value: `${log.resource} (${log.resourceId || 'Resource ID not recorded'})`,
                   },
-                  actorId: { value: log.userId || "System actor" },
+                  actorId: { value: log.userId || 'System actor' },
                   details: {
                     value: (
                       <Button
@@ -222,7 +222,10 @@ export function AccountingAuditWorkspace() {
               }))}
               pagination={{
                 page,
-                totalPages: Math.max(1, Math.ceil((query.data?.total ?? 0) / 50)),
+                totalPages: Math.max(
+                  1,
+                  Math.ceil((query.data?.total ?? 0) / 50),
+                ),
                 totalRows: query.data?.total ?? 0,
                 onPageChange: setPage,
               }}
@@ -249,11 +252,11 @@ export function AccountingAuditWorkspace() {
                 />
                 <AuditDetailField
                   label="Resource ID"
-                  value={selectedLog.resourceId || "Resource ID not recorded"}
+                  value={selectedLog.resourceId || 'Resource ID not recorded'}
                 />
                 <AuditDetailField
                   label="Actor ID"
-                  value={selectedLog.userId || "System actor"}
+                  value={selectedLog.userId || 'System actor'}
                 />
                 <AuditDetailField
                   label="Timestamp"
@@ -261,7 +264,7 @@ export function AccountingAuditWorkspace() {
                 />
                 <AuditDetailField
                   label="Tenant scope"
-                  value={selectedLog.tenantId || "Tenant scope not recorded"}
+                  value={selectedLog.tenantId || 'Tenant scope not recorded'}
                 />
               </div>
 
@@ -274,7 +277,7 @@ export function AccountingAuditWorkspace() {
                     <pre>
                       {selectedLog.before
                         ? JSON.stringify(selectedLog.before, null, 2)
-                        : "No previous value recorded"}
+                        : 'No previous value recorded'}
                     </pre>
                   </div>
                 </div>
@@ -286,7 +289,7 @@ export function AccountingAuditWorkspace() {
                     <pre>
                       {selectedLog.after
                         ? JSON.stringify(selectedLog.after, null, 2)
-                        : "No updated value recorded"}
+                        : 'No updated value recorded'}
                     </pre>
                   </div>
                 </div>

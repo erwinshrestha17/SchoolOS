@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
 import type {
   PayrollExceptionSeverity,
   PayrollExceptionStatus,
   PayrollExceptionSummary,
-} from "@schoolos/core";
-import { getNepalNow } from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+} from '@schoolos/core';
+import { getNepalNow } from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   BadgeCheck,
@@ -15,10 +15,10 @@ import {
   Info,
   RefreshCcw,
   Search,
-} from "lucide-react";
-import Link from "next/link";
-import { FormEvent, useState } from "react";
-import { Button } from "../../../../components/ui/button";
+} from 'lucide-react';
+import Link from 'next/link';
+import { FormEvent, useState } from 'react';
+import { Button } from '../../../../components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -26,27 +26,27 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../../../../components/ui/dialog";
-import { EmptyState } from "../../../../components/ui/empty-state";
-import { ErrorState } from "../../../../components/ui/error-state";
-import { Input } from "../../../../components/ui/input";
-import { KpiCard, KpiGrid } from "../../../../components/ui/kpi-card";
-import { LoadingState } from "../../../../components/ui/loading-state";
-import { Select } from "../../../../components/ui/select";
-import { StatusBadge } from "../../../../components/ui/status-badge";
-import { TablePagination } from "../../../../components/ui/table-pagination";
-import { usePayrollCapabilities } from "../../../../lib/permissions-ui";
-import { api } from "../../../../lib/api";
+} from '../../../../components/ui/dialog';
+import { EmptyState } from '../../../../components/ui/empty-state';
+import { ErrorState } from '../../../../components/ui/error-state';
+import { Input } from '../../../../components/ui/input';
+import { KpiCard, KpiGrid } from '../../../../components/ui/kpi-card';
+import { LoadingState } from '../../../../components/ui/loading-state';
+import { Select } from '../../../../components/ui/select';
+import { StatusBadge } from '../../../../components/ui/status-badge';
+import { TablePagination } from '../../../../components/ui/table-pagination';
+import { usePayrollCapabilities } from '../../../../lib/permissions-ui';
+import { api } from '../../../../lib/api';
 
 const PAGE_SIZE = 25;
 
 const severityTone: Record<
   PayrollExceptionSeverity,
-  "rejected" | "partial" | "info"
+  'rejected' | 'partial' | 'info'
 > = {
-  BLOCKING: "rejected",
-  WARNING: "partial",
-  INFO: "info",
+  BLOCKING: 'rejected',
+  WARNING: 'partial',
+  INFO: 'info',
 };
 
 export default function PayrollReadinessPage() {
@@ -56,12 +56,12 @@ export default function PayrollReadinessPage() {
   const [year, setYear] = useState(initialPeriod.year);
   const [month, setMonth] = useState(initialPeriod.month);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [severity, setSeverity] = useState<PayrollExceptionSeverity | "">("");
-  const [status, setStatus] = useState<PayrollExceptionStatus | "">("");
+  const [search, setSearch] = useState('');
+  const [severity, setSeverity] = useState<PayrollExceptionSeverity | ''>('');
+  const [status, setStatus] = useState<PayrollExceptionStatus | ''>('');
   const [acknowledging, setAcknowledging] =
     useState<PayrollExceptionSummary | null>(null);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState('');
 
   const params = {
     year,
@@ -73,19 +73,19 @@ export default function PayrollReadinessPage() {
     status: status || undefined,
   };
   const query = useQuery({
-    queryKey: ["payroll-exceptions", params],
+    queryKey: ['payroll-exceptions', params],
     queryFn: () => api.listPayrollExceptions(params),
     enabled:
-      payrollCaps.resolution === "granted" &&
+      payrollCaps.resolution === 'granted' &&
       (payrollCaps.canReview || payrollCaps.canView),
   });
   const canReview = payrollCaps.canReview;
   const recheckMutation = useMutation({
     mutationFn: () => api.recheckPayrollReadiness({ year, month }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["payroll-exceptions"] });
+      await queryClient.invalidateQueries({ queryKey: ['payroll-exceptions'] });
       await queryClient.invalidateQueries({
-        queryKey: ["payroll-dashboard-summary"],
+        queryKey: ['payroll-dashboard-summary'],
       });
     },
   });
@@ -94,10 +94,10 @@ export default function PayrollReadinessPage() {
       api.acknowledgePayrollException(input.id, input.reason),
     onSuccess: async () => {
       setAcknowledging(null);
-      setReason("");
-      await queryClient.invalidateQueries({ queryKey: ["payroll-exceptions"] });
+      setReason('');
+      await queryClient.invalidateQueries({ queryKey: ['payroll-exceptions'] });
       await queryClient.invalidateQueries({
-        queryKey: ["payroll-dashboard-summary"],
+        queryKey: ['payroll-dashboard-summary'],
       });
     },
   });
@@ -189,7 +189,7 @@ export default function PayrollReadinessPage() {
             className="mt-1"
             value={severity}
             onChange={(event) => {
-              setSeverity(event.target.value as PayrollExceptionSeverity | "");
+              setSeverity(event.target.value as PayrollExceptionSeverity | '');
               setPage(1);
             }}
           >
@@ -205,7 +205,7 @@ export default function PayrollReadinessPage() {
             className="mt-1"
             value={status}
             onChange={(event) => {
-              setStatus(event.target.value as PayrollExceptionStatus | "");
+              setStatus(event.target.value as PayrollExceptionStatus | '');
               setPage(1);
             }}
           >
@@ -233,22 +233,23 @@ export default function PayrollReadinessPage() {
           title="Readiness"
           value={
             query.isError
-              ? "Unavailable"
-              : (readiness?.readinessStatus.replaceAll("_", " ") ?? "Unavailable")
+              ? 'Unavailable'
+              : (readiness?.readinessStatus.replaceAll('_', ' ') ??
+                'Unavailable')
           }
           icon={<BadgeCheck className="h-5 w-5" />}
           loading={query.isLoading}
-          tone={readiness?.readinessStatus === "READY" ? "success" : "warning"}
+          tone={readiness?.readinessStatus === 'READY' ? 'success' : 'warning'}
           description={
             readiness?.stale
-              ? "Source data needs recheck"
-              : "Calculated from the current payroll records"
+              ? 'Source data needs recheck'
+              : 'Calculated from the current payroll records'
           }
         />
         <KpiCard
           title="Staff considered"
           value={
-            query.isError ? "Unavailable" : (readiness?.staffConsidered ?? 0)
+            query.isError ? 'Unavailable' : (readiness?.staffConsidered ?? 0)
           }
           icon={<BadgeCheck className="h-5 w-5" />}
           loading={query.isLoading}
@@ -259,33 +260,33 @@ export default function PayrollReadinessPage() {
           title="Blocking"
           value={
             query.isError
-              ? "Unavailable"
+              ? 'Unavailable'
               : (readiness?.blockingExceptionCount ?? 0)
           }
           icon={<CircleAlert className="h-5 w-5" />}
           loading={query.isLoading}
           tone={
-            (readiness?.blockingExceptionCount ?? 0) > 0 ? "danger" : "success"
+            (readiness?.blockingExceptionCount ?? 0) > 0 ? 'danger' : 'success'
           }
           description="Must be fixed at the source"
         />
         <KpiCard
           title="Warnings"
-          value={query.isError ? "Unavailable" : (readiness?.warningCount ?? 0)}
+          value={query.isError ? 'Unavailable' : (readiness?.warningCount ?? 0)}
           icon={<AlertTriangle className="h-5 w-5" />}
           loading={query.isLoading}
-          tone={(readiness?.warningCount ?? 0) > 0 ? "warning" : "success"}
+          tone={(readiness?.warningCount ?? 0) > 0 ? 'warning' : 'success'}
           description="Open warnings need acknowledgement"
         />
         <KpiCard
           title="Information"
           value={
-            query.isError ? "Unavailable" : (readiness?.informationalCount ?? 0)
+            query.isError ? 'Unavailable' : (readiness?.informationalCount ?? 0)
           }
           icon={<Info className="h-5 w-5" />}
           loading={query.isLoading}
           tone="info"
-          description={`Next action: ${readiness?.allowedNextAction?.replaceAll("_", " ") ?? "Resolve blockers"}`}
+          description={`Next action: ${readiness?.allowedNextAction?.replaceAll('_', ' ') ?? 'Resolve blockers'}`}
         />
       </KpiGrid>
 
@@ -325,7 +326,7 @@ export default function PayrollReadinessPage() {
                       />
                       <StatusBadge status={exception.status} />
                       <span className="text-xs font-bold text-slate-400">
-                        {exception.code.replaceAll("_", " ")}
+                        {exception.code.replaceAll('_', ' ')}
                       </span>
                     </div>
                     <h3 className="mt-3 font-black text-slate-950">
@@ -336,21 +337,21 @@ export default function PayrollReadinessPage() {
                     </p>
                     <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
                       <span>
-                        Staff: {exception.staffName ?? "Run-level issue"}
+                        Staff: {exception.staffName ?? 'Run-level issue'}
                         {exception.employeeId
                           ? ` (${exception.employeeId})`
-                          : ""}
+                          : ''}
                       </span>
                       <span>
-                        Department: {exception.department ?? "Not assigned"}
+                        Department: {exception.department ?? 'Not assigned'}
                       </span>
                       <span>
-                        Blocks:{" "}
+                        Blocks:{' '}
                         {exception.blockedActions.length
                           ? exception.blockedActions
-                              .join(", ")
-                              .replaceAll("_", " ")
-                          : "No workflow action"}
+                              .join(', ')
+                              .replaceAll('_', ' ')
+                          : 'No workflow action'}
                       </span>
                     </div>
                     {exception.resolutionReason ? (
@@ -361,7 +362,7 @@ export default function PayrollReadinessPage() {
                   </div>
                   <div className="flex flex-wrap gap-2 lg:justify-end">
                     {exception.resolutionRoute &&
-                    exception.status !== "RESOLVED" ? (
+                    exception.status !== 'RESOLVED' ? (
                       <Link
                         href={exception.resolutionRoute}
                         className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)]"
@@ -370,8 +371,8 @@ export default function PayrollReadinessPage() {
                         <ExternalLink className="h-4 w-4" />
                       </Link>
                     ) : null}
-                    {exception.severity === "WARNING" &&
-                    exception.status === "OPEN" &&
+                    {exception.severity === 'WARNING' &&
+                    exception.status === 'OPEN' &&
                     canReview ? (
                       <Button
                         type="button"
@@ -406,7 +407,7 @@ export default function PayrollReadinessPage() {
         onOpenChange={(open: boolean) => {
           if (!open) {
             setAcknowledging(null);
-            setReason("");
+            setReason('');
           }
         }}
       >

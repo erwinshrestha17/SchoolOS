@@ -8,10 +8,13 @@ import { RemoteStaffSelector } from '../staff/remote-staff-selector';
 
 export function CentralDocumentsPanel() {
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-  const [selectedStaff, setSelectedStaff] =
-    useState<StaffLookupOption | null>(null);
-  const formatAssignedText = (value: string | null | undefined, fallback: string) =>
-    value?.trim() || fallback;
+  const [selectedStaff, setSelectedStaff] = useState<StaffLookupOption | null>(
+    null,
+  );
+  const formatAssignedText = (
+    value: string | null | undefined,
+    fallback: string,
+  ) => value?.trim() || fallback;
 
   return (
     <div className="space-y-6">
@@ -22,7 +25,9 @@ export function CentralDocumentsPanel() {
               <FileText size={18} className="text-[var(--color-mod-hr-text)]" />
               Staff Documents Hub
             </h3>
-            <p className="text-xs text-slate-500">Select a staff member to upload, verify, and manage their records.</p>
+            <p className="text-xs text-slate-500">
+              Select a staff member to upload, verify, and manage their records.
+            </p>
           </div>
           <div className="w-full sm:w-72">
             <RemoteStaffSelector
@@ -51,7 +56,16 @@ export function CentralDocumentsPanel() {
                 {selectedStaff?.fullName}
               </h4>
               <p className="text-xs text-slate-500">
-                {selectedStaff?.employeeId} &bull; {formatAssignedText(selectedStaff?.designation, 'Designation not set')} &bull; {formatAssignedText(selectedStaff?.department, 'Department not set')}
+                {selectedStaff?.employeeId} &bull;{' '}
+                {formatAssignedText(
+                  selectedStaff?.designation,
+                  'Designation not set',
+                )}{' '}
+                &bull;{' '}
+                {formatAssignedText(
+                  selectedStaff?.department,
+                  'Department not set',
+                )}
               </p>
             </div>
           </div>
@@ -63,7 +77,10 @@ export function CentralDocumentsPanel() {
             <User size={20} />
           </div>
           <p className="text-slate-900 font-bold">No Staff Selected</p>
-          <p className="text-slate-500 text-xs mt-1">Please select a staff member from the dropdown to manage their documents.</p>
+          <p className="text-slate-500 text-xs mt-1">
+            Please select a staff member from the dropdown to manage their
+            documents.
+          </p>
         </div>
       )}
     </div>

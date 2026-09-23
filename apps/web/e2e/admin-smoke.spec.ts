@@ -29,8 +29,10 @@ test.describe.serial('SchoolOS Web Admin Smoke Tests', () => {
 
   test('Dashboard: Navigation and shell integrity', async ({ page }) => {
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByRole('heading', { name: /School Dashboard/i })).toBeVisible();
-    
+    await expect(
+      page.getByRole('heading', { name: /School Dashboard/i }),
+    ).toBeVisible();
+
     // Verify sidebar navigation to refactored modules
     const navItems = [
       { name: /Students/i, url: /\/students/ },
@@ -46,59 +48,92 @@ test.describe.serial('SchoolOS Web Admin Smoke Tests', () => {
     }
   });
 
-  test('Finance: Collection counter and invoice selection', async ({ page }) => {
+  test('Finance: Collection counter and invoice selection', async ({
+    page,
+  }) => {
     await page.goto('/dashboard/fees/collect');
-    await expect(page.getByRole('heading', { name: /Collect payment/i })).toBeVisible();
-    
+    await expect(
+      page.getByRole('heading', { name: /Collect payment/i }),
+    ).toBeVisible();
+
     // Check for the polished search input
     const searchInput = page.getByPlaceholder(/Find student or invoice/i);
     await expect(searchInput).toBeVisible();
-    
+
     // Verify collection cards (assuming data exists)
-    await expect(page.getByText(/Student Discovery|Selected Student/i)).toBeVisible();
+    await expect(
+      page.getByText(/Student Discovery|Selected Student/i),
+    ).toBeVisible();
   });
 
   test('Attendance: Roster loading and interactions', async ({ page }) => {
     await page.goto('/dashboard/attendance');
-    await expect(page.getByRole('heading', { name: /^Attendance$/i })).toBeVisible();
-    
+    await expect(
+      page.getByRole('heading', { name: /^Attendance$/i }),
+    ).toBeVisible();
+
     // Verify section header
-    await expect(page.getByText(/Record daily student presence/i)).toBeVisible();
-    
+    await expect(
+      page.getByText(/Record daily student presence/i),
+    ).toBeVisible();
+
     // Verify that class selection triggers roster load
     await page.getByLabel(/Class/i).selectOption({ index: 1 });
     // Assuming some data loads or empty state shows
-    await expect(page.getByTestId('attendance-roster') || page.getByText(/No students found/i)).toBeVisible();
+    await expect(
+      page.getByTestId('attendance-roster') ||
+        page.getByText(/No students found/i),
+    ).toBeVisible();
   });
 
   test('Communications: Multi-tab form interactions', async ({ page }) => {
     await page.goto('/dashboard/notices');
-    await expect(page.getByRole('heading', { name: /Notice Center/i })).toBeVisible();
-    
+    await expect(
+      page.getByRole('heading', { name: /Notice Center/i }),
+    ).toBeVisible();
+
     // Test Tab Switching
-    const tabs = ['Events', 'Delivery Records', 'Consent Management', 'Notices'];
+    const tabs = [
+      'Events',
+      'Delivery Records',
+      'Consent Management',
+      'Notices',
+    ];
     for (const tab of tabs) {
       await page.getByRole('button', { name: tab, exact: true }).click();
       // Verify specific header content per tab
       if (tab === 'Events') {
-        await expect(page.getByRole('heading', { name: /Event Publisher/i })).toBeVisible();
+        await expect(
+          page.getByRole('heading', { name: /Event Publisher/i }),
+        ).toBeVisible();
       } else if (tab === 'Delivery Records') {
-        await expect(page.getByRole('heading', { name: /Delivery Records/i })).toBeVisible();
+        await expect(
+          page.getByRole('heading', { name: /Delivery Records/i }),
+        ).toBeVisible();
       } else if (tab === 'Consent Management') {
-        await expect(page.getByRole('heading', { name: /Consent Management/i })).toBeVisible();
+        await expect(
+          page.getByRole('heading', { name: /Consent Management/i }),
+        ).toBeVisible();
       }
     }
   });
 
   test('HR: Staff directory and card layouts', async ({ page }) => {
     await page.goto('/dashboard/payroll');
-    await expect(page.getByRole('heading', { name: /HR & Payroll/i })).toBeVisible();
-    
+    await expect(
+      page.getByRole('heading', { name: /HR & Payroll/i }),
+    ).toBeVisible();
+
     await page.getByRole('button', { name: /Staff Directory/i }).click();
-    await expect(page.getByRole('heading', { name: /Staff Directory/i })).toBeVisible();
-    
+    await expect(
+      page.getByRole('heading', { name: /Staff Directory/i }),
+    ).toBeVisible();
+
     // Check for stylized staff cards (assuming data exists)
-    await expect(page.getByText(/Active Staff Members/i) || page.getByText(/No staff records/i)).toBeVisible();
+    await expect(
+      page.getByText(/Active Staff Members/i) ||
+        page.getByText(/No staff records/i),
+    ).toBeVisible();
   });
 });
 

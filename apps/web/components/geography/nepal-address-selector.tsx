@@ -100,15 +100,18 @@ export function NepalAddressSelector({
   });
 
   const provinceOptions = useMemo(
-    () => (provincesQuery.data ?? []).map((p) => ({ id: p.id, label: p.label })),
+    () =>
+      (provincesQuery.data ?? []).map((p) => ({ id: p.id, label: p.label })),
     [provincesQuery.data],
   );
   const districtOptions = useMemo(
-    () => (districtsQuery.data ?? []).map((d) => ({ id: d.id, label: d.label })),
+    () =>
+      (districtsQuery.data ?? []).map((d) => ({ id: d.id, label: d.label })),
     [districtsQuery.data],
   );
   const localLevelOptions = useMemo(
-    () => (localLevelsQuery.data ?? []).map((l) => ({ id: l.id, label: l.label })),
+    () =>
+      (localLevelsQuery.data ?? []).map((l) => ({ id: l.id, label: l.label })),
     [localLevelsQuery.data],
   );
 
@@ -133,7 +136,11 @@ export function NepalAddressSelector({
     <div className={cn('space-y-4', className)}>
       <div className="flex items-center justify-end gap-1 text-xs font-semibold text-slate-500">
         <span id={`${idPrefix}-locale-label`}>Labels:</span>
-        <div role="group" aria-labelledby={`${idPrefix}-locale-label`} className="flex overflow-hidden rounded-lg border border-slate-200">
+        <div
+          role="group"
+          aria-labelledby={`${idPrefix}-locale-label`}
+          className="flex overflow-hidden rounded-lg border border-slate-200"
+        >
           {(['en', 'ne'] as const).map((option) => (
             <button
               key={option}
@@ -175,7 +182,9 @@ export function NepalAddressSelector({
           options={districtOptions}
           selectedId={districtId}
           onSelect={handleDistrictChange}
-          placeholder={provinceId == null ? 'Select province first' : 'Select district'}
+          placeholder={
+            provinceId == null ? 'Select province first' : 'Select district'
+          }
           emptyMessage="No districts found"
         />
         <GeoCombobox
@@ -187,14 +196,19 @@ export function NepalAddressSelector({
           options={localLevelOptions}
           selectedId={localLevelId}
           onSelect={handleLocalLevelChange}
-          placeholder={districtId == null ? 'Select district first' : 'Select local level'}
+          placeholder={
+            districtId == null ? 'Select district first' : 'Select local level'
+          }
           emptyMessage="No local levels found"
         />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <label htmlFor={`${idPrefix}-ward`} className="text-sm font-semibold text-slate-700">
+          <label
+            htmlFor={`${idPrefix}-ward`}
+            className="text-sm font-semibold text-slate-700"
+          >
             Ward Number
           </label>
           <input
@@ -209,7 +223,10 @@ export function NepalAddressSelector({
           />
         </div>
         <div className="space-y-1.5">
-          <label htmlFor={`${idPrefix}-tole`} className="text-sm font-semibold text-slate-700">
+          <label
+            htmlFor={`${idPrefix}-tole`}
+            className="text-sm font-semibold text-slate-700"
+          >
             Tole / Locality
           </label>
           <input
@@ -223,7 +240,10 @@ export function NepalAddressSelector({
           />
         </div>
         <div className="space-y-1.5">
-          <label htmlFor={`${idPrefix}-street`} className="text-sm font-semibold text-slate-700">
+          <label
+            htmlFor={`${idPrefix}-street`}
+            className="text-sm font-semibold text-slate-700"
+          >
             Street Address
           </label>
           <input
@@ -231,12 +251,17 @@ export function NepalAddressSelector({
             type="text"
             disabled={disabled}
             value={value.streetAddress ?? ''}
-            onChange={(e) => onChange({ ...value, streetAddress: e.target.value })}
+            onChange={(e) =>
+              onChange({ ...value, streetAddress: e.target.value })
+            }
             className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary-soft)]"
           />
         </div>
         <div className="space-y-1.5">
-          <label htmlFor={`${idPrefix}-landmark`} className="text-sm font-semibold text-slate-700">
+          <label
+            htmlFor={`${idPrefix}-landmark`}
+            className="text-sm font-semibold text-slate-700"
+          >
             Landmark
           </label>
           <input

@@ -25,16 +25,18 @@ test.describe.serial('M8 Library circulation lifecycle', () => {
     ).toBeVisible();
 
     await page
-      .getByRole('button', { name: 'Search available barcode or book title...' })
+      .getByRole('button', {
+        name: 'Search available barcode or book title...',
+      })
       .click();
-    await page.getByPlaceholder('Search catalogue...').fill(FIXTURE_COPY_BARCODE);
+    await page
+      .getByPlaceholder('Search catalogue...')
+      .fill(FIXTURE_COPY_BARCODE);
     await page
       .getByRole('button', { name: FIXTURE_BOOK_TITLE, exact: false })
       .click();
 
-    await page
-      .getByRole('button', { name: 'Search by name or ID...' })
-      .click();
+    await page.getByRole('button', { name: 'Search by name or ID...' }).click();
     await page.getByPlaceholder('Type to search...').fill('Ashika');
     await page
       .getByRole('button', { name: FIXTURE_STUDENT_NAME, exact: false })
@@ -80,7 +82,9 @@ test.describe.serial('M8 Library circulation lifecycle', () => {
       .filter({ hasText: FIXTURE_STUDENT_NAME })
       .filter({ has: page.getByRole('button', { name: 'Return Copy' }) })
       .last();
-    await expect(issueRow.getByRole('button', { name: /Return Copy/i })).toBeVisible();
+    await expect(
+      issueRow.getByRole('button', { name: /Return Copy/i }),
+    ).toBeVisible();
     await issueRow.getByRole('button', { name: /Return Copy/i }).click();
 
     await Promise.all([

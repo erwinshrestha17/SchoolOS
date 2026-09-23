@@ -1,13 +1,13 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { describe, it } from "node:test";
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { describe, it } from 'node:test';
 
-const webRoot = new URL("../", import.meta.url);
-const read = (path) => readFileSync(new URL(path, webRoot), "utf8");
+const webRoot = new URL('../', import.meta.url);
+const read = (path) => readFileSync(new URL(path, webRoot), 'utf8');
 
-describe("M10 canteen route hardening", () => {
-  it("uses one shared shell with canonical task routes and stock terminology", () => {
-    const layout = read("app/dashboard/canteen/layout.tsx");
+describe('M10 canteen route hardening', () => {
+  it('uses one shared shell with canonical task routes and stock terminology', () => {
+    const layout = read('app/dashboard/canteen/layout.tsx');
 
     assert.match(layout, /DashboardPageShell/);
     assert.match(layout, /ModuleHeader/);
@@ -21,16 +21,16 @@ describe("M10 canteen route hardening", () => {
     );
 
     const routeSections = new Map([
-      ["page.tsx", "overview"],
-      ["menu/page.tsx", "menu"],
-      ["meal-plans/page.tsx", "plans"],
-      ["enrollments/page.tsx", "enrollments"],
-      ["serving/page.tsx", "serving"],
-      ["wallets/page.tsx", "wallets"],
-      ["pos/page.tsx", "pos"],
-      ["controls/page.tsx", "controls"],
-      ["stock/page.tsx", "stock"],
-      ["reports/page.tsx", "reports"],
+      ['page.tsx', 'overview'],
+      ['menu/page.tsx', 'menu'],
+      ['meal-plans/page.tsx', 'plans'],
+      ['enrollments/page.tsx', 'enrollments'],
+      ['serving/page.tsx', 'serving'],
+      ['wallets/page.tsx', 'wallets'],
+      ['pos/page.tsx', 'pos'],
+      ['controls/page.tsx', 'controls'],
+      ['stock/page.tsx', 'stock'],
+      ['reports/page.tsx', 'reports'],
     ]);
 
     for (const [route, section] of routeSections) {
@@ -42,8 +42,8 @@ describe("M10 canteen route hardening", () => {
     }
   });
 
-  it("keeps the URL authoritative and avoids unrelated route fetches", () => {
-    const workspace = read("components/canteen/canteen-workspace.tsx");
+  it('keeps the URL authoritative and avoids unrelated route fetches', () => {
+    const workspace = read('components/canteen/canteen-workspace.tsx');
 
     assert.match(
       workspace,
@@ -55,37 +55,37 @@ describe("M10 canteen route hardening", () => {
     );
     assert.match(
       workspace,
-      /enabled: canReadMenu && \(activeTab === "menu" \|\| activeTab === "pos"\)/,
+      /enabled: canReadMenu && \(activeTab === ['"]menu['"] \|\| activeTab === ['"]pos['"]\)/,
     );
     assert.match(
       workspace,
-      /enabled:\s*canReadPlans && \(activeTab === "plans" \|\| activeTab === "enrollments"\)/,
+      /enabled:\s*canReadPlans && \(activeTab === ['"]plans['"] \|\| activeTab === ['"]enrollments['"]\)/,
     );
     assert.match(
       workspace,
-      /enabled: canReadEnrollments && activeTab === "enrollments"/,
+      /enabled: canReadEnrollments && activeTab === ['"]enrollments['"]/,
     );
     assert.match(
       workspace,
-      /enabled:\s*canReadServings &&\s*\(activeTab === "overview" \|\| activeTab === "serving"\)/,
+      /enabled:\s*canReadServings &&\s*\(activeTab === ['"]overview['"] \|\| activeTab === ['"]serving['"]\)/,
     );
     assert.match(
       workspace,
-      /enabled: canReadPos && \(activeTab === "overview" \|\| activeTab === "pos"\)/,
+      /enabled: canReadPos && \(activeTab === ['"]overview['"] \|\| activeTab === ['"]pos['"]\)/,
     );
     assert.match(
       workspace,
-      /enabled: canReadReports && activeTab === "overview"/,
+      /enabled: canReadReports && activeTab === ['"]overview['"]/,
     );
     assert.match(
       workspace,
-      /enabled: canReadInventory && activeTab === "stock"/,
+      /enabled: canReadInventory && activeTab === ['"]stock['"]/,
     );
     assert.match(
       workspace,
-      /enabled: canReadReports && activeTab === "stock"/,
+      /enabled: canReadReports && activeTab === ['"]stock['"]/,
     );
-    assert.match(workspace, /activeTab === "stock"/);
+    assert.match(workspace, /activeTab === ['"]stock['"]/);
     assert.match(
       workspace,
       /const firstError = workspaceErrors\[activeTab\]\.find\(Boolean\)/,
@@ -93,29 +93,29 @@ describe("M10 canteen route hardening", () => {
     assert.match(workspace, /reports: \[\]/);
   });
 
-  it("physically isolates report state, queries, exports, and rendering", () => {
-    const workspace = read("components/canteen/canteen-workspace.tsx");
-    const reports = read("components/canteen/canteen-reports-workspace.tsx");
+  it('physically isolates report state, queries, exports, and rendering', () => {
+    const workspace = read('components/canteen/canteen-workspace.tsx');
+    const reports = read('components/canteen/canteen-reports-workspace.tsx');
 
     assert.match(
       workspace,
-      /activeTab === "reports" \? <CanteenReportsWorkspace \/>/,
+      /activeTab === ['"]reports['"] \? <CanteenReportsWorkspace \/>/,
     );
-    assert.match(workspace, /from "\.\/canteen-reports-workspace"/);
+    assert.match(workspace, /from ['"]\.\/canteen-reports-workspace['"]/);
     assert.doesNotMatch(workspace, /canteen-daily-meal-csv-export/);
     assert.doesNotMatch(workspace, /const mealCountQuery = useQuery/);
     assert.doesNotMatch(workspace, /const \[reportDate, setReportDate\]/);
 
     for (const marker of [
-      "reportDate",
-      "reportFrom",
-      "reportTo",
-      'queryKey: ["canteen-meal-count"',
-      'queryKey: ["canteen-item-sales"',
-      'queryKey: ["canteen-spending-summary"',
-      "canteen-daily-meal-csv-export",
-      "canteen-item-sales-csv-export",
-      "Canteen reports could not be fully loaded",
+      'reportDate',
+      'reportFrom',
+      'reportTo',
+      "queryKey: ['canteen-meal-count'",
+      "queryKey: ['canteen-item-sales'",
+      "queryKey: ['canteen-spending-summary'",
+      'canteen-daily-meal-csv-export',
+      'canteen-item-sales-csv-export',
+      'Canteen reports could not be fully loaded',
     ]) {
       assert.ok(
         reports.includes(marker),
@@ -124,40 +124,40 @@ describe("M10 canteen route hardening", () => {
     }
   });
 
-  it("uses remote student discovery without a full-school preload", () => {
-    const workspace = read("components/canteen/canteen-workspace.tsx");
+  it('uses remote student discovery without a full-school preload', () => {
+    const workspace = read('components/canteen/canteen-workspace.tsx');
 
     assert.equal((workspace.match(/<RemoteStudentSelector/g) ?? []).length, 5);
     assert.doesNotMatch(workspace, /listStudents\s*\(\s*\{\s*limit:\s*1000/);
     assert.doesNotMatch(workspace, /<StudentSelector/);
   });
 
-  it("redirects legacy route aliases to canonical destinations", () => {
+  it('redirects legacy route aliases to canonical destinations', () => {
     assert.match(
-      read("app/dashboard/canteen/inventory/page.tsx"),
-      /redirect\("\/dashboard\/canteen\/stock"\)/,
+      read('app/dashboard/canteen/inventory/page.tsx'),
+      /redirect\(['"]\/dashboard\/canteen\/stock['"]\)/,
     );
     assert.match(
-      read("app/dashboard/canteen/vendors/page.tsx"),
-      /redirect\("\/dashboard\/canteen\/stock"\)/,
+      read('app/dashboard/canteen/vendors/page.tsx'),
+      /redirect\(['"]\/dashboard\/canteen\/stock['"]\)/,
     );
     assert.match(
-      read("app/dashboard/canteen/plans/page.tsx"),
-      /redirect\("\/dashboard\/canteen\/meal-plans"\)/,
+      read('app/dashboard/canteen/plans/page.tsx'),
+      /redirect\(['"]\/dashboard\/canteen\/meal-plans['"]\)/,
     );
   });
 
-  it("preserves safety acknowledgements, corrections, and protected receipts", () => {
-    const workspace = read("components/canteen/canteen-workspace.tsx");
+  it('preserves safety acknowledgements, corrections, and protected receipts', () => {
+    const workspace = read('components/canteen/canteen-workspace.tsx');
 
     for (const marker of [
-      "servingAllergyAcknowledgementLabel",
-      "preventDuplicate: true",
-      "reverseWalletTransactionMutation",
-      "walletReversalReason",
-      "openPosReceiptPdf",
-      "Open invoice",
-      "accounting controls",
+      'servingAllergyAcknowledgementLabel',
+      'preventDuplicate: true',
+      'reverseWalletTransactionMutation',
+      'walletReversalReason',
+      'openPosReceiptPdf',
+      'Open invoice',
+      'accounting controls',
     ]) {
       assert.ok(
         workspace.includes(marker),

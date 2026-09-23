@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/dialog';
 import { Button } from '../ui/button';
 import { FormField, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
@@ -59,13 +65,20 @@ export function PayrollActionDialog({
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
-      void queryClient.invalidateQueries({ queryKey: ['payroll-run-detail', runId] });
-      void queryClient.invalidateQueries({ queryKey: ['payroll-dashboard-summary'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['payroll-run-detail', runId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['payroll-dashboard-summary'],
+      });
       onClose();
       setReason('');
     },
     onError: (error: any) => {
-      setToastError(error.message || `Failed to perform ${actionType.toLowerCase()} action.`);
+      setToastError(
+        error.message ||
+          `Failed to perform ${actionType.toLowerCase()} action.`,
+      );
     },
   });
 
@@ -75,8 +88,14 @@ export function PayrollActionDialog({
         return {
           title: 'Submit for Review',
           description: 'Submit this payroll run for administrative review.',
-          icon: <ShieldAlert size={20} className="text-[var(--color-mod-hr-text)]" />,
-          warning: 'This will lock the draft and alert reviewers. No direct edits are allowed during review.',
+          icon: (
+            <ShieldAlert
+              size={20}
+              className="text-[var(--color-mod-hr-text)]"
+            />
+          ),
+          warning:
+            'This will lock the draft and alert reviewers. No direct edits are allowed during review.',
           requiresReason: false,
           confirmText: 'Submit Review',
           confirmVariant: 'default' as const,
@@ -84,9 +103,11 @@ export function PayrollActionDialog({
       case 'APPROVE':
         return {
           title: 'Approve Payroll',
-          description: 'Approve this payroll run, finalising all earnings, deductions, and net payouts.',
+          description:
+            'Approve this payroll run, finalising all earnings, deductions, and net payouts.',
           icon: <ShieldCheck size={20} className="text-emerald-500" />,
-          warning: 'Approve locks the calculations. Approved runs are ready for M11 posting and payslip downloads. This action is irreversible.',
+          warning:
+            'Approve locks the calculations. Approved runs are ready for M11 posting and payslip downloads. This action is irreversible.',
           requiresReason: false,
           confirmText: 'Approve',
           confirmVariant: 'default' as const,
@@ -96,7 +117,12 @@ export function PayrollActionDialog({
           title: 'Complete Payroll Review',
           description:
             'Mark the administrative review complete and make this run eligible for approval.',
-          icon: <ShieldCheck size={20} className="text-[var(--color-mod-hr-text)]" />,
+          icon: (
+            <ShieldCheck
+              size={20}
+              className="text-[var(--color-mod-hr-text)]"
+            />
+          ),
           warning:
             'This does not approve or post payroll. A user with approval permission must still approve the reviewed run.',
           requiresReason: false,
@@ -120,7 +146,8 @@ export function PayrollActionDialog({
           title: 'Post to Accounting',
           description: 'Post this approved payroll run to M11 General Ledger.',
           icon: <Landmark size={20} className="text-purple-500" />,
-          warning: 'Posting generates the M11 payroll accrual journal entries. This action locks the run against deletions or changes.',
+          warning:
+            'Posting generates the M11 payroll accrual journal entries. This action locks the run against deletions or changes.',
           requiresReason: false,
           confirmText: 'Post to M11',
           confirmVariant: 'default' as const,
@@ -163,7 +190,8 @@ export function PayrollActionDialog({
               {config.title}
             </DialogTitle>
             <p className="text-xs text-slate-500 mt-1">
-              Run Period: <span className="font-semibold text-slate-800">{periodText}</span>
+              Run Period:{' '}
+              <span className="font-semibold text-slate-800">{periodText}</span>
             </p>
           </div>
           <button

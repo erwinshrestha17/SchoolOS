@@ -31,7 +31,12 @@ const sidePositionClasses: Record<TooltipSide, string> = {
  * icon-only controls stay accessible without a mouse, and links the trigger
  * via aria-describedby so screen readers announce it too.
  */
-export function Tooltip({ content, children, side = 'top', className }: TooltipProps) {
+export function Tooltip({
+  content,
+  children,
+  side = 'top',
+  className,
+}: TooltipProps) {
   const [visible, setVisible] = useState(false);
   const tooltipId = useId();
 
@@ -42,19 +47,27 @@ export function Tooltip({ content, children, side = 'top', className }: TooltipP
     {
       'aria-describedby': content ? tooltipId : undefined,
       onMouseEnter: (event: React.MouseEvent) => {
-        (children.props as { onMouseEnter?: (e: React.MouseEvent) => void }).onMouseEnter?.(event);
+        (
+          children.props as { onMouseEnter?: (e: React.MouseEvent) => void }
+        ).onMouseEnter?.(event);
         setVisible(true);
       },
       onMouseLeave: (event: React.MouseEvent) => {
-        (children.props as { onMouseLeave?: (e: React.MouseEvent) => void }).onMouseLeave?.(event);
+        (
+          children.props as { onMouseLeave?: (e: React.MouseEvent) => void }
+        ).onMouseLeave?.(event);
         setVisible(false);
       },
       onFocus: (event: React.FocusEvent) => {
-        (children.props as { onFocus?: (e: React.FocusEvent) => void }).onFocus?.(event);
+        (
+          children.props as { onFocus?: (e: React.FocusEvent) => void }
+        ).onFocus?.(event);
         setVisible(true);
       },
       onBlur: (event: React.FocusEvent) => {
-        (children.props as { onBlur?: (e: React.FocusEvent) => void }).onBlur?.(event);
+        (children.props as { onBlur?: (e: React.FocusEvent) => void }).onBlur?.(
+          event,
+        );
         setVisible(false);
       },
     },

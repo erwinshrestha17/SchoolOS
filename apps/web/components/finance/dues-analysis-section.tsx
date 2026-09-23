@@ -1,22 +1,22 @@
-"use client";
+'use client';
 
-import type { DuesReportFilters, DuesReportRow } from "@schoolos/core";
-import { formatBsDate } from "@schoolos/core";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { SectionCard } from "@/components/ui/section-card";
-import { DataTable } from "@/components/ui/data-table";
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { Download } from "lucide-react";
-import { cn } from "@/lib/utils";
+import type { DuesReportFilters, DuesReportRow } from '@schoolos/core';
+import { formatBsDate } from '@schoolos/core';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { SectionCard } from '@/components/ui/section-card';
+import { DataTable } from '@/components/ui/data-table';
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Download } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const formatCurrency = (amount: string) =>
-  new Intl.NumberFormat("en-NP", {
-    style: "currency",
-    currency: "NPR",
+  new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(amount));
@@ -25,39 +25,39 @@ export function DuesAnalysisSection() {
   const [filters, setFilters] = useState<DuesReportFilters>({});
 
   const duesQuery = useQuery({
-    queryKey: ["dues-report", filters],
+    queryKey: ['dues-report', filters],
     queryFn: () => api.getDuesTableReport(filters),
   });
 
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
 
   const feeHeadsQuery = useQuery({
-    queryKey: ["fee-heads"],
+    queryKey: ['fee-heads'],
     queryFn: api.listFeeHeads,
   });
 
   const exportMutation = useMutation({
     mutationFn: () =>
-      api.downloadReport("dues-table-report", { format: "csv", filters }),
+      api.downloadReport('dues-table-report', { format: 'csv', filters }),
   });
 
   const columns = [
     {
-      header: "Student Information",
+      header: 'Student Information',
       cell: (row: DuesReportRow) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">{row.studentName}</span>
           <span className="text-[0.65rem] text-slate-500 uppercase tracking-widest font-bold">
-            {row.className} {row.sectionName ? `• ${row.sectionName}` : ""}
+            {row.className} {row.sectionName ? `• ${row.sectionName}` : ''}
           </span>
         </div>
       ),
     },
     {
-      header: "Fee Head",
+      header: 'Fee Head',
       cell: (row: DuesReportRow) => (
         <Badge
           variant="info"
@@ -68,7 +68,7 @@ export function DuesAnalysisSection() {
       ),
     },
     {
-      header: "Financials",
+      header: 'Financials',
       cell: (row: DuesReportRow) => (
         <div className="flex flex-col">
           <div className="flex items-center justify-between gap-4 text-xs">
@@ -87,7 +87,7 @@ export function DuesAnalysisSection() {
       ),
     },
     {
-      header: "Outstanding",
+      header: 'Outstanding',
       cell: (row: DuesReportRow) => (
         <div className="text-right">
           <span className="text-sm font-black text-danger-600 tabular-nums">
@@ -97,15 +97,15 @@ export function DuesAnalysisSection() {
       ),
     },
     {
-      header: "Status",
+      header: 'Status',
       cell: (row: DuesReportRow) => {
         const isOverdue =
-          row.status === "overdue" && Number(row.outstanding) > 0;
+          row.status === 'overdue' && Number(row.outstanding) > 0;
         return (
           <div className="flex flex-col items-end">
             <StatusBadge
-              status={isOverdue ? "overdue" : "pending"}
-              label={isOverdue ? "Overdue" : "Due Soon"}
+              status={isOverdue ? 'overdue' : 'pending'}
+              label={isOverdue ? 'Overdue' : 'Due Soon'}
               className="h-5"
             />
             <span className="text-[0.6rem] text-slate-400 font-bold mt-1 uppercase tracking-widest">
@@ -132,7 +132,7 @@ export function DuesAnalysisSection() {
             data-testid="finance-dues-csv-export"
           >
             <Download size={14} />
-            {exportMutation.isPending ? "Exporting..." : "Export Dues"}
+            {exportMutation.isPending ? 'Exporting...' : 'Export Dues'}
           </Button>
         </div>
       }
@@ -152,7 +152,7 @@ export function DuesAnalysisSection() {
               </label>
               <select
                 className="premium-input bg-white h-12"
-                value={filters.classId ?? ""}
+                value={filters.classId ?? ''}
                 onChange={(e) =>
                   setFilters({ ...filters, classId: e.target.value })
                 }
@@ -171,7 +171,7 @@ export function DuesAnalysisSection() {
               </label>
               <select
                 className="premium-input bg-white h-12"
-                value={filters.feeHeadId ?? ""}
+                value={filters.feeHeadId ?? ''}
                 onChange={(e) =>
                   setFilters({ ...filters, feeHeadId: e.target.value })
                 }
@@ -231,7 +231,7 @@ export function DuesAnalysisSection() {
 function SummaryStat({
   label,
   value,
-  color = "text-slate-900",
+  color = 'text-slate-900',
   isMain = false,
 }: {
   label: string;
@@ -242,16 +242,16 @@ function SummaryStat({
   return (
     <div
       className={cn(
-        "p-6 rounded-2xl border transition-all",
+        'p-6 rounded-2xl border transition-all',
         isMain
-          ? "bg-[var(--color-mod-fees-bg)] border-[var(--color-mod-fees-border)] shadow-sm"
-          : "bg-white border-slate-100",
+          ? 'bg-[var(--color-mod-fees-bg)] border-[var(--color-mod-fees-border)] shadow-sm'
+          : 'bg-white border-slate-100',
       )}
     >
       <p
         className={cn(
-          "text-[0.6rem] font-black uppercase tracking-[0.2em] mb-2",
-          isMain ? "text-[var(--color-mod-fees-text)]" : "text-slate-500",
+          'text-[0.6rem] font-black uppercase tracking-[0.2em] mb-2',
+          isMain ? 'text-[var(--color-mod-fees-text)]' : 'text-slate-500',
         )}
       >
         {label}
@@ -259,19 +259,19 @@ function SummaryStat({
       <div className="flex items-baseline gap-1">
         <span
           className={cn(
-            "text-[0.65rem] font-bold uppercase",
-            isMain ? "text-[var(--color-mod-fees-text)]/70" : "text-slate-400",
+            'text-[0.65rem] font-bold uppercase',
+            isMain ? 'text-[var(--color-mod-fees-text)]/70' : 'text-slate-400',
           )}
         >
           NPR
         </span>
         <p
           className={cn(
-            "text-2xl font-black tracking-tighter",
-            isMain ? "text-[var(--color-mod-fees-text)]" : color,
+            'text-2xl font-black tracking-tighter',
+            isMain ? 'text-[var(--color-mod-fees-text)]' : color,
           )}
         >
-          {formatCurrency(value).replace(/^NPR\s*/, "")}
+          {formatCurrency(value).replace(/^NPR\s*/, '')}
         </p>
       </div>
     </div>

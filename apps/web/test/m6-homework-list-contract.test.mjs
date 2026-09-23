@@ -1,18 +1,18 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { describe, it } from "node:test";
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { describe, it } from 'node:test';
 
-const webRoot = new URL("../", import.meta.url);
-const read = (path) => readFileSync(new URL(path, webRoot), "utf8");
+const webRoot = new URL('../', import.meta.url);
+const read = (path) => readFileSync(new URL(path, webRoot), 'utf8');
 
 // Rewritten for the M6 homework redesign (fuzzy-gliding-hopper.md): homework
 // is now a standalone, single-route, 4-tab workspace fully decoupled from
 // timetable, with 4 prioritized backend-driven summaries and no "Supporting homework
 // tools" disclosure — Templates and Completion are real tabs now.
-describe("M6 homework list contract", () => {
-  it("uses the backend page contract with URL-backed filters and pagination", () => {
-    const page = read("app/dashboard/homework/page.tsx");
-    const api = read("lib/api/academics.ts");
+describe('M6 homework list contract', () => {
+  it('uses the backend page contract with URL-backed filters and pagination', () => {
+    const page = read('app/dashboard/homework/page.tsx');
+    const api = read('lib/api/academics.ts');
 
     assert.match(api, /listHomeworkPage/);
     assert.match(api, /request<HomeworkAssignmentPage>/);
@@ -31,13 +31,13 @@ describe("M6 homework list contract", () => {
     assert.match(page, /homeworkMeta\.total/);
     assert.match(page, /setFilters\(\{ page \}\)/);
     assert.doesNotMatch(page, /DATE_FILTER_FETCH_LIMIT/);
-    assert.doesNotMatch(page, /assignedDate \?\? ""\)\.slice/);
+    assert.doesNotMatch(page, /assignedDate \?\? ['"]['"]\)\.slice/);
     assert.doesNotMatch(page, /dateFilteredItems/);
   });
 
   it("derives today's assignment date from the Nepal school-day policy", () => {
-    const page = read("app/dashboard/homework/page.tsx");
-    const createForm = read("components/homework/homework-create-form.tsx");
+    const page = read('app/dashboard/homework/page.tsx');
+    const createForm = read('components/homework/homework-create-form.tsx');
 
     assert.match(page, /getNepalSchoolDay\(\)\.gregorianDate/);
     assert.match(createForm, /getNepalSchoolDay\(\)\.gregorianDate/);
@@ -48,9 +48,9 @@ describe("M6 homework list contract", () => {
     );
   });
 
-  it("keeps quick inspection in a drawer and protected files behind the helper", () => {
-    const page = read("app/dashboard/homework/page.tsx");
-    const api = read("lib/api/academics.ts");
+  it('keeps quick inspection in a drawer and protected files behind the helper', () => {
+    const page = read('app/dashboard/homework/page.tsx');
+    const api = read('lib/api/academics.ts');
 
     assert.match(page, /<Drawer/);
     assert.match(page, /Quick View/);
@@ -62,16 +62,16 @@ describe("M6 homework list contract", () => {
     assert.doesNotMatch(page, /window\.open|signedUrl|objectKey|bucket/);
   });
 
-  it("uses backend submission counts instead of a fabricated progress bar", () => {
-    const page = read("app/dashboard/homework/page.tsx");
+  it('uses backend submission counts instead of a fabricated progress bar', () => {
+    const page = read('app/dashboard/homework/page.tsx');
 
     assert.match(page, /submissionSummary\.total/);
     assert.doesNotMatch(page, /row\.submissions\?\.length/);
     assert.doesNotMatch(page, /Math\.min\(100,[\s\S]*submissions/);
   });
 
-  it("keeps permission, retry, empty, no-result, and stale-data states explicit", () => {
-    const page = read("app/dashboard/homework/page.tsx");
+  it('keeps permission, retry, empty, no-result, and stale-data states explicit', () => {
+    const page = read('app/dashboard/homework/page.tsx');
 
     assert.match(page, /ApiRequestError/);
     assert.match(page, /statusCode === 403/);
@@ -83,8 +83,8 @@ describe("M6 homework list contract", () => {
     assert.match(page, /canReviewHomework/);
   });
 
-  it("sources four prioritized summary cards from the real per-role backend endpoint", () => {
-    const page = read("app/dashboard/homework/page.tsx");
+  it('sources four prioritized summary cards from the real per-role backend endpoint', () => {
+    const page = read('app/dashboard/homework/page.tsx');
 
     // Regression guard for the recurring "loading-literal" KPI bug: value
     // must never fall back to the bare string "Loading" — a separate
@@ -95,40 +95,43 @@ describe("M6 homework list contract", () => {
     assert.match(page, /summary\?\.notChecked/);
     assert.match(page, /summary\?\.incompleteStudents/);
     assert.match(page, /summary\?\.classesWithoutHomework/);
-    assert.doesNotMatch(page, /api\.getModuleSummary\("homework-timetable"\)/);
+    assert.doesNotMatch(
+      page,
+      /api\.getModuleSummary\(['"]homework-timetable['"]\)/,
+    );
   });
 
-  it("keeps the header within the 4-tab / 4-summary budget and fully decoupled from timetable", () => {
-    const page = read("app/dashboard/homework/page.tsx");
+  it('keeps the header within the 4-tab / 4-summary budget and fully decoupled from timetable', () => {
+    const page = read('app/dashboard/homework/page.tsx');
 
     assert.equal(
       (
         page.match(
-          /\{ value: "(?:today|all|completion|templates)", label: /g,
+          /\{ value: ['"](?:today|all|completion|templates)['"], label: /g,
         ) ?? []
       ).length,
       4,
     );
     assert.equal((page.match(/<SummaryCard/g) ?? []).length, 4);
     assert.match(page, /<SummaryGrid/);
-    assert.doesNotMatch(page, /title="Homework Assigned"/);
-    assert.doesNotMatch(page, /title="Pending Submissions"/);
-    assert.doesNotMatch(page, /title="Timetable Conflicts"/);
-    assert.doesNotMatch(page, /title="Teacher Workload"/);
+    assert.doesNotMatch(page, /title=['"]Homework Assigned['"]/);
+    assert.doesNotMatch(page, /title=['"]Pending Submissions['"]/);
+    assert.doesNotMatch(page, /title=['"]Timetable Conflicts['"]/);
+    assert.doesNotMatch(page, /title=['"]Teacher Workload['"]/);
     assert.doesNotMatch(page, /\/dashboard\/timetable/);
     assert.doesNotMatch(page, /Supporting homework tools/);
   });
 
   it("gates the Templates and Completion tabs' queries behind the active tab", () => {
-    const page = read("app/dashboard/homework/page.tsx");
+    const page = read('app/dashboard/homework/page.tsx');
 
     assert.match(
       page,
-      /enabled:\s*!isSupportOverride && activeTab === "templates"/,
+      /enabled:\s*!isSupportOverride && activeTab === ['"]templates['"]/,
     );
     assert.match(
       page,
-      /enabled:[\s\S]{0,80}!isSupportOverride &&[\s\S]{0,40}activeTab === "completion"/,
+      /enabled:[\s\S]{0,80}!isSupportOverride &&[\s\S]{0,40}activeTab === ['"]completion['"]/,
     );
     assert.match(page, /api\.listHomeworkTemplates/);
     assert.match(page, /api\.getHomeworkCompletionReport/);

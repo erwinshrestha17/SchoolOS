@@ -147,8 +147,7 @@ export function WorkspaceTabs({
                 variant={active ? 'default' : 'secondary'}
                 className={cn(
                   'ml-1 min-w-5 justify-center px-1.5',
-                  active &&
-                    'bg-[var(--mod-accent,var(--primary))] text-white',
+                  active && 'bg-[var(--mod-accent,var(--primary))] text-white',
                 )}
               >
                 {item.count}
@@ -221,11 +220,15 @@ export function WorkspaceTabs({
                     item.href
                       ? undefined
                       : () =>
-                          item.value !== undefined && onValueChange?.(item.value)
+                          item.value !== undefined &&
+                          onValueChange?.(item.value)
                   }
                 >
                   {item.href ? (
-                    <Link href={item.href} aria-current={active ? 'page' : undefined}>
+                    <Link
+                      href={item.href}
+                      aria-current={active ? 'page' : undefined}
+                    >
                       {inner}
                     </Link>
                   ) : (

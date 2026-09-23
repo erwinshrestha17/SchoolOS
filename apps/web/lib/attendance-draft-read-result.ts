@@ -1,7 +1,7 @@
 export type AttendanceDraftReadResult<T> =
-  | { status: "found"; draft: T }
-  | { status: "missing" }
-  | { status: "unavailable" };
+  | { status: 'found'; draft: T }
+  | { status: 'missing' }
+  | { status: 'unavailable' };
 
 /**
  * Keeps a missing draft distinct from storage that could not be read. Final
@@ -13,8 +13,8 @@ export async function resolveAttendanceDraftRead<T>(
 ): Promise<AttendanceDraftReadResult<T>> {
   try {
     const draft = await read();
-    return draft === null ? { status: "missing" } : { status: "found", draft };
+    return draft === null ? { status: 'missing' } : { status: 'found', draft };
   } catch {
-    return { status: "unavailable" };
+    return { status: 'unavailable' };
   }
 }

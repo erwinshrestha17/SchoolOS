@@ -1,22 +1,22 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
 import {
   PaginatedDataTable,
   type PaginatedDataTableColumn,
   type PaginatedDataTableSort,
-} from "@/components/schoolos/data/paginated-data-table";
-import { Button } from "@/components/ui/primitives/button";
-import { Eye, Printer } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { ReprintDialog } from "./reprint-dialog";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { formatBsDate } from "@schoolos/core";
-import { Drawer } from "@/components/ui/drawer";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { ErrorState } from "@/components/ui/error-state";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+} from '@/components/schoolos/data/paginated-data-table';
+import { Button } from '@/components/ui/primitives/button';
+import { Eye, Printer } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ReprintDialog } from './reprint-dialog';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { formatBsDate } from '@schoolos/core';
+import { Drawer } from '@/components/ui/drawer';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { ErrorState } from '@/components/ui/error-state';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 interface Invoice {
   id: string;
@@ -40,7 +40,7 @@ interface Invoice {
  * (apps/api/src/finance/dto/list-finance-records.query.dto.ts) — do not add
  * a `sortable: true` column here without confirming the backend enum first.
  */
-type InvoiceSortColumn = "invoiceNumber" | "dueDate" | "totalAmount";
+type InvoiceSortColumn = 'invoiceNumber' | 'dueDate' | 'totalAmount';
 
 interface FeeLedgerProps {
   invoices: Invoice[];
@@ -57,9 +57,9 @@ interface FeeLedgerProps {
 }
 
 const formatCurrency = (amount: string) => {
-  return new Intl.NumberFormat("en-NP", {
-    style: "currency",
-    currency: "NPR",
+  return new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
     maximumFractionDigits: 0,
   }).format(Number(amount));
 };
@@ -82,21 +82,21 @@ export function FeeLedger({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const selectedInvoiceId = searchParams.get("invoiceId");
+  const selectedInvoiceId = searchParams.get('invoiceId');
   const [selectedReceipt, setSelectedReceipt] = useState<{
     id: string;
     number: string;
   } | null>(null);
   const invoiceDetailQuery = useQuery({
-    queryKey: ["invoice-detail", selectedInvoiceId],
+    queryKey: ['invoice-detail', selectedInvoiceId],
     queryFn: () => api.getInvoiceDetail(selectedInvoiceId!),
     enabled: Boolean(selectedInvoiceId),
   });
 
   const setSelectedInvoice = (invoiceId: string | null) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (invoiceId) params.set("invoiceId", invoiceId);
-    else params.delete("invoiceId");
+    if (invoiceId) params.set('invoiceId', invoiceId);
+    else params.delete('invoiceId');
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, {
       scroll: false,
@@ -114,8 +114,8 @@ export function FeeLedger({
 
   const columns: PaginatedDataTableColumn<Invoice>[] = [
     {
-      id: "invoiceNumber",
-      header: "Invoice #",
+      id: 'invoiceNumber',
+      header: 'Invoice #',
       sortable: true,
       cell: (inv) => (
         <div className="flex flex-col">
@@ -123,36 +123,36 @@ export function FeeLedger({
           <span className="text-[0.65rem] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
             {inv.issuedAt
               ? `Issued ${formatDate(inv.issuedAt)}`
-              : "Issue date unavailable"}
+              : 'Issue date unavailable'}
           </span>
         </div>
       ),
     },
     {
-      id: "student",
-      header: "Student",
+      id: 'student',
+      header: 'Student',
       cell: (inv) => (
         <div className="flex flex-col">
           <span className="text-sm font-bold text-slate-900">
-            {inv.student?.name || "Student name not set"}
+            {inv.student?.name || 'Student name not set'}
           </span>
           <span className="text-[0.6rem] text-slate-400 uppercase tracking-widest">
-            {inv.student?.studentSystemId || "Student ID not set"}
+            {inv.student?.studentSystemId || 'Student ID not set'}
           </span>
         </div>
       ),
     },
     {
-      id: "dueDate",
-      header: "Due Date",
+      id: 'dueDate',
+      header: 'Due Date',
       sortable: true,
       cell: (inv) => (
         <span
           className={cn(
-            "text-xs font-bold",
-            inv.status !== "PAID" && inv.status !== "VOID"
-              ? "text-danger-600"
-              : "text-slate-500",
+            'text-xs font-bold',
+            inv.status !== 'PAID' && inv.status !== 'VOID'
+              ? 'text-danger-600'
+              : 'text-slate-500',
           )}
         >
           {formatDate(inv.dueDate)}
@@ -160,8 +160,8 @@ export function FeeLedger({
       ),
     },
     {
-      id: "totalAmount",
-      header: "Total",
+      id: 'totalAmount',
+      header: 'Total',
       sortable: true,
       cell: (inv) => (
         <span className="font-black text-slate-900 text-sm">
@@ -170,29 +170,29 @@ export function FeeLedger({
       ),
     },
     {
-      id: "paidAmount",
-      header: "Paid",
+      id: 'paidAmount',
+      header: 'Paid',
       cell: (inv) => (
         <span className="text-sm font-black text-emerald-600">
-          {formatCurrency(inv.paidAmount ?? "0.00")}
+          {formatCurrency(inv.paidAmount ?? '0.00')}
         </span>
       ),
     },
     {
-      id: "outstandingAmount",
-      header: "Outstanding",
-      align: "right",
+      id: 'outstandingAmount',
+      header: 'Outstanding',
+      align: 'right',
       cell: (inv) => (
         <span className="block text-right text-sm font-bold text-slate-950 tabular-nums">
           {inv.outstandingAmount
             ? formatCurrency(inv.outstandingAmount)
-            : "Unavailable"}
+            : 'Unavailable'}
         </span>
       ),
     },
     {
-      id: "status",
-      header: "Status",
+      id: 'status',
+      header: 'Status',
       cell: (inv) => <StatusBadge status={inv.status} className="h-6" />,
     },
   ];
@@ -237,7 +237,7 @@ export function FeeLedger({
         columns={columns}
         items={invoices}
         getRowId={(inv) => inv.id}
-        status={isError ? "error" : isLoading ? "loading" : "ready"}
+        status={isError ? 'error' : isLoading ? 'loading' : 'ready'}
         page={page}
         pageSize={pageSize}
         totalItems={totalItems}
@@ -266,7 +266,7 @@ export function FeeLedger({
       <Drawer
         isOpen={Boolean(selectedInvoiceId)}
         onClose={() => setSelectedInvoice(null)}
-        title={invoiceDetailQuery.data?.invoiceNumber ?? "Invoice detail"}
+        title={invoiceDetailQuery.data?.invoiceNumber ?? 'Invoice detail'}
         description="Official invoice, payment, waiver, receipt, and accounting-handoff context."
         width="lg"
       >
@@ -303,14 +303,14 @@ function InvoiceDetailContent({
         </p>
         <p className="mt-1 text-sm text-slate-600">
           {detail.student.studentSystemId} · {detail.student.className}
-          {detail.student.sectionName ? ` · ${detail.student.sectionName}` : ""}
+          {detail.student.sectionName ? ` · ${detail.student.sectionName}` : ''}
         </p>
         {detail.student.guardianName ? (
           <p className="mt-2 text-xs text-slate-500">
             Guardian: {detail.student.guardianName}
             {detail.student.guardianPhone
               ? ` · ${detail.student.guardianPhone}`
-              : ""}
+              : ''}
           </p>
         ) : null}
       </section>
@@ -371,7 +371,7 @@ function InvoiceDetailContent({
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-semibold text-slate-950">
-                      {payment.receipt?.receiptNumber ?? "Receipt pending"}
+                      {payment.receipt?.receiptNumber ?? 'Receipt pending'}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
                       {payment.method} · {formatDate(payment.paidAt)}
@@ -385,16 +385,16 @@ function InvoiceDetailContent({
                   <div className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
                     {payment.refunds.map((refund) => (
                       <p key={refund.id}>
-                        {refund.refundNumber} · {formatCurrency(refund.amount)}{" "}
+                        {refund.refundNumber} · {formatCurrency(refund.amount)}{' '}
                         · {refund.reason}
                       </p>
                     ))}
                   </div>
                 ) : null}
                 <p className="mt-3 text-xs text-slate-500">
-                  Accounting handoff:{" "}
+                  Accounting handoff:{' '}
                   {payment.journalEntryNumber ??
-                    "Not available in current response"}
+                    'Not available in current response'}
                 </p>
               </div>
             ))}
@@ -416,7 +416,7 @@ function InvoiceDetailContent({
                 className="rounded-xl border border-slate-200 p-3 text-sm"
               >
                 <div className="flex justify-between gap-4">
-                  <span>{waiver.feeHeadName ?? "Invoice waiver"}</span>
+                  <span>{waiver.feeHeadName ?? 'Invoice waiver'}</span>
                   <span className="font-semibold tabular-nums">
                     {formatCurrency(waiver.amount)}
                   </span>
@@ -442,7 +442,7 @@ function InvoiceFact({
 }) {
   return (
     <div
-      className={`rounded-xl border p-3 ${emphasized ? "border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)]" : "border-slate-200 bg-white"}`}
+      className={`rounded-xl border p-3 ${emphasized ? 'border-[var(--color-mod-fees-border)] bg-[var(--color-mod-fees-bg)]' : 'border-slate-200 bg-white'}`}
     >
       <dt className="text-xs text-slate-500">{label}</dt>
       <dd className="mt-1 text-sm font-semibold text-slate-950 tabular-nums">

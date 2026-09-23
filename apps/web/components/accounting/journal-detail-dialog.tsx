@@ -1,15 +1,15 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
-import { api } from "../../lib/api";
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
+import { api } from '../../lib/api';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "../ui/dialog";
-import { Badge } from "../ui/badge";
+} from '../ui/dialog';
+import { Badge } from '../ui/badge';
 import {
   ArrowLeftRight,
   Ban,
@@ -17,16 +17,16 @@ import {
   AlertCircle,
   RotateCcw,
   Wrench,
-} from "lucide-react";
+} from 'lucide-react';
 import {
   formatBsDate,
   formatBsDateTime,
   type JournalEntryView,
-} from "@schoolos/core";
-import { cn } from "../../lib/utils";
-import { Button } from "../ui/button";
-import { Toast, type ToastTone } from "../ui/toast";
-import { useSession } from "../session-provider";
+} from '@schoolos/core';
+import { cn } from '../../lib/utils';
+import { Button } from '../ui/button';
+import { Toast, type ToastTone } from '../ui/toast';
+import { useSession } from '../session-provider';
 
 interface JournalDetailDialogProps {
   isOpen: boolean;
@@ -41,13 +41,13 @@ export function JournalDetailDialog({
 }: JournalDetailDialogProps) {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
-  const canSubmit = hasPermissions(["accounting:journals:submit"]);
-  const canApprove = hasPermissions(["accounting:journals:approve"]);
-  const canPost = hasPermissions(["accounting:journals:post"]);
-  const canReverse = hasPermissions(["accounting:journals:reverse"]);
+  const canSubmit = hasPermissions(['accounting:journals:submit']);
+  const canApprove = hasPermissions(['accounting:journals:approve']);
+  const canPost = hasPermissions(['accounting:journals:post']);
+  const canReverse = hasPermissions(['accounting:journals:reverse']);
   const [isReversing, setIsReversing] = useState(false);
   const [isCorrecting, setIsCorrecting] = useState(false);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState('');
   const [notice, setNotice] = useState<{
     title: string;
     description?: string;
@@ -60,27 +60,27 @@ export function JournalDetailDialog({
       action,
     }: {
       id: string;
-      action: "submit" | "approve" | "post";
+      action: 'submit' | 'approve' | 'post';
     }) => {
-      if (action === "submit") return api.submitJournal(id, {});
-      if (action === "approve") return api.approveJournal(id, {});
+      if (action === 'submit') return api.submitJournal(id, {});
+      if (action === 'approve') return api.approveJournal(id, {});
       return api.postJournal(id);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
+      void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
       onClose();
     },
     onError: (err: Error, variables) => {
       const actionFailureTitle = {
-        submit: "Submission failed",
-        approve: "Approval failed",
-        post: "Posting failed",
+        submit: 'Submission failed',
+        approve: 'Approval failed',
+        post: 'Posting failed',
       } as const;
       setNotice({
         title: actionFailureTitle[variables.action],
         description:
-          err.message || "The journal action could not be completed.",
-        tone: "danger",
+          err.message || 'The journal action could not be completed.',
+        tone: 'danger',
       });
     },
   });
@@ -88,15 +88,15 @@ export function JournalDetailDialog({
   const reverseMutation = useMutation({
     mutationFn: (id: string) => api.reverseJournal(id, { reason }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
+      void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
       resetState();
       onClose();
     },
     onError: (err: Error) => {
       setNotice({
-        title: "Reversal failed",
-        description: err.message || "Failed to reverse journal entry",
-        tone: "danger",
+        title: 'Reversal failed',
+        description: err.message || 'Failed to reverse journal entry',
+        tone: 'danger',
       });
     },
   });
@@ -104,15 +104,15 @@ export function JournalDetailDialog({
   const correctMutation = useMutation({
     mutationFn: (id: string) => api.correctJournal(id, { reason }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
+      void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
       resetState();
       onClose();
     },
     onError: (err: Error) => {
       setNotice({
-        title: "Correction failed",
-        description: err.message || "Failed to correct journal entry",
-        tone: "danger",
+        title: 'Correction failed',
+        description: err.message || 'Failed to correct journal entry',
+        tone: 'danger',
       });
     },
   });
@@ -120,7 +120,7 @@ export function JournalDetailDialog({
   const resetState = () => {
     setIsReversing(false);
     setIsCorrecting(false);
-    setReason("");
+    setReason('');
   };
 
   const handleClose = () => {
@@ -133,27 +133,27 @@ export function JournalDetailDialog({
   const sourceDrilldown = buildSourceDrilldown(entry);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-NP", {
-      style: "currency",
-      currency: "NPR",
+    return new Intl.NumberFormat('en-NP', {
+      style: 'currency',
+      currency: 'NPR',
       maximumFractionDigits: 2,
     }).format(amount);
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "POSTED":
-        return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-      case "DRAFT":
-        return "bg-slate-500/10 text-slate-600 border-slate-500/20";
-      case "SUBMITTED":
-        return "bg-amber-500/10 text-amber-600 border-amber-500/20";
-      case "REVERSED":
-        return "bg-rose-500/10 text-rose-600 border-rose-500/20";
-      case "CANCELLED":
-        return "bg-rose-500/10 text-rose-600 border-rose-500/20";
+      case 'POSTED':
+        return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
+      case 'DRAFT':
+        return 'bg-slate-500/10 text-slate-600 border-slate-500/20';
+      case 'SUBMITTED':
+        return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+      case 'REVERSED':
+        return 'bg-rose-500/10 text-rose-600 border-rose-500/20';
+      case 'CANCELLED':
+        return 'bg-rose-500/10 text-rose-600 border-rose-500/20';
       default:
-        return "bg-slate-500/10 text-slate-600 border-slate-500/20";
+        return 'bg-slate-500/10 text-slate-600 border-slate-500/20';
     }
   };
 
@@ -168,7 +168,7 @@ export function JournalDetailDialog({
                 <Badge
                   variant="outline"
                   className={cn(
-                    "text-[10px] font-bold uppercase tracking-widest",
+                    'text-[10px] font-bold uppercase tracking-widest',
                     getStatusColor(entry.status),
                   )}
                 >
@@ -204,32 +204,32 @@ export function JournalDetailDialog({
           {(isReversing || isCorrecting) && (
             <div
               className={cn(
-                "rounded-2xl p-5 border animate-in slide-in-from-top-4 duration-300",
+                'rounded-2xl p-5 border animate-in slide-in-from-top-4 duration-300',
                 isReversing
-                  ? "bg-rose-50 border-rose-100"
-                  : "bg-amber-50 border-amber-100",
+                  ? 'bg-rose-50 border-rose-100'
+                  : 'bg-amber-50 border-amber-100',
               )}
             >
               <div className="flex gap-3 mb-4">
                 <AlertCircle
                   size={20}
-                  className={isReversing ? "text-rose-600" : "text-amber-600"}
+                  className={isReversing ? 'text-rose-600' : 'text-amber-600'}
                 />
                 <div>
                   <p
                     className={cn(
-                      "text-sm font-bold",
-                      isReversing ? "text-rose-900" : "text-amber-900",
+                      'text-sm font-bold',
+                      isReversing ? 'text-rose-900' : 'text-amber-900',
                     )}
                   >
                     {isReversing
-                      ? "Reverse Posted Journal"
-                      : "Correct Posted Journal"}
+                      ? 'Reverse Posted Journal'
+                      : 'Correct Posted Journal'}
                   </p>
                   <p
                     className={cn(
-                      "text-xs mt-0.5 font-medium leading-relaxed",
-                      isReversing ? "text-rose-700" : "text-amber-700",
+                      'text-xs mt-0.5 font-medium leading-relaxed',
+                      isReversing ? 'text-rose-700' : 'text-amber-700',
                     )}
                   >
                     Posted journals are immutable for audit integrity. This
@@ -242,20 +242,20 @@ export function JournalDetailDialog({
               <div className="space-y-3">
                 <label
                   className={cn(
-                    "text-[10px] font-black uppercase tracking-widest block",
-                    isReversing ? "text-rose-600" : "text-amber-600",
+                    'text-[10px] font-black uppercase tracking-widest block',
+                    isReversing ? 'text-rose-600' : 'text-amber-600',
                   )}
                 >
-                  Reason for {isReversing ? "Reversal" : "Correction"}
+                  Reason for {isReversing ? 'Reversal' : 'Correction'}
                 </label>
                 <textarea
                   className={cn(
-                    "w-full rounded-xl border p-3 text-sm font-medium focus:outline-none focus:ring-2 transition-all min-h-[80px]",
+                    'w-full rounded-xl border p-3 text-sm font-medium focus:outline-none focus:ring-2 transition-all min-h-[80px]',
                     isReversing
-                      ? "border-rose-200 focus:ring-rose-500 text-rose-900 placeholder:text-rose-300"
-                      : "border-amber-200 focus:ring-amber-500 text-amber-900 placeholder:text-amber-300",
+                      ? 'border-rose-200 focus:ring-rose-500 text-rose-900 placeholder:text-rose-300'
+                      : 'border-amber-200 focus:ring-amber-500 text-amber-900 placeholder:text-amber-300',
                   )}
-                  placeholder={`Why is this ${isReversing ? "reversal" : "correction"} necessary?`}
+                  placeholder={`Why is this ${isReversing ? 'reversal' : 'correction'} necessary?`}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   autoFocus
@@ -275,7 +275,7 @@ export function JournalDetailDialog({
                 <Button
                   type="button"
                   size="sm"
-                  variant={isReversing ? "destructive" : "default"}
+                  variant={isReversing ? 'destructive' : 'default'}
                   onClick={() =>
                     isReversing
                       ? reverseMutation.mutate(entry.id)
@@ -290,9 +290,9 @@ export function JournalDetailDialog({
                     reverseMutation.isPending || correctMutation.isPending
                   }
                   className={cn(
-                    "gap-2 rounded-xl px-6 text-xs shadow-lg",
+                    'gap-2 rounded-xl px-6 text-xs shadow-lg',
                     !isReversing &&
-                      "bg-amber-600 shadow-amber-600/20 hover:bg-amber-700",
+                      'bg-amber-600 shadow-amber-600/20 hover:bg-amber-700',
                   )}
                 >
                   {!reverseMutation.isPending && !correctMutation.isPending ? (
@@ -302,7 +302,7 @@ export function JournalDetailDialog({
                       <Wrench size={14} />
                     )
                   ) : null}
-                  Confirm {isReversing ? "Reversal" : "Correction"}
+                  Confirm {isReversing ? 'Reversal' : 'Correction'}
                 </Button>
               </div>
             </div>
@@ -335,12 +335,12 @@ export function JournalDetailDialog({
                   Source record
                 </p>
                 <p className="mt-1 text-sm font-bold text-slate-900">
-                  {entry.sourceModule ?? "Accounting"} / {entry.sourceType}
+                  {entry.sourceModule ?? 'Accounting'} / {entry.sourceType}
                 </p>
                 <p className="mt-1 break-all text-xs font-semibold text-slate-500">
                   {entry.sourceId
                     ? `Source ID: ${entry.sourceId}`
-                    : "Source ID not recorded"}
+                    : 'Source ID not recorded'}
                 </p>
               </div>
               {sourceDrilldown ? (
@@ -394,14 +394,14 @@ export function JournalDetailDialog({
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-emerald-600">
-                        {line.side === "DEBIT"
+                        {line.side === 'DEBIT'
                           ? formatCurrency(line.amount)
-                          : "-"}
+                          : '-'}
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-rose-600">
-                        {line.side === "CREDIT"
+                        {line.side === 'CREDIT'
                           ? formatCurrency(line.amount)
-                          : "-"}
+                          : '-'}
                       </td>
                     </tr>
                   ))}
@@ -429,7 +429,7 @@ export function JournalDetailDialog({
               <span className="text-sm font-bold text-slate-700">
                 {entry.postedBy
                   ? `${entry.postedBy.firstName} ${entry.postedBy.lastName}`
-                  : "Posting user not recorded"}
+                  : 'Posting user not recorded'}
               </span>
             </div>
             <div className="rounded-xl border border-slate-100 p-3 flex flex-col">
@@ -446,11 +446,11 @@ export function JournalDetailDialog({
         <DialogFooter className="gap-2 sm:gap-0 p-4 border-t bg-slate-50/50">
           {!isReversing && !isCorrecting && (
             <>
-              {entry.status === "DRAFT" && canSubmit && (
+              {entry.status === 'DRAFT' && canSubmit && (
                 <Button
                   type="button"
                   onClick={() =>
-                    actionMutation.mutate({ id: entry.id, action: "submit" })
+                    actionMutation.mutate({ id: entry.id, action: 'submit' })
                   }
                   isLoading={actionMutation.isPending}
                   className="gap-2 rounded-xl bg-amber-600 text-sm shadow-sm hover:bg-amber-700"
@@ -462,11 +462,11 @@ export function JournalDetailDialog({
                 </Button>
               )}
 
-              {entry.status === "SUBMITTED" && canApprove && (
+              {entry.status === 'SUBMITTED' && canApprove && (
                 <Button
                   type="button"
                   onClick={() =>
-                    actionMutation.mutate({ id: entry.id, action: "approve" })
+                    actionMutation.mutate({ id: entry.id, action: 'approve' })
                   }
                   isLoading={actionMutation.isPending}
                   className="gap-2 rounded-xl bg-[var(--color-mod-accounting-accent)] text-sm shadow-sm hover:bg-[var(--color-mod-accounting-text)]"
@@ -478,11 +478,11 @@ export function JournalDetailDialog({
                 </Button>
               )}
 
-              {entry.status === "APPROVED" && canPost && (
+              {entry.status === 'APPROVED' && canPost && (
                 <Button
                   type="button"
                   onClick={() =>
-                    actionMutation.mutate({ id: entry.id, action: "post" })
+                    actionMutation.mutate({ id: entry.id, action: 'post' })
                   }
                   isLoading={actionMutation.isPending}
                   className="gap-2 rounded-xl bg-emerald-600 text-sm shadow-lg shadow-emerald-600/20 hover:bg-emerald-700"
@@ -494,7 +494,7 @@ export function JournalDetailDialog({
                 </Button>
               )}
 
-              {entry.status === "POSTED" && canReverse && (
+              {entry.status === 'POSTED' && canReverse && (
                 <div className="flex gap-2 mr-auto">
                   <Button
                     type="button"
@@ -535,23 +535,23 @@ export function JournalDetailDialog({
 function buildSourceDrilldown(entry: JournalEntryView) {
   if (!entry.sourceId) return null;
 
-  const moduleName = entry.sourceModule?.toUpperCase() ?? "";
+  const moduleName = entry.sourceModule?.toUpperCase() ?? '';
   const sourceType = entry.sourceType.toUpperCase();
   const sourceId = encodeURIComponent(entry.sourceId);
 
-  if (moduleName === "PAYROLL") {
+  if (moduleName === 'PAYROLL') {
     return { href: `/dashboard/hr/payroll?runId=${sourceId}` };
   }
 
-  if (moduleName === "CANTEEN") {
+  if (moduleName === 'CANTEEN') {
     return { href: `/dashboard/canteen/pos?saleId=${sourceId}` };
   }
 
-  if (moduleName === "LIBRARY") {
+  if (moduleName === 'LIBRARY') {
     return { href: `/dashboard/library?fineId=${sourceId}` };
   }
 
-  if (moduleName === "FINANCE" || sourceType === "INVOICE") {
+  if (moduleName === 'FINANCE' || sourceType === 'INVOICE') {
     return { href: `/dashboard/fees/collect?invoiceId=${sourceId}` };
   }
 

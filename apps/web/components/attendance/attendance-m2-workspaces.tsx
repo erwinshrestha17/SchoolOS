@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BS_MONTH_NAMES_EN,
   formatBsDateTime,
@@ -13,7 +13,7 @@ import {
   ATTENDANCE_SESSION_STATE_LABELS,
   type AttendanceCorrectionRequest,
   type AttendanceSessionState,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   AlertTriangle,
   BarChart3,
@@ -31,43 +31,43 @@ import {
   ShieldAlert,
   Users,
   XCircle,
-} from "lucide-react";
-import { api } from "@/lib/api";
+} from 'lucide-react';
+import { api } from '@/lib/api';
 import type {
   AttendanceMonthlyRegister,
   AttendanceRegisterExportSummary,
   M2FollowUpQueue,
-} from "@/lib/api/attendance";
+} from '@/lib/api/attendance';
 import {
   AttendanceForm,
   type AttendanceDraftRecoveryScope,
-} from "@/components/forms/attendance-form";
-import { AttendanceConflictReview } from "./attendance-conflict-review";
-import { AttendanceCorrectionReview } from "./attendance-correction-review";
-import { useSession } from "@/components/session-provider";
-import { useTeacherAccess } from "@/lib/teacher-access";
-import { useAttendanceCapabilities } from "@/lib/permissions-ui";
-import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ErrorState } from "@/components/ui/error-state";
-import { FilterBar } from "@/components/ui/filter-bar";
-import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
-import { SummaryCard, SummaryGrid } from "@/components/ui/summary-card";
-import { LoadingState } from "@/components/ui/loading-state";
-import { LockedRecordBanner } from "@/components/ui/locked-record-banner";
-import { PermissionDenied } from "@/components/ui/permission-denied";
-import { ModuleHeader } from "@/components/ui/module-header";
+} from '@/components/forms/attendance-form';
+import { AttendanceConflictReview } from './attendance-conflict-review';
+import { AttendanceCorrectionReview } from './attendance-correction-review';
+import { useSession } from '@/components/session-provider';
+import { useTeacherAccess } from '@/lib/teacher-access';
+import { useAttendanceCapabilities } from '@/lib/permissions-ui';
+import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
+import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
+import { LoadingState } from '@/components/ui/loading-state';
+import { LockedRecordBanner } from '@/components/ui/locked-record-banner';
+import { PermissionDenied } from '@/components/ui/permission-denied';
+import { ModuleHeader } from '@/components/ui/module-header';
 import {
   SchoolSettingsPageHeader,
   SettingsPermissionNotice,
-} from "@/components/settings/settings-page-header";
-import { ModuleTabs, WorkspaceTabs } from "@/components/ui/module-tabs";
-import { ProtectedFileButton } from "@/components/ui/protected-file";
-import { SectionCard } from "@/components/ui/section-card";
-import { WorkSurface } from "@/components/ui/work-surface";
+} from '@/components/settings/settings-page-header';
+import { ModuleTabs, WorkspaceTabs } from '@/components/ui/module-tabs';
+import { ProtectedFileButton } from '@/components/ui/protected-file';
+import { SectionCard } from '@/components/ui/section-card';
+import { WorkSurface } from '@/components/ui/work-surface';
 import {
   Table,
   TableBody,
@@ -75,55 +75,55 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { TablePagination } from "@/components/ui/table-pagination";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from '@/components/ui/table';
+import { TablePagination } from '@/components/ui/table-pagination';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   PaginatedDataTable,
   type PaginatedDataTableColumn,
-} from "@/components/schoolos/data/paginated-data-table";
-import { cn, formatDate, formatDateTime } from "@/lib/utils";
+} from '@/components/schoolos/data/paginated-data-table';
+import { cn, formatDate, formatDateTime } from '@/lib/utils';
 import {
   listAttendanceDraftsForCurrentBrowser,
   type StoredAttendanceDraft,
-} from "@/lib/session";
+} from '@/lib/session';
 
 const correctionColumns: PaginatedDataTableColumn<AttendanceCorrectionRequest>[] =
   [
     {
-      id: "id",
-      header: "Request",
+      id: 'id',
+      header: 'Request',
       cell: (item) => (
         <span className="font-bold text-blue-700">{item.id.slice(0, 8)}</span>
       ),
     },
     {
-      id: "student",
-      header: "Student",
+      id: 'student',
+      header: 'Student',
       cell: (item) => correctionStudentName(item),
     },
     {
-      id: "previousStatus",
-      header: "Original",
-      cell: (item) => item.previousStatus ?? "No record",
+      id: 'previousStatus',
+      header: 'Original',
+      cell: (item) => item.previousStatus ?? 'No record',
     },
     {
-      id: "requestedStatus",
-      header: "Requested",
+      id: 'requestedStatus',
+      header: 'Requested',
       cell: (item) => item.requestedStatus,
     },
     {
-      id: "status",
-      header: "Status",
+      id: 'status',
+      header: 'Status',
       cell: (item) => (
-        <Badge variant={item.status === "PENDING" ? "warning" : "success"}>
+        <Badge variant={item.status === 'PENDING' ? 'warning' : 'success'}>
           {item.status}
         </Badge>
       ),
     },
     {
-      id: "review",
-      header: "Review",
+      id: 'review',
+      header: 'Review',
       cell: (item) => (
         <Link
           className="text-sm font-bold text-blue-700"
@@ -139,23 +139,23 @@ const today = getNepalSchoolDay().gregorianDate;
 const thirtyDaysAgo = shiftGregorianDateOnly(today, -30);
 
 const attendanceTabs = [
-  { href: "/dashboard/attendance", label: "Overview", icon: BarChart3 },
+  { href: '/dashboard/attendance', label: 'Overview', icon: BarChart3 },
   {
-    href: "/dashboard/attendance/mark",
-    label: "Mark Attendance",
+    href: '/dashboard/attendance/mark',
+    label: 'Mark Attendance',
     icon: CalendarCheck,
   },
   {
-    href: "/dashboard/attendance/register/monthly",
-    label: "Monthly Register",
+    href: '/dashboard/attendance/register/monthly',
+    label: 'Monthly Register',
     icon: FileText,
   },
   {
-    href: "/dashboard/attendance/corrections",
-    label: "Corrections",
+    href: '/dashboard/attendance/corrections',
+    label: 'Corrections',
     icon: ClipboardCheck,
   },
-  { href: "/dashboard/attendance/reports", label: "Reports", icon: Download },
+  { href: '/dashboard/attendance/reports', label: 'Reports', icon: Download },
 ];
 
 function visibleAttendanceTabs(canMark: boolean, isSupportOverride: boolean) {
@@ -166,7 +166,7 @@ function visibleAttendanceTabs(canMark: boolean, isSupportOverride: boolean) {
   return canMark
     ? attendanceTabs
     : attendanceTabs.filter(
-        ({ href }) => href !== "/dashboard/attendance/mark",
+        ({ href }) => href !== '/dashboard/attendance/mark',
       );
 }
 
@@ -204,28 +204,28 @@ export function AttendanceOverviewWorkspace() {
   const { session } = useSession();
   const isSupportOverride = session?.user.isSupportOverride === true;
   const analyticsQuery = useQuery({
-    queryKey: ["attendance-analytics"],
+    queryKey: ['attendance-analytics'],
     queryFn: api.listAttendanceAnalytics,
   });
   const correctionsSummaryQuery = useQuery({
-    queryKey: ["attendance-corrections-summary", isSupportOverride],
+    queryKey: ['attendance-corrections-summary', isSupportOverride],
     queryFn: async () => {
       if (isSupportOverride) {
         return api.getAttendanceCorrectionSummary();
       }
       const page = await api.listAttendanceCorrections({
-        status: "PENDING",
+        status: 'PENDING',
         limit: 1,
       });
       return { pending: page.total };
     },
   });
   const conflictsQuery = useQuery({
-    queryKey: ["attendance-conflicts"],
+    queryKey: ['attendance-conflicts'],
     queryFn: api.listAttendanceConflicts,
   });
   const followUpsQuery = useQuery({
-    queryKey: ["attendance-m2-follow-ups", thirtyDaysAgo, today],
+    queryKey: ['attendance-m2-follow-ups', thirtyDaysAgo, today],
     queryFn: () =>
       api.listM2FollowUps({ fromDate: thirtyDaysAgo, toDate: today }),
   });
@@ -239,12 +239,12 @@ export function AttendanceOverviewWorkspace() {
         title="Smart Attendance"
         description={
           isSupportOverride
-            ? "Inspect submitted attendance and bounded operational evidence in this read-only support session."
-            : "Track daily attendance, late arrivals, corrections, and alerts across the school."
+            ? 'Inspect submitted attendance and bounded operational evidence in this read-only support session.'
+            : 'Track daily attendance, late arrivals, corrections, and alerts across the school.'
         }
         primaryAction={
           attendance.canMark ? (
-            <Button onClick={() => router.push("/dashboard/attendance/mark")}>
+            <Button onClick={() => router.push('/dashboard/attendance/mark')}>
               <CalendarCheck className="h-4 w-4" />
               Mark Attendance
             </Button>
@@ -257,44 +257,44 @@ export function AttendanceOverviewWorkspace() {
                 ...(attendance.canMark
                   ? [
                       {
-                        label: "Bulk actions",
+                        label: 'Bulk actions',
                         icon: <Users size={16} />,
                         onClick: () =>
-                          router.push("/dashboard/attendance/register"),
+                          router.push('/dashboard/attendance/register'),
                       },
                     ]
                   : []),
                 {
-                  label: "Exports and reports",
+                  label: 'Exports and reports',
                   icon: <Download size={16} />,
-                  onClick: () => router.push("/dashboard/attendance/reports"),
+                  onClick: () => router.push('/dashboard/attendance/reports'),
                 },
                 ...(attendance.canMark
                   ? [
                       {
-                        label: "Offline drafts",
+                        label: 'Offline drafts',
                         icon: <Save size={16} />,
                         onClick: () =>
-                          router.push("/dashboard/attendance/offline-drafts"),
+                          router.push('/dashboard/attendance/offline-drafts'),
                       },
                     ]
                   : []),
                 {
-                  label: "Attendance anomalies",
+                  label: 'Attendance anomalies',
                   icon: <ShieldAlert size={16} />,
-                  onClick: () => router.push("/dashboard/attendance/anomalies"),
+                  onClick: () => router.push('/dashboard/attendance/anomalies'),
                 },
                 {
-                  label: "Follow-up queue",
+                  label: 'Follow-up queue',
                   icon: <MessageSquare size={16} />,
                   onClick: () =>
-                    router.push("/dashboard/attendance/follow-ups"),
+                    router.push('/dashboard/attendance/follow-ups'),
                 },
                 {
-                  label: "Settings",
+                  label: 'Settings',
                   icon: <Settings size={16} />,
                   onClick: () =>
-                    router.push("/dashboard/settings/policies/attendance"),
+                    router.push('/dashboard/settings/policies/attendance'),
                 },
               ]
         }
@@ -304,7 +304,7 @@ export function AttendanceOverviewWorkspace() {
             label="Classes marked"
             loading={analyticsQuery.isLoading}
             value={
-              analytics?.todaySummary.submittedSessionCount ?? "Unavailable"
+              analytics?.todaySummary.submittedSessionCount ?? 'Unavailable'
             }
             icon={<CheckCircle2 size={20} />}
             tone="success"
@@ -312,8 +312,8 @@ export function AttendanceOverviewWorkspace() {
               isSupportOverride
                 ? undefined
                 : attendance.canMark
-                  ? "/dashboard/attendance/mark"
-                  : "/dashboard/attendance/register"
+                  ? '/dashboard/attendance/mark'
+                  : '/dashboard/attendance/register'
             }
             description="Submitted class sessions today."
           />
@@ -321,47 +321,47 @@ export function AttendanceOverviewWorkspace() {
             label="Classes not marked"
             loading={analyticsQuery.isLoading}
             value={
-              analytics?.todaySummary.notMarkedSessionCount ?? "Unavailable"
+              analytics?.todaySummary.notMarkedSessionCount ?? 'Unavailable'
             }
             icon={<AlertTriangle size={20} />}
             tone={
               (analytics?.todaySummary.notMarkedSessionCount ?? 0) > 0
-                ? "warning"
-                : "module"
+                ? 'warning'
+                : 'module'
             }
             href={
               isSupportOverride
                 ? undefined
                 : attendance.canMark
-                  ? "/dashboard/attendance/mark"
-                  : "/dashboard/attendance/register"
+                  ? '/dashboard/attendance/mark'
+                  : '/dashboard/attendance/register'
             }
             description="Active class scopes awaiting submission today."
           />
           <SummaryCard
             label="Absent today"
             loading={analyticsQuery.isLoading}
-            value={totals?.absent ?? "Unavailable"}
+            value={totals?.absent ?? 'Unavailable'}
             icon={<XCircle size={20} />}
             tone="danger"
             href={
-              isSupportOverride ? undefined : "/dashboard/attendance/reports"
+              isSupportOverride ? undefined : '/dashboard/attendance/reports'
             }
           />
           <SummaryCard
             label="Pending corrections"
             loading={correctionsSummaryQuery.isLoading}
-            value={correctionsSummaryQuery.data?.pending ?? "Unavailable"}
+            value={correctionsSummaryQuery.data?.pending ?? 'Unavailable'}
             icon={<ClipboardCheck size={20} />}
             tone={
               (correctionsSummaryQuery.data?.pending ?? 0) > 0
-                ? "warning"
-                : "module"
+                ? 'warning'
+                : 'module'
             }
             href={
               isSupportOverride
                 ? undefined
-                : "/dashboard/attendance/corrections"
+                : '/dashboard/attendance/corrections'
             }
           />
         </SummaryGrid>
@@ -401,7 +401,7 @@ export function AttendanceOverviewWorkspace() {
                     <TableRow key={session.sessionId}>
                       <TableCell className="font-bold text-slate-900">
                         {session.className}
-                        {session.sectionName ? ` / ${session.sectionName}` : ""}
+                        {session.sectionName ? ` / ${session.sectionName}` : ''}
                       </TableCell>
                       <TableCell>
                         {formatDate(session.attendanceDate)}
@@ -508,23 +508,23 @@ export function AttendanceRegisterWorkspace({
 }) {
   const router = useRouter();
   const { canExport } = useAttendanceCapabilities();
-  const [academicYearId, setAcademicYearId] = useState("");
-  const [classId, setClassId] = useState("");
-  const [sectionId, setSectionId] = useState("");
+  const [academicYearId, setAcademicYearId] = useState('');
+  const [classId, setClassId] = useState('');
+  const [sectionId, setSectionId] = useState('');
   const [currentBsDate] = useState(() => getNepalSchoolDay().bsDate);
   const [bsMonth, setBsMonth] = useState(currentBsDate.month);
   const [bsYear, setBsYear] = useState(currentBsDate.year);
-  const [exportMessage, setExportMessage] = useState("");
+  const [exportMessage, setExportMessage] = useState('');
   const academicYearsQuery = useQuery({
-    queryKey: ["academic-years"],
+    queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
   });
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
   const sectionsQuery = useQuery({
-    queryKey: ["sections"],
+    queryKey: ['sections'],
     queryFn: api.listSections,
   });
   const { isTeacherPersona } = useTeacherAccess();
@@ -562,7 +562,7 @@ export function AttendanceRegisterWorkspace({
     [assignedSections, classId, isTeacherPersona, sectionsQuery.data],
   );
   const currentRosterQuery = useQuery({
-    queryKey: ["attendance-register-current-year", classId, sectionId],
+    queryKey: ['attendance-register-current-year', classId, sectionId],
     queryFn: () =>
       api.getAttendanceRoster({
         classId,
@@ -575,7 +575,7 @@ export function AttendanceRegisterWorkspace({
   });
   const registerQuery = useQuery({
     queryKey: [
-      "attendance-register",
+      'attendance-register',
       academicYearId,
       classId,
       sectionId,
@@ -628,7 +628,7 @@ export function AttendanceRegisterWorkspace({
         ]
       : []);
 
-  async function exportRegister(format: "csv" | "pdf") {
+  async function exportRegister(format: 'csv' | 'pdf') {
     if (!canExport || !academicYearId || !classId) return;
     await api.exportAttendanceRegister(
       {
@@ -648,17 +648,17 @@ export function AttendanceRegisterWorkspace({
       <ModuleHeader
         eyebrow="Smart Attendance"
         title={
-          monthly ? "Monthly Attendance Register" : "Class Attendance Register"
+          monthly ? 'Monthly Attendance Register' : 'Class Attendance Register'
         }
         description={
           monthly
-            ? "View monthly attendance in a compact matrix."
-            : "Review attendance records by date, class, and section."
+            ? 'View monthly attendance in a compact matrix.'
+            : 'Review attendance records by date, class, and section.'
         }
         primaryAction={
           canExport ? (
             <Button
-              onClick={() => void exportRegister("csv")}
+              onClick={() => void exportRegister('csv')}
               disabled={!register?.matrix.length}
             >
               <Download className="h-4 w-4" />
@@ -670,19 +670,19 @@ export function AttendanceRegisterWorkspace({
           ...(canExport
             ? [
                 {
-                  label: "Download PDF",
+                  label: 'Download PDF',
                   icon: <FileText size={16} />,
-                  onClick: () => void exportRegister("pdf"),
+                  onClick: () => void exportRegister('pdf'),
                 },
               ]
             : []),
           {
-            label: "Review corrections",
+            label: 'Review corrections',
             icon: <ClipboardCheck size={16} />,
-            onClick: () => router.push("/dashboard/attendance/corrections"),
+            onClick: () => router.push('/dashboard/attendance/corrections'),
           },
           {
-            label: "Print register",
+            label: 'Print register',
             icon: <FileText size={16} />,
             onClick: printAttendanceRegister,
           },
@@ -691,15 +691,15 @@ export function AttendanceRegisterWorkspace({
         <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             title="Completed registers"
-            value={summary?.submittedDays ?? "Unavailable"}
+            value={summary?.submittedDays ?? 'Unavailable'}
             icon={<CheckCircle2 size={20} />}
             tone="success"
           />
           <KpiCard
             title="Pending registers"
-            value={summary?.notMarkedDays ?? "Unavailable"}
+            value={summary?.notMarkedDays ?? 'Unavailable'}
             icon={<FileClock size={20} />}
-            tone={(summary?.notMarkedDays ?? 0) > 0 ? "warning" : "neutral"}
+            tone={(summary?.notMarkedDays ?? 0) > 0 ? 'warning' : 'neutral'}
           />
           <KpiCard
             title="Locked days"
@@ -712,7 +712,7 @@ export function AttendanceRegisterWorkspace({
             title="Average attendance"
             value={
               summary?.attendancePercentage === null || !summary
-                ? "Unavailable"
+                ? 'Unavailable'
                 : `${summary.attendancePercentage}%`
             }
             icon={<BarChart3 size={20} />}
@@ -737,7 +737,7 @@ export function AttendanceRegisterWorkspace({
             value={classId}
             onChange={(value) => {
               setClassId(value);
-              setSectionId("");
+              setSectionId('');
             }}
             options={availableClasses.map((item) => [item.id, item.name])}
           />
@@ -746,7 +746,7 @@ export function AttendanceRegisterWorkspace({
             value={sectionId}
             onChange={setSectionId}
             options={[
-              ["", "All sections"],
+              ['', 'All sections'],
               ...availableSections.map(
                 (item) => [item.id, item.name] as [string, string],
               ),
@@ -792,17 +792,17 @@ export function AttendanceRegisterWorkspace({
   );
 }
 
-const AUDIT_LOG_VIEW = "AUDIT" as const;
+const AUDIT_LOG_VIEW = 'AUDIT' as const;
 
 const CORRECTIONS_PAGE_SIZE = 25;
 
 export function AttendanceCorrectionsQueueWorkspace() {
   const { canReviewConflicts } = useAttendanceCapabilities();
-  const [status, setStatus] = useState("PENDING");
+  const [status, setStatus] = useState('PENDING');
   const [page, setPage] = useState(1);
   const showAuditLog = status === AUDIT_LOG_VIEW;
   const correctionsQuery = useQuery({
-    queryKey: ["attendance-corrections", status, page],
+    queryKey: ['attendance-corrections', status, page],
     queryFn: () =>
       api.listAttendanceCorrections({
         status,
@@ -817,7 +817,7 @@ export function AttendanceCorrectionsQueueWorkspace() {
     setPage(1);
   }
   const auditQuery = useQuery({
-    queryKey: ["attendance-m2-correction-audit", thirtyDaysAgo, today],
+    queryKey: ['attendance-m2-correction-audit', thirtyDaysAgo, today],
     queryFn: () =>
       api.listM2CorrectionAudit({ fromDate: thirtyDaysAgo, toDate: today }),
     enabled: showAuditLog,
@@ -895,13 +895,13 @@ export function AttendanceCorrectionsQueueWorkspace() {
                     </TableCell>
                     <TableCell>{formatDate(item.attendanceDate)}</TableCell>
                     <TableCell>
-                      {item.previousStatus ?? "No record"} →{" "}
+                      {item.previousStatus ?? 'No record'} →{' '}
                       {item.requestedStatus}
                     </TableCell>
                     <TableCell>
                       <Badge
                         variant={
-                          item.status === "PENDING" ? "warning" : "success"
+                          item.status === 'PENDING' ? 'warning' : 'success'
                         }
                       >
                         {item.status}
@@ -910,7 +910,7 @@ export function AttendanceCorrectionsQueueWorkspace() {
                     <TableCell>
                       {item.reviewedAt
                         ? formatDateTime(item.reviewedAt)
-                        : "Not reviewed"}
+                        : 'Not reviewed'}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -928,7 +928,7 @@ export function AttendanceCorrectionsQueueWorkspace() {
             </Table>
           )}
         </SectionCard>
-      ) : status === "PENDING" ? (
+      ) : status === 'PENDING' ? (
         <div className="space-y-3">
           <AttendanceCorrectionReview
             corrections={correctionsQuery.data?.items ?? []}
@@ -951,9 +951,9 @@ export function AttendanceCorrectionsQueueWorkspace() {
       ) : (
         <SectionCard
           title={
-            status === "APPROVED"
-              ? "Reviewed Corrections"
-              : "Escalated Corrections"
+            status === 'APPROVED'
+              ? 'Reviewed Corrections'
+              : 'Escalated Corrections'
           }
           description="Correction requests available to your role and school."
           headerAction={
@@ -968,10 +968,10 @@ export function AttendanceCorrectionsQueueWorkspace() {
             getRowId={(item) => item.id}
             status={
               correctionsQuery.isError
-                ? "error"
+                ? 'error'
                 : correctionsQuery.isLoading
-                  ? "loading"
-                  : "ready"
+                  ? 'loading'
+                  : 'ready'
             }
             page={page}
             pageSize={CORRECTIONS_PAGE_SIZE}
@@ -991,16 +991,16 @@ export function AttendanceCorrectionsQueueWorkspace() {
 export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const { canReviewConflicts, resolution } = useAttendanceCapabilities();
-  const permissionsLoading = resolution === "loading";
+  const permissionsLoading = resolution === 'loading';
   const policyQuery = useQuery({
-    queryKey: ["attendance-m2-policy"],
+    queryKey: ['attendance-m2-policy'],
     queryFn: api.getM2Policy,
   });
   const reviewMinReasonLength =
     policyQuery.data?.policy.correctionReviewMinReasonLength ?? 8;
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState('');
   const correctionQuery = useQuery({
-    queryKey: ["attendance-correction", id],
+    queryKey: ['attendance-correction', id],
     queryFn: () => api.getAttendanceCorrection(id),
   });
   const approveMutation = useMutation({
@@ -1008,10 +1008,10 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
       api.approveAttendanceCorrection(id, { reviewReason: reason }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["attendance-correction", id],
+        queryKey: ['attendance-correction', id],
       });
       void queryClient.invalidateQueries({
-        queryKey: ["attendance-corrections"],
+        queryKey: ['attendance-corrections'],
       });
     },
   });
@@ -1020,17 +1020,17 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
       api.rejectAttendanceCorrection(id, { reviewReason: reason }),
     onSuccess: () =>
       void queryClient.invalidateQueries({
-        queryKey: ["attendance-correction", id],
+        queryKey: ['attendance-correction', id],
       }),
   });
   const correction = correctionQuery.data;
   const canDecide =
     canReviewConflicts &&
-    correction?.status === "PENDING" &&
+    correction?.status === 'PENDING' &&
     !permissionsLoading;
   const lockStateRequiresEscalation =
-    correction?.lockState === "OVERRIDE_REQUIRED" ||
-    correction?.lockState === "EXPIRED";
+    correction?.lockState === 'OVERRIDE_REQUIRED' ||
+    correction?.lockState === 'EXPIRED';
 
   return (
     <DashboardPageShell>
@@ -1048,7 +1048,7 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
                 }
               >
                 <CheckCircle2 className="h-4 w-4" />
-                {approveMutation.isPending ? "Approving..." : "Approve"}
+                {approveMutation.isPending ? 'Approving...' : 'Approve'}
               </Button>
               <Button
                 variant="destructive"
@@ -1059,7 +1059,7 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
                 }
               >
                 <XCircle className="h-4 w-4" />
-                {rejectMutation.isPending ? "Rejecting..." : "Reject"}
+                {rejectMutation.isPending ? 'Rejecting...' : 'Reject'}
               </Button>
             </div>
           ) : undefined
@@ -1155,7 +1155,7 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
                 Minimum reason length: {reviewMinReasonLength} characters from
                 tenant policy.
               </p>
-              {correction.status === "APPROVED" ? (
+              {correction.status === 'APPROVED' ? (
                 <div className="mt-4">
                   <Notice tone="success">
                     Approved corrections update the official record and the day
@@ -1167,12 +1167,12 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
             <SectionCard title="Approval History">
               <SummaryRows
                 rows={[
-                  ["Request submitted", formatDateTime(correction.requestedAt)],
+                  ['Request submitted', formatDateTime(correction.requestedAt)],
                   [
-                    "Under review",
-                    correction.reviewedAt ? "Reviewed" : "Pending",
+                    'Under review',
+                    correction.reviewedAt ? 'Reviewed' : 'Pending',
                   ],
-                  ["Decision", correction.status],
+                  ['Decision', correction.status],
                 ]}
               />
             </SectionCard>
@@ -1189,11 +1189,11 @@ export function AttendanceOfflineDraftsWorkspace() {
   const [localDraftsLoading, setLocalDraftsLoading] = useState(true);
   const [localDraftsError, setLocalDraftsError] = useState<Error | null>(null);
   const draftsQuery = useQuery({
-    queryKey: ["attendance-drafts"],
+    queryKey: ['attendance-drafts'],
     queryFn: api.listAttendanceDrafts,
   });
   const conflictsQuery = useQuery({
-    queryKey: ["attendance-m2-offline-conflicts", thirtyDaysAgo, today],
+    queryKey: ['attendance-m2-offline-conflicts', thirtyDaysAgo, today],
     queryFn: () =>
       api.listM2OfflineConflicts({
         fromDate: thirtyDaysAgo,
@@ -1236,7 +1236,7 @@ export function AttendanceOfflineDraftsWorkspace() {
       } catch {
         if (!cancelled) {
           setLocalDraftsError(
-            new Error("Saved drafts are unavailable on this browser."),
+            new Error('Saved drafts are unavailable on this browser.'),
           );
         }
       } finally {
@@ -1300,8 +1300,8 @@ export function AttendanceOfflineDraftsWorkspace() {
                       <TableCell>
                         <div className="font-semibold text-slate-900">
                           {accessRestricted
-                            ? "Attendance access removed"
-                            : (draft.classLabel ?? "Selected class")}
+                            ? 'Attendance access removed'
+                            : (draft.classLabel ?? 'Selected class')}
                         </div>
                         {!accessRestricted && draft.sectionLabel ? (
                           <div className="text-xs text-slate-500">
@@ -1310,15 +1310,15 @@ export function AttendanceOfflineDraftsWorkspace() {
                         ) : null}
                         <div className="text-xs text-slate-500">
                           {accessRestricted
-                            ? "Student details cleared from this browser"
+                            ? 'Student details cleared from this browser'
                             : (draft.academicYearLabel ??
-                              "Academic year label unavailable")}
+                              'Academic year label unavailable')}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div>
                           {accessRestricted
-                            ? "Scope hidden"
+                            ? 'Scope hidden'
                             : formatDate(draft.attendanceDate)}
                         </div>
                         <div className="text-xs text-slate-500">
@@ -1338,7 +1338,7 @@ export function AttendanceOfflineDraftsWorkspace() {
                         ) : (
                           <Link
                             href={attendanceDraftRecoveryHref(draft)}
-                            aria-label={`Open saved attendance scope for ${draft.classLabel ?? "selected class"} on ${formatDate(draft.attendanceDate)}`}
+                            aria-label={`Open saved attendance scope for ${draft.classLabel ?? 'selected class'} on ${formatDate(draft.attendanceDate)}`}
                             className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
                           >
                             Open saved scope
@@ -1375,7 +1375,7 @@ export function AttendanceOfflineDraftsWorkspace() {
                   <TableRow key={draft.id}>
                     <TableCell>
                       {draft.class?.name ?? draft.classId}
-                      {draft.section?.name ? ` / ${draft.section.name}` : ""}
+                      {draft.section?.name ? ` / ${draft.section.name}` : ''}
                     </TableCell>
                     <TableCell>{formatDate(draft.attendanceDate)}</TableCell>
                     <TableCell>
@@ -1435,65 +1435,65 @@ export function AttendanceOfflineDraftsWorkspace() {
 
 function getAttendanceSyncStatusLabel(status: string) {
   switch (status) {
-    case "ACCEPTED":
-    case "SYNCED":
-      return "Received";
-    case "CONFLICTED":
-      return "Needs office review";
-    case "REJECTED":
-      return "Not accepted";
-    case "PROCESSING":
-      return "Checking server receipt";
-    case "DUPLICATE":
-      return "Already received";
+    case 'ACCEPTED':
+    case 'SYNCED':
+      return 'Received';
+    case 'CONFLICTED':
+      return 'Needs office review';
+    case 'REJECTED':
+      return 'Not accepted';
+    case 'PROCESSING':
+      return 'Checking server receipt';
+    case 'DUPLICATE':
+      return 'Already received';
     default:
-      return "Needs review";
+      return 'Needs review';
   }
 }
 
 function getAttendanceSyncStatusTone(
   status: string,
-): "destructive" | "success" | "warning" | "neutral" {
-  if (status === "REJECTED") return "destructive";
-  if (["ACCEPTED", "SYNCED", "DUPLICATE"].includes(status)) return "success";
-  if (["PROCESSING", "CONFLICTED"].includes(status)) return "warning";
-  return "neutral";
+): 'destructive' | 'success' | 'warning' | 'neutral' {
+  if (status === 'REJECTED') return 'destructive';
+  if (['ACCEPTED', 'SYNCED', 'DUPLICATE'].includes(status)) return 'success';
+  if (['PROCESSING', 'CONFLICTED'].includes(status)) return 'warning';
+  return 'neutral';
 }
 
 function getAttendanceSyncNextStep(
   status: string,
   rejectionReason: string | null,
 ) {
-  if (status === "PROCESSING") {
-    return "Keep the device draft and check the official roster before retrying.";
+  if (status === 'PROCESSING') {
+    return 'Keep the device draft and check the official roster before retrying.';
   }
-  if (status === "CONFLICTED") {
-    return "The office must compare this submission with the official roster.";
+  if (status === 'CONFLICTED') {
+    return 'The office must compare this submission with the official roster.';
   }
-  if (status !== "REJECTED") {
-    return "No action is required unless the roster looks different.";
+  if (status !== 'REJECTED') {
+    return 'No action is required unless the roster looks different.';
   }
 
   switch (rejectionReason) {
-    case "LOCKED_SESSION":
-      return "The attendance day is locked. Request a correction if needed.";
-    case "ROSTER_MISMATCH":
-      return "The roster changed. Review the saved draft against the current roster.";
-    case "REFERENCE_NOT_FOUND":
-      return "The class, section, year, or student scope is no longer available.";
-    case "VALIDATION_ERROR":
-      return "Review the school day and attendance entries before creating a revised draft.";
-    case "SCOPE_REVOKED":
-    case "UNASSIGNED_TEACHER":
+    case 'LOCKED_SESSION':
+      return 'The attendance day is locked. Request a correction if needed.';
+    case 'ROSTER_MISMATCH':
+      return 'The roster changed. Review the saved draft against the current roster.';
+    case 'REFERENCE_NOT_FOUND':
+      return 'The class, section, year, or student scope is no longer available.';
+    case 'VALIDATION_ERROR':
+      return 'Review the school day and attendance entries before creating a revised draft.';
+    case 'SCOPE_REVOKED':
+    case 'UNASSIGNED_TEACHER':
       return "This teacher's assignment changed. Do not resend this draft; create a new one only if access is restored.";
     default:
-      return "Keep the device draft and ask the office to check the official roster.";
+      return 'Keep the device draft and ask the office to check the official roster.';
   }
 }
 
 export function AttendanceAnomaliesWorkspace() {
   const anomaliesQuery = useQuery({
-    queryKey: ["attendance-m2-hardened-anomalies", thirtyDaysAgo, today],
+    queryKey: ['attendance-m2-hardened-anomalies', thirtyDaysAgo, today],
     queryFn: () =>
       api.listM2HardenedAnomalies({ fromDate: thirtyDaysAgo, toDate: today }),
   });
@@ -1529,21 +1529,21 @@ export function AttendanceAnomaliesWorkspace() {
             </TableHeader>
             <TableBody>
               {(anomaliesQuery.data?.anomalies ?? []).map((item, index) => (
-                <TableRow key={`${item.code ?? "anomaly"}-${index}`}>
+                <TableRow key={`${item.code ?? 'anomaly'}-${index}`}>
                   <TableCell>
-                    {String(item.code ?? item.title ?? "ANOMALY")}
+                    {String(item.code ?? item.title ?? 'ANOMALY')}
                   </TableCell>
                   <TableCell>
                     <Badge
                       variant={
-                        item.severity === "HIGH" ? "destructive" : "warning"
+                        item.severity === 'HIGH' ? 'destructive' : 'warning'
                       }
                     >
-                      {String(item.severity ?? "MEDIUM")}
+                      {String(item.severity ?? 'MEDIUM')}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {String(item.className ?? "Class scope")}
+                    {String(item.className ?? 'Class scope')}
                   </TableCell>
                   <TableCell>
                     {formatDate(String(item.attendanceDate ?? today))}
@@ -1563,10 +1563,10 @@ export function AttendanceAnomaliesWorkspace() {
 
 export function AttendanceFollowUpsWorkspace() {
   const { canManageAll } = useAttendanceCapabilities();
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState('');
   const queryClient = useQueryClient();
   const queueQuery = useQuery({
-    queryKey: ["attendance-m2-follow-ups", thirtyDaysAgo, today],
+    queryKey: ['attendance-m2-follow-ups', thirtyDaysAgo, today],
     queryFn: () =>
       api.listM2FollowUps({ fromDate: thirtyDaysAgo, toDate: today }),
   });
@@ -1588,7 +1588,7 @@ export function AttendanceFollowUpsWorkspace() {
       }),
     onSuccess: () =>
       void queryClient.invalidateQueries({
-        queryKey: ["attendance-m2-follow-ups"],
+        queryKey: ['attendance-m2-follow-ups'],
       }),
   });
 
@@ -1656,7 +1656,7 @@ export function AttendanceStudentProfileWorkspace({
   studentId: string;
 }) {
   const historyQuery = useQuery({
-    queryKey: ["attendance-student-history", studentId],
+    queryKey: ['attendance-student-history', studentId],
     queryFn: () =>
       api.getAttendanceStudentHistory(studentId, {
         startDate: thirtyDaysAgo,
@@ -1664,7 +1664,7 @@ export function AttendanceStudentProfileWorkspace({
       }),
   });
   const summaryQuery = useQuery({
-    queryKey: ["attendance-student-summary", studentId],
+    queryKey: ['attendance-student-summary', studentId],
     queryFn: () => api.getAttendanceStudentSummary(studentId),
   });
   const summary = summaryQuery.data;
@@ -1682,7 +1682,7 @@ export function AttendanceStudentProfileWorkspace({
           value={
             summary
               ? `${Math.round(summary.percentage * 10) / 10}%`
-              : "Unavailable"
+              : 'Unavailable'
           }
           icon={<BarChart3 size={20} />}
           tone="success"
@@ -1690,21 +1690,21 @@ export function AttendanceStudentProfileWorkspace({
         <KpiCard
           title="Present"
           loading={summaryQuery.isLoading}
-          value={summary?.totals.present ?? "Unavailable"}
+          value={summary?.totals.present ?? 'Unavailable'}
           icon={<CheckCircle2 size={20} />}
           tone="success"
         />
         <KpiCard
           title="Absent"
           loading={summaryQuery.isLoading}
-          value={summary?.totals.absent ?? "Unavailable"}
+          value={summary?.totals.absent ?? 'Unavailable'}
           icon={<XCircle size={20} />}
           tone="danger"
         />
         <KpiCard
           title="Late"
           loading={summaryQuery.isLoading}
-          value={summary?.totals.late ?? "Unavailable"}
+          value={summary?.totals.late ?? 'Unavailable'}
           icon={<FileClock size={20} />}
           tone="warning"
         />
@@ -1729,7 +1729,7 @@ export function AttendanceStudentProfileWorkspace({
                   <TableCell>
                     <StatusBadge status={item.status} />
                   </TableCell>
-                  <TableCell>{item.remark ?? "-"}</TableCell>
+                  <TableCell>{item.remark ?? '-'}</TableCell>
                   <TableCell>{item.markedBy}</TableCell>
                 </TableRow>
               ))}
@@ -1743,11 +1743,11 @@ export function AttendanceStudentProfileWorkspace({
 
 export function AttendanceReportsWorkspace() {
   const analyticsQuery = useQuery({
-    queryKey: ["attendance-analytics"],
+    queryKey: ['attendance-analytics'],
     queryFn: api.listAttendanceAnalytics,
   });
   const exportHistoryQuery = useQuery({
-    queryKey: ["attendance-register-exports", 1, 8],
+    queryKey: ['attendance-register-exports', 1, 8],
     queryFn: () => api.listAttendanceRegisterExports({ page: 1, limit: 8 }),
   });
   const analytics = analyticsQuery.data;
@@ -1775,7 +1775,7 @@ export function AttendanceReportsWorkspace() {
             value={
               analytics
                 ? `${analytics.monthlyAttendance.attendancePercent}%`
-                : "Unavailable"
+                : 'Unavailable'
             }
             icon={<Users size={20} />}
             tone="info"
@@ -1783,14 +1783,14 @@ export function AttendanceReportsWorkspace() {
           <KpiCard
             title="Students below 80%"
             loading={analyticsQuery.isLoading}
-            value={analytics?.below80Warnings?.length ?? "Unavailable"}
+            value={analytics?.below80Warnings?.length ?? 'Unavailable'}
             icon={<AlertTriangle size={20} />}
             tone="warning"
           />
           <KpiCard
             title="Avg late arrivals"
             loading={analyticsQuery.isLoading}
-            value={analytics?.todaySummary.totals.late ?? "Unavailable"}
+            value={analytics?.todaySummary.totals.late ?? 'Unavailable'}
             icon={<FileClock size={20} />}
             tone="warning"
           />
@@ -1803,7 +1803,7 @@ export function AttendanceReportsWorkspace() {
           <KpiCard
             title="Leave utilization"
             loading={analyticsQuery.isLoading}
-            value={analytics?.todaySummary.totals.leave ?? "Unavailable"}
+            value={analytics?.todaySummary.totals.leave ?? 'Unavailable'}
             icon={<CalendarCheck size={20} />}
             tone="info"
           />
@@ -1836,7 +1836,7 @@ export function AttendanceReportsWorkspace() {
                     <TableRow key={session.sessionId}>
                       <TableCell>
                         {session.className}
-                        {session.sectionName ? ` / ${session.sectionName}` : ""}
+                        {session.sectionName ? ` / ${session.sectionName}` : ''}
                       </TableCell>
                       <TableCell>{rate}%</TableCell>
                       <TableCell>{session.totals.present}</TableCell>
@@ -1897,7 +1897,7 @@ export function AttendanceReportsWorkspace() {
                               Download protected file
                             </ProtectedFileButton>
                             <span className="text-xs font-semibold text-slate-500">
-                              {item.file.fileName} ·{" "}
+                              {item.file.fileName} ·{' '}
                               {formatFileSize(item.file.sizeBytes)}
                             </span>
                           </div>
@@ -1910,7 +1910,7 @@ export function AttendanceReportsWorkspace() {
                       <TableCell>
                         {item.completedAt
                           ? formatBsDateTime(item.completedAt)
-                          : "Not completed"}
+                          : 'Not completed'}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1923,11 +1923,11 @@ export function AttendanceReportsWorkspace() {
           <SummaryRows
             rows={[
               [
-                "Lifecycle",
-                "Requested / queued / processing / completed / failed",
+                'Lifecycle',
+                'Requested / queued / processing / completed / failed',
               ],
-              ["Download", "Protected File Registry helper"],
-              ["Retained exports", String(exportHistoryQuery.data?.total ?? 0)],
+              ['Download', 'Protected File Registry helper'],
+              ['Retained exports', String(exportHistoryQuery.data?.total ?? 0)],
             ]}
           />
         </SectionCard>
@@ -1942,14 +1942,14 @@ export function AttendanceSettingsWorkspace() {
   const attendance = useAttendanceCapabilities();
   const canManage = attendance.canManageAll;
   const policyQuery = useQuery({
-    queryKey: ["attendance-m2-policy"],
+    queryKey: ['attendance-m2-policy'],
     queryFn: api.getM2Policy,
   });
   const statesQuery = useQuery({
-    queryKey: ["attendance-m2-states"],
+    queryKey: ['attendance-m2-states'],
     queryFn: api.getM2States,
   });
-  const [lateThreshold, setLateThreshold] = useState("");
+  const [lateThreshold, setLateThreshold] = useState('');
   const updateMutation = useMutation({
     mutationFn: () =>
       api.updateM2Policy({
@@ -1957,7 +1957,7 @@ export function AttendanceSettingsWorkspace() {
       }),
     onSuccess: () =>
       void queryClient.invalidateQueries({
-        queryKey: ["attendance-m2-policy"],
+        queryKey: ['attendance-m2-policy'],
       }),
   });
   const policy = policyQuery.data?.policy;
@@ -1967,7 +1967,7 @@ export function AttendanceSettingsWorkspace() {
       <SchoolSettingsPageHeader
         title="Attendance"
         description="Configure attendance rules, lock windows, calendar policy, notifications, and role summaries."
-        access={canManage ? "can-manage" : "view-only"}
+        access={canManage ? 'can-manage' : 'view-only'}
         actions={
           lateThreshold && canManage ? (
             <Button
@@ -1975,7 +1975,7 @@ export function AttendanceSettingsWorkspace() {
               disabled={updateMutation.isPending}
             >
               <Save className="h-4 w-4" />
-              {updateMutation.isPending ? "Saving…" : "Save Settings"}
+              {updateMutation.isPending ? 'Saving…' : 'Save Settings'}
             </Button>
           ) : undefined
         }
@@ -1986,25 +1986,25 @@ export function AttendanceSettingsWorkspace() {
           <SectionCard title="School Attendance Policy">
             <SummaryRows
               rows={[
-                ["Default mark state", "Present by daily attendance default"],
+                ['Default mark state', 'Present by daily attendance default'],
                 [
-                  "Late follow-up threshold",
-                  String(policy?.lateFollowUpThreshold ?? "Unavailable"),
+                  'Late follow-up threshold',
+                  String(policy?.lateFollowUpThreshold ?? 'Unavailable'),
                 ],
                 [
-                  "Half-day rule",
+                  'Half-day rule',
                   statesQuery.data?.persisted.some(
-                    (state) => state.code === "HALF_DAY",
+                    (state) => state.code === 'HALF_DAY',
                   )
-                    ? "Supported"
-                    : "Unavailable",
+                    ? 'Supported'
+                    : 'Unavailable',
                 ],
                 [
-                  "Leave categories",
+                  'Leave categories',
                   statesQuery.data?.persisted
-                    .filter((state) => state.code.includes("LEAVE"))
+                    .filter((state) => state.code.includes('LEAVE'))
                     .map((state) => state.label)
-                    .join(", ") ?? "Unavailable",
+                    .join(', ') ?? 'Unavailable',
                 ],
               ]}
             />
@@ -2023,18 +2023,18 @@ export function AttendanceSettingsWorkspace() {
             <SummaryRows
               rows={[
                 [
-                  "Teacher submission deadline",
-                  `${policy?.cutoffHour ?? "--"}:${String(policy?.cutoffMinute ?? 0).padStart(2, "0")}`,
+                  'Teacher submission deadline',
+                  `${policy?.cutoffHour ?? '--'}:${String(policy?.cutoffMinute ?? 0).padStart(2, '0')}`,
                 ],
                 [
-                  "Correction review reason",
-                  `${policy?.correctionReviewMinReasonLength ?? "--"} chars minimum`,
+                  'Correction review reason',
+                  `${policy?.correctionReviewMinReasonLength ?? '--'} chars minimum`,
                 ],
                 [
-                  "Override reason",
-                  `${policy?.lockOverrideMinReasonLength ?? "--"} chars minimum`,
+                  'Override reason',
+                  `${policy?.lockOverrideMinReasonLength ?? '--'} chars minimum`,
                 ],
-                ["Historical locked dates", "Recorded session lock time"],
+                ['Historical locked dates', 'Recorded session lock time'],
               ]}
             />
           </SectionCard>
@@ -2042,21 +2042,21 @@ export function AttendanceSettingsWorkspace() {
             <SummaryRows
               rows={[
                 [
-                  "Parent absence notifications",
-                  policy?.notifyParentsForAbsence ? "Enabled" : "Disabled",
+                  'Parent absence notifications',
+                  policy?.notifyParentsForAbsence ? 'Enabled' : 'Disabled',
                 ],
                 [
-                  "Parent late notifications",
-                  policy?.notifyParentsForLate ? "Enabled" : "Disabled",
+                  'Parent late notifications',
+                  policy?.notifyParentsForLate ? 'Enabled' : 'Disabled',
                 ],
                 [
-                  "Channels",
-                  policy?.parentNotificationChannels.join(", ") ??
-                    "Unavailable",
+                  'Channels',
+                  policy?.parentNotificationChannels.join(', ') ??
+                    'Unavailable',
                 ],
                 [
-                  "Provider state",
-                  "Read through M10 delivery/provider records",
+                  'Provider state',
+                  'Read through M10 delivery/provider records',
                 ],
               ]}
             />
@@ -2064,10 +2064,10 @@ export function AttendanceSettingsWorkspace() {
           <SectionCard title="Role Permissions Summary">
             <SummaryRows
               rows={[
-                ["Teacher", "Assigned class/section/subject only"],
-                ["Attendance admin", "Review/override where permissions allow"],
-                ["Parent", "Linked child summaries only"],
-                ["Student", "Own/session scoped only"],
+                ['Teacher', 'Assigned class/section/subject only'],
+                ['Attendance admin', 'Review/override where permissions allow'],
+                ['Parent', 'Linked child summaries only'],
+                ['Student', 'Own/session scoped only'],
               ]}
             />
           </SectionCard>
@@ -2076,13 +2076,13 @@ export function AttendanceSettingsWorkspace() {
           <SummaryRows
             rows={[
               [
-                "Rule highlights",
-                statesQuery.data?.supportPolicy ?? "Unavailable",
+                'Rule highlights',
+                statesQuery.data?.supportPolicy ?? 'Unavailable',
               ],
-              ["Audit history", "Policy updates retained in the audit history"],
+              ['Audit history', 'Policy updates retained in the audit history'],
               [
-                "Device configuration",
-                "Biometric/device setup is not part of M2",
+                'Device configuration',
+                'Biometric/device setup is not part of M2',
               ],
             ]}
           />
@@ -2099,7 +2099,7 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
   );
   return (
     <SectionCard
-      title={`${register.className}${register.sectionName ? ` / ${register.sectionName}` : ""}`}
+      title={`${register.className}${register.sectionName ? ` / ${register.sectionName}` : ''}`}
       description={`${register.periodLabel} · Compact monthly matrix from the official register.`}
       noPadding
       className="attendance-register-print"
@@ -2109,12 +2109,12 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
       <dl className="flex flex-wrap gap-x-4 gap-y-1 border-b border-slate-100 px-4 py-2.5 text-xs text-slate-600">
         {(
           [
-            ["P", "Present"],
-            ["A", "Absent"],
-            ["L", "Late"],
-            ["LV", "Leave"],
-            ["H", "Holiday"],
-            ["NM", "Not marked"],
+            ['P', 'Present'],
+            ['A', 'Absent'],
+            ['L', 'Late'],
+            ['LV', 'Leave'],
+            ['H', 'Holiday'],
+            ['NM', 'Not marked'],
           ] as const
         ).map(([code, label]) => (
           <div key={code} className="flex items-center gap-1.5">
@@ -2165,7 +2165,7 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
                 <td className="sticky left-0 z-10 border-b bg-white p-3 font-bold text-slate-900">
                   {student.name}
                   <div className="text-xs text-slate-500">
-                    Roll {student.rollNumber ?? "-"}
+                    Roll {student.rollNumber ?? '-'}
                   </div>
                 </td>
                 {student.attendance.map((entry) => (
@@ -2175,7 +2175,7 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
                     // readers: the two-letter code alone is not a label.
                     title={`Day ${entry.day}: ${statusLabel(entry.status)}`}
                     className={cn(
-                      "border-b p-2 text-center text-xs font-black",
+                      'border-b p-2 text-center text-xs font-black',
                       statusColor(entry.status),
                     )}
                   >
@@ -2196,7 +2196,7 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
                 </td>
                 <td className="border-b p-2 text-center font-bold text-slate-700">
                   {student.totals.percentage === null
-                    ? "-"
+                    ? '-'
                     : student.totals.percentage.toFixed(1)}
                 </td>
               </tr>
@@ -2213,7 +2213,7 @@ function RegisterSnapshot({
   summary,
 }: {
   register: AttendanceMonthlyRegister;
-  summary: AttendanceMonthlyRegister["summary"];
+  summary: AttendanceMonthlyRegister['summary'];
 }) {
   return (
     <div className="space-y-6">
@@ -2221,36 +2221,36 @@ function RegisterSnapshot({
         <SummaryRows
           rows={[
             [
-              "Class",
-              `${register.className}${register.sectionName ? ` / ${register.sectionName}` : ""}`,
+              'Class',
+              `${register.className}${register.sectionName ? ` / ${register.sectionName}` : ''}`,
             ],
-            ["Period", register.periodLabel],
-            ["Total students", String(summary.totalStudents)],
-            ["Working days", String(summary.workingDays)],
-            ["Holidays / closures", String(summary.holidayDays)],
-            ["Submitted days", String(summary.submittedDays)],
-            ["Draft days", String(summary.draftDays)],
-            ["Not marked days", String(summary.notMarkedDays)],
+            ['Period', register.periodLabel],
+            ['Total students', String(summary.totalStudents)],
+            ['Working days', String(summary.workingDays)],
+            ['Holidays / closures', String(summary.holidayDays)],
+            ['Submitted days', String(summary.submittedDays)],
+            ['Draft days', String(summary.draftDays)],
+            ['Not marked days', String(summary.notMarkedDays)],
             [
-              "Attendance rate",
+              'Attendance rate',
               summary.attendancePercentage === null
-                ? "Unavailable"
+                ? 'Unavailable'
                 : `${summary.attendancePercentage}%`,
             ],
-            ["Absent records", String(summary.totals.absent)],
-            ["Late records", String(summary.totals.late)],
-            ["Leave records", String(summary.totals.leave)],
+            ['Absent records', String(summary.totals.absent)],
+            ['Late records', String(summary.totals.late)],
+            ['Leave records', String(summary.totals.leave)],
           ]}
         />
       </SectionCard>
       <SectionCard title="Legend">
         <SummaryRows
           rows={[
-            ["P", "Present"],
-            ["A", "Absent"],
-            ["L", "Late"],
-            ["LV", "Leave"],
-            ["-", "Holiday / not marked"],
+            ['P', 'Present'],
+            ['A', 'Absent'],
+            ['L', 'Late'],
+            ['LV', 'Leave'],
+            ['-', 'Holiday / not marked'],
           ]}
         />
       </SectionCard>
@@ -2278,7 +2278,7 @@ function TrendPanel({
           >
             <span className="text-sm font-bold text-slate-800">
               {item.className}
-              {item.sectionName ? ` / ${item.sectionName}` : ""}
+              {item.sectionName ? ` / ${item.sectionName}` : ''}
             </span>
             <span className="text-sm font-black text-blue-700">
               {item.attendancePercent}%
@@ -2312,7 +2312,7 @@ function ActivityPanel({
           >
             <p className="text-sm font-bold text-slate-900">
               Attendance marked for {session.className}
-              {session.sectionName ? ` / ${session.sectionName}` : ""}
+              {session.sectionName ? ` / ${session.sectionName}` : ''}
             </p>
             <p className="text-xs text-slate-500">
               {formatDateTime(session.submittedAt ?? session.attendanceDate)}
@@ -2354,7 +2354,7 @@ function AtRiskPanel({
               </p>
               <p className="text-xs text-slate-500">
                 {item.className}
-                {item.sectionName ? ` / ${item.sectionName}` : ""} ·{" "}
+                {item.sectionName ? ` / ${item.sectionName}` : ''} ·{' '}
                 {item.absences} absences · {item.lates} late
               </p>
             </Link>
@@ -2401,14 +2401,14 @@ function FollowUpTable({
               </Link>
               <div className="text-xs text-slate-500">
                 {item.className}
-                {item.sectionName ? ` / ${item.sectionName}` : ""}
+                {item.sectionName ? ` / ${item.sectionName}` : ''}
               </div>
             </TableCell>
             <TableCell>{item.absences}</TableCell>
             <TableCell>{item.lates}</TableCell>
             <TableCell>{item.consecutiveAbsences}</TableCell>
             <TableCell>
-              {item.recommendedChannels.join(", ") || "Provider unavailable"}
+              {item.recommendedChannels.join(', ') || 'Provider unavailable'}
             </TableCell>
           </TableRow>
         ))}
@@ -2463,7 +2463,7 @@ function SelectLike({
         onChange={(event) => onChange(event.target.value)}
       >
         {options.map(([optionValue, optionLabel]) => (
-          <option key={optionValue || "all"} value={optionValue}>
+          <option key={optionValue || 'all'} value={optionValue}>
             {optionLabel}
           </option>
         ))}
@@ -2476,18 +2476,18 @@ function Notice({
   tone,
   children,
 }: {
-  tone: "info" | "warning" | "success";
+  tone: 'info' | 'warning' | 'success';
   children: ReactNode;
 }) {
   return (
     <div
       className={cn(
-        "rounded-xl border px-4 py-3 text-sm font-semibold",
-        tone === "success" &&
-          "border-success-100 bg-success-50 text-success-700",
-        tone === "warning" &&
-          "border-warning-100 bg-warning-50 text-warning-800",
-        tone === "info" && "border-info-100 bg-info-50 text-info-800",
+        'rounded-xl border px-4 py-3 text-sm font-semibold',
+        tone === 'success' &&
+          'border-success-100 bg-success-50 text-success-700',
+        tone === 'warning' &&
+          'border-warning-100 bg-warning-50 text-warning-800',
+        tone === 'info' && 'border-info-100 bg-info-50 text-info-800',
       )}
     >
       {children}
@@ -2531,21 +2531,21 @@ function ComparisonCard({
 }: {
   title: string;
   rows: Record<string, string | null>;
-  tone: "success" | "danger";
+  tone: 'success' | 'danger';
 }) {
   return (
     <div
       className={cn(
-        "rounded-xl border p-4",
-        tone === "success"
-          ? "border-success-100 bg-success-50/40"
-          : "border-danger-100 bg-danger-50/40",
+        'rounded-xl border p-4',
+        tone === 'success'
+          ? 'border-success-100 bg-success-50/40'
+          : 'border-danger-100 bg-danger-50/40',
       )}
     >
       <h3
         className={cn(
-          "text-sm font-black",
-          tone === "success" ? "text-success-800" : "text-danger-800",
+          'text-sm font-black',
+          tone === 'success' ? 'text-success-800' : 'text-danger-800',
         )}
       >
         {title}
@@ -2554,10 +2554,10 @@ function ComparisonCard({
         {Object.entries(rows).map(([key, value]) => (
           <div key={key} className="flex justify-between gap-3 text-sm">
             <span className="font-semibold capitalize text-slate-500">
-              {key.replace(/[A-Z]/g, " $&")}
+              {key.replace(/[A-Z]/g, ' $&')}
             </span>
             <span className="text-right font-bold text-slate-900">
-              {value ?? "-"}
+              {value ?? '-'}
             </span>
           </div>
         ))}
@@ -2577,33 +2577,33 @@ function attendanceDraftRecoveryHref(draft: StoredAttendanceDraft) {
     classId: draft.classId,
     attendanceDate: draft.attendanceDate,
   });
-  if (draft.sectionId) search.set("sectionId", draft.sectionId);
+  if (draft.sectionId) search.set('sectionId', draft.sectionId);
 
   return `/dashboard/attendance/mark?${search.toString()}`;
 }
 
 function BrowserAttendanceDraftStatus({ status }: { status?: string }) {
-  const normalizedStatus = status?.toUpperCase() ?? "";
+  const normalizedStatus = status?.toUpperCase() ?? '';
 
-  if (normalizedStatus === "AUTHORIZATION_DENIED") {
+  if (normalizedStatus === 'AUTHORIZATION_DENIED') {
     return <Badge variant="destructive">Access denied — details cleared</Badge>;
   }
-  if (normalizedStatus === "ACCESS_REVALIDATION_REQUIRED") {
+  if (normalizedStatus === 'ACCESS_REVALIDATION_REQUIRED') {
     return <Badge variant="destructive">Access revalidation required</Badge>;
   }
-  if (normalizedStatus === "REJECTED") {
+  if (normalizedStatus === 'REJECTED') {
     return <Badge variant="destructive">Rejected — review</Badge>;
   }
-  if (normalizedStatus === "FAILED") {
+  if (normalizedStatus === 'FAILED') {
     return <Badge variant="destructive">Sync failed — saved locally</Badge>;
   }
-  if (["ACCEPTED", "SYNCED"].includes(normalizedStatus)) {
+  if (['ACCEPTED', 'SYNCED'].includes(normalizedStatus)) {
     return <Badge variant="success">Accepted — local receipt retained</Badge>;
   }
-  if (normalizedStatus === "CONFLICTED") {
+  if (normalizedStatus === 'CONFLICTED') {
     return <Badge variant="warning">Conflict recorded</Badge>;
   }
-  if (normalizedStatus === "QUEUED") {
+  if (normalizedStatus === 'QUEUED') {
     return <Badge variant="warning">Queued — not submitted</Badge>;
   }
   if (normalizedStatus) {
@@ -2614,8 +2614,8 @@ function BrowserAttendanceDraftStatus({ status }: { status?: string }) {
 }
 
 function isAccessRestrictedBrowserDraft(status?: string) {
-  return ["AUTHORIZATION_DENIED", "ACCESS_REVALIDATION_REQUIRED"].includes(
-    status?.toUpperCase() ?? "",
+  return ['AUTHORIZATION_DENIED', 'ACCESS_REVALIDATION_REQUIRED'].includes(
+    status?.toUpperCase() ?? '',
   );
 }
 
@@ -2628,45 +2628,45 @@ function AttendanceStateBadge({
     return <Badge variant="neutral">Unavailable</Badge>;
   }
   const variant =
-    state === "LOCKED"
-      ? "info"
-      : state === "SUBMITTED"
-        ? "success"
-        : state === "CONFLICT"
-          ? "destructive"
-          : state === "DRAFT"
-            ? "warning"
-            : "neutral";
+    state === 'LOCKED'
+      ? 'info'
+      : state === 'SUBMITTED'
+        ? 'success'
+        : state === 'CONFLICT'
+          ? 'destructive'
+          : state === 'DRAFT'
+            ? 'warning'
+            : 'neutral';
   return (
     <Badge variant={variant}>{ATTENDANCE_SESSION_STATE_LABELS[state]}</Badge>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  if (status === "PRESENT") return <Badge variant="success">Present</Badge>;
-  if (status === "ABSENT") return <Badge variant="destructive">Absent</Badge>;
-  if (status === "LATE") return <Badge variant="warning">Late</Badge>;
-  if (status.includes("LEAVE")) return <Badge variant="info">Leave</Badge>;
+  if (status === 'PRESENT') return <Badge variant="success">Present</Badge>;
+  if (status === 'ABSENT') return <Badge variant="destructive">Absent</Badge>;
+  if (status === 'LATE') return <Badge variant="warning">Late</Badge>;
+  if (status.includes('LEAVE')) return <Badge variant="info">Leave</Badge>;
   return <Badge variant="neutral">{status}</Badge>;
 }
 
 function ExportStatusBadge({
   status,
 }: {
-  status: AttendanceRegisterExportSummary["status"];
+  status: AttendanceRegisterExportSummary['status'];
 }) {
-  if (status === "COMPLETED") {
+  if (status === 'COMPLETED') {
     return <Badge variant="success">Completed</Badge>;
   }
-  if (status === "QUEUED" || status === "RUNNING") {
+  if (status === 'QUEUED' || status === 'RUNNING') {
     return (
-      <Badge variant="info">{status === "QUEUED" ? "Queued" : "Running"}</Badge>
+      <Badge variant="info">{status === 'QUEUED' ? 'Queued' : 'Running'}</Badge>
     );
   }
-  if (status === "FAILED" || status === "CANCELLED") {
+  if (status === 'FAILED' || status === 'CANCELLED') {
     return (
-      <Badge variant={status === "FAILED" ? "destructive" : "warning"}>
-        {status === "FAILED" ? "Failed" : "Cancelled"}
+      <Badge variant={status === 'FAILED' ? 'destructive' : 'warning'}>
+        {status === 'FAILED' ? 'Failed' : 'Cancelled'}
       </Badge>
     );
   }
@@ -2675,7 +2675,7 @@ function ExportStatusBadge({
 
 function formatFileSize(sizeBytes: number) {
   if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
-    return "0 KB";
+    return '0 KB';
   }
   if (sizeBytes < 1024 * 1024) {
     return `${Math.ceil(sizeBytes / 1024)} KB`;
@@ -2692,9 +2692,9 @@ function correctionStudentName(correction: {
 }) {
   const name = [correction.student?.firstNameEn, correction.student?.lastNameEn]
     .filter(Boolean)
-    .join(" ")
+    .join(' ')
     .trim();
-  return name || correction.student?.studentSystemId || "Student record";
+  return name || correction.student?.studentSystemId || 'Student record';
 }
 
 /**
@@ -2708,47 +2708,47 @@ function correctionStudentName(correction: {
  * collapsed them.
  */
 function statusShort(status: string) {
-  if (status === "PRESENT") return "P";
-  if (status === "ABSENT") return "A";
-  if (status === "LATE") return "L";
-  if (status === "HALF_DAY") return "½";
-  if (status.includes("LEAVE")) return "LV";
-  if (status === "HOLIDAY") return "H";
-  return "NM";
+  if (status === 'PRESENT') return 'P';
+  if (status === 'ABSENT') return 'A';
+  if (status === 'LATE') return 'L';
+  if (status === 'HALF_DAY') return '½';
+  if (status.includes('LEAVE')) return 'LV';
+  if (status === 'HOLIDAY') return 'H';
+  return 'NM';
 }
 
 /** Full label for the cell tooltip and screen readers. */
 function statusLabel(status: string) {
-  if (status === "PRESENT") return "Present";
-  if (status === "ABSENT") return "Absent";
-  if (status === "LATE") return "Late";
-  if (status === "HALF_DAY") return "Half day";
-  if (status === "SICK_LEAVE") return "Sick leave";
-  if (status === "EXCUSED_LEAVE") return "Excused leave";
-  if (status === "UNEXCUSED_LEAVE") return "Unexcused leave";
-  if (status.includes("LEAVE")) return "Leave";
-  if (status === "HOLIDAY") return "Holiday";
-  return "Not marked";
+  if (status === 'PRESENT') return 'Present';
+  if (status === 'ABSENT') return 'Absent';
+  if (status === 'LATE') return 'Late';
+  if (status === 'HALF_DAY') return 'Half day';
+  if (status === 'SICK_LEAVE') return 'Sick leave';
+  if (status === 'EXCUSED_LEAVE') return 'Excused leave';
+  if (status === 'UNEXCUSED_LEAVE') return 'Unexcused leave';
+  if (status.includes('LEAVE')) return 'Leave';
+  if (status === 'HOLIDAY') return 'Holiday';
+  return 'Not marked';
 }
 
 function printAttendanceRegister() {
   const cleanup = () =>
-    document.body.classList.remove("attendance-register-printing");
-  document.body.classList.add("attendance-register-printing");
-  window.addEventListener("afterprint", cleanup, { once: true });
+    document.body.classList.remove('attendance-register-printing');
+  document.body.classList.add('attendance-register-printing');
+  window.addEventListener('afterprint', cleanup, { once: true });
   window.print();
   window.setTimeout(cleanup, 1_000);
 }
 
 function statusColor(status: string) {
-  if (status === "PRESENT") return "text-success-700 bg-success-50";
-  if (status === "ABSENT") return "text-danger-700 bg-danger-50";
-  if (status === "LATE" || status === "HALF_DAY")
-    return "text-warning-700 bg-warning-50";
-  if (status.includes("LEAVE")) return "text-info-700 bg-info-50";
+  if (status === 'PRESENT') return 'text-success-700 bg-success-50';
+  if (status === 'ABSENT') return 'text-danger-700 bg-danger-50';
+  if (status === 'LATE' || status === 'HALF_DAY')
+    return 'text-warning-700 bg-warning-50';
+  if (status.includes('LEAVE')) return 'text-info-700 bg-info-50';
   // Holiday is settled (nothing owed); not-marked is outstanding work. They
   // must not look alike -- the code itself (H vs NM) carries the meaning so
   // this never depends on colour alone.
-  if (status === "HOLIDAY") return "text-slate-400 bg-slate-100";
-  return "text-amber-700 bg-amber-50/70";
+  if (status === 'HOLIDAY') return 'text-slate-400 bg-slate-100';
+  return 'text-amber-700 bg-amber-50/70';
 }

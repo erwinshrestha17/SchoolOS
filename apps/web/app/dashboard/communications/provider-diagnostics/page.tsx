@@ -30,8 +30,7 @@ export default function ProviderDiagnosticsPage() {
   const diagnosticsQuery = useQuery({
     queryKey: ['communications', 'provider-diagnostics'],
     queryFn: communicationsApi.getCommunicationsProviderDiagnostics,
-    enabled:
-      commsCaps.resolution === 'granted' && canReadDeliveries,
+    enabled: commsCaps.resolution === 'granted' && canReadDeliveries,
   });
   const diagnostics = diagnosticsQuery.data;
 
@@ -45,7 +44,9 @@ export default function ProviderDiagnosticsPage() {
           <KpiCard
             title="Provider Mode"
             loading={diagnosticsQuery.isLoading}
-            value={diagnostics ? formatMode(diagnostics.overallMode) : 'Unavailable'}
+            value={
+              diagnostics ? formatMode(diagnostics.overallMode) : 'Unavailable'
+            }
             icon={<Settings size={20} />}
             tone={
               diagnostics?.overallMode === 'configured' ? 'success' : 'neutral'

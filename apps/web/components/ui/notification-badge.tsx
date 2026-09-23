@@ -8,7 +8,11 @@ type NotificationBadgeProps = {
   className?: string;
 };
 
-export function NotificationBadge({ count = 0, label, className }: NotificationBadgeProps) {
+export function NotificationBadge({
+  count = 0,
+  label,
+  className,
+}: NotificationBadgeProps) {
   if (count <= 0) return null;
 
   const display = count > 99 ? '99+' : String(count);

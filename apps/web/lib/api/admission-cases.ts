@@ -17,8 +17,8 @@ import type {
   DirectAdmitAdmissionCasePayload,
   ReviewAdmissionCasePayload,
   WaiveCaseDocumentPayload,
-} from "@schoolos/core";
-import { request } from "./client";
+} from '@schoolos/core';
+import { request } from './client';
 
 export type AdmissionCaseQueue = AdmissionCaseQueueName;
 export type { AdmissionCaseQueueItem };
@@ -38,14 +38,14 @@ export const admissionCasesApi = {
     limit?: number;
   }) => {
     const searchParams = new URLSearchParams();
-    if (query.tab) searchParams.set("tab", query.tab);
-    if (query.policyId) searchParams.set("policyId", query.policyId);
-    if (query.classId) searchParams.set("classId", query.classId);
-    if (query.page) searchParams.set("page", String(query.page));
-    if (query.limit) searchParams.set("limit", String(query.limit));
+    if (query.tab) searchParams.set('tab', query.tab);
+    if (query.policyId) searchParams.set('policyId', query.policyId);
+    if (query.classId) searchParams.set('classId', query.classId);
+    if (query.page) searchParams.set('page', String(query.page));
+    if (query.limit) searchParams.set('limit', String(query.limit));
     const suffix = searchParams.toString();
     return request<AdmissionAssessmentSessionPage>(
-      `/admissions/assessment-sessions${suffix ? `?${suffix}` : ""}`,
+      `/admissions/assessment-sessions${suffix ? `?${suffix}` : ''}`,
     );
   },
   listAssessmentCandidates: (query: {
@@ -57,14 +57,14 @@ export const admissionCasesApi = {
   }) => {
     const searchParams = new URLSearchParams();
     if (query.admissionCaseId)
-      searchParams.set("admissionCaseId", query.admissionCaseId);
-    if (query.policyId) searchParams.set("policyId", query.policyId);
-    if (query.classId) searchParams.set("classId", query.classId);
-    if (query.page) searchParams.set("page", String(query.page));
-    if (query.limit) searchParams.set("limit", String(query.limit));
+      searchParams.set('admissionCaseId', query.admissionCaseId);
+    if (query.policyId) searchParams.set('policyId', query.policyId);
+    if (query.classId) searchParams.set('classId', query.classId);
+    if (query.page) searchParams.set('page', String(query.page));
+    if (query.limit) searchParams.set('limit', String(query.limit));
     const suffix = searchParams.toString();
     return request<AdmissionAssessmentCandidatePage>(
-      `/admissions/assessment-candidates${suffix ? `?${suffix}` : ""}`,
+      `/admissions/assessment-candidates${suffix ? `?${suffix}` : ''}`,
     );
   },
   scheduleAssessmentSession: (
@@ -81,7 +81,7 @@ export const admissionCasesApi = {
     request<AdmissionAssessmentSessionSummary>(
       `/admissions/cases/${admissionCaseId}/assessment-session`,
       {
-        method: "POST",
+        method: 'POST',
         json: payload,
       },
     ),
@@ -96,7 +96,7 @@ export const admissionCasesApi = {
     request<AdmissionAssessmentSessionSummary>(
       `/admissions/assessment-sessions/${assessmentSessionId}/result`,
       {
-        method: "POST",
+        method: 'POST',
         json: payload,
       },
     ),
@@ -104,33 +104,33 @@ export const admissionCasesApi = {
     policyId?: string;
     classId?: string;
     documentKind?: string;
-    timing?: AdmissionDocumentTiming | "";
+    timing?: AdmissionDocumentTiming | '';
     minDaysPending?: number;
     page?: number;
     limit?: number;
   }) => {
     const searchParams = new URLSearchParams();
-    if (query.policyId) searchParams.set("policyId", query.policyId);
-    if (query.classId) searchParams.set("classId", query.classId);
+    if (query.policyId) searchParams.set('policyId', query.policyId);
+    if (query.classId) searchParams.set('classId', query.classId);
     if (query.documentKind?.trim()) {
-      searchParams.set("documentKind", query.documentKind.trim());
+      searchParams.set('documentKind', query.documentKind.trim());
     }
-    if (query.timing) searchParams.set("timing", query.timing);
+    if (query.timing) searchParams.set('timing', query.timing);
     if (query.minDaysPending !== undefined) {
-      searchParams.set("minDaysPending", String(query.minDaysPending));
+      searchParams.set('minDaysPending', String(query.minDaysPending));
     }
-    if (query.page) searchParams.set("page", String(query.page));
-    if (query.limit) searchParams.set("limit", String(query.limit));
+    if (query.page) searchParams.set('page', String(query.page));
+    if (query.limit) searchParams.set('limit', String(query.limit));
     const suffix = searchParams.toString();
     return request<AdmissionDocumentRequestPage>(
-      `/admissions/document-requests${suffix ? `?${suffix}` : ""}`,
+      `/admissions/document-requests${suffix ? `?${suffix}` : ''}`,
     );
   },
   requestDocumentReminders: (admissionCaseIds: string[]) =>
     request<AdmissionDocumentReminderBatchResult>(
-      "/admissions/document-requests/reminders",
+      '/admissions/document-requests/reminders',
       {
-        method: "POST",
+        method: 'POST',
         json: { admissionCaseIds },
       },
     ),
@@ -141,13 +141,13 @@ export const admissionCasesApi = {
     search?: string;
   }) => {
     const searchParams = new URLSearchParams();
-    if (query.queue) searchParams.set("queue", query.queue);
-    if (query.page) searchParams.set("page", String(query.page));
-    if (query.limit) searchParams.set("limit", String(query.limit));
-    if (query.search?.trim()) searchParams.set("search", query.search.trim());
+    if (query.queue) searchParams.set('queue', query.queue);
+    if (query.page) searchParams.set('page', String(query.page));
+    if (query.limit) searchParams.set('limit', String(query.limit));
+    if (query.search?.trim()) searchParams.set('search', query.search.trim());
     const suffix = searchParams.toString();
     return request<AdmissionCaseQueuePage>(
-      `/admissions/cases${suffix ? `?${suffix}` : ""}`,
+      `/admissions/cases${suffix ? `?${suffix}` : ''}`,
     );
   },
   getStudentFollowUps: (studentId: string) =>
@@ -157,8 +157,8 @@ export const admissionCasesApi = {
       items: AdmissionFollowUp[];
     }>(`/admissions/students/${studentId}/follow-ups`),
   createCase: (payload: CreateAdmissionCasePayload) =>
-    request<AdmissionCase>("/admissions/cases", {
-      method: "POST",
+    request<AdmissionCase>('/admissions/cases', {
+      method: 'POST',
       json: payload,
     }),
   getCase: (admissionCaseId: string) =>
@@ -175,13 +175,13 @@ export const admissionCasesApi = {
     payload: Partial<CreateAdmissionCasePayload>,
   ) =>
     request<AdmissionCase>(`/admissions/cases/${admissionCaseId}`, {
-      method: "PATCH",
+      method: 'PATCH',
       json: payload,
     }),
   waiveDocument: (admissionCaseId: string, payload: WaiveCaseDocumentPayload) =>
     request<AdmissionCase>(
       `/admissions/cases/${admissionCaseId}/documents/waive`,
-      { method: "POST", json: payload },
+      { method: 'POST', json: payload },
     ),
   removeDocumentWaiver: (
     admissionCaseId: string,
@@ -189,11 +189,11 @@ export const admissionCasesApi = {
   ) =>
     request<AdmissionCase>(
       `/admissions/cases/${admissionCaseId}/documents/unwaive`,
-      { method: "POST", json: payload },
+      { method: 'POST', json: payload },
     ),
   reviewCase: (admissionCaseId: string, payload: ReviewAdmissionCasePayload) =>
     request<AdmissionCase>(`/admissions/cases/${admissionCaseId}/review`, {
-      method: "POST",
+      method: 'POST',
       json: payload,
     }),
   directAdmit: (
@@ -206,7 +206,7 @@ export const admissionCasesApi = {
       student: { id: string; studentSystemId: string; fullNameEn: string };
       redirectPath: string;
     }>(`/admissions/cases/${admissionCaseId}/direct-admit`, {
-      method: "POST",
+      method: 'POST',
       json: payload,
     }),
   finalize: (
@@ -219,7 +219,7 @@ export const admissionCasesApi = {
       student: { id: string; studentSystemId: string; fullNameEn: string };
       redirectPath: string;
     }>(`/admissions/cases/${admissionCaseId}/finalize`, {
-      method: "POST",
+      method: 'POST',
       json: payload,
     }),
 };

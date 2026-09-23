@@ -22,7 +22,11 @@ const modules = [
     label: 'Academics & Report Cards',
     href: '/dashboard/academics',
   },
-  { key: 'homework', label: 'Homework & Timetable', href: '/dashboard/homework' },
+  {
+    key: 'homework',
+    label: 'Homework & Timetable',
+    href: '/dashboard/homework',
+  },
   { key: 'activity', label: 'Activity Feed', href: '/dashboard/activity' },
   { key: 'hr', label: 'HR & Payroll', href: '/dashboard/hr' },
   { key: 'library', label: 'Library', href: '/dashboard/library' },

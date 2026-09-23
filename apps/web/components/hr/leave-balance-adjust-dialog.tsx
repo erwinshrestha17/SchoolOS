@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/dialog';
 import { Button } from '../ui/button';
 import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
@@ -26,8 +32,9 @@ export function LeaveBalanceAdjustDialog({
   const [toastError, setToastError] = useState<string | null>(null);
 
   const [staffId, setStaffId] = useState(lockedStaffId ?? '');
-  const [staffOption, setStaffOption] =
-    useState<StaffLookupOption | null>(null);
+  const [staffOption, setStaffOption] = useState<StaffLookupOption | null>(
+    null,
+  );
   const [leaveType, setLeaveType] = useState('CASUAL');
   const [year, setYear] = useState(() => getNepalNow().year);
   const [adjustment, setAdjustment] = useState<number>(0);
@@ -36,8 +43,12 @@ export function LeaveBalanceAdjustDialog({
   const adjustMutation = useMutation({
     mutationFn: api.adjustLeaveBalance,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['staff-leave-balances', lockedStaffId || staffId] });
-      void queryClient.invalidateQueries({ queryKey: ['staff-detail', lockedStaffId || staffId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-leave-balances', lockedStaffId || staffId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-detail', lockedStaffId || staffId],
+      });
       onClose();
       // Reset form
       setLeaveType('CASUAL');
@@ -95,7 +106,9 @@ export function LeaveBalanceAdjustDialog({
               <Sliders size={20} className="text-[var(--color-mod-hr-text)]" />
               Adjust Leave Balance
             </DialogTitle>
-            <p className="text-xs text-slate-500 mt-1">Manually credit or debit leave days for staff.</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Manually credit or debit leave days for staff.
+            </p>
           </div>
           <button
             type="button"
@@ -132,7 +145,10 @@ export function LeaveBalanceAdjustDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Leave Type">
-              <Select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
+              <Select
+                value={leaveType}
+                onChange={(e) => setLeaveType(e.target.value)}
+              >
                 <option value="SICK">Sick Leave</option>
                 <option value="CASUAL">Casual Leave</option>
                 <option value="EARNED">Earned Leave</option>

@@ -1,10 +1,10 @@
 export type SchoolIntegrationStatusLabel =
-  | 'disabled'
-  | 'dev-log'
-  | 'mock'
-  | 'configured'
-  | 'needs attention'
-  | 'unavailable';
+  | "disabled"
+  | "dev-log"
+  | "mock"
+  | "configured"
+  | "needs attention"
+  | "unavailable";
 
 export type SchoolIntegrationStatusSignal = {
   id: string;
@@ -15,7 +15,7 @@ export type SchoolIntegrationStatusSignal = {
 };
 
 export type SchoolIntegrationStatusItem = {
-  id: 'payment-gateway' | 'notification-providers' | 'attendance-devices';
+  id: "payment-gateway" | "notification-providers" | "attendance-devices";
   title: string;
   description: string;
   status: SchoolIntegrationStatusLabel;

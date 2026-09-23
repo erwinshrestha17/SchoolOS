@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { SectionCard } from "@/components/ui/section-card";
-import { Badge } from "@/components/ui/badge";
-import { LoadingState } from "@/components/ui/loading-state";
-import { ProtectedFileLink } from "@/components/ui/protected-file";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { SectionCard } from '@/components/ui/section-card';
+import { Badge } from '@/components/ui/badge';
+import { LoadingState } from '@/components/ui/loading-state';
+import { ProtectedFileLink } from '@/components/ui/protected-file';
 import {
   Wallet,
   CheckCircle2,
@@ -16,14 +16,14 @@ import {
   Loader2,
   ChevronRight,
   Landmark,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { formatBsDateTime, getNepalSchoolDay } from "@schoolos/core";
-import { ErrorState } from "@/components/ui/error-state";
-import { Button } from "@/components/ui/button";
-import { PermissionDenied } from "@/components/ui/permission-denied";
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { formatBsDateTime, getNepalSchoolDay } from '@schoolos/core';
+import { ErrorState } from '@/components/ui/error-state';
+import { Button } from '@/components/ui/button';
+import { PermissionDenied } from '@/components/ui/permission-denied';
 import {
   Dialog,
   DialogContent,
@@ -31,16 +31,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useSession } from "@/components/session-provider";
+} from '@/components/ui/dialog';
+import { useSession } from '@/components/session-provider';
 
 export function CashierCloseSection() {
   const { hasPermissions } = useSession();
-  const canClose = hasPermissions(["payments:close"]);
+  const canClose = hasPermissions(['payments:close']);
   const canManageDeposits = hasPermissions([
-    "payments:close",
-    "accounting:reconciliation:manage",
-    "accounting:journals:post",
+    'payments:close',
+    'accounting:reconciliation:manage',
+    'accounting:journals:post',
   ]);
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -48,15 +48,15 @@ export function CashierCloseSection() {
   const searchParams = useSearchParams();
   const closePage = Math.max(
     1,
-    Number(searchParams.get("closePage") ?? "1") || 1,
+    Number(searchParams.get('closePage') ?? '1') || 1,
   );
-  const [remarks, setRemarks] = useState("");
-  const [actualCashAmount, setActualCashAmount] = useState("");
+  const [remarks, setRemarks] = useState('');
+  const [actualCashAmount, setActualCashAmount] = useState('');
   const [isConfirmingClose, setIsConfirmingClose] = useState(false);
   const [closePdfError, setClosePdfError] = useState<string | null>(null);
-  const [depositAccountId, setDepositAccountId] = useState("");
-  const [depositReference, setDepositReference] = useState("");
-  const [depositReason, setDepositReason] = useState("");
+  const [depositAccountId, setDepositAccountId] = useState('');
+  const [depositReference, setDepositReference] = useState('');
+  const [depositReason, setDepositReason] = useState('');
   const [depositIdempotencyKey, setDepositIdempotencyKey] = useState(() =>
     crypto.randomUUID(),
   );
@@ -69,29 +69,29 @@ export function CashierCloseSection() {
       : schoolDay.endExclusiveUtc;
 
   const closesQuery = useQuery({
-    queryKey: ["cashier-closes", closePage],
+    queryKey: ['cashier-closes', closePage],
     queryFn: () => api.listCashierClosesPage({ page: closePage, limit: 10 }),
   });
   const depositAccountsQuery = useQuery({
-    queryKey: ["chart-accounts", "cash-deposit"],
+    queryKey: ['chart-accounts', 'cash-deposit'],
     queryFn: () => api.listChartAccounts(),
     enabled: canManageDeposits,
   });
   const depositsQuery = useQuery({
-    queryKey: ["cash-deposits"],
+    queryKey: ['cash-deposits'],
     queryFn: () => api.listCashDeposits({ page: 1, limit: 25 }),
     enabled: canManageDeposits,
   });
 
   const activeSession = closesQuery.data?.items.find((close) =>
-    ["OPEN", "COUNTED", "SUBMITTED", "APPROVED"].includes(close.status),
+    ['OPEN', 'COUNTED', 'SUBMITTED', 'APPROVED'].includes(close.status),
   );
   const sessionOpenedAt = activeSession
     ? new Date(activeSession.openedAt)
     : openedAt;
 
   const previewQuery = useQuery({
-    queryKey: ["cashier-close-preview", sessionOpenedAt.toISOString()],
+    queryKey: ['cashier-close-preview', sessionOpenedAt.toISOString()],
     queryFn: () =>
       api.previewCashierClose({
         openedAt: sessionOpenedAt.toISOString(),
@@ -108,36 +108,36 @@ export function CashierCloseSection() {
           notes: reason || null,
         });
       }
-      if (activeSession.status === "OPEN") {
+      if (activeSession.status === 'OPEN') {
         return api.countCashierClose(activeSession.id, {
           countedThroughAt: closedAt.toISOString(),
           actualCashAmount: Number(actualCashAmount).toFixed(2),
           varianceReason: hasVariance ? reason : null,
         });
       }
-      if (activeSession.status === "COUNTED") {
+      if (activeSession.status === 'COUNTED') {
         return api.submitCashierClose(activeSession.id, reason);
       }
-      if (activeSession.status === "SUBMITTED") {
+      if (activeSession.status === 'SUBMITTED') {
         return api.approveCashierClose(activeSession.id, reason);
       }
       return api.closeCashierClose(activeSession.id, reason);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["cashier-closes"] });
+      void queryClient.invalidateQueries({ queryKey: ['cashier-closes'] });
       void queryClient.invalidateQueries({
-        queryKey: ["cashier-close-preview"],
+        queryKey: ['cashier-close-preview'],
       });
-      setRemarks("");
-      setActualCashAmount("");
+      setRemarks('');
+      setActualCashAmount('');
       setIsConfirmingClose(false);
       void queryClient.invalidateQueries({
-        queryKey: ["finance-dashboard-summary"],
+        queryKey: ['finance-dashboard-summary'],
       });
     },
   });
   const depositCandidate = closesQuery.data?.items.find(
-    (close) => close.status === "CLOSED",
+    (close) => close.status === 'CLOSED',
   );
   const currentDeposit = depositCandidate
     ? depositsQuery.data?.items.find(
@@ -147,11 +147,11 @@ export function CashierCloseSection() {
   const depositMutation = useMutation({
     mutationFn: async () => {
       if (!depositCandidate) {
-        throw new Error("No closed cashier session is ready for deposit.");
+        throw new Error('No closed cashier session is ready for deposit.');
       }
       if (!currentDeposit) {
         if (!depositAccountId) {
-          throw new Error("Select the destination account for this deposit.");
+          throw new Error('Select the destination account for this deposit.');
         }
         return api.prepareCashDeposit({
           cashierCloseId: depositCandidate.id,
@@ -160,23 +160,23 @@ export function CashierCloseSection() {
           idempotencyKey: depositIdempotencyKey,
         });
       }
-      if (currentDeposit.status === "DRAFT") {
+      if (currentDeposit.status === 'DRAFT') {
         return api.submitCashDeposit(currentDeposit.id, depositReason.trim());
       }
-      if (currentDeposit.status === "SUBMITTED") {
+      if (currentDeposit.status === 'SUBMITTED') {
         return api.completeCashDeposit(currentDeposit.id, depositReason.trim());
       }
       return currentDeposit;
     },
     onSuccess: (deposit) => {
-      void queryClient.invalidateQueries({ queryKey: ["cash-deposits"] });
-      void queryClient.invalidateQueries({ queryKey: ["cashier-closes"] });
-      if (deposit.status === "DEPOSITED") {
-        setDepositAccountId("");
-        setDepositReference("");
+      void queryClient.invalidateQueries({ queryKey: ['cash-deposits'] });
+      void queryClient.invalidateQueries({ queryKey: ['cashier-closes'] });
+      if (deposit.status === 'DEPOSITED') {
+        setDepositAccountId('');
+        setDepositReference('');
         setDepositIdempotencyKey(crypto.randomUUID());
       }
-      setDepositReason("");
+      setDepositReason('');
     },
   });
 
@@ -203,17 +203,17 @@ export function CashierCloseSection() {
     : closesQuery.data?.items.find((close) => close.closePdfFile);
   const updateClosePage = (page: number) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (page <= 1) params.delete("closePage");
-    else params.set("closePage", String(page));
+    if (page <= 1) params.delete('closePage');
+    else params.set('closePage', String(page));
     router.replace(`${pathname}?${params.toString()}`, {
       scroll: false,
     });
   };
 
   const formatCurrency = (amount: string) => {
-    return new Intl.NumberFormat("en-NP", {
-      style: "currency",
-      currency: "NPR",
+    return new Intl.NumberFormat('en-NP', {
+      style: 'currency',
+      currency: 'NPR',
       maximumFractionDigits: 0,
     }).format(Number(amount));
   };
@@ -227,51 +227,51 @@ export function CashierCloseSection() {
   const depositAccounts =
     depositAccountsQuery.data?.filter(
       (account) =>
-        account.type === "ASSET" &&
+        account.type === 'ASSET' &&
         account.isActive !== false &&
-        account.code !== "1010",
+        account.code !== '1010',
     ) ?? [];
   const expectedCashAmount = Number(preview?.expectedCashAmount ?? 0);
   const countedCashAmount =
-    actualCashAmount === "" ? null : Number(actualCashAmount);
+    actualCashAmount === '' ? null : Number(actualCashAmount);
   const hasVariance =
     countedCashAmount !== null &&
     Math.abs(countedCashAmount - expectedCashAmount) > 0.001;
   const requiresReason = Boolean(
-    activeSession && activeSession.status !== "OPEN",
+    activeSession && activeSession.status !== 'OPEN',
   );
   const closeDisabled =
     closeMutation.isPending ||
-    (activeSession?.status === "OPEN" &&
+    (activeSession?.status === 'OPEN' &&
       (countedCashAmount === null || countedCashAmount < 0)) ||
-    (activeSession?.status === "OPEN" &&
+    (activeSession?.status === 'OPEN' &&
       hasVariance &&
       remarks.trim().length < 5) ||
     (requiresReason && remarks.trim().length < 5);
   const lifecycleActionLabel = !activeSession
-    ? "Open cashier session"
-    : activeSession.status === "OPEN"
-      ? "Record counted cash"
-      : activeSession.status === "COUNTED"
-        ? "Submit for approval"
-        : activeSession.status === "SUBMITTED"
-          ? "Approve cashier count"
-          : "Close approved session";
+    ? 'Open cashier session'
+    : activeSession.status === 'OPEN'
+      ? 'Record counted cash'
+      : activeSession.status === 'COUNTED'
+        ? 'Submit for approval'
+        : activeSession.status === 'SUBMITTED'
+          ? 'Approve cashier count'
+          : 'Close approved session';
   const depositActionLabel = !currentDeposit
-    ? "Prepare deposit"
-    : currentDeposit.status === "DRAFT"
-      ? "Submit deposit"
-      : currentDeposit.status === "SUBMITTED"
-        ? "Confirm deposited and post"
-        : "Deposit completed";
+    ? 'Prepare deposit'
+    : currentDeposit.status === 'DRAFT'
+      ? 'Submit deposit'
+      : currentDeposit.status === 'SUBMITTED'
+        ? 'Confirm deposited and post'
+        : 'Deposit completed';
   const depositActionDisabled =
     depositMutation.isPending ||
     !depositCandidate ||
     (!currentDeposit && !depositAccountId) ||
     (Boolean(currentDeposit) &&
-      currentDeposit?.status !== "DEPOSITED" &&
+      currentDeposit?.status !== 'DEPOSITED' &&
       depositReason.trim().length < 5) ||
-    currentDeposit?.status === "DEPOSITED";
+    currentDeposit?.status === 'DEPOSITED';
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -279,7 +279,7 @@ export function CashierCloseSection() {
         className="grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-4"
         aria-label="Cashier close steps"
       >
-        {["Open", "Count", "Submit", "Approve and close"].map(
+        {['Open', 'Count', 'Submit', 'Approve and close'].map(
           (label, index) => (
             <li
               key={label}
@@ -297,14 +297,14 @@ export function CashierCloseSection() {
       <div className="grid gap-6 md:grid-cols-3">
         <CollectionStat
           label="Total Collection"
-          value={formatCurrency(preview?.netCollected ?? "0.00")}
+          value={formatCurrency(preview?.netCollected ?? '0.00')}
           sub={`${preview?.paymentCount ?? 0} Transactions`}
           icon={<Wallet size={20} />}
           color="emerald"
         />
         <CollectionStat
           label="Cash in Hand"
-          value={formatCurrency(preview?.expectedCashAmount ?? "0.00")}
+          value={formatCurrency(preview?.expectedCashAmount ?? '0.00')}
           sub="Physical Handover"
           icon={<Banknote size={20} />}
           color="primary"
@@ -370,10 +370,10 @@ export function CashierCloseSection() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center text-[0.65rem] font-bold">
-                        {u.userName?.slice(0, 2).toUpperCase() || "CO"}
+                        {u.userName?.slice(0, 2).toUpperCase() || 'CO'}
                       </div>
                       <span className="text-sm font-bold">
-                        {u.userName || "Collector not recorded"}
+                        {u.userName || 'Collector not recorded'}
                       </span>
                     </div>
                     <span className="text-sm font-black text-[var(--color-mod-fees-accent)]">
@@ -414,7 +414,7 @@ export function CashierCloseSection() {
                 />
                 {hasVariance ? (
                   <p className="text-xs font-semibold text-warning-700">
-                    Variance:{" "}
+                    Variance:{' '}
                     {formatCurrency(
                       ((countedCashAmount ?? 0) - expectedCashAmount).toFixed(
                         2,
@@ -475,7 +475,7 @@ export function CashierCloseSection() {
                   <AlertCircle size={16} className="mt-0.5 shrink-0" />
                   {closeMutation.error instanceof Error
                     ? closeMutation.error.message
-                    : "The cashier close was not recorded. It may already be closed or require corrected inputs."}
+                    : 'The cashier close was not recorded. It may already be closed or require corrected inputs.'}
                 </div>
               ) : null}
 
@@ -528,10 +528,10 @@ export function CashierCloseSection() {
                     {close.closeNumber}
                   </p>
                   <p className="mt-1 text-xs font-semibold text-slate-500">
-                    {formatBsDateTime(close.openedAt)} to{" "}
+                    {formatBsDateTime(close.openedAt)} to{' '}
                     {close.closedAt
                       ? formatBsDateTime(close.closedAt)
-                      : "Session open"}
+                      : 'Session open'}
                   </p>
                 </div>
                 <div className="text-left sm:text-right">
@@ -554,7 +554,7 @@ export function CashierCloseSection() {
                 {Math.min(
                   closePage * closesQuery.data.limit,
                   closesQuery.data.total,
-                )}{" "}
+                )}{' '}
                 of {closesQuery.data.total}
               </span>
               <div className="flex gap-2">
@@ -620,12 +620,12 @@ export function CashierCloseSection() {
               className="grid gap-3 sm:grid-cols-4"
               aria-label="Cash deposit status"
             >
-              {["Closed", "Prepared", "Submitted", "Deposited and posted"].map(
+              {['Closed', 'Prepared', 'Submitted', 'Deposited and posted'].map(
                 (label, index) => {
                   const completedStep = currentDeposit
-                    ? currentDeposit.status === "DEPOSITED"
+                    ? currentDeposit.status === 'DEPOSITED'
                       ? 3
-                      : currentDeposit.status === "SUBMITTED"
+                      : currentDeposit.status === 'SUBMITTED'
                         ? 2
                         : 1
                     : 0;
@@ -633,10 +633,10 @@ export function CashierCloseSection() {
                     <div
                       key={label}
                       className={cn(
-                        "rounded-xl border px-4 py-3 text-xs font-bold",
+                        'rounded-xl border px-4 py-3 text-xs font-bold',
                         index <= completedStep
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : "border-slate-200 bg-white text-slate-500",
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                          : 'border-slate-200 bg-white text-slate-500',
                       )}
                     >
                       {label}
@@ -655,7 +655,7 @@ export function CashierCloseSection() {
                   {depositCandidate.closeNumber}
                 </p>
                 <p className="mt-1 text-xs text-slate-600">
-                  Counted cash:{" "}
+                  Counted cash:{' '}
                   {formatCurrency(
                     depositCandidate.actualCashAmount ??
                       depositCandidate.expectedCashAmount,
@@ -671,7 +671,7 @@ export function CashierCloseSection() {
                     {currentDeposit.depositNumber}
                   </p>
                   <p className="mt-1 text-xs text-slate-600">
-                    {currentDeposit.accountCode} {currentDeposit.accountName} ·{" "}
+                    {currentDeposit.accountCode} {currentDeposit.accountName} ·{' '}
                     {formatBsDateTime(currentDeposit.depositDate)}
                   </p>
                 </div>
@@ -710,11 +710,11 @@ export function CashierCloseSection() {
                   />
                 </label>
               </div>
-            ) : currentDeposit.status !== "DEPOSITED" ? (
+            ) : currentDeposit.status !== 'DEPOSITED' ? (
               <label className="space-y-2 text-xs font-bold text-slate-600">
-                {currentDeposit.status === "DRAFT"
-                  ? "Submission reason"
-                  : "Deposit confirmation reason"}
+                {currentDeposit.status === 'DRAFT'
+                  ? 'Submission reason'
+                  : 'Deposit confirmation reason'}
                 <textarea
                   value={depositReason}
                   onChange={(event) => setDepositReason(event.target.value)}
@@ -728,8 +728,8 @@ export function CashierCloseSection() {
                 <div>
                   <p className="font-bold">Deposit completed</p>
                   <p className="mt-1 text-xs">
-                    The cashier session is deposited and linked to journal{" "}
-                    {currentDeposit.journalEntryId ?? "record unavailable"}.
+                    The cashier session is deposited and linked to journal{' '}
+                    {currentDeposit.journalEntryId ?? 'record unavailable'}.
                     Bank reconciliation remains a separate M11 step.
                   </p>
                 </div>
@@ -753,7 +753,7 @@ export function CashierCloseSection() {
               <p className="text-sm font-semibold text-danger-700" role="alert">
                 {depositMutation.error instanceof Error
                   ? depositMutation.error.message
-                  : "The deposit state was not changed."}
+                  : 'The deposit state was not changed.'}
               </p>
             ) : null}
           </div>
@@ -774,13 +774,13 @@ export function CashierCloseSection() {
               Expected cash: {formatCurrency(expectedCashAmount.toFixed(2))}
             </p>
             <p>
-              Counted cash:{" "}
+              Counted cash:{' '}
               {countedCashAmount === null
-                ? "Not entered"
+                ? 'Not entered'
                 : formatCurrency(countedCashAmount.toFixed(2))}
             </p>
             <p>
-              Net collection: {formatCurrency(preview?.netCollected ?? "0.00")}
+              Net collection: {formatCurrency(preview?.netCollected ?? '0.00')}
             </p>
           </div>
           <DialogFooter>
@@ -818,26 +818,26 @@ function CollectionStat({
   value: string;
   sub: string;
   icon: React.ReactNode;
-  color: "emerald" | "primary" | "amber";
+  color: 'emerald' | 'primary' | 'amber';
 }) {
   const colorMap = {
-    emerald: "text-emerald-600 bg-emerald-50 border-emerald-100",
+    emerald: 'text-emerald-600 bg-emerald-50 border-emerald-100',
     primary:
-      "text-[var(--color-mod-fees-accent)] bg-[var(--color-mod-fees-bg)] border-[var(--color-mod-fees-border)]",
-    amber: "text-amber-600 bg-amber-50 border-amber-100",
+      'text-[var(--color-mod-fees-accent)] bg-[var(--color-mod-fees-bg)] border-[var(--color-mod-fees-border)]',
+    amber: 'text-amber-600 bg-amber-50 border-amber-100',
   };
 
   return (
     <div
       className={cn(
-        "flex items-center gap-5 rounded-xl border bg-white p-6 shadow-sm",
+        'flex items-center gap-5 rounded-xl border bg-white p-6 shadow-sm',
         colorMap[color],
       )}
     >
       <div
         className={cn(
-          "h-14 w-14 rounded-2xl flex items-center justify-center shadow-inner",
-          colorMap[color].split(" ")[1],
+          'h-14 w-14 rounded-2xl flex items-center justify-center shadow-inner',
+          colorMap[color].split(' ')[1],
         )}
       >
         {icon}

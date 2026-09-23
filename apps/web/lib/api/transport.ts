@@ -1,9 +1,4 @@
-import {
-  downloadCsv,
-  JsonBody,
-  request,
-  withQuery,
-} from './client';
+import { downloadCsv, JsonBody, request, withQuery } from './client';
 
 export type TransportVehicleStatus = 'ACTIVE' | 'MAINTENANCE' | 'RETIRED';
 export type TransportEnrollmentStatus = 'ACTIVE' | 'PAUSED' | 'ENDED';
@@ -351,12 +346,18 @@ export const transportApi = {
   listRoutes: (params?: { q?: string | null }) =>
     request<TransportRoute[]>(withQuery('/transport/routes', params ?? {})),
   createRoute: (body: TransportRoutePayload) =>
-    request<TransportRoute>('/transport/routes', { method: 'POST', json: body }),
-  updateRoute: (routeId: string, body: Partial<TransportRoutePayload>) =>
-    request<TransportRoute>(`/transport/routes/${encodeURIComponent(routeId)}`, {
-      method: 'PATCH',
+    request<TransportRoute>('/transport/routes', {
+      method: 'POST',
       json: body,
     }),
+  updateRoute: (routeId: string, body: Partial<TransportRoutePayload>) =>
+    request<TransportRoute>(
+      `/transport/routes/${encodeURIComponent(routeId)}`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   listStops: (params?: { routeId?: string | null }) =>
     request<TransportStop[]>(withQuery('/transport/stops', params ?? {})),
   createStop: (body: TransportStopPayload) =>
@@ -405,10 +406,13 @@ export const transportApi = {
   startTrip: (body: TransportTripPayload) =>
     request<TransportTrip>('/transport/trips', { method: 'POST', json: body }),
   completeTrip: (tripId: string, body?: { notes?: string }) =>
-    request<TransportTrip>(`/transport/trips/${encodeURIComponent(tripId)}/complete`, {
-      method: 'PATCH',
-      json: body ?? {},
-    }),
+    request<TransportTrip>(
+      `/transport/trips/${encodeURIComponent(tripId)}/complete`,
+      {
+        method: 'PATCH',
+        json: body ?? {},
+      },
+    ),
   markStudentBoarded: (tripId: string, body: TransportStudentStatusPayload) =>
     request<TransportTripStudentStatusRecord>(
       `/transport/trips/${encodeURIComponent(tripId)}/students/boarded`,
@@ -420,8 +424,13 @@ export const transportApi = {
       { method: 'PATCH', json: body },
     ),
   listActiveTrips: () => request<TransportTrip[]>('/transport/trips/active'),
-  listTrips: (params?: { routeId?: string | null; vehicleId?: string | null }) =>
-    request<TransportTrip[]>(withQuery('/transport/trips/history', params ?? {})),
+  listTrips: (params?: {
+    routeId?: string | null;
+    vehicleId?: string | null;
+  }) =>
+    request<TransportTrip[]>(
+      withQuery('/transport/trips/history', params ?? {}),
+    ),
   createLocationPing: (tripId: string, body: TransportLocationPingPayload) =>
     request<TransportLocationPing>(
       `/transport/trips/${encodeURIComponent(tripId)}/location`,
@@ -447,7 +456,9 @@ export const transportApi = {
     request<TransportOneDayRouteChangesReport>(
       withQuery('/transport/reports/one-day-route-changes', params ?? {}),
     ),
-  getVehicleDocumentExpiryReport: (params?: { days?: number | string | null }) =>
+  getVehicleDocumentExpiryReport: (params?: {
+    days?: number | string | null;
+  }) =>
     request<TransportVehicleDocumentExpiryReport>(
       withQuery('/transport/reports/vehicle-documents', params ?? {}),
     ),
@@ -456,10 +467,13 @@ export const transportApi = {
       '/transport/reports/maintenance',
     ),
   cancelTrip: (tripId: string, body?: { reason?: string }) =>
-    request<TransportTrip>(`/transport/trips/${encodeURIComponent(tripId)}/cancel`, {
-      method: 'PATCH',
-      json: body ?? {},
-    }),
+    request<TransportTrip>(
+      `/transport/trips/${encodeURIComponent(tripId)}/cancel`,
+      {
+        method: 'PATCH',
+        json: body ?? {},
+      },
+    ),
   pauseStudentAssignment: (assignmentId: string) =>
     request<any>(
       `/transport/assignments/students/${encodeURIComponent(assignmentId)}/pause`,
@@ -490,8 +504,11 @@ export const transportApi = {
     tripId: string,
     body: { isDelayed: boolean; delayReason?: string; delayMinutes?: number },
   ) =>
-    request<TransportTrip>(`/transport/trips/${encodeURIComponent(tripId)}/delay`, {
-      method: 'PATCH',
-      json: body,
-    }),
+    request<TransportTrip>(
+      `/transport/trips/${encodeURIComponent(tripId)}/delay`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
 };

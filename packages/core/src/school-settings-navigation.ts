@@ -12,19 +12,19 @@
  *   (`settings:delegate`).
  */
 export type SchoolSettingsAccess =
-  | 'view'
-  | 'edit'
-  | 'approve'
-  | 'manage'
-  | 'delegate';
+  | "view"
+  | "edit"
+  | "approve"
+  | "manage"
+  | "delegate";
 
 export type SchoolSettingsNavigationGroupId =
-  | 'school-setup'
-  | 'academic-student-policy'
-  | 'finance-administration'
-  | 'communication-documents'
-  | 'people-governance'
-  | 'module-settings';
+  | "school-setup"
+  | "academic-student-policy"
+  | "finance-administration"
+  | "communication-documents"
+  | "people-governance"
+  | "module-settings";
 
 export type SchoolSettingsNavigationItem = {
   id: string;

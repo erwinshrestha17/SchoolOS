@@ -17,25 +17,47 @@ test.describe('Dashboard widget smoke', () => {
 
   test('verifies all dashboard widgets are visible', async ({ page }) => {
     // 1. Check KPIs
-    await expect(page.getByText('Total Students', { exact: false })).toBeVisible();
-    await expect(page.getByText("Today's Attendance", { exact: false })).toBeVisible();
-    await expect(page.getByText('Monthly Collection', { exact: false })).toBeVisible();
+    await expect(
+      page.getByText('Total Students', { exact: false }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Today's Attendance", { exact: false }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Monthly Collection', { exact: false }),
+    ).toBeVisible();
 
     // 2. Check Operational Alerts
-    await expect(page.getByRole('heading', { name: /Operational Alerts/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Operational Alerts/i }),
+    ).toBeVisible();
 
     // 3. Check Quick Actions
-    await expect(page.getByRole('heading', { name: /Quick Actions/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /New Admission/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Mark Attendance/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Quick Actions/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: /New Admission/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: /Mark Attendance/i }),
+    ).toBeVisible();
 
     // 4. Check Snapshots/Charts
-    await expect(page.getByRole('heading', { name: /Fee Collection/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Attendance Mix/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Notification Health/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Fee Collection/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Attendance Mix/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Notification Health/i }),
+    ).toBeVisible();
 
     // 5. Check Recent Activity
-    await expect(page.getByRole('heading', { name: /Recent Activity/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Recent Activity/i }),
+    ).toBeVisible();
   });
 
   test('verifies quick actions navigation', async ({ page }) => {

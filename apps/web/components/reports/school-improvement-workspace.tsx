@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   formatBsDate,
   parseBsDateInput,
@@ -10,7 +10,7 @@ import {
   type SchoolImprovementActionStatus,
   type SchoolImprovementPlanRecord,
   type SchoolImprovementPlanStatus,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,75 +21,75 @@ import {
   FileUp,
   Plus,
   Target,
-} from "lucide-react";
-import { useSession } from "@/components/session-provider";
-import { api, type SchoolUserSummary } from "@/lib/api";
-import { ModuleHeader } from "@/components/ui/module-header";
-import { SummaryCard, SummaryGrid } from "@/components/ui/summary-card";
-import { WorkSurface } from "@/components/ui/work-surface";
-import { Button } from "@/components/ui/button";
-import { BsDateField } from "@/components/ui/bs-date-field";
-import { FormField, Input, Select, TextArea } from "@/components/ui/form-field";
-import { LoadingState } from "@/components/ui/loading-state";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ErrorState } from "@/components/ui/error-state";
-import { PermissionDenied } from "@/components/ui/permission-denied";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { ProtectedFileButton } from "@/components/ui/protected-file";
+} from 'lucide-react';
+import { useSession } from '@/components/session-provider';
+import { api, type SchoolUserSummary } from '@/lib/api';
+import { ModuleHeader } from '@/components/ui/module-header';
+import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
+import { WorkSurface } from '@/components/ui/work-surface';
+import { Button } from '@/components/ui/button';
+import { BsDateField } from '@/components/ui/bs-date-field';
+import { FormField, Input, Select, TextArea } from '@/components/ui/form-field';
+import { LoadingState } from '@/components/ui/loading-state';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { PermissionDenied } from '@/components/ui/permission-denied';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { ProtectedFileButton } from '@/components/ui/protected-file';
 
 export function SchoolImprovementWorkspace() {
   const { session, hasPermissions } = useSession();
   const queryClient = useQueryClient();
   const canRead =
-    hasPermissions(["reports:read"]) || hasPermissions(["settings:manage"]);
-  const canManage = hasPermissions(["settings:manage"]);
+    hasPermissions(['reports:read']) || hasPermissions(['settings:manage']);
+  const canManage = hasPermissions(['settings:manage']);
   const [page, setPage] = useState(1);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const plansQuery = useQuery({
-    queryKey: ["school-improvement-plans", page],
+    queryKey: ['school-improvement-plans', page],
     queryFn: () => api.listSchoolImprovementPlans({ page, limit: 20 }),
     enabled: canRead,
   });
   const selectedPlanQuery = useQuery({
-    queryKey: ["school-improvement-plan", selectedPlanId],
+    queryKey: ['school-improvement-plan', selectedPlanId],
     queryFn: () => api.getSchoolImprovementPlan(selectedPlanId!),
     enabled: Boolean(canRead && selectedPlanId),
   });
   const yearsQuery = useQuery({
-    queryKey: ["academic-years"],
+    queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
     enabled: canManage,
   });
   const usersQuery = useQuery({
-    queryKey: ["school-users", "improvement-plan-owners"],
+    queryKey: ['school-users', 'improvement-plan-owners'],
     queryFn: api.listUsers,
     enabled: canManage,
   });
   const refresh = async () => {
     await Promise.all([
       queryClient.invalidateQueries({
-        queryKey: ["school-improvement-plans"],
+        queryKey: ['school-improvement-plans'],
       }),
       queryClient.invalidateQueries({
-        queryKey: ["school-improvement-plan"],
+        queryKey: ['school-improvement-plan'],
       }),
     ]);
   };
   const plans = plansQuery.data?.items ?? [];
-  const activePlans = plans.filter((plan) => plan.status === "ACTIVE").length;
+  const activePlans = plans.filter((plan) => plan.status === 'ACTIVE').length;
   const openActions = plans.reduce(
     (total, plan) =>
       total +
       plan.actions.filter((action) =>
-        ["NOT_STARTED", "IN_PROGRESS", "BLOCKED"].includes(action.status),
+        ['NOT_STARTED', 'IN_PROGRESS', 'BLOCKED'].includes(action.status),
       ).length,
     0,
   );
   const completedActions = plans.reduce(
     (total, plan) =>
       total +
-      plan.actions.filter((action) => action.status === "COMPLETED").length,
+      plan.actions.filter((action) => action.status === 'COMPLETED').length,
     0,
   );
 
@@ -106,7 +106,7 @@ export function SchoolImprovementWorkspace() {
               onClick={() => setShowCreate((open) => !open)}
             >
               <Plus className="size-4" />
-              {showCreate ? "Close form" : "Create plan"}
+              {showCreate ? 'Close form' : 'Create plan'}
             </Button>
           ) : undefined
         }
@@ -133,7 +133,7 @@ export function SchoolImprovementWorkspace() {
           <SummaryGrid>
             <SummaryCard
               label="Plans on this page"
-              value={plansQuery.isError ? "Unavailable" : plans.length}
+              value={plansQuery.isError ? 'Unavailable' : plans.length}
               icon={<ClipboardList />}
               tone="info"
               loading={plansQuery.isLoading}
@@ -141,7 +141,7 @@ export function SchoolImprovementWorkspace() {
             />
             <SummaryCard
               label="Active plans"
-              value={plansQuery.isError ? "Unavailable" : activePlans}
+              value={plansQuery.isError ? 'Unavailable' : activePlans}
               icon={<Target />}
               tone="module"
               loading={plansQuery.isLoading}
@@ -149,15 +149,15 @@ export function SchoolImprovementWorkspace() {
             />
             <SummaryCard
               label="Open actions"
-              value={plansQuery.isError ? "Unavailable" : openActions}
+              value={plansQuery.isError ? 'Unavailable' : openActions}
               icon={<CalendarCheck />}
-              tone={openActions > 0 ? "warning" : "success"}
+              tone={openActions > 0 ? 'warning' : 'success'}
               loading={plansQuery.isLoading}
               description="Visible page only"
             />
             <SummaryCard
               label="Completed actions"
-              value={plansQuery.isError ? "Unavailable" : completedActions}
+              value={plansQuery.isError ? 'Unavailable' : completedActions}
               icon={<CheckCircle2 />}
               tone="success"
               loading={plansQuery.isLoading}
@@ -168,9 +168,9 @@ export function SchoolImprovementWorkspace() {
           {showCreate && canManage ? (
             <CreatePlanForm
               academicYears={yearsQuery.data ?? []}
-              currentUserId={session?.user.id ?? ""}
+              currentUserId={session?.user.id ?? ''}
               users={(usersQuery.data ?? []).filter(
-                (user) => user.status === "ACTIVE",
+                (user) => user.status === 'ACTIVE',
               )}
               onCreated={async (plan) => {
                 setShowCreate(false);
@@ -196,8 +196,8 @@ export function SchoolImprovementWorkspace() {
               title="No school improvement plan"
               description={
                 canManage
-                  ? "Create the first plan from an agreed baseline and target."
-                  : "No school improvement plan is available for this school."
+                  ? 'Create the first plan from an agreed baseline and target.'
+                  : 'No school improvement plan is available for this school.'
               }
             />
           ) : (
@@ -218,8 +218,8 @@ export function SchoolImprovementWorkspace() {
                         {plan.title}
                       </span>
                       <span className="mt-1 block text-sm text-slate-600">
-                        {formatBsDate(plan.startsOn)} –{" "}
-                        {formatBsDate(plan.endsOn)} • {plan.kpis.length}{" "}
+                        {formatBsDate(plan.startsOn)} –{' '}
+                        {formatBsDate(plan.endsOn)} • {plan.kpis.length}{' '}
                         indicators • {plan.actions.length} actions
                       </span>
                     </span>
@@ -332,13 +332,13 @@ function PlanDetail({
             <div key={kpi.id} className="rounded-xl border p-4">
               <p className="font-bold">{kpi.name}</p>
               <p className="mt-2 text-sm text-slate-600">
-                Baseline {kpi.baselineValue} {kpi.unit} • Target{" "}
+                Baseline {kpi.baselineValue} {kpi.unit} • Target{' '}
                 {kpi.targetValue} {kpi.unit}
               </p>
               <p className="mt-1 text-sm font-semibold">
-                Latest:{" "}
+                Latest:{' '}
                 {kpi.latestValue === null
-                  ? "Not reviewed"
+                  ? 'Not reviewed'
                   : `${kpi.latestValue} ${kpi.unit}`}
               </p>
               <p className="mt-1 text-xs text-slate-500">
@@ -365,7 +365,7 @@ function PlanDetail({
         </div>
       </WorkSurface>
 
-      {canManage && plan.status !== "ARCHIVED" ? (
+      {canManage && plan.status !== 'ARCHIVED' ? (
         <ReviewForm plan={plan} onChanged={onChanged} />
       ) : null}
 
@@ -412,7 +412,7 @@ function CreatePlanForm({
   const currentYear =
     academicYears.find((year) => year.isCurrent)?.id ??
     academicYears[0]?.id ??
-    "";
+    '';
   const ownerOptions = useMemo(
     () =>
       users.length > 0
@@ -420,27 +420,27 @@ function CreatePlanForm({
         : [
             {
               id: currentUserId,
-              email: "Current signed-in school leader",
+              email: 'Current signed-in school leader',
             } as SchoolUserSummary,
           ],
     [currentUserId, users],
   );
   const [academicYearId, setAcademicYearId] = useState(currentYear);
   const [ownerUserId, setOwnerUserId] = useState(currentUserId);
-  const [title, setTitle] = useState("");
-  const [baseline, setBaseline] = useState("");
-  const [target, setTarget] = useState("");
-  const [startsOn, setStartsOn] = useState("");
-  const [endsOn, setEndsOn] = useState("");
-  const [kpiName, setKpiName] = useState("");
-  const [kpiUnit, setKpiUnit] = useState("");
-  const [baselineValue, setBaselineValue] = useState("");
-  const [targetValue, setTargetValue] = useState("");
-  const [kpiDueOn, setKpiDueOn] = useState("");
-  const [actionTitle, setActionTitle] = useState("");
-  const [actionDetails, setActionDetails] = useState("");
-  const [actionDueOn, setActionDueOn] = useState("");
-  const [error, setError] = useState("");
+  const [title, setTitle] = useState('');
+  const [baseline, setBaseline] = useState('');
+  const [target, setTarget] = useState('');
+  const [startsOn, setStartsOn] = useState('');
+  const [endsOn, setEndsOn] = useState('');
+  const [kpiName, setKpiName] = useState('');
+  const [kpiUnit, setKpiUnit] = useState('');
+  const [baselineValue, setBaselineValue] = useState('');
+  const [targetValue, setTargetValue] = useState('');
+  const [kpiDueOn, setKpiDueOn] = useState('');
+  const [actionTitle, setActionTitle] = useState('');
+  const [actionDetails, setActionDetails] = useState('');
+  const [actionDueOn, setActionDueOn] = useState('');
+  const [error, setError] = useState('');
   const mutation = useMutation({
     mutationFn: () =>
       api.createSchoolImprovementPlan({
@@ -474,7 +474,7 @@ function CreatePlanForm({
     onSuccess: (plan) => void onCreated(plan),
     onError: () =>
       setError(
-        "The plan could not be saved. Check the dates, owners, indicator values, and required details.",
+        'The plan could not be saved. Check the dates, owners, indicator values, and required details.',
       ),
   });
   return (
@@ -487,7 +487,7 @@ function CreatePlanForm({
         className="grid gap-4 lg:grid-cols-3"
         onSubmit={(event) => {
           event.preventDefault();
-          setError("");
+          setError('');
           mutation.mutate();
         }}
       >
@@ -501,7 +501,7 @@ function CreatePlanForm({
             {academicYears.map((year) => (
               <option key={year.id} value={year.id}>
                 {year.name}
-                {year.isCurrent ? " • Current" : ""}
+                {year.isCurrent ? ' • Current' : ''}
               </option>
             ))}
           </Select>
@@ -515,7 +515,7 @@ function CreatePlanForm({
             <option value="">Choose owner</option>
             {ownerOptions.map((user) => (
               <option key={user.id} value={user.id}>
-                {user.email ?? "School user"}
+                {user.email ?? 'School user'}
               </option>
             ))}
           </Select>
@@ -628,7 +628,7 @@ function CreatePlanForm({
         ) : null}
         <div className="lg:col-span-3">
           <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? "Saving plan…" : "Save draft plan"}
+            {mutation.isPending ? 'Saving plan…' : 'Save draft plan'}
           </Button>
         </div>
       </form>
@@ -643,7 +643,7 @@ function PlanTransitionForm({
   plan: SchoolImprovementPlanRecord;
   onChanged: () => Promise<void>;
 }) {
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState('');
   const nextStatus = nextPlanStatus(plan.status);
   const mutation = useMutation({
     mutationFn: () =>
@@ -653,7 +653,7 @@ function PlanTransitionForm({
         reason,
       }),
     onSuccess: () => {
-      setReason("");
+      setReason('');
       void onChanged();
     },
   });
@@ -693,13 +693,13 @@ function ActionCard({
   const [status, setStatus] = useState<SchoolImprovementActionStatus>(
     action.status,
   );
-  const [reason, setReason] = useState("");
-  const [progressNote, setProgressNote] = useState(action.progressNote ?? "");
+  const [reason, setReason] = useState('');
+  const [progressNote, setProgressNote] = useState(action.progressNote ?? '');
   const [evidenceFileAssetId, setEvidenceFileAssetId] = useState<
     string | undefined
   >(undefined);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const mutation = useMutation({
     mutationFn: () =>
       api.updateSchoolImprovementAction(action.id, {
@@ -710,13 +710,13 @@ function ActionCard({
         evidenceFileAssetId,
       }),
     onSuccess: () => {
-      setReason("");
+      setReason('');
       setEvidenceFileAssetId(undefined);
       void onChanged();
     },
     onError: () =>
       setError(
-        "The action changed or could not be updated. Refresh the plan and try again.",
+        'The action changed or could not be updated. Refresh the plan and try again.',
       ),
   });
   return (
@@ -753,7 +753,7 @@ function ActionCard({
           className="mt-4 grid gap-3 md:grid-cols-2"
           onSubmit={(event) => {
             event.preventDefault();
-            setError("");
+            setError('');
             mutation.mutate();
           }}
         >
@@ -765,14 +765,14 @@ function ActionCard({
               }
             >
               {[
-                "NOT_STARTED",
-                "IN_PROGRESS",
-                "BLOCKED",
-                "COMPLETED",
-                "CANCELLED",
+                'NOT_STARTED',
+                'IN_PROGRESS',
+                'BLOCKED',
+                'COMPLETED',
+                'CANCELLED',
               ].map((value) => (
                 <option key={value} value={value}>
-                  {value.replace(/_/g, " ")}
+                  {value.replace(/_/g, ' ')}
                 </option>
               ))}
             </Select>
@@ -798,10 +798,10 @@ function ActionCard({
             <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 p-3 text-sm font-semibold text-slate-700 hover:border-[var(--primary)]">
               <FileUp className="size-4" />
               {uploading
-                ? "Uploading…"
+                ? 'Uploading…'
                 : evidenceFileAssetId
-                  ? "Evidence ready to save"
-                  : "Choose evidence file"}
+                  ? 'Evidence ready to save'
+                  : 'Choose evidence file'}
               <input
                 type="file"
                 className="sr-only"
@@ -810,21 +810,21 @@ function ActionCard({
                   const file = event.target.files?.[0];
                   if (!file) return;
                   setUploading(true);
-                  setError("");
+                  setError('');
                   try {
                     const uploaded = await api.uploadFile(
                       file,
-                      "institutional-improvement",
+                      'institutional-improvement',
                       action.id,
                     );
                     setEvidenceFileAssetId(uploaded.id);
                   } catch {
                     setError(
-                      "The evidence file could not be uploaded. No action change was saved.",
+                      'The evidence file could not be uploaded. No action change was saved.',
                     );
                   } finally {
                     setUploading(false);
-                    event.target.value = "";
+                    event.target.value = '';
                   }
                 }}
               />
@@ -858,11 +858,11 @@ function ReviewForm({
   plan: SchoolImprovementPlanRecord;
   onChanged: () => Promise<void>;
 }) {
-  const [reviewedOn, setReviewedOn] = useState("");
-  const [summary, setSummary] = useState("");
-  const [nextActions, setNextActions] = useState("");
+  const [reviewedOn, setReviewedOn] = useState('');
+  const [summary, setSummary] = useState('');
+  const [nextActions, setNextActions] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const mutation = useMutation({
     mutationFn: () =>
       api.addSchoolImprovementReview(plan.id, {
@@ -876,15 +876,15 @@ function ReviewForm({
         clientRequestId: crypto.randomUUID(),
       }),
     onSuccess: () => {
-      setReviewedOn("");
-      setSummary("");
-      setNextActions("");
+      setReviewedOn('');
+      setSummary('');
+      setNextActions('');
       setValues({});
       void onChanged();
     },
     onError: () =>
       setError(
-        "The review could not be recorded. Enter a value for every indicator and try again.",
+        'The review could not be recorded. Enter a value for every indicator and try again.',
       ),
   });
   return (
@@ -897,7 +897,7 @@ function ReviewForm({
         className="grid gap-4 md:grid-cols-2"
         onSubmit={(event) => {
           event.preventDefault();
-          setError("");
+          setError('');
           mutation.mutate();
         }}
       >
@@ -930,7 +930,7 @@ function ReviewForm({
               required
               type="number"
               step="any"
-              value={values[kpi.id] ?? ""}
+              value={values[kpi.id] ?? ''}
               onChange={(event) =>
                 setValues((current) => ({
                   ...current,
@@ -947,7 +947,7 @@ function ReviewForm({
         ) : null}
         <div className="md:col-span-2">
           <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending ? "Recording review…" : "Record review"}
+            {mutation.isPending ? 'Recording review…' : 'Record review'}
           </Button>
         </div>
       </form>
@@ -957,20 +957,20 @@ function ReviewForm({
 
 function gregorianDateString(value: string) {
   const gregorian = toGregorianDateFromBs(parseBsDateInput(value));
-  return `${gregorian.year}-${String(gregorian.month).padStart(2, "0")}-${String(gregorian.day).padStart(2, "0")}`;
+  return `${gregorian.year}-${String(gregorian.month).padStart(2, '0')}-${String(gregorian.day).padStart(2, '0')}`;
 }
 
 function nextPlanStatus(
   status: SchoolImprovementPlanStatus,
 ): SchoolImprovementPlanStatus | null {
-  if (status === "DRAFT") return "ACTIVE";
-  if (status === "ACTIVE") return "COMPLETED";
-  if (status === "COMPLETED") return "ARCHIVED";
+  if (status === 'DRAFT') return 'ACTIVE';
+  if (status === 'ACTIVE') return 'COMPLETED';
+  if (status === 'COMPLETED') return 'ARCHIVED';
   return null;
 }
 
 function planActionLabel(status: SchoolImprovementPlanStatus) {
-  if (status === "ACTIVE") return "Activate plan";
-  if (status === "COMPLETED") return "Complete plan";
-  return "Archive plan";
+  if (status === 'ACTIVE') return 'Activate plan';
+  if (status === 'COMPLETED') return 'Complete plan';
+  return 'Archive plan';
 }

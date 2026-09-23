@@ -579,10 +579,7 @@ export const academicsApi = {
     page?: number;
     limit?: number;
   }) => request<TimetableSlotPage>(withQuery('/timetable', params ?? {})),
-  listSupportPublishedTimetable: (params?: {
-    page?: number;
-    limit?: number;
-  }) =>
+  listSupportPublishedTimetable: (params?: { page?: number; limit?: number }) =>
     request<SupportPublishedTimetablePage>(
       withQuery('/timetable/support/published', params ?? {}),
     ),

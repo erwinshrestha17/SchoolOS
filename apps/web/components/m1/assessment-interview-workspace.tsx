@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
 import type {
   AdmissionAssessmentMode,
   AdmissionAssessmentResult,
   AdmissionAssessmentSessionSummary,
   AdmissionAssessmentTab,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   formatBsDateForInput,
   formatBsDateTime,
   formatNepalTime,
-} from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+} from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CalendarClock,
   CheckCircle2,
@@ -21,51 +21,51 @@ import {
   Loader2,
   RefreshCw,
   UserRoundCheck,
-} from "lucide-react";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { api } from "../../lib/api";
-import { ApiRequestError } from "../../lib/api/client";
-import { admissionCasesApi } from "../../lib/api/admission-cases";
-import { admissionPoliciesApi } from "../../lib/api/admission-policies";
-import { schoolFacingErrorMessage } from "../../lib/school-facing-error";
+} from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '../../lib/api';
+import { ApiRequestError } from '../../lib/api/client';
+import { admissionCasesApi } from '../../lib/api/admission-cases';
+import { admissionPoliciesApi } from '../../lib/api/admission-policies';
+import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
 import {
   classOptionLabel,
   educationProgramLabel,
-} from "../../lib/education-program";
-import { useUrlFilters } from "../../lib/hooks/use-url-filters";
-import { useSession } from "../session-provider";
-import { Button } from "../ui/button";
-import { EmptyState } from "../ui/empty-state";
-import { KpiCard, KpiGrid } from "../ui/kpi-card";
-import { ModuleLockedState } from "../ui/module-locked-state";
-import { PageState } from "../ui/page-state";
-import { StatusBadge } from "../ui/status-badge";
+} from '../../lib/education-program';
+import { useUrlFilters } from '../../lib/hooks/use-url-filters';
+import { useSession } from '../session-provider';
+import { Button } from '../ui/button';
+import { EmptyState } from '../ui/empty-state';
+import { KpiCard, KpiGrid } from '../ui/kpi-card';
+import { ModuleLockedState } from '../ui/module-locked-state';
+import { PageState } from '../ui/page-state';
+import { StatusBadge } from '../ui/status-badge';
 
 const TABS: Array<{ id: AdmissionAssessmentTab; label: string }> = [
-  { id: "TODAY", label: "Today" },
-  { id: "UPCOMING", label: "Upcoming" },
-  { id: "AWAITING_RESULTS", label: "Awaiting Results" },
+  { id: 'TODAY', label: 'Today' },
+  { id: 'UPCOMING', label: 'Upcoming' },
+  { id: 'AWAITING_RESULTS', label: 'Awaiting Results' },
 ];
 
 const MODES: Array<{ id: AdmissionAssessmentMode; label: string }> = [
-  { id: "IN_PERSON", label: "In person" },
-  { id: "PHONE", label: "Phone" },
-  { id: "ONLINE", label: "Online" },
-  { id: "WRITTEN", label: "Written" },
+  { id: 'IN_PERSON', label: 'In person' },
+  { id: 'PHONE', label: 'Phone' },
+  { id: 'ONLINE', label: 'Online' },
+  { id: 'WRITTEN', label: 'Written' },
 ];
 
 const RESULTS: Array<{ id: AdmissionAssessmentResult; label: string }> = [
-  { id: "PASSED", label: "Passed" },
-  { id: "NEEDS_FOLLOW_UP", label: "Needs follow-up" },
-  { id: "FAILED", label: "Failed" },
-  { id: "NO_SHOW", label: "No-show" },
+  { id: 'PASSED', label: 'Passed' },
+  { id: 'NEEDS_FOLLOW_UP', label: 'Needs follow-up' },
+  { id: 'FAILED', label: 'Failed' },
+  { id: 'NO_SHOW', label: 'No-show' },
 ];
 
 export function AssessmentInterviewWorkspace() {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
-  const canManage = hasPermissions(["students:manage_lifecycle"]);
+  const canManage = hasPermissions(['students:manage_lifecycle']);
   const [filters, setFilters] = useUrlFilters<{
     tab: AdmissionAssessmentTab;
     admissionCaseId: string;
@@ -73,23 +73,23 @@ export function AssessmentInterviewWorkspace() {
     classId: string;
     page: number;
   }>({
-    tab: "TODAY",
-    admissionCaseId: "",
-    policyId: "",
-    classId: "",
+    tab: 'TODAY',
+    admissionCaseId: '',
+    policyId: '',
+    classId: '',
     page: 1,
   });
   const tab = TABS.some((item) => item.id === filters.tab)
     ? filters.tab
-    : "TODAY";
+    : 'TODAY';
   const [scheduleForm, setScheduleForm] = useState({
-    admissionCaseId: "",
+    admissionCaseId: '',
     bsDate: formatBsDateForInput(new Date()),
-    startTime: "10:00",
+    startTime: '10:00',
     durationMinutes: 30,
-    mode: "IN_PERSON" as AdmissionAssessmentMode,
-    location: "",
-    notes: "",
+    mode: 'IN_PERSON' as AdmissionAssessmentMode,
+    location: '',
+    notes: '',
   });
   const [resultForm, setResultForm] = useState<{
     session: AdmissionAssessmentSessionSummary | null;
@@ -98,14 +98,14 @@ export function AssessmentInterviewWorkspace() {
     notes: string;
   }>({
     session: null,
-    result: "PASSED",
-    score: "",
-    notes: "",
+    result: 'PASSED',
+    score: '',
+    notes: '',
   });
 
   const sessionsQuery = useQuery({
     queryKey: [
-      "admission-assessment-sessions",
+      'admission-assessment-sessions',
       tab,
       filters.policyId,
       filters.classId,
@@ -122,7 +122,7 @@ export function AssessmentInterviewWorkspace() {
   });
   const candidatesQuery = useQuery({
     queryKey: [
-      "admission-assessment-candidates",
+      'admission-assessment-candidates',
       filters.admissionCaseId,
       filters.policyId,
       filters.classId,
@@ -137,11 +137,11 @@ export function AssessmentInterviewWorkspace() {
       }),
   });
   const policiesQuery = useQuery({
-    queryKey: ["admission-policies"],
+    queryKey: ['admission-policies'],
     queryFn: admissionPoliciesApi.list,
   });
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
 
@@ -180,11 +180,11 @@ export function AssessmentInterviewWorkspace() {
         },
       ),
     onSuccess: async () => {
-      setFilters({ admissionCaseId: "" }, { history: "replace" });
+      setFilters({ admissionCaseId: '' }, { history: 'replace' });
       setScheduleForm((current) => ({
         ...current,
-        admissionCaseId: "",
-        notes: "",
+        admissionCaseId: '',
+        notes: '',
       }));
       await refreshAssessmentQueries(queryClient);
     },
@@ -192,7 +192,7 @@ export function AssessmentInterviewWorkspace() {
   const resultMutation = useMutation({
     mutationFn: () => {
       if (!resultForm.session) {
-        throw new Error("Choose an assessment or interview session.");
+        throw new Error('Choose an assessment or interview session.');
       }
       const score = resultForm.score.trim()
         ? Number(resultForm.score.trim())
@@ -206,9 +206,9 @@ export function AssessmentInterviewWorkspace() {
     onSuccess: async () => {
       setResultForm({
         session: null,
-        result: "PASSED",
-        score: "",
-        notes: "",
+        result: 'PASSED',
+        score: '',
+        notes: '',
       });
       await refreshAssessmentQueries(queryClient);
     },
@@ -233,15 +233,15 @@ export function AssessmentInterviewWorkspace() {
         <KpiCard
           title="Today"
           loading={sessionsQuery.isLoading}
-          value={summary?.today ?? "Unavailable"}
+          value={summary?.today ?? 'Unavailable'}
           icon={<CalendarClock size={18} />}
-          tone={(summary?.today ?? 0) > 0 ? "warning" : "neutral"}
+          tone={(summary?.today ?? 0) > 0 ? 'warning' : 'neutral'}
           description="Scheduled assessment and interview sessions due today."
         />
         <KpiCard
           title="Upcoming"
           loading={sessionsQuery.isLoading}
-          value={summary?.upcoming ?? "Unavailable"}
+          value={summary?.upcoming ?? 'Unavailable'}
           icon={<RefreshCw size={18} />}
           tone="neutral"
           description="Future sessions already scheduled."
@@ -249,17 +249,17 @@ export function AssessmentInterviewWorkspace() {
         <KpiCard
           title="Awaiting Results"
           loading={sessionsQuery.isLoading}
-          value={summary?.awaitingResults ?? "Unavailable"}
+          value={summary?.awaitingResults ?? 'Unavailable'}
           icon={<ClipboardCheck size={18} />}
-          tone={(summary?.awaitingResults ?? 0) > 0 ? "danger" : "neutral"}
+          tone={(summary?.awaitingResults ?? 0) > 0 ? 'danger' : 'neutral'}
           description="Scheduled sessions whose result has not been recorded."
         />
         <KpiCard
           title="Needs Scheduling"
           loading={sessionsQuery.isLoading || candidatesQuery.isLoading}
-          value={summary?.needsScheduling ?? "Unavailable"}
+          value={summary?.needsScheduling ?? 'Unavailable'}
           icon={<UserRoundCheck size={18} />}
-          tone={(summary?.needsScheduling ?? 0) > 0 ? "warning" : "neutral"}
+          tone={(summary?.needsScheduling ?? 0) > 0 ? 'warning' : 'neutral'}
           description="Open cases matched to a policy that requires an interview."
         />
       </KpiGrid>
@@ -324,8 +324,8 @@ export function AssessmentInterviewWorkspace() {
             </h2>
             <p className="mt-1 text-sm text-slate-600">
               {selectedCandidate
-                ? `${selectedCandidate.applicantName} · ${selectedCandidate.className ?? "Class not selected"} · ${educationProgramLabel(selectedCandidate.program)}`
-                : "Choose an interview-required admission case."}
+                ? `${selectedCandidate.applicantName} · ${selectedCandidate.className ?? 'Class not selected'} · ${educationProgramLabel(selectedCandidate.program)}`
+                : 'Choose an interview-required admission case.'}
             </p>
           </div>
           {!canManage ? (
@@ -345,7 +345,7 @@ export function AssessmentInterviewWorkspace() {
                   ...current,
                   admissionCaseId,
                 }));
-                setFilters({ admissionCaseId }, { history: "replace" });
+                setFilters({ admissionCaseId }, { history: 'replace' });
               }}
               disabled={!canManage}
               className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
@@ -356,8 +356,8 @@ export function AssessmentInterviewWorkspace() {
                   key={candidate.admissionCaseId}
                   value={candidate.admissionCaseId}
                 >
-                  {candidate.applicantName} ·{" "}
-                  {candidate.className ?? "No class"} ·{" "}
+                  {candidate.applicantName} ·{' '}
+                  {candidate.className ?? 'No class'} ·{' '}
                   {educationProgramLabel(candidate.program)}
                 </option>
               ))}
@@ -521,8 +521,8 @@ export function AssessmentInterviewWorkspace() {
               onClick={() => setFilters({ tab: item.id, page: 1 })}
               className={`inline-flex min-h-11 items-center rounded-xl border px-4 text-sm font-bold transition ${
                 selected
-                  ? "border-[var(--color-mod-admissions-accent)] bg-blue-50 text-slate-950"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  ? 'border-[var(--color-mod-admissions-accent)] bg-blue-50 text-slate-950'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
               }`}
             >
               {item.label}
@@ -563,9 +563,9 @@ export function AssessmentInterviewWorkspace() {
                     onRecord={() =>
                       setResultForm({
                         session: row,
-                        result: "PASSED",
-                        score: "",
-                        notes: "",
+                        result: 'PASSED',
+                        score: '',
+                        notes: '',
                       })
                     }
                   />
@@ -582,7 +582,7 @@ export function AssessmentInterviewWorkspace() {
         <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
           <span>
             {sessionsQuery.data.total} session
-            {sessionsQuery.data.total === 1 ? "" : "s"}
+            {sessionsQuery.data.total === 1 ? '' : 's'}
           </span>
           <div className="flex gap-2">
             <Button
@@ -617,7 +617,7 @@ export function AssessmentInterviewWorkspace() {
                 Record result
               </h2>
               <p className="mt-1 text-sm text-slate-600">
-                {resultForm.session.applicantName} ·{" "}
+                {resultForm.session.applicantName} ·{' '}
                 {formatBsDateTime(resultForm.session.scheduledAt)}
               </p>
             </div>
@@ -627,9 +627,9 @@ export function AssessmentInterviewWorkspace() {
               onClick={() =>
                 setResultForm({
                   session: null,
-                  result: "PASSED",
-                  score: "",
-                  notes: "",
+                  result: 'PASSED',
+                  score: '',
+                  notes: '',
                 })
               }
             >
@@ -720,10 +720,10 @@ function AssessmentRow({
       <td className="px-5 py-4 align-top">
         <p className="font-bold text-slate-950">{row.applicantName}</p>
         <p className="mt-1 text-xs text-slate-500">
-          {row.guardianFullName ?? "Guardian not recorded"}
+          {row.guardianFullName ?? 'Guardian not recorded'}
         </p>
         <p className="mt-1 text-xs font-semibold text-slate-600">
-          {row.guardianPhone ?? "No guardian phone"}
+          {row.guardianPhone ?? 'No guardian phone'}
         </p>
       </td>
       <td className="px-5 py-4 align-top">
@@ -734,15 +734,15 @@ function AssessmentRow({
           {row.durationMinutes} min · {modeLabel(row.mode)}
         </p>
         <p className="mt-1 text-xs text-slate-500">
-          {row.location || "Location not set"}
+          {row.location || 'Location not set'}
         </p>
       </td>
       <td className="px-5 py-4 align-top">
         <p className="font-semibold text-slate-800">
-          {row.policyName ?? "No matched policy"}
+          {row.policyName ?? 'No matched policy'}
         </p>
         <p className="mt-1 text-xs text-slate-500">
-          {row.className ?? "Class not selected"} ·{" "}
+          {row.className ?? 'Class not selected'} ·{' '}
           {educationProgramLabel(row.program)}
         </p>
         <div className="mt-2">
@@ -756,7 +756,7 @@ function AssessmentRow({
               {resultLabel(row.result)}
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              {row.resultScore === null ? "No score" : `${row.resultScore}/100`}
+              {row.resultScore === null ? 'No score' : `${row.resultScore}/100`}
             </p>
           </>
         ) : (
@@ -765,7 +765,7 @@ function AssessmentRow({
             <p className="mt-1 text-xs text-slate-500">
               {scheduledForFuture
                 ? `Starts ${formatNepalTime(row.scheduledAt)}`
-                : "Ready for result entry"}
+                : 'Ready for result entry'}
             </p>
           </>
         )}
@@ -846,28 +846,28 @@ async function refreshAssessmentQueries(
 ) {
   await Promise.all([
     queryClient.invalidateQueries({
-      queryKey: ["admission-assessment-sessions"],
+      queryKey: ['admission-assessment-sessions'],
     }),
     queryClient.invalidateQueries({
-      queryKey: ["admission-assessment-candidates"],
+      queryKey: ['admission-assessment-candidates'],
     }),
-    queryClient.invalidateQueries({ queryKey: ["admission-case-queues"] }),
-    queryClient.invalidateQueries({ queryKey: ["admission-case"] }),
+    queryClient.invalidateQueries({ queryKey: ['admission-case-queues'] }),
+    queryClient.invalidateQueries({ queryKey: ['admission-case'] }),
   ]);
 }
 
 function readError(error: unknown) {
-  if (!error) return "";
+  if (!error) return '';
   return schoolFacingErrorMessage(error, {
     fallback:
-      "The assessment action could not be saved. No candidate result was changed.",
+      'The assessment action could not be saved. No candidate result was changed.',
     invalid:
-      "Review the schedule, candidate, mode, and result details before continuing.",
+      'Review the schedule, candidate, mode, and result details before continuing.',
     forbidden:
-      "You do not have permission to change assessment or interview records.",
-    notFound: "This candidate or assessment session is no longer available.",
+      'You do not have permission to change assessment or interview records.',
+    notFound: 'This candidate or assessment session is no longer available.',
     conflict:
-      "This assessment record changed while you were working. Refresh and try again.",
+      'This assessment record changed while you were working. Refresh and try again.',
   });
 }
 
@@ -876,9 +876,9 @@ function isModuleLockedError(error: unknown) {
     return false;
   const message = error.message.toLowerCase();
   return (
-    message.includes("subscription plan") ||
-    message.includes("not enabled") ||
-    message.includes("module.students")
+    message.includes('subscription plan') ||
+    message.includes('not enabled') ||
+    message.includes('module.students')
   );
 }
 
@@ -892,7 +892,7 @@ function resultLabel(result: AdmissionAssessmentResult) {
 
 function humanize(value: string) {
   return value
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replaceAll("_", " ")
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replaceAll('_', ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

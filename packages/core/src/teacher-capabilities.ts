@@ -90,7 +90,10 @@ const CAPABILITY_PERMISSIONS: Record<TeacherCapability, PermissionKey[]> = {
     "timetable:substitute",
     "timetable:manage",
   ],
-  [TeacherCapability.EXAM_TERM_ADMIN]: ["exam-terms:manage", "academics:manage"],
+  [TeacherCapability.EXAM_TERM_ADMIN]: [
+    "exam-terms:manage",
+    "academics:manage",
+  ],
   [TeacherCapability.ACADEMIC_STRUCTURE_ADMIN]: [
     "assessment-components:manage",
     "academics:manage",

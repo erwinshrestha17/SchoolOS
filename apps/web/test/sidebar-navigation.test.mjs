@@ -74,9 +74,9 @@ function collectNavEntries(source, navGroupsName) {
 
 describe('school operations sidebar', () => {
   it('keeps platform controls out of the school dashboard shell', () => {
-    assert.doesNotMatch(personaNavConfig, /label: 'Platform Control'/);
-    assert.doesNotMatch(personaNavConfig, /label: 'Managed Schools'/);
-    assert.doesNotMatch(personaNavConfig, /label: 'Operations Hub'/);
+    assert.doesNotMatch(personaNavConfig, /label: ['"]Platform Control['"]/);
+    assert.doesNotMatch(personaNavConfig, /label: ['"]Managed Schools['"]/);
+    assert.doesNotMatch(personaNavConfig, /label: ['"]Operations Hub['"]/);
   });
 
   it('keeps shared persona trees in the base and Principal overrides in the active config', () => {
@@ -86,7 +86,7 @@ describe('school operations sidebar', () => {
     assert.match(personaNavBase, /export const hrNavGroups/);
     assert.match(personaNavBase, /export const accountantNavGroups/);
     assert.match(personaNavEntry, /export function navGroupsForPersona/);
-    assert.match(sidebar, /from '\.\/sidebar-persona-nav\.config'/);
+    assert.match(sidebar, /from ['"]\.\/sidebar-persona-nav\.config['"]/);
     assert.doesNotMatch(sidebar, /export const principalNavGroups: NavGroup/);
   });
 
@@ -108,21 +108,27 @@ describe('school operations sidebar', () => {
     }
 
     assert.match(sidebar, /function NavGroupSection/);
-    assert.doesNotMatch(personaNavConfig, /label: 'Overview'/);
-    assert.doesNotMatch(personaNavConfig, /label: 'People'/);
-    assert.doesNotMatch(personaNavConfig, /label: 'Campus Services'/);
-    assert.doesNotMatch(personaNavConfig, /label: 'Workforce & Finance'/);
-    assert.doesNotMatch(personaNavConfig, /label: 'Insights'/);
-    assert.doesNotMatch(personaNavConfig, /label: 'CAS Records'/);
-    assert.doesNotMatch(personaNavConfig, /label: 'Report Cards'/);
+    assert.doesNotMatch(personaNavConfig, /label: ['"]Overview['"]/);
+    assert.doesNotMatch(personaNavConfig, /label: ['"]People['"]/);
+    assert.doesNotMatch(personaNavConfig, /label: ['"]Campus Services['"]/);
+    assert.doesNotMatch(personaNavConfig, /label: ['"]Workforce & Finance['"]/);
+    assert.doesNotMatch(personaNavConfig, /label: ['"]Insights['"]/);
+    assert.doesNotMatch(personaNavConfig, /label: ['"]CAS Records['"]/);
+    assert.doesNotMatch(personaNavConfig, /label: ['"]Report Cards['"]/);
   });
 
   it('keeps notice compatibility and academic routes active through their consolidated entries', () => {
-    assert.match(personaNavConfig, /'\/dashboard\/notices'/);
-    assert.doesNotMatch(personaNavConfig, /href: '\/dashboard\/messages'/);
-    assert.match(personaNavConfig, /'\/dashboard\/academics\/cas'/);
-    assert.match(personaNavConfig, /'\/dashboard\/academics\/report-cards'/);
-    assert.match(personaNavConfig, /'\/dashboard\/timetable'/);
+    assert.match(personaNavConfig, /['"]\/dashboard\/notices['"]/);
+    assert.doesNotMatch(
+      personaNavConfig,
+      /href: ['"]\/dashboard\/messages['"]/,
+    );
+    assert.match(personaNavConfig, /['"]\/dashboard\/academics\/cas['"]/);
+    assert.match(
+      personaNavConfig,
+      /['"]\/dashboard\/academics\/report-cards['"]/,
+    );
+    assert.match(personaNavConfig, /['"]\/dashboard\/timetable['"]/);
     assert.match(sidebar, /function isActiveNavItem/);
   });
 
@@ -132,7 +138,7 @@ describe('school operations sidebar', () => {
     assert.match(sidebar, /computeActiveNavHref/);
     assert.match(
       personaNavConfig,
-      /activeWhen: \['\/dashboard\/communications', '\/dashboard\/notices'\]/,
+      /activeWhen: \[['"]\/dashboard\/communications['"], ['"]\/dashboard\/notices['"]\]/,
     );
     assert.match(navHash, /score = candidatePath\.length \+ 10_000/);
   });
@@ -151,10 +157,13 @@ describe('school operations sidebar', () => {
   it('keeps visibility scoped to session permissions and module entitlements', () => {
     assert.match(sidebar, /function canDisplayNavItem/);
     assert.match(sidebar, /hasAnyPermission\(session, item\.permissions\)/);
-    assert.match(sidebar, /moduleKeys\.some\(\(module\) => hasModule\(module\)\)/);
+    assert.match(
+      sidebar,
+      /moduleKeys\.some\(\(module\) => hasModule\(module\)\)/,
+    );
     assert.match(sidebar, /getRequiredModuleForHref/);
-    assert.match(sidebar, /from '..\/..\/lib\/nav-module-map'/);
-    assert.match(dashboardLayout, /from "..\/..\/lib\/nav-module-map"/);
+    assert.match(sidebar, /from ['"]..\/..\/lib\/nav-module-map['"]/);
+    assert.match(dashboardLayout, /from ['"]..\/..\/lib\/nav-module-map['"]/);
     assert.doesNotMatch(sidebar, /function getRequiredModuleForHref/);
     assert.doesNotMatch(dashboardLayout, /function getRequiredModuleForHref/);
   });
@@ -172,7 +181,10 @@ describe('school operations sidebar', () => {
     assert.match(personaNavEntry, /export function shouldShowSettingsHub/);
     assert.match(commandPalette, /shouldShowSettingsHub/);
     assert.match(commandPalette, /isTeacherPersona/);
-    assert.match(commandPalette, /from '\.\/sidebar-persona-nav\.config'/);
+    assert.match(
+      commandPalette,
+      /from ['"]\.\/sidebar-persona-nav\.config['"]/,
+    );
     assert.doesNotMatch(commandPalette, /settingsNavItem,\s*\n\s*\];/);
   });
 
@@ -188,21 +200,24 @@ describe('school operations sidebar', () => {
   });
 
   it('keeps collapsed navigation and the footer accessible', () => {
-    assert.match(sidebarNavLink, /aria-label=\{collapsed \? label : undefined\}/);
+    assert.match(
+      sidebarNavLink,
+      /aria-label=\{collapsed \? label : undefined\}/,
+    );
     assert.match(sidebarNavLink, /title=\{collapsed \? label : undefined\}/);
     assert.match(
       sidebar,
-      /aria-label=\{collapsed \? 'Expand sidebar' : 'Collapse sidebar'\}/,
+      /aria-label=\{collapsed \? ['"]Expand sidebar['"] : ['"]Collapse sidebar['"]\}/,
     );
     assert.match(sidebar, /School workspace/);
     assert.match(sidebar, /CircleUserRound/);
   });
 
   it('badges Notifications with the real unread count instead of a hardcoded number', () => {
-    assert.match(sidebar, /queryKey: \['notification-center'\]/);
+    assert.match(sidebar, /queryKey: \[['"]notification-center['"]\]/);
     assert.match(sidebar, /queryFn: api\.getNotificationCenter/);
     assert.match(sidebar, /function formatBadgeCount/);
-    assert.match(sidebar, /count > 99 \? '99\+' : count/);
+    assert.match(sidebar, /count > 99 \? ['"]99\+['"] : count/);
     assert.doesNotMatch(personaNavConfig, /badge: \d/);
   });
 
@@ -219,13 +234,19 @@ describe('school operations sidebar', () => {
 
   it('uses the shared modal sheet for compact navigation and releases it at desktop width', () => {
     assert.match(sidebar, /Sheet, SheetContent, SheetTitle/);
-    assert.match(sidebar, /<Sheet open=\{mobileOpen\}/);
-    assert.match(sidebar, /id="school-navigation-drawer"/);
+    assert.match(sidebar, /<Sheet\s+open=\{mobileOpen\}/);
+    assert.match(sidebar, /id=['"]school-navigation-drawer['"]/);
     assert.match(sidebar, /onCloseAutoFocus/);
-    assert.match(sidebar, /aria-label="Close navigation menu"/);
-    assert.match(sidebar, /matchMedia\('\(min-width: 1024px\)'\)/);
-    assert.match(sidebar, /desktop\.addEventListener\('change', closeOnDesktop\)/);
-    assert.match(sidebar, /desktop\.removeEventListener\('change', closeOnDesktop\)/);
+    assert.match(sidebar, /aria-label=['"]Close navigation menu['"]/);
+    assert.match(sidebar, /matchMedia\(['"]\(min-width: 1024px\)['"]\)/);
+    assert.match(
+      sidebar,
+      /desktop\.addEventListener\(['"]change['"], closeOnDesktop\)/,
+    );
+    assert.match(
+      sidebar,
+      /desktop\.removeEventListener\(['"]change['"], closeOnDesktop\)/,
+    );
   });
 });
 
@@ -271,7 +292,7 @@ describe('persona sidebar contracts', () => {
     }
     assert.doesNotMatch(
       principalSlice,
-      /href: '\/dashboard\/accounting'[\s\S]*label: 'Finance Overview'/,
+      /href: ['"]\/dashboard\/accounting['"][\s\S]*label: ['"]Finance Overview['"]/,
     );
 
     const permissions = collectPermissionStrings(
@@ -295,15 +316,21 @@ describe('persona sidebar contracts', () => {
     assert.equal(moduleKeyDeclarations.length, 1);
     assert.match(
       principalSlice,
-      /moduleKeys: \['library', 'transport', 'canteen'\]/,
+      /moduleKeys: \[['"]library['"], ['"]transport['"], ['"]canteen['"]\]/,
     );
-    assert.doesNotMatch(principalSlice, /moduleKeys: \['academics'\]/);
-    assert.match(navModuleMap, /prefix: "\/dashboard\/academics", module: "exams"/);
+    assert.doesNotMatch(principalSlice, /moduleKeys: \[['"]academics['"]\]/);
+    assert.match(
+      navModuleMap,
+      /prefix: ['"]\/dashboard\/academics['"], module: ['"]exams['"]/,
+    );
   });
 
   it('uses canonical communication permission names for Principal oversight', () => {
-    assert.match(personaNavEntry, /'communications:read_deliveries'/);
-    assert.doesNotMatch(personaNavEntry, /'communications:deliveries:read'/);
+    assert.match(personaNavEntry, /['"]communications:read_deliveries['"]/);
+    assert.doesNotMatch(
+      personaNavEntry,
+      /['"]communications:deliveries:read['"]/,
+    );
   });
 
   it('keeps Operations inside School Readiness and uses school-friendly Reports & Audit wording', () => {
@@ -313,10 +340,13 @@ describe('persona sidebar contracts', () => {
     );
     const readinessStart = principalSlice.indexOf("label: 'School Readiness'");
     const communicationStart = principalSlice.indexOf("label: 'Communication'");
-    const readinessSlice = principalSlice.slice(readinessStart, communicationStart);
-    assert.match(readinessSlice, /label: 'Operations Overview'/);
-    assert.doesNotMatch(principalSlice, /label: 'School Operations'/);
-    assert.match(principalSlice, /label: 'Reports & Audit'/);
+    const readinessSlice = principalSlice.slice(
+      readinessStart,
+      communicationStart,
+    );
+    assert.match(readinessSlice, /label: ['"]Operations Overview['"]/);
+    assert.doesNotMatch(principalSlice, /label: ['"]School Operations['"]/);
+    assert.match(principalSlice, /label: ['"]Reports & Audit['"]/);
   });
 
   it('keeps institutional Settings out of the Principal leadership-only shell', () => {
@@ -330,7 +360,7 @@ describe('persona sidebar contracts', () => {
     const settingsSlice = personaNavEntry.slice(settingsStart, settingsEnd);
     assert.match(
       settingsSlice,
-      /const principalLeadershipOnly = \['principal'\]\.includes\(persona\)/,
+      /const principalLeadershipOnly = \[['"]principal['"]\]\.includes\(persona\)/,
     );
     assert.match(
       settingsSlice,
@@ -358,8 +388,10 @@ describe('persona sidebar contracts', () => {
 
   it('teacher nav includes notifications without inventing class reports', () => {
     const entries = collectNavEntries(personaNavConfig, 'teacherNavGroups');
-    assert.ok(entries.some((entry) => entry.href === '/dashboard/notifications'));
-    assert.doesNotMatch(personaNavConfig, /label: 'Class Reports'/);
+    assert.ok(
+      entries.some((entry) => entry.href === '/dashboard/notifications'),
+    );
+    assert.doesNotMatch(personaNavConfig, /label: ['"]Class Reports['"]/);
   });
 
   it('cashier shell stays on counter operations only', () => {
@@ -376,8 +408,8 @@ describe('persona sidebar contracts', () => {
       personaNavEntry,
       'principalNavGroups',
     );
-    assert.match(principalSlice, /href: '\/dashboard\/attention'/);
-    assert.match(principalSlice, /href: '\/dashboard\/approvals'/);
+    assert.match(principalSlice, /href: ['"]\/dashboard\/attention['"]/);
+    assert.match(principalSlice, /href: ['"]\/dashboard\/approvals['"]/);
     assert.doesNotMatch(principalSlice, /\/dashboard#needs-attention/);
   });
 });

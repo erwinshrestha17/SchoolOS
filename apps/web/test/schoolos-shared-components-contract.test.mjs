@@ -29,8 +29,8 @@ describe('Shadcn foundation (components.json + primitive bridge)', () => {
 
   it('upgrades cn() to clsx + tailwind-merge without changing its call signature', () => {
     const utils = read('lib/utils.ts');
-    assert.match(utils, /import \{ type ClassValue, clsx \} from 'clsx'/);
-    assert.match(utils, /import \{ twMerge \} from 'tailwind-merge'/);
+    assert.match(utils, /import \{ type ClassValue, clsx \} from ['"]clsx['"]/);
+    assert.match(utils, /import \{ twMerge \} from ['"]tailwind-merge['"]/);
     assert.match(utils, /export function cn\(\.\.\.inputs: ClassValue\[\]\)/);
   });
 
@@ -51,10 +51,16 @@ describe('Shadcn foundation (components.json + primitive bridge)', () => {
 
   it('mounts TooltipProvider and a light-pinned Sonner Toaster once, globally', () => {
     const providers = read('app/providers.tsx');
-    assert.match(providers, /from '..\/components\/ui\/primitives\/tooltip'/);
-    assert.match(providers, /from '..\/components\/ui\/primitives\/sonner'/);
+    assert.match(
+      providers,
+      /from ['"]..\/components\/ui\/primitives\/tooltip['"]/,
+    );
+    assert.match(
+      providers,
+      /from ['"]..\/components\/ui\/primitives\/sonner['"]/,
+    );
     assert.match(providers, /<TooltipProvider>/);
-    assert.match(providers, /<Toaster theme="light"/);
+    assert.match(providers, /<Toaster theme=['"]light['"]/);
   });
 });
 
@@ -62,14 +68,20 @@ describe('PaginatedDataTable (components/schoolos/data)', () => {
   const source = read('components/schoolos/data/paginated-data-table.tsx');
 
   it('is built on the new Shadcn table/checkbox primitives, not a duplicate grid', () => {
-    assert.match(source, /from '@\/components\/ui\/primitives\/table'/);
-    assert.match(source, /from '@\/components\/ui\/primitives\/checkbox'/);
+    assert.match(source, /from ['"]@\/components\/ui\/primitives\/table['"]/);
+    assert.match(
+      source,
+      /from ['"]@\/components\/ui\/primitives\/checkbox['"]/,
+    );
   });
 
   it('models selection as a discriminated union so "select all" can never silently imply every backend record', () => {
-    assert.match(source, /mode: 'none'/);
-    assert.match(source, /mode: 'explicit'; ids: Set<string>/);
-    assert.match(source, /mode: 'all-matching-filter'; totalCount: number/);
+    assert.match(source, /mode: ['"]none['"]/);
+    assert.match(source, /mode: ['"]explicit['"]; ids: Set<string>/);
+    assert.match(
+      source,
+      /mode: ['"]all-matching-filter['"]; totalCount: number/,
+    );
     assert.match(source, /onSelectAllMatchingFilter/);
   });
 
@@ -80,7 +92,12 @@ describe('PaginatedDataTable (components/schoolos/data)', () => {
   });
 
   it('renders every required list screen state explicitly', () => {
-    for (const status of ['loading', 'error', 'permission-denied', 'module-locked']) {
+    for (const status of [
+      'loading',
+      'error',
+      'permission-denied',
+      'module-locked',
+    ]) {
       assert.match(source, new RegExp(`status === '${status}'`));
     }
     assert.match(source, /showEmpty/);
@@ -106,11 +123,14 @@ describe('QueuedJobState (components/schoolos/jobs)', () => {
   });
 
   it('reuses the shared StatusBadge instead of a second badge implementation', () => {
-    assert.match(source, /from '@\/components\/ui\/status-badge'/);
+    assert.match(source, /from ['"]@\/components\/ui\/status-badge['"]/);
   });
 
   it('never simulates progress client-side', () => {
-    assert.match(source, /Never simulates progress client-side|Backend-owned background-job status/);
+    assert.match(
+      source,
+      /Never simulates progress client-side|Backend-owned background-job status/,
+    );
     assert.doesNotMatch(source, /setInterval|setTimeout/);
   });
 
@@ -126,13 +146,13 @@ describe('StatusBadge job-lifecycle extension (additive only)', () => {
   it('adds new lifecycle keys without changing any existing mapping', () => {
     // Original mappings this file shipped with (46 consumers depend on
     // these exact tones) must remain byte-for-byte present.
-    assert.match(source, /ACTIVE: 'active',/);
-    assert.match(source, /QUEUED: 'pending',/);
-    assert.match(source, /FAILED: 'rejected',/);
-    assert.match(source, /PAID: 'paid',/);
+    assert.match(source, /ACTIVE: ['"]active['"],/);
+    assert.match(source, /QUEUED: ['"]pending['"],/);
+    assert.match(source, /FAILED: ['"]rejected['"],/);
+    assert.match(source, /PAID: ['"]paid['"],/);
     // New job-lifecycle keys added for QueuedJobState.
-    assert.match(source, /PROCESSING: 'pending',/);
-    assert.match(source, /PARTIALLY_SUCCEEDED: 'partial',/);
-    assert.match(source, /EXPIRED: 'rejected',/);
+    assert.match(source, /PROCESSING: ['"]pending['"],/);
+    assert.match(source, /PARTIALLY_SUCCEEDED: ['"]partial['"],/);
+    assert.match(source, /EXPIRED: ['"]rejected['"],/);
   });
 });

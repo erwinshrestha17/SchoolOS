@@ -3,7 +3,13 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, FileText, Lock, Search } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FileText,
+  Lock,
+  Search,
+} from 'lucide-react';
 import { api } from '@/lib/api';
 import { DataTable } from '@/components/ui/data-table';
 import { FilterBar } from '@/components/ui/filter-bar';
@@ -19,9 +25,18 @@ export function ResultsPublishingWorkspace() {
   const [sectionId, setSectionId] = useState('');
   const [includeCas, setIncludeCas] = useState(true);
 
-  const examsQuery = useQuery({ queryKey: ['exam-terms'], queryFn: api.listExamTerms });
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
-  const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
+  const examsQuery = useQuery({
+    queryKey: ['exam-terms'],
+    queryFn: api.listExamTerms,
+  });
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: api.listClasses,
+  });
+  const sectionsQuery = useQuery({
+    queryKey: ['sections'],
+    queryFn: api.listSections,
+  });
 
   const previewQuery = useQuery({
     queryKey: ['result-preview', examTermId, classId, sectionId, includeCas],
@@ -38,13 +53,22 @@ export function ResultsPublishingWorkspace() {
 
   const selectedExam = examsQuery.data?.find((exam) => exam.id === examTermId);
   const sectionsForClass = useMemo(
-    () => (sectionsQuery.data ?? []).filter((section) => section.classId === classId),
+    () =>
+      (sectionsQuery.data ?? []).filter(
+        (section) => section.classId === classId,
+      ),
     [sectionsQuery.data, classId],
   );
   const rows = previewQuery.data?.items ?? [];
-  const incompleteCount = rows.filter((row) => row.summary.incompleteSubjectCount > 0).length;
-  const failedCount = rows.filter((row) => row.summary.failedSubjectCount > 0).length;
-  const withheldCount = rows.filter((row) => row.summary.withheldSubjectCount > 0).length;
+  const incompleteCount = rows.filter(
+    (row) => row.summary.incompleteSubjectCount > 0,
+  ).length;
+  const failedCount = rows.filter(
+    (row) => row.summary.failedSubjectCount > 0,
+  ).length;
+  const withheldCount = rows.filter(
+    (row) => row.summary.withheldSubjectCount > 0,
+  ).length;
   const readyCount = rows.filter(
     (row) =>
       row.summary.resultStatus === 'PASS' &&
@@ -71,14 +95,17 @@ export function ResultsPublishingWorkspace() {
         <div className="flex items-center gap-2">
           <span className="font-black text-slate-900">{row.summary.grade}</span>
           <span className="text-[10px] font-bold text-slate-400">
-            {row.summary.percentage.toFixed(1)}% / GPA {row.summary.gpa.toFixed(2)}
+            {row.summary.percentage.toFixed(1)}% / GPA{' '}
+            {row.summary.gpa.toFixed(2)}
           </span>
         </div>
       ),
     },
     {
       header: 'Status',
-      cell: (row: (typeof rows)[number]) => <StatusBadge status={row.summary.resultStatus} />,
+      cell: (row: (typeof rows)[number]) => (
+        <StatusBadge status={row.summary.resultStatus} />
+      ),
     },
     {
       header: 'Validation',
@@ -87,14 +114,18 @@ export function ResultsPublishingWorkspace() {
           row.summary.incompleteSubjectCount > 0
             ? `${row.summary.incompleteSubjectCount} incomplete`
             : null,
-          row.summary.failedSubjectCount > 0 ? `${row.summary.failedSubjectCount} failed` : null,
+          row.summary.failedSubjectCount > 0
+            ? `${row.summary.failedSubjectCount} failed`
+            : null,
           row.summary.withheldSubjectCount > 0
             ? `${row.summary.withheldSubjectCount} withheld`
             : null,
         ].filter(Boolean);
 
         return warnings.length > 0 ? (
-          <span className="text-xs font-bold text-amber-700">{warnings.join(' · ')}</span>
+          <span className="text-xs font-bold text-amber-700">
+            {warnings.join(' · ')}
+          </span>
         ) : (
           <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700">
             <CheckCircle2 size={14} />
@@ -150,7 +181,11 @@ export function ResultsPublishingWorkspace() {
           </Link>
         }
       >
-        <Select value={examTermId} onChange={(event) => setExamTermId(event.target.value)} className="lg:w-48">
+        <Select
+          value={examTermId}
+          onChange={(event) => setExamTermId(event.target.value)}
+          className="lg:w-48"
+        >
           <option value="">Exam Term</option>
           {examsQuery.data?.map((exam) => (
             <option key={exam.id} value={exam.id}>
@@ -218,13 +253,24 @@ export function ResultsPublishingWorkspace() {
             />
           </SectionCard>
 
-          <SectionCard title="Validation Warnings" description="Resolve these before report-card generation.">
+          <SectionCard
+            title="Validation Warnings"
+            description="Resolve these before report-card generation."
+          >
             <div className="space-y-3 text-sm">
-              <WarningRow label="Missing or incomplete marks" value={incompleteCount} />
-              <WarningRow label="Failed subject threshold" value={failedCount} />
+              <WarningRow
+                label="Missing or incomplete marks"
+                value={incompleteCount}
+              />
+              <WarningRow
+                label="Failed subject threshold"
+                value={failedCount}
+              />
               <WarningRow label="Withheld results" value={withheldCount} />
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs font-medium leading-5 text-slate-600">
-                Results shown here are calculated from saved academic records. Lock marks after staff review, then generate report cards from the locked data.
+                Results shown here are calculated from saved academic records.
+                Lock marks after staff review, then generate report cards from
+                the locked data.
               </div>
               <Link
                 href="/dashboard/reports"
@@ -253,7 +299,13 @@ function WarningRow({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-4">
       <span className="font-bold text-slate-600">{label}</span>
-      <span className={value > 0 ? 'font-black text-amber-700' : 'font-black text-emerald-700'}>
+      <span
+        className={
+          value > 0
+            ? 'font-black text-amber-700'
+            : 'font-black text-emerald-700'
+        }
+      >
         {value}
       </span>
     </div>

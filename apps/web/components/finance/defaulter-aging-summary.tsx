@@ -1,34 +1,34 @@
-"use client";
+'use client';
 
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { api } from "@/lib/api";
-import { Clock, ChevronRight, Download } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { LoadingState } from "@/components/ui/loading-state";
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { api } from '@/lib/api';
+import { Clock, ChevronRight, Download } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { LoadingState } from '@/components/ui/loading-state';
 
 export function DefaulterAgingSummary() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const defaultersQuery = useQuery({
-    queryKey: ["defaulters"],
+    queryKey: ['defaulters'],
     queryFn: () => api.listDefaulters(),
   });
 
   const viewBucket = (bucketKey: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("defaulterAgingBucket", bucketKey);
+    params.set('defaulterAgingBucket', bucketKey);
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
     document
-      .getElementById("defaulter-queue")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      .getElementById('defaulter-queue')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const exportMutation = useMutation({
     mutationFn: () =>
-      api.downloadReport("defaulter-aging-report", {
-        format: "csv",
+      api.downloadReport('defaulter-aging-report', {
+        format: 'csv',
         filters: {},
       }),
   });
@@ -44,45 +44,45 @@ export function DefaulterAgingSummary() {
   );
 
   const formatCurrency = (amount: string) => {
-    return new Intl.NumberFormat("en-NP", {
-      style: "currency",
-      currency: "NPR",
+    return new Intl.NumberFormat('en-NP', {
+      style: 'currency',
+      currency: 'NPR',
       maximumFractionDigits: 0,
     }).format(Number(amount));
   };
 
   const bucketData = [
     {
-      label: "0-30 days",
-      severity: "Recent",
-      key: "0-30",
-      color: "text-emerald-700",
-      bg: "bg-emerald-50",
-      border: "border-emerald-100",
+      label: '0-30 days',
+      severity: 'Recent',
+      key: '0-30',
+      color: 'text-emerald-700',
+      bg: 'bg-emerald-50',
+      border: 'border-emerald-100',
     },
     {
-      label: "31-60 days",
-      severity: "Follow-up",
-      key: "31-60",
-      color: "text-amber-700",
-      bg: "bg-amber-50",
-      border: "border-amber-100",
+      label: '31-60 days',
+      severity: 'Follow-up',
+      key: '31-60',
+      color: 'text-amber-700',
+      bg: 'bg-amber-50',
+      border: 'border-amber-100',
     },
     {
-      label: "61-90 days",
-      severity: "High priority",
-      key: "61-90",
-      color: "text-orange-700",
-      bg: "bg-orange-50",
-      border: "border-orange-100",
+      label: '61-90 days',
+      severity: 'High priority',
+      key: '61-90',
+      color: 'text-orange-700',
+      bg: 'bg-orange-50',
+      border: 'border-orange-100',
     },
     {
-      label: "90+ days",
-      severity: "Critical",
-      key: "90+",
-      color: "text-rose-700",
-      bg: "bg-rose-50",
-      border: "border-rose-100",
+      label: '90+ days',
+      severity: 'Critical',
+      key: '90+',
+      color: 'text-rose-700',
+      bg: 'bg-rose-50',
+      border: 'border-rose-100',
     },
   ] as const;
 
@@ -94,7 +94,8 @@ export function DefaulterAgingSummary() {
             Defaulter Aging
           </h2>
           <p className="mt-1 text-sm font-medium text-slate-500">
-            Official aging buckets for collection follow-up and guardian reminders.
+            Official aging buckets for collection follow-up and guardian
+            reminders.
           </p>
         </div>
         <Button
@@ -106,7 +107,7 @@ export function DefaulterAgingSummary() {
           data-testid="finance-defaulter-aging-csv-export"
         >
           <Download size={14} />
-          {exportMutation.isPending ? "Exporting..." : "Export Summary"}
+          {exportMutation.isPending ? 'Exporting...' : 'Export Summary'}
         </Button>
       </div>
 
@@ -121,14 +122,14 @@ export function DefaulterAgingSummary() {
           <div
             key={b.label}
             className={cn(
-              "group relative p-6 bg-white rounded-2xl border transition-all duration-300 hover:shadow-md",
+              'group relative p-6 bg-white rounded-2xl border transition-all duration-300 hover:shadow-md',
               b.border,
             )}
           >
             <div className="flex items-center justify-between mb-4">
               <div
                 className={cn(
-                  "h-12 w-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 duration-500",
+                  'h-12 w-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 duration-500',
                   b.bg,
                   b.color,
                 )}
@@ -140,7 +141,7 @@ export function DefaulterAgingSummary() {
                   {b.label}
                 </span>
                 <div className="flex items-center gap-1 mt-1">
-                  <span className={cn("text-xs font-semibold", b.color)}>
+                  <span className={cn('text-xs font-semibold', b.color)}>
                     {b.severity}
                   </span>
                 </div>
@@ -155,7 +156,7 @@ export function DefaulterAgingSummary() {
                 Defaulters
               </p>
               <p className="text-xs font-black text-slate-700">
-                {formatCurrency(segments.get(b.key)?.outstanding ?? "0.00")}
+                {formatCurrency(segments.get(b.key)?.outstanding ?? '0.00')}
               </p>
             </div>
 
@@ -170,7 +171,7 @@ export function DefaulterAgingSummary() {
                 View List
                 <ChevronRight size={12} />
               </Button>
-              <span className={cn("text-xs font-semibold", b.color)}>
+              <span className={cn('text-xs font-semibold', b.color)}>
                 {b.label}
               </span>
             </div>

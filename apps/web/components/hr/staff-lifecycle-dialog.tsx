@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/dialog';
 import { Button } from '../ui/button';
 import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
@@ -28,29 +34,51 @@ export function StaffLifecycleDialog({
   const queryClient = useQueryClient();
   const [toastError, setToastError] = useState<string | null>(null);
 
-  const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE' | 'TERMINATED'>('ACTIVE');
+  const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE' | 'TERMINATED'>(
+    'ACTIVE',
+  );
   const [reason, setReason] = useState('');
-  const [effectiveDate, setEffectiveDate] = useState(getNepalSchoolDay().gregorianDate);
+  const [effectiveDate, setEffectiveDate] = useState(
+    getNepalSchoolDay().gregorianDate,
+  );
 
   useEffect(() => {
-    if (currentStatus === 'ACTIVE' || currentStatus === 'INACTIVE' || currentStatus === 'TERMINATED') {
+    if (
+      currentStatus === 'ACTIVE' ||
+      currentStatus === 'INACTIVE' ||
+      currentStatus === 'TERMINATED'
+    ) {
       setStatus(currentStatus);
     }
   }, [currentStatus, isOpen]);
 
   const transitionMutation = useMutation({
-    mutationFn: (payload: { status: 'ACTIVE' | 'INACTIVE' | 'TERMINATED'; reason: string; effectiveDate?: string }) => {
+    mutationFn: (payload: {
+      status: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
+      reason: string;
+      effectiveDate?: string;
+    }) => {
       if (payload.status === 'TERMINATED') {
-        return api.terminateStaff(staffId, { reason: payload.reason, effectiveDate: payload.effectiveDate });
+        return api.terminateStaff(staffId, {
+          reason: payload.reason,
+          effectiveDate: payload.effectiveDate,
+        });
       } else if (payload.status === 'INACTIVE') {
         return api.archiveStaff(staffId, payload.reason);
       } else {
-        return api.updateStaffLifecycle(staffId, { status: payload.status, reason: payload.reason });
+        return api.updateStaffLifecycle(staffId, {
+          status: payload.status,
+          reason: payload.reason,
+        });
       }
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['staff-detail', staffId] });
-      void queryClient.invalidateQueries({ queryKey: ['staff-history', staffId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-detail', staffId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-history', staffId],
+      });
       void queryClient.invalidateQueries({ queryKey: ['staff'] });
       onClose();
     },
@@ -82,7 +110,9 @@ export function StaffLifecycleDialog({
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle>Update Lifecycle Status</DialogTitle>
-            <p className="text-xs text-slate-500 mt-1">Modify access and employment status for {fullName}.</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Modify access and employment status for {fullName}.
+            </p>
           </div>
           <button
             type="button"
@@ -107,7 +137,9 @@ export function StaffLifecycleDialog({
           <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4 flex gap-3 text-xs text-amber-800 leading-relaxed">
             <AlertTriangle className="shrink-0 text-amber-600" size={18} />
             <div>
-              <strong>Security Warning:</strong> Changing a user status to INACTIVE or TERMINATED immediately suspends active system logins and disables access to all SchoolOS workspaces.
+              <strong>Security Warning:</strong> Changing a user status to
+              INACTIVE or TERMINATED immediately suspends active system logins
+              and disables access to all SchoolOS workspaces.
             </div>
           </div>
 

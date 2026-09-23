@@ -16,7 +16,7 @@ export type JournalEntryView = {
   } | null;
   lines: Array<{
     id: string;
-    side: 'DEBIT' | 'CREDIT';
+    side: "DEBIT" | "CREDIT";
     amount: number;
     description: string | null;
     accountName: string;
@@ -69,16 +69,16 @@ export type FiscalPeriodSummary = {
 };
 
 export type AccountingPostingBatchStatus =
-  | 'DRAFT'
-  | 'READY'
-  | 'POSTING'
-  | 'POSTED'
-  | 'FAILED'
-  | 'REVERSED';
+  | "DRAFT"
+  | "READY"
+  | "POSTING"
+  | "POSTED"
+  | "FAILED"
+  | "REVERSED";
 
 export type AccountingPostingBatchSummary = {
   id: string;
-  sourceModule: 'M3' | 'M7' | string;
+  sourceModule: "M3" | "M7" | string;
   sourceType: string;
   sourceBatchId: string;
   postingType: string;
@@ -116,36 +116,36 @@ export type FiscalPeriodCloseReadiness = {
   };
   blockers: Array<{
     code:
-      | 'DRAFT_JOURNALS'
-      | 'SUBMITTED_JOURNALS'
-      | 'APPROVED_UNPOSTED_JOURNALS'
-      | 'POSTED_SOURCE_WITHOUT_MAPPING'
-      | 'UNRECONCILED_BANK_ITEMS'
-      | 'UNBALANCED_POSTED_JOURNALS'
-      | 'UNBALANCED_TRIAL_BALANCE';
+      | "DRAFT_JOURNALS"
+      | "SUBMITTED_JOURNALS"
+      | "APPROVED_UNPOSTED_JOURNALS"
+      | "POSTED_SOURCE_WITHOUT_MAPPING"
+      | "UNRECONCILED_BANK_ITEMS"
+      | "UNBALANCED_POSTED_JOURNALS"
+      | "UNBALANCED_TRIAL_BALANCE";
     count: number;
     safeMessage: string;
     resolutionRoute: string;
   }>;
   unavailableChecks: Array<
-    'NEEDS_POSTING_FAILURE_CONTRACT' | 'NEEDS_REPORT_SNAPSHOT_POLICY'
+    "NEEDS_POSTING_FAILURE_CONTRACT" | "NEEDS_REPORT_SNAPSHOT_POLICY"
   >;
   readyToClose: boolean;
 };
 
-export type FiscalCloseIssueSeverity = 'BLOCKING' | 'WARNING' | 'INFO';
+export type FiscalCloseIssueSeverity = "BLOCKING" | "WARNING" | "INFO";
 
 export type FiscalYearCloseIssueCode =
-  | 'OPEN_PERIODS'
-  | 'DRAFT_JOURNALS'
-  | 'SUBMITTED_JOURNALS'
-  | 'APPROVED_UNPOSTED_JOURNALS'
-  | 'MISSING_SOURCE_MAPPINGS'
-  | 'UNRECONCILED_BANK_ITEMS'
-  | 'UNBALANCED_JOURNALS'
-  | 'TRIAL_BALANCE_NOT_READY'
-  | 'OPENING_BALANCE_INCOMPLETE'
-  | 'PAYROLL_POSTING_INCOMPLETE';
+  | "OPEN_PERIODS"
+  | "DRAFT_JOURNALS"
+  | "SUBMITTED_JOURNALS"
+  | "APPROVED_UNPOSTED_JOURNALS"
+  | "MISSING_SOURCE_MAPPINGS"
+  | "UNRECONCILED_BANK_ITEMS"
+  | "UNBALANCED_JOURNALS"
+  | "TRIAL_BALANCE_NOT_READY"
+  | "OPENING_BALANCE_INCOMPLETE"
+  | "PAYROLL_POSTING_INCOMPLETE";
 
 export type FiscalYearCloseReadiness = {
   checkedAt: string;
@@ -196,14 +196,14 @@ export type FiscalYearCloseReadiness = {
   }>;
   blockingIssueCount: number;
   warningCount: number;
-  readinessStatus: 'READY' | 'NEEDS_ACKNOWLEDGEMENT' | 'BLOCKED' | 'CLOSED';
-  allowedActions: Array<'CLOSE' | 'REOPEN'>;
+  readinessStatus: "READY" | "NEEDS_ACKNOWLEDGEMENT" | "BLOCKED" | "CLOSED";
+  allowedActions: Array<"CLOSE" | "REOPEN">;
   unavailableChecks: Array<
-    | 'NEEDS_POSTING_FAILURE_CONTRACT'
-    | 'NEEDS_REPORT_SNAPSHOT_POLICY'
-    | 'NEEDS_EXPORT_JOB_SCOPE_CONFIRMATION'
-    | 'NEEDS_FEE_POSTING_RECONCILIATION_CONTRACT'
-    | 'NEEDS_WARNING_ACKNOWLEDGEMENT_CONTRACT'
+    | "NEEDS_POSTING_FAILURE_CONTRACT"
+    | "NEEDS_REPORT_SNAPSHOT_POLICY"
+    | "NEEDS_EXPORT_JOB_SCOPE_CONFIRMATION"
+    | "NEEDS_FEE_POSTING_RECONCILIATION_CONTRACT"
+    | "NEEDS_WARNING_ACKNOWLEDGEMENT_CONTRACT"
   >;
   readyToClose: boolean;
 };
@@ -272,7 +272,7 @@ export type AccountingTrialBalanceResponse = {
     closingDebit: string;
     closingCredit: string;
     netBalance: string;
-    normalBalanceSide: 'DEBIT' | 'CREDIT';
+    normalBalanceSide: "DEBIT" | "CREDIT";
   }>;
   generatedAt: string;
 };
@@ -285,9 +285,9 @@ export type AccountingGeneralLedgerResponse = {
   accountId: string;
   accountCode: string;
   openingBalance: string;
-  openingBalanceSide: 'DEBIT' | 'CREDIT';
+  openingBalanceSide: "DEBIT" | "CREDIT";
   closingBalance: string;
-  closingBalanceSide: 'DEBIT' | 'CREDIT';
+  closingBalanceSide: "DEBIT" | "CREDIT";
   totals: { debit: string; credit: string };
   rows: Array<{
     journalEntryId: string;
@@ -305,9 +305,14 @@ export type AccountingGeneralLedgerResponse = {
     debit: string;
     credit: string;
     runningBalance: string;
-    runningBalanceSide: 'DEBIT' | 'CREDIT';
+    runningBalanceSide: "DEBIT" | "CREDIT";
   }>;
-  pagination: { page: number; limit: number; total: number; totalPages: number };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
   generatedAt: string;
 };
 
@@ -318,11 +323,11 @@ export type AccountingCashBookResponse = {
   toDate?: string;
   account?: { id: string; code: string; name: string };
   openingBalance: string;
-  openingBalanceSide: 'DEBIT' | 'CREDIT';
+  openingBalanceSide: "DEBIT" | "CREDIT";
   totalReceipts: string;
   totalPayments: string;
   closingBalance: string;
-  closingBalanceSide: 'DEBIT' | 'CREDIT';
+  closingBalanceSide: "DEBIT" | "CREDIT";
   rows: Array<{
     journalEntryId: string;
     journalLineId: string;
@@ -339,9 +344,14 @@ export type AccountingCashBookResponse = {
     receiptAmount: string;
     paymentAmount: string;
     runningBalance: string;
-    runningBalanceSide: 'DEBIT' | 'CREDIT';
+    runningBalanceSide: "DEBIT" | "CREDIT";
   }>;
-  pagination: { page: number; limit: number; total: number; totalPages: number };
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
   generatedAt: string;
   setupWarnings?: string[];
 };
@@ -352,7 +362,7 @@ export type AccountingIncomeStatementResponse = {
   fromDate?: string;
   toDate?: string;
   sections: Array<{
-    section: 'INCOME' | 'EXPENSE';
+    section: "INCOME" | "EXPENSE";
     total: string;
     accounts: Array<{
       accountId: string;
@@ -364,7 +374,7 @@ export type AccountingIncomeStatementResponse = {
   totalIncome: string;
   totalExpense: string;
   netSurplusOrDeficit: string;
-  resultType: 'SURPLUS' | 'DEFICIT' | 'BREAK_EVEN';
+  resultType: "SURPLUS" | "DEFICIT" | "BREAK_EVEN";
   generatedAt: string;
 };
 
@@ -372,7 +382,7 @@ export type AccountingBalanceSheetResponse = {
   fiscalYearId: string;
   asOfDate: string;
   sections: Array<{
-    section: 'ASSETS' | 'LIABILITIES' | 'EQUITY';
+    section: "ASSETS" | "LIABILITIES" | "EQUITY";
     total: string;
     accounts: Array<{
       accountId?: string;
@@ -421,7 +431,7 @@ export type AccountingDashboardSummary = {
   activeExportJobs: number;
   failedExportJobs: number;
   failedSourcePostings: null;
-  failedSourcePostingsAvailability: 'NEEDS_POSTING_FAILURE_CONTRACT';
+  failedSourcePostingsAvailability: "NEEDS_POSTING_FAILURE_CONTRACT";
   trialBalance: {
     totalDebit: string;
     totalCredit: string;
@@ -445,7 +455,7 @@ export type AccountingDashboardSummary = {
 
 export type AccountingSourceMappingSummary = {
   id: string;
-  sourceModule: 'FEES' | 'PAYROLL' | 'CANTEEN' | 'LIBRARY' | 'TRANSPORT';
+  sourceModule: "FEES" | "PAYROLL" | "CANTEEN" | "LIBRARY" | "TRANSPORT";
   sourceType: string;
   postingType: string;
   description: string | null;
@@ -455,11 +465,11 @@ export type AccountingSourceMappingSummary = {
   archivedAt: string | null;
   debitAccount: Pick<
     ChartAccountSummary,
-    'id' | 'code' | 'name' | 'type' | 'isActive'
+    "id" | "code" | "name" | "type" | "isActive"
   >;
   creditAccount: Pick<
     ChartAccountSummary,
-    'id' | 'code' | 'name' | 'type' | 'isActive'
+    "id" | "code" | "name" | "type" | "isActive"
   >;
 };
 
@@ -477,7 +487,7 @@ export type AccountingSourceMappingHealth = {
     }>;
   };
   modules: Array<{
-    sourceModule: AccountingSourceMappingSummary['sourceModule'];
+    sourceModule: AccountingSourceMappingSummary["sourceModule"];
     postedCount: number;
     missingSourceIdCount: number;
     sampleEntryIds: string[];
@@ -524,7 +534,7 @@ export type BankStatementImportResult = {
 
 export type BankStatementImportJobQueuedResult = {
   jobId: string | null;
-  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
   importBatchId: string | null;
   totalRows: number;
   processedRows: number;
@@ -537,7 +547,7 @@ export type BankStatementImportJobStatus = {
   id: string;
   tenantId: string;
   accountId: string;
-  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
   totalRows: number;
   processedRows: number;
   insertedRows: number | null;
@@ -575,10 +585,10 @@ export type BankReconciliationSuggestion = {
     ledgerTransactionId: string;
     bankTransactionId: string;
     score: number;
-    confidence: 'EXACT' | 'HIGH' | 'MEDIUM' | 'LOW';
+    confidence: "EXACT" | "HIGH" | "MEDIUM" | "LOW";
     matchedFields: string[];
     warningFlags: string[];
-    suggestedAction: 'REVIEW_AND_CONFIRM' | 'MANUAL_REVIEW';
+    suggestedAction: "REVIEW_AND_CONFIRM" | "MANUAL_REVIEW";
     reason: string;
   }>;
 };

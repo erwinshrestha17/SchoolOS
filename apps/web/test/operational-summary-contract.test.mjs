@@ -10,14 +10,23 @@ const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 describe('operational summary web contracts', () => {
   it('uses verified dashboard and platform summary endpoints', () => {
     const client = read('lib/api/operational-summary.ts');
-    assert.match(client, /'\/dashboard\/summary'/);
-    assert.match(client, /`\/dashboard\/\$\{encodeURIComponent\(module\)\}\/summary`/);
-    assert.match(client, /'\/platform\/summary'/);
+    assert.match(client, /['"]\/dashboard\/summary['"]/);
+    assert.match(
+      client,
+      /`\/dashboard\/\$\{encodeURIComponent\(module\)\}\/summary`/,
+    );
+    assert.match(client, /['"]\/platform\/summary['"]/);
   });
 
   it('renders all operational summary states through shared UI', () => {
     const component = read('components/ui/operational-summary.tsx');
-    for (const state of ['ready', 'empty', 'partial', 'locked', 'permissionDenied']) {
+    for (const state of [
+      'ready',
+      'empty',
+      'partial',
+      'locked',
+      'permissionDenied',
+    ]) {
       assert.match(component, new RegExp(state));
     }
     assert.match(component, /ModuleLockedState/);
@@ -29,7 +38,10 @@ describe('operational summary web contracts', () => {
     const component = read('components/ui/operational-summary.tsx');
     assert.match(component, /APPROVED_DASHBOARD_ROUTES/);
     assert.match(component, /resolveOperationalSummaryAction/);
-    assert.match(component, /return APPROVED_DASHBOARD_ROUTES\.has\(action\.route\) \? action\.route : null/);
+    assert.match(
+      component,
+      /return APPROVED_DASHBOARD_ROUTES\.has\(action\.route\) \? action\.route : null/,
+    );
   });
 
   it('uses native links for summary navigation instead of unsupported Button slot props', () => {

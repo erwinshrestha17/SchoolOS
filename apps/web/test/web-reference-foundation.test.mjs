@@ -33,7 +33,10 @@ describe('reference dashboard foundation', () => {
     ]) {
       assert.match(sourceOfTruth, new RegExp(marker.replace(/[&/]/g, '\\$&')));
     }
-    assert.match(sourceOfTruth, /Chat\/conversations are not part of the active product/);
+    assert.match(
+      sourceOfTruth,
+      /Chat\/conversations are not part of the active product/,
+    );
     assert.match(sourceOfTruth, /controlled-pilot readiness/);
     assert.match(sourceOfTruth, /single repository-wide source of truth/);
     assert.match(sourceOfTruth, /Prose never proves implementation completion/);
@@ -48,7 +51,10 @@ describe('reference dashboard foundation', () => {
     for (const playbook of playbooks) {
       assert.ok(sourceOfTruth.includes(playbook));
       const content = readFileSync(join(repoRoot, playbook), 'utf8');
-      assert.match(content, /If this (?:playbook|file) conflicts with `AGENTS\.md`/);
+      assert.match(
+        content,
+        /If this (?:playbook|file) conflicts with `AGENTS\.md`/,
+      );
       assert.match(content, /`AGENTS\.md` wins/);
     }
   });
@@ -71,16 +77,21 @@ describe('reference dashboard foundation', () => {
       header.indexOf('{primaryAction}') < header.indexOf('<ActionMenu'),
       'Primary action must appear before the More Actions menu',
     );
-    assert.match(header, /label="Open more actions"/);
+    assert.match(header, /label=['"]Open more actions['"]/);
   });
 
   it('keeps the permission-scoped real-API operations composition route', () => {
     const operations = read('app/dashboard/operations/page.tsx');
     const layout = read('app/dashboard/layout.tsx');
-    const principalNav = read('components/layout/sidebar-persona-nav.config.ts');
+    const principalNav = read(
+      'components/layout/sidebar-persona-nav.config.ts',
+    );
 
     assert.match(layout, /prefix: ['"]\/dashboard\/operations['"]/);
-    assert.match(principalNav, /href: ['"]\/dashboard\/operations\/overview['"]/);
+    assert.match(
+      principalNav,
+      /href: ['"]\/dashboard\/operations\/overview['"]/,
+    );
     for (const helper of [
       'libraryApi.getOverdueBooksReport',
       'transportApi.getReports',
@@ -104,14 +115,17 @@ describe('reference dashboard foundation', () => {
     ].join('\n');
 
     assert.match(layout, /prefix: ['"]\/dashboard\/communications['"]/);
-    assert.match(personaNav, /href: '\/dashboard\/notices'/);
-    assert.match(communications, /redirect\('\/dashboard\/notices'\)/);
-    assert.match(noticesWorkspace, /communicationsApi\.getCommunicationsSummary/);
+    assert.match(personaNav, /href: ['"]\/dashboard\/notices['"]/);
+    assert.match(communications, /redirect\(['"]\/dashboard\/notices['"]\)/);
+    assert.match(
+      noticesWorkspace,
+      /communicationsApi\.getCommunicationsSummary/,
+    );
     assert.equal((noticesWorkspace.match(/<SummaryCard/g) ?? []).length, 4);
     assert.match(noticesWorkspace, /<WorkspaceTabs/);
     assert.match(noticesWorkspace, /<WorkSurface/);
     assert.doesNotMatch(noticesWorkspace, /provider-diagnostics/);
-    assert.doesNotMatch(noticesWorkspace, /title="Provider Status"/);
+    assert.doesNotMatch(noticesWorkspace, /title=['"]Provider Status['"]/);
     assert.doesNotMatch(noticesWorkspace, /setTimeout|setInterval/);
   });
 });

@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { useSession } from "../../components/session-provider";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { PlatformShell } from "../../components/layout/platform-shell";
-import { PermissionDenied } from "../../components/platform/PermissionDenied";
-import { OfflineLockedState } from "../../components/ui/offline-locked-state";
+import { useSession } from '../../components/session-provider';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { PlatformShell } from '../../components/layout/platform-shell';
+import { PermissionDenied } from '../../components/platform/PermissionDenied';
+import { OfflineLockedState } from '../../components/ui/offline-locked-state';
 
 const PLATFORM_ROLES = [
-  "platform_super_admin",
-  "platform_support",
-  "platform_billing_admin",
+  'platform_super_admin',
+  'platform_support',
+  'platform_billing_admin',
 ];
 
 export default function PlatformLayout({
@@ -23,32 +23,32 @@ export default function PlatformLayout({
   const pathname = usePathname();
 
   useEffect(() => {
-    if (status === "anonymous") {
-      router.push("/login");
+    if (status === 'anonymous') {
+      router.push('/login');
       return;
     }
 
-    if (status === "authenticated" && session) {
-      const isPlatformAdmin = session.user.roles.some((role) =>
-        PLATFORM_ROLES.includes(role),
-      ) && session.user.securityDomain === "PLATFORM" &&
+    if (status === 'authenticated' && session) {
+      const isPlatformAdmin =
+        session.user.roles.some((role) => PLATFORM_ROLES.includes(role)) &&
+        session.user.securityDomain === 'PLATFORM' &&
         !session.user.isSupportOverride;
 
       if (!isPlatformAdmin) {
-        router.push("/dashboard");
+        router.push('/dashboard');
       }
     }
   }, [status, session, router]);
 
-  if (status === "offline_locked" || status === "verification_failed") {
+  if (status === 'offline_locked' || status === 'verification_failed') {
     return (
       <OfflineLockedState
-        reason={status === "verification_failed" ? "server" : "network"}
+        reason={status === 'verification_failed' ? 'server' : 'network'}
       />
     );
   }
 
-  if (status === "loading" || !session) {
+  if (status === 'loading' || !session) {
     return (
       <div className="flex h-screen items-center justify-center bg-[var(--color-mod-platform-text)]">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-mod-platform-border)] border-t-transparent" />
@@ -56,9 +56,9 @@ export default function PlatformLayout({
     );
   }
 
-  const isPlatformAdmin = session.user.roles.some((role) =>
-    PLATFORM_ROLES.includes(role),
-  ) && session.user.securityDomain === "PLATFORM" &&
+  const isPlatformAdmin =
+    session.user.roles.some((role) => PLATFORM_ROLES.includes(role)) &&
+    session.user.securityDomain === 'PLATFORM' &&
     !session.user.isSupportOverride;
 
   if (!isPlatformAdmin) {
@@ -72,9 +72,9 @@ export default function PlatformLayout({
 
   if (
     session.user.mustChangePassword &&
-    pathname !== "/platform/account-security"
+    pathname !== '/platform/account-security'
   ) {
-    router.replace("/platform/account-security");
+    router.replace('/platform/account-security');
     return (
       <PlatformShell>
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-950">

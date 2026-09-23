@@ -99,7 +99,8 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
   });
   const navigationLoading =
     !accountOnly &&
-    (entitlementsLoading || (mayLoadSchoolSettings && navigationQuery.isLoading));
+    (entitlementsLoading ||
+      (mayLoadSchoolSettings && navigationQuery.isLoading));
 
   const backendItemsById = useMemo(() => {
     const items =
@@ -132,13 +133,7 @@ export function SettingsRouteFrame({ children }: { children: ReactNode }) {
       }
       return [definition];
     });
-  }, [
-    accountOnly,
-    backendItemsById,
-    entitlementsLoading,
-    hasModule,
-    session,
-  ]);
+  }, [accountOnly, backendItemsById, entitlementsLoading, hasModule, session]);
 
   const filteredItems = useMemo(
     () =>

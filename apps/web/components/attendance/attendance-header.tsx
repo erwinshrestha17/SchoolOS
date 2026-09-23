@@ -10,7 +10,11 @@ interface AttendanceHeaderProps {
   exceptions: number;
 }
 
-export function AttendanceHeader({ total, presentPercent, exceptions }: AttendanceHeaderProps) {
+export function AttendanceHeader({
+  total,
+  presentPercent,
+  exceptions,
+}: AttendanceHeaderProps) {
   return (
     <KpiGrid className="md:grid-cols-3 xl:grid-cols-3">
       <KpiCard

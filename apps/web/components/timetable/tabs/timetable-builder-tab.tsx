@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { api } from "../../../lib/api";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { api } from '../../../lib/api';
 import {
   formatBsDate,
   type AcademicYearSummary,
@@ -12,18 +12,18 @@ import {
   type TimetableSlotSummary,
   type TimetableValidationResult,
   type TimetableVersionSummary,
-} from "@schoolos/core";
-import { cn } from "../../../lib/utils";
-import { SectionCard } from "../../ui/section-card";
-import { StatCard } from "../../ui/stat-card";
-import { Badge } from "../../ui/badge";
-import { EmptyState } from "../../ui/empty-state";
-import { LoadingState } from "../../ui/loading-state";
-import { FilterBar } from "../../ui/filter-bar";
-import { PageState } from "../../ui/page-state";
-import { AuditInfo } from "../../ui/audit-info";
-import { ConfirmDialog } from "../../ui/confirm-dialog";
-import { FormField, Input, Select } from "../../ui/form-field";
+} from '@schoolos/core';
+import { cn } from '../../../lib/utils';
+import { SectionCard } from '../../ui/section-card';
+import { StatCard } from '../../ui/stat-card';
+import { Badge } from '../../ui/badge';
+import { EmptyState } from '../../ui/empty-state';
+import { LoadingState } from '../../ui/loading-state';
+import { FilterBar } from '../../ui/filter-bar';
+import { PageState } from '../../ui/page-state';
+import { AuditInfo } from '../../ui/audit-info';
+import { ConfirmDialog } from '../../ui/confirm-dialog';
+import { FormField, Input, Select } from '../../ui/form-field';
 import {
   Plus,
   CheckCircle2,
@@ -32,8 +32,8 @@ import {
   Archive,
   Zap,
   Clock,
-} from "lucide-react";
-import { RemoteStaffSelector } from "../../staff/remote-staff-selector";
+} from 'lucide-react';
+import { RemoteStaffSelector } from '../../staff/remote-staff-selector';
 
 type Props = {
   academicYears: AcademicYearSummary[];
@@ -46,27 +46,27 @@ type Props = {
   setClassId: (id: string) => void;
 };
 
-type VersionAction = "publish" | "lock" | "archive";
+type VersionAction = 'publish' | 'lock' | 'archive';
 
 const daysOfWeek = [
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" },
-  { value: 7, label: "Sunday" },
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
+  { value: 7, label: 'Sunday' },
 ];
 
 function formatTimetableDate(
   value: string | null | undefined,
-  fallback = "Date not set",
+  fallback = 'Date not set',
 ) {
   if (!value) return fallback;
   try {
     return formatBsDate(value);
   } catch {
-    return "Date unavailable";
+    return 'Date unavailable';
   }
 }
 
@@ -75,7 +75,7 @@ function formatSlotTeacher(slot: TimetableSlotSummary) {
     [slot.staff?.firstName, slot.staff?.lastName]
       .map((part) => part?.trim())
       .filter(Boolean)
-      .join(" ") || "Teacher not assigned"
+      .join(' ') || 'Teacher not assigned'
   );
 }
 
@@ -92,7 +92,7 @@ export function TimetableBuilderTab({
   const queryClient = useQueryClient();
   const currentYear =
     academicYears.find((year) => year.isCurrent) ?? academicYears[0];
-  const [selectedVersionId, setSelectedVersionId] = useState("");
+  const [selectedVersionId, setSelectedVersionId] = useState('');
   const [validationResult, setValidationResult] =
     useState<TimetableValidationResult | null>(null);
   const [confirmAction, setConfirmAction] = useState<VersionAction | null>(
@@ -100,24 +100,24 @@ export function TimetableBuilderTab({
   );
 
   const [slot, setSlot] = useState({
-    academicYearId: currentYear?.id ?? "",
-    sectionId: "",
-    subjectId: "",
-    staffId: "",
+    academicYearId: currentYear?.id ?? '',
+    sectionId: '',
+    subjectId: '',
+    staffId: '',
     dayOfWeek: 1,
-    startsAt: "09:00",
-    endsAt: "09:45",
-    room: "",
+    startsAt: '09:00',
+    endsAt: '09:45',
+    room: '',
   });
 
   const slotMut = useMutation({
     mutationFn: api.createTimetableSlot,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["timetable", classId] });
-      void queryClient.invalidateQueries({ queryKey: ["teacher-workload"] });
+      void queryClient.invalidateQueries({ queryKey: ['timetable', classId] });
+      void queryClient.invalidateQueries({ queryKey: ['teacher-workload'] });
       setSlot((c) => ({
         ...c,
-        subjectId: "",
+        subjectId: '',
         startsAt: c.endsAt,
         endsAt: calculateNextEnd(c.endsAt),
       }));
@@ -128,19 +128,19 @@ export function TimetableBuilderTab({
   });
 
   const periodsQuery = useQuery({
-    queryKey: ["timetable-periods", currentYear?.id],
+    queryKey: ['timetable-periods', currentYear?.id],
     queryFn: () =>
       api.listTimetablePeriods({ academicYearId: currentYear?.id }),
     enabled: Boolean(currentYear?.id),
   });
 
   const roomsQuery = useQuery({
-    queryKey: ["timetable-rooms"],
+    queryKey: ['timetable-rooms'],
     queryFn: api.listRooms,
   });
 
   const versionsQuery = useQuery({
-    queryKey: ["timetable-versions", currentYear?.id, classId],
+    queryKey: ['timetable-versions', currentYear?.id, classId],
     queryFn: () =>
       api.listTimetableVersions({
         academicYearId: currentYear?.id,
@@ -150,7 +150,7 @@ export function TimetableBuilderTab({
   });
 
   const substitutionsQuery = useQuery({
-    queryKey: ["timetable-substitutions", classId],
+    queryKey: ['timetable-substitutions', classId],
     queryFn: () => api.listSubstitutions({ classId }),
     enabled: Boolean(classId),
   });
@@ -158,14 +158,14 @@ export function TimetableBuilderTab({
   const createVersionMut = useMutation({
     mutationFn: () =>
       api.createTimetableVersion({
-        academicYearId: currentYear?.id ?? "",
+        academicYearId: currentYear?.id ?? '',
         classId,
         versionName: `Draft timetable ${formatBsDate(new Date())}`,
         effectiveFrom: currentYear?.startsOn ?? new Date().toISOString(),
       }),
     onSuccess: (version: TimetableVersionSummary) => {
       setSelectedVersionId(version.id);
-      void queryClient.invalidateQueries({ queryKey: ["timetable-versions"] });
+      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
     },
   });
 
@@ -178,7 +178,7 @@ export function TimetableBuilderTab({
     mutationFn: api.publishTimetableVersion,
     onSuccess: () => {
       setConfirmAction(null);
-      void queryClient.invalidateQueries({ queryKey: ["timetable-versions"] });
+      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
     },
   });
 
@@ -186,7 +186,7 @@ export function TimetableBuilderTab({
     mutationFn: api.lockTimetableVersion,
     onSuccess: () => {
       setConfirmAction(null);
-      void queryClient.invalidateQueries({ queryKey: ["timetable-versions"] });
+      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
     },
   });
 
@@ -194,13 +194,13 @@ export function TimetableBuilderTab({
     mutationFn: api.archiveTimetableVersion,
     onSuccess: () => {
       setConfirmAction(null);
-      void queryClient.invalidateQueries({ queryKey: ["timetable-versions"] });
+      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
     },
   });
 
   const calculateNextEnd = (time: string) => {
-    if (!time) return "";
-    const [h, m] = time.split(":").map(Number);
+    if (!time) return '';
+    const [h, m] = time.split(':').map(Number);
     const date = new Date();
     date.setHours(h, m + 45, 0, 0);
     return date.toTimeString().slice(0, 5);
@@ -211,7 +211,7 @@ export function TimetableBuilderTab({
   );
   const rooms = roomsQuery.data ?? [];
   const versions = versionsQuery.data?.items ?? [];
-  const activeVersionId = selectedVersionId || versions[0]?.id || "";
+  const activeVersionId = selectedVersionId || versions[0]?.id || '';
   const activeVersion = versions.find(
     (version) => version.id === activeVersionId,
   );
@@ -245,33 +245,33 @@ export function TimetableBuilderTab({
 
   const confirmCopy = {
     publish: {
-      title: "Publish timetable version?",
+      title: 'Publish timetable version?',
       description:
-        "Publishing makes this timetable active for school operations. Blocking conflicts will be checked again before publication.",
-      confirmLabel: "Publish",
-      variant: "default" as const,
+        'Publishing makes this timetable active for school operations. Blocking conflicts will be checked again before publication.',
+      confirmLabel: 'Publish',
+      variant: 'default' as const,
     },
     lock: {
-      title: "Lock timetable version?",
+      title: 'Lock timetable version?',
       description:
-        "Locked timetable versions cannot be edited through normal workflows. Continue only after review is complete.",
-      confirmLabel: "Lock Version",
-      variant: "warning" as const,
+        'Locked timetable versions cannot be edited through normal workflows. Continue only after review is complete.',
+      confirmLabel: 'Lock Version',
+      variant: 'warning' as const,
     },
     archive: {
-      title: "Archive timetable version?",
+      title: 'Archive timetable version?',
       description:
-        "Archived versions are removed from normal active workflows. This action should be used for obsolete drafts or superseded versions.",
-      confirmLabel: "Archive",
-      variant: "destructive" as const,
+        'Archived versions are removed from normal active workflows. This action should be used for obsolete drafts or superseded versions.',
+      confirmLabel: 'Archive',
+      variant: 'destructive' as const,
     },
   };
 
   function runConfirmedAction() {
     if (!activeVersionId || !confirmAction) return;
-    if (confirmAction === "publish") publishVersionMut.mutate(activeVersionId);
-    if (confirmAction === "lock") lockVersionMut.mutate(activeVersionId);
-    if (confirmAction === "archive") archiveVersionMut.mutate(activeVersionId);
+    if (confirmAction === 'publish') publishVersionMut.mutate(activeVersionId);
+    if (confirmAction === 'lock') lockVersionMut.mutate(activeVersionId);
+    if (confirmAction === 'archive') archiveVersionMut.mutate(activeVersionId);
   }
 
   return (
@@ -285,7 +285,7 @@ export function TimetableBuilderTab({
             variant="outline"
             className="py-1.5 text-[10px] font-black uppercase tracking-widest"
           >
-            {currentYear?.name ?? "No active year"}
+            {currentYear?.name ?? 'No active year'}
           </Badge>
         }
       >
@@ -356,7 +356,7 @@ export function TimetableBuilderTab({
                     title="Unable to load versions"
                     description={
                       versionsQuery.error?.message ??
-                      "Timetable versions could not be loaded."
+                      'Timetable versions could not be loaded.'
                     }
                     className="min-h-0 py-5"
                   />
@@ -410,7 +410,7 @@ export function TimetableBuilderTab({
                   <button
                     type="button"
                     className="flex h-9 items-center gap-2 rounded-full bg-emerald-50 px-4 text-[10px] font-black uppercase tracking-widest text-emerald-700 transition-colors hover:bg-emerald-100"
-                    onClick={() => setConfirmAction("publish")}
+                    onClick={() => setConfirmAction('publish')}
                     disabled={!activeVersionId || publishVersionMut.isPending}
                   >
                     <CheckCircle2 className="h-3 w-3" />
@@ -419,7 +419,7 @@ export function TimetableBuilderTab({
                   <button
                     type="button"
                     className="flex h-9 items-center gap-2 rounded-full bg-slate-100 px-4 text-[10px] font-black uppercase tracking-widest text-slate-700 transition-colors hover:bg-slate-200"
-                    onClick={() => setConfirmAction("lock")}
+                    onClick={() => setConfirmAction('lock')}
                     disabled={!activeVersionId || lockVersionMut.isPending}
                   >
                     <Lock className="h-3 w-3" />
@@ -428,7 +428,7 @@ export function TimetableBuilderTab({
                   <button
                     type="button"
                     className="flex h-9 items-center gap-2 rounded-full bg-red-50 px-4 text-[10px] font-black uppercase tracking-widest text-red-700 transition-colors hover:bg-red-100"
-                    onClick={() => setConfirmAction("archive")}
+                    onClick={() => setConfirmAction('archive')}
                     disabled={!activeVersionId || archiveVersionMut.isPending}
                   >
                     <Archive className="h-3 w-3" />
@@ -444,12 +444,12 @@ export function TimetableBuilderTab({
               title="Conflict Validation"
               description="Stays current automatically as you add slots — no manual re-check needed."
               className={cn(
-                "border-2",
+                'border-2',
                 !validationResult
-                  ? "border-slate-100"
+                  ? 'border-slate-100'
                   : validationResult.valid
-                    ? "border-emerald-100"
-                    : "border-red-100",
+                    ? 'border-emerald-100'
+                    : 'border-red-100',
               )}
             >
               {!validationResult ? (
@@ -464,14 +464,14 @@ export function TimetableBuilderTab({
                     )}
                     <p
                       className={cn(
-                        "text-sm font-black uppercase tracking-widest",
+                        'text-sm font-black uppercase tracking-widest',
                         validationResult.valid
-                          ? "text-emerald-700"
-                          : "text-red-700",
+                          ? 'text-emerald-700'
+                          : 'text-red-700',
                       )}
                     >
                       {validationResult.valid
-                        ? "No blocking conflicts"
+                        ? 'No blocking conflicts'
                         : `${validationResult.errors.length} conflict(s) found`}
                     </p>
                   </div>
@@ -512,7 +512,7 @@ export function TimetableBuilderTab({
                 title="Unable to load substitutions"
                 description={
                   substitutionsQuery.error?.message ??
-                  "Substitution records could not be loaded."
+                  'Substitution records could not be loaded.'
                 }
               />
             ) : substitutionsQuery.data?.items.length ? (
@@ -526,8 +526,8 @@ export function TimetableBuilderTab({
                       {item.status}
                     </p>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                      {formatTimetableDate(item.date)} ·{" "}
-                      {item.reason?.trim() || "Reason not set"}
+                      {formatTimetableDate(item.date)} ·{' '}
+                      {item.reason?.trim() || 'Reason not set'}
                     </p>
                   </div>
                 ))}
@@ -699,7 +699,7 @@ export function TimetableBuilderTab({
                     })
                   }
                 >
-                  {slotMut.isPending ? "Saving..." : "Add Slot to Schedule"}
+                  {slotMut.isPending ? 'Saving...' : 'Add Slot to Schedule'}
                 </button>
               </div>
             </SectionCard>
@@ -743,24 +743,24 @@ export function TimetableBuilderTab({
                               <div
                                 key={s.id}
                                 className={cn(
-                                  "w-48 flex-shrink-0 space-y-2 rounded-2xl border p-4 transition-colors",
+                                  'w-48 flex-shrink-0 space-y-2 rounded-2xl border p-4 transition-colors',
                                   hasConflict
-                                    ? "border-red-200 bg-red-50 hover:bg-red-100/50"
-                                    : "border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] hover:bg-white",
+                                    ? 'border-red-200 bg-red-50 hover:bg-red-100/50'
+                                    : 'border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] hover:bg-white',
                                 )}
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="flex items-center gap-1.5">
                                     <p
                                       className={cn(
-                                        "text-xs font-black uppercase leading-tight tracking-tight",
+                                        'text-xs font-black uppercase leading-tight tracking-tight',
                                         hasConflict
-                                          ? "text-red-900"
-                                          : "text-[var(--color-mod-homework-text)]",
+                                          ? 'text-red-900'
+                                          : 'text-[var(--color-mod-homework-text)]',
                                       )}
                                     >
                                       {s.subject?.code?.trim() ||
-                                        "Code not set"}
+                                        'Code not set'}
                                     </p>
                                     {hasConflict && (
                                       <AlertCircle className="h-3 w-3 text-red-500" />
@@ -769,10 +769,10 @@ export function TimetableBuilderTab({
                                   <Badge
                                     variant="outline"
                                     className={cn(
-                                      "px-1 py-0 text-[8px] font-black uppercase",
+                                      'px-1 py-0 text-[8px] font-black uppercase',
                                       hasConflict
-                                        ? "border-red-200 text-red-400"
-                                        : "border-[var(--color-mod-homework-border)] text-[var(--color-mod-homework-text)]",
+                                        ? 'border-red-200 text-red-400'
+                                        : 'border-[var(--color-mod-homework-border)] text-[var(--color-mod-homework-text)]',
                                     )}
                                   >
                                     {s.startsAt}
@@ -780,10 +780,10 @@ export function TimetableBuilderTab({
                                 </div>
                                 <p
                                   className={cn(
-                                    "truncate text-[10px] font-bold uppercase tracking-widest",
+                                    'truncate text-[10px] font-bold uppercase tracking-widest',
                                     hasConflict
-                                      ? "text-red-700"
-                                      : "text-slate-500",
+                                      ? 'text-red-700'
+                                      : 'text-slate-500',
                                   )}
                                 >
                                   {formatSlotTeacher(s)}
@@ -791,10 +791,10 @@ export function TimetableBuilderTab({
                                 {(s.section?.name || s.room) && (
                                   <div
                                     className={cn(
-                                      "flex gap-2 text-[9px] font-black uppercase tracking-widest",
+                                      'flex gap-2 text-[9px] font-black uppercase tracking-widest',
                                       hasConflict
-                                        ? "text-red-300"
-                                        : "text-slate-500",
+                                        ? 'text-red-300'
+                                        : 'text-slate-500',
                                     )}
                                   >
                                     {s.section?.name && (
@@ -824,7 +824,7 @@ export function TimetableBuilderTab({
           description={confirmCopy[confirmAction].description}
           confirmLabel={confirmCopy[confirmAction].confirmLabel}
           variant={confirmCopy[confirmAction].variant}
-          destructive={confirmAction === "archive"}
+          destructive={confirmAction === 'archive'}
           isConfirming={
             publishVersionMut.isPending ||
             lockVersionMut.isPending ||

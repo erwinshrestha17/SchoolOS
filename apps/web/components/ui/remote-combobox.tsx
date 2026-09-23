@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   useEffect,
@@ -8,11 +8,11 @@ import {
   useState,
   type FocusEvent,
   type KeyboardEvent,
-} from "react";
-import { useInfiniteQuery, type QueryKey } from "@tanstack/react-query";
-import type { RemoteLookupPage } from "@schoolos/core";
-import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
-import { cn } from "../../lib/utils";
+} from 'react';
+import { useInfiniteQuery, type QueryKey } from '@tanstack/react-query';
+import type { RemoteLookupPage } from '@schoolos/core';
+import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 const REMOTE_SEARCH_DEBOUNCE_MS = 350;
 
@@ -76,8 +76,8 @@ export function RemoteCombobox<TOption extends { id: string }>({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const [retainedOption, setRetainedOption] = useState<TOption | null>(
     selectedOption ?? null,
@@ -147,16 +147,16 @@ export function RemoteCombobox<TOption extends { id: string }>({
 
   function openCombobox() {
     if (disabled) return;
-    setSearch("");
-    setDebouncedSearch("");
+    setSearch('');
+    setDebouncedSearch('');
     setActiveIndex(0);
     setIsOpen(true);
   }
 
   function closeCombobox() {
     setIsOpen(false);
-    setSearch("");
-    setDebouncedSearch("");
+    setSearch('');
+    setDebouncedSearch('');
   }
 
   function selectOption(option: TOption) {
@@ -168,7 +168,7 @@ export function RemoteCombobox<TOption extends { id: string }>({
 
   function clearSelection() {
     setRetainedOption(null);
-    onChange("", null);
+    onChange('', null);
     closeCombobox();
     triggerRef.current?.focus();
   }
@@ -180,14 +180,14 @@ export function RemoteCombobox<TOption extends { id: string }>({
   }
 
   function handleTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key === "ArrowDown") {
+    if (event.key === 'ArrowDown') {
       event.preventDefault();
       openCombobox();
     }
   }
 
   function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "ArrowDown") {
+    if (event.key === 'ArrowDown') {
       event.preventDefault();
       setActiveIndex((current) =>
         options.length === 0 ? 0 : Math.min(current + 1, options.length - 1),
@@ -195,19 +195,19 @@ export function RemoteCombobox<TOption extends { id: string }>({
       return;
     }
 
-    if (event.key === "ArrowUp") {
+    if (event.key === 'ArrowUp') {
       event.preventDefault();
       setActiveIndex((current) => Math.max(current - 1, 0));
       return;
     }
 
-    if (event.key === "Enter" && activeOption) {
+    if (event.key === 'Enter' && activeOption) {
       event.preventDefault();
       selectOption(activeOption);
       return;
     }
 
-    if (event.key === "Escape") {
+    if (event.key === 'Escape') {
       event.preventDefault();
       closeCombobox();
       triggerRef.current?.focus();
@@ -216,14 +216,14 @@ export function RemoteCombobox<TOption extends { id: string }>({
 
   return (
     <div
-      className={cn("relative space-y-1.5", className)}
+      className={cn('relative space-y-1.5', className)}
       onBlur={handleContainerBlur}
     >
       <label
         htmlFor={triggerId}
         className={cn(
-          "text-sm font-semibold text-slate-700",
-          hideLabel && "sr-only",
+          'text-sm font-semibold text-slate-700',
+          hideLabel && 'sr-only',
         )}
       >
         {label}
@@ -241,14 +241,14 @@ export function RemoteCombobox<TOption extends { id: string }>({
           onClick={() => (isOpen ? closeCombobox() : openCombobox())}
           onKeyDown={handleTriggerKeyDown}
           className={cn(
-            "flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 text-left text-sm transition focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400",
-            clearable && value ? "pr-20" : "pr-10",
+            'flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 text-left text-sm transition focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400',
+            clearable && value ? 'pr-20' : 'pr-10',
           )}
         >
           <span
             className={cn(
-              "truncate",
-              !currentOption && !selectedLabel && "text-slate-400",
+              'truncate',
+              !currentOption && !selectedLabel && 'text-slate-400',
             )}
           >
             {currentOption
@@ -260,8 +260,8 @@ export function RemoteCombobox<TOption extends { id: string }>({
           <ChevronDown
             aria-hidden="true"
             className={cn(
-              "absolute right-3 h-4 w-4 text-slate-400 transition-transform",
-              isOpen && "rotate-180",
+              'absolute right-3 h-4 w-4 text-slate-400 transition-transform',
+              isOpen && 'rotate-180',
             )}
           />
         </button>
@@ -314,7 +314,7 @@ export function RemoteCombobox<TOption extends { id: string }>({
             {!canSearch
               ? `Type at least ${minimumSearchLength} characters to search.`
               : optionsQuery.isPending
-                ? "Loading results."
+                ? 'Loading results.'
                 : optionsQuery.isError
                   ? errorMessage
                   : `${options.length} results loaded.`}
@@ -363,10 +363,10 @@ export function RemoteCombobox<TOption extends { id: string }>({
                         onMouseEnter={() => setActiveIndex(index)}
                         onClick={() => selectOption(option)}
                         className={cn(
-                          "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm outline-none transition hover:bg-slate-50 focus:bg-slate-50",
-                          activeIndex === index && "bg-slate-50",
+                          'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm outline-none transition hover:bg-slate-50 focus:bg-slate-50',
+                          activeIndex === index && 'bg-slate-50',
                           isSelected &&
-                            "bg-[var(--primary-soft)] text-[var(--primary-dark)]",
+                            'bg-[var(--primary-soft)] text-[var(--primary-dark)]',
                         )}
                       >
                         <span className="min-w-0 flex-1">
@@ -404,8 +404,8 @@ export function RemoteCombobox<TOption extends { id: string }>({
                       />
                     ) : null}
                     {optionsQuery.isFetchingNextPage
-                      ? "Loading more…"
-                      : "Load more results"}
+                      ? 'Loading more…'
+                      : 'Load more results'}
                   </button>
                 ) : null}
               </>

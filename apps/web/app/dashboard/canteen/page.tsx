@@ -1,4 +1,4 @@
-import { CanteenWorkspace } from "../../../components/canteen/canteen-workspace";
+import { CanteenWorkspace } from '../../../components/canteen/canteen-workspace';
 
 export default function CanteenPage() {
   return <CanteenWorkspace activeTab="overview" />;

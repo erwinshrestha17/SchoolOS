@@ -1,4 +1,4 @@
-import type { OperationalModuleSummary } from "@schoolos/core";
+import type { OperationalModuleSummary } from '@schoolos/core';
 
 /**
  * Reorders a dashboard section's module cards so whichever one has the most

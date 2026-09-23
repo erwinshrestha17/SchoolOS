@@ -1,14 +1,11 @@
-"use client";
+'use client';
 
-import { useCallback } from "react";
-import type { RemoteLookupPage } from "@schoolos/core";
-import {
-  canteenApi,
-  type CanteenInventoryItem,
-} from "../../lib/canteen-api";
-import { RemoteCombobox } from "../ui/remote-combobox";
+import { useCallback } from 'react';
+import type { RemoteLookupPage } from '@schoolos/core';
+import { canteenApi, type CanteenInventoryItem } from '../../lib/canteen-api';
+import { RemoteCombobox } from '../ui/remote-combobox';
 
-const INVENTORY_OPTIONS_QUERY_KEY = ["remote-canteen-inventory-items"] as const;
+const INVENTORY_OPTIONS_QUERY_KEY = ['remote-canteen-inventory-items'] as const;
 
 type RemoteCanteenInventoryItemSelectorProps = {
   value: string;
@@ -28,7 +25,7 @@ export function RemoteCanteenInventoryItemSelector({
   onChange,
   selectedOption,
   selectedLabel,
-  label = "Stock item",
+  label = 'Stock item',
   disabled,
   clearable,
 }: RemoteCanteenInventoryItemSelectorProps) {
@@ -72,7 +69,7 @@ export function RemoteCanteenInventoryItemSelector({
       loadPage={loadPage}
       getOptionLabel={(option) => option.name}
       getOptionDescription={(option) =>
-        [option.sku, option.category, option.unit].filter(Boolean).join(" · ")
+        [option.sku, option.category, option.unit].filter(Boolean).join(' · ')
       }
       label={label}
       placeholder="Search for a stock item"

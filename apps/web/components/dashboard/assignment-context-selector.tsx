@@ -83,7 +83,8 @@ export function AssignmentContextSelector({
 }
 
 function ResponsibilityIcon({ option }: { option: TeacherAssignmentOption }) {
-  const Icon = option.responsibility === 'CLASS_TEACHER' ? Users : GraduationCap;
+  const Icon =
+    option.responsibility === 'CLASS_TEACHER' ? Users : GraduationCap;
   return <Icon className="h-4 w-4 text-slate-500" aria-hidden="true" />;
 }
 

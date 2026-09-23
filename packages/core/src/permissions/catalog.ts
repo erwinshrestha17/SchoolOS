@@ -253,7 +253,8 @@ export const permissionCatalog = [
   {
     resource: "accounting",
     action: "reverse",
-    description: "Create reversing journal entries for posted accounting records",
+    description:
+      "Create reversing journal entries for posted accounting records",
   },
   {
     resource: "accounting:accounts",
@@ -388,7 +389,8 @@ export const permissionCatalog = [
   {
     resource: "accounting:payroll-handoff",
     action: "post",
-    description: "Post an approved payroll snapshot through the accounting boundary",
+    description:
+      "Post an approved payroll snapshot through the accounting boundary",
   },
   {
     resource: "accounting:expenses",
@@ -438,7 +440,8 @@ export const permissionCatalog = [
   {
     resource: "finance:principal",
     action: "read",
-    description: "Read server-projected Principal financial oversight summaries",
+    description:
+      "Read server-projected Principal financial oversight summaries",
   },
   {
     resource: "finance:approvals",
@@ -1391,7 +1394,8 @@ export const permissionCatalog = [
   {
     resource: "settings",
     action: "manage",
-    description: "Manage tenant branding, localization, and operational settings",
+    description:
+      "Manage tenant branding, localization, and operational settings",
   },
   {
     resource: "settings",
@@ -1503,7 +1507,8 @@ export const permissionCatalog = [
   {
     resource: "students",
     action: "manage_lifecycle",
-    description: "Transfer, exit, archive, and manage student lifecycle transitions",
+    description:
+      "Transfer, exit, archive, and manage student lifecycle transitions",
   },
   {
     resource: "admission_policy",

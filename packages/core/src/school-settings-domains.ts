@@ -149,9 +149,9 @@ export const SCHOOL_SETTINGS_DOMAIN_KEYS: Record<
 };
 
 const KEY_TO_DOMAIN = new Map<TenantSettingKey, SchoolSettingsDomain>();
-for (const [domain, keys] of Object.entries(SCHOOL_SETTINGS_DOMAIN_KEYS) as Array<
-  [SchoolSettingsDomain, readonly TenantSettingKey[]]
->) {
+for (const [domain, keys] of Object.entries(
+  SCHOOL_SETTINGS_DOMAIN_KEYS,
+) as Array<[SchoolSettingsDomain, readonly TenantSettingKey[]]>) {
   for (const key of keys) {
     KEY_TO_DOMAIN.set(key, domain);
   }

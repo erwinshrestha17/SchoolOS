@@ -1,39 +1,39 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Download, Package } from "lucide-react";
-import { getNepalSchoolDay } from "@schoolos/core";
-import { canteenApi } from "../../lib/canteen-api";
-import { EmptyState } from "../ui/empty-state";
-import { ErrorState } from "../ui/error-state";
-import { LoadingState } from "../ui/loading-state";
-import { WorkSurface } from "../ui/work-surface";
+import { useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Download, Package } from 'lucide-react';
+import { getNepalSchoolDay } from '@schoolos/core';
+import { canteenApi } from '../../lib/canteen-api';
+import { EmptyState } from '../ui/empty-state';
+import { ErrorState } from '../ui/error-state';
+import { LoadingState } from '../ui/loading-state';
+import { WorkSurface } from '../ui/work-surface';
 
 const today = getNepalSchoolDay().gregorianDate;
-const moneyFormatter = new Intl.NumberFormat("en-NP", {
-  style: "currency",
-  currency: "NPR",
+const moneyFormatter = new Intl.NumberFormat('en-NP', {
+  style: 'currency',
+  currency: 'NPR',
   maximumFractionDigits: 0,
 });
 
 export function CanteenReportsWorkspace() {
   const [reportDate, setReportDate] = useState(today);
-  const [reportFrom, setReportFrom] = useState("");
-  const [reportTo, setReportTo] = useState("");
+  const [reportFrom, setReportFrom] = useState('');
+  const [reportTo, setReportTo] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
 
   const mealCountQuery = useQuery({
-    queryKey: ["canteen-meal-count", reportDate],
+    queryKey: ['canteen-meal-count', reportDate],
     queryFn: () => canteenApi.getDailyMealCountReport({ date: reportDate }),
   });
   const itemSalesQuery = useQuery({
-    queryKey: ["canteen-item-sales", reportFrom, reportTo],
+    queryKey: ['canteen-item-sales', reportFrom, reportTo],
     queryFn: () =>
       canteenApi.getItemWiseSalesReport({ from: reportFrom, to: reportTo }),
   });
   const spendingSummaryQuery = useQuery({
-    queryKey: ["canteen-spending-summary", reportFrom, reportTo],
+    queryKey: ['canteen-spending-summary', reportFrom, reportTo],
     queryFn: () =>
       canteenApi.getStudentSpendingSummary({
         from: reportFrom,
@@ -41,11 +41,11 @@ export function CanteenReportsWorkspace() {
       }),
   });
   const lowBalanceQuery = useQuery({
-    queryKey: ["canteen-low-balance"],
+    queryKey: ['canteen-low-balance'],
     queryFn: () => canteenApi.getLowBalanceWallets(),
   });
   const stockLedgerQuery = useQuery({
-    queryKey: ["canteen-stock-ledger", reportFrom, reportTo],
+    queryKey: ['canteen-stock-ledger', reportFrom, reportTo],
     queryFn: () =>
       canteenApi.getStockLedger({ from: reportFrom, to: reportTo }),
   });
@@ -53,7 +53,7 @@ export function CanteenReportsWorkspace() {
   const dailyMealCsvMutation = useMutation({
     mutationFn: () =>
       canteenApi.downloadDailyMealCountCsv({ date: reportDate }),
-    onSuccess: () => setNotice("Daily meal count CSV downloaded."),
+    onSuccess: () => setNotice('Daily meal count CSV downloaded.'),
   });
   const itemSalesCsvMutation = useMutation({
     mutationFn: () =>
@@ -61,7 +61,7 @@ export function CanteenReportsWorkspace() {
         from: reportFrom,
         to: reportTo,
       }),
-    onSuccess: () => setNotice("Item-wise sales CSV downloaded."),
+    onSuccess: () => setNotice('Item-wise sales CSV downloaded.'),
   });
 
   const firstError =
@@ -143,8 +143,8 @@ export function CanteenReportsWorkspace() {
           >
             <Download aria-hidden="true" className="h-4 w-4" />
             {dailyMealCsvMutation.isPending
-              ? "Exporting..."
-              : "Export daily meal CSV"}
+              ? 'Exporting...'
+              : 'Export daily meal CSV'}
           </button>
           <button
             type="button"
@@ -155,8 +155,8 @@ export function CanteenReportsWorkspace() {
           >
             <Download aria-hidden="true" className="h-4 w-4" />
             {itemSalesCsvMutation.isPending
-              ? "Exporting..."
-              : "Export item sales CSV"}
+              ? 'Exporting...'
+              : 'Export item sales CSV'}
           </button>
         </div>
         {dailyMealCsvMutation.error ? (
@@ -211,7 +211,7 @@ export function CanteenReportsWorkspace() {
                   {studentLabel(wallet.student) || wallet.studentId}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Balance {money(wallet.balance)} • threshold{" "}
+                  Balance {money(wallet.balance)} • threshold{' '}
                   {money(wallet.lowBalanceThreshold)}
                 </p>
               </div>
@@ -256,18 +256,18 @@ export function CanteenReportsWorkspace() {
                     <p className="truncate font-bold text-slate-900">
                       {row.inventoryItem?.name ??
                         row.inventoryItemId ??
-                        "Stock item"}
+                        'Stock item'}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {row.type ?? "Movement"} -{" "}
-                      {row.reason ?? row.referenceType ?? "No reason recorded"}
+                      {row.type ?? 'Movement'} -{' '}
+                      {row.reason ?? row.referenceType ?? 'No reason recorded'}
                     </p>
                   </div>
                 </div>
                 <div className="shrink-0 text-right text-xs font-semibold text-slate-500">
                   <p>
-                    {Number(row.quantity ?? 0).toLocaleString()}{" "}
-                    {row.inventoryItem?.unit ?? ""}
+                    {Number(row.quantity ?? 0).toLocaleString()}{' '}
+                    {row.inventoryItem?.unit ?? ''}
                   </p>
                   <p>
                     Balance {Number(row.balanceAfter ?? 0).toLocaleString()}
@@ -354,8 +354,8 @@ function studentLabel(
     studentSystemId?: string;
   } | null,
 ) {
-  if (!student) return "";
-  return `${student.firstNameEn ?? ""} ${student.lastNameEn ?? ""} ${student.studentSystemId ? `(${student.studentSystemId})` : ""}`.trim();
+  if (!student) return '';
+  return `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''} ${student.studentSystemId ? `(${student.studentSystemId})` : ''}`.trim();
 }
 
 function money(value: string | number | null | undefined) {

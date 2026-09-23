@@ -47,9 +47,7 @@ export function BankReconciliationWorkspace() {
   >([]);
   const [importPreview, setImportPreview] =
     useState<BankStatementImportPreview | null>(null);
-  const [queuedJobMessage, setQueuedJobMessage] = useState<string | null>(
-    null,
-  );
+  const [queuedJobMessage, setQueuedJobMessage] = useState<string | null>(null);
 
   const accountsQuery = useQuery({
     queryKey: ['chart-accounts'],
@@ -553,48 +551,57 @@ export function BankReconciliationWorkspace() {
                   { id: 'date', label: 'Date', width: 150 },
                   { id: 'description', label: 'Description', width: 260 },
                   { id: 'amount', label: 'Amount', align: 'right' },
-                  { id: 'action', label: 'Action', align: 'center', width: 100 },
-                ]}
-                rows={(unreconciledQuery.data ?? []).map((stmt: BankStatementLineSummary) => ({
-                  id: stmt.id,
-                  className:
-                    matching === stmt.id
-                      ? 'bg-[var(--color-mod-accounting-bg)] ring-2 ring-[var(--color-mod-accounting-accent)] ring-inset'
-                      : '',
-                  cells: {
-                    date: { value: stmt.statementDate, type: 'date' },
-                    description: { value: stmt.description },
-                    amount: {
-                      value:
-                        Number(stmt.debitAmount) > 0
-                          ? stmt.debitAmount
-                          : `-${stmt.creditAmount}`,
-                      type: 'currency',
-                      className:
-                        Number(stmt.debitAmount) > 0
-                          ? 'text-emerald-600'
-                          : 'text-rose-600',
-                    },
-                    action: {
-                      value: (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={matching === stmt.id ? 'default' : 'secondary'}
-                          onClick={() =>
-                            setMatching(matching === stmt.id ? null : stmt.id)
-                          }
-                          className={cn(
-                            matching === stmt.id &&
-                              'bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]',
-                          )}
-                        >
-                          {matching === stmt.id ? 'Cancel' : 'Match'}
-                        </Button>
-                      ),
-                    },
+                  {
+                    id: 'action',
+                    label: 'Action',
+                    align: 'center',
+                    width: 100,
                   },
-                }))}
+                ]}
+                rows={(unreconciledQuery.data ?? []).map(
+                  (stmt: BankStatementLineSummary) => ({
+                    id: stmt.id,
+                    className:
+                      matching === stmt.id
+                        ? 'bg-[var(--color-mod-accounting-bg)] ring-2 ring-[var(--color-mod-accounting-accent)] ring-inset'
+                        : '',
+                    cells: {
+                      date: { value: stmt.statementDate, type: 'date' },
+                      description: { value: stmt.description },
+                      amount: {
+                        value:
+                          Number(stmt.debitAmount) > 0
+                            ? stmt.debitAmount
+                            : `-${stmt.creditAmount}`,
+                        type: 'currency',
+                        className:
+                          Number(stmt.debitAmount) > 0
+                            ? 'text-emerald-600'
+                            : 'text-rose-600',
+                      },
+                      action: {
+                        value: (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={
+                              matching === stmt.id ? 'default' : 'secondary'
+                            }
+                            onClick={() =>
+                              setMatching(matching === stmt.id ? null : stmt.id)
+                            }
+                            className={cn(
+                              matching === stmt.id &&
+                                'bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]',
+                            )}
+                          >
+                            {matching === stmt.id ? 'Cancel' : 'Match'}
+                          </Button>
+                        ),
+                      },
+                    },
+                  }),
+                )}
               />
             </div>
           </SectionCard>
@@ -627,7 +634,12 @@ export function BankReconciliationWorkspace() {
                     { id: 'date', label: 'Date', width: 150 },
                     { id: 'journal', label: 'Journal #', width: 160 },
                     { id: 'amount', label: 'Amount', align: 'right' },
-                    { id: 'select', label: 'Select', align: 'center', width: 96 },
+                    {
+                      id: 'select',
+                      label: 'Select',
+                      align: 'center',
+                      width: 96,
+                    },
                   ]}
                   rows={(ledgerQuery.data?.rows ?? [])
                     .filter(
@@ -640,7 +652,10 @@ export function BankReconciliationWorkspace() {
                       id: row.journalLineId,
                       cells: {
                         date: { value: row.entryDate, type: 'date' },
-                        journal: { value: row.entryNumber ?? 'Unnumbered', bold: true },
+                        journal: {
+                          value: row.entryNumber ?? 'Unnumbered',
+                          bold: true,
+                        },
                         amount: {
                           value:
                             Number(row.debit) > 0

@@ -10,7 +10,9 @@ const require = createRequire(import.meta.url);
 const compat = new FlatCompat({
   baseDirectory: __dirname,
   // Resolve Next's bundled plugins consistently in CLI and build workers.
-  resolvePluginsRelativeTo: dirname(require.resolve('eslint-config-next/package.json')),
+  resolvePluginsRelativeTo: dirname(
+    require.resolve('eslint-config-next/package.json'),
+  ),
 });
 
 const eslintConfig = [

@@ -60,7 +60,7 @@ describe('Account & Security password contracts', () => {
     assert.match(workspace, /aria-invalid/);
     assert.match(workspace, /aria-describedby/);
     assert.match(workspace, /aria-pressed/);
-    assert.match(workspace, /"Hide" : "Show"/);
+    assert.match(workspace, /['"]Hide['"] : ['"]Show['"]/);
     assert.doesNotMatch(workspace, />Logout</);
   });
 

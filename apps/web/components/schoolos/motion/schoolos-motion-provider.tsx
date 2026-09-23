@@ -33,7 +33,11 @@ export function SchoolOSMotionProvider({ children }: PropsWithChildren) {
         ease: schoolOSMotion.easeOut,
       }}
     >
-      <div style={motionVariables} className="contents" data-schoolos-motion="global">
+      <div
+        style={motionVariables}
+        className="contents"
+        data-schoolos-motion="global"
+      >
         {children}
       </div>
     </MotionConfig>

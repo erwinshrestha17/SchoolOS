@@ -20,7 +20,7 @@ import {
   Calendar,
   AlertCircle,
   BarChart3,
-  Search
+  Search,
 } from 'lucide-react';
 
 type WorkloadSummary = {
@@ -30,7 +30,9 @@ type WorkloadSummary = {
   totalWeeklyHours: number;
 };
 
-function workloadColumns(selectedTeacherId: string): PaginatedDataTableColumn<TeacherWorkloadSummary>[] {
+function workloadColumns(
+  selectedTeacherId: string,
+): PaginatedDataTableColumn<TeacherWorkloadSummary>[] {
   return [
     {
       id: 'teacher',
@@ -55,7 +57,9 @@ function workloadColumns(selectedTeacherId: string): PaginatedDataTableColumn<Te
               <p
                 className={cn(
                   'font-black uppercase tracking-tight text-sm',
-                  isSelected ? 'text-[var(--color-mod-homework-text)]' : 'text-slate-900',
+                  isSelected
+                    ? 'text-[var(--color-mod-homework-text)]'
+                    : 'text-slate-900',
                 )}
               >
                 {item.staffName}
@@ -74,7 +78,14 @@ function workloadColumns(selectedTeacherId: string): PaginatedDataTableColumn<Te
       cell: (item) => {
         const isSelected = selectedTeacherId === item.staffId;
         return (
-          <span className={cn('text-sm font-bold', isSelected ? 'text-[var(--color-mod-homework-text)]' : 'text-slate-700')}>
+          <span
+            className={cn(
+              'text-sm font-bold',
+              isSelected
+                ? 'text-[var(--color-mod-homework-text)]'
+                : 'text-slate-700',
+            )}
+          >
             {item.slotCount}
           </span>
         );
@@ -89,11 +100,21 @@ function workloadColumns(selectedTeacherId: string): PaginatedDataTableColumn<Te
         const isSelected = selectedTeacherId === item.staffId;
         return (
           <div className="flex items-center gap-2">
-            <span className={cn('text-sm font-bold', isSelected ? 'text-[var(--color-mod-homework-text)]' : 'text-slate-700')}>
+            <span
+              className={cn(
+                'text-sm font-bold',
+                isSelected
+                  ? 'text-[var(--color-mod-homework-text)]'
+                  : 'text-slate-700',
+              )}
+            >
               {hours.toFixed(1)}h
             </span>
             {isOverloaded && (
-              <Badge variant={isSelected ? 'secondary' : 'warning'} className="text-[8px] py-0 px-1 font-black uppercase">
+              <Badge
+                variant={isSelected ? 'secondary' : 'warning'}
+                className="text-[8px] py-0 px-1 font-black uppercase"
+              >
                 High
               </Badge>
             )}
@@ -107,7 +128,14 @@ function workloadColumns(selectedTeacherId: string): PaginatedDataTableColumn<Te
       cell: (item) => {
         const isSelected = selectedTeacherId === item.staffId;
         return (
-          <span className={cn('text-sm font-bold', isSelected ? 'text-[var(--color-mod-homework-text)]' : 'text-slate-700')}>
+          <span
+            className={cn(
+              'text-sm font-bold',
+              isSelected
+                ? 'text-[var(--color-mod-homework-text)]'
+                : 'text-slate-700',
+            )}
+          >
             {item.homeworkCount}
           </span>
         );
@@ -125,11 +153,16 @@ function workloadColumns(selectedTeacherId: string): PaginatedDataTableColumn<Te
           <div
             className={cn(
               'inline-flex h-2 w-20 overflow-hidden rounded-full',
-              isSelected ? 'bg-[var(--color-mod-homework-border)]' : 'bg-slate-100',
+              isSelected
+                ? 'bg-[var(--color-mod-homework-border)]'
+                : 'bg-slate-100',
             )}
           >
             <div
-              className={cn('h-full rounded-full transition-all duration-1000', isOverloaded ? 'bg-amber-500' : 'bg-emerald-500')}
+              className={cn(
+                'h-full rounded-full transition-all duration-1000',
+                isOverloaded ? 'bg-amber-500' : 'bg-emerald-500',
+              )}
               style={{ width: `${Math.min(100, (hours / 40) * 100)}%` }}
             />
           </div>
@@ -173,11 +206,16 @@ export function TeacherWorkloadTab({
     enabled: Boolean(selectedTeacherId),
   });
 
-  const totalHours = summary?.totalWeeklyHours ?? workload.reduce((acc, curr) => acc + (curr.teachingMinutes / 60), 0);
+  const totalHours =
+    summary?.totalWeeklyHours ??
+    workload.reduce((acc, curr) => acc + curr.teachingMinutes / 60, 0);
   const teacherCount = summary?.teacherCount ?? workload.length;
-  const avgSlots = workload.length > 0
-    ? workload.reduce((acc, curr) => acc + curr.slotCount, 0) / workload.length / 5
-    : 0;
+  const avgSlots =
+    workload.length > 0
+      ? workload.reduce((acc, curr) => acc + curr.slotCount, 0) /
+        workload.length /
+        5
+      : 0;
   const workloadDistribution = [...workload]
     .sort((a, b) => b.teachingMinutes - a.teachingMinutes)
     .slice(0, 5);
@@ -209,8 +247,8 @@ export function TeacherWorkloadTab({
 
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Main Workload Table */}
-        <SectionCard 
-          title="Faculty Workload Analysis" 
+        <SectionCard
+          title="Faculty Workload Analysis"
           description="Monitoring teaching capacity and assignment density across staff."
           className="lg:col-span-2"
         >
@@ -238,14 +276,14 @@ export function TeacherWorkloadTab({
 
         {/* Details Sidebar */}
         <div className="space-y-8 lg:col-span-1">
-          <SectionCard 
-            title="Availability Insights" 
+          <SectionCard
+            title="Availability Insights"
             description="Detailed constraints and limits for the selected teacher."
           >
             {!selectedTeacherId ? (
-              <EmptyState 
-                title="Select a teacher" 
-                description="Click on a row to view specific availability records and workload limits." 
+              <EmptyState
+                title="Select a teacher"
+                description="Click on a row to view specific availability records and workload limits."
                 className="bg-slate-50/50"
                 icon={<Search className="h-8 w-8 text-slate-300" />}
               />
@@ -255,56 +293,80 @@ export function TeacherWorkloadTab({
               <div className="space-y-6">
                 <div className="grid gap-4">
                   <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Daily Period Limit</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Daily Period Limit
+                    </p>
                     <p className="text-2xl font-black text-slate-900 italic">
-                      {availabilityQuery.data?.limit?.maxPeriodsPerDay ?? 'No Limit'}
+                      {availabilityQuery.data?.limit?.maxPeriodsPerDay ??
+                        'No Limit'}
                     </p>
                   </div>
                   <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Weekly Period Limit</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Weekly Period Limit
+                    </p>
                     <p className="text-2xl font-black text-slate-900 italic">
-                      {availabilityQuery.data?.limit?.maxPeriodsPerWeek ?? 'No Limit'}
+                      {availabilityQuery.data?.limit?.maxPeriodsPerWeek ??
+                        'No Limit'}
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                     <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900">Custom Blocks</h4>
-                     <Badge variant="outline" className="text-[9px] font-black uppercase py-0 px-1.5 border-slate-200">
-                       {availabilityQuery.data?.availability.length ?? 0} Active
-                     </Badge>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900">
+                      Custom Blocks
+                    </h4>
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] font-black uppercase py-0 px-1.5 border-slate-200"
+                    >
+                      {availabilityQuery.data?.availability.length ?? 0} Active
+                    </Badge>
                   </div>
-                  
+
                   {availabilityQuery.data?.availability.length ? (
                     <div className="space-y-2">
                       {availabilityQuery.data.availability.map((av: any) => (
-                        <div key={av.id} className="p-3 rounded-xl border border-slate-100 bg-white shadow-sm flex items-center justify-between">
+                        <div
+                          key={av.id}
+                          className="p-3 rounded-xl border border-slate-100 bg-white shadow-sm flex items-center justify-between"
+                        >
                           <div>
-                            <p className="text-[11px] font-black text-slate-700 uppercase tracking-tight">Period {av.periodId || 'All Day'}</p>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Day {av.dayOfWeek}</p>
+                            <p className="text-[11px] font-black text-slate-700 uppercase tracking-tight">
+                              Period {av.periodId || 'All Day'}
+                            </p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                              Day {av.dayOfWeek}
+                            </p>
                           </div>
-                          <Badge variant={av.isAvailable ? 'success' : 'destructive'} className="text-[8px] px-1 py-0 font-black uppercase">
+                          <Badge
+                            variant={av.isAvailable ? 'success' : 'destructive'}
+                            className="text-[8px] px-1 py-0 font-black uppercase"
+                          >
                             {av.isAvailable ? 'AVAIL' : 'BLOCK'}
                           </Badge>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center py-4">No custom constraints found</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center py-4">
+                      No custom constraints found
+                    </p>
                   )}
                 </div>
 
                 <div className="rounded-2xl border border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] p-4 flex items-start gap-3">
-                   <AlertCircle className="h-4 w-4 text-[var(--color-mod-homework-text)] shrink-0 mt-0.5" />
-                   <p className="text-[11px] font-medium text-[var(--color-mod-homework-text)] leading-relaxed">
-                     Limits are enforced by the Timetable Builder during slot assignment to prevent scheduling conflicts.
-                   </p>
+                  <AlertCircle className="h-4 w-4 text-[var(--color-mod-homework-text)] shrink-0 mt-0.5" />
+                  <p className="text-[11px] font-medium text-[var(--color-mod-homework-text)] leading-relaxed">
+                    Limits are enforced by the Timetable Builder during slot
+                    assignment to prevent scheduling conflicts.
+                  </p>
                 </div>
               </div>
             )}
           </SectionCard>
-          
+
           <SectionCard
             title="Workload Distribution"
             className="border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)]"
@@ -312,14 +374,26 @@ export function TeacherWorkloadTab({
             {workloadDistribution.length === 0 ? (
               <div className="flex h-40 flex-col items-center justify-center space-y-3 text-center">
                 <BarChart3 className="h-10 w-10 text-slate-400" />
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-mod-homework-text)]">No slots assigned</p>
-                <p className="text-[11px] font-medium text-slate-500">Publish timetable slots to compare teacher load.</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-mod-homework-text)]">
+                  No slots assigned
+                </p>
+                <p className="text-[11px] font-medium text-slate-500">
+                  Publish timetable slots to compare teacher load.
+                </p>
               </div>
             ) : (
-              <div className="space-y-4" data-testid="teacher-workload-distribution">
+              <div
+                className="space-y-4"
+                data-testid="teacher-workload-distribution"
+              >
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Top teaching load</p>
-                  <Badge variant="secondary" className="border-[var(--color-mod-homework-border)] bg-white text-[9px] font-black uppercase text-[var(--color-mod-homework-text)]">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    Top teaching load
+                  </p>
+                  <Badge
+                    variant="secondary"
+                    className="border-[var(--color-mod-homework-border)] bg-white text-[9px] font-black uppercase text-[var(--color-mod-homework-text)]"
+                  >
                     {workloadDistribution.length} shown
                   </Badge>
                 </div>
@@ -334,8 +408,12 @@ export function TeacherWorkloadTab({
                     return (
                       <div key={item.staffId} className="space-y-1">
                         <div className="flex items-center justify-between gap-3 text-[11px]">
-                          <span className="truncate font-bold text-[var(--color-mod-homework-text)]">{item.staffName}</span>
-                          <span className="shrink-0 font-black text-[var(--color-mod-homework-text)]">{hours.toFixed(1)}h</span>
+                          <span className="truncate font-bold text-[var(--color-mod-homework-text)]">
+                            {item.staffName}
+                          </span>
+                          <span className="shrink-0 font-black text-[var(--color-mod-homework-text)]">
+                            {hours.toFixed(1)}h
+                          </span>
                         </div>
                         <div className="h-2 overflow-hidden rounded-full bg-white">
                           <div
@@ -351,7 +429,8 @@ export function TeacherWorkloadTab({
                   })}
                 </div>
                 <p className="text-[11px] font-medium leading-relaxed text-slate-500">
-                  Bars use live timetable workload totals and highlight teachers above 30 weekly hours.
+                  Bars use live timetable workload totals and highlight teachers
+                  above 30 weekly hours.
                 </p>
               </div>
             )}

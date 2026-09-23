@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useRef } from "react";
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useRef } from 'react';
 import {
   buildFilterHref,
   buildFilterQuery,
   parseUrlFilters,
   type FilterDefaults,
   type FilterValues,
-} from "./url-filters";
+} from './url-filters';
 
 /**
  * Keeps a list page's filters/pagination in the URL instead of local state,
@@ -27,7 +27,7 @@ export function useUrlFilters<T extends FilterDefaults>(
   FilterValues<T>,
   (
     updates: Partial<FilterValues<T>>,
-    options?: { resetPage?: boolean; history?: "push" | "replace" },
+    options?: { resetPage?: boolean; history?: 'push' | 'replace' },
   ) => void,
 ] {
   const router = useRouter();
@@ -42,7 +42,7 @@ export function useUrlFilters<T extends FilterDefaults>(
   const setFilters = useCallback(
     (
       updates: Partial<FilterValues<T>>,
-      options?: { resetPage?: boolean; history?: "push" | "replace" },
+      options?: { resetPage?: boolean; history?: 'push' | 'replace' },
     ) => {
       const query = buildFilterQuery(
         defaultsRef.current,
@@ -56,7 +56,7 @@ export function useUrlFilters<T extends FilterDefaults>(
         return;
       }
 
-      if (options?.history === "push") {
+      if (options?.history === 'push') {
         router.push(nextHref, { scroll: false });
       } else {
         router.replace(nextHref, { scroll: false });

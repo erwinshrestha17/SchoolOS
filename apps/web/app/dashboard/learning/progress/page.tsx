@@ -14,7 +14,11 @@ export default function LearningProgressPage() {
         description="Review class and student progress with supportive labels only."
       />
       <div className="mb-6">
-        <ModuleTabs items={learningWorkspaceTabs} accentColor="emerald" variant="light" />
+        <ModuleTabs
+          items={learningWorkspaceTabs}
+          accentColor="emerald"
+          variant="light"
+        />
       </div>
       <LearningWorkspace initialTab="progress" />
     </DashboardPageShell>

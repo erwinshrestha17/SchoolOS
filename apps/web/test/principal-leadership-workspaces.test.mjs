@@ -10,7 +10,9 @@ const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 const dashboard = read('app/dashboard/page.tsx');
 const summaryStrip = read('components/dashboard/dashboard-summary-strip.tsx');
 const readiness = read('components/dashboard/dashboard-readiness-section.tsx');
-const principalSummary = read('components/principal/principal-summary-workspace.tsx');
+const principalSummary = read(
+  'components/principal/principal-summary-workspace.tsx',
+);
 const approvals = read('app/dashboard/approvals/page.tsx');
 const advancedOperationsApi = read('lib/api/advanced-operations.ts');
 const attention = read('app/dashboard/attention/page.tsx');
@@ -18,20 +20,26 @@ const operations = read('app/dashboard/operations/overview/page.tsx');
 
 describe('Principal leadership workspaces', () => {
   it('keeps Principal Home leadership-first and routes attention to a durable workspace', () => {
-    assert.match(dashboard, /title: "Principal Home"/);
-    assert.match(dashboard, /"\/dashboard\/attention"/);
-    assert.doesNotMatch(dashboard, /title: "Executive Dashboard"/);
-    assert.match(attention, /title="Attention Centre"/);
+    assert.match(dashboard, /title: ['"]Principal Home['"]/);
+    assert.match(dashboard, /['"]\/dashboard\/attention['"]/);
+    assert.doesNotMatch(dashboard, /title: ['"]Executive Dashboard['"]/);
+    assert.match(attention, /title=['"]Attention Centre['"]/);
   });
 
   it('uses four leadership-safe headline cards without granting Principal fee operations', () => {
-    assert.match(summaryStrip, /label: "Attendance"/);
-    assert.match(summaryStrip, /label: "Finance health"/);
-    assert.match(summaryStrip, /label: "Staff availability"/);
-    assert.match(summaryStrip, /label: "Needs attention"/);
-    assert.match(summaryStrip, /moduleMap, "m11_accounting"/);
-    assert.match(summaryStrip, /persona === "admin" \|\| persona === "accountant"/);
-    assert.doesNotMatch(summaryStrip, /persona === "principal"[^\n]*includeFees/);
+    assert.match(summaryStrip, /label: ['"]Attendance['"]/);
+    assert.match(summaryStrip, /label: ['"]Finance health['"]/);
+    assert.match(summaryStrip, /label: ['"]Staff availability['"]/);
+    assert.match(summaryStrip, /label: ['"]Needs attention['"]/);
+    assert.match(summaryStrip, /moduleMap, ['"]m11_accounting['"]/);
+    assert.match(
+      summaryStrip,
+      /persona === ['"]admin['"] \|\| persona === ['"]accountant['"]/,
+    );
+    assert.doesNotMatch(
+      summaryStrip,
+      /persona === ['"]principal['"][^\n]*includeFees/,
+    );
   });
 
   it('keeps Principal readiness inside the server projection and permission-gates timetable navigation', () => {
@@ -41,20 +49,32 @@ describe('Principal leadership workspaces', () => {
       'm7_hr_payroll',
       'm10_communications',
     ]) {
-      assert.match(readiness, new RegExp(`"${moduleKey}"`));
+      assert.match(readiness, new RegExp(`["']${moduleKey}["']`));
     }
-    assert.match(readiness, /persona !== "principal" \|\| PRINCIPAL_READINESS_MODULES\.has/);
-    assert.match(readiness, /useHasPermission\("timetable:read_published"\)/);
+    assert.match(
+      readiness,
+      /persona !== ['"]principal['"] \|\| PRINCIPAL_READINESS_MODULES\.has/,
+    );
+    assert.match(
+      readiness,
+      /useHasPermission\(['"]timetable:read_published['"]\)/,
+    );
   });
 
   it('keeps Principal overview surfaces read-only and backend-backed', () => {
     assert.match(principalSummary, /api\.getModuleSummary/);
-    assert.match(principalSummary, /summary\.status === "locked"/);
-    assert.match(principalSummary, /summary\.status === "permissionDenied"/);
-    assert.match(principalSummary, /summary\.status === "partial"/);
-    assert.match(principalSummary, /variant="spinner"/);
-    assert.match(principalSummary, /label=\{`Loading \$\{definition\.moduleName/);
-    assert.doesNotMatch(principalSummary, /variant="skeleton"/);
+    assert.match(principalSummary, /summary\.status === ['"]locked['"]/);
+    assert.match(
+      principalSummary,
+      /summary\.status === ['"]permissionDenied['"]/,
+    );
+    assert.match(principalSummary, /summary\.status === ['"]partial['"]/);
+    assert.match(principalSummary, /variant=['"]spinner['"]/);
+    assert.match(
+      principalSummary,
+      /label=\{`Loading \$\{definition\.moduleName/,
+    );
+    assert.doesNotMatch(principalSummary, /variant=['"]skeleton['"]/);
     assert.doesNotMatch(principalSummary, /POST|PUT|PATCH|DELETE/);
   });
 
@@ -69,11 +89,11 @@ describe('Principal leadership workspaces', () => {
     );
     assert.match(approvals, /api\.decideApprovalRequest/);
     assert.match(approvals, /crypto\.randomUUID\(\)/);
-    assert.match(approvals, /setConfirmDecision\("APPROVE"\)/);
-    assert.match(approvals, /setConfirmDecision\("REJECT"\)/);
+    assert.match(approvals, /setConfirmDecision\(['"]APPROVE['"]\)/);
+    assert.match(approvals, /setConfirmDecision\(['"]REJECT['"]\)/);
     assert.match(
       approvals,
-      /Confirm \{confirmDecision === "APPROVE" \? "approval" : "rejection"\}/,
+      /Confirm\{['"] ['"]\}\s*\{confirmDecision === ['"]APPROVE['"]\s*\? ['"]approval['"]\s*: ['"]rejection['"]\}/,
     );
     assert.match(approvals, /Rejection reason is required/);
   });
@@ -81,7 +101,10 @@ describe('Principal leadership workspaces', () => {
   it('keeps M8 M9 M10 leadership access on the purpose-limited Principal summary endpoint', () => {
     assert.match(operations, /dashboard\/principal\/operations-summary/);
     assert.match(operations, /School Operations Overview/);
-    assert.doesNotMatch(operations, /api\.collect|api\.create|api\.update|api\.delete/);
+    assert.doesNotMatch(
+      operations,
+      /api\.collect|api\.create|api\.update|api\.delete/,
+    );
   });
 
   it('creates every planned leadership route', () => {

@@ -21,7 +21,9 @@
     "build": "pnpm run clean && tsc --project tsconfig.json",
     "lint": "tsc --noEmit --project tsconfig.json",
     "typecheck": "tsc --noEmit --project tsconfig.json",
-    "test": "echo \"No tests for @schoolos/core\""
+    "test": "echo \"No tests for @schoolos/core\"",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\""
   },
   "dependencies": {
     "zod": "^4.3.6"

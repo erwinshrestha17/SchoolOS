@@ -35,7 +35,8 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
   });
   const duplicateMutation = useMutation({
     mutationFn: () => admissionPoliciesApi.duplicate(policyId, {}),
-    onSuccess: (duplicated) => router.push(`/dashboard/settings/admissions/${duplicated.id}/edit`),
+    onSuccess: (duplicated) =>
+      router.push(`/dashboard/settings/admissions/${duplicated.id}/edit`),
   });
   const archiveMutation = useMutation({
     mutationFn: () =>
@@ -70,7 +71,9 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-black text-slate-950">{policy.name}</h2>
             <StatusBadge status={policy.status} />
-            {policy.draftVersion ? <StatusBadge status="DRAFT" label="Draft changes pending" /> : null}
+            {policy.draftVersion ? (
+              <StatusBadge status="DRAFT" label="Draft changes pending" />
+            ) : null}
           </div>
           <p className="mt-1 text-sm text-slate-600">
             Version {version?.version ?? 1}
@@ -79,16 +82,30 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
         </div>
         {canManage ? (
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" disabled={duplicateMutation.isPending} onClick={() => duplicateMutation.mutate()}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={duplicateMutation.isPending}
+              onClick={() => duplicateMutation.mutate()}
+            >
               Duplicate policy
             </Button>
             {policy.status !== 'ARCHIVED' ? (
-              <Button type="button" onClick={() => router.push(`/dashboard/settings/admissions/${policyId}/edit`)}>
+              <Button
+                type="button"
+                onClick={() =>
+                  router.push(`/dashboard/settings/admissions/${policyId}/edit`)
+                }
+              >
                 Edit policy
               </Button>
             ) : null}
             {!policy.isDefault && policy.status !== 'ARCHIVED' ? (
-              <Button type="button" variant="destructive" onClick={() => setArchiveDialogOpen(true)}>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => setArchiveDialogOpen(true)}
+              >
                 Archive policy
               </Button>
             ) : null}
@@ -97,19 +114,26 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
       </div>
 
       {duplicateMutation.isError ? (
-        <p className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800" role="alert">
+        <p
+          className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800"
+          role="alert"
+        >
           This policy could not be duplicated. Please try again.
         </p>
       ) : null}
 
       {policy.status === 'ARCHIVED' ? (
         <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
-          This policy is archived and read-only. Duplicate it to create a new editable draft.
+          This policy is archived and read-only. Duplicate it to create a new
+          editable draft.
         </p>
       ) : null}
 
       {archiveMutation.isError ? (
-        <p className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800" role="alert">
+        <p
+          className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800"
+          role="alert"
+        >
           This policy could not be archived. Reload the page and try again.
         </p>
       ) : null}
@@ -128,9 +152,21 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
         <TabsContent value="overview">
           <SectionCard title="Policy overview">
             <dl className="grid gap-3 sm:grid-cols-2">
-              <Summary label="Applicant type" value={policy.applicantType === 'BOTH' ? 'New admission and transfer' : policy.applicantType === 'TRANSFER' ? 'Transfer only' : 'New admission only'} />
+              <Summary
+                label="Applicant type"
+                value={
+                  policy.applicantType === 'BOTH'
+                    ? 'New admission and transfer'
+                    : policy.applicantType === 'TRANSFER'
+                      ? 'Transfer only'
+                      : 'New admission only'
+                }
+              />
               <Summary label="Grade band" value={policy.gradeBand ?? 'Any'} />
-              <Summary label="Required documents" value={String(policy.requiredDocumentCount)} />
+              <Summary
+                label="Required documents"
+                value={String(policy.requiredDocumentCount)}
+              />
               <Summary label="Assessment" value={policy.assessment} />
               <Summary
                 label="Approval"
@@ -140,87 +176,178 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
                     : 'Front-desk'
                 }
               />
-              <Summary label="Last updated" value={formatSchoolDate(policy.updatedAt)} />
+              <Summary
+                label="Last updated"
+                value={formatSchoolDate(policy.updatedAt)}
+              />
             </dl>
           </SectionCard>
         </TabsContent>
 
         <TabsContent value="form-fields">
-          <SectionCard title="Required information" description="Additional fields staff must collect for this policy.">
+          <SectionCard
+            title="Required information"
+            description="Additional fields staff must collect for this policy."
+          >
             {version?.requiredFields.length ? (
               <ul className="flex flex-wrap gap-2">
                 {version.requiredFields.map((field) => (
-                  <li key={field} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700">{field}</li>
+                  <li
+                    key={field}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700"
+                  >
+                    {field}
+                  </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-slate-500">No additional fields required beyond the school&apos;s standard admission form.</p>
+              <p className="text-sm text-slate-500">
+                No additional fields required beyond the school&apos;s standard
+                admission form.
+              </p>
             )}
-            <p className="mt-3 text-sm text-slate-600">Section required: {version?.requireSection ? 'Yes' : 'No'}</p>
+            <p className="mt-3 text-sm text-slate-600">
+              Section required: {version?.requireSection ? 'Yes' : 'No'}
+            </p>
           </SectionCard>
         </TabsContent>
 
         <TabsContent value="documents">
-          <SectionCard title="Required documents" description="Documents needed before admission is confirmed.">
+          <SectionCard
+            title="Required documents"
+            description="Documents needed before admission is confirmed."
+          >
             {version?.documentRequirements?.length ? (
               <ul className="space-y-2">
                 {version.documentRequirements.map((requirement) => (
-                  <li key={requirement.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
-                    <span className="font-semibold text-slate-800">{requirement.label}</span>
+                  <li
+                    key={requirement.id}
+                    className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3"
+                  >
+                    <span className="font-semibold text-slate-800">
+                      {requirement.label}
+                    </span>
                     <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                      {requirement.isRequired ? 'Required' : 'Optional'} · {requirement.timing === 'BEFORE_REVIEW' ? 'Before review' : 'Before enrollment'}
+                      {requirement.isRequired ? 'Required' : 'Optional'} ·{' '}
+                      {requirement.timing === 'BEFORE_REVIEW'
+                        ? 'Before review'
+                        : 'Before enrollment'}
                     </span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-slate-500">No documents required yet.</p>
+              <p className="text-sm text-slate-500">
+                No documents required yet.
+              </p>
             )}
           </SectionCard>
         </TabsContent>
 
         <TabsContent value="eligibility">
-          <SectionCard title="Eligibility and capacity" description="How this policy checks class capacity.">
+          <SectionCard
+            title="Eligibility and capacity"
+            description="How this policy checks class capacity."
+          >
             <dl className="grid gap-3 sm:grid-cols-2">
-              <Summary label="Check capacity when configured" value={version?.enforceCapacityWhenAvailable ? 'Yes' : 'No'} />
-              <Summary label="Capacity override" value={version?.capacityOverride != null ? String(version.capacityOverride) : "Uses the section's configured capacity"} />
+              <Summary
+                label="Check capacity when configured"
+                value={version?.enforceCapacityWhenAvailable ? 'Yes' : 'No'}
+              />
+              <Summary
+                label="Capacity override"
+                value={
+                  version?.capacityOverride != null
+                    ? String(version.capacityOverride)
+                    : "Uses the section's configured capacity"
+                }
+              />
             </dl>
           </SectionCard>
         </TabsContent>
 
         <TabsContent value="assessment">
-          <SectionCard title="Assessment" description="Evaluation this policy requires before admission.">
+          <SectionCard
+            title="Assessment"
+            description="Evaluation this policy requires before admission."
+          >
             <ul className="flex flex-wrap gap-2 text-sm font-semibold text-slate-700">
-              <li className="rounded-lg border border-slate-200 bg-white px-3 py-1.5">Document review: {version?.requireDocumentReview ? 'Required' : 'Not required'}</li>
-              <li className="rounded-lg border border-slate-200 bg-white px-3 py-1.5">Interview: {version?.requireInterview ? 'Required' : 'Not required'}</li>
-              <li className="rounded-lg border border-slate-200 bg-white px-3 py-1.5">Grade 11-12 stream/marks review: {version?.requireStreamOrMarksReview ? 'Required' : 'Not required'}</li>
+              <li className="rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+                Document review:{' '}
+                {version?.requireDocumentReview ? 'Required' : 'Not required'}
+              </li>
+              <li className="rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+                Interview:{' '}
+                {version?.requireInterview ? 'Required' : 'Not required'}
+              </li>
+              <li className="rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+                Grade 11-12 stream/marks review:{' '}
+                {version?.requireStreamOrMarksReview
+                  ? 'Required'
+                  : 'Not required'}
+              </li>
             </ul>
           </SectionCard>
         </TabsContent>
 
         <TabsContent value="decisions">
-          <SectionCard title="Decision" description="How admissions under this policy are approved.">
+          <SectionCard
+            title="Decision"
+            description="How admissions under this policy are approved."
+          >
             <dl className="grid gap-3 sm:grid-cols-2">
-              <Summary label="Admission mode" value={version?.admissionMode === 'DIRECT_ALLOWED' ? 'Direct admission allowed' : 'Review required'} />
+              <Summary
+                label="Admission mode"
+                value={
+                  version?.admissionMode === 'DIRECT_ALLOWED'
+                    ? 'Direct admission allowed'
+                    : 'Review required'
+                }
+              />
               {!version?.approvalChain ? (
-                <Summary label="Principal approval" value={version?.requirePrincipalApproval ? 'Required' : 'Not required'} />
+                <Summary
+                  label="Principal approval"
+                  value={
+                    version?.requirePrincipalApproval
+                      ? 'Required'
+                      : 'Not required'
+                  }
+                />
               ) : null}
-              <Summary label="Allow admission with documents pending" value={version?.allowAdmissionWithDocumentsPending ? 'Yes' : 'No'} />
+              <Summary
+                label="Allow admission with documents pending"
+                value={
+                  version?.allowAdmissionWithDocumentsPending ? 'Yes' : 'No'
+                }
+              />
             </dl>
             {version?.approvalChain ? (
               <div className="mt-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Approval chain</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Approval chain
+                </p>
                 <ol className="mt-2 space-y-2">
                   {version.approvalChain.stages.map((stage, index) => (
-                    <li key={index} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">{index + 1}</span>
-                      {stage.approverRole ?? stage.approverPermission ?? 'Principal/Admin only'}
+                    <li
+                      key={index}
+                      className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                    >
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
+                        {index + 1}
+                      </span>
+                      {stage.approverRole ??
+                        stage.approverPermission ??
+                        'Principal/Admin only'}
                     </li>
                   ))}
                 </ol>
               </div>
             ) : null}
-            {version?.notesForOffice ? <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{version.notesForOffice}</p> : null}
+            {version?.notesForOffice ? (
+              <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                {version.notesForOffice}
+              </p>
+            ) : null}
           </SectionCard>
         </TabsContent>
 
@@ -229,28 +356,48 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
             {versionsQuery.data?.length ? (
               <ul className="space-y-2">
                 {versionsQuery.data.map((historyVersion) => (
-                  <li key={historyVersion.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3">
-                    <span className="font-semibold text-slate-800">Version {historyVersion.version}</span>
+                  <li
+                    key={historyVersion.id}
+                    className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3"
+                  >
+                    <span className="font-semibold text-slate-800">
+                      Version {historyVersion.version}
+                    </span>
                     <StatusBadge status={historyVersion.status} />
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-slate-500">{versionsQuery.isLoading ? 'Loading versions…' : 'No versions yet.'}</p>
+              <p className="text-sm text-slate-500">
+                {versionsQuery.isLoading
+                  ? 'Loading versions…'
+                  : 'No versions yet.'}
+              </p>
             )}
           </SectionCard>
           <SectionCard title="Policy audit timeline" className="mt-4">
             {auditQuery.data?.length ? (
               <ul className="space-y-3">
                 {auditQuery.data.map((event) => (
-                  <li key={event.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                    <p className="text-sm font-bold text-slate-900">{event.action.replace(/_/g, ' ')}</p>
-                    <p className="mt-0.5 text-xs font-medium text-slate-500">{formatSchoolDate(event.createdAt)}</p>
+                  <li
+                    key={event.id}
+                    className="rounded-xl border border-slate-200 bg-white p-3"
+                  >
+                    <p className="text-sm font-bold text-slate-900">
+                      {event.action.replace(/_/g, ' ')}
+                    </p>
+                    <p className="mt-0.5 text-xs font-medium text-slate-500">
+                      {formatSchoolDate(event.createdAt)}
+                    </p>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-slate-500">{auditQuery.isLoading ? 'Loading audit history…' : 'No changes recorded yet.'}</p>
+              <p className="text-sm text-slate-500">
+                {auditQuery.isLoading
+                  ? 'Loading audit history…'
+                  : 'No changes recorded yet.'}
+              </p>
             )}
           </SectionCard>
         </TabsContent>
@@ -291,7 +438,9 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
 function Summary({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </dt>
       <dd className="mt-1 text-sm font-semibold text-slate-900">{value}</dd>
     </div>
   );

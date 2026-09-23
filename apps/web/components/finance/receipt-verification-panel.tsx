@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { FormEvent, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { FormEvent, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -9,26 +9,26 @@ import {
   QrCode,
   Search,
   XCircle,
-} from "lucide-react";
-import { api } from "@/lib/api";
-import type { ReceiptVerificationResult } from "@/lib/api/finance";
-import { Button } from "@/components/ui/button";
-import { SectionCard } from "@/components/ui/section-card";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { cn } from "@/lib/utils";
-import { formatBsDateTime } from "@schoolos/core";
+} from 'lucide-react';
+import { api } from '@/lib/api';
+import type { ReceiptVerificationResult } from '@/lib/api/finance';
+import { Button } from '@/components/ui/button';
+import { SectionCard } from '@/components/ui/section-card';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { cn } from '@/lib/utils';
+import { formatBsDateTime } from '@schoolos/core';
 
 const formatCurrency = (amount: string) =>
-  new Intl.NumberFormat("en-NP", {
-    style: "currency",
-    currency: "NPR",
+  new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
     maximumFractionDigits: 0,
   }).format(Number(amount));
 
 const formatDateTime = (value: string) => formatBsDateTime(value);
 
 export function ReceiptVerificationPanel() {
-  const [receiptNumber, setReceiptNumber] = useState("");
+  const [receiptNumber, setReceiptNumber] = useState('');
   const verifyMutation = useMutation({
     mutationFn: (value: string) => api.verifyReceipt(value),
   });
@@ -84,7 +84,7 @@ export function ReceiptVerificationPanel() {
               <span>
                 {verifyMutation.error instanceof Error
                   ? verifyMutation.error.message
-                  : "Receipt could not be verified."}
+                  : 'Receipt could not be verified.'}
               </span>
             </div>
           )}
@@ -112,15 +112,15 @@ function VerificationResult({
   }
 
   const valid =
-    result.status === "VALID" || result.status === "PARTIALLY_REFUNDED";
+    result.status === 'VALID' || result.status === 'PARTIALLY_REFUNDED';
 
   return (
     <div
       className={cn(
-        "rounded-2xl border p-4",
+        'rounded-2xl border p-4',
         valid
-          ? "border-success-100 bg-success-50/40"
-          : "border-warning-100 bg-warning-50/50",
+          ? 'border-success-100 bg-success-50/40'
+          : 'border-warning-100 bg-warning-50/50',
       )}
       data-testid="receipt-verification-result"
     >

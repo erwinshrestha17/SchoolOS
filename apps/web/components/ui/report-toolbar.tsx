@@ -17,11 +17,7 @@ export function ReportToolbar({
   actions,
 }: ReportToolbarProps) {
   return (
-    <SectionCard
-      title={title}
-      description={description}
-      headerAction={actions}
-    >
+    <SectionCard title={title} description={description} headerAction={actions}>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">{filters}</div>
     </SectionCard>
   );

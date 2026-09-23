@@ -2,7 +2,13 @@
 
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, FileText, Link as LinkIcon, Plus, StickyNote } from 'lucide-react';
+import {
+  Archive,
+  FileText,
+  Link as LinkIcon,
+  Plus,
+  StickyNote,
+} from 'lucide-react';
 import { learningApi } from '../../lib/api/learning';
 import type {
   LearningResource,
@@ -24,7 +30,11 @@ const emptyResourceForm: LearningResourcePayload = {
   metadata: {},
 };
 
-export function LearningResourcesPanel({ activityId }: { activityId?: string }) {
+export function LearningResourcesPanel({
+  activityId,
+}: {
+  activityId?: string;
+}) {
   const [form, setForm] = useState<LearningResourcePayload>(emptyResourceForm);
   const [notice, setNotice] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -95,7 +105,10 @@ export function LearningResourcesPanel({ activityId }: { activityId?: string }) 
         )}
       </div>
 
-      <form className="mt-5 grid gap-3 md:grid-cols-[160px_minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={submit}>
+      <form
+        className="mt-5 grid gap-3 md:grid-cols-[160px_minmax(0,1fr)_minmax(0,1fr)_auto]"
+        onSubmit={submit}
+      >
         <label className="block">
           <span className="text-xs font-black uppercase tracking-wide text-slate-500">
             Type
@@ -163,7 +176,9 @@ export function LearningResourcesPanel({ activityId }: { activityId?: string }) 
       ) : resourcesQuery.data?.items.length === 0 ? (
         <EmptyState
           icon={<FileText size={28} />}
-          title={scopedToActivity ? 'No resources attached' : 'No learning resources'}
+          title={
+            scopedToActivity ? 'No resources attached' : 'No learning resources'
+          }
           description={
             scopedToActivity
               ? 'Attach resource metadata after files have been registered through the SchoolOS file pipeline.'
@@ -183,7 +198,9 @@ export function LearningResourcesPanel({ activityId }: { activityId?: string }) 
         </div>
       )}
 
-      {(attachMutation.error || archiveMutation.error || resourcesQuery.error) && (
+      {(attachMutation.error ||
+        archiveMutation.error ||
+        resourcesQuery.error) && (
         <div className="mt-4 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
           {attachMutationErrorMessage(
             attachMutation.error,
@@ -202,7 +219,9 @@ function attachMutationErrorMessage(
   queryError: unknown,
 ) {
   const error = attachError ?? archiveError ?? queryError;
-  return error instanceof Error ? error.message : 'Learning resource request failed.';
+  return error instanceof Error
+    ? error.message
+    : 'Learning resource request failed.';
 }
 
 function ResourceRow({
@@ -231,10 +250,14 @@ function ResourceRow({
           </p>
           <p className="mt-1 truncate text-xs text-slate-500">
             {resource.type === 'FILE'
-              ? resource.fileAsset?.fileName ?? 'Protected file metadata unavailable'
+              ? (resource.fileAsset?.fileName ??
+                'Protected file metadata unavailable')
               : resource.type === 'LINK'
                 ? resource.url
-                : String((resource.metadata as { note?: string })?.note ?? 'Teacher note')}
+                : String(
+                    (resource.metadata as { note?: string })?.note ??
+                      'Teacher note',
+                  )}
           </p>
         </div>
       </div>

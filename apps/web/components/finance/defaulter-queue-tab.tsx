@@ -1,32 +1,32 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { api } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
-import { SectionCard } from "@/components/ui/section-card";
-import { Button } from "@/components/ui/button";
-import { PermissionDenied } from "@/components/ui/permission-denied";
-import { Loader2, Send, Download, Check, AlertCircle } from "lucide-react";
-import { useSession } from "@/components/session-provider";
-import type { DefaulterReminderResult } from "@schoolos/core";
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { api } from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
+import { SectionCard } from '@/components/ui/section-card';
+import { Button } from '@/components/ui/button';
+import { PermissionDenied } from '@/components/ui/permission-denied';
+import { Loader2, Send, Download, Check, AlertCircle } from 'lucide-react';
+import { useSession } from '@/components/session-provider';
+import type { DefaulterReminderResult } from '@schoolos/core';
 
 export function DefaulterQueueTab() {
   const { hasPermissions } = useSession();
-  const canManage = hasPermissions(["fees:manage"]);
+  const canManage = hasPermissions(['fees:manage']);
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const classId = searchParams.get("defaulterClassId") ?? "";
-  const feeHeadId = searchParams.get("defaulterFeeHeadId") ?? "";
-  const agingBucket = searchParams.get("defaulterAgingBucket") ?? "";
-  const search = searchParams.get("defaulterSearch") ?? "";
+  const classId = searchParams.get('defaulterClassId') ?? '';
+  const feeHeadId = searchParams.get('defaulterFeeHeadId') ?? '';
+  const agingBucket = searchParams.get('defaulterAgingBucket') ?? '';
+  const search = searchParams.get('defaulterSearch') ?? '';
   const page = Math.max(
     1,
-    Number(searchParams.get("defaulterPage") ?? "1") || 1,
+    Number(searchParams.get('defaulterPage') ?? '1') || 1,
   );
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [isExporting, setIsExporting] = useState(false);
@@ -35,18 +35,18 @@ export function DefaulterQueueTab() {
 
   // Queries
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
 
   const feeHeadsQuery = useQuery({
-    queryKey: ["fee-heads"],
+    queryKey: ['fee-heads'],
     queryFn: api.listFeeHeads,
   });
 
   const defaultersQuery = useQuery({
     queryKey: [
-      "defaulters-queue",
+      'defaulters-queue',
       classId,
       feeHeadId,
       agingBucket,
@@ -67,11 +67,11 @@ export function DefaulterQueueTab() {
   const updateFilters = (
     updates: Partial<
       Record<
-        | "defaulterClassId"
-        | "defaulterFeeHeadId"
-        | "defaulterAgingBucket"
-        | "defaulterSearch"
-        | "defaulterPage",
+        | 'defaulterClassId'
+        | 'defaulterFeeHeadId'
+        | 'defaulterAgingBucket'
+        | 'defaulterSearch'
+        | 'defaulterPage',
         string | number
       >
     >,
@@ -81,7 +81,7 @@ export function DefaulterQueueTab() {
       if (!value || value === 1) params.delete(key);
       else params.set(key, String(value));
     }
-    if (!("defaulterPage" in updates)) params.delete("defaulterPage");
+    if (!('defaulterPage' in updates)) params.delete('defaulterPage');
     router.replace(`${pathname}?${params.toString()}`, {
       scroll: false,
     });
@@ -91,7 +91,7 @@ export function DefaulterQueueTab() {
   // Mutation
   const reminderMutation = useMutation({
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["defaulters-queue"] });
+      queryClient.invalidateQueries({ queryKey: ['defaulters-queue'] });
       setReminderResult(data);
       setSelectedInvoiceIds([]);
       setTimeout(() => setReminderResult(null), 5000);
@@ -102,8 +102,8 @@ export function DefaulterQueueTab() {
   const onExportAgingCsv = async () => {
     setIsExporting(true);
     try {
-      await api.downloadReport("defaulter-aging-report", {
-        format: "csv",
+      await api.downloadReport('defaulter-aging-report', {
+        format: 'csv',
         filters: {
           asOfDate: new Date().toISOString(),
           classId: classId || undefined,
@@ -112,7 +112,7 @@ export function DefaulterQueueTab() {
         },
       });
     } catch (error) {
-      console.error("Export failed:", error);
+      console.error('Export failed:', error);
     } finally {
       setIsExporting(false);
     }
@@ -136,9 +136,9 @@ export function DefaulterQueueTab() {
   };
 
   const formatCurrency = (amount: string) => {
-    return new Intl.NumberFormat("en-NP", {
-      style: "currency",
-      currency: "NPR",
+    return new Intl.NumberFormat('en-NP', {
+      style: 'currency',
+      currency: 'NPR',
       maximumFractionDigits: 0,
     }).format(Number(amount));
   };
@@ -160,7 +160,7 @@ export function DefaulterQueueTab() {
               className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black text-slate-600 shadow-sm"
             >
               <Download size={14} />
-              {isExporting ? "Exporting..." : "Export Queue"}
+              {isExporting ? 'Exporting...' : 'Export Queue'}
             </Button>
           </div>
         ) : undefined
@@ -259,8 +259,8 @@ export function DefaulterQueueTab() {
                   className="rounded-xl px-4 py-2 text-xs font-bold"
                 >
                   {selectedInvoiceIds.length === defaulters.length
-                    ? "Deselect All"
-                    : "Select All"}
+                    ? 'Deselect All'
+                    : 'Select All'}
                 </Button>
                 <Button
                   type="button"
@@ -271,16 +271,16 @@ export function DefaulterQueueTab() {
                   onClick={() =>
                     reminderMutation.mutate({
                       invoiceIds: selectedInvoiceIds,
-                      channels: ["EMAIL", "SMS", "PUSH"],
-                      message: "Fee payment reminder from SchoolOS.",
+                      channels: ['EMAIL', 'SMS', 'PUSH'],
+                      message: 'Fee payment reminder from SchoolOS.',
                     })
                   }
                   className="inline-flex items-center gap-2 rounded-xl !bg-[var(--color-mod-fees-accent)] px-4 py-2 text-xs font-black uppercase tracking-widest text-white hover:!bg-[var(--color-mod-fees-text)]"
                 >
                   <Send size={12} />
                   {reminderMutation.isPending
-                    ? "Sending..."
-                    : "Remind Selected"}
+                    ? 'Sending...'
+                    : 'Remind Selected'}
                 </Button>
               </>
             )}
@@ -290,7 +290,7 @@ export function DefaulterQueueTab() {
         {reminderResult && (
           <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700">
             <Check size={14} />
-            Reminders sent! Requested: {reminderResult.requested}, Dispatched:{" "}
+            Reminders sent! Requested: {reminderResult.requested}, Dispatched:{' '}
             {reminderResult.reminded}.
           </div>
         )}
@@ -314,8 +314,8 @@ export function DefaulterQueueTab() {
                     onClick={() => handleToggleSelect(item.invoiceId)}
                     className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 select-none ${
                       isChecked
-                        ? "border-[var(--color-mod-fees-accent)] bg-[var(--color-mod-fees-bg)] shadow-sm shadow-[var(--color-mod-fees-border)]/20"
-                        : "border-slate-100 bg-white hover:border-slate-200"
+                        ? 'border-[var(--color-mod-fees-accent)] bg-[var(--color-mod-fees-bg)] shadow-sm shadow-[var(--color-mod-fees-border)]/20'
+                        : 'border-slate-100 bg-white hover:border-slate-200'
                     }`}
                   >
                     <input
@@ -375,7 +375,7 @@ export function DefaulterQueueTab() {
                   (page - 1) * 25 + 1,
                   defaultersQuery.data?.total ?? 0,
                 )}
-                –{Math.min(page * 25, defaultersQuery.data?.total ?? 0)} of{" "}
+                –{Math.min(page * 25, defaultersQuery.data?.total ?? 0)} of{' '}
                 {defaultersQuery.data?.total ?? 0}
               </span>
               <div className="flex gap-2">

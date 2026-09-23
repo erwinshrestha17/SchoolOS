@@ -32,7 +32,10 @@ export function ModuleHeader({
   const hasMoreActionItems = Boolean(moreActionItems?.length);
 
   return (
-    <header className={cn('border-b border-border pb-5', className)} data-schoolos-ui="module-header">
+    <header
+      className={cn('border-b border-border pb-5', className)}
+      data-schoolos-ui="module-header"
+    >
       {breadcrumb ? <div className="mb-3">{breadcrumb}</div> : null}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
@@ -56,7 +59,7 @@ export function ModuleHeader({
           ) : null}
         </div>
 
-        {(primaryAction || secondaryActions || hasMoreActionItems) ? (
+        {primaryAction || secondaryActions || hasMoreActionItems ? (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {primaryAction}
             {secondaryActions}

@@ -19,5 +19,6 @@ export const operationalSummaryApi = {
       `/dashboard/${encodeURIComponent(module)}/summary`,
     ),
 
-  getPlatformSummary: () => request<PlatformDashboardSummary>('/platform/summary'),
+  getPlatformSummary: () =>
+    request<PlatformDashboardSummary>('/platform/summary'),
 };

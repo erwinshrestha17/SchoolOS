@@ -20,19 +20,21 @@ export function NumberTicker({
   className,
   formatter = (val) => Math.round(val).toLocaleString(),
 }: NumberTickerProps) {
-  const [displayValue, setDisplayValue] = React.useState(direction === 'up' ? 0 : value);
+  const [displayValue, setDisplayValue] = React.useState(
+    direction === 'up' ? 0 : value,
+  );
 
   React.useEffect(() => {
     let startTimestamp: number | null = null;
     const startValue = direction === 'up' ? 0 : value;
     const endValue = direction === 'up' ? value : 0;
-    
+
     let animationFrameId: number;
 
     const step = (timestamp: number) => {
       if (!startTimestamp) startTimestamp = timestamp;
       const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      
+
       // Easing function: easeOutQuad
       const easedProgress = progress * (2 - progress);
       const current = startValue + easedProgress * (endValue - startValue);
@@ -55,5 +57,9 @@ export function NumberTicker({
     };
   }, [value, direction, delay, duration]);
 
-  return <span className={cn("tabular-nums inline-block", className)}>{formatter(displayValue)}</span>;
+  return (
+    <span className={cn('tabular-nums inline-block', className)}>
+      {formatter(displayValue)}
+    </span>
+  );
 }

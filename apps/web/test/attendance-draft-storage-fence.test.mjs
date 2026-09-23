@@ -1,12 +1,12 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   AttendanceDraftStorageFence,
   AttendanceDraftStorageInvalidatedError,
-} from "../lib/attendance-draft-storage-fence.ts";
+} from '../lib/attendance-draft-storage-fence.ts';
 
-describe("attendance draft storage fence", () => {
-  it("orders teardown after an active write and rejects every stale late write", async () => {
+describe('attendance draft storage fence', () => {
+  it('orders teardown after an active write and rejects every stale late write', async () => {
     const fence = new AttendanceDraftStorageFence();
     const staleTicket = fence.captureTicket();
     const events = [];
@@ -20,7 +20,7 @@ describe("attendance draft storage fence", () => {
     });
 
     const activeWrite = fence.run(staleTicket, async () => {
-      events.push("active-write");
+      events.push('active-write');
       markActiveWriteStarted();
       await activeWriteGate;
     });
@@ -28,10 +28,10 @@ describe("attendance draft storage fence", () => {
 
     const cleanupTicket = fence.invalidate();
     const cleanup = fence.run(cleanupTicket, () => {
-      events.push("clear");
+      events.push('clear');
     });
     const lateWrite = fence.run(staleTicket, () => {
-      events.push("late-write");
+      events.push('late-write');
     });
 
     releaseActiveWrite();
@@ -39,10 +39,10 @@ describe("attendance draft storage fence", () => {
     await assert.rejects(activeWrite, AttendanceDraftStorageInvalidatedError);
     await cleanup;
     await assert.rejects(lateWrite, AttendanceDraftStorageInvalidatedError);
-    assert.deepEqual(events, ["active-write", "clear"]);
+    assert.deepEqual(events, ['active-write', 'clear']);
   });
 
-  it("accepts only tickets from the current generation", async () => {
+  it('accepts only tickets from the current generation', async () => {
     const fence = new AttendanceDraftStorageFence();
     const first = fence.captureTicket();
     const second = fence.invalidate();

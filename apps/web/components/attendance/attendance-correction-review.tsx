@@ -33,7 +33,7 @@ export function AttendanceCorrectionReview({
 }: AttendanceCorrectionReviewProps) {
   const queryClient = useQueryClient();
   const { canReviewConflicts, resolution } = useAttendanceCapabilities();
-  const permissionsLoading = resolution === "loading";
+  const permissionsLoading = resolution === 'loading';
   const [reviewReasons, setReviewReasons] = useState<Record<string, string>>(
     {},
   );

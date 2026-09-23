@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { api } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { SectionCard } from "@/components/ui/section-card";
-import { Loader2, Plus, Check, AlertCircle } from "lucide-react";
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { SectionCard } from '@/components/ui/section-card';
+import { Loader2, Plus, Check, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,12 +15,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 
 export function DiscountsWaiversTab({
-  mode = "all",
+  mode = 'all',
 }: {
-  mode?: "all" | "discounts" | "waivers";
+  mode?: 'all' | 'discounts' | 'waivers';
 }) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -28,33 +28,33 @@ export function DiscountsWaiversTab({
   const searchParams = useSearchParams();
   const discountPage = Math.max(
     1,
-    Number(searchParams.get("discountPage") ?? "1") || 1,
+    Number(searchParams.get('discountPage') ?? '1') || 1,
   );
   const waiverPage = Math.max(
     1,
-    Number(searchParams.get("waiverPage") ?? "1") || 1,
+    Number(searchParams.get('waiverPage') ?? '1') || 1,
   );
-  const discountSearch = searchParams.get("discountSearch") ?? "";
-  const waiverSearch = searchParams.get("waiverSearch") ?? "";
-  const waiverInvoiceSearch = searchParams.get("waiverInvoiceSearch") ?? "";
+  const discountSearch = searchParams.get('discountSearch') ?? '';
+  const waiverSearch = searchParams.get('waiverSearch') ?? '';
+  const waiverInvoiceSearch = searchParams.get('waiverInvoiceSearch') ?? '';
 
   // Form State
   const [discount, setDiscount] = useState({
-    name: "",
-    reason: "",
-    type: "SIBLING",
-    feeHeadId: "",
-    classId: "",
-    feePlanId: "",
+    name: '',
+    reason: '',
+    type: 'SIBLING',
+    feeHeadId: '',
+    classId: '',
+    feePlanId: '',
     percentOff: 0,
     amountOff: 0,
   });
 
   const [waiver, setWaiver] = useState({
-    invoiceId: "",
-    feeHeadId: "",
+    invoiceId: '',
+    feeHeadId: '',
     amount: 0,
-    reason: "",
+    reason: '',
   });
 
   // Success States
@@ -64,22 +64,22 @@ export function DiscountsWaiversTab({
 
   // Queries
   const feeHeadsQuery = useQuery({
-    queryKey: ["fee-heads"],
+    queryKey: ['fee-heads'],
     queryFn: api.listFeeHeads,
   });
 
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
 
   const feePlansQuery = useQuery({
-    queryKey: ["fee-plans"],
+    queryKey: ['fee-plans'],
     queryFn: api.listFeePlans,
   });
 
   const invoicesQuery = useQuery({
-    queryKey: ["invoices", "waiver-selector", waiverInvoiceSearch],
+    queryKey: ['invoices', 'waiver-selector', waiverInvoiceSearch],
     queryFn: () =>
       api.listInvoices({
         limit: 25,
@@ -89,25 +89,25 @@ export function DiscountsWaiversTab({
   });
 
   const discountsQuery = useQuery({
-    queryKey: ["discounts", discountPage, discountSearch],
+    queryKey: ['discounts', discountPage, discountSearch],
     queryFn: () =>
       api.listDiscountsPage({
         page: discountPage,
         limit: 25,
         search: discountSearch || undefined,
       }),
-    enabled: mode !== "waivers",
+    enabled: mode !== 'waivers',
   });
 
   const waiversQuery = useQuery({
-    queryKey: ["waivers", waiverPage, waiverSearch],
+    queryKey: ['waivers', waiverPage, waiverSearch],
     queryFn: () =>
       api.listWaiversPage({
         page: waiverPage,
         limit: 25,
         search: waiverSearch || undefined,
       }),
-    enabled: mode !== "discounts",
+    enabled: mode !== 'discounts',
   });
 
   const updateUrl = (updates: Record<string, string | number>) => {
@@ -116,8 +116,8 @@ export function DiscountsWaiversTab({
       if (!value || value === 1) params.delete(key);
       else params.set(key, String(value));
     }
-    if ("discountSearch" in updates) params.delete("discountPage");
-    if ("waiverSearch" in updates) params.delete("waiverPage");
+    if ('discountSearch' in updates) params.delete('discountPage');
+    if ('waiverSearch' in updates) params.delete('waiverPage');
     router.replace(`${pathname}?${params.toString()}`, {
       scroll: false,
     });
@@ -126,14 +126,14 @@ export function DiscountsWaiversTab({
   // Mutations
   const discountMutation = useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["discounts"] });
+      queryClient.invalidateQueries({ queryKey: ['discounts'] });
       setDiscount({
-        name: "",
-        reason: "",
-        type: "SIBLING",
-        feeHeadId: "",
-        classId: "",
-        feePlanId: "",
+        name: '',
+        reason: '',
+        type: 'SIBLING',
+        feeHeadId: '',
+        classId: '',
+        feePlanId: '',
         percentOff: 0,
         amountOff: 0,
       });
@@ -145,13 +145,13 @@ export function DiscountsWaiversTab({
 
   const waiverMutation = useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["waivers"] });
-      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ['waivers'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
       setWaiver({
-        invoiceId: "",
-        feeHeadId: "",
+        invoiceId: '',
+        feeHeadId: '',
         amount: 0,
-        reason: "",
+        reason: '',
       });
       setIsConfirmingWaiver(false);
       setWaiverSuccess(true);
@@ -192,7 +192,7 @@ export function DiscountsWaiversTab({
     if (!selectedInvoice) return;
 
     waiverMutation.mutate({
-      studentId: selectedInvoice.student?.id || "",
+      studentId: selectedInvoice.student?.id || '',
       invoiceId: waiver.invoiceId || null,
       feeHeadId: waiver.feeHeadId || null,
       amount: waiver.amount.toFixed(2),
@@ -204,13 +204,13 @@ export function DiscountsWaiversTab({
     (inv) => inv.id === waiver.invoiceId,
   );
   const selectedWaiverOutstanding = selectedInvoiceObj
-    ? (selectedInvoiceObj.outstandingAmount ?? "0.00")
-    : "0.00";
+    ? (selectedInvoiceObj.outstandingAmount ?? '0.00')
+    : '0.00';
 
   const formatCurrency = (amount: string) => {
-    return new Intl.NumberFormat("en-NP", {
-      style: "currency",
-      currency: "NPR",
+    return new Intl.NumberFormat('en-NP', {
+      style: 'currency',
+      currency: 'NPR',
       maximumFractionDigits: 0,
     }).format(Number(amount));
   };
@@ -220,7 +220,7 @@ export function DiscountsWaiversTab({
       {/* Creation Forms */}
       <div className="space-y-8">
         {/* Discount Rule Form */}
-        {mode !== "waivers" ? (
+        {mode !== 'waivers' ? (
           <SectionCard
             title="Create Discount Rule"
             description="Setup automatic discounts (e.g. Sibling or Scholarship rules) to be applied on billing runs."
@@ -236,7 +236,7 @@ export function DiscountsWaiversTab({
                 <div className="flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700">
                   <AlertCircle size={14} />
                   {discountMutation.error.message ||
-                    "Failed to create discount rule."}
+                    'Failed to create discount rule.'}
                 </div>
               )}
 
@@ -384,7 +384,7 @@ export function DiscountsWaiversTab({
                     min={0}
                     max={100}
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
-                    value={discount.percentOff || ""}
+                    value={discount.percentOff || ''}
                     onChange={(e) =>
                       setDiscount((prev) => ({
                         ...prev,
@@ -405,7 +405,7 @@ export function DiscountsWaiversTab({
                     type="number"
                     min={0}
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
-                    value={discount.amountOff || ""}
+                    value={discount.amountOff || ''}
                     onChange={(e) =>
                       setDiscount((prev) => ({
                         ...prev,
@@ -453,7 +453,7 @@ export function DiscountsWaiversTab({
         ) : null}
 
         {/* Waiver Form */}
-        {mode !== "discounts" ? (
+        {mode !== 'discounts' ? (
           <SectionCard
             title="Issue Fee Waiver"
             description="Grant a manual or specific fee waiver to an outstanding invoice."
@@ -468,7 +468,7 @@ export function DiscountsWaiversTab({
               {waiverMutation.isError && (
                 <div className="flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700">
                   <AlertCircle size={14} />
-                  {waiverMutation.error.message || "Failed to apply waiver."}
+                  {waiverMutation.error.message || 'Failed to apply waiver.'}
                 </div>
               )}
 
@@ -505,8 +505,8 @@ export function DiscountsWaiversTab({
                     ?.filter((inv) => Number(inv.outstandingAmount ?? 0) > 0)
                     ?.map((inv) => (
                       <option key={inv.id} value={inv.id}>
-                        {inv.invoiceNumber} · {inv.student?.name ?? "Student"}{" "}
-                        (Due: {formatCurrency(inv.outstandingAmount ?? "0.00")})
+                        {inv.invoiceNumber} · {inv.student?.name ?? 'Student'}{' '}
+                        (Due: {formatCurrency(inv.outstandingAmount ?? '0.00')})
                       </option>
                     ))}
                 </select>
@@ -547,7 +547,7 @@ export function DiscountsWaiversTab({
                     max={Number(selectedWaiverOutstanding) || undefined}
                     placeholder="Waiver Amount"
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
-                    value={waiver.amount || ""}
+                    value={waiver.amount || ''}
                     onChange={(e) =>
                       setWaiver((prev) => ({
                         ...prev,
@@ -579,7 +579,7 @@ export function DiscountsWaiversTab({
 
               {selectedInvoiceObj && (
                 <p className="text-xs font-bold text-slate-400">
-                  Outstanding Balance on Invoice:{" "}
+                  Outstanding Balance on Invoice:{' '}
                   <span className="text-slate-800">
                     {formatCurrency(selectedWaiverOutstanding)}
                   </span>
@@ -616,7 +616,7 @@ export function DiscountsWaiversTab({
       {/* Lists Overview */}
       <div className="space-y-8">
         {/* Discounts List */}
-        {mode !== "waivers" ? (
+        {mode !== 'waivers' ? (
           <SectionCard title="Active Discount Rules">
             <input
               value={discountSearch}
@@ -667,14 +667,14 @@ export function DiscountsWaiversTab({
                           </td>
                           <td className="px-4 py-3">
                             <StatusBadge
-                              status={item.isActive ? "ACTIVE" : "INACTIVE"}
+                              status={item.isActive ? 'ACTIVE' : 'INACTIVE'}
                               className="text-[9px] px-1.5 py-0"
                             />
                           </td>
                           <td className="px-4 py-3 font-bold text-slate-800">
                             {item.percentOff
                               ? `${item.percentOff}% Off`
-                              : formatCurrency(item.amountOff ?? "0.00")}
+                              : formatCurrency(item.amountOff ?? '0.00')}
                           </td>
                         </tr>
                       ))}
@@ -694,7 +694,7 @@ export function DiscountsWaiversTab({
         ) : null}
 
         {/* Waivers List */}
-        {mode !== "discounts" ? (
+        {mode !== 'discounts' ? (
           <SectionCard title="Recent Approved Waivers">
             <input
               value={waiverSearch}
@@ -737,13 +737,13 @@ export function DiscountsWaiversTab({
                             <div className="flex flex-col">
                               <span className="font-bold text-slate-700">
                                 {item.invoiceId
-                                  ? "Invoice-scoped waiver"
-                                  : "Student fee waiver"}
+                                  ? 'Invoice-scoped waiver'
+                                  : 'Student fee waiver'}
                               </span>
                               <span className="text-[10px] text-slate-500 font-semibold">
                                 {item.studentId
-                                  ? "Student record protected"
-                                  : "Student unavailable"}
+                                  ? 'Student record protected'
+                                  : 'Student unavailable'}
                               </span>
                             </div>
                           </td>
@@ -771,7 +771,7 @@ export function DiscountsWaiversTab({
         ) : null}
       </div>
 
-      {mode !== "discounts" ? (
+      {mode !== 'discounts' ? (
         <Dialog open={isConfirmingWaiver} onOpenChange={setIsConfirmingWaiver}>
           <DialogContent className="max-w-md rounded-2xl">
             <DialogHeader>
@@ -782,10 +782,10 @@ export function DiscountsWaiversTab({
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2 rounded-xl border border-warning-100 bg-warning-50 p-4 text-sm text-warning-900">
-              <p>Invoice: {selectedInvoiceObj?.invoiceNumber ?? "—"}</p>
-              <p>Student: {selectedInvoiceObj?.student?.name ?? "—"}</p>
+              <p>Invoice: {selectedInvoiceObj?.invoiceNumber ?? '—'}</p>
+              <p>Student: {selectedInvoiceObj?.student?.name ?? '—'}</p>
               <p>Waiver amount: {formatCurrency(waiver.amount.toFixed(2))}</p>
-              <p>Reason: {waiver.reason || "—"}</p>
+              <p>Reason: {waiver.reason || '—'}</p>
             </div>
             <DialogFooter>
               <Button
@@ -800,7 +800,7 @@ export function DiscountsWaiversTab({
                 disabled={waiverMutation.isPending}
                 onClick={submitWaiver}
               >
-                {waiverMutation.isPending ? "Approving..." : "Approve waiver"}
+                {waiverMutation.isPending ? 'Approving...' : 'Approve waiver'}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -258,7 +258,8 @@ export const permissionCatalog = [
   {
     resource: "accounting",
     action: "reverse",
-    description: "Create reversing journal entries for posted accounting records",
+    description:
+      "Create reversing journal entries for posted accounting records",
   },
   {
     resource: "accounting:accounts",
@@ -393,7 +394,8 @@ export const permissionCatalog = [
   {
     resource: "accounting:payroll-handoff",
     action: "post",
-    description: "Post an approved payroll snapshot through the accounting boundary",
+    description:
+      "Post an approved payroll snapshot through the accounting boundary",
   },
   {
     resource: "accounting:expenses",
@@ -443,7 +445,8 @@ export const permissionCatalog = [
   {
     resource: "finance:principal",
     action: "read",
-    description: "Read server-projected Principal financial oversight summaries",
+    description:
+      "Read server-projected Principal financial oversight summaries",
   },
   {
     resource: "finance:approvals",
@@ -1396,7 +1399,8 @@ export const permissionCatalog = [
   {
     resource: "settings",
     action: "manage",
-    description: "Manage tenant branding, localization, and operational settings",
+    description:
+      "Manage tenant branding, localization, and operational settings",
   },
   {
     resource: "settings",
@@ -1508,7 +1512,8 @@ export const permissionCatalog = [
   {
     resource: "students",
     action: "manage_lifecycle",
-    description: "Transfer, exit, archive, and manage student lifecycle transitions",
+    description:
+      "Transfer, exit, archive, and manage student lifecycle transitions",
   },
   {
     resource: "admission_policy",
@@ -1694,12 +1699,9 @@ export type PermissionAction = (typeof permissionCatalog)[number]["action"];
 export type PermissionKey =
   `${(typeof permissionCatalog)[number]["resource"]}:${(typeof permissionCatalog)[number]["action"]}`;
 
-
 export function buildPermissionKey(resource: string, action: string) {
   return `${resource}:${action}`;
 }
-
-
 
 export const systemRoleDefinitions = [
   {
@@ -1924,7 +1926,15 @@ export const PRINCIPAL_PERMISSION_KEYS: PermissionKey[] = [
 const ADMIN_EXCLUDED_FINANCE_KEYS = TENANT_PERMISSION_KEYS.filter((key) => {
   const [root] = key.split(":");
   return (
-    ["accounting", "fees", "payments", "receipts", "ledger", "payroll", "finance"].includes(root) ||
+    [
+      "accounting",
+      "fees",
+      "payments",
+      "receipts",
+      "ledger",
+      "payroll",
+      "finance",
+    ].includes(root) ||
     key === "settings:finance:manage" ||
     key === "settings:accounting:manage"
   );
@@ -2239,9 +2249,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "transport:operate",
     "settings:read_public",
   ],
-  platform_super_admin: [
-    ...PLATFORM_PERMISSION_KEYS,
-  ],
+  platform_super_admin: [...PLATFORM_PERMISSION_KEYS],
   platform_support: [
     "platform:read",
     "platform:dashboard:read",
@@ -2280,4 +2288,3 @@ export const PLATFORM_SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> =
       isPlatformRoleName(roleName),
     ),
   );
-

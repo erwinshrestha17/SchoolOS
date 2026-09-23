@@ -13,13 +13,29 @@ import type { TabItem } from '@/components/ui/module-tabs';
 // navigation is consistent and always reflects the real current route.
 export const academicsWorkspaceTabs: TabItem[] = [
   { href: '/dashboard/academics', label: 'Overview', icon: LayoutDashboard },
-  { href: '/dashboard/academics/exam-terms', label: 'Exam Terms', icon: ClipboardList },
-  { href: '/dashboard/academics/marks', label: 'Marks Entry', icon: PencilLine },
+  {
+    href: '/dashboard/academics/exam-terms',
+    label: 'Exam Terms',
+    icon: ClipboardList,
+  },
+  {
+    href: '/dashboard/academics/marks',
+    label: 'Marks Entry',
+    icon: PencilLine,
+  },
   { href: '/dashboard/academics/cas', label: 'CAS', icon: Layers3 },
-  { href: '/dashboard/academics/report-cards', label: 'Report Cards', icon: FileText },
+  {
+    href: '/dashboard/academics/report-cards',
+    label: 'Report Cards',
+    icon: FileText,
+  },
   { href: '/dashboard/academics/results', label: 'Results', icon: Eye },
 ];
 
 export const academicsWorkspaceOverflowTabs: TabItem[] = [
-  { href: '/dashboard/academics/publishing', label: 'Publishing', icon: Megaphone },
+  {
+    href: '/dashboard/academics/publishing',
+    label: 'Publishing',
+    icon: Megaphone,
+  },
 ];

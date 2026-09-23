@@ -4,7 +4,13 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatBsDateTime } from '@schoolos/core';
 import { api } from '../../lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/dialog';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, Lock, Unlock, RefreshCcw } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -16,7 +22,12 @@ interface FiscalYearCloseDialogProps {
   mode: 'CLOSE' | 'REOPEN';
 }
 
-export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: FiscalYearCloseDialogProps) {
+export function FiscalYearCloseDialog({
+  isOpen,
+  onClose,
+  fiscalYear,
+  mode,
+}: FiscalYearCloseDialogProps) {
   const queryClient = useQueryClient();
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +91,7 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
             {mode === 'CLOSE' ? 'Close Fiscal Year' : 'Reopen Fiscal Year'}
           </DialogTitle>
           <p className="text-center text-sm text-slate-500 mt-2">
-            {mode === 'CLOSE' 
+            {mode === 'CLOSE'
               ? `Are you sure you want to close ${fiscalYear?.name}? This will generate closing entries for all revenue and expense accounts and transfer net income to Retained Earnings.`
               : `Reopening ${fiscalYear?.name} will allow further postings. Please provide a reason for the audit trail.`}
           </p>
@@ -121,7 +132,8 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
               )}
               {readinessQuery.isError && (
                 <p className="text-xs font-semibold text-rose-700">
-                  Readiness could not be checked. Confirm your fiscal permission and try again.
+                  Readiness could not be checked. Confirm your fiscal permission
+                  and try again.
                 </p>
               )}
               {readiness && (
@@ -129,7 +141,9 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
                   <p
                     className={cn(
                       'text-xs font-bold',
-                      readiness.readyToClose ? 'text-emerald-700' : 'text-rose-700',
+                      readiness.readyToClose
+                        ? 'text-emerald-700'
+                        : 'text-rose-700',
                     )}
                   >
                     {readiness.readyToClose
@@ -151,9 +165,11 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
                       </p>
                     ))}
                   <p className="text-[10px] text-slate-400">
-                    Last calculated {formatBsDateTime(readiness.lastCalculatedAt)}. Posting-failure,
-                    report-snapshot, export-job, fee-reconciliation, and warning-acknowledgement checks remain
-                    explicitly unavailable in this release.
+                    Last calculated{' '}
+                    {formatBsDateTime(readiness.lastCalculatedAt)}.
+                    Posting-failure, report-snapshot, export-job,
+                    fee-reconciliation, and warning-acknowledgement checks
+                    remain explicitly unavailable in this release.
                   </p>
                 </div>
               )}

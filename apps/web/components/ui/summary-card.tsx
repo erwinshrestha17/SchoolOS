@@ -128,10 +128,7 @@ export function SummaryGrid({
 }: ComponentProps<'div'>) {
   return (
     <div
-      className={cn(
-        className,
-        'grid gap-4 sm:grid-cols-2 xl:grid-cols-4',
-      )}
+      className={cn(className, 'grid gap-4 sm:grid-cols-2 xl:grid-cols-4')}
       data-schoolos-ui="summary-grid"
       {...props}
     >

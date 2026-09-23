@@ -85,12 +85,12 @@ test.describe.serial('FEE-15 Refund and Reversal Register export', () => {
       expect(latestFee15).toBeDefined();
       expect(latestFee15?.financialReportId).toBe('FEE-15');
       expect(latestFee15?.status).toBe('COMPLETED');
-      expect(Number(latestFee15?.displayedTotals?.rowCount ?? '0')).toBeGreaterThan(
-        0,
-      );
-      expect(Number(latestFee15?.displayedTotals?.refundCount ?? '0')).toBeGreaterThan(
-        0,
-      );
+      expect(
+        Number(latestFee15?.displayedTotals?.rowCount ?? '0'),
+      ).toBeGreaterThan(0);
+      expect(
+        Number(latestFee15?.displayedTotals?.refundCount ?? '0'),
+      ).toBeGreaterThan(0);
       expect(latestFee15?.displayedTotals?.totalAmount).toBeTruthy();
 
       const snapshotRow = page

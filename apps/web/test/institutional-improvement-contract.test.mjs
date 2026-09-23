@@ -18,9 +18,7 @@ describe('Stage 4 institutional-improvement web contract', () => {
   });
 
   it('connects teacher development to reasoned, versioned, protected workflows', () => {
-    const workspace = read(
-      'components/hr/teacher-development-workspace.tsx',
-    );
+    const workspace = read('components/hr/teacher-development-workspace.tsx');
     const api = read('lib/api/institutional-improvement.ts');
 
     assert.match(workspace, /expectedVersion/);

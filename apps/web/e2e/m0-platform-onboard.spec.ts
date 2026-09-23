@@ -1,12 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 const platformCredentials = {
-  tenantSlug:
-    process.env.SCHOOLOS_E2E_PLATFORM_TENANT_SLUG ?? 'platform',
-  email:
-    process.env.SCHOOLOS_E2E_PLATFORM_EMAIL ?? 'admin@schoolos.io',
-  password:
-    process.env.SCHOOLOS_E2E_PLATFORM_PASSWORD ?? 'SchoolOS@2026',
+  tenantSlug: process.env.SCHOOLOS_E2E_PLATFORM_TENANT_SLUG ?? 'platform',
+  email: process.env.SCHOOLOS_E2E_PLATFORM_EMAIL ?? 'admin@schoolos.io',
+  password: process.env.SCHOOLOS_E2E_PLATFORM_PASSWORD ?? 'SchoolOS@2026',
 };
 
 test.describe('M0 Platform onboard browser E2E', () => {
@@ -38,7 +35,10 @@ test.describe('M0 Platform onboard browser E2E', () => {
       'Schools',
     );
 
-    await page.getByRole('button', { name: /Onboard school/i }).first().click();
+    await page
+      .getByRole('button', { name: /Onboard school/i })
+      .first()
+      .click();
     await expect(
       page.getByRole('heading', { name: /Onboard new school/i }),
     ).toBeVisible();
@@ -57,9 +57,7 @@ test.describe('M0 Platform onboard browser E2E', () => {
     await page.getByRole('link', { name: schoolName, exact: true }).click();
     await expect(page.getByRole('heading', { name: schoolName })).toBeVisible();
 
-    await page
-      .getByRole('link', { name: 'Onboarding', exact: true })
-      .click();
+    await page.getByRole('link', { name: 'Onboarding', exact: true }).click();
     await expect(
       page.getByRole('heading', { name: 'Onboarding', exact: true }),
     ).toBeVisible();

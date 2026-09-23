@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   AlertTriangle,
@@ -8,50 +8,50 @@ import {
   RefreshCcw,
   ShieldAlert,
   Wallet,
-} from "lucide-react";
-import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+} from 'lucide-react';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import {
   formatBsDate,
   formatBsDateTime,
   getNepalSchoolDay,
   NEPAL_TIME_ZONE,
-} from "@schoolos/core";
-import { useSession } from "@/components/session-provider";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ErrorState } from "@/components/ui/error-state";
-import { SummaryCard, SummaryGrid } from "@/components/ui/summary-card";
-import { SectionCard } from "@/components/ui/section-card";
-import { WorkSurface } from "@/components/ui/work-surface";
-import { api } from "@/lib/api";
+} from '@schoolos/core';
+import { useSession } from '@/components/session-provider';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
+import { SectionCard } from '@/components/ui/section-card';
+import { WorkSurface } from '@/components/ui/work-surface';
+import { api } from '@/lib/api';
 
 const formatCurrency = (amount: string) =>
-  new Intl.NumberFormat("en-NP", {
-    style: "currency",
-    currency: "NPR",
+  new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(amount));
 
 const closeStateLabel: Record<string, string> = {
-  NOT_STARTED: "Not started",
-  OPEN: "Open",
-  CLOSED: "Closed",
+  NOT_STARTED: 'Not started',
+  OPEN: 'Open',
+  CLOSED: 'Closed',
 };
 
 export function FeeOverview() {
   const { hasPermissions } = useSession();
-  const canCollect = hasPermissions(["payments:collect"]);
-  const canManage = hasPermissions(["fees:manage"]);
-  const canReadReceipts = hasPermissions(["receipts:read"]);
-  const canClose = hasPermissions(["payments:close"]);
+  const canCollect = hasPermissions(['payments:collect']);
+  const canManage = hasPermissions(['fees:manage']);
+  const canReadReceipts = hasPermissions(['receipts:read']);
+  const canClose = hasPermissions(['payments:close']);
   const canReviewAdjustments =
-    hasPermissions(["payments:refund"]) || hasPermissions(["payments:reverse"]);
+    hasPermissions(['payments:refund']) || hasPermissions(['payments:reverse']);
   const schoolDay = getNepalSchoolDay();
 
   const summaryQuery = useQuery({
-    queryKey: ["finance-dashboard-summary", schoolDay.gregorianDate],
+    queryKey: ['finance-dashboard-summary', schoolDay.gregorianDate],
     queryFn: () =>
       api.getFinanceDashboardSummary({
         date: schoolDay.gregorianDate,
@@ -59,13 +59,13 @@ export function FeeOverview() {
       }),
   });
   const overdueQuery = useQuery({
-    queryKey: ["defaulters", "overview"],
+    queryKey: ['defaulters', 'overview'],
     queryFn: () =>
       api.listDefaulters({
         page: 1,
         limit: 5,
-        sortBy: "dueDate",
-        sortDirection: "asc",
+        sortBy: 'dueDate',
+        sortDirection: 'asc',
       }),
     enabled: canManage,
   });
@@ -80,24 +80,24 @@ export function FeeOverview() {
           value={
             summary
               ? formatCurrency(summary.collectedToday.netAmount)
-              : "Unavailable"
+              : 'Unavailable'
           }
           loading={summaryQuery.isLoading}
           icon={<Wallet className="h-5 w-5" />}
           tone="success"
-          href={canCollect ? "/dashboard/fees/collect" : undefined}
+          href={canCollect ? '/dashboard/fees/collect' : undefined}
           description="Net confirmed collection."
         />
         <SummaryCard
           label="Total outstanding"
           value={
-            summary ? formatCurrency(summary.outstanding.amount) : "Unavailable"
+            summary ? formatCurrency(summary.outstanding.amount) : 'Unavailable'
           }
           loading={summaryQuery.isLoading}
           icon={<Wallet className="h-5 w-5" />}
           tone="module"
           href={
-            canManage ? "/dashboard/fees/invoices?outstanding=true" : undefined
+            canManage ? '/dashboard/fees/invoices?outstanding=true' : undefined
           }
           description="Official outstanding balance."
         />
@@ -105,37 +105,37 @@ export function FeeOverview() {
           label="Overdue"
           value={
             !canManage
-              ? "Restricted"
+              ? 'Restricted'
               : summary
                 ? formatCurrency(summary.overdue.amount)
-                : "Unavailable"
+                : 'Unavailable'
           }
           loading={canManage && summaryQuery.isLoading}
           icon={<AlertTriangle className="h-5 w-5" />}
-          tone={summary?.overdue.studentCount ? "warning" : "module"}
+          tone={summary?.overdue.studentCount ? 'warning' : 'module'}
           href={
-            canManage ? "/dashboard/fees/reports?agingBucket=all" : undefined
+            canManage ? '/dashboard/fees/reports?agingBucket=all' : undefined
           }
           description={
             summary
               ? `${summary.overdue.studentCount} students.`
-              : "Aging summary."
+              : 'Aging summary.'
           }
         />
         <SummaryCard
           label="Cashier close"
           value={
             !canClose
-              ? "Restricted"
+              ? 'Restricted'
               : summary
                 ? (closeStateLabel[summary.cashierClose.state] ??
                   summary.cashierClose.state)
-                : "Unavailable"
+                : 'Unavailable'
           }
           loading={canClose && summaryQuery.isLoading}
           icon={<History className="h-5 w-5" />}
-          tone={summary?.cashierClose.state === "OPEN" ? "warning" : "module"}
-          href={canClose ? "/dashboard/fees/cashier-close" : undefined}
+          tone={summary?.cashierClose.state === 'OPEN' ? 'warning' : 'module'}
+          href={canClose ? '/dashboard/fees/cashier-close' : undefined}
           description="School-day close state."
         />
       </SummaryGrid>
@@ -154,7 +154,7 @@ export function FeeOverview() {
           disabled={summaryQuery.isFetching}
         >
           <RefreshCcw
-            className={`h-4 w-4 ${summaryQuery.isFetching ? "animate-spin" : ""}`}
+            className={`h-4 w-4 ${summaryQuery.isFetching ? 'animate-spin' : ''}`}
             aria-hidden
           />
           Refresh
@@ -203,12 +203,12 @@ export function FeeOverview() {
                     amount={
                       summary
                         ? formatCurrency(summary.collectedToday.grossAmount)
-                        : "Unavailable"
+                        : 'Unavailable'
                     }
                     context={
                       summary
                         ? `${summary.receiptsIssued} receipts issued`
-                        : "Official summary"
+                        : 'Official summary'
                     }
                   />
                   <ActivityRow
@@ -216,7 +216,7 @@ export function FeeOverview() {
                     amount={
                       summary
                         ? formatCurrency(summary.collectedToday.refundedAmount)
-                        : "Unavailable"
+                        : 'Unavailable'
                     }
                     context="Included in net collection"
                   />
@@ -225,7 +225,7 @@ export function FeeOverview() {
                     amount={
                       summary
                         ? formatCurrency(summary.collectedToday.netAmount)
-                        : "Unavailable"
+                        : 'Unavailable'
                     }
                     context="Official school-day position"
                     emphasized
@@ -285,7 +285,7 @@ export function FeeOverview() {
                           <span className="block text-xs font-normal text-slate-500">
                             {[item.className, item.sectionName]
                               .filter(Boolean)
-                              .join(" · ")}
+                              .join(' · ')}
                           </span>
                         </td>
                         <td className="px-5 py-3.5 text-slate-700">
@@ -347,15 +347,15 @@ export function FeeOverview() {
                   canManage && summary
                     ? String(summary.overdue.studentCount)
                     : canManage
-                      ? "Unavailable"
-                      : "Restricted"
+                      ? 'Unavailable'
+                      : 'Restricted'
                 }
                 href={
                   canManage
-                    ? "/dashboard/fees/reports?agingBucket=all"
+                    ? '/dashboard/fees/reports?agingBucket=all'
                     : undefined
                 }
-                tone={summary?.overdue.studentCount ? "warning" : "neutral"}
+                tone={summary?.overdue.studentCount ? 'warning' : 'neutral'}
               />
               <AttentionRow
                 label="Pending adjustments"
@@ -363,15 +363,15 @@ export function FeeOverview() {
                   canReviewAdjustments && summary
                     ? String(summary.pendingApprovalCount)
                     : canReviewAdjustments
-                      ? "Unavailable"
-                      : "Restricted"
+                      ? 'Unavailable'
+                      : 'Restricted'
                 }
                 href={
                   canReviewAdjustments
-                    ? "/dashboard/fees/adjustments?status=PENDING"
+                    ? '/dashboard/fees/adjustments?status=PENDING'
                     : undefined
                 }
-                tone={summary?.pendingApprovalCount ? "warning" : "neutral"}
+                tone={summary?.pendingApprovalCount ? 'warning' : 'neutral'}
               />
               <AttentionRow
                 label="Unclosed payments"
@@ -379,14 +379,14 @@ export function FeeOverview() {
                   canClose && summary
                     ? String(summary.cashierClose.unclosedPaymentCount)
                     : canClose
-                      ? "Unavailable"
-                      : "Restricted"
+                      ? 'Unavailable'
+                      : 'Restricted'
                 }
-                href={canClose ? "/dashboard/fees/cashier-close" : undefined}
+                href={canClose ? '/dashboard/fees/cashier-close' : undefined}
                 tone={
                   summary?.cashierClose.unclosedPaymentCount
-                    ? "warning"
-                    : "neutral"
+                    ? 'warning'
+                    : 'neutral'
                 }
               />
             </div>
@@ -416,7 +416,7 @@ export function FeeOverview() {
                 <OverviewFact
                   label="Latest close"
                   value={
-                    summary.cashierClose.latestCloseNumber ?? "Not closed yet"
+                    summary.cashierClose.latestCloseNumber ?? 'Not closed yet'
                   }
                 />
                 <OverviewFact
@@ -424,7 +424,7 @@ export function FeeOverview() {
                   value={
                     summary.cashierClose.latestClosedAt
                       ? formatBsDateTime(summary.cashierClose.latestClosedAt)
-                      : "Not available"
+                      : 'Not available'
                   }
                 />
                 <Link
@@ -458,14 +458,14 @@ function ActivityRow({
   emphasized?: boolean;
 }) {
   return (
-    <tr className={emphasized ? "bg-slate-50" : undefined}>
+    <tr className={emphasized ? 'bg-slate-50' : undefined}>
       <td
-        className={`px-5 py-4 ${emphasized ? "font-semibold text-slate-950" : "text-slate-700"}`}
+        className={`px-5 py-4 ${emphasized ? 'font-semibold text-slate-950' : 'text-slate-700'}`}
       >
         {label}
       </td>
       <td
-        className={`px-5 py-4 text-right ${emphasized ? "font-bold text-slate-950" : "font-semibold text-slate-900"}`}
+        className={`px-5 py-4 text-right ${emphasized ? 'font-bold text-slate-950' : 'font-semibold text-slate-900'}`}
       >
         {amount}
       </td>
@@ -483,13 +483,13 @@ function AttentionRow({
   label: string;
   value: string;
   href?: string;
-  tone: "warning" | "neutral";
+  tone: 'warning' | 'neutral';
 }) {
   const content = (
     <div className="flex min-h-14 items-center justify-between gap-4 py-3">
       <span className="text-sm font-medium text-slate-700">{label}</span>
       <span
-        className={`text-sm font-bold tabular-nums ${tone === "warning" ? "text-warning-700" : "text-slate-700"}`}
+        className={`text-sm font-bold tabular-nums ${tone === 'warning' ? 'text-warning-700' : 'text-slate-700'}`}
       >
         {value}
       </span>

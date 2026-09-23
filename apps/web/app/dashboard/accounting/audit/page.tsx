@@ -12,7 +12,8 @@ export default function AccountingAuditPage() {
           Audit Trail
         </h1>
         <p className="mt-2 text-sm text-slate-500">
-          Immutable log of all financial transactions, configurations, and ledger modifications.
+          Immutable log of all financial transactions, configurations, and
+          ledger modifications.
         </p>
       </div>
 

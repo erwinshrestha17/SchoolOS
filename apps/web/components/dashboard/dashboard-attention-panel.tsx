@@ -1,22 +1,22 @@
-"use client";
+'use client';
 
 import type {
   OperationalAttentionItem,
   OperationalSummaryModule,
-} from "@schoolos/core";
-import { ArrowRight, CheckCircle2 } from "lucide-react";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { scrollToNavHash } from "../../lib/nav-hash";
-import { cn } from "../../lib/utils";
-import { SectionCard } from "../ui/section-card";
+} from '@schoolos/core';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { scrollToNavHash } from '../../lib/nav-hash';
+import { cn } from '../../lib/utils';
+import { SectionCard } from '../ui/section-card';
 import {
   attentionKind,
   formatNumber,
   MODULE_DEFINITIONS,
   safeRoute,
   severityPresentation,
-} from "./dashboard-module-meta";
+} from './dashboard-module-meta';
 
 type DashboardAttentionItem = OperationalAttentionItem & {
   module: OperationalSummaryModule;
@@ -47,13 +47,17 @@ export function DashboardAttentionPanel({
   }, [openItems.length]);
 
   return (
-    <section id="needs-attention" className="scroll-mt-6" aria-label="Needs your attention">
+    <section
+      id="needs-attention"
+      className="scroll-mt-6"
+      aria-label="Needs your attention"
+    >
       <SectionCard
         title="Needs your attention"
         description={
           openItems.length
-            ? "Start with the items that can affect today’s school day."
-            : "Nothing needs your attention right now."
+            ? 'Start with the items that can affect today’s school day.'
+            : 'Nothing needs your attention right now.'
         }
         headerAction={
           openItems.length ? (
@@ -75,7 +79,7 @@ export function DashboardAttentionPanel({
               className="text-sm font-bold text-[var(--primary)] transition hover:text-[var(--primary-dark)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)] focus-visible:ring-offset-2"
             >
               {expanded
-                ? "Show fewer items"
+                ? 'Show fewer items'
                 : `View all ${formatNumber(openItems.length)} attention items`}
             </button>
           ) : undefined
@@ -120,7 +124,7 @@ function AttentionRow({ item }: { item: DashboardAttentionItem }) {
     <>
       <span
         className={cn(
-          "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border",
+          'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border',
           definition.accentClass,
         )}
       >
@@ -131,19 +135,19 @@ function AttentionRow({ item }: { item: DashboardAttentionItem }) {
           {item.label}
         </p>
         <p className="mt-0.5 truncate text-xs font-medium text-slate-600">
-          {formatNumber(item.count)} {item.count === 1 ? "item" : "items"} in{" "}
+          {formatNumber(item.count)} {item.count === 1 ? 'item' : 'items'} in{' '}
           {definition.shortLabel}
         </p>
       </div>
       <span
         className={cn(
-          "shrink-0 rounded-full px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide",
-          kind === "approval"
-            ? "bg-[var(--primary-soft)] text-[color:var(--primary-dark)]"
+          'shrink-0 rounded-full px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide',
+          kind === 'approval'
+            ? 'bg-[var(--primary-soft)] text-[color:var(--primary-dark)]'
             : presentation.chipClass,
         )}
       >
-        {kind === "approval" ? "Approval" : presentation.label}
+        {kind === 'approval' ? 'Approval' : presentation.label}
       </span>
       {href ? (
         <ArrowRight
@@ -158,7 +162,7 @@ function AttentionRow({ item }: { item: DashboardAttentionItem }) {
   // module icon keeps the module accent, matching the colour direction's
   // attention-queue treatment.
   const className = cn(
-    "group flex items-center gap-3 rounded-xl border p-3 transition hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2",
+    'group flex items-center gap-3 rounded-xl border p-3 transition hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2',
     presentation.rowClass,
   );
 

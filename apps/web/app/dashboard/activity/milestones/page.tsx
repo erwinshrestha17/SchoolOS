@@ -1,36 +1,36 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   formatBsDate,
   getNepalSchoolDay,
   type StudentLookupOption,
-} from "@schoolos/core";
-import { api } from "../../../../lib/api";
-import { DashboardPageShell } from "../../../../components/dashboard/dashboard-page-shell";
-import { PageHeader } from "../../../../components/ui/page-header";
-import { EmptyState } from "../../../../components/ui/empty-state";
-import { LoadingState } from "../../../../components/ui/loading-state";
+} from '@schoolos/core';
+import { api } from '../../../../lib/api';
+import { DashboardPageShell } from '../../../../components/dashboard/dashboard-page-shell';
+import { PageHeader } from '../../../../components/ui/page-header';
+import { EmptyState } from '../../../../components/ui/empty-state';
+import { LoadingState } from '../../../../components/ui/loading-state';
 import {
   FormField,
   Input,
   Select,
   TextArea,
-} from "../../../../components/ui/form-field";
-import { Badge } from "../../../../components/ui/badge";
-import { RemoteStudentSelector } from "../../../../components/students/remote-student-selector";
+} from '../../../../components/ui/form-field';
+import { Badge } from '../../../../components/ui/badge';
+import { RemoteStudentSelector } from '../../../../components/students/remote-student-selector';
 
 const today = getNepalSchoolDay().gregorianDate;
 const statuses = [
-  "EMERGING",
-  "PROGRESSING",
-  "ACHIEVED",
-  "NEEDS_SUPPORT",
+  'EMERGING',
+  'PROGRESSING',
+  'ACHIEVED',
+  'NEEDS_SUPPORT',
 ] as const;
 
 function newClientSubmissionId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();
   }
   return `csid-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -40,20 +40,20 @@ export default function ActivityMilestonesPage() {
   const queryClient = useQueryClient();
   const [selectedStudent, setSelectedStudent] =
     useState<StudentLookupOption | null>(null);
-  const [monthFilter, setMonthFilter] = useState("");
-  const [domainFilter, setDomainFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState('');
+  const [domainFilter, setDomainFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [clientSubmissionId, setClientSubmissionId] = useState(
     newClientSubmissionId,
   );
 
   const templatesQuery = useQuery({
-    queryKey: ["milestone-templates"],
+    queryKey: ['milestone-templates'],
     queryFn: () => api.listMilestoneTemplates(),
   });
-  const selectedStudentId = selectedStudent?.id ?? "";
+  const selectedStudentId = selectedStudent?.id ?? '';
   const milestonesQuery = useQuery({
-    queryKey: ["developmental-milestones", selectedStudentId, monthFilter],
+    queryKey: ['developmental-milestones', selectedStudentId, monthFilter],
     queryFn: () =>
       api.listDevelopmentalMilestones({
         studentId: selectedStudentId || null,
@@ -73,10 +73,10 @@ export default function ActivityMilestonesPage() {
   });
 
   const [form, setForm] = useState({
-    domain: "",
-    milestone: "",
-    status: "PROGRESSING" as (typeof statuses)[number],
-    observationNote: "",
+    domain: '',
+    milestone: '',
+    status: 'PROGRESSING' as (typeof statuses)[number],
+    observationNote: '',
     observedAt: today,
   });
 
@@ -84,13 +84,13 @@ export default function ActivityMilestonesPage() {
     mutationFn: api.createDevelopmentalMilestone,
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ["developmental-milestones"],
+        queryKey: ['developmental-milestones'],
       });
       setForm({
-        domain: "",
-        milestone: "",
-        status: "PROGRESSING",
-        observationNote: "",
+        domain: '',
+        milestone: '',
+        status: 'PROGRESSING',
+        observationNote: '',
         observedAt: today,
       });
       setClientSubmissionId(newClientSubmissionId());
@@ -338,7 +338,7 @@ export default function ActivityMilestonesPage() {
                   onClick={save}
                   className="mt-4 h-12 w-full rounded-2xl bg-[var(--color-mod-activity-accent)] text-xs font-black uppercase tracking-[0.2em] text-white shadow-sm transition-all hover:bg-[var(--color-mod-activity-text)] disabled:opacity-50"
                 >
-                  {mutation.isPending ? "Saving..." : "Save milestone"}
+                  {mutation.isPending ? 'Saving...' : 'Save milestone'}
                 </button>
               </section>
             </>
@@ -351,7 +351,7 @@ export default function ActivityMilestonesPage() {
 
 function formatEnumLabel(value: string) {
   return value
-    .split("_")
+    .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(" ");
+    .join(' ');
 }

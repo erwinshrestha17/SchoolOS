@@ -1,5 +1,5 @@
-import { toast as sonnerToast } from "sonner";
-import { parseApiErrorMessage } from "./api/client";
+import { toast as sonnerToast } from 'sonner';
+import { parseApiErrorMessage } from './api/client';
 
 /** Success feedback with an explicit, action-specific message. */
 export function showSuccess(message: string) {
@@ -41,7 +41,7 @@ export function resolveUserFacingError(
     return parsed || error.message;
   }
 
-  if (typeof error === "string" && error.trim()) {
+  if (typeof error === 'string' && error.trim()) {
     return parseApiErrorMessage(error) || error;
   }
 

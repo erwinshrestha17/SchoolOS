@@ -1,44 +1,44 @@
-"use client";
+'use client';
 
 import {
   formatBsDate,
   formatBsDateForInput,
   formatBsDateTime,
   toGregorianDateFromBs,
-} from "@schoolos/core";
-import { useQuery } from "@tanstack/react-query";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { DefaulterAgingSummary } from "@/components/finance/defaulter-aging-summary";
-import { DefaulterQueueTab } from "@/components/finance/defaulter-queue-tab";
-import { DuesAnalysisSection } from "@/components/finance/dues-analysis-section";
-import { LedgerSection } from "@/components/finance/ledger-section";
-import { useSession } from "@/components/session-provider";
-import { BsDateField } from "@/components/ui/bs-date-field";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ErrorState } from "@/components/ui/error-state";
-import { Button } from "@/components/ui/button";
-import { SectionCard } from "@/components/ui/section-card";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { api } from "@/lib/api";
+} from '@schoolos/core';
+import { useQuery } from '@tanstack/react-query';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { DefaulterAgingSummary } from '@/components/finance/defaulter-aging-summary';
+import { DefaulterQueueTab } from '@/components/finance/defaulter-queue-tab';
+import { DuesAnalysisSection } from '@/components/finance/dues-analysis-section';
+import { LedgerSection } from '@/components/finance/ledger-section';
+import { useSession } from '@/components/session-provider';
+import { BsDateField } from '@/components/ui/bs-date-field';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { Button } from '@/components/ui/button';
+import { SectionCard } from '@/components/ui/section-card';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { api } from '@/lib/api';
 
 type ReportKey =
-  | "collections"
-  | "dues"
-  | "aging"
-  | "payment-methods"
-  | "unallocated-payments"
-  | "cashier-closes"
-  | "adjustments"
-  | "refund-reversals"
-  | "invoices"
-  | "sequence-exceptions"
-  | "receipts";
+  | 'collections'
+  | 'dues'
+  | 'aging'
+  | 'payment-methods'
+  | 'unallocated-payments'
+  | 'cashier-closes'
+  | 'adjustments'
+  | 'refund-reversals'
+  | 'invoices'
+  | 'sequence-exceptions'
+  | 'receipts';
 
 const formatCurrency = (amount: string) =>
-  new Intl.NumberFormat("en-NP", {
-    style: "currency",
-    currency: "NPR",
+  new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(amount));
@@ -52,78 +52,78 @@ export function FinanceReportWorkspace() {
     () =>
       [
         {
-          value: "collections" as const,
-          label: "Collections",
-          allowed: hasPermissions(["fees:manage"]),
+          value: 'collections' as const,
+          label: 'Collections',
+          allowed: hasPermissions(['fees:manage']),
         },
         {
-          value: "dues" as const,
-          label: "Dues",
-          allowed: hasPermissions(["fees:manage"]),
+          value: 'dues' as const,
+          label: 'Dues',
+          allowed: hasPermissions(['fees:manage']),
         },
         {
-          value: "aging" as const,
-          label: "Defaulter aging",
-          allowed: hasPermissions(["fees:manage"]),
+          value: 'aging' as const,
+          label: 'Defaulter aging',
+          allowed: hasPermissions(['fees:manage']),
         },
         {
-          value: "payment-methods" as const,
-          label: "Payment methods",
-          allowed: hasPermissions(["fees:manage"]),
+          value: 'payment-methods' as const,
+          label: 'Payment methods',
+          allowed: hasPermissions(['fees:manage']),
         },
         {
-          value: "unallocated-payments" as const,
-          label: "Advances and unallocated payments",
-          allowed: hasPermissions(["fees:manage", "ledger:read"]),
+          value: 'unallocated-payments' as const,
+          label: 'Advances and unallocated payments',
+          allowed: hasPermissions(['fees:manage', 'ledger:read']),
         },
         {
-          value: "cashier-closes" as const,
-          label: "Cashier closes",
-          allowed: hasPermissions(["payments:close"]),
+          value: 'cashier-closes' as const,
+          label: 'Cashier closes',
+          allowed: hasPermissions(['payments:close']),
         },
         {
-          value: "adjustments" as const,
-          label: "Adjustments",
+          value: 'adjustments' as const,
+          label: 'Adjustments',
           allowed:
-            hasPermissions(["payments:refund"]) ||
-            hasPermissions(["payments:reverse"]),
+            hasPermissions(['payments:refund']) ||
+            hasPermissions(['payments:reverse']),
         },
         {
-          value: "refund-reversals" as const,
-          label: "Refund and reversal register",
+          value: 'refund-reversals' as const,
+          label: 'Refund and reversal register',
           allowed:
-            hasPermissions(["payments:refund"]) ||
-            hasPermissions(["payments:reverse"]) ||
-            hasPermissions(["ledger:read"]),
+            hasPermissions(['payments:refund']) ||
+            hasPermissions(['payments:reverse']) ||
+            hasPermissions(['ledger:read']),
         },
         {
-          value: "invoices" as const,
-          label: "Invoice register",
-          allowed: hasPermissions(["fees:manage"]),
+          value: 'invoices' as const,
+          label: 'Invoice register',
+          allowed: hasPermissions(['fees:manage']),
         },
         {
-          value: "sequence-exceptions" as const,
-          label: "Receipt sequence exceptions",
-          allowed: hasPermissions(["receipts:read"]),
+          value: 'sequence-exceptions' as const,
+          label: 'Receipt sequence exceptions',
+          allowed: hasPermissions(['receipts:read']),
         },
         {
-          value: "receipts" as const,
-          label: "Receipts",
-          allowed: hasPermissions(["receipts:read"]),
+          value: 'receipts' as const,
+          label: 'Receipts',
+          allowed: hasPermissions(['receipts:read']),
         },
       ].filter((item) => item.allowed),
     [hasPermissions],
   );
-  const requestedReport = searchParams.get("report") as ReportKey | null;
+  const requestedReport = searchParams.get('report') as ReportKey | null;
   const report = reportOptions.some((item) => item.value === requestedReport)
     ? requestedReport!
-    : (reportOptions[0]?.value ?? "collections");
+    : (reportOptions[0]?.value ?? 'collections');
 
   const setReport = (value: ReportKey) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("report", value);
-    params.delete("page");
-    params.delete("search");
+    params.set('report', value);
+    params.delete('page');
+    params.delete('search');
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
@@ -139,7 +139,8 @@ export function FinanceReportWorkspace() {
               Report catalog
             </label>
             <p className="mt-1 text-xs text-slate-500">
-              Choose a report available to your role. Filters and pagination stay in the URL.
+              Choose a report available to your role. Filters and pagination
+              stay in the URL.
             </p>
           </div>
           <select
@@ -157,28 +158,28 @@ export function FinanceReportWorkspace() {
         </div>
       </div>
 
-      {report === "collections" ? (
+      {report === 'collections' ? (
         <CollectionReportPanel />
-      ) : report === "dues" ? (
+      ) : report === 'dues' ? (
         <DuesAnalysisSection />
-      ) : report === "aging" ? (
+      ) : report === 'aging' ? (
         <div className="space-y-6">
           <DefaulterAgingSummary />
           <DefaulterQueueTab />
         </div>
-      ) : report === "payment-methods" ? (
+      ) : report === 'payment-methods' ? (
         <PaymentMethodReportPanel />
-      ) : report === "unallocated-payments" ? (
+      ) : report === 'unallocated-payments' ? (
         <UnallocatedPaymentReportPanel />
-      ) : report === "cashier-closes" ? (
+      ) : report === 'cashier-closes' ? (
         <CashierCloseReportPanel />
-      ) : report === "adjustments" ? (
+      ) : report === 'adjustments' ? (
         <AdjustmentReportPanel />
-      ) : report === "refund-reversals" ? (
+      ) : report === 'refund-reversals' ? (
         <RefundReversalRegisterPanel />
-      ) : report === "invoices" ? (
+      ) : report === 'invoices' ? (
         <InvoiceRegisterPanel />
-      ) : report === "sequence-exceptions" ? (
+      ) : report === 'sequence-exceptions' ? (
         <ReceiptSequenceExceptionPanel />
       ) : (
         <LedgerSection mode="receipts" />
@@ -190,7 +191,7 @@ export function FinanceReportWorkspace() {
 function CollectionReportPanel() {
   const { fromDate, toDate } = useReportPeriodParams();
   const reportQuery = useQuery({
-    queryKey: ["finance-report", "collections", fromDate, toDate],
+    queryKey: ['finance-report', 'collections', fromDate, toDate],
     queryFn: () =>
       api.getCollectionReport({
         fromDate: fromDate || undefined,
@@ -213,12 +214,12 @@ function CollectionReportPanel() {
 
   const report = reportQuery.data;
   const summaries = [
-    ["Billed", report.totalBilled],
-    ["Gross collected", report.totalCollected],
-    ["Refunded", report.totalRefunded],
-    ["Net collected", report.netCollected],
-    ["Outstanding", report.totalOutstanding],
-    ["Waived", report.totalWaived],
+    ['Billed', report.totalBilled],
+    ['Gross collected', report.totalCollected],
+    ['Refunded', report.totalRefunded],
+    ['Net collected', report.netCollected],
+    ['Outstanding', report.totalOutstanding],
+    ['Waived', report.totalWaived],
   ] as const;
 
   return (
@@ -226,7 +227,7 @@ function CollectionReportPanel() {
       <ReportPeriodFilter />
       <SectionCard
         title="Collections"
-        description={`Official totals generated ${formatBsDateTime(report.generatedAt)}${report.period ? ` · ${formatBsDate(report.period.fromDate)} to ${formatBsDate(report.period.toDate)}` : " · All recorded time"}`}
+        description={`Official totals generated ${formatBsDateTime(report.generatedAt)}${report.period ? ` · ${formatBsDate(report.period.fromDate)} to ${formatBsDate(report.period.toDate)}` : ' · All recorded time'}`}
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {summaries.map(([label, value]) => (
@@ -266,7 +267,7 @@ function CollectionReportPanel() {
 function PaymentMethodReportPanel() {
   const { fromDate, toDate } = useReportPeriodParams();
   const reportQuery = useQuery({
-    queryKey: ["finance-report", "payment-methods", fromDate, toDate],
+    queryKey: ['finance-report', 'payment-methods', fromDate, toDate],
     queryFn: () =>
       api.getPaymentMethodReport({
         fromDate: fromDate || undefined,
@@ -348,15 +349,15 @@ function UnallocatedPaymentReportPanel() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
   const reportQuery = useQuery({
-    queryKey: ["finance-report", "unallocated-payments", page],
+    queryKey: ['finance-report', 'unallocated-payments', page],
     queryFn: () => api.getUnallocatedPaymentReport({ page, limit: 25 }),
   });
   const setPage = (nextPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (nextPage <= 1) params.delete("page");
-    else params.set("page", String(nextPage));
+    if (nextPage <= 1) params.delete('page');
+    else params.set('page', String(nextPage));
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
@@ -397,7 +398,7 @@ function UnallocatedPaymentReportPanel() {
                 {report.rows.map((row) => (
                   <tr key={row.paymentId}>
                     <td className="px-5 py-3.5 font-semibold text-slate-950">
-                      {row.receiptNumber ?? "Receipt pending"}
+                      {row.receiptNumber ?? 'Receipt pending'}
                     </td>
                     <td className="px-5 py-3.5 text-slate-700">
                       {row.studentName}
@@ -451,15 +452,15 @@ function CashierCloseReportPanel() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
   const reportQuery = useQuery({
-    queryKey: ["finance-report", "cashier-closes", page],
+    queryKey: ['finance-report', 'cashier-closes', page],
     queryFn: () => api.listCashierClosesPage({ page, limit: 25 }),
   });
   const setPage = (nextPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (nextPage <= 1) params.delete("page");
-    else params.set("page", String(nextPage));
+    if (nextPage <= 1) params.delete('page');
+    else params.set('page', String(nextPage));
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
@@ -502,10 +503,10 @@ function CashierCloseReportPanel() {
                     <td className="px-5 py-3.5 text-slate-600">
                       {row.closedAt
                         ? formatBsDateTime(row.closedAt)
-                        : "Session open"}
+                        : 'Session open'}
                     </td>
                     <td className="px-5 py-3.5 text-slate-700">
-                      {row.collectorUser?.email ?? "All cashiers"}
+                      {row.collectorUser?.email ?? 'All cashiers'}
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       {row.paymentCount}
@@ -514,7 +515,7 @@ function CashierCloseReportPanel() {
                       {formatCurrency(row.netCollected)}
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      {formatCurrency(row.varianceAmount ?? "0.00")}
+                      {formatCurrency(row.varianceAmount ?? '0.00')}
                     </td>
                   </tr>
                 ))}
@@ -542,7 +543,7 @@ function InvoiceRegisterPanel() {
   const { fromDate, toDate } = useReportPeriodParams();
   const { page, setPage } = useReportPageParams();
   const reportQuery = useQuery({
-    queryKey: ["finance-report", "invoices", fromDate, toDate, page],
+    queryKey: ['finance-report', 'invoices', fromDate, toDate, page],
     queryFn: () =>
       api.getInvoiceRegister({
         fromDate: fromDate || undefined,
@@ -639,7 +640,7 @@ function InvoiceRegisterPanel() {
 function ReceiptSequenceExceptionPanel() {
   const { page, setPage } = useReportPageParams();
   const reportQuery = useQuery({
-    queryKey: ["finance-report", "sequence-exceptions", page],
+    queryKey: ['finance-report', 'sequence-exceptions', page],
     queryFn: () => api.getReceiptSequenceExceptions({ page, limit: 25 }),
   });
 
@@ -712,7 +713,7 @@ function RefundReversalRegisterPanel() {
   const { fromDate, toDate } = useReportPeriodParams();
   const { page, setPage } = useReportPageParams();
   const reportQuery = useQuery({
-    queryKey: ["finance-report", "refund-reversals", fromDate, toDate, page],
+    queryKey: ['finance-report', 'refund-reversals', fromDate, toDate, page],
     queryFn: () =>
       api.getRefundReversalRegister({
         fromDate: fromDate || undefined,
@@ -773,7 +774,7 @@ function RefundReversalRegisterPanel() {
                         {formatBsDateTime(row.processedAt)}
                       </td>
                       <td className="px-5 py-3.5 text-slate-600">
-                        {row.journalEntryNumber || "—"}
+                        {row.journalEntryNumber || '—'}
                       </td>
                     </tr>
                   ))}
@@ -802,10 +803,10 @@ function AdjustmentReportPanel() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
-  const status = searchParams.get("status") ?? "";
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
+  const status = searchParams.get('status') ?? '';
   const reportQuery = useQuery({
-    queryKey: ["finance-report", "adjustments", page, status],
+    queryKey: ['finance-report', 'adjustments', page, status],
     queryFn: () =>
       api.listFinanceApprovalRequests({
         page,
@@ -884,7 +885,7 @@ function AdjustmentReportPanel() {
                         {row.reason}
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                        {row.amount == null ? "—" : formatCurrency(row.amount)}
+                        {row.amount == null ? '—' : formatCurrency(row.amount)}
                       </td>
                       <td className="px-5 py-3.5">
                         <StatusBadge status={row.status} />
@@ -903,7 +904,7 @@ function AdjustmentReportPanel() {
         ) : (
           <EmptyState
             title={
-              status ? "No results for this status" : "No adjustment requests"
+              status ? 'No results for this status' : 'No adjustment requests'
             }
             description="No adjustment requests matched the current filters."
             className="m-5 min-h-52"
@@ -920,35 +921,35 @@ function ReportPeriodFilter() {
   const searchParams = useSearchParams();
   const { fromDate, toDate } = useReportPeriodParams();
   const [fromBs, setFromBs] = useState(
-    fromDate ? formatBsDateForInput(fromDate) : "",
+    fromDate ? formatBsDateForInput(fromDate) : '',
   );
-  const [toBs, setToBs] = useState(toDate ? formatBsDateForInput(toDate) : "");
+  const [toBs, setToBs] = useState(toDate ? formatBsDateForInput(toDate) : '');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setFromBs(fromDate ? formatBsDateForInput(fromDate) : "");
-    setToBs(toDate ? formatBsDateForInput(toDate) : "");
+    setFromBs(fromDate ? formatBsDateForInput(fromDate) : '');
+    setToBs(toDate ? formatBsDateForInput(toDate) : '');
   }, [fromDate, toDate]);
 
   const runReport = () => {
     setError(null);
     if (Boolean(fromBs.trim()) !== Boolean(toBs.trim())) {
-      setError("Enter both BS dates, or clear both for all recorded time.");
+      setError('Enter both BS dates, or clear both for all recorded time.');
       return;
     }
     try {
       const params = new URLSearchParams(searchParams.toString());
       if (!fromBs.trim() && !toBs.trim()) {
-        params.delete("fromDate");
-        params.delete("toDate");
+        params.delete('fromDate');
+        params.delete('toDate');
       } else {
-        params.set("fromDate", toGregorianIso(fromBs));
-        params.set("toDate", toGregorianIso(toBs));
+        params.set('fromDate', toGregorianIso(fromBs));
+        params.set('toDate', toGregorianIso(toBs));
       }
-      params.delete("page");
+      params.delete('page');
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     } catch {
-      setError("Enter valid BS dates in YYYY-MM-DD format.");
+      setError('Enter valid BS dates in YYYY-MM-DD format.');
     }
   };
 
@@ -975,8 +976,8 @@ function ReportPeriodFilter() {
 function useReportPeriodParams() {
   const searchParams = useSearchParams();
   return {
-    fromDate: searchParams.get("fromDate") ?? "",
-    toDate: searchParams.get("toDate") ?? "",
+    fromDate: searchParams.get('fromDate') ?? '',
+    toDate: searchParams.get('toDate') ?? '',
   };
 }
 
@@ -984,11 +985,11 @@ function useReportPageParams() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
   const setPage = (nextPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (nextPage <= 1) params.delete("page");
-    else params.set("page", String(nextPage));
+    if (nextPage <= 1) params.delete('page');
+    else params.set('page', String(nextPage));
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
   return { page, setPage };
@@ -1075,12 +1076,12 @@ function ReportLoading() {
 
 function friendlyMethod(value: string) {
   return value
-    .replace(/_/g, " ")
+    .replace(/_/g, ' ')
     .toLowerCase()
     .replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
 function toGregorianIso(bsDate: string) {
   const gregorian = toGregorianDateFromBs(bsDate);
-  return `${gregorian.year}-${String(gregorian.month).padStart(2, "0")}-${String(gregorian.day).padStart(2, "0")}`;
+  return `${gregorian.year}-${String(gregorian.month).padStart(2, '0')}-${String(gregorian.day).padStart(2, '0')}`;
 }

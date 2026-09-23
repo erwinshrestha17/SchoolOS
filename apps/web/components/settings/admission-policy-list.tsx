@@ -1,58 +1,58 @@
-"use client";
+'use client';
 
 import type {
   AdmissionPolicySummary,
   AdmissionPolicyStatus,
-} from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { api } from "../../lib/api";
-import { admissionPoliciesApi } from "../../lib/api/admission-policies";
-import { formatSchoolDate } from "../../lib/date-utils";
-import { useSession } from "../session-provider";
-import { ActionMenu } from "../ui/action-menu";
-import { Button } from "../ui/button";
-import { DataTable } from "../ui/data-table";
-import { ErrorState } from "../ui/error-state";
-import { KpiCard, KpiGrid } from "../ui/kpi-card";
-import type { StatusTone } from "../ui/status-badge";
-import { StatusBadge } from "../ui/status-badge";
+} from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { api } from '../../lib/api';
+import { admissionPoliciesApi } from '../../lib/api/admission-policies';
+import { formatSchoolDate } from '../../lib/date-utils';
+import { useSession } from '../session-provider';
+import { ActionMenu } from '../ui/action-menu';
+import { Button } from '../ui/button';
+import { DataTable } from '../ui/data-table';
+import { ErrorState } from '../ui/error-state';
+import { KpiCard, KpiGrid } from '../ui/kpi-card';
+import type { StatusTone } from '../ui/status-badge';
+import { StatusBadge } from '../ui/status-badge';
 
 const STATUS_TONE: Record<AdmissionPolicyStatus, StatusTone> = {
-  DRAFT: "draft",
-  ACTIVE: "active",
-  SCHEDULED: "pending",
-  EXPIRED: "inactive",
-  ARCHIVED: "inactive",
-  NEEDS_REVIEW: "conflict",
+  DRAFT: 'draft',
+  ACTIVE: 'active',
+  SCHEDULED: 'pending',
+  EXPIRED: 'inactive',
+  ARCHIVED: 'inactive',
+  NEEDS_REVIEW: 'conflict',
 };
 
 export function AdmissionPolicyList() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
-  const canManage = hasPermissions(["admission_policy:manage"]);
+  const canManage = hasPermissions(['admission_policy:manage']);
 
   const policiesQuery = useQuery({
-    queryKey: ["admission-policies"],
+    queryKey: ['admission-policies'],
     queryFn: admissionPoliciesApi.list,
   });
   const duplicateMutation = useMutation({
     mutationFn: (policyId: string) =>
       admissionPoliciesApi.duplicate(policyId, {}),
     onSuccess: (duplicated) => {
-      void queryClient.invalidateQueries({ queryKey: ["admission-policies"] });
+      void queryClient.invalidateQueries({ queryKey: ['admission-policies'] });
       router.push(`/dashboard/settings/admissions/${duplicated.id}/edit`);
     },
   });
   const academicYearsQuery = useQuery({
-    queryKey: ["academic-years"],
+    queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
   });
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
 
@@ -84,7 +84,7 @@ export function AdmissionPolicyList() {
         <div className="flex justify-end">
           <Button
             type="button"
-            onClick={() => router.push("/dashboard/settings/admissions/new")}
+            onClick={() => router.push('/dashboard/settings/admissions/new')}
           >
             <Plus className="h-4 w-4" />
             Create Admission Policy
@@ -139,7 +139,7 @@ export function AdmissionPolicyList() {
         emptyMessage="Create your first admission policy to control what staff see when they start a new admission."
         columns={[
           {
-            header: "Policy",
+            header: 'Policy',
             cell: (policy) => (
               <Link
                 href={`/dashboard/settings/admissions/${policy.id}`}
@@ -156,42 +156,42 @@ export function AdmissionPolicyList() {
             ),
           },
           {
-            header: "Applies to",
+            header: 'Applies to',
             cell: (policy) => (
               <span className="text-slate-600">
                 {[
                   policy.classId
-                    ? (classNames.get(policy.classId) ?? "Class")
+                    ? (classNames.get(policy.classId) ?? 'Class')
                     : null,
                   policy.academicYearId
                     ? (academicYearNames.get(policy.academicYearId) ?? null)
                     : null,
-                  policy.gradeBand ? policy.gradeBand.replace(/_/g, " ") : null,
-                  policy.applicantType !== "BOTH"
-                    ? policy.applicantType === "TRANSFER"
-                      ? "Transfer"
-                      : "New admission"
+                  policy.gradeBand ? policy.gradeBand.replace(/_/g, ' ') : null,
+                  policy.applicantType !== 'BOTH'
+                    ? policy.applicantType === 'TRANSFER'
+                      ? 'Transfer'
+                      : 'New admission'
                     : null,
                 ]
                   .filter(Boolean)
-                  .join(", ") || "All admissions"}
+                  .join(', ') || 'All admissions'}
               </span>
             ),
           },
           {
-            header: "Documents",
+            header: 'Documents',
             cell: (policy) => `${policy.requiredDocumentCount} required`,
           },
-          { header: "Assessment", cell: (policy) => policy.assessment },
+          { header: 'Assessment', cell: (policy) => policy.assessment },
           {
-            header: "Approval",
+            header: 'Approval',
             cell: (policy) =>
               policy.approvalChainSummary
-                ? `${policy.approvalChainSummary.stageCount} stage${policy.approvalChainSummary.stageCount === 1 ? "" : "s"}`
-                : "Front-desk",
+                ? `${policy.approvalChainSummary.stageCount} stage${policy.approvalChainSummary.stageCount === 1 ? '' : 's'}`
+                : 'Front-desk',
           },
           {
-            header: "Status",
+            header: 'Status',
             cell: (policy) => (
               <StatusBadge
                 status={policy.status}
@@ -200,17 +200,17 @@ export function AdmissionPolicyList() {
             ),
           },
           {
-            header: "Last updated",
+            header: 'Last updated',
             cell: (policy) => formatSchoolDate(policy.updatedAt),
           },
           {
-            header: "",
+            header: '',
             cell: (policy) => (
               <div onClick={(event) => event.stopPropagation()}>
                 <ActionMenu
                   items={[
                     {
-                      label: "View policy",
+                      label: 'View policy',
                       onClick: () =>
                         router.push(
                           `/dashboard/settings/admissions/${policy.id}`,
@@ -219,7 +219,7 @@ export function AdmissionPolicyList() {
                     ...(canManage
                       ? [
                           {
-                            label: "Edit policy",
+                            label: 'Edit policy',
                             onClick: () =>
                               router.push(
                                 `/dashboard/settings/admissions/${policy.id}/edit`,
@@ -229,8 +229,8 @@ export function AdmissionPolicyList() {
                             label:
                               duplicateMutation.isPending &&
                               duplicateMutation.variables === policy.id
-                                ? "Duplicating policy…"
-                                : "Duplicate policy",
+                                ? 'Duplicating policy…'
+                                : 'Duplicate policy',
                             disabled: duplicateMutation.isPending,
                             onClick: () => duplicateMutation.mutate(policy.id),
                           },

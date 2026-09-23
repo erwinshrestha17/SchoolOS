@@ -60,8 +60,7 @@ export function InterventionCaseSheet({
   const entryMutation = useMutation({
     mutationFn: () =>
       api.addStudentInterventionEntry(caseId as string, {
-        entryType:
-          entryType as AddInterventionEntryPayload['entryType'],
+        entryType: entryType as AddInterventionEntryPayload['entryType'],
         body: entryBody.trim(),
         parentVisible,
         ...(entryFollowUpBs
@@ -84,8 +83,7 @@ export function InterventionCaseSheet({
       const current = detailQuery.data;
       if (!current) throw new Error('Case unavailable');
       return api.updateStudentIntervention(caseId as string, {
-        status:
-          nextStatus as UpdateStudentInterventionPayload['status'],
+        status: nextStatus as UpdateStudentInterventionPayload['status'],
         reason: statusReason.trim(),
         expectedVersion: current.version,
         ...(resolutionSummary.trim()
@@ -279,7 +277,9 @@ export function InterventionCaseSheet({
                 >
                   <div className="flex items-center gap-2">
                     <MessageSquarePlus className="h-4 w-4" />
-                    <h3 className="text-sm font-semibold">Add timeline entry</h3>
+                    <h3 className="text-sm font-semibold">
+                      Add timeline entry
+                    </h3>
                   </div>
                   <label className="block space-y-1.5">
                     <span className="text-sm font-medium">Entry type</span>
@@ -351,19 +351,17 @@ export function InterventionCaseSheet({
                     >
                       <option value="">Select status</option>
                       {interventionNextStatuses(item.status).map((value) => (
-                          <option key={value} value={value}>
-                            {value.replace(/_/g, ' ')}
-                          </option>
-                        ))}
+                        <option key={value} value={value}>
+                          {value.replace(/_/g, ' ')}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <label className="block space-y-1.5">
                     <span className="text-sm font-medium">Reason</span>
                     <Textarea
                       value={statusReason}
-                      onChange={(event) =>
-                        setStatusReason(event.target.value)
-                      }
+                      onChange={(event) => setStatusReason(event.target.value)}
                       maxLength={600}
                       required
                     />
@@ -388,9 +386,7 @@ export function InterventionCaseSheet({
                     variant="outline"
                     disabled={statusMutation.isPending}
                   >
-                    {statusMutation.isPending
-                      ? 'Updating…'
-                      : 'Update status'}
+                    {statusMutation.isPending ? 'Updating…' : 'Update status'}
                   </Button>
                 </form>
               </>
@@ -434,11 +430,13 @@ function caseError(error: unknown) {
 }
 
 function interventionNextStatuses(status: string) {
-  return {
-    OPEN: ['IN_PROGRESS', 'MONITORING', 'RESOLVED'],
-    IN_PROGRESS: ['MONITORING', 'RESOLVED'],
-    MONITORING: ['IN_PROGRESS', 'RESOLVED'],
-    RESOLVED: ['IN_PROGRESS', 'CLOSED'],
-    CLOSED: [],
-  }[status] ?? [];
+  return (
+    {
+      OPEN: ['IN_PROGRESS', 'MONITORING', 'RESOLVED'],
+      IN_PROGRESS: ['MONITORING', 'RESOLVED'],
+      MONITORING: ['IN_PROGRESS', 'RESOLVED'],
+      RESOLVED: ['IN_PROGRESS', 'CLOSED'],
+      CLOSED: [],
+    }[status] ?? []
+  );
 }

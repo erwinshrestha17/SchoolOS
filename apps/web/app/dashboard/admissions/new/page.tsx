@@ -9,7 +9,12 @@ export default async function NewAdmissionPage({
   searchParams: Promise<{ mode?: string; caseId?: string }>;
 }) {
   const { mode, caseId } = await searchParams;
-  const initialMode = caseId || mode === 'enrollment' || mode === 'direct' ? 'direct' : mode === 'review' ? 'review' : undefined;
+  const initialMode =
+    caseId || mode === 'enrollment' || mode === 'direct'
+      ? 'direct'
+      : mode === 'review'
+        ? 'review'
+        : undefined;
 
   return (
     <DashboardPageShell>
@@ -17,7 +22,10 @@ export default async function NewAdmissionPage({
         title="New admission"
         description="Add a student through the school’s configured admission policy. Normal office admissions stay simple; review is used only when needed."
         secondaryActions={
-          <Link href="/dashboard/admissions" className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+          <Link
+            href="/dashboard/admissions"
+            className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+          >
             Cancel
           </Link>
         }

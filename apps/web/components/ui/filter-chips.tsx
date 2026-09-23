@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { X } from "lucide-react";
+import { X } from 'lucide-react';
 
 export type FilterChip = {
   key: string;
@@ -24,7 +24,7 @@ export function FilterChips({
   chips,
   onClearAll,
   activeCount,
-  className = "",
+  className = '',
 }: FilterChipsProps) {
   if (chips.length === 0) {
     return null;
@@ -37,7 +37,7 @@ export function FilterChips({
       className={`flex flex-wrap items-center gap-2 ${className}`.trim()}
       data-schoolos-ui="filter-chips"
       role="group"
-      aria-label={`${count} active filter${count === 1 ? "" : "s"}`}
+      aria-label={`${count} active filter${count === 1 ? '' : 's'}`}
     >
       {chips.map((chip) => (
         <button

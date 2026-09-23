@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Calculator,
   Wallet,
@@ -16,41 +16,41 @@ import {
   Settings,
   Clock,
   XCircle,
-} from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { api } from "../../lib/api";
-import { SummaryCard, SummaryGrid } from "../ui/summary-card";
-import { WorkSurface } from "../ui/work-surface";
-import { Badge } from "../ui/badge";
-import { Button } from "@/components/ui/button";
-import { cn } from "../../lib/utils";
-import { PageState } from "../ui/page-state";
-import { AuditInfo } from "../ui/audit-info";
-import { ReportTable } from "./report-table";
-import { VoucherDialog, type VoucherType } from "./voucher-dialog";
-import { useSession } from "../session-provider";
+} from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { api } from '../../lib/api';
+import { SummaryCard, SummaryGrid } from '../ui/summary-card';
+import { WorkSurface } from '../ui/work-surface';
+import { Badge } from '../ui/badge';
+import { Button } from '@/components/ui/button';
+import { cn } from '../../lib/utils';
+import { PageState } from '../ui/page-state';
+import { AuditInfo } from '../ui/audit-info';
+import { ReportTable } from './report-table';
+import { VoucherDialog, type VoucherType } from './voucher-dialog';
+import { useSession } from '../session-provider';
 
-const nprFormatter = new Intl.NumberFormat("en-NP", {
-  style: "currency",
-  currency: "NPR",
+const nprFormatter = new Intl.NumberFormat('en-NP', {
+  style: 'currency',
+  currency: 'NPR',
   maximumFractionDigits: 2,
 });
 
 function formatMoney(amount?: string | number | null) {
-  if (amount === undefined || amount === null) return "Unavailable";
-  const numericAmount = typeof amount === "number" ? amount : Number(amount);
+  if (amount === undefined || amount === null) return 'Unavailable';
+  const numericAmount = typeof amount === 'number' ? amount : Number(amount);
   return Number.isFinite(numericAmount)
     ? nprFormatter.format(numericAmount)
-    : "Unavailable";
+    : 'Unavailable';
 }
 
 export function AccountingDashboardView() {
   const router = useRouter();
   const { hasPermissions } = useSession();
-  const canCreateJournal = hasPermissions(["accounting:journals:create"]);
+  const canCreateJournal = hasPermissions(['accounting:journals:create']);
   const summaryQuery = useQuery({
-    queryKey: ["accounting-dashboard-summary"],
+    queryKey: ['accounting-dashboard-summary'],
     queryFn: () => api.getAccountingDashboardSummary(),
     staleTime: 60_000,
   });
@@ -58,7 +58,7 @@ export function AccountingDashboardView() {
   const [voucherType, setVoucherType] = useState<VoucherType | null>(null);
 
   const accountsQuery = useQuery({
-    queryKey: ["chart-accounts"],
+    queryKey: ['chart-accounts'],
     queryFn: () => api.listChartAccounts(),
     enabled: voucherType !== null,
   });
@@ -70,58 +70,58 @@ export function AccountingDashboardView() {
 
   return (
     <div className="space-y-6 pb-10">
-        <SummaryGrid>
-          <SummaryCard
-            label="Fiscal Year Status"
-            loading={summaryQuery.isLoading}
-            value={activeFiscalYear?.status ?? "Unavailable"}
-            icon={<Clock size={20} />}
-            tone={activeFiscalYear?.status === "OPEN" ? "success" : "neutral"}
-            description={
-              activeFiscalYear?.name ?? "Fiscal year is not configured."
-            }
-            href="/dashboard/accounting/fiscal-periods"
-          />
-          <SummaryCard
-            label="Pending Approvals"
-            loading={summaryQuery.isLoading}
-            value={summaryQuery.data?.pendingJournalApprovals ?? "Unavailable"}
-            icon={<FileText size={20} />}
-            tone={
-              (summaryQuery.data?.pendingJournalApprovals ?? 0) > 0
-                ? "warning"
-                : "success"
-            }
-            description="Submitted journals awaiting approval."
-            href="/dashboard/accounting/journals?status=SUBMITTED"
-          />
-          <SummaryCard
-            label="Unreconciled Items"
-            loading={summaryQuery.isLoading}
-            value={summaryQuery.data?.unreconciledBankItems ?? "Unavailable"}
-            icon={<Landmark size={20} />}
-            tone={
-              (summaryQuery.data?.unreconciledBankItems ?? 0) > 0
-                ? "warning"
-                : "success"
-            }
-            description="Bank statement rows awaiting review."
-            href="/dashboard/accounting/reconciliation"
-          />
-          <SummaryCard
-            label="Mapping Issues"
-            loading={summaryQuery.isLoading}
-            value={summaryQuery.data?.sourceMappingIssueCount ?? "Unavailable"}
-            icon={<AlertCircle size={20} />}
-            tone={
-              (summaryQuery.data?.sourceMappingIssueCount ?? 0) > 0
-                ? "danger"
-                : "success"
-            }
-            description="Missing source references or active source mappings."
-            href="/dashboard/accounting/source-mappings"
-          />
-        </SummaryGrid>
+      <SummaryGrid>
+        <SummaryCard
+          label="Fiscal Year Status"
+          loading={summaryQuery.isLoading}
+          value={activeFiscalYear?.status ?? 'Unavailable'}
+          icon={<Clock size={20} />}
+          tone={activeFiscalYear?.status === 'OPEN' ? 'success' : 'neutral'}
+          description={
+            activeFiscalYear?.name ?? 'Fiscal year is not configured.'
+          }
+          href="/dashboard/accounting/fiscal-periods"
+        />
+        <SummaryCard
+          label="Pending Approvals"
+          loading={summaryQuery.isLoading}
+          value={summaryQuery.data?.pendingJournalApprovals ?? 'Unavailable'}
+          icon={<FileText size={20} />}
+          tone={
+            (summaryQuery.data?.pendingJournalApprovals ?? 0) > 0
+              ? 'warning'
+              : 'success'
+          }
+          description="Submitted journals awaiting approval."
+          href="/dashboard/accounting/journals?status=SUBMITTED"
+        />
+        <SummaryCard
+          label="Unreconciled Items"
+          loading={summaryQuery.isLoading}
+          value={summaryQuery.data?.unreconciledBankItems ?? 'Unavailable'}
+          icon={<Landmark size={20} />}
+          tone={
+            (summaryQuery.data?.unreconciledBankItems ?? 0) > 0
+              ? 'warning'
+              : 'success'
+          }
+          description="Bank statement rows awaiting review."
+          href="/dashboard/accounting/reconciliation"
+        />
+        <SummaryCard
+          label="Mapping Issues"
+          loading={summaryQuery.isLoading}
+          value={summaryQuery.data?.sourceMappingIssueCount ?? 'Unavailable'}
+          icon={<AlertCircle size={20} />}
+          tone={
+            (summaryQuery.data?.sourceMappingIssueCount ?? 0) > 0
+              ? 'danger'
+              : 'success'
+          }
+          description="Missing source references or active source mappings."
+          href="/dashboard/accounting/source-mappings"
+        />
+      </SummaryGrid>
 
       {summaryQuery.isError ? (
         <PageState
@@ -129,7 +129,7 @@ export function AccountingDashboardView() {
           title="Unable to load the accounting operating summary"
           description={
             summaryQuery.error?.message ??
-            "The bounded M11 summary could not be loaded."
+            'The bounded M11 summary could not be loaded.'
           }
           actionLabel="Retry summary"
           onAction={() => void summaryQuery.refetch()}
@@ -154,7 +154,7 @@ export function AccountingDashboardView() {
               <Button
                 type="button"
                 className="mt-4 bg-rose-900 hover:bg-rose-950"
-                onClick={() => router.push("/dashboard/accounting/management")}
+                onClick={() => router.push('/dashboard/accounting/management')}
               >
                 Go to Fiscal Management
                 <ArrowRight size={14} />
@@ -174,39 +174,39 @@ export function AccountingDashboardView() {
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                 {[
                   {
-                    label: "Journal Voucher",
-                    desc: "Balanced multi-line draft",
+                    label: 'Journal Voucher',
+                    desc: 'Balanced multi-line draft',
                     icon: FileText,
-                    color: "bg-[var(--color-mod-accounting-accent)]",
-                    action: () => setVoucherType("JOURNAL"),
+                    color: 'bg-[var(--color-mod-accounting-accent)]',
+                    action: () => setVoucherType('JOURNAL'),
                   },
                   {
-                    label: "Expense Voucher",
-                    desc: "Direct school expenses",
+                    label: 'Expense Voucher',
+                    desc: 'Direct school expenses',
                     icon: Calculator,
-                    color: "bg-rose-600",
-                    action: () => setVoucherType("EXPENSE"),
+                    color: 'bg-rose-600',
+                    action: () => setVoucherType('EXPENSE'),
                   },
                   {
-                    label: "Payment Voucher",
-                    desc: "Vendor or staff payment",
+                    label: 'Payment Voucher',
+                    desc: 'Vendor or staff payment',
                     icon: Wallet,
-                    color: "bg-[var(--color-mod-accounting-accent)]",
-                    action: () => setVoucherType("PAYMENT"),
+                    color: 'bg-[var(--color-mod-accounting-accent)]',
+                    action: () => setVoucherType('PAYMENT'),
                   },
                   {
-                    label: "Receipt Voucher",
-                    desc: "Inward cash or bank receipt",
+                    label: 'Receipt Voucher',
+                    desc: 'Inward cash or bank receipt',
                     icon: CheckCircle2,
-                    color: "bg-emerald-600",
-                    action: () => setVoucherType("RECEIPT"),
+                    color: 'bg-emerald-600',
+                    action: () => setVoucherType('RECEIPT'),
                   },
                   {
-                    label: "Contra Voucher",
-                    desc: "Cash and bank transfer",
+                    label: 'Contra Voucher',
+                    desc: 'Cash and bank transfer',
                     icon: ArrowRight,
-                    color: "bg-cyan-600",
-                    action: () => setVoucherType("CONTRA"),
+                    color: 'bg-cyan-600',
+                    action: () => setVoucherType('CONTRA'),
                   },
                 ].map((action, idx) => (
                   <Button
@@ -218,7 +218,7 @@ export function AccountingDashboardView() {
                   >
                     <div
                       className={cn(
-                        "flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-lg transition group-hover:scale-110",
+                        'flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-lg transition group-hover:scale-110',
                         action.color,
                       )}
                     >
@@ -250,46 +250,46 @@ export function AccountingDashboardView() {
               <div className="grid gap-4 sm:grid-cols-2">
                 {[
                   {
-                    href: "/dashboard/accounting/reports?report=trial-balance",
-                    label: "Trial Balance",
-                    desc: "Summary of all ledger balances.",
+                    href: '/dashboard/accounting/reports?report=trial-balance',
+                    label: 'Trial Balance',
+                    desc: 'Summary of all ledger balances.',
                     icon: BarChart3,
-                    color: "bg-[var(--color-mod-accounting-accent)]",
+                    color: 'bg-[var(--color-mod-accounting-accent)]',
                   },
                   {
-                    href: "/dashboard/accounting/reports?report=income-statement",
-                    label: "Income Statement",
-                    desc: "Profit and loss for the period.",
+                    href: '/dashboard/accounting/reports?report=income-statement',
+                    label: 'Income Statement',
+                    desc: 'Profit and loss for the period.',
                     icon: FileText,
-                    color: "bg-emerald-500",
+                    color: 'bg-emerald-500',
                   },
                   {
-                    href: "/dashboard/accounting/reports?report=balance-sheet",
-                    label: "Balance Sheet",
-                    desc: "Financial position of the school.",
+                    href: '/dashboard/accounting/reports?report=balance-sheet',
+                    label: 'Balance Sheet',
+                    desc: 'Financial position of the school.',
                     icon: PieChart,
-                    color: "bg-secondary-500",
+                    color: 'bg-secondary-500',
                   },
                   {
-                    href: "/dashboard/accounting/reports?report=general-ledger",
-                    label: "General Ledger",
-                    desc: "Detailed transaction history.",
+                    href: '/dashboard/accounting/reports?report=general-ledger',
+                    label: 'General Ledger',
+                    desc: 'Detailed transaction history.',
                     icon: History,
-                    color: "bg-amber-500",
+                    color: 'bg-amber-500',
                   },
                   {
-                    href: "/dashboard/accounting/reports?report=cash-book",
-                    label: "Cash Book",
-                    desc: "Real-time cash and bank flow.",
+                    href: '/dashboard/accounting/reports?report=cash-book',
+                    label: 'Cash Book',
+                    desc: 'Real-time cash and bank flow.',
                     icon: Wallet,
-                    color: "bg-cyan-500",
+                    color: 'bg-cyan-500',
                   },
                   {
-                    href: "/dashboard/accounting/reconciliation",
-                    label: "Bank Reconciliation",
-                    desc: "Verify bank statements.",
+                    href: '/dashboard/accounting/reconciliation',
+                    label: 'Bank Reconciliation',
+                    desc: 'Verify bank statements.',
                     icon: Landmark,
-                    color: "bg-[var(--color-mod-accounting-accent)]",
+                    color: 'bg-[var(--color-mod-accounting-accent)]',
                   },
                 ].map((report) => (
                   <Link
@@ -299,7 +299,7 @@ export function AccountingDashboardView() {
                   >
                     <div
                       className={cn(
-                        "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white shadow-lg transition group-hover:scale-110",
+                        'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white shadow-lg transition group-hover:scale-110',
                         report.color,
                       )}
                     >
@@ -329,7 +329,7 @@ export function AccountingDashboardView() {
                 type="button"
                 variant="link"
                 className="h-auto p-0 text-sm font-bold text-emerald-600 hover:text-emerald-700"
-                onClick={() => router.push("/dashboard/accounting/journals")}
+                onClick={() => router.push('/dashboard/accounting/journals')}
               >
                 View All Journals
               </Button>
@@ -347,25 +347,25 @@ export function AccountingDashboardView() {
                 title="Unable to load journal entries"
                 description={
                   summaryQuery.error?.message ??
-                  "Recent ledger postings could not be loaded."
+                  'Recent ledger postings could not be loaded.'
                 }
               />
             ) : (
               <ReportTable
                 columns={[
-                  { id: "date", label: "Date", width: 150 },
-                  { id: "number", label: "Number", width: 160 },
-                  { id: "narration", label: "Narration", width: 260 },
-                  { id: "amount", label: "Amount", align: "right" },
+                  { id: 'date', label: 'Date', width: 150 },
+                  { id: 'number', label: 'Number', width: 160 },
+                  { id: 'narration', label: 'Narration', width: 260 },
+                  { id: 'amount', label: 'Amount', align: 'right' },
                 ]}
                 rows={(summaryQuery.data?.recentJournals ?? []).map(
                   (entry) => ({
                     id: entry.id,
                     cells: {
-                      date: { value: entry.entryDate, type: "date" },
+                      date: { value: entry.entryDate, type: 'date' },
                       number: { value: entry.entryNumber, bold: true },
                       narration: { value: entry.narration },
-                      amount: { value: entry.totalDebit, type: "currency" },
+                      amount: { value: entry.totalDebit, type: 'currency' },
                     },
                   }),
                 )}
@@ -382,7 +382,7 @@ export function AccountingDashboardView() {
                   Current Fiscal Year
                 </p>
                 <h4 className="mt-1 text-xl font-black">
-                  {activeFiscalYear?.name ?? "Fiscal year not set"}
+                  {activeFiscalYear?.name ?? 'Fiscal year not set'}
                 </h4>
 
                 <div className="mt-4 flex items-center justify-between border-t border-[var(--color-mod-accounting-border)] pt-4">
@@ -404,7 +404,7 @@ export function AccountingDashboardView() {
                     </div>
                     <div>
                       <p className="text-sm font-bold text-slate-900">
-                        {activePeriod?.label ?? "No Active Period"}
+                        {activePeriod?.label ?? 'No Active Period'}
                       </p>
                       <p className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">
                         Current Period
@@ -413,14 +413,14 @@ export function AccountingDashboardView() {
                   </div>
                   <Badge
                     variant={
-                      activePeriod?.status === "OPEN"
-                        ? "success"
-                        : activePeriod?.status === "LOCKED"
-                          ? "warning"
-                          : "destructive"
+                      activePeriod?.status === 'OPEN'
+                        ? 'success'
+                        : activePeriod?.status === 'LOCKED'
+                          ? 'warning'
+                          : 'destructive'
                     }
                   >
-                    {activePeriod?.status ?? "CLOSED"}
+                    {activePeriod?.status ?? 'CLOSED'}
                   </Badge>
                 </div>
 
@@ -443,7 +443,9 @@ export function AccountingDashboardView() {
                   type="button"
                   variant="outline"
                   className="w-full"
-                  onClick={() => router.push("/dashboard/accounting/management")}
+                  onClick={() =>
+                    router.push('/dashboard/accounting/management')
+                  }
                 >
                   <Settings size={14} />
                   Manage Fiscal Settings
@@ -498,7 +500,7 @@ export function AccountingDashboardView() {
         isOpen={voucherType !== null}
         onClose={() => setVoucherType(null)}
         accounts={accountsQuery.data ?? []}
-        voucherType={voucherType ?? "EXPENSE"}
+        voucherType={voucherType ?? 'EXPENSE'}
       />
     </div>
   );

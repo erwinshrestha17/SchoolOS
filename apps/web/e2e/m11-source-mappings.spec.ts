@@ -11,7 +11,9 @@ test.describe.serial('M11 source mapping workflow', () => {
     await expect(
       page.getByRole('heading', { name: 'Source posting mappings' }),
     ).toBeVisible();
-    await expect(page.getByText(/does not prove end-to-end posting readiness/i)).toBeVisible();
+    await expect(
+      page.getByText(/does not prove end-to-end posting readiness/i),
+    ).toBeVisible();
 
     await createMapping(page, sourceType);
     const mappingRow = page.getByRole('row').filter({ hasText: sourceType });
@@ -21,7 +23,8 @@ test.describe.serial('M11 source mapping workflow', () => {
     await createMapping(page, sourceType, false);
     await expect(
       page.getByRole('alert').filter({
-        hasText: /active mapping already covers this source and effective period/i,
+        hasText:
+          /active mapping already covers this source and effective period/i,
       }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
@@ -33,9 +36,13 @@ test.describe.serial('M11 source mapping workflow', () => {
     await archiveDialog
       .getByPlaceholder('Why is this mapping being archived?')
       .fill('Authenticated M11 browser verification cleanup');
-    await archiveDialog.getByRole('button', { name: 'Archive mapping' }).click();
+    await archiveDialog
+      .getByRole('button', { name: 'Archive mapping' })
+      .click();
 
-    await expect(mappingRow.getByText('Archived', { exact: true })).toBeVisible();
+    await expect(
+      mappingRow.getByText('Archived', { exact: true }),
+    ).toBeVisible();
   });
 });
 

@@ -3,7 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { Plus, Trash2, AlertCircle } from 'lucide-react';
@@ -17,7 +23,12 @@ interface OpeningBalanceDialogProps {
   accounts: any[];
 }
 
-export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: OpeningBalanceDialogProps) {
+export function OpeningBalanceDialog({
+  isOpen,
+  onClose,
+  fiscalYear,
+  accounts,
+}: OpeningBalanceDialogProps) {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,8 +38,12 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
     { chartAccountId: '', side: 'CREDIT', amount: 0 },
   ]);
 
-  const totalDebit = lines.filter(l => l.side === 'DEBIT').reduce((sum, l) => sum + Number(l.amount), 0);
-  const totalCredit = lines.filter(l => l.side === 'CREDIT').reduce((sum, l) => sum + Number(l.amount), 0);
+  const totalDebit = lines
+    .filter((l) => l.side === 'DEBIT')
+    .reduce((sum, l) => sum + Number(l.amount), 0);
+  const totalCredit = lines
+    .filter((l) => l.side === 'CREDIT')
+    .reduce((sum, l) => sum + Number(l.amount), 0);
   const diff = totalDebit - totalCredit;
 
   const mutation = useMutation({
@@ -45,21 +60,25 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
     onSettled: () => setLoading(false),
   });
 
-  const addLine = () => setLines([...lines, { chartAccountId: '', side: 'DEBIT', amount: 0 }]);
-  const removeLine = (index: number) => setLines(lines.filter((_, i) => i !== index));
+  const addLine = () =>
+    setLines([...lines, { chartAccountId: '', side: 'DEBIT', amount: 0 }]);
+  const removeLine = (index: number) =>
+    setLines(lines.filter((_, i) => i !== index));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (Math.abs(diff) > 0.001) {
-      setError('Opening balance must be balanced (Total Debit must equal Total Credit)');
+      setError(
+        'Opening balance must be balanced (Total Debit must equal Total Credit)',
+      );
       return;
     }
 
     setLoading(true);
     mutation.mutate({
       fiscalYearId: fiscalYear.id,
-      lines: lines.map(l => ({ ...l, amount: Number(l.amount) })),
+      lines: lines.map((l) => ({ ...l, amount: Number(l.amount) })),
     });
   };
 
@@ -69,7 +88,8 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
         <DialogHeader>
           <DialogTitle>Opening Balance - {fiscalYear?.name}</DialogTitle>
           <p className="text-sm text-slate-500">
-            Set the starting balances for the chart of accounts for this fiscal year.
+            Set the starting balances for the chart of accounts for this fiscal
+            year.
           </p>
         </DialogHeader>
 
@@ -80,7 +100,10 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col py-4">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-hidden flex flex-col py-4"
+        >
           <div className="flex-1 overflow-y-auto space-y-4 px-1">
             <div className="grid grid-cols-12 gap-2 font-bold text-xs text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-100">
               <div className="col-span-6">Account</div>
@@ -92,8 +115,8 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
             {lines.map((line, index) => (
               <div key={index} className="grid grid-cols-12 gap-2 items-center">
                 <div className="col-span-6">
-                  <Select 
-                    value={line.chartAccountId} 
+                  <Select
+                    value={line.chartAccountId}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                       const newLines = [...lines];
                       newLines[index].chartAccountId = e.target.value;
@@ -101,14 +124,16 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
                     }}
                   >
                     <option value="">Select account</option>
-                    {accounts.map(a => (
-                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.code} - {a.name}
+                      </option>
                     ))}
                   </Select>
                 </div>
                 <div className="col-span-2">
-                  <Select 
-                    value={line.side} 
+                  <Select
+                    value={line.side}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                       const newLines = [...lines];
                       newLines[index].side = e.target.value;
@@ -162,19 +187,33 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
           <div className="mt-4 rounded-2xl bg-slate-50 p-4 space-y-2 border border-slate-100 shadow-inner">
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Total Debit:</span>
-              <span className="font-bold text-slate-900">{totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <span className="font-bold text-slate-900">
+                {totalDebit.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                })}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Total Credit:</span>
-              <span className="font-bold text-slate-900">{totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <span className="font-bold text-slate-900">
+                {totalCredit.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                })}
+              </span>
             </div>
-            <div className={cn(
-              "flex justify-between pt-2 border-t border-slate-200 text-base font-bold",
-              Math.abs(diff) < 0.001 ? "text-emerald-600" : "text-rose-600"
-            )}>
+            <div
+              className={cn(
+                'flex justify-between pt-2 border-t border-slate-200 text-base font-bold',
+                Math.abs(diff) < 0.001 ? 'text-emerald-600' : 'text-rose-600',
+              )}
+            >
               <span>Difference:</span>
               <span>
-                {Math.abs(diff) < 0.001 ? "BALANCED" : diff.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {Math.abs(diff) < 0.001
+                  ? 'BALANCED'
+                  : diff.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                    })}
               </span>
             </div>
             {Math.abs(diff) >= 0.001 && (
@@ -186,7 +225,8 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
             {Math.abs(diff) < 0.001 && (
               <div className="flex items-center gap-2 mt-2 text-[10px] text-amber-600 font-bold uppercase tracking-tight bg-amber-50 p-2 rounded-lg border border-amber-100">
                 <AlertCircle size={14} />
-                Opening balances are audited. Ensure all figures match the school&apos;s closing statement.
+                Opening balances are audited. Ensure all figures match the
+                school&apos;s closing statement.
               </div>
             )}
           </div>

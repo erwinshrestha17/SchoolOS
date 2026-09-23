@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { Lock, RefreshCw } from "lucide-react";
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Lock, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -18,29 +18,29 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useSession } from "@/components/session-provider";
-import { platformApi } from "@/lib/api/platform";
-import { hasPermission } from "@/lib/session";
-import { useTenantDetail } from "./tenant-detail-page";
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useSession } from '@/components/session-provider';
+import { platformApi } from '@/lib/api/platform';
+import { hasPermission } from '@/lib/session';
+import { useTenantDetail } from './tenant-detail-page';
 
 const PLATFORM_MODULE_ENTITLEMENTS = [
-  { key: "module.students", label: "M1 Admissions and Student Profiles" },
-  { key: "module.attendance", label: "M2 Smart Attendance" },
-  { key: "module.fees", label: "M3 Fees and Receipts" },
-  { key: "module.exams", label: "M4 Academics, Exams, CAS, Report Cards" },
-  { key: "module.activity", label: "M5 Activity Feed and Milestones" },
-  { key: "module.homework", label: "M6 Homework and Timetable" },
-  { key: "module.hr", label: "M7 HR and Payroll" },
-  { key: "module.library", label: "M8 Library" },
-  { key: "module.transport", label: "M9 Transport" },
-  { key: "module.canteen", label: "M10 Canteen" },
-  { key: "module.accounting", label: "M11 Accounting and Finance" },
-  { key: "module.notifications", label: "M12 Notifications and Delivery" },
-  { key: "module.learning", label: "M13 Learning Layer" },
-  { key: "module.notices", label: "M15 Notices and Announcements" },
+  { key: 'module.students', label: 'M1 Admissions and Student Profiles' },
+  { key: 'module.attendance', label: 'M2 Smart Attendance' },
+  { key: 'module.fees', label: 'M3 Fees and Receipts' },
+  { key: 'module.exams', label: 'M4 Academics, Exams, CAS, Report Cards' },
+  { key: 'module.activity', label: 'M5 Activity Feed and Milestones' },
+  { key: 'module.homework', label: 'M6 Homework and Timetable' },
+  { key: 'module.hr', label: 'M7 HR and Payroll' },
+  { key: 'module.library', label: 'M8 Library' },
+  { key: 'module.transport', label: 'M9 Transport' },
+  { key: 'module.canteen', label: 'M10 Canteen' },
+  { key: 'module.accounting', label: 'M11 Accounting and Finance' },
+  { key: 'module.notifications', label: 'M12 Notifications and Delivery' },
+  { key: 'module.learning', label: 'M13 Learning Layer' },
+  { key: 'module.notices', label: 'M15 Notices and Announcements' },
 ] as const;
 
 export function TenantModules() {
@@ -48,13 +48,13 @@ export function TenantModules() {
   const { session } = useSession();
   const canManageModules = hasPermission(
     session,
-    "platform:subscriptions:manage",
+    'platform:subscriptions:manage',
   );
   const [target, setTarget] = useState<{
     key: string;
     enabled: boolean;
   } | null>(null);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,15 +72,15 @@ export function TenantModules() {
       });
       await refreshTenant();
       setMessage(
-        `${target.key} ${target.enabled ? "enabled" : "disabled"} by audited override.`,
+        `${target.key} ${target.enabled ? 'enabled' : 'disabled'} by audited override.`,
       );
       setTarget(null);
-      setReason("");
+      setReason('');
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "The module override could not be saved.",
+          : 'The module override could not be saved.',
       );
     } finally {
       setSaving(false);
@@ -100,7 +100,7 @@ export function TenantModules() {
 
       {message || error ? (
         <div
-          className={`rounded-2xl border p-4 text-sm font-bold ${error ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+          className={`rounded-2xl border p-4 text-sm font-bold ${error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}
         >
           {error ?? message}
         </div>
@@ -125,7 +125,7 @@ export function TenantModules() {
             return (
               <div
                 key={key}
-                className={`rounded-2xl border p-4 ${enabled ? "border-slate-100 bg-white" : "border-slate-100 bg-slate-50"}`}
+                className={`rounded-2xl border p-4 ${enabled ? 'border-slate-100 bg-white' : 'border-slate-100 bg-slate-50'}`}
               >
                 <div className="min-h-14">
                   <p className="text-sm font-bold text-slate-900">{label}</p>
@@ -135,8 +135,8 @@ export function TenantModules() {
                 </div>
                 <div className="mt-4 flex items-center justify-between gap-3">
                   <div className="flex gap-2">
-                    <Badge variant={enabled ? "success" : "neutral"}>
-                      {enabled ? "ENABLED" : "DISABLED"}
+                    <Badge variant={enabled ? 'success' : 'neutral'}>
+                      {enabled ? 'ENABLED' : 'DISABLED'}
                     </Badge>
                     {override ? (
                       <Badge variant="warning">OVERRIDE</Badge>
@@ -149,7 +149,7 @@ export function TenantModules() {
                       className="rounded-xl font-bold"
                       onClick={() => setTarget({ key, enabled: !enabled })}
                     >
-                      {enabled ? "Disable" : "Enable"}
+                      {enabled ? 'Disable' : 'Enable'}
                     </Button>
                   ) : null}
                 </div>
@@ -183,8 +183,8 @@ export function TenantModules() {
                     {override.reason}
                   </p>
                 </div>
-                <Badge variant={override.enabled ? "success" : "destructive"}>
-                  {override.enabled ? "FORCED ON" : "FORCED OFF"}
+                <Badge variant={override.enabled ? 'success' : 'destructive'}>
+                  {override.enabled ? 'FORCED ON' : 'FORCED OFF'}
                 </Badge>
               </div>
             ))
@@ -207,7 +207,7 @@ export function TenantModules() {
             <DialogHeader>
               <DialogTitle>Confirm module override</DialogTitle>
               <DialogDescription>
-                This will {target?.enabled ? "enable" : "disable"} {target?.key}{" "}
+                This will {target?.enabled ? 'enable' : 'disable'} {target?.key}{' '}
                 outside the plan default. The backend records the reason.
               </DialogDescription>
             </DialogHeader>

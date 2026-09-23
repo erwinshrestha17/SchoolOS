@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { api } from "../../lib/api";
-import { formatBsDateTime } from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { api } from '../../lib/api';
+import { formatBsDateTime } from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   AlertCircle,
   Bell,
@@ -13,8 +13,8 @@ import {
   Inbox,
   Loader2,
   RefreshCw,
-} from "lucide-react";
-import { NotificationBadge } from "../ui/notification-badge";
+} from 'lucide-react';
+import { NotificationBadge } from '../ui/notification-badge';
 
 type NotificationBellProps = {
   enabled: boolean;
@@ -26,7 +26,7 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
   const queryClient = useQueryClient();
 
   const centerQuery = useQuery({
-    queryKey: ["notification-center"],
+    queryKey: ['notification-center'],
     queryFn: api.getNotificationCenter,
     enabled,
     refetchInterval: 60_000,
@@ -35,14 +35,14 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
   const markReadMutation = useMutation({
     mutationFn: api.markNotificationRead,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["notification-center"] });
+      void queryClient.invalidateQueries({ queryKey: ['notification-center'] });
     },
   });
 
   const markAllReadMutation = useMutation({
     mutationFn: api.markAllNotificationsRead,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["notification-center"] });
+      void queryClient.invalidateQueries({ queryKey: ['notification-center'] });
     },
   });
 
@@ -57,16 +57,16 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
     }
 
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         setOpen(false);
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, []);
 
@@ -83,7 +83,7 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
         aria-label={
           hasUnread
             ? `Notifications, ${unreadCount} unread`
-            : "Notifications, all caught up"
+            : 'Notifications, all caught up'
         }
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -109,8 +109,8 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
                 </p>
                 <p className="mt-0.5 text-xs text-gray-500">
                   {hasUnread
-                    ? `${unreadCount} unread update${unreadCount === 1 ? "" : "s"} need attention`
-                    : "All caught up for now"}
+                    ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'} need attention`
+                    : 'All caught up for now'}
                 </p>
               </div>
               <div className="flex items-center gap-1">
@@ -188,7 +188,7 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
                   key={item.id}
                   href={item.linkHref}
                   className={`group block border-b border-gray-50 px-4 py-3 transition-colors last:border-b-0 hover:bg-gray-50 ${
-                    item.isRead ? "bg-white" : "bg-[var(--primary-soft)]"
+                    item.isRead ? 'bg-white' : 'bg-[var(--primary-soft)]'
                   }`}
                   onClick={() => {
                     if (!item.isRead && !markReadMutation.isPending) {
@@ -200,7 +200,7 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
                   <div className="flex gap-3">
                     <span
                       className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
-                        item.isRead ? "bg-gray-200" : "bg-[var(--primary)]"
+                        item.isRead ? 'bg-gray-200' : 'bg-[var(--primary)]'
                       }`}
                       aria-hidden="true"
                     />
@@ -267,7 +267,7 @@ function PanelMessage({ icon, title, body }: PanelMessageProps) {
 }
 
 function formatChannel(value: string) {
-  return value.replace(/_/g, " ");
+  return value.replace(/_/g, ' ');
 }
 
 function formatDateTime(value: string) {

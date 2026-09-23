@@ -14,7 +14,11 @@ export default function LearningSmartBoardLaunchPage() {
         description="Open a live Learning session on the classroom board without exposing answer keys."
       />
       <div className="mb-6">
-        <ModuleTabs items={learningWorkspaceTabs} accentColor="emerald" variant="light" />
+        <ModuleTabs
+          items={learningWorkspaceTabs}
+          accentColor="emerald"
+          variant="light"
+        />
       </div>
       <LearningWorkspace initialTab="board" />
     </DashboardPageShell>

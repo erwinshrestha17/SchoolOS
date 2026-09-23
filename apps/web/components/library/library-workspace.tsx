@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
   ArrowUpRight,
@@ -18,13 +18,13 @@ import {
   Library,
   RotateCcw,
   Search,
-} from "lucide-react";
+} from 'lucide-react';
 import {
   formatBsDate,
   type PermissionKey,
   type StaffLookupOption,
   type StudentLookupOption,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   libraryApi,
   type LibraryBook,
@@ -43,113 +43,113 @@ import {
   type LibraryReservationPayload,
   type FulfillLibraryReservationPayload,
   type ReturnLibraryIssuePayload,
-} from "../../lib/library-api";
-import { SummaryCard, SummaryGrid } from "../ui/summary-card";
-import { WorkSurface } from "../ui/work-surface";
-import { EmptyState } from "../ui/empty-state";
-import { ErrorState } from "../ui/error-state";
-import { LoadingState } from "../ui/loading-state";
-import { StatusBadge, type StatusTone } from "../ui/status-badge";
-import { cn } from "../../lib/utils";
-import { RemoteStudentSelector } from "../students/remote-student-selector";
-import { RemoteStaffSelector } from "../staff/remote-staff-selector";
-import { BookSelector } from "./book-selector";
-import { QRResolver } from "../ui/qr-resolver";
-import { ConfirmDialog } from "../ui/confirm-dialog";
-import { PermissionDenied } from "../ui/permission-denied";
-import { usePermissionAccess } from "../../lib/permissions-ui";
+} from '../../lib/library-api';
+import { SummaryCard, SummaryGrid } from '../ui/summary-card';
+import { WorkSurface } from '../ui/work-surface';
+import { EmptyState } from '../ui/empty-state';
+import { ErrorState } from '../ui/error-state';
+import { LoadingState } from '../ui/loading-state';
+import { StatusBadge, type StatusTone } from '../ui/status-badge';
+import { cn } from '../../lib/utils';
+import { RemoteStudentSelector } from '../students/remote-student-selector';
+import { RemoteStaffSelector } from '../staff/remote-staff-selector';
+import { BookSelector } from './book-selector';
+import { QRResolver } from '../ui/qr-resolver';
+import { ConfirmDialog } from '../ui/confirm-dialog';
+import { PermissionDenied } from '../ui/permission-denied';
+import { usePermissionAccess } from '../../lib/permissions-ui';
 
 const tabs = [
-  { key: "overview", label: "Overview", href: "/dashboard/library" },
-  { key: "books", label: "Catalog", href: "/dashboard/library/catalog" },
-  { key: "copies", label: "Copies", href: "/dashboard/library/copies" },
+  { key: 'overview', label: 'Overview', href: '/dashboard/library' },
+  { key: 'books', label: 'Catalog', href: '/dashboard/library/catalog' },
+  { key: 'copies', label: 'Copies', href: '/dashboard/library/copies' },
   {
-    key: "issues",
-    label: "Issue / Return",
-    href: "/dashboard/library/issue-return",
+    key: 'issues',
+    label: 'Issue / Return',
+    href: '/dashboard/library/issue-return',
   },
   {
-    key: "reservations",
-    label: "Reservations",
-    href: "/dashboard/library/reservations",
+    key: 'reservations',
+    label: 'Reservations',
+    href: '/dashboard/library/reservations',
   },
-  { key: "overdue", label: "Overdue", href: "/dashboard/library/overdue" },
-  { key: "fines", label: "Fines", href: "/dashboard/library/fines" },
-  { key: "reports", label: "Reports", href: "/dashboard/library/reports" },
+  { key: 'overdue', label: 'Overdue', href: '/dashboard/library/overdue' },
+  { key: 'fines', label: 'Fines', href: '/dashboard/library/fines' },
+  { key: 'reports', label: 'Reports', href: '/dashboard/library/reports' },
 ] as const;
 
-export type LibraryWorkspaceSection = (typeof tabs)[number]["key"];
+export type LibraryWorkspaceSection = (typeof tabs)[number]['key'];
 
 type LibraryWorkspaceProps = {
   section?: LibraryWorkspaceSection;
 };
 
 const libraryTabReadPermissions: Record<
-  Exclude<LibraryWorkspaceSection, "overview">,
+  Exclude<LibraryWorkspaceSection, 'overview'>,
   PermissionKey
 > = {
-  books: "library:books:read",
-  copies: "library:copies:read",
-  issues: "library:issues:read",
-  reservations: "library:issues:read",
-  overdue: "library:reports:read",
-  fines: "library:reports:read",
-  reports: "library:reports:read",
+  books: 'library:books:read',
+  copies: 'library:copies:read',
+  issues: 'library:issues:read',
+  reservations: 'library:issues:read',
+  overdue: 'library:reports:read',
+  fines: 'library:reports:read',
+  reports: 'library:reports:read',
 };
 
 const libraryOverviewReadPermissions: PermissionKey[] = [
-  "library:books:read",
-  "library:copies:read",
-  "library:issues:read",
-  "library:reports:read",
+  'library:books:read',
+  'library:copies:read',
+  'library:issues:read',
+  'library:reports:read',
 ];
 
 const copyStatuses: LibraryCopyStatus[] = [
-  "AVAILABLE",
-  "ISSUED",
-  "RESERVED",
-  "LOST",
-  "DAMAGED",
+  'AVAILABLE',
+  'ISSUED',
+  'RESERVED',
+  'LOST',
+  'DAMAGED',
 ];
 
 const emptyBookForm: LibraryBookPayload = {
-  title: "",
-  author: "",
-  isbn: "",
-  publisher: "",
-  subjectCategory: "",
-  classLevel: "",
+  title: '',
+  author: '',
+  isbn: '',
+  publisher: '',
+  subjectCategory: '',
+  classLevel: '',
 };
 
 const emptyCopyForm: LibraryCopyPayload = {
-  bookId: "",
-  barcode: "",
-  qrCode: "",
-  shelfLocation: "",
+  bookId: '',
+  barcode: '',
+  qrCode: '',
+  shelfLocation: '',
 };
 
 const emptyIssueForm: LibraryIssuePayload = {
-  copyId: "",
-  borrowerStudentId: "",
-  borrowerStaffId: "",
-  dueAt: "",
-  notes: "",
+  copyId: '',
+  borrowerStudentId: '',
+  borrowerStaffId: '',
+  dueAt: '',
+  notes: '',
 };
 
 const emptyReservationForm: LibraryReservationPayload = {
-  bookId: "",
-  copyId: "",
-  borrowerStudentId: "",
-  borrowerStaffId: "",
-  expiresAt: "",
-  notes: "",
+  bookId: '',
+  copyId: '',
+  borrowerStudentId: '',
+  borrowerStaffId: '',
+  expiresAt: '',
+  notes: '',
 };
 
 const emptyBooks: LibraryBook[] = [];
 const emptyCopies: LibraryCopy[] = [];
 const emptyIssues: LibraryIssue[] = [];
 const emptyReservations: LibraryReservation[] = [];
-const listPageSize = "25";
+const listPageSize = '25';
 
 type LibraryQrBorrower = {
   id?: string;
@@ -165,40 +165,40 @@ type LibraryQrBorrower = {
 
 type LibraryCopyScanResult = {
   code: string;
-  status: "matched" | "unavailable" | "missing";
+  status: 'matched' | 'unavailable' | 'missing';
   message: string;
   copy?: LibraryCopy;
   scannedAt: string;
 };
 
 export function LibraryWorkspace({
-  section = "overview",
+  section = 'overview',
 }: LibraryWorkspaceProps) {
   const router = useRouter();
   const activeTab = section;
   const access = usePermissionAccess();
-  const canReadBooks = access.hasPermission("library:books:read");
-  const canReadCopies = access.hasPermission("library:copies:read");
-  const canReadIssues = access.hasPermission("library:issues:read");
-  const canReadReports = access.hasPermission("library:reports:read");
-  const canCreateBooks = access.hasPermission("library:books:create");
-  const canUpdateBooks = access.hasPermission("library:books:update");
-  const canCreateCopies = access.hasPermission("library:copies:create");
-  const canUpdateCopies = access.hasPermission("library:copies:update");
-  const canCreateIssues = access.hasPermission("library:issues:create");
-  const canReturnIssues = access.hasPermission("library:issues:return");
-  const canCreateFines = access.hasPermission("library:fines:create");
-  const canUpdateFines = access.hasPermission("library:fines:update");
-  const canPostFines = access.hasPermission("library:fines:post");
+  const canReadBooks = access.hasPermission('library:books:read');
+  const canReadCopies = access.hasPermission('library:copies:read');
+  const canReadIssues = access.hasPermission('library:issues:read');
+  const canReadReports = access.hasPermission('library:reports:read');
+  const canCreateBooks = access.hasPermission('library:books:create');
+  const canUpdateBooks = access.hasPermission('library:books:update');
+  const canCreateCopies = access.hasPermission('library:copies:create');
+  const canUpdateCopies = access.hasPermission('library:copies:update');
+  const canCreateIssues = access.hasPermission('library:issues:create');
+  const canReturnIssues = access.hasPermission('library:issues:return');
+  const canCreateFines = access.hasPermission('library:fines:create');
+  const canUpdateFines = access.hasPermission('library:fines:update');
+  const canPostFines = access.hasPermission('library:fines:post');
   const canViewActiveTab =
-    activeTab === "overview"
+    activeTab === 'overview'
       ? access.hasAnyPermission(libraryOverviewReadPermissions)
       : access.hasPermission(libraryTabReadPermissions[activeTab]);
-  const [bookSearch, setBookSearch] = useState("");
-  const [copySearch, setCopySearch] = useState("");
-  const [copyStatus, setCopyStatus] = useState("");
-  const [issueStatus, setIssueStatus] = useState("");
-  const [reservationStatus, setReservationStatus] = useState("ACTIVE");
+  const [bookSearch, setBookSearch] = useState('');
+  const [copySearch, setCopySearch] = useState('');
+  const [copyStatus, setCopyStatus] = useState('');
+  const [issueStatus, setIssueStatus] = useState('');
+  const [reservationStatus, setReservationStatus] = useState('ACTIVE');
   const [bookPage, setBookPage] = useState(1);
   const [copyPage, setCopyPage] = useState(1);
   const [issuePage, setIssuePage] = useState(1);
@@ -223,7 +223,7 @@ export function LibraryWorkspace({
     null,
   );
   const [viewingHistory, setViewingHistory] = useState<{
-    type: "book" | "copy";
+    type: 'book' | 'copy';
     id: string;
   } | null>(null);
   const [copyStatusReasons, setCopyStatusReasons] = useState<
@@ -236,7 +236,7 @@ export function LibraryWorkspace({
   const queryClient = useQueryClient();
 
   const booksQuery = useQuery({
-    queryKey: ["library-books", bookSearch, bookPage],
+    queryKey: ['library-books', bookSearch, bookPage],
     queryFn: () =>
       libraryApi.listBooks({
         q: bookSearch,
@@ -245,12 +245,12 @@ export function LibraryWorkspace({
       }),
     enabled:
       canReadBooks &&
-      ["overview", "books", "copies", "issues", "reservations"].includes(
+      ['overview', 'books', 'copies', 'issues', 'reservations'].includes(
         activeTab,
       ),
   });
   const copiesQuery = useQuery({
-    queryKey: ["library-copies", copySearch, copyStatus, copyPage],
+    queryKey: ['library-copies', copySearch, copyStatus, copyPage],
     queryFn: () =>
       libraryApi.listCopies({
         barcode: copySearch,
@@ -260,10 +260,10 @@ export function LibraryWorkspace({
       }),
     enabled:
       canReadCopies &&
-      ["overview", "copies", "issues", "reservations"].includes(activeTab),
+      ['overview', 'copies', 'issues', 'reservations'].includes(activeTab),
   });
   const issuesQuery = useQuery({
-    queryKey: ["library-issues", issueStatus, issuePage],
+    queryKey: ['library-issues', issueStatus, issuePage],
     queryFn: () =>
       libraryApi.listIssues({
         status: issueStatus,
@@ -271,27 +271,26 @@ export function LibraryWorkspace({
         limit: listPageSize,
       }),
     enabled:
-      canReadIssues && ["overview", "issues", "fines"].includes(activeTab),
+      canReadIssues && ['overview', 'issues', 'fines'].includes(activeTab),
   });
   const activeLoansQuery = useQuery({
-    queryKey: ["library-issues", "ISSUED", "overview"],
+    queryKey: ['library-issues', 'ISSUED', 'overview'],
     queryFn: () =>
-      libraryApi.listIssues({ status: "ISSUED", page: "1", limit: "1" }),
-    enabled: canReadIssues && activeTab === "overview",
+      libraryApi.listIssues({ status: 'ISSUED', page: '1', limit: '1' }),
+    enabled: canReadIssues && activeTab === 'overview',
   });
   const overdueQuery = useQuery({
-    queryKey: ["library-overdue", overduePage],
+    queryKey: ['library-overdue', overduePage],
     queryFn: () =>
       libraryApi.listOverdue({
         page: String(overduePage),
         limit: listPageSize,
       }),
     enabled:
-      canReadReports &&
-      (activeTab === "overview" || activeTab === "overdue"),
+      canReadReports && (activeTab === 'overview' || activeTab === 'overdue'),
   });
   const reservationsQuery = useQuery({
-    queryKey: ["library-reservations", reservationStatus, reservationPage],
+    queryKey: ['library-reservations', reservationStatus, reservationPage],
     queryFn: () =>
       libraryApi.listReservations({
         status: reservationStatus,
@@ -300,58 +299,58 @@ export function LibraryWorkspace({
       }),
     enabled:
       canReadIssues &&
-      (activeTab === "overview" || activeTab === "reservations"),
+      (activeTab === 'overview' || activeTab === 'reservations'),
   });
 
   const finesQuery = useQuery({
-    queryKey: ["library-fines", finePage],
+    queryKey: ['library-fines', finePage],
     queryFn: () =>
       libraryApi.listFines({
         page: String(finePage),
         limit: listPageSize,
       }),
     enabled:
-      canReadReports && (activeTab === "fines" || activeTab === "overview"),
+      canReadReports && (activeTab === 'fines' || activeTab === 'overview'),
   });
 
   const popularBooksQuery = useQuery({
-    queryKey: ["library-popular-books"],
-    queryFn: () => libraryApi.getPopularBooks({ limit: "10" }),
-    enabled: canReadReports && activeTab === "reports",
+    queryKey: ['library-popular-books'],
+    queryFn: () => libraryApi.getPopularBooks({ limit: '10' }),
+    enabled: canReadReports && activeTab === 'reports',
   });
 
   const issuedBooksReportQuery = useQuery({
-    queryKey: ["library-issued-books-report"],
-    queryFn: () => libraryApi.getIssuedBooksReport({ limit: "8" }),
-    enabled: canReadReports && activeTab === "reports",
+    queryKey: ['library-issued-books-report'],
+    queryFn: () => libraryApi.getIssuedBooksReport({ limit: '8' }),
+    enabled: canReadReports && activeTab === 'reports',
   });
 
   const overdueBooksReportQuery = useQuery({
-    queryKey: ["library-overdue-books-report"],
+    queryKey: ['library-overdue-books-report'],
     queryFn: libraryApi.getOverdueBooksReport,
-    enabled: canReadReports && activeTab === "reports",
+    enabled: canReadReports && activeTab === 'reports',
   });
 
   const lostDamagedQuery = useQuery({
-    queryKey: ["library-lost-damaged"],
+    queryKey: ['library-lost-damaged'],
     queryFn: () => libraryApi.getLostDamagedReport(),
-    enabled: canReadReports && activeTab === "reports",
+    enabled: canReadReports && activeTab === 'reports',
   });
 
   const fineSummaryQuery = useQuery({
-    queryKey: ["library-fine-summary"],
+    queryKey: ['library-fine-summary'],
     queryFn: libraryApi.getFineSummary,
-    enabled: canReadReports && activeTab === "reports",
+    enabled: canReadReports && activeTab === 'reports',
   });
 
   const historyQuery = useQuery<{ history: LibraryIssue[] }, Error>({
-    queryKey: ["library-history", viewingHistory],
+    queryKey: ['library-history', viewingHistory],
     queryFn: async () => {
-      if (viewingHistory?.type === "book") {
+      if (viewingHistory?.type === 'book') {
         const res = await libraryApi.getBookHistory(viewingHistory.id);
         return { history: res.history };
       }
-      if (viewingHistory?.type === "copy") {
+      if (viewingHistory?.type === 'copy') {
         const res = await libraryApi.getCopyHistory(viewingHistory.id);
         return { history: res.history };
       }
@@ -359,14 +358,14 @@ export function LibraryWorkspace({
     },
     enabled:
       Boolean(viewingHistory) &&
-      (viewingHistory?.type === "book" ? canReadBooks : canReadCopies),
+      (viewingHistory?.type === 'book' ? canReadBooks : canReadCopies),
   });
 
   const createFineMutation = useMutation({
     mutationFn: libraryApi.createFine,
     onSuccess: () => {
-      setNotice("Manual fine recorded.");
-      void queryClient.invalidateQueries({ queryKey: ["library-fines"] });
+      setNotice('Manual fine recorded.');
+      void queryClient.invalidateQueries({ queryKey: ['library-fines'] });
     },
   });
 
@@ -374,8 +373,8 @@ export function LibraryWorkspace({
     mutationFn: ({ id, body }: { id: string; body: any }) =>
       libraryApi.updateFine(id, body),
     onSuccess: () => {
-      setNotice("Fine updated.");
-      void queryClient.invalidateQueries({ queryKey: ["library-fines"] });
+      setNotice('Fine updated.');
+      void queryClient.invalidateQueries({ queryKey: ['library-fines'] });
     },
   });
 
@@ -385,27 +384,27 @@ export function LibraryWorkspace({
     onSuccess: (fine) => {
       setNotice(
         fine.alreadyPosted
-          ? "Library fine was already linked to a fee invoice."
-          : "Library fine posted to Fees. Open the linked invoice from the fine row.",
+          ? 'Library fine was already linked to a fee invoice.'
+          : 'Library fine posted to Fees. Open the linked invoice from the fine row.',
       );
-      void queryClient.invalidateQueries({ queryKey: ["library-fines"] });
-      void queryClient.invalidateQueries({ queryKey: ["library-issues"] });
-      void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      void queryClient.invalidateQueries({ queryKey: ['library-fines'] });
+      void queryClient.invalidateQueries({ queryKey: ['library-issues'] });
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
     },
   });
 
   const invalidateLibrary = () => {
-    void queryClient.invalidateQueries({ queryKey: ["library-books"] });
-    void queryClient.invalidateQueries({ queryKey: ["library-copies"] });
-    void queryClient.invalidateQueries({ queryKey: ["library-issues"] });
-    void queryClient.invalidateQueries({ queryKey: ["library-overdue"] });
+    void queryClient.invalidateQueries({ queryKey: ['library-books'] });
+    void queryClient.invalidateQueries({ queryKey: ['library-copies'] });
+    void queryClient.invalidateQueries({ queryKey: ['library-issues'] });
+    void queryClient.invalidateQueries({ queryKey: ['library-overdue'] });
   };
 
   const createBookMutation = useMutation({
     mutationFn: libraryApi.createBook,
     onSuccess: () => {
       setBookForm(emptyBookForm);
-      setNotice("Book saved.");
+      setNotice('Book saved.');
       invalidateLibrary();
     },
   });
@@ -421,7 +420,7 @@ export function LibraryWorkspace({
     onSuccess: () => {
       setBookForm(emptyBookForm);
       setEditingBookId(null);
-      setNotice("Book updated.");
+      setNotice('Book updated.');
       invalidateLibrary();
     },
   });
@@ -430,7 +429,7 @@ export function LibraryWorkspace({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       libraryApi.archiveBook(id, { reason }),
     onSuccess: () => {
-      setNotice("Book archived with audit reason.");
+      setNotice('Book archived with audit reason.');
       invalidateLibrary();
     },
   });
@@ -439,7 +438,7 @@ export function LibraryWorkspace({
     mutationFn: libraryApi.createCopy,
     onSuccess: () => {
       setCopyForm(emptyCopyForm);
-      setNotice("Book copy saved.");
+      setNotice('Book copy saved.');
       invalidateLibrary();
     },
   });
@@ -455,7 +454,7 @@ export function LibraryWorkspace({
     onSuccess: () => {
       setCopyForm(emptyCopyForm);
       setEditingCopyId(null);
-      setNotice("Copy updated.");
+      setNotice('Copy updated.');
       invalidateLibrary();
     },
   });
@@ -471,7 +470,7 @@ export function LibraryWorkspace({
       reason?: string;
     }) => libraryApi.updateCopyStatus(id, { status, reason }),
     onSuccess: () => {
-      setNotice("Copy status updated.");
+      setNotice('Copy status updated.');
       invalidateLibrary();
     },
   });
@@ -480,7 +479,7 @@ export function LibraryWorkspace({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       libraryApi.archiveCopy(id, { reason }),
     onSuccess: () => {
-      setNotice("Copy archived with audit reason.");
+      setNotice('Copy archived with audit reason.');
       invalidateLibrary();
     },
   });
@@ -489,7 +488,7 @@ export function LibraryWorkspace({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       libraryApi.deleteCopy(id, { reason }),
     onSuccess: () => {
-      setNotice("Copy removed.");
+      setNotice('Copy removed.');
       invalidateLibrary();
     },
   });
@@ -498,7 +497,7 @@ export function LibraryWorkspace({
     mutationFn: libraryApi.issueCopy,
     onSuccess: () => {
       setIssueForm(emptyIssueForm);
-      setNotice("Book issued.");
+      setNotice('Book issued.');
       invalidateLibrary();
     },
   });
@@ -512,7 +511,7 @@ export function LibraryWorkspace({
       body: ReturnLibraryIssuePayload;
     }) => libraryApi.returnIssue(id, body),
     onSuccess: () => {
-      setNotice("Book returned.");
+      setNotice('Book returned.');
       invalidateLibrary();
     },
   });
@@ -521,9 +520,9 @@ export function LibraryWorkspace({
     mutationFn: libraryApi.createReservation,
     onSuccess: () => {
       setReservationForm(emptyReservationForm);
-      setNotice("Reservation added to the queue.");
+      setNotice('Reservation added to the queue.');
       void queryClient.invalidateQueries({
-        queryKey: ["library-reservations"],
+        queryKey: ['library-reservations'],
       });
       invalidateLibrary();
     },
@@ -532,9 +531,9 @@ export function LibraryWorkspace({
   const cancelReservationMutation = useMutation({
     mutationFn: libraryApi.cancelReservation,
     onSuccess: () => {
-      setNotice("Reservation cancelled.");
+      setNotice('Reservation cancelled.');
       void queryClient.invalidateQueries({
-        queryKey: ["library-reservations"],
+        queryKey: ['library-reservations'],
       });
       invalidateLibrary();
     },
@@ -549,10 +548,10 @@ export function LibraryWorkspace({
       body: FulfillLibraryReservationPayload;
     }) => libraryApi.fulfillReservation(id, body),
     onSuccess: () => {
-      setNotice("Reservation fulfilled and issue record created.");
+      setNotice('Reservation fulfilled and issue record created.');
       setReservationFulfillmentDrafts({});
       void queryClient.invalidateQueries({
-        queryKey: ["library-reservations"],
+        queryKey: ['library-reservations'],
       });
       invalidateLibrary();
     },
@@ -571,7 +570,7 @@ export function LibraryWorkspace({
   const issuedCsvMutation = useMutation({
     mutationFn: libraryApi.downloadIssuedBooksCsv,
     onSuccess: () => {
-      setNotice("Issued books CSV export downloaded.");
+      setNotice('Issued books CSV export downloaded.');
     },
   });
 
@@ -587,18 +586,22 @@ export function LibraryWorkspace({
 
   const stats = useMemo(() => {
     return {
-      activeLoans: !canReadIssues || activeLoansQuery.isError
-        ? ("Unavailable" as const)
-        : (activeLoansQuery.data?.meta.total ?? 0),
-      overdueIssues: !canReadReports || overdueQuery.isError
-        ? ("Unavailable" as const)
-        : (overdueQuery.data?.meta.total ?? 0),
-      reservationsWaiting: !canReadIssues || reservationsQuery.isError
-        ? ("Unavailable" as const)
-        : (reservationsQuery.data?.meta.total ?? 0),
-      totalCopies: !canReadCopies || copiesQuery.isError
-        ? ("Unavailable" as const)
-        : (copiesQuery.data?.meta.total ?? 0),
+      activeLoans:
+        !canReadIssues || activeLoansQuery.isError
+          ? ('Unavailable' as const)
+          : (activeLoansQuery.data?.meta.total ?? 0),
+      overdueIssues:
+        !canReadReports || overdueQuery.isError
+          ? ('Unavailable' as const)
+          : (overdueQuery.data?.meta.total ?? 0),
+      reservationsWaiting:
+        !canReadIssues || reservationsQuery.isError
+          ? ('Unavailable' as const)
+          : (reservationsQuery.data?.meta.total ?? 0),
+      totalCopies:
+        !canReadCopies || copiesQuery.isError
+          ? ('Unavailable' as const)
+          : (copiesQuery.data?.meta.total ?? 0),
     };
   }, [
     activeLoansQuery.data?.meta.total,
@@ -637,9 +640,9 @@ export function LibraryWorkspace({
   ].find(Boolean);
   const error =
     historyQuery.error ||
-    (activeTab === "overview"
+    (activeTab === 'overview'
       ? overviewError
-      : activeTab === "reports"
+      : activeTab === 'reports'
         ? reportsError
         : null);
 
@@ -695,17 +698,17 @@ export function LibraryWorkspace({
     setBookForm({
       title: book.title,
       author: book.author,
-      isbn: book.isbn ?? "",
-      publisher: book.publisher ?? "",
+      isbn: book.isbn ?? '',
+      publisher: book.publisher ?? '',
       publishedYear: book.publishedYear ?? undefined,
-      subjectCategory: book.subjectCategory ?? "",
-      classLevel: book.classLevel ?? "",
+      subjectCategory: book.subjectCategory ?? '',
+      classLevel: book.classLevel ?? '',
       purchasePrice:
         book.purchasePrice === null || book.purchasePrice === undefined
           ? undefined
           : Number(book.purchasePrice),
     });
-    router.push("/dashboard/library/catalog");
+    router.push('/dashboard/library/catalog');
   }
 
   function editCopy(copy: LibraryCopy) {
@@ -713,18 +716,18 @@ export function LibraryWorkspace({
     setCopyForm({
       bookId: copy.bookId,
       barcode: copy.barcode,
-      qrCode: copy.qrCode ?? "",
-      shelfLocation: copy.shelfLocation ?? "",
+      qrCode: copy.qrCode ?? '',
+      shelfLocation: copy.shelfLocation ?? '',
       replacementCost:
         copy.replacementCost === null || copy.replacementCost === undefined
           ? undefined
           : Number(copy.replacementCost),
-      purchasedAt: copy.purchasedAt?.slice(0, 10) ?? "",
+      purchasedAt: copy.purchasedAt?.slice(0, 10) ?? '',
     });
-    router.push("/dashboard/library/copies");
+    router.push('/dashboard/library/copies');
   }
 
-  if (access.resolution === "loading") {
+  if (access.resolution === 'loading') {
     return <LoadingState label="Checking library access..." />;
   }
 
@@ -756,7 +759,7 @@ export function LibraryWorkspace({
 
       {error && <ErrorNotice message={(error as Error).message} />}
 
-      {activeTab === "overview" && (
+      {activeTab === 'overview' && (
         <OverviewPanel
           stats={stats}
           isLoading={isLoading}
@@ -764,7 +767,7 @@ export function LibraryWorkspace({
         />
       )}
 
-      {activeTab === "books" && (
+      {activeTab === 'books' && (
         <BooksPanel
           books={books}
           copies={copies}
@@ -804,7 +807,7 @@ export function LibraryWorkspace({
         />
       )}
 
-      {activeTab === "copies" && (
+      {activeTab === 'copies' && (
         <CopiesPanel
           books={books}
           copies={copies}
@@ -867,7 +870,7 @@ export function LibraryWorkspace({
       <ConfirmDialog
         isOpen={Boolean(viewingHistory)}
         onClose={() => setViewingHistory(null)}
-        title={`${viewingHistory?.type === "book" ? "Book" : "Copy"} Circulation History`}
+        title={`${viewingHistory?.type === 'book' ? 'Book' : 'Copy'} Circulation History`}
         description="Review all historical issue and return events for this item."
         confirmLabel="Close"
         onConfirm={() => setViewingHistory(null)}
@@ -905,7 +908,7 @@ export function LibraryWorkspace({
         </div>
       </ConfirmDialog>
 
-      {activeTab === "issues" && (
+      {activeTab === 'issues' && (
         <IssuesPanel
           copies={copies}
           issues={issues}
@@ -939,7 +942,7 @@ export function LibraryWorkspace({
         />
       )}
 
-      {activeTab === "reservations" && (
+      {activeTab === 'reservations' && (
         <ReservationsPanel
           books={books}
           copies={copies}
@@ -972,7 +975,11 @@ export function LibraryWorkspace({
             fulfillReservationMutation.error ||
             reservationsQuery.error
           }
-          queryError={reservationsQuery.isError ? (reservationsQuery.error as Error) : null}
+          queryError={
+            reservationsQuery.isError
+              ? (reservationsQuery.error as Error)
+              : null
+          }
           onRetryQuery={() => void reservationsQuery.refetch()}
           meta={reservationsQuery.data?.meta}
           onPageChange={setReservationPage}
@@ -980,21 +987,23 @@ export function LibraryWorkspace({
         />
       )}
 
-      {activeTab === "overdue" && (
+      {activeTab === 'overdue' && (
         <OverduePanel
           overdueIssues={overdueIssues}
           isLoading={overdueQuery.isLoading}
           isSending={remindersMutation.isPending}
           onSendReminders={() => remindersMutation.mutate()}
           error={remindersMutation.error}
-          queryError={overdueQuery.isError ? (overdueQuery.error as Error) : null}
+          queryError={
+            overdueQuery.isError ? (overdueQuery.error as Error) : null
+          }
           onRetryQuery={() => void overdueQuery.refetch()}
           meta={overdueQuery.data?.meta}
           onPageChange={setOverduePage}
         />
       )}
 
-      {activeTab === "fines" && (
+      {activeTab === 'fines' && (
         <FinesPanel
           fines={finesQuery.data?.items ?? []}
           issues={issues}
@@ -1019,7 +1028,7 @@ export function LibraryWorkspace({
         />
       )}
 
-      {activeTab === "reports" && (
+      {activeTab === 'reports' && (
         <ReportsPanel
           issuedBooksReport={issuedBooksReportQuery.data}
           overdueBooksReport={overdueBooksReportQuery.data}
@@ -1048,10 +1057,10 @@ function OverviewPanel({
   overdueIssues,
 }: {
   stats: {
-    activeLoans: number | "Unavailable";
-    overdueIssues: number | "Unavailable";
-    reservationsWaiting: number | "Unavailable";
-    totalCopies: number | "Unavailable";
+    activeLoans: number | 'Unavailable';
+    overdueIssues: number | 'Unavailable';
+    reservationsWaiting: number | 'Unavailable';
+    totalCopies: number | 'Unavailable';
   };
   isLoading: boolean;
   overdueIssues: LibraryIssue[];
@@ -1075,9 +1084,9 @@ function OverviewPanel({
           href="/dashboard/library/overdue"
           description="Current overdue records"
           tone={
-            typeof stats.overdueIssues === "number" && stats.overdueIssues > 0
-              ? "warning"
-              : "success"
+            typeof stats.overdueIssues === 'number' && stats.overdueIssues > 0
+              ? 'warning'
+              : 'success'
           }
         />
         <SummaryCard
@@ -1087,10 +1096,10 @@ function OverviewPanel({
           loading={isLoading}
           href="/dashboard/library/reservations"
           tone={
-            typeof stats.reservationsWaiting === "number" &&
+            typeof stats.reservationsWaiting === 'number' &&
             stats.reservationsWaiting > 0
-              ? "info"
-              : "success"
+              ? 'info'
+              : 'success'
           }
           description="Active reservation metadata"
         />
@@ -1187,7 +1196,7 @@ function BooksPanel(props: {
   setEditingBookId: (value: string | null) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onEdit: (book: LibraryBook) => void;
-  onViewHistory: (type: "book" | "copy", id: string) => void;
+  onViewHistory: (type: 'book' | 'copy', id: string) => void;
   onArchiveBook: (book: LibraryBook, reason: string) => void;
   reasons: Record<string, string>;
   setReason: (bookId: string, reason: string) => void;
@@ -1206,8 +1215,8 @@ function BooksPanel(props: {
   const categories = Array.from(
     new Set(props.books.map((book) => book.subjectCategory).filter(Boolean)),
   ) as string[];
-  const [category, setCategory] = useState("");
-  const [author, setAuthor] = useState("");
+  const [category, setCategory] = useState('');
+  const [author, setAuthor] = useState('');
   const authors = Array.from(
     new Set(props.books.map((book) => book.author).filter(Boolean)),
   );
@@ -1270,91 +1279,92 @@ function BooksPanel(props: {
               description="Add your first library book or adjust the filters."
             />
           ) : null}
-          {!props.queryError && visibleBooks.map((book) => {
-            const bookCopies = props.copies.filter(
-              (copy) => copy.bookId === book.id,
-            );
-            const fallbackCopies = book.copies ?? [];
-            const copiesForBook =
-              bookCopies.length > 0 ? bookCopies : fallbackCopies;
-            const copyCount = copiesForBook.length;
-            const availableCopies = copiesForBook.filter(
-              (copy) => copy.status === "AVAILABLE",
-            ).length;
-            const hasIssuedCopy = copiesForBook.some(
-              (copy) => copy.status === "ISSUED",
-            );
-            return (
-              <div
-                key={book.id}
-                className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
-              >
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-slate-900">{book.title}</h3>
-                    <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
-                      <BookMeta label="Author" value={book.author} />
-                      <BookMeta label="ISBN" value={book.isbn || "Not set"} />
-                      <BookMeta
-                        label="Category"
-                        value={book.subjectCategory || "Uncategorized"}
-                      />
-                      <BookMeta
-                        label="Total copies"
-                        value={String(copyCount)}
-                      />
-                      <BookMeta
-                        label="Available copies"
-                        value={String(availableCopies)}
-                      />
-                    </dl>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {availableCopies > 0 ? (
-                      <LibraryStatusBadge status="AVAILABLE" />
-                    ) : copyCount > 0 ? (
-                      <LibraryStatusBadge status="ISSUED" />
-                    ) : (
-                      <StatusBadge
-                        status="DRAFT"
-                        label="No copies"
-                        tone="draft"
-                      />
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => props.onEdit(book)}
-                      className="btn-secondary"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => props.onViewHistory("book", book.id)}
-                      className="btn-secondary"
-                    >
-                      History
-                    </button>
-                    <Link
-                      href={`/dashboard/library/copies?bookId=${encodeURIComponent(book.id)}`}
-                      className="btn-secondary"
-                    >
-                      Copies
-                    </Link>
-                    {!hasIssuedCopy && (
+          {!props.queryError &&
+            visibleBooks.map((book) => {
+              const bookCopies = props.copies.filter(
+                (copy) => copy.bookId === book.id,
+              );
+              const fallbackCopies = book.copies ?? [];
+              const copiesForBook =
+                bookCopies.length > 0 ? bookCopies : fallbackCopies;
+              const copyCount = copiesForBook.length;
+              const availableCopies = copiesForBook.filter(
+                (copy) => copy.status === 'AVAILABLE',
+              ).length;
+              const hasIssuedCopy = copiesForBook.some(
+                (copy) => copy.status === 'ISSUED',
+              );
+              return (
+                <div
+                  key={book.id}
+                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-slate-900">{book.title}</h3>
+                      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
+                        <BookMeta label="Author" value={book.author} />
+                        <BookMeta label="ISBN" value={book.isbn || 'Not set'} />
+                        <BookMeta
+                          label="Category"
+                          value={book.subjectCategory || 'Uncategorized'}
+                        />
+                        <BookMeta
+                          label="Total copies"
+                          value={String(copyCount)}
+                        />
+                        <BookMeta
+                          label="Available copies"
+                          value={String(availableCopies)}
+                        />
+                      </dl>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {availableCopies > 0 ? (
+                        <LibraryStatusBadge status="AVAILABLE" />
+                      ) : copyCount > 0 ? (
+                        <LibraryStatusBadge status="ISSUED" />
+                      ) : (
+                        <StatusBadge
+                          status="DRAFT"
+                          label="No copies"
+                          tone="draft"
+                        />
+                      )}
                       <button
                         type="button"
-                        onClick={() => setPendingArchiveBook(book)}
-                        className="btn-secondary text-red-600"
+                        onClick={() => props.onEdit(book)}
+                        className="btn-secondary"
                       >
-                        Archive
+                        Edit
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => props.onViewHistory('book', book.id)}
+                        className="btn-secondary"
+                      >
+                        History
+                      </button>
+                      <Link
+                        href={`/dashboard/library/copies?bookId=${encodeURIComponent(book.id)}`}
+                        className="btn-secondary"
+                      >
+                        Copies
+                      </Link>
+                      {!hasIssuedCopy && (
+                        <button
+                          type="button"
+                          onClick={() => setPendingArchiveBook(book)}
+                          className="btn-secondary text-red-600"
+                        >
+                          Archive
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
         <PaginationControls
           meta={props.meta}
@@ -1367,7 +1377,7 @@ function BooksPanel(props: {
             if (pendingArchiveBook) {
               props.onArchiveBook(
                 pendingArchiveBook,
-                props.reasons[pendingArchiveBook.id]?.trim() ?? "",
+                props.reasons[pendingArchiveBook.id]?.trim() ?? '',
               );
             }
             setPendingArchiveBook(null);
@@ -1377,7 +1387,7 @@ function BooksPanel(props: {
           confirmLabel="Archive book"
           confirmDisabled={
             pendingArchiveBook
-              ? !(props.reasons[pendingArchiveBook.id] ?? "").trim()
+              ? !(props.reasons[pendingArchiveBook.id] ?? '').trim()
               : false
           }
           variant="destructive"
@@ -1388,7 +1398,7 @@ function BooksPanel(props: {
                 Audit reason
               </span>
               <textarea
-                value={props.reasons[pendingArchiveBook.id] ?? ""}
+                value={props.reasons[pendingArchiveBook.id] ?? ''}
                 onChange={(event) =>
                   props.setReason(pendingArchiveBook.id, event.target.value)
                 }
@@ -1402,7 +1412,7 @@ function BooksPanel(props: {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <PanelHeader
-          title={props.editingBookId ? "Edit Book" : "Add Book"}
+          title={props.editingBookId ? 'Edit Book' : 'Add Book'}
           description="Catalogue data used by copy tracking and issue workflows."
         />
         {props.error && <ErrorNotice message={props.error.message} />}
@@ -1421,12 +1431,12 @@ function BooksPanel(props: {
           />
           <TextInput
             label="ISBN"
-            value={props.form.isbn ?? ""}
+            value={props.form.isbn ?? ''}
             onChange={(isbn) => props.setForm({ ...props.form, isbn })}
           />
           <TextInput
             label="Publisher"
-            value={props.form.publisher ?? ""}
+            value={props.form.publisher ?? ''}
             onChange={(publisher) =>
               props.setForm({ ...props.form, publisher })
             }
@@ -1434,14 +1444,14 @@ function BooksPanel(props: {
           <div className="grid gap-3 sm:grid-cols-2">
             <TextInput
               label="Category"
-              value={props.form.subjectCategory ?? ""}
+              value={props.form.subjectCategory ?? ''}
               onChange={(subjectCategory) =>
                 props.setForm({ ...props.form, subjectCategory })
               }
             />
             <TextInput
               label="Class suitability"
-              value={props.form.classLevel ?? ""}
+              value={props.form.classLevel ?? ''}
               onChange={(classLevel) =>
                 props.setForm({ ...props.form, classLevel })
               }
@@ -1451,7 +1461,7 @@ function BooksPanel(props: {
             <TextInput
               label="Published year"
               type="number"
-              value={props.form.publishedYear?.toString() ?? ""}
+              value={props.form.publishedYear?.toString() ?? ''}
               onChange={(value) =>
                 props.setForm({
                   ...props.form,
@@ -1462,7 +1472,7 @@ function BooksPanel(props: {
             <TextInput
               label="Purchase price"
               type="number"
-              value={props.form.purchasePrice?.toString() ?? ""}
+              value={props.form.purchasePrice?.toString() ?? ''}
               onChange={(value) =>
                 props.setForm({
                   ...props.form,
@@ -1478,10 +1488,10 @@ function BooksPanel(props: {
               disabled={props.isSaving}
             >
               {props.isSaving
-                ? "Saving..."
+                ? 'Saving...'
                 : props.editingBookId
-                  ? "Update book"
-                  : "Add book"}
+                  ? 'Update book'
+                  : 'Add book'}
             </button>
             {props.editingBookId && (
               <button
@@ -1515,7 +1525,7 @@ function CopiesPanel(props: {
   setEditingCopyId: (value: string | null) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onEdit: (copy: LibraryCopy) => void;
-  onViewHistory: (type: "book" | "copy", id: string) => void;
+  onViewHistory: (type: 'book' | 'copy', id: string) => void;
   onStatusChange: (copy: LibraryCopy, status: LibraryCopyStatus) => void;
   onArchiveCopy: (copy: LibraryCopy, reason: string) => void;
   onDeleteCopy: (copy: LibraryCopy, reason: string) => void;
@@ -1581,89 +1591,90 @@ function CopiesPanel(props: {
               description="Add barcode copies from the form."
             />
           ) : null}
-          {!props.queryError && props.copies.map((copy) => (
-            <div
-              key={copy.id}
-              className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
-            >
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-bold text-slate-900">
-                      {copy.book?.title?.trim() || "Book title not set"}
-                    </h3>
-                    <LibraryStatusBadge status={copy.status} />
+          {!props.queryError &&
+            props.copies.map((copy) => (
+              <div
+                key={copy.id}
+                className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+              >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-bold text-slate-900">
+                        {copy.book?.title?.trim() || 'Book title not set'}
+                      </h3>
+                      <LibraryStatusBadge status={copy.status} />
+                    </div>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Barcode: {copy.barcode} • Shelf:{' '}
+                      {copy.shelfLocation || 'Not set'}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-400">
+                      Replacement cost: {money(copy.replacementCost)} • QR:{' '}
+                      {copy.qrCode || 'Same as barcode'}
+                    </p>
                   </div>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Barcode: {copy.barcode} • Shelf:{" "}
-                    {copy.shelfLocation || "Not set"}
-                  </p>
-                  <p className="mt-2 text-xs text-slate-400">
-                    Replacement cost: {money(copy.replacementCost)} • QR:{" "}
-                    {copy.qrCode || "Same as barcode"}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => props.onEdit(copy)}
-                    className="btn-secondary"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => props.onViewHistory("copy", copy.id)}
-                    className="btn-secondary"
-                  >
-                    History
-                  </button>
-                  {copy.status !== "ISSUED" && (
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => setPendingArchiveCopy(copy)}
-                      className="btn-secondary text-red-600"
+                      onClick={() => props.onEdit(copy)}
+                      className="btn-secondary"
                     >
-                      Archive
+                      Edit
                     </button>
-                  )}
-                  {copy.status !== "ISSUED" && (
                     <button
                       type="button"
-                      onClick={() => setPendingDeleteCopy(copy)}
-                      className="btn-secondary text-red-600"
+                      onClick={() => props.onViewHistory('copy', copy.id)}
+                      className="btn-secondary"
                     >
-                      Delete
+                      History
                     </button>
-                  )}
-                  {copy.status !== "ISSUED" &&
-                    copyStatuses
-                      .filter((status) => status !== copy.status)
-                      .map((status) => (
-                        <button
-                          key={status}
-                          type="button"
-                          onClick={() => {
-                            if (status === "LOST" || status === "DAMAGED") {
-                              setPendingStatusChange({ copy, status });
-                              return;
-                            }
+                    {copy.status !== 'ISSUED' && (
+                      <button
+                        type="button"
+                        onClick={() => setPendingArchiveCopy(copy)}
+                        className="btn-secondary text-red-600"
+                      >
+                        Archive
+                      </button>
+                    )}
+                    {copy.status !== 'ISSUED' && (
+                      <button
+                        type="button"
+                        onClick={() => setPendingDeleteCopy(copy)}
+                        className="btn-secondary text-red-600"
+                      >
+                        Delete
+                      </button>
+                    )}
+                    {copy.status !== 'ISSUED' &&
+                      copyStatuses
+                        .filter((status) => status !== copy.status)
+                        .map((status) => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => {
+                              if (status === 'LOST' || status === 'DAMAGED') {
+                                setPendingStatusChange({ copy, status });
+                                return;
+                              }
 
-                            props.onStatusChange(copy, status);
-                          }}
-                          className={
-                            status === "LOST" || status === "DAMAGED"
-                              ? "btn-secondary text-red-600"
-                              : "btn-secondary"
-                          }
-                        >
-                          Mark {formatStatus(status)}
-                        </button>
-                      ))}
+                              props.onStatusChange(copy, status);
+                            }}
+                            className={
+                              status === 'LOST' || status === 'DAMAGED'
+                                ? 'btn-secondary text-red-600'
+                                : 'btn-secondary'
+                            }
+                          >
+                            Mark {formatStatus(status)}
+                          </button>
+                        ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
         <PaginationControls
           meta={props.meta}
@@ -1681,12 +1692,12 @@ function CopiesPanel(props: {
             }
             setPendingStatusChange(null);
           }}
-          title={`Mark copy ${formatStatus(pendingStatusChange?.status ?? "")}?`}
+          title={`Mark copy ${formatStatus(pendingStatusChange?.status ?? '')}?`}
           description="This changes the physical copy status used by issue/return workflows. Use this only after confirming the book is actually lost or damaged."
           confirmLabel="Confirm status change"
           confirmDisabled={
             pendingStatusChange
-              ? !(props.reasons[pendingStatusChange.copy.id] ?? "").trim()
+              ? !(props.reasons[pendingStatusChange.copy.id] ?? '').trim()
               : false
           }
           variant="destructive"
@@ -1697,7 +1708,7 @@ function CopiesPanel(props: {
                 Audit reason
               </span>
               <textarea
-                value={props.reasons[pendingStatusChange.copy.id] ?? ""}
+                value={props.reasons[pendingStatusChange.copy.id] ?? ''}
                 onChange={(event) =>
                   props.setReason(
                     pendingStatusChange.copy.id,
@@ -1717,7 +1728,7 @@ function CopiesPanel(props: {
             if (pendingArchiveCopy) {
               props.onArchiveCopy(
                 pendingArchiveCopy,
-                props.reasons[pendingArchiveCopy.id]?.trim() ?? "",
+                props.reasons[pendingArchiveCopy.id]?.trim() ?? '',
               );
             }
             setPendingArchiveCopy(null);
@@ -1727,7 +1738,7 @@ function CopiesPanel(props: {
           confirmLabel="Archive copy"
           confirmDisabled={
             pendingArchiveCopy
-              ? !(props.reasons[pendingArchiveCopy.id] ?? "").trim()
+              ? !(props.reasons[pendingArchiveCopy.id] ?? '').trim()
               : false
           }
           variant="destructive"
@@ -1738,7 +1749,7 @@ function CopiesPanel(props: {
                 Audit reason
               </span>
               <textarea
-                value={props.reasons[pendingArchiveCopy.id] ?? ""}
+                value={props.reasons[pendingArchiveCopy.id] ?? ''}
                 onChange={(event) =>
                   props.setReason(pendingArchiveCopy.id, event.target.value)
                 }
@@ -1755,7 +1766,7 @@ function CopiesPanel(props: {
             if (pendingDeleteCopy) {
               props.onDeleteCopy(
                 pendingDeleteCopy,
-                props.reasons[pendingDeleteCopy.id]?.trim() ?? "",
+                props.reasons[pendingDeleteCopy.id]?.trim() ?? '',
               );
             }
             setPendingDeleteCopy(null);
@@ -1765,7 +1776,7 @@ function CopiesPanel(props: {
           confirmLabel="Delete copy"
           confirmDisabled={
             pendingDeleteCopy
-              ? !(props.reasons[pendingDeleteCopy.id] ?? "").trim()
+              ? !(props.reasons[pendingDeleteCopy.id] ?? '').trim()
               : false
           }
           variant="destructive"
@@ -1776,7 +1787,7 @@ function CopiesPanel(props: {
                 Audit reason
               </span>
               <textarea
-                value={props.reasons[pendingDeleteCopy.id] ?? ""}
+                value={props.reasons[pendingDeleteCopy.id] ?? ''}
                 onChange={(event) =>
                   props.setReason(pendingDeleteCopy.id, event.target.value)
                 }
@@ -1790,7 +1801,7 @@ function CopiesPanel(props: {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <PanelHeader
-          title={props.editingCopyId ? "Edit Copy" : "Add Copy"}
+          title={props.editingCopyId ? 'Edit Copy' : 'Add Copy'}
           description="Barcode must be unique per tenant."
         />
         {props.error && <ErrorNotice message={props.error.message} />}
@@ -1821,12 +1832,12 @@ function CopiesPanel(props: {
           />
           <TextInput
             label="QR code"
-            value={props.form.qrCode ?? ""}
+            value={props.form.qrCode ?? ''}
             onChange={(qrCode) => props.setForm({ ...props.form, qrCode })}
           />
           <TextInput
             label="Shelf / location"
-            value={props.form.shelfLocation ?? ""}
+            value={props.form.shelfLocation ?? ''}
             onChange={(shelfLocation) =>
               props.setForm({ ...props.form, shelfLocation })
             }
@@ -1835,7 +1846,7 @@ function CopiesPanel(props: {
             <TextInput
               label="Replacement cost"
               type="number"
-              value={props.form.replacementCost?.toString() ?? ""}
+              value={props.form.replacementCost?.toString() ?? ''}
               onChange={(value) =>
                 props.setForm({
                   ...props.form,
@@ -1846,7 +1857,7 @@ function CopiesPanel(props: {
             <TextInput
               label="Purchased at"
               type="date"
-              value={props.form.purchasedAt ?? ""}
+              value={props.form.purchasedAt ?? ''}
               onChange={(purchasedAt) =>
                 props.setForm({ ...props.form, purchasedAt })
               }
@@ -1859,10 +1870,10 @@ function CopiesPanel(props: {
               disabled={props.isSaving}
             >
               {props.isSaving
-                ? "Saving..."
+                ? 'Saving...'
                 : props.editingCopyId
-                  ? "Update copy"
-                  : "Add copy"}
+                  ? 'Update copy'
+                  : 'Add copy'}
             </button>
             {props.editingCopyId && (
               <button
@@ -1908,7 +1919,7 @@ function IssuesPanel(props: {
   canReturn: boolean;
 }) {
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [copyScanValue, setCopyScanValue] = useState("");
+  const [copyScanValue, setCopyScanValue] = useState('');
   const [copyScanResult, setCopyScanResult] =
     useState<LibraryCopyScanResult | null>(null);
   const [recentCopyScans, setRecentCopyScans] = useState<
@@ -1918,13 +1929,14 @@ function IssuesPanel(props: {
     useState<LibraryQrBorrower | null>(null);
   const [selectedStudent, setSelectedStudent] =
     useState<StudentLookupOption | null>(null);
-  const [selectedStaff, setSelectedStaff] =
-    useState<StaffLookupOption | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<StaffLookupOption | null>(
+    null,
+  );
   const [scannedCopy, setScannedCopy] = useState<LibraryCopy | null>(null);
   const availableCopies = [
-    ...props.copies.filter((copy) => copy.status === "AVAILABLE"),
+    ...props.copies.filter((copy) => copy.status === 'AVAILABLE'),
     ...(scannedCopy &&
-    scannedCopy.status === "AVAILABLE" &&
+    scannedCopy.status === 'AVAILABLE' &&
     !props.copies.some((copy) => copy.id === scannedCopy.id)
       ? [scannedCopy]
       : []),
@@ -1951,8 +1963,8 @@ function IssuesPanel(props: {
     recordCopyScan({
       code,
       copy,
-      status: "matched",
-      message: `${copy.book?.title ?? "Copy"} selected for issue.`,
+      status: 'matched',
+      message: `${copy.book?.title ?? 'Copy'} selected for issue.`,
       scannedAt: new Date().toISOString(),
     });
   }
@@ -1964,24 +1976,24 @@ function IssuesPanel(props: {
     try {
       const copy = await props.onResolveCopyScan(code);
 
-      if (copy.status !== "AVAILABLE") {
+      if (copy.status !== 'AVAILABLE') {
         recordCopyScan({
           code,
           copy,
-          status: "unavailable",
-          message: `${copy.book?.title ?? "Copy"} is ${formatStatus(copy.status)} and cannot be issued.`,
+          status: 'unavailable',
+          message: `${copy.book?.title ?? 'Copy'} is ${formatStatus(copy.status)} and cannot be issued.`,
           scannedAt: new Date().toISOString(),
         });
         return;
       }
 
       selectCopyFromScan(copy, code);
-      setCopyScanValue("");
+      setCopyScanValue('');
     } catch {
       recordCopyScan({
         code,
-        status: "missing",
-        message: "No library copy matched this barcode or QR code.",
+        status: 'missing',
+        message: 'No library copy matched this barcode or QR code.',
         scannedAt: new Date().toISOString(),
       });
     }
@@ -1997,7 +2009,7 @@ function IssuesPanel(props: {
     props.setForm({
       ...props.form,
       borrowerStudentId: studentId,
-      borrowerStaffId: "",
+      borrowerStaffId: '',
     });
   }
 
@@ -2015,7 +2027,7 @@ function IssuesPanel(props: {
             className="input-control"
           >
             <option value="">All active & historical records</option>
-            {["ISSUED", "RETURNED", "OVERDUE", "LOST"].map((status) => (
+            {['ISSUED', 'RETURNED', 'OVERDUE', 'LOST'].map((status) => (
               <option key={status} value={status}>
                 {formatStatus(status)}
               </option>
@@ -2037,89 +2049,90 @@ function IssuesPanel(props: {
               description="Issue an available copy to start circulation history."
             />
           ) : null}
-          {!props.queryError && props.issues.map((issue) => {
-            const draft = props.returnDrafts[issue.id] ?? {};
-            const active = ["ISSUED", "OVERDUE"].includes(issue.status);
-            return (
-              <div
-                key={issue.id}
-                className={cn(
-                  "rounded-2xl border p-4 transition",
-                  active
-                    ? "border-slate-200 bg-white shadow-sm"
-                    : "border-slate-100 bg-slate-50 opacity-80",
-                )}
-              >
-                <IssueRow issue={issue} />
-                {active && (
-                  <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-4 lg:items-end">
-                    <TextInput
-                      label="Condition"
-                      placeholder="e.g. Good"
-                      value={draft.returnCondition ?? ""}
-                      onChange={(returnCondition) =>
-                        props.setReturnDrafts({
-                          ...props.returnDrafts,
-                          [issue.id]: { ...draft, returnCondition },
-                        })
-                      }
-                    />
-                    <TextInput
-                      label="Fine (NPR)"
-                      type="number"
-                      value={draft.fineAmount?.toString() ?? ""}
-                      onChange={(value) =>
-                        props.setReturnDrafts({
-                          ...props.returnDrafts,
-                          [issue.id]: {
-                            ...draft,
-                            fineAmount: value ? Number(value) : undefined,
-                          },
-                        })
-                      }
-                    />
-                    <label className="flex items-center gap-2 pb-3 text-sm font-bold text-slate-700">
-                      <input
-                        type="checkbox"
-                        className="rounded-lg border-slate-300 text-[var(--color-mod-library-text)] focus:ring-[var(--color-mod-library-bg)]"
-                        checked={Boolean(draft.markLost)}
-                        onChange={(e) =>
+          {!props.queryError &&
+            props.issues.map((issue) => {
+              const draft = props.returnDrafts[issue.id] ?? {};
+              const active = ['ISSUED', 'OVERDUE'].includes(issue.status);
+              return (
+                <div
+                  key={issue.id}
+                  className={cn(
+                    'rounded-2xl border p-4 transition',
+                    active
+                      ? 'border-slate-200 bg-white shadow-sm'
+                      : 'border-slate-100 bg-slate-50 opacity-80',
+                  )}
+                >
+                  <IssueRow issue={issue} />
+                  {active && (
+                    <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-4 lg:items-end">
+                      <TextInput
+                        label="Condition"
+                        placeholder="e.g. Good"
+                        value={draft.returnCondition ?? ''}
+                        onChange={(returnCondition) =>
+                          props.setReturnDrafts({
+                            ...props.returnDrafts,
+                            [issue.id]: { ...draft, returnCondition },
+                          })
+                        }
+                      />
+                      <TextInput
+                        label="Fine (NPR)"
+                        type="number"
+                        value={draft.fineAmount?.toString() ?? ''}
+                        onChange={(value) =>
                           props.setReturnDrafts({
                             ...props.returnDrafts,
                             [issue.id]: {
                               ...draft,
-                              markLost: e.target.checked,
+                              fineAmount: value ? Number(value) : undefined,
                             },
                           })
                         }
                       />
-                      Mark lost/damaged
-                    </label>
-                    <button
-                      type="button"
-                      className="btn-primary h-11"
-                      disabled={props.isSaving}
-                      onClick={() => setConfirmId(issue.id)}
-                    >
-                      <RotateCcw size={16} /> Return Copy
-                    </button>
-                  </div>
-                )}
-                <ConfirmDialog
-                  isOpen={confirmId === issue.id}
-                  onClose={() => setConfirmId(null)}
-                  onConfirm={() => {
-                    props.onReturn(issue, draft);
-                    setConfirmId(null);
-                  }}
-                  title="Confirm Return"
-                  description={`Are you sure you want to mark "${issue.copy?.book?.title}" as returned? ${draft.markLost ? "This copy will be marked as lost." : ""}`}
-                  confirmLabel="Return now"
-                  variant={draft.markLost ? "destructive" : "default"}
-                />
-              </div>
-            );
-          })}
+                      <label className="flex items-center gap-2 pb-3 text-sm font-bold text-slate-700">
+                        <input
+                          type="checkbox"
+                          className="rounded-lg border-slate-300 text-[var(--color-mod-library-text)] focus:ring-[var(--color-mod-library-bg)]"
+                          checked={Boolean(draft.markLost)}
+                          onChange={(e) =>
+                            props.setReturnDrafts({
+                              ...props.returnDrafts,
+                              [issue.id]: {
+                                ...draft,
+                                markLost: e.target.checked,
+                              },
+                            })
+                          }
+                        />
+                        Mark lost/damaged
+                      </label>
+                      <button
+                        type="button"
+                        className="btn-primary h-11"
+                        disabled={props.isSaving}
+                        onClick={() => setConfirmId(issue.id)}
+                      >
+                        <RotateCcw size={16} /> Return Copy
+                      </button>
+                    </div>
+                  )}
+                  <ConfirmDialog
+                    isOpen={confirmId === issue.id}
+                    onClose={() => setConfirmId(null)}
+                    onConfirm={() => {
+                      props.onReturn(issue, draft);
+                      setConfirmId(null);
+                    }}
+                    title="Confirm Return"
+                    description={`Are you sure you want to mark "${issue.copy?.book?.title}" as returned? ${draft.markLost ? 'This copy will be marked as lost.' : ''}`}
+                    confirmLabel="Return now"
+                    variant={draft.markLost ? 'destructive' : 'default'}
+                  />
+                </div>
+              );
+            })}
         </div>
         <PaginationControls
           meta={props.meta}
@@ -2186,11 +2199,11 @@ function IssuesPanel(props: {
             />
 
             <RemoteStudentSelector
-              value={props.form.borrowerStudentId ?? ""}
+              value={props.form.borrowerStudentId ?? ''}
               selectedOption={selectedStudent}
               selectedLabel={
                 resolvedBorrower?.id === props.form.borrowerStudentId
-                  ? resolvedBorrower?.name ?? resolvedBorrower?.studentCode
+                  ? (resolvedBorrower?.name ?? resolvedBorrower?.studentCode)
                   : undefined
               }
               onChange={(studentId, option) => {
@@ -2199,7 +2212,7 @@ function IssuesPanel(props: {
                 props.setForm({
                   ...props.form,
                   borrowerStudentId: studentId,
-                  borrowerStaffId: studentId ? "" : props.form.borrowerStaffId,
+                  borrowerStaffId: studentId ? '' : props.form.borrowerStaffId,
                 });
                 if (studentId !== resolvedBorrower?.id) {
                   setResolvedBorrower(null);
@@ -2223,7 +2236,7 @@ function IssuesPanel(props: {
             </div>
 
             <RemoteStaffSelector
-              value={props.form.borrowerStaffId ?? ""}
+              value={props.form.borrowerStaffId ?? ''}
               selectedOption={selectedStaff}
               onChange={(staffId, option) => {
                 setSelectedStaff(option);
@@ -2232,7 +2245,7 @@ function IssuesPanel(props: {
                   ...props.form,
                   borrowerStaffId: staffId,
                   borrowerStudentId: staffId
-                    ? ""
+                    ? ''
                     : props.form.borrowerStudentId,
                 });
                 if (staffId) {
@@ -2247,13 +2260,13 @@ function IssuesPanel(props: {
             <TextInput
               label="Due date"
               type="date"
-              value={props.form.dueAt ?? ""}
+              value={props.form.dueAt ?? ''}
               required
               onChange={(dueAt) => props.setForm({ ...props.form, dueAt })}
             />
             <TextInput
               label="Internal Notes"
-              value={props.form.notes ?? ""}
+              value={props.form.notes ?? ''}
               onChange={(notes) => props.setForm({ ...props.form, notes })}
             />
 
@@ -2267,7 +2280,7 @@ function IssuesPanel(props: {
                 (!props.form.borrowerStudentId && !props.form.borrowerStaffId)
               }
             >
-              {props.isSaving ? "Issuing..." : "Issue book now"}
+              {props.isSaving ? 'Issuing...' : 'Issue book now'}
             </button>
           </form>
         </section>
@@ -2307,10 +2320,11 @@ function ReservationsPanel(props: {
   const [confirmFulfillId, setConfirmFulfillId] = useState<string | null>(null);
   const [selectedStudent, setSelectedStudent] =
     useState<StudentLookupOption | null>(null);
-  const [selectedStaff, setSelectedStaff] =
-    useState<StaffLookupOption | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<StaffLookupOption | null>(
+    null,
+  );
   const activeCopies = props.copies.filter(
-    (copy) => copy.status === "AVAILABLE" || copy.status === "RESERVED",
+    (copy) => copy.status === 'AVAILABLE' || copy.status === 'RESERVED',
   );
 
   return (
@@ -2327,7 +2341,7 @@ function ReservationsPanel(props: {
             className="input-control"
           >
             <option value="">All reservation states</option>
-            {["ACTIVE", "FULFILLED", "CANCELLED", "EXPIRED"].map((status) => (
+            {['ACTIVE', 'FULFILLED', 'CANCELLED', 'EXPIRED'].map((status) => (
               <option key={status} value={status}>
                 {formatStatus(status)}
               </option>
@@ -2352,126 +2366,129 @@ function ReservationsPanel(props: {
               description="Create a reservation from the form or adjust the status filter."
             />
           ) : null}
-          {!props.queryError && props.reservations.map((reservation) => {
-            const active = reservation.status === "ACTIVE";
-            const draft = props.fulfillmentDrafts[reservation.id] ?? {};
-            const defaultCopyId =
-              draft.copyId ??
-              reservation.copyId ??
-              availableCopyForBook(activeCopies, reservation.bookId)?.id ??
-              "";
-            const fulfillmentDraft = { ...draft, copyId: defaultCopyId };
+          {!props.queryError &&
+            props.reservations.map((reservation) => {
+              const active = reservation.status === 'ACTIVE';
+              const draft = props.fulfillmentDrafts[reservation.id] ?? {};
+              const defaultCopyId =
+                draft.copyId ??
+                reservation.copyId ??
+                availableCopyForBook(activeCopies, reservation.bookId)?.id ??
+                '';
+              const fulfillmentDraft = { ...draft, copyId: defaultCopyId };
 
-            return (
-              <div
-                key={reservation.id}
-                className={cn(
-                  "rounded-2xl border p-4",
-                  active
-                    ? "border-slate-200 bg-white shadow-sm"
-                    : "border-slate-100 bg-slate-50",
-                )}
-              >
-                <ReservationRow reservation={reservation} />
-                {active && (
-                  <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-4 lg:items-end">
-                    <label className="block text-sm font-semibold text-slate-700">
-                      Fulfillment copy
-                      <select
-                        value={defaultCopyId}
-                        onChange={(event) =>
+              return (
+                <div
+                  key={reservation.id}
+                  className={cn(
+                    'rounded-2xl border p-4',
+                    active
+                      ? 'border-slate-200 bg-white shadow-sm'
+                      : 'border-slate-100 bg-slate-50',
+                  )}
+                >
+                  <ReservationRow reservation={reservation} />
+                  {active && (
+                    <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-4 lg:items-end">
+                      <label className="block text-sm font-semibold text-slate-700">
+                        Fulfillment copy
+                        <select
+                          value={defaultCopyId}
+                          onChange={(event) =>
+                            props.setFulfillmentDrafts({
+                              ...props.fulfillmentDrafts,
+                              [reservation.id]: {
+                                ...fulfillmentDraft,
+                                copyId: event.target.value,
+                              },
+                            })
+                          }
+                          className="input-control mt-1"
+                        >
+                          <option value="">Select copy</option>
+                          {activeCopies
+                            .filter(
+                              (copy) => copy.bookId === reservation.bookId,
+                            )
+                            .map((copy) => (
+                              <option key={copy.id} value={copy.id}>
+                                {copy.barcode} - {formatStatus(copy.status)}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                      <TextInput
+                        label="Due date"
+                        type="date"
+                        value={fulfillmentDraft.dueAt ?? ''}
+                        onChange={(dueAt) =>
                           props.setFulfillmentDrafts({
                             ...props.fulfillmentDrafts,
-                            [reservation.id]: {
-                              ...fulfillmentDraft,
-                              copyId: event.target.value,
-                            },
+                            [reservation.id]: { ...fulfillmentDraft, dueAt },
                           })
                         }
-                        className="input-control mt-1"
-                      >
-                        <option value="">Select copy</option>
-                        {activeCopies
-                          .filter((copy) => copy.bookId === reservation.bookId)
-                          .map((copy) => (
-                            <option key={copy.id} value={copy.id}>
-                              {copy.barcode} - {formatStatus(copy.status)}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                    <TextInput
-                      label="Due date"
-                      type="date"
-                      value={fulfillmentDraft.dueAt ?? ""}
-                      onChange={(dueAt) =>
-                        props.setFulfillmentDrafts({
-                          ...props.fulfillmentDrafts,
-                          [reservation.id]: { ...fulfillmentDraft, dueAt },
-                        })
-                      }
-                    />
-                    <TextInput
-                      label="Notes"
-                      value={fulfillmentDraft.notes ?? ""}
-                      onChange={(notes) =>
-                        props.setFulfillmentDrafts({
-                          ...props.fulfillmentDrafts,
-                          [reservation.id]: { ...fulfillmentDraft, notes },
-                        })
-                      }
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="btn-primary h-11"
-                        disabled={props.isSaving || !defaultCopyId}
-                        onClick={() => setConfirmFulfillId(reservation.id)}
-                      >
-                        Fulfill
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-secondary h-11 text-red-600"
-                        disabled={props.isSaving}
-                        onClick={() => setConfirmCancelId(reservation.id)}
-                      >
-                        Cancel
-                      </button>
+                      />
+                      <TextInput
+                        label="Notes"
+                        value={fulfillmentDraft.notes ?? ''}
+                        onChange={(notes) =>
+                          props.setFulfillmentDrafts({
+                            ...props.fulfillmentDrafts,
+                            [reservation.id]: { ...fulfillmentDraft, notes },
+                          })
+                        }
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="btn-primary h-11"
+                          disabled={props.isSaving || !defaultCopyId}
+                          onClick={() => setConfirmFulfillId(reservation.id)}
+                        >
+                          Fulfill
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary h-11 text-red-600"
+                          disabled={props.isSaving}
+                          onClick={() => setConfirmCancelId(reservation.id)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
-                <ConfirmDialog
-                  isOpen={confirmFulfillId === reservation.id}
-                  onClose={() => setConfirmFulfillId(null)}
-                  onConfirm={() => {
-                    props.onFulfill(
-                      reservation,
-                      cleanFulfillmentPayload(fulfillmentDraft),
-                    );
-                    setConfirmFulfillId(null);
-                  }}
-                  title="Fulfill reservation"
-                  description="This creates an issue record after checking borrower eligibility, queue order, and copy availability."
-                  confirmLabel="Fulfill reservation"
-                  isConfirming={props.isSaving}
-                />
-                <ConfirmDialog
-                  isOpen={confirmCancelId === reservation.id}
-                  onClose={() => setConfirmCancelId(null)}
-                  onConfirm={() => {
-                    props.onCancel(reservation);
-                    setConfirmCancelId(null);
-                  }}
-                  title="Cancel reservation"
-                  description="Cancel only after confirming the borrower no longer needs this hold or the reservation has been handled outside the queue."
-                  confirmLabel="Cancel reservation"
-                  variant="destructive"
-                  isConfirming={props.isSaving}
-                />
-              </div>
-            );
-          })}
+                  )}
+                  <ConfirmDialog
+                    isOpen={confirmFulfillId === reservation.id}
+                    onClose={() => setConfirmFulfillId(null)}
+                    onConfirm={() => {
+                      props.onFulfill(
+                        reservation,
+                        cleanFulfillmentPayload(fulfillmentDraft),
+                      );
+                      setConfirmFulfillId(null);
+                    }}
+                    title="Fulfill reservation"
+                    description="This creates an issue record after checking borrower eligibility, queue order, and copy availability."
+                    confirmLabel="Fulfill reservation"
+                    isConfirming={props.isSaving}
+                  />
+                  <ConfirmDialog
+                    isOpen={confirmCancelId === reservation.id}
+                    onClose={() => setConfirmCancelId(null)}
+                    onConfirm={() => {
+                      props.onCancel(reservation);
+                      setConfirmCancelId(null);
+                    }}
+                    title="Cancel reservation"
+                    description="Cancel only after confirming the borrower no longer needs this hold or the reservation has been handled outside the queue."
+                    confirmLabel="Cancel reservation"
+                    variant="destructive"
+                    isConfirming={props.isSaving}
+                  />
+                </div>
+              );
+            })}
         </div>
         <PaginationControls
           meta={props.meta}
@@ -2490,7 +2507,7 @@ function ReservationsPanel(props: {
             books={props.books}
             selectedId={props.form.bookId}
             onSelect={(bookId) =>
-              props.setForm({ ...props.form, bookId, copyId: "" })
+              props.setForm({ ...props.form, bookId, copyId: '' })
             }
             label="Book"
             placeholder="Search title, author, or ISBN"
@@ -2500,13 +2517,13 @@ function ReservationsPanel(props: {
             copies={props.copies.filter(
               (copy) => copy.bookId === props.form.bookId,
             )}
-            selectedId={props.form.copyId ?? ""}
+            selectedId={props.form.copyId ?? ''}
             onSelect={(copyId) => props.setForm({ ...props.form, copyId })}
             label="Optional copy"
             placeholder="Reserve a specific barcode"
           />
           <RemoteStudentSelector
-            value={props.form.borrowerStudentId ?? ""}
+            value={props.form.borrowerStudentId ?? ''}
             selectedOption={selectedStudent}
             onChange={(borrowerStudentId, option) => {
               setSelectedStudent(option);
@@ -2515,7 +2532,7 @@ function ReservationsPanel(props: {
                 ...props.form,
                 borrowerStudentId,
                 borrowerStaffId: borrowerStudentId
-                  ? ""
+                  ? ''
                   : props.form.borrowerStaffId,
               });
             }}
@@ -2535,7 +2552,7 @@ function ReservationsPanel(props: {
             </div>
           </div>
           <RemoteStaffSelector
-            value={props.form.borrowerStaffId ?? ""}
+            value={props.form.borrowerStaffId ?? ''}
             selectedOption={selectedStaff}
             onChange={(borrowerStaffId, option) => {
               setSelectedStaff(option);
@@ -2544,7 +2561,7 @@ function ReservationsPanel(props: {
                 ...props.form,
                 borrowerStaffId,
                 borrowerStudentId: borrowerStaffId
-                  ? ""
+                  ? ''
                   : props.form.borrowerStudentId,
               });
             }}
@@ -2555,14 +2572,14 @@ function ReservationsPanel(props: {
           <TextInput
             label="Hold expires"
             type="date"
-            value={props.form.expiresAt ?? ""}
+            value={props.form.expiresAt ?? ''}
             onChange={(expiresAt) =>
               props.setForm({ ...props.form, expiresAt })
             }
           />
           <TextInput
             label="Internal notes"
-            value={props.form.notes ?? ""}
+            value={props.form.notes ?? ''}
             onChange={(notes) => props.setForm({ ...props.form, notes })}
           />
           <button
@@ -2574,7 +2591,7 @@ function ReservationsPanel(props: {
               (!props.form.borrowerStudentId && !props.form.borrowerStaffId)
             }
           >
-            {props.isSaving ? "Saving..." : "Create reservation"}
+            {props.isSaving ? 'Saving...' : 'Create reservation'}
           </button>
         </form>
       </section>
@@ -2611,7 +2628,7 @@ function LibraryCopyScanner({
             manually.
           </p>
         </div>
-        {result?.status === "matched" ? (
+        {result?.status === 'matched' ? (
           <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-500" />
         ) : null}
       </div>
@@ -2625,20 +2642,20 @@ function LibraryCopyScanner({
             aria-label="Library copy barcode or QR code"
             onChange={(event) => onChange(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
+              if (event.key === 'Enter') {
                 event.preventDefault();
                 onScan();
               }
             }}
             placeholder="Scan barcode or QR code"
             className={cn(
-              "input-control pl-10",
-              result?.status === "matched" &&
-                "border-emerald-300 focus:border-emerald-400 focus:ring-emerald-100",
-              result?.status === "unavailable" &&
-                "border-amber-300 focus:border-amber-400 focus:ring-amber-100",
-              result?.status === "missing" &&
-                "border-red-300 focus:border-red-400 focus:ring-red-100",
+              'input-control pl-10',
+              result?.status === 'matched' &&
+                'border-emerald-300 focus:border-emerald-400 focus:ring-emerald-100',
+              result?.status === 'unavailable' &&
+                'border-amber-300 focus:border-amber-400 focus:ring-amber-100',
+              result?.status === 'missing' &&
+                'border-red-300 focus:border-red-400 focus:ring-red-100',
             )}
           />
         </label>
@@ -2648,20 +2665,20 @@ function LibraryCopyScanner({
           disabled={!value.trim() || isResolving}
           className="btn-secondary shrink-0"
         >
-          {isResolving ? "Checking..." : "Scan"}
+          {isResolving ? 'Checking...' : 'Scan'}
         </button>
       </div>
 
       {result ? (
         <div
           className={cn(
-            "mt-3 rounded-xl border px-3 py-2 text-xs font-bold",
-            result.status === "matched" &&
-              "border-emerald-100 bg-emerald-50 text-emerald-700",
-            result.status === "unavailable" &&
-              "border-amber-100 bg-amber-50 text-amber-800",
-            result.status === "missing" &&
-              "border-red-100 bg-red-50 text-red-700",
+            'mt-3 rounded-xl border px-3 py-2 text-xs font-bold',
+            result.status === 'matched' &&
+              'border-emerald-100 bg-emerald-50 text-emerald-700',
+            result.status === 'unavailable' &&
+              'border-amber-100 bg-amber-50 text-amber-800',
+            result.status === 'missing' &&
+              'border-red-100 bg-red-50 text-red-700',
           )}
         >
           {result.message}
@@ -2674,15 +2691,15 @@ function LibraryCopyScanner({
             <button
               key={`${scan.code}-${scan.scannedAt}`}
               type="button"
-              disabled={!scan.copy || scan.copy.status !== "AVAILABLE"}
+              disabled={!scan.copy || scan.copy.status !== 'AVAILABLE'}
               onClick={() => scan.copy && onSelectCopy(scan.copy, scan.code)}
               className={cn(
-                "rounded-xl border px-3 py-1.5 text-xs font-bold transition",
-                scan.status === "matched"
-                  ? "border-emerald-100 bg-white text-emerald-700 hover:bg-emerald-50"
-                  : "border-slate-100 bg-white text-slate-500",
-                (!scan.copy || scan.copy.status !== "AVAILABLE") &&
-                  "cursor-not-allowed opacity-70",
+                'rounded-xl border px-3 py-1.5 text-xs font-bold transition',
+                scan.status === 'matched'
+                  ? 'border-emerald-100 bg-white text-emerald-700 hover:bg-emerald-50'
+                  : 'border-slate-100 bg-white text-slate-500',
+                (!scan.copy || scan.copy.status !== 'AVAILABLE') &&
+                  'cursor-not-allowed opacity-70',
               )}
             >
               {scan.copy?.barcode ?? scan.code}
@@ -2707,18 +2724,18 @@ function QrBorrowerSummary({ borrower }: { borrower: LibraryQrBorrower }) {
             QR borrower selected
           </p>
           <h3 className="mt-1 truncate font-bold text-slate-900">
-            {borrower.name?.trim() || "Student name not set"}
+            {borrower.name?.trim() || 'Student name not set'}
           </h3>
           <p className="mt-1 text-xs font-semibold text-slate-500">
             {[borrower.studentCode, borrower.classSection]
               .filter(Boolean)
-              .join(" • ") || "Student QR resolved"}
+              .join(' • ') || 'Student QR resolved'}
           </p>
         </div>
         <StatusBadge
-          status={canBorrow ? "CAN_BORROW" : "LIMIT_REACHED"}
-          label={canBorrow ? "Can borrow" : "Limit reached"}
-          tone={canBorrow ? "approved" : "conflict"}
+          status={canBorrow ? 'CAN_BORROW' : 'LIMIT_REACHED'}
+          label={canBorrow ? 'Can borrow' : 'Limit reached'}
+          tone={canBorrow ? 'approved' : 'conflict'}
         />
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-bold">
@@ -2730,8 +2747,8 @@ function QrBorrowerSummary({ borrower }: { borrower: LibraryQrBorrower }) {
           <p className="text-slate-400">Overdue books</p>
           <p
             className={cn(
-              "mt-1 text-lg",
-              overdueBooks > 0 ? "text-red-600" : "text-slate-900",
+              'mt-1 text-lg',
+              overdueBooks > 0 ? 'text-red-600' : 'text-slate-900',
             )}
           >
             {overdueBooks}
@@ -2763,8 +2780,8 @@ function IssueSelectionSummary({
           label="Copy"
           value={
             copy
-              ? `${copy.book?.title ?? "Book"} (${copy.barcode})`
-              : "No copy selected"
+              ? `${copy.book?.title ?? 'Book'} (${copy.barcode})`
+              : 'No copy selected'
           }
         />
         <IssueSummaryLine
@@ -2774,7 +2791,7 @@ function IssueSelectionSummary({
               ? studentName(student)
               : staff
                 ? staffName(staff)
-                : "No borrower selected"
+                : 'No borrower selected'
           }
         />
       </div>
@@ -2829,7 +2846,7 @@ function OverduePanel({
           disabled={isSending || overdueIssues.length === 0}
           className="btn-primary"
         >
-          <BellRing size={16} /> {isSending ? "Sending..." : "Send reminders"}
+          <BellRing size={16} /> {isSending ? 'Sending...' : 'Send reminders'}
         </button>
       </div>
       {error && <ErrorNotice message={error.message} />}
@@ -2848,20 +2865,21 @@ function OverduePanel({
             description="No active library issues are past their due date."
           />
         ) : null}
-        {!queryError && overdueIssues.map((issue) => (
-          <div
-            key={issue.id}
-            className="rounded-2xl border border-red-100 bg-red-50/60 p-4"
-          >
-            <IssueRow issue={issue} compact />
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <LibraryStatusBadge status="OVERDUE" />
-              <p className="text-sm font-semibold text-red-700">
-                Overdue by {overdueDays(issue.dueAt)} day(s)
-              </p>
+        {!queryError &&
+          overdueIssues.map((issue) => (
+            <div
+              key={issue.id}
+              className="rounded-2xl border border-red-100 bg-red-50/60 p-4"
+            >
+              <IssueRow issue={issue} compact />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <LibraryStatusBadge status="OVERDUE" />
+                <p className="text-sm font-semibold text-red-700">
+                  Overdue by {overdueDays(issue.dueAt)} day(s)
+                </p>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
       </div>
       <PaginationControls meta={meta} onPageChange={onPageChange} />
     </section>
@@ -2880,7 +2898,7 @@ function IssueRow({
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-bold text-slate-900">
-            {issue.copy?.book?.title?.trim() || "Book title not set"}
+            {issue.copy?.book?.title?.trim() || 'Book title not set'}
           </h3>
           <LibraryStatusBadge status={issue.status} />
         </div>
@@ -2889,13 +2907,13 @@ function IssueRow({
         </p>
         {!compact && (
           <p className="mt-2 text-xs text-slate-400">
-            Notes: {issue.notes || "—"}
+            Notes: {issue.notes || '—'}
           </p>
         )}
       </div>
       <div className="text-sm text-slate-500 lg:text-right">
         <p>Due: {formatDate(issue.dueAt)}</p>
-        <p>Returned: {issue.returnedAt ? formatDate(issue.returnedAt) : "—"}</p>
+        <p>Returned: {issue.returnedAt ? formatDate(issue.returnedAt) : '—'}</p>
         <p>Fine: {money(issue.fineAmount)}</p>
       </div>
     </div>
@@ -2907,19 +2925,19 @@ function ReservationRow({ reservation }: { reservation: LibraryReservation }) {
     ? studentName(reservation.borrowerStudent)
     : reservation.borrowerStaff
       ? staffName(reservation.borrowerStaff)
-      : "Borrower record unavailable";
+      : 'Borrower record unavailable';
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-bold text-slate-900">
-            {reservation.book?.title?.trim() || "Book title not set"}
+            {reservation.book?.title?.trim() || 'Book title not set'}
           </h3>
           <LibraryStatusBadge status={reservation.status} />
         </div>
         <p className="mt-1 text-sm text-slate-500">
-          {borrower} • {reservation.copy?.barcode ?? "Any available copy"}
+          {borrower} • {reservation.copy?.barcode ?? 'Any available copy'}
         </p>
         {reservation.notes ? (
           <p className="mt-2 text-xs text-slate-400">
@@ -3004,21 +3022,21 @@ function PendingLibraryCard({ title }: { title: string }) {
 function LibraryStatusBadge({ status }: { status: string }) {
   const normalized = status.trim().toUpperCase();
   const badgeMap: Record<string, { label: string; tone: StatusTone }> = {
-    AVAILABLE: { label: "Available", tone: "approved" },
-    ISSUED: { label: "Issued", tone: "published" },
-    RESERVED: { label: "Reserved", tone: "pending" },
-    LOST: { label: "Lost", tone: "conflict" },
-    DAMAGED: { label: "Damaged", tone: "conflict" },
-    OVERDUE: { label: "Overdue", tone: "overdue" },
-    RETURNED: { label: "Returned", tone: "approved" },
-    ACTIVE: { label: "Active", tone: "pending" },
-    FULFILLED: { label: "Fulfilled", tone: "approved" },
-    CANCELLED: { label: "Cancelled", tone: "draft" },
-    EXPIRED: { label: "Expired", tone: "overdue" },
+    AVAILABLE: { label: 'Available', tone: 'approved' },
+    ISSUED: { label: 'Issued', tone: 'published' },
+    RESERVED: { label: 'Reserved', tone: 'pending' },
+    LOST: { label: 'Lost', tone: 'conflict' },
+    DAMAGED: { label: 'Damaged', tone: 'conflict' },
+    OVERDUE: { label: 'Overdue', tone: 'overdue' },
+    RETURNED: { label: 'Returned', tone: 'approved' },
+    ACTIVE: { label: 'Active', tone: 'pending' },
+    FULFILLED: { label: 'Fulfilled', tone: 'approved' },
+    CANCELLED: { label: 'Cancelled', tone: 'draft' },
+    EXPIRED: { label: 'Expired', tone: 'overdue' },
   };
   const config = badgeMap[normalized] ?? {
     label: formatStatus(normalized),
-    tone: "info" as StatusTone,
+    tone: 'info' as StatusTone,
   };
 
   return (
@@ -3067,7 +3085,7 @@ function TextInput({
   label,
   value,
   onChange,
-  type = "text",
+  type = 'text',
   placeholder,
   required = false,
 }: {
@@ -3161,27 +3179,27 @@ function cleanFulfillmentPayload(
 
 function availableCopyForBook(copies: LibraryCopy[], bookId: string) {
   return copies.find(
-    (copy) => copy.bookId === bookId && copy.status === "AVAILABLE",
+    (copy) => copy.bookId === bookId && copy.status === 'AVAILABLE',
   );
 }
 
 function formatStatus(status: string) {
   return status
-    .replaceAll("_", " ")
+    .replaceAll('_', ' ')
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatDate(value?: string | null) {
-  if (!value) return "—";
+  if (!value) return '—';
   return formatBsDate(value);
 }
 
 function money(value?: string | number | null) {
   const amount = Number(value ?? 0);
-  return new Intl.NumberFormat("en-NP", {
-    style: "currency",
-    currency: "NPR",
+  return new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
     maximumFractionDigits: 0,
   }).format(amount);
 }
@@ -3194,7 +3212,7 @@ function overdueDays(dueAt: string) {
 function borrowerName(issue: LibraryIssue) {
   if (issue.borrowerStudent) return studentName(issue.borrowerStudent);
   if (issue.borrowerStaff) return staffName(issue.borrowerStaff);
-  return "Borrower record unavailable";
+  return 'Borrower record unavailable';
 }
 
 function studentName(student: {
@@ -3205,9 +3223,9 @@ function studentName(student: {
 }) {
   return (
     student.fullNameEn ||
-    `${student.firstNameEn ?? ""} ${student.lastNameEn ?? ""}`.trim() ||
+    `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() ||
     student.studentSystemId ||
-    "Student"
+    'Student'
   );
 }
 
@@ -3219,9 +3237,9 @@ function staffName(staff: {
 }) {
   return (
     staff.fullName ||
-    `${staff.firstName ?? ""} ${staff.lastName ?? ""}`.trim() ||
+    `${staff.firstName ?? ''} ${staff.lastName ?? ''}`.trim() ||
     staff.employeeId ||
-    "Staff"
+    'Staff'
   );
 }
 
@@ -3262,13 +3280,13 @@ function FinesPanel({
   canPost: boolean;
 }) {
   const [waivingId, setWaivingId] = useState<string | null>(null);
-  const [waiveReason, setWaiveReason] = useState("");
+  const [waiveReason, setWaiveReason] = useState('');
   const [waiveAmount, setWaiveAmount] = useState<number>(0);
   const [postingId, setPostingId] = useState<string | null>(null);
-  const [postReason, setPostReason] = useState("");
-  const [newFineIssueId, setNewFineIssueId] = useState("");
+  const [postReason, setPostReason] = useState('');
+  const [newFineIssueId, setNewFineIssueId] = useState('');
   const [newFineAmount, setNewFineAmount] = useState<number>(0);
-  const [newFineNotes, setNewFineNotes] = useState("");
+  const [newFineNotes, setNewFineNotes] = useState('');
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -3295,9 +3313,9 @@ function FinesPanel({
               amount: newFineAmount,
               notes: newFineNotes.trim() || undefined,
             });
-            setNewFineIssueId("");
+            setNewFineIssueId('');
             setNewFineAmount(0);
-            setNewFineNotes("");
+            setNewFineNotes('');
           }}
           className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto] sm:items-end"
         >
@@ -3312,7 +3330,7 @@ function FinesPanel({
               <option value="">Select an issue...</option>
               {issues.map((issue) => (
                 <option key={issue.id} value={issue.id}>
-                  {issue.copy?.book?.title ?? "Untitled"} —{" "}
+                  {issue.copy?.book?.title ?? 'Untitled'} —{' '}
                   {borrowerName(issue)} ({issue.status})
                 </option>
               ))}
@@ -3329,7 +3347,7 @@ function FinesPanel({
             className="btn-primary"
             disabled={isCreating || !newFineIssueId || newFineAmount <= 0}
           >
-            {isCreating ? "Saving..." : "Add fine"}
+            {isCreating ? 'Saving...' : 'Add fine'}
           </button>
           <TextInput
             label="Notes"
@@ -3354,99 +3372,104 @@ function FinesPanel({
             description="Library circulation is currently clear of outstanding fines."
           />
         ) : null}
-        {!queryError && fines.map((fine) => {
-          const linkedInvoiceId =
-            fine.feeInvoiceId ?? fine.issue?.invoiceId ?? null;
-          const canPostToFees =
-            fine.status === "PENDING" &&
-            Boolean(fine.issue?.borrowerStudentId) &&
-            !linkedInvoiceId;
+        {!queryError &&
+          fines.map((fine) => {
+            const linkedInvoiceId =
+              fine.feeInvoiceId ?? fine.issue?.invoiceId ?? null;
+            const canPostToFees =
+              fine.status === 'PENDING' &&
+              Boolean(fine.issue?.borrowerStudentId) &&
+              !linkedInvoiceId;
 
-          return (
-            <div
-              key={fine.id}
-              className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
-            >
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-bold text-slate-900">
-                      {fine.issue?.copy?.book?.title?.trim() ||
-                        "Book title not set"}
-                    </h3>
-                    <StatusBadge
-                      status={fine.status}
-                      label={fine.status}
-                      tone={fine.status === "PENDING" ? "overdue" : "approved"}
-                    />
-                  </div>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Borrower:{" "}
-                    {fine.issue ? borrowerName(fine.issue) : "Borrower not set"}{" "}
-                    • Amount: {money(fine.amount)}
-                  </p>
-                  {fine.waivedAmount > 0 && (
-                    <p className="mt-1 text-xs text-emerald-600 font-semibold">
-                      Waived: {money(fine.waivedAmount)} (Reason:{" "}
-                      {fine.waiverReason})
+            return (
+              <div
+                key={fine.id}
+                className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-bold text-slate-900">
+                        {fine.issue?.copy?.book?.title?.trim() ||
+                          'Book title not set'}
+                      </h3>
+                      <StatusBadge
+                        status={fine.status}
+                        label={fine.status}
+                        tone={
+                          fine.status === 'PENDING' ? 'overdue' : 'approved'
+                        }
+                      />
+                    </div>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Borrower:{' '}
+                      {fine.issue
+                        ? borrowerName(fine.issue)
+                        : 'Borrower not set'}{' '}
+                      • Amount: {money(fine.amount)}
                     </p>
-                  )}
-                  {linkedInvoiceId && (
-                    <p className="mt-1 text-xs font-semibold text-[var(--color-mod-library-text)]">
-                      Linked Fees invoice:{" "}
-                      {fine.issue?.invoice?.invoiceNumber ?? linkedInvoiceId}
-                    </p>
-                  )}
-                  {!fine.issue?.borrowerStudentId &&
-                    fine.status === "PENDING" && (
-                      <p className="mt-1 text-xs font-semibold text-slate-500">
-                        Staff fines stay in Library and are not posted to
-                        student fees.
+                    {fine.waivedAmount > 0 && (
+                      <p className="mt-1 text-xs text-emerald-600 font-semibold">
+                        Waived: {money(fine.waivedAmount)} (Reason:{' '}
+                        {fine.waiverReason})
                       </p>
                     )}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                  {linkedInvoiceId && (
-                    <Link
-                      href={`/dashboard/fees/collect?invoiceId=${encodeURIComponent(linkedInvoiceId)}`}
-                      className="btn-secondary"
-                      data-testid="library-fine-open-invoice"
-                    >
-                      <ArrowUpRight size={16} /> Open invoice
-                    </Link>
-                  )}
-                  {canPostToFees && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPostingId(fine.id);
-                        setPostReason(
-                          `Post library fine for ${fine.issue?.copy?.book?.title ?? "returned book"}`,
-                        );
-                      }}
-                      className="btn-primary"
-                      data-testid="library-fine-post-to-fees"
-                    >
-                      <FileText size={16} /> Post to fees
-                    </button>
-                  )}
-                  {fine.status === "PENDING" && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWaivingId(fine.id);
-                        setWaiveAmount(Number(fine.amount));
-                      }}
-                      className="btn-secondary"
-                    >
-                      Waive / Correct
-                    </button>
-                  )}
+                    {linkedInvoiceId && (
+                      <p className="mt-1 text-xs font-semibold text-[var(--color-mod-library-text)]">
+                        Linked Fees invoice:{' '}
+                        {fine.issue?.invoice?.invoiceNumber ?? linkedInvoiceId}
+                      </p>
+                    )}
+                    {!fine.issue?.borrowerStudentId &&
+                      fine.status === 'PENDING' && (
+                        <p className="mt-1 text-xs font-semibold text-slate-500">
+                          Staff fines stay in Library and are not posted to
+                          student fees.
+                        </p>
+                      )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    {linkedInvoiceId && (
+                      <Link
+                        href={`/dashboard/fees/collect?invoiceId=${encodeURIComponent(linkedInvoiceId)}`}
+                        className="btn-secondary"
+                        data-testid="library-fine-open-invoice"
+                      >
+                        <ArrowUpRight size={16} /> Open invoice
+                      </Link>
+                    )}
+                    {canPostToFees && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPostingId(fine.id);
+                          setPostReason(
+                            `Post library fine for ${fine.issue?.copy?.book?.title ?? 'returned book'}`,
+                          );
+                        }}
+                        className="btn-primary"
+                        data-testid="library-fine-post-to-fees"
+                      >
+                        <FileText size={16} /> Post to fees
+                      </button>
+                    )}
+                    {fine.status === 'PENDING' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWaivingId(fine.id);
+                          setWaiveAmount(Number(fine.amount));
+                        }}
+                        className="btn-secondary"
+                      >
+                        Waive / Correct
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
       </div>
       <PaginationControls meta={meta} onPageChange={onPageChange} />
 
@@ -3454,7 +3477,7 @@ function FinesPanel({
         isOpen={Boolean(waivingId)}
         onClose={() => {
           setWaivingId(null);
-          setWaiveReason("");
+          setWaiveReason('');
         }}
         onConfirm={() => {
           if (waivingId) {
@@ -3462,14 +3485,14 @@ function FinesPanel({
               status:
                 waiveAmount >=
                 Number(fines.find((f) => f.id === waivingId)?.amount)
-                  ? "WAIVED"
-                  : "PENDING",
+                  ? 'WAIVED'
+                  : 'PENDING',
               waivedAmount: waiveAmount,
               waiverReason: waiveReason,
             });
           }
           setWaivingId(null);
-          setWaiveReason("");
+          setWaiveReason('');
         }}
         title="Waive Library Fine"
         description="Provide a reason for waiving this fine. This action is audit-logged and visible to school administrators."
@@ -3495,14 +3518,14 @@ function FinesPanel({
         isOpen={Boolean(postingId)}
         onClose={() => {
           setPostingId(null);
-          setPostReason("");
+          setPostReason('');
         }}
         onConfirm={() => {
           if (postingId) {
             onPostFineToFees(postingId, postReason);
           }
           setPostingId(null);
-          setPostReason("");
+          setPostReason('');
         }}
         title="Post Library Fine to Fees"
         description="This creates a student fee invoice through the M3 Fees module and routes collection to the Finance counter."
@@ -3567,7 +3590,7 @@ function ReportsPanel({
             data-testid="library-issued-books-csv-export"
           >
             <Download className="h-4 w-4" />
-            {isExportingIssuedCsv ? "Exporting..." : "Export issued CSV"}
+            {isExportingIssuedCsv ? 'Exporting...' : 'Export issued CSV'}
           </button>
         </div>
 
@@ -3583,7 +3606,7 @@ function ReportsPanel({
             title="Overdue report"
             value={overdueTotal}
             description="Past due active issues"
-            tone={overdueTotal > 0 ? "danger" : "normal"}
+            tone={overdueTotal > 0 ? 'danger' : 'normal'}
           />
           <LibraryReportStat
             title="Fine exposure"
@@ -3594,7 +3617,7 @@ function ReportsPanel({
             title="Lost or damaged"
             value={lostDamaged.length}
             description="Unusable inventory copies"
-            tone={lostDamaged.length > 0 ? "warning" : "normal"}
+            tone={lostDamaged.length > 0 ? 'warning' : 'normal'}
           />
         </div>
       </section>
@@ -3649,15 +3672,15 @@ function ReportsPanel({
             {isLoading && <LoadingState label="Loading popularity report..." />}
             {popularBooks.map((item, idx) => (
               <div
-                key={`${item.book?.id ?? "book"}-${idx}`}
+                key={`${item.book?.id ?? 'book'}-${idx}`}
                 className="flex items-center justify-between border-b border-slate-50 p-3 last:border-0"
               >
                 <div className="min-w-0">
                   <p className="truncate font-bold text-slate-900">
-                    {item.book?.title?.trim() || "Book title not set"}
+                    {item.book?.title?.trim() || 'Book title not set'}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {item.book?.author ?? "Author not recorded"}
+                    {item.book?.author ?? 'Author not recorded'}
                   </p>
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
@@ -3688,7 +3711,7 @@ function ReportsPanel({
               >
                 <div>
                   <p className="font-bold text-slate-900">
-                    {copy.book?.title?.trim() || "Book title not set"}
+                    {copy.book?.title?.trim() || 'Book title not set'}
                   </p>
                   <p className="text-xs text-slate-500">
                     Barcode: {copy.barcode} - Status: {copy.status}
@@ -3714,22 +3737,22 @@ function LibraryReportStat({
   title,
   value,
   description,
-  tone = "normal",
+  tone = 'normal',
 }: {
   title: string;
   value: string | number;
   description: string;
-  tone?: "normal" | "warning" | "danger";
+  tone?: 'normal' | 'warning' | 'danger';
 }) {
   const toneClass =
-    tone === "danger"
-      ? "border-red-100 bg-red-50 text-red-700"
-      : tone === "warning"
-        ? "border-amber-100 bg-amber-50 text-amber-700"
-        : "border-slate-100 bg-slate-50 text-slate-700";
+    tone === 'danger'
+      ? 'border-red-100 bg-red-50 text-red-700'
+      : tone === 'warning'
+        ? 'border-amber-100 bg-amber-50 text-amber-700'
+        : 'border-slate-100 bg-slate-50 text-slate-700';
 
   return (
-    <div className={cn("rounded-2xl border p-4", toneClass)}>
+    <div className={cn('rounded-2xl border p-4', toneClass)}>
       <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide">
         <FileText className="h-4 w-4" />
         {title}
@@ -3751,11 +3774,11 @@ function LibraryIssueReportRow({
     <div className="flex items-center justify-between gap-3 border-b border-slate-50 p-3 last:border-0">
       <div className="min-w-0">
         <p className="truncate font-bold text-slate-900">
-          {issue.copy?.book?.title?.trim() || "Book title not set"}
+          {issue.copy?.book?.title?.trim() || 'Book title not set'}
         </p>
         <p className="text-xs text-slate-500">
-          {borrowerName(issue)} - Barcode{" "}
-          {issue.copy?.barcode ?? "Barcode not recorded"}
+          {borrowerName(issue)} - Barcode{' '}
+          {issue.copy?.barcode ?? 'Barcode not recorded'}
         </p>
       </div>
       <div className="shrink-0 text-right text-xs font-semibold text-slate-500">
@@ -3764,7 +3787,7 @@ function LibraryIssueReportRow({
             ? `${overdueDays(issue.dueAt)} day(s) overdue`
             : `Due ${formatDate(issue.dueAt)}`}
         </p>
-        <p className={overdue ? "text-red-600" : "text-slate-400"}>
+        <p className={overdue ? 'text-red-600' : 'text-slate-400'}>
           {issue.status}
         </p>
       </div>

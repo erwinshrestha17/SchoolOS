@@ -13,9 +13,18 @@ describe('Slice 3 server-side dashboard projection client contract', () => {
 
     assert.match(page, /assertServerDashboardProjection/);
     assert.match(page, /compositionPersona/);
-    assert.match(page, /queryKey: \["operational-dashboard-summary", tenantId\]/);
-    assert.doesNotMatch(page, /queryKey: \["operational-dashboard-summary", compositionPersona\]/);
-    assert.doesNotMatch(page, /projectDashboardForPersona\(dashboardQuery\.data, expectedPersona\)/);
+    assert.match(
+      page,
+      /queryKey: \[['"]operational-dashboard-summary['"], tenantId\]/,
+    );
+    assert.doesNotMatch(
+      page,
+      /queryKey: \[['"]operational-dashboard-summary['"], compositionPersona\]/,
+    );
+    assert.doesNotMatch(
+      page,
+      /projectDashboardForPersona\(dashboardQuery\.data, expectedPersona\)/,
+    );
   });
 
   it('fails closed when server projection persona mismatches client expectation', () => {
@@ -29,8 +38,8 @@ describe('Slice 3 server-side dashboard projection client contract', () => {
   it('keeps dashboard query disabled until permission resolution completes', () => {
     const page = read('app/dashboard/page.tsx');
 
-    assert.match(page, /permissionResolution === "granted"/);
-    assert.match(page, /permissionResolution === "loading"/);
+    assert.match(page, /permissionResolution === ['"]granted['"]/);
+    assert.match(page, /permissionResolution === ['"]loading['"]/);
   });
 });
 

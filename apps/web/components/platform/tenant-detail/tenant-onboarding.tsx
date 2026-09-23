@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { CheckCircle2, Circle, RefreshCw } from "lucide-react";
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { CheckCircle2, Circle, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -18,14 +18,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import { Textarea } from "@/components/ui/textarea";
-import { useSession } from "@/components/session-provider";
-import { platformApi } from "@/lib/api/platform";
-import { hasPermission } from "@/lib/session";
-import { useTenantDetail } from "./tenant-detail-page";
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
+import { useSession } from '@/components/session-provider';
+import { platformApi } from '@/lib/api/platform';
+import { hasPermission } from '@/lib/session';
+import { useTenantDetail } from './tenant-detail-page';
 
 type OnboardingTarget = { key: string; label: string; completed: boolean };
 
@@ -34,10 +34,10 @@ export function TenantOnboarding() {
   const { session } = useSession();
   const canManageOnboarding = hasPermission(
     session,
-    "platform:onboarding:manage",
+    'platform:onboarding:manage',
   );
   const [target, setTarget] = useState<OnboardingTarget | null>(null);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,14 +54,14 @@ export function TenantOnboarding() {
         reason: reason.trim(),
       });
       await refreshTenant();
-      setMessage("Onboarding checklist override saved.");
+      setMessage('Onboarding checklist override saved.');
       setTarget(null);
-      setReason("");
+      setReason('');
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "The onboarding override could not be saved.",
+          : 'The onboarding override could not be saved.',
       );
     } finally {
       setSaving(false);
@@ -81,7 +81,7 @@ export function TenantOnboarding() {
 
       {message || error ? (
         <div
-          className={`rounded-2xl border p-4 text-sm font-bold ${error ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+          className={`rounded-2xl border p-4 text-sm font-bold ${error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}
         >
           {error ?? message}
         </div>
@@ -129,7 +129,7 @@ export function TenantOnboarding() {
                     <div>
                       <p className="font-bold text-slate-900">{item.label}</p>
                       <p className="mt-1 text-xs font-semibold text-slate-500">
-                        {item.required ? "Required" : "Optional"} ·{" "}
+                        {item.required ? 'Required' : 'Optional'} ·{' '}
                         {item.source}
                       </p>
                       {item.href ? (
@@ -140,8 +140,8 @@ export function TenantOnboarding() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={item.completed ? "success" : "neutral"}>
-                      {item.completed ? "COMPLETE" : "OPEN"}
+                    <Badge variant={item.completed ? 'success' : 'neutral'}>
+                      {item.completed ? 'COMPLETE' : 'OPEN'}
                     </Badge>
                     {canManageOnboarding ? (
                       <Button

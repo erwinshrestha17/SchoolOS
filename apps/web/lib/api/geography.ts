@@ -78,7 +78,11 @@ export const geographyApi = {
     locale?: GeographyLocale,
   ) =>
     request<NepalLocalLevel[]>(
-      withQuery('/reference/nepal/local-levels', { districtId, typeId, locale }),
+      withQuery('/reference/nepal/local-levels', {
+        districtId,
+        typeId,
+        locale,
+      }),
     ),
   getLocalLevel: (id: number, locale?: GeographyLocale) =>
     request<NepalLocalLevel>(

@@ -5,7 +5,13 @@ import Link from 'next/link';
 import { cn } from '../../lib/utils';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
-type StatTone = 'dashboard' | 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+type StatTone =
+  | 'dashboard'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'info'
+  | 'neutral';
 
 interface StatCardProps {
   title: string;
@@ -24,7 +30,8 @@ interface StatCardProps {
 }
 
 const toneStyles: Record<StatTone, string> = {
-  dashboard: 'border-[var(--primary-soft)] bg-[var(--primary-soft)] text-[var(--primary-dark)]',
+  dashboard:
+    'border-[var(--primary-soft)] bg-[var(--primary-soft)] text-[var(--primary-dark)]',
   success: 'border-success-100 bg-success-50 text-success-700',
   warning: 'border-warning-100 bg-warning-50 text-warning-700',
   danger: 'border-danger-100 bg-danger-50 text-danger-700',
@@ -68,9 +75,7 @@ export function StatCard({
             <span
               className={cn(
                 'inline-flex items-center gap-0.5 text-xs font-semibold',
-                trend.isUp
-                  ? 'text-success-700'
-                  : 'text-danger-700',
+                trend.isUp ? 'text-success-700' : 'text-danger-700',
               )}
             >
               {trend.isUp ? (
@@ -117,8 +122,6 @@ export function StatCard({
   }
 
   return (
-    <div className={cn('shell-card min-h-40 p-5', className)}>
-      {content}
-    </div>
+    <div className={cn('shell-card min-h-40 p-5', className)}>{content}</div>
   );
 }

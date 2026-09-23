@@ -1,14 +1,14 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import test from "node:test";
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import test from 'node:test';
 
-const webRoot = new URL("..", import.meta.url).pathname;
-const read = (path) => readFileSync(join(webRoot, path), "utf8");
+const webRoot = new URL('..', import.meta.url).pathname;
+const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 
-test("remote option clients use bounded paginated endpoints and forward cancellation", () => {
-  const studentsApi = read("lib/api/students.ts");
-  const payrollApi = read("lib/api/payroll.ts");
+test('remote option clients use bounded paginated endpoints and forward cancellation', () => {
+  const studentsApi = read('lib/api/students.ts');
+  const payrollApi = read('lib/api/payroll.ts');
 
   assert.match(studentsApi, /listStudentOptions/);
   assert.match(studentsApi, /\/students\/options/);
@@ -20,12 +20,12 @@ test("remote option clients use bounded paginated endpoints and forward cancella
   assert.match(payrollApi, /\{ signal \}/);
 });
 
-test("shared remote selectors debounce, cache, page, retain selection, and expose accessible recovery", () => {
-  const combobox = read("components/ui/remote-combobox.tsx");
+test('shared remote selectors debounce, cache, page, retain selection, and expose accessible recovery', () => {
+  const combobox = read('components/ui/remote-combobox.tsx');
   const studentSelector = read(
-    "components/students/remote-student-selector.tsx",
+    'components/students/remote-student-selector.tsx',
   );
-  const staffSelector = read("components/staff/remote-staff-selector.tsx");
+  const staffSelector = read('components/staff/remote-staff-selector.tsx');
 
   assert.match(combobox, /REMOTE_SEARCH_DEBOUNCE_MS = 350/);
   assert.match(combobox, /useInfiniteQuery/);
@@ -37,9 +37,9 @@ test("shared remote selectors debounce, cache, page, retain selection, and expos
   assert.match(combobox, /Load more results/);
   assert.match(combobox, /retainedOption/);
   assert.match(combobox, /selectedOption\?\.id === value/);
-  assert.match(combobox, /role="combobox"/);
-  assert.match(combobox, /role="listbox"/);
-  assert.match(combobox, /role="option"/);
+  assert.match(combobox, /role=['"]combobox['"]/);
+  assert.match(combobox, /role=['"]listbox['"]/);
+  assert.match(combobox, /role=['"]option['"]/);
   assert.match(combobox, /aria-activedescendant/);
   assert.match(combobox, /event\.key === ["']ArrowDown["']/);
   assert.match(combobox, /event\.key === ["']ArrowUp["']/);
@@ -53,14 +53,14 @@ test("shared remote selectors debounce, cache, page, retain selection, and expos
   assert.match(staffSelector, /listStaffOptions/);
 });
 
-test("Activity selectors no longer load or locally filter the full student roster", () => {
+test('Activity selectors no longer load or locally filter the full student roster', () => {
   const activitySources = [
-    "app/dashboard/activity/milestones/page.tsx",
-    "app/dashboard/activity/observations/page.tsx",
-    "app/dashboard/activity/gallery/page.tsx",
+    'app/dashboard/activity/milestones/page.tsx',
+    'app/dashboard/activity/observations/page.tsx',
+    'app/dashboard/activity/gallery/page.tsx',
   ]
     .map(read)
-    .join("\n");
+    .join('\n');
 
   assert.doesNotMatch(activitySources, /listStudents\s*\(/);
   assert.doesNotMatch(activitySources, /limit:\s*1000/);
@@ -68,9 +68,9 @@ test("Activity selectors no longer load or locally filter the full student roste
   assert.match(activitySources, /RemoteStudentSelector/);
 });
 
-test("Learning and timetable selectors use bounded remote student and staff search", () => {
-  const learning = read("components/learning/learning-workspace.tsx");
-  const timetable = read("components/staff/staff-selector.tsx");
+test('Learning and timetable selectors use bounded remote student and staff search', () => {
+  const learning = read('components/learning/learning-workspace.tsx');
+  const timetable = read('components/staff/staff-selector.tsx');
 
   assert.doesNotMatch(learning, /listStudents\s*\(/);
   assert.doesNotMatch(learning, /listStaff\s*\(/);
@@ -81,15 +81,15 @@ test("Learning and timetable selectors use bounded remote student and staff sear
   assert.match(timetable, /RemoteStaffSelector/);
 });
 
-test("HR and academic structure staff selectors use bounded remote search", () => {
+test('HR and academic structure staff selectors use bounded remote search', () => {
   const selectorSources = [
-    "components/hr/central-documents-panel.tsx",
-    "components/hr/contract-list.tsx",
-    "components/hr/leave-balance-adjust-dialog.tsx",
-    "components/hr/leave-request-create-dialog.tsx",
-    "components/hr/salary-structure-dialog.tsx",
-    "components/hr/teacher-development-workspace.tsx",
-    "components/settings/academic-structure-workspace.tsx",
+    'components/hr/central-documents-panel.tsx',
+    'components/hr/contract-list.tsx',
+    'components/hr/leave-balance-adjust-dialog.tsx',
+    'components/hr/leave-request-create-dialog.tsx',
+    'components/hr/salary-structure-dialog.tsx',
+    'components/hr/teacher-development-workspace.tsx',
+    'components/settings/academic-structure-workspace.tsx',
   ].map((path) => ({ path, source: read(path) }));
 
   for (const { path, source } of selectorSources) {
@@ -98,24 +98,24 @@ test("HR and academic structure staff selectors use bounded remote search", () =
   }
 
   for (const path of [
-    "components/hr/central-documents-panel.tsx",
-    "components/hr/contract-list.tsx",
-    "components/hr/leave-balance-adjust-dialog.tsx",
-    "components/hr/leave-request-create-dialog.tsx",
-    "components/hr/salary-structure-dialog.tsx",
-    "components/hr/teacher-development-workspace.tsx",
+    'components/hr/central-documents-panel.tsx',
+    'components/hr/contract-list.tsx',
+    'components/hr/leave-balance-adjust-dialog.tsx',
+    'components/hr/leave-request-create-dialog.tsx',
+    'components/hr/salary-structure-dialog.tsx',
+    'components/hr/teacher-development-workspace.tsx',
   ]) {
     assert.match(read(path), /selectedOption=/, path);
   }
   assert.match(
-    read("components/settings/academic-structure-workspace.tsx"),
+    read('components/settings/academic-structure-workspace.tsx'),
     /selectedLabel=/,
   );
 });
 
-test("bulk staff attendance uses the paginated purpose-limited active roster", () => {
-  const dialog = read("components/hr/staff-attendance-mark-dialog.tsx");
-  const attendanceApi = read("lib/api/attendance.ts");
+test('bulk staff attendance uses the paginated purpose-limited active roster', () => {
+  const dialog = read('components/hr/staff-attendance-mark-dialog.tsx');
+  const attendanceApi = read('lib/api/attendance.ts');
 
   assert.doesNotMatch(dialog, /\bapi\.listStaff\b/);
   assert.match(dialog, /api\.listStaffAttendanceRoster/);

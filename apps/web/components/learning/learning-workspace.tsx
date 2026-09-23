@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { FormEvent, useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatBsDateTime } from "@schoolos/core";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatBsDateTime } from '@schoolos/core';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Archive,
   BookOpenCheck,
@@ -12,8 +12,8 @@ import {
   Plus,
   Save,
   Users,
-} from "lucide-react";
-import { learningApi } from "../../lib/api/learning";
+} from 'lucide-react';
+import { learningApi } from '../../lib/api/learning';
 import type {
   LearningActivity,
   LearningActivityPayload,
@@ -24,31 +24,31 @@ import type {
   LearningMode,
   LearningQuestion,
   LearningQuestionType,
-} from "../../lib/api/learning";
-import { api } from "../../lib/api";
-import { cn } from "../../lib/utils";
-import { EmptyState } from "../ui/empty-state";
-import { FilterBar } from "../ui/filter-bar";
-import { LoadingState } from "../ui/loading-state";
-import { OperationalSummaryGrid } from "../ui/operational-summary-grid";
-import { StatusBadge } from "../ui/status-badge";
-import { TablePagination } from "../ui/table-pagination";
-import { WorkSurface } from "../ui/work-surface";
-import { LearningResourcesPanel } from "./learning-resources-panel";
-import { LearningSessionsPanel } from "./learning-sessions-panel";
-import { LearningRouteGuard } from "./learning-runtime";
-import { RemoteStaffSelector } from "../staff/remote-staff-selector";
-import { RemoteStudentSelector } from "../students/remote-student-selector";
+} from '../../lib/api/learning';
+import { api } from '../../lib/api';
+import { cn } from '../../lib/utils';
+import { EmptyState } from '../ui/empty-state';
+import { FilterBar } from '../ui/filter-bar';
+import { LoadingState } from '../ui/loading-state';
+import { OperationalSummaryGrid } from '../ui/operational-summary-grid';
+import { StatusBadge } from '../ui/status-badge';
+import { TablePagination } from '../ui/table-pagination';
+import { WorkSurface } from '../ui/work-surface';
+import { LearningResourcesPanel } from './learning-resources-panel';
+import { LearningSessionsPanel } from './learning-sessions-panel';
+import { LearningRouteGuard } from './learning-runtime';
+import { RemoteStaffSelector } from '../staff/remote-staff-selector';
+import { RemoteStudentSelector } from '../students/remote-student-selector';
 
 type LearningTab =
-  | "overview"
-  | "activities"
-  | "builder"
-  | "resources"
-  | "sessions"
-  | "board"
-  | "lab"
-  | "progress";
+  | 'overview'
+  | 'activities'
+  | 'builder'
+  | 'resources'
+  | 'sessions'
+  | 'board'
+  | 'lab'
+  | 'progress';
 
 type LearningWorkspaceProps = {
   initialTab?: LearningTab;
@@ -56,79 +56,82 @@ type LearningWorkspaceProps = {
 };
 
 const activityTypes: LearningActivityType[] = [
-  "PRACTICE",
-  "QUIZ",
-  "EXPLANATION",
-  "REVISION",
-  "OBSERVATION",
+  'PRACTICE',
+  'QUIZ',
+  'EXPLANATION',
+  'REVISION',
+  'OBSERVATION',
 ];
-const difficulties: LearningDifficulty[] = ["EASY", "MEDIUM", "HARD"];
+const difficulties: LearningDifficulty[] = ['EASY', 'MEDIUM', 'HARD'];
 const modes: LearningMode[] = [
-  "SMART_BOARD",
-  "GROUP",
-  "COMPUTER_LAB",
-  "WORKSHEET",
-  "HYBRID",
+  'SMART_BOARD',
+  'GROUP',
+  'COMPUTER_LAB',
+  'WORKSHEET',
+  'HYBRID',
 ];
-const languageModes: LearningLanguageMode[] = ["ENGLISH", "NEPALI", "MIXED"];
-const statuses: LearningActivityStatus[] = ["DRAFT", "READY"];
+const languageModes: LearningLanguageMode[] = ['ENGLISH', 'NEPALI', 'MIXED'];
+const statuses: LearningActivityStatus[] = ['DRAFT', 'READY'];
 const questionTypes: LearningQuestionType[] = [
-  "MULTIPLE_CHOICE",
-  "TRUE_FALSE",
-  "SHORT_ANSWER",
-  "MATCHING",
-  "ORDERING",
+  'MULTIPLE_CHOICE',
+  'TRUE_FALSE',
+  'SHORT_ANSWER',
+  'MATCHING',
+  'ORDERING',
 ];
 
 const emptyQuestion: LearningQuestion = {
-  type: "MULTIPLE_CHOICE",
-  prompt: "",
-  options: ["Option A", "Option B"],
-  correctAnswer: "Option A",
+  type: 'MULTIPLE_CHOICE',
+  prompt: '',
+  options: ['Option A', 'Option B'],
+  correctAnswer: 'Option A',
   points: 1,
 };
 
 const emptyActivityForm: LearningActivityPayload = {
-  title: "",
-  description: "",
-  classId: "",
-  sectionId: "",
-  subjectId: "",
-  teacherId: "",
-  activityType: "PRACTICE",
-  difficulty: "EASY",
-  mode: "SMART_BOARD",
-  accessType: "SCHOOL_ONLY",
-  languageMode: "ENGLISH",
+  title: '',
+  description: '',
+  classId: '',
+  sectionId: '',
+  subjectId: '',
+  teacherId: '',
+  activityType: 'PRACTICE',
+  difficulty: 'EASY',
+  mode: 'SMART_BOARD',
+  accessType: 'SCHOOL_ONLY',
+  languageMode: 'ENGLISH',
   estimatedMinutes: 20,
-  status: "DRAFT",
+  status: 'DRAFT',
   questions: [{ ...emptyQuestion }],
 };
 
 export function LearningWorkspace({
-  initialTab = "overview",
+  initialTab = 'overview',
   activityId,
 }: LearningWorkspaceProps) {
   return (
-    <LearningRouteGuard permissions={["learning:read"]} title="Learning">
-      <LearningWorkspaceContent initialTab={initialTab} activityId={activityId} />
+    <LearningRouteGuard permissions={['learning:read']} title="Learning">
+      <LearningWorkspaceContent
+        initialTab={initialTab}
+        activityId={activityId}
+      />
     </LearningRouteGuard>
   );
 }
 
 function LearningWorkspaceContent({
-  initialTab = "overview",
+  initialTab = 'overview',
   activityId,
 }: LearningWorkspaceProps) {
   const router = useRouter();
-  const activeTab: LearningTab = activityId ? "builder" : initialTab;
+  const activeTab: LearningTab = activityId ? 'builder' : initialTab;
   const [filters, setFilters] = useState({
-    classId: "",
-    sectionId: "",
-    subjectId: "",
-    difficulty: "",
-    mode: "",
-    status: "",
+    classId: '',
+    sectionId: '',
+    subjectId: '',
+    difficulty: '',
+    mode: '',
+    status: '',
   });
   const [page, setPage] = useState(1);
   const [form, setForm] = useState<LearningActivityPayload>({
@@ -139,13 +142,13 @@ function LearningWorkspaceContent({
     activityId ?? null,
   );
   const [notice, setNotice] = useState<string | null>(null);
-  const [progressClassId, setProgressClassId] = useState("");
-  const [progressStudentId, setProgressStudentId] = useState("");
+  const [progressClassId, setProgressClassId] = useState('');
+  const [progressStudentId, setProgressStudentId] = useState('');
 
   const queryClient = useQueryClient();
 
   const activitiesQuery = useQuery({
-    queryKey: ["learning-activities", filters],
+    queryKey: ['learning-activities', filters],
     queryFn: () =>
       learningApi.listActivities({
         classId: filters.classId || undefined,
@@ -159,31 +162,31 @@ function LearningWorkspaceContent({
       }),
   });
   const activityDetailQuery = useQuery({
-    queryKey: ["learning-activity", editingActivityId],
+    queryKey: ['learning-activity', editingActivityId],
     queryFn: () => learningApi.getActivity(editingActivityId as string),
     enabled: Boolean(editingActivityId),
   });
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
   const sectionsQuery = useQuery({
-    queryKey: ["sections"],
+    queryKey: ['sections'],
     queryFn: api.listSections,
   });
   const subjectsQuery = useQuery({
-    queryKey: ["subjects", form.classId],
+    queryKey: ['subjects', form.classId],
     queryFn: () => api.listSubjects({ classId: form.classId || undefined }),
   });
   const classProgressQuery = useQuery({
-    queryKey: ["learning-class-progress", progressClassId],
+    queryKey: ['learning-class-progress', progressClassId],
     queryFn: () => learningApi.getClassProgress(progressClassId),
-    enabled: activeTab === "progress" && Boolean(progressClassId),
+    enabled: activeTab === 'progress' && Boolean(progressClassId),
   });
   const studentProgressQuery = useQuery({
-    queryKey: ["learning-student-progress", progressStudentId],
+    queryKey: ['learning-student-progress', progressStudentId],
     queryFn: () => learningApi.getStudentProgress(progressStudentId),
-    enabled: activeTab === "progress" && Boolean(progressStudentId),
+    enabled: activeTab === 'progress' && Boolean(progressStudentId),
   });
 
   const activities = activitiesQuery.data?.items ?? [];
@@ -199,11 +202,11 @@ function LearningWorkspaceContent({
   const createActivityMutation = useMutation({
     mutationFn: learningApi.createActivity,
     onSuccess: (activity) => {
-      setNotice("Learning activity saved.");
+      setNotice('Learning activity saved.');
       setEditingActivityId(activity.id);
-      void queryClient.invalidateQueries({ queryKey: ["learning-activities"] });
+      void queryClient.invalidateQueries({ queryKey: ['learning-activities'] });
       void queryClient.invalidateQueries({
-        queryKey: ["learning-activity", activity.id],
+        queryKey: ['learning-activity', activity.id],
       });
     },
   });
@@ -216,18 +219,18 @@ function LearningWorkspaceContent({
       body: Partial<LearningActivityPayload>;
     }) => learningApi.updateActivity(id, body),
     onSuccess: (activity) => {
-      setNotice("Learning activity updated.");
-      void queryClient.invalidateQueries({ queryKey: ["learning-activities"] });
+      setNotice('Learning activity updated.');
+      void queryClient.invalidateQueries({ queryKey: ['learning-activities'] });
       void queryClient.invalidateQueries({
-        queryKey: ["learning-activity", activity.id],
+        queryKey: ['learning-activity', activity.id],
       });
     },
   });
   const archiveActivityMutation = useMutation({
     mutationFn: learningApi.archiveActivity,
     onSuccess: () => {
-      setNotice("Learning activity archived.");
-      void queryClient.invalidateQueries({ queryKey: ["learning-activities"] });
+      setNotice('Learning activity archived.');
+      void queryClient.invalidateQueries({ queryKey: ['learning-activities'] });
     },
   });
   function selectActivity(activity: LearningActivity) {
@@ -239,7 +242,7 @@ function LearningWorkspaceContent({
   function resetBuilder() {
     setEditingActivityId(null);
     setForm({ ...emptyActivityForm, questions: [{ ...emptyQuestion }] });
-    router.push("/dashboard/learning/activities/new");
+    router.push('/dashboard/learning/activities/new');
   }
 
   function submitActivity(event: FormEvent<HTMLFormElement>) {
@@ -286,7 +289,7 @@ function LearningWorkspaceContent({
     currentTeacher && currentTeacher.id === form.teacherId
       ? [currentTeacher.firstName, currentTeacher.lastName]
           .filter(Boolean)
-          .join(" ")
+          .join(' ')
       : undefined;
   useEffect(() => {
     if (!currentActivity) return;
@@ -296,19 +299,57 @@ function LearningWorkspaceContent({
     <div className="space-y-6">
       {notice && <Notice message={notice} onDismiss={() => setNotice(null)} />}
 
-      {activeTab === "overview" && (
+      {activeTab === 'overview' && (
         <section className="space-y-5">
           <OperationalSummaryGrid
             module="learning"
             moduleName="Learning"
             cards={[
-              { key: "myDraftActivities", label: "My draft activities", description: "Teacher activities still being prepared.", icon: <BookOpenCheck /> },
-              { key: "draftActivities", label: "Draft activities", description: "Activities still being prepared.", icon: <BookOpenCheck /> },
-              { key: "myLiveSessions", label: "My live sessions", description: "Teacher-led sessions active now.", icon: <MonitorPlay />, tone: "info" },
-              { key: "liveSessions", label: "Live sessions", description: "School learning sessions active now.", icon: <MonitorPlay />, tone: "info" },
-              { key: "mySessionRisks", label: "Session attention", description: "Paused or expired sessions needing review.", tone: "warning" },
-              { key: "sessionRisks", label: "Session attention", description: "Paused or expired sessions needing review.", tone: "warning" },
-              { key: "submittedAttemptsToday", label: "Submitted today", description: "Attempts submitted during the current school day.", tone: "success" },
+              {
+                key: 'myDraftActivities',
+                label: 'My draft activities',
+                description: 'Teacher activities still being prepared.',
+                icon: <BookOpenCheck />,
+              },
+              {
+                key: 'draftActivities',
+                label: 'Draft activities',
+                description: 'Activities still being prepared.',
+                icon: <BookOpenCheck />,
+              },
+              {
+                key: 'myLiveSessions',
+                label: 'My live sessions',
+                description: 'Teacher-led sessions active now.',
+                icon: <MonitorPlay />,
+                tone: 'info',
+              },
+              {
+                key: 'liveSessions',
+                label: 'Live sessions',
+                description: 'School learning sessions active now.',
+                icon: <MonitorPlay />,
+                tone: 'info',
+              },
+              {
+                key: 'mySessionRisks',
+                label: 'Session attention',
+                description: 'Paused or expired sessions needing review.',
+                tone: 'warning',
+              },
+              {
+                key: 'sessionRisks',
+                label: 'Session attention',
+                description: 'Paused or expired sessions needing review.',
+                tone: 'warning',
+              },
+              {
+                key: 'submittedAttemptsToday',
+                label: 'Submitted today',
+                description:
+                  'Attempts submitted during the current school day.',
+                tone: 'success',
+              },
             ]}
           />
           <ActivityList
@@ -317,83 +358,71 @@ function LearningWorkspaceContent({
             isLoading={activitiesQuery.isLoading}
             onSelect={selectActivity}
             onArchive={(id) => archiveActivityMutation.mutate(id)}
-            onLaunch={() => router.push("/dashboard/learning/sessions")}
+            onLaunch={() => router.push('/dashboard/learning/sessions')}
           />
         </section>
       )}
 
-      {activeTab === "activities" && (
+      {activeTab === 'activities' && (
         <section className="space-y-5">
           <FilterBar
             label="Learning activity filters"
             description="Filter the server-backed teacher activity directory."
           >
-              <SelectField
-                label="Class"
-                value={filters.classId}
-                onChange={(value) =>
-                  updateFilter("classId", value)
-                }
-                options={(classesQuery.data ?? []).map((item) => ({
-                  value: item.id,
-                  label: item.name,
-                }))}
-              />
-              <SelectField
-                label="Section"
-                value={filters.sectionId}
-                onChange={(value) =>
-                  updateFilter("sectionId", value)
-                }
-                options={(sectionsQuery.data ?? []).map((item) => ({
-                  value: item.id,
-                  label: item.name,
-                }))}
-              />
-              <SelectField
-                label="Subject"
-                value={filters.subjectId}
-                onChange={(value) =>
-                  updateFilter("subjectId", value)
-                }
-                options={(subjectsQuery.data ?? []).map((item) => ({
-                  value: item.id,
-                  label: item.name,
-                }))}
-              />
-              <SelectField
-                label="Difficulty"
-                value={filters.difficulty}
-                onChange={(value) =>
-                  updateFilter("difficulty", value)
-                }
-                options={difficulties.map((value) => ({
-                  value,
-                  label: labelize(value),
-                }))}
-              />
-              <SelectField
-                label="Mode"
-                value={filters.mode}
-                onChange={(value) =>
-                  updateFilter("mode", value)
-                }
-                options={modes.map((value) => ({
-                  value,
-                  label: labelize(value),
-                }))}
-              />
-              <SelectField
-                label="Status"
-                value={filters.status}
-                onChange={(value) =>
-                  updateFilter("status", value)
-                }
-                options={["", ...statuses].filter(Boolean).map((value) => ({
-                  value,
-                  label: labelize(value),
-                }))}
-              />
+            <SelectField
+              label="Class"
+              value={filters.classId}
+              onChange={(value) => updateFilter('classId', value)}
+              options={(classesQuery.data ?? []).map((item) => ({
+                value: item.id,
+                label: item.name,
+              }))}
+            />
+            <SelectField
+              label="Section"
+              value={filters.sectionId}
+              onChange={(value) => updateFilter('sectionId', value)}
+              options={(sectionsQuery.data ?? []).map((item) => ({
+                value: item.id,
+                label: item.name,
+              }))}
+            />
+            <SelectField
+              label="Subject"
+              value={filters.subjectId}
+              onChange={(value) => updateFilter('subjectId', value)}
+              options={(subjectsQuery.data ?? []).map((item) => ({
+                value: item.id,
+                label: item.name,
+              }))}
+            />
+            <SelectField
+              label="Difficulty"
+              value={filters.difficulty}
+              onChange={(value) => updateFilter('difficulty', value)}
+              options={difficulties.map((value) => ({
+                value,
+                label: labelize(value),
+              }))}
+            />
+            <SelectField
+              label="Mode"
+              value={filters.mode}
+              onChange={(value) => updateFilter('mode', value)}
+              options={modes.map((value) => ({
+                value,
+                label: labelize(value),
+              }))}
+            />
+            <SelectField
+              label="Status"
+              value={filters.status}
+              onChange={(value) => updateFilter('status', value)}
+              options={['', ...statuses].filter(Boolean).map((value) => ({
+                value,
+                label: labelize(value),
+              }))}
+            />
           </FilterBar>
           <ActivityList
             title="Teacher activities"
@@ -401,7 +430,7 @@ function LearningWorkspaceContent({
             isLoading={activitiesQuery.isLoading}
             onSelect={selectActivity}
             onArchive={(id) => archiveActivityMutation.mutate(id)}
-            onLaunch={() => router.push("/dashboard/learning/sessions")}
+            onLaunch={() => router.push('/dashboard/learning/sessions')}
             page={page}
             pageSize={20}
             total={activitiesQuery.data?.total ?? 0}
@@ -410,14 +439,14 @@ function LearningWorkspaceContent({
         </section>
       )}
 
-      {activeTab === "builder" && (
+      {activeTab === 'builder' && (
         <section className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-black text-slate-950">
                 {editingActivityId
-                  ? "Edit Learning Activity"
-                  : "Teacher Activity Builder"}
+                  ? 'Edit Learning Activity'
+                  : 'Teacher Activity Builder'}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
                 Build school-only activities with Easy, Medium, or Hard
@@ -448,7 +477,7 @@ function LearningWorkspaceContent({
                 />
                 <SelectField
                   label="Status"
-                  value={form.status ?? "DRAFT"}
+                  value={form.status ?? 'DRAFT'}
                   onChange={(value) =>
                     setForm((current) => ({
                       ...current,
@@ -462,7 +491,7 @@ function LearningWorkspaceContent({
                 />
                 <TextAreaField
                   label="Description"
-                  value={form.description ?? ""}
+                  value={form.description ?? ''}
                   onChange={(value) =>
                     setForm((current) => ({ ...current, description: value }))
                   }
@@ -476,7 +505,7 @@ function LearningWorkspaceContent({
                     setForm((current) => ({
                       ...current,
                       classId: value,
-                      subjectId: "",
+                      subjectId: '',
                     }))
                   }
                   options={(classesQuery.data ?? []).map((item) => ({
@@ -486,7 +515,7 @@ function LearningWorkspaceContent({
                 />
                 <SelectField
                   label="Section"
-                  value={form.sectionId ?? ""}
+                  value={form.sectionId ?? ''}
                   onChange={(value) =>
                     setForm((current) => ({ ...current, sectionId: value }))
                   }
@@ -509,7 +538,7 @@ function LearningWorkspaceContent({
                 />
                 <RemoteStaffSelector
                   label="Teacher"
-                  value={form.teacherId ?? ""}
+                  value={form.teacherId ?? ''}
                   onChange={(teacherId) =>
                     setForm((current) => ({ ...current, teacherId }))
                   }
@@ -560,7 +589,7 @@ function LearningWorkspaceContent({
                 />
                 <SelectField
                   label="Language"
-                  value={form.languageMode ?? "ENGLISH"}
+                  value={form.languageMode ?? 'ENGLISH'}
                   onChange={(value) =>
                     setForm((current) => ({
                       ...current,
@@ -575,7 +604,7 @@ function LearningWorkspaceContent({
                 <InputField
                   label="Estimated minutes"
                   type="number"
-                  value={String(form.estimatedMinutes ?? "")}
+                  value={String(form.estimatedMinutes ?? '')}
                   onChange={(value) =>
                     setForm((current) => ({
                       ...current,
@@ -632,12 +661,12 @@ function LearningWorkspaceContent({
                   className="inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--primary)] px-5 text-sm font-black text-white shadow-sm hover:bg-[var(--primary-dark)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Save size={17} />
-                  {editingActivityId ? "Update activity" : "Create activity"}
+                  {editingActivityId ? 'Update activity' : 'Create activity'}
                 </button>
                 {currentActivity && (
                   <button
                     type="button"
-                    onClick={() => router.push("/dashboard/learning/sessions")}
+                    onClick={() => router.push('/dashboard/learning/sessions')}
                     className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-white px-5 text-sm font-black text-[var(--primary)] hover:bg-muted"
                   >
                     <MonitorPlay size={17} />
@@ -650,17 +679,17 @@ function LearningWorkspaceContent({
         </section>
       )}
 
-      {activeTab === "sessions" && (
+      {activeTab === 'sessions' && (
         <LearningSessionsPanel activities={activities} />
       )}
 
-      {activeTab === "resources" && <LearningResourcesPanel />}
+      {activeTab === 'resources' && <LearningResourcesPanel />}
 
-      {activeTab === "board" && <BoardLaunchPanel />}
+      {activeTab === 'board' && <BoardLaunchPanel />}
 
-      {activeTab === "lab" && <LabPanel />}
+      {activeTab === 'lab' && <LabPanel />}
 
-      {activeTab === "progress" && (
+      {activeTab === 'progress' && (
         <ProgressPanel
           classes={(classesQuery.data ?? []).map((item) => ({
             id: item.id,
@@ -741,68 +770,79 @@ function ActivityList({
   return (
     <WorkSurface
       title={title}
-      description={total === undefined ? "Open an activity to edit, archive, or launch it." : `${total} activities match the current server filters.`}
+      description={
+        total === undefined
+          ? 'Open an activity to edit, archive, or launch it.'
+          : `${total} activities match the current server filters.`
+      }
       variant="table"
       flush
-      footer={page && pageSize && total !== undefined && onPageChange ? (
-        <TablePagination page={page} pageSize={pageSize} total={total} onPageChange={onPageChange} />
-      ) : undefined}
+      footer={
+        page && pageSize && total !== undefined && onPageChange ? (
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={onPageChange}
+          />
+        ) : undefined
+      }
     >
       <div className="overflow-x-auto">
-      <div className="grid grid-cols-12 border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-500">
-        <div className="col-span-4">Activity</div>
-        <div className="col-span-2">Class</div>
-        <div className="col-span-2">Mode</div>
-        <div className="col-span-2">Status</div>
-        <div className="col-span-2 text-right">Actions</div>
-      </div>
-      {activities.map((activity) => (
-        <div
-          key={activity.id}
-          className="grid grid-cols-12 items-center gap-3 border-b border-slate-100 px-4 py-4 last:border-0"
-        >
-          <button
-            type="button"
-            onClick={() => onSelect(activity)}
-            className="col-span-4 min-w-0 text-left"
-          >
-            <p className="truncate text-sm font-black text-slate-950">
-              {activity.title}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {labelize(activity.difficulty)} ·{" "}
-              {activity._count?.questions ?? activity.questions?.length ?? 0}{" "}
-              questions
-            </p>
-          </button>
-          <div className="col-span-2 text-sm text-slate-600">
-            {activity.class?.name ?? activity.classId}
-            {activity.section?.name ? ` / ${activity.section.name}` : ""}
-          </div>
-          <div className="col-span-2 text-sm font-semibold text-slate-600">
-            {labelize(activity.mode)}
-          </div>
-          <div className="col-span-2">
-            <StatusBadge status={activity.status} />
-          </div>
-          <div className="col-span-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => onLaunch(activity.id)}
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 px-3 text-xs font-black text-emerald-800 hover:bg-emerald-100"
-            >
-              <MonitorPlay size={15} />
-            </button>
-            <button
-              type="button"
-              onClick={() => onArchive(activity.id)}
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 hover:bg-slate-50"
-            >
-              <Archive size={15} />
-            </button>
-          </div>
+        <div className="grid grid-cols-12 border-b border-slate-100 bg-slate-50 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-500">
+          <div className="col-span-4">Activity</div>
+          <div className="col-span-2">Class</div>
+          <div className="col-span-2">Mode</div>
+          <div className="col-span-2">Status</div>
+          <div className="col-span-2 text-right">Actions</div>
         </div>
-      ))}
+        {activities.map((activity) => (
+          <div
+            key={activity.id}
+            className="grid grid-cols-12 items-center gap-3 border-b border-slate-100 px-4 py-4 last:border-0"
+          >
+            <button
+              type="button"
+              onClick={() => onSelect(activity)}
+              className="col-span-4 min-w-0 text-left"
+            >
+              <p className="truncate text-sm font-black text-slate-950">
+                {activity.title}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {labelize(activity.difficulty)} ·{' '}
+                {activity._count?.questions ?? activity.questions?.length ?? 0}{' '}
+                questions
+              </p>
+            </button>
+            <div className="col-span-2 text-sm text-slate-600">
+              {activity.class?.name ?? activity.classId}
+              {activity.section?.name ? ` / ${activity.section.name}` : ''}
+            </div>
+            <div className="col-span-2 text-sm font-semibold text-slate-600">
+              {labelize(activity.mode)}
+            </div>
+            <div className="col-span-2">
+              <StatusBadge status={activity.status} />
+            </div>
+            <div className="col-span-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => onLaunch(activity.id)}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 px-3 text-xs font-black text-emerald-800 hover:bg-emerald-100"
+              >
+                <MonitorPlay size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onArchive(activity.id)}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 hover:bg-slate-50"
+              >
+                <Archive size={15} />
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </WorkSurface>
   );
@@ -901,7 +941,7 @@ function ProgressPanel(props: {
                       <StatusBadge
                         key={progress.id}
                         status={progress.label}
-                        label={`${progress.subject?.name ?? "Subject"} · ${progress.labelText}`}
+                        label={`${progress.subject?.name ?? 'Subject'} · ${progress.labelText}`}
                         tone={progressTone(progress.label)}
                       />
                     ))
@@ -926,10 +966,10 @@ function ProgressPanel(props: {
                 <p className="text-sm font-black text-slate-950">
                   {progress.activity?.title ??
                     progress.subject?.name ??
-                    "Learning progress"}
+                    'Learning progress'}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  {progress.completedCount} completed ·{" "}
+                  {progress.completedCount} completed ·{' '}
                   {Math.round(progress.averageAccuracy)}%
                 </p>
                 <div className="mt-3">
@@ -960,12 +1000,12 @@ function QuestionEditor({
   onRemove: () => void;
 }) {
   const optionsText = Array.isArray(question.options)
-    ? question.options.join("\n")
-    : "";
+    ? question.options.join('\n')
+    : '';
   const matchingPairsText =
-    question.type === "MATCHING" ? matchingPairsToText(question.options) : "";
+    question.type === 'MATCHING' ? matchingPairsToText(question.options) : '';
   const orderingItemsText =
-    question.type === "ORDERING" ? orderingItemsToText(question.options) : "";
+    question.type === 'ORDERING' ? orderingItemsToText(question.options) : '';
 
   return (
     <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
@@ -994,14 +1034,14 @@ function QuestionEditor({
           onChange={(value) => onChange({ points: Number(value || 1) })}
         />
       </div>
-      {question.type === "MULTIPLE_CHOICE" && (
+      {question.type === 'MULTIPLE_CHOICE' && (
         <TextAreaField
           label="Options, one per line"
           value={optionsText}
           onChange={(value) =>
             onChange({
               options: value
-                .split("\n")
+                .split('\n')
                 .map((item) => item.trim())
                 .filter(Boolean),
             })
@@ -1009,7 +1049,7 @@ function QuestionEditor({
           className="mt-3"
         />
       )}
-      {question.type === "MATCHING" && (
+      {question.type === 'MATCHING' && (
         <TextAreaField
           label="Pairs: leftId | leftText | rightId | rightText"
           value={matchingPairsText}
@@ -1026,7 +1066,7 @@ function QuestionEditor({
           className="mt-3"
         />
       )}
-      {question.type === "ORDERING" && (
+      {question.type === 'ORDERING' && (
         <TextAreaField
           label="Ordered items: id | text"
           value={orderingItemsText}
@@ -1040,32 +1080,32 @@ function QuestionEditor({
           className="mt-3"
         />
       )}
-      {question.type === "TRUE_FALSE" ? (
+      {question.type === 'TRUE_FALSE' ? (
         <SelectField
           label="Correct answer"
-          value={String(question.correctAnswer ?? "true")}
-          onChange={(value) => onChange({ correctAnswer: value === "true" })}
+          value={String(question.correctAnswer ?? 'true')}
+          onChange={(value) => onChange({ correctAnswer: value === 'true' })}
           options={[
-            { value: "true", label: "True" },
-            { value: "false", label: "False" },
+            { value: 'true', label: 'True' },
+            { value: 'false', label: 'False' },
           ]}
           className="mt-3"
         />
-      ) : question.type === "MATCHING" || question.type === "ORDERING" ? (
+      ) : question.type === 'MATCHING' || question.type === 'ORDERING' ? (
         <p className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500">
           Correct answer is derived from the ordered rows above.
         </p>
       ) : (
         <InputField
           label="Correct answer"
-          value={String(question.correctAnswer ?? "")}
+          value={String(question.correctAnswer ?? '')}
           onChange={(value) => onChange({ correctAnswer: value })}
           className="mt-3"
         />
       )}
       <InputField
         label="Explanation"
-        value={question.explanation ?? ""}
+        value={question.explanation ?? ''}
         onChange={(value) => onChange({ explanation: value })}
         className="mt-3"
       />
@@ -1084,7 +1124,7 @@ function InputField({
   label,
   value,
   onChange,
-  type = "text",
+  type = 'text',
   required = false,
   className,
 }: {
@@ -1096,7 +1136,7 @@ function InputField({
   className?: string;
 }) {
   return (
-    <label className={cn("block", className)}>
+    <label className={cn('block', className)}>
       <span className="text-xs font-black uppercase tracking-wide text-slate-500">
         {label}
       </span>
@@ -1123,7 +1163,7 @@ function TextAreaField({
   className?: string;
 }) {
   return (
-    <label className={cn("block", className)}>
+    <label className={cn('block', className)}>
       <span className="text-xs font-black uppercase tracking-wide text-slate-500">
         {label}
       </span>
@@ -1153,7 +1193,7 @@ function SelectField({
   className?: string;
 }) {
   return (
-    <label className={cn("block", className)}>
+    <label className={cn('block', className)}>
       <span className="text-xs font-black uppercase tracking-wide text-slate-500">
         {label}
       </span>
@@ -1198,7 +1238,7 @@ function Notice({
 function ErrorNotice({ error }: { error: unknown }) {
   return (
     <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
-      {error instanceof Error ? error.message : "Learning request failed."}
+      {error instanceof Error ? error.message : 'Learning request failed.'}
     </div>
   );
 }
@@ -1206,9 +1246,9 @@ function ErrorNotice({ error }: { error: unknown }) {
 function activityToForm(activity: LearningActivity): LearningActivityPayload {
   return {
     title: activity.title,
-    description: activity.description ?? "",
+    description: activity.description ?? '',
     classId: activity.classId,
-    sectionId: activity.sectionId ?? "",
+    sectionId: activity.sectionId ?? '',
     subjectId: activity.subjectId,
     teacherId: activity.teacherId,
     activityType: activity.activityType,
@@ -1217,7 +1257,7 @@ function activityToForm(activity: LearningActivity): LearningActivityPayload {
     accessType: activity.accessType,
     languageMode: activity.languageMode,
     estimatedMinutes: activity.estimatedMinutes ?? 20,
-    status: activity.status === "ARCHIVED" ? "DRAFT" : activity.status,
+    status: activity.status === 'ARCHIVED' ? 'DRAFT' : activity.status,
     questions: activity.questions?.length
       ? activity.questions.map((question, index) => ({
           ...question,
@@ -1236,7 +1276,7 @@ function normalizeActivityPayload(
     teacherId: payload.teacherId || undefined,
     description: payload.description || undefined,
     estimatedMinutes: payload.estimatedMinutes || undefined,
-    accessType: "SCHOOL_ONLY",
+    accessType: 'SCHOOL_ONLY',
     questions: (payload.questions ?? [])
       .filter((question) => question.prompt.trim())
       .map((question, index) => ({
@@ -1251,29 +1291,29 @@ function normalizeActivityPayload(
 function questionDefaultsForType(
   type: LearningQuestionType,
 ): Partial<LearningQuestion> {
-  if (type === "MULTIPLE_CHOICE") {
+  if (type === 'MULTIPLE_CHOICE') {
     return {
       type,
-      options: ["Option A", "Option B"],
-      correctAnswer: "Option A",
+      options: ['Option A', 'Option B'],
+      correctAnswer: 'Option A',
     };
   }
-  if (type === "TRUE_FALSE") {
+  if (type === 'TRUE_FALSE') {
     return { type, options: undefined, correctAnswer: true };
   }
-  if (type === "MATCHING") {
+  if (type === 'MATCHING') {
     const pairs = [
       {
-        leftId: "left-1",
-        leftText: "Prompt 1",
-        rightId: "right-1",
-        rightText: "Match 1",
+        leftId: 'left-1',
+        leftText: 'Prompt 1',
+        rightId: 'right-1',
+        rightText: 'Match 1',
       },
       {
-        leftId: "left-2",
-        leftText: "Prompt 2",
-        rightId: "right-2",
-        rightText: "Match 2",
+        leftId: 'left-2',
+        leftText: 'Prompt 2',
+        rightId: 'right-2',
+        rightText: 'Match 2',
       },
     ];
     return {
@@ -1285,10 +1325,10 @@ function questionDefaultsForType(
       })),
     };
   }
-  if (type === "ORDERING") {
+  if (type === 'ORDERING') {
     const items = [
-      { id: "item-1", text: "First step" },
-      { id: "item-2", text: "Second step" },
+      { id: 'item-1', text: 'First step' },
+      { id: 'item-2', text: 'Second step' },
     ];
     return {
       type,
@@ -1296,13 +1336,13 @@ function questionDefaultsForType(
       correctAnswer: items.map((item) => item.id),
     };
   }
-  return { type, options: undefined, correctAnswer: "" };
+  return { type, options: undefined, correctAnswer: '' };
 }
 
 function parseMatchingPairs(value: string) {
   return value
-    .split("\n")
-    .map((line) => line.split("|").map((part) => part.trim()))
+    .split('\n')
+    .map((line) => line.split('|').map((part) => part.trim()))
     .filter((parts) => parts.length >= 4 && parts.every(Boolean))
     .map(([leftId, leftText, rightId, rightText]) => ({
       leftId,
@@ -1313,59 +1353,59 @@ function parseMatchingPairs(value: string) {
 }
 
 function matchingPairsToText(options: unknown) {
-  if (!isRecord(options) || !Array.isArray(options.pairs)) return "";
+  if (!isRecord(options) || !Array.isArray(options.pairs)) return '';
   return options.pairs
     .map((pair) => {
-      if (!isRecord(pair)) return "";
+      if (!isRecord(pair)) return '';
       return [pair.leftId, pair.leftText, pair.rightId, pair.rightText]
-        .map((value) => String(value ?? ""))
-        .join(" | ");
+        .map((value) => String(value ?? ''))
+        .join(' | ');
     })
     .filter(Boolean)
-    .join("\n");
+    .join('\n');
 }
 
 function parseOrderingItems(value: string) {
   return value
-    .split("\n")
-    .map((line) => line.split("|").map((part) => part.trim()))
+    .split('\n')
+    .map((line) => line.split('|').map((part) => part.trim()))
     .filter((parts) => parts.length >= 2 && parts[0] && parts[1])
     .map(([id, text]) => ({ id, text }));
 }
 
 function orderingItemsToText(options: unknown) {
-  if (!isRecord(options) || !Array.isArray(options.items)) return "";
+  if (!isRecord(options) || !Array.isArray(options.items)) return '';
   return options.items
     .map((item) => {
-      if (!isRecord(item)) return "";
+      if (!isRecord(item)) return '';
       return [item.id, item.text]
-        .map((value) => String(value ?? ""))
-        .join(" | ");
+        .map((value) => String(value ?? ''))
+        .join(' | ');
     })
     .filter(Boolean)
-    .join("\n");
+    .join('\n');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function labelize(value: string) {
   return value
     .toLowerCase()
-    .split("_")
+    .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+    .join(' ');
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return "not set";
+  if (!value) return 'not set';
   return formatBsDateTime(value);
 }
 
 function progressTone(label: string) {
-  if (label === "STRONG") return "approved";
-  if (label === "READY") return "published";
-  if (label === "IMPROVING") return "pending";
-  return "conflict";
+  if (label === 'STRONG') return 'approved';
+  if (label === 'READY') return 'published';
+  if (label === 'IMPROVING') return 'pending';
+  return 'conflict';
 }

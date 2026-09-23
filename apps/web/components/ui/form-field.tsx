@@ -1,6 +1,13 @@
 'use client';
 
-import { Children, cloneElement, isValidElement, useId, type ReactNode, type HTMLAttributes } from 'react';
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  useId,
+  type ReactNode,
+  type HTMLAttributes,
+} from 'react';
 import { cn } from '../../lib/utils';
 import { Input } from './input';
 import { Select } from './select';
@@ -19,13 +26,31 @@ interface FormFieldProps {
   htmlFor?: string;
 }
 
-type ControlProps = HTMLAttributes<HTMLElement> & { children?: ReactNode; required?: boolean; type?: string };
+type ControlProps = HTMLAttributes<HTMLElement> & {
+  children?: ReactNode;
+  required?: boolean;
+  type?: string;
+};
 
 function isControl(type: unknown) {
-  return type === 'input' || type === 'select' || type === 'textarea' || type === Input || type === Select || type === Textarea;
+  return (
+    type === 'input' ||
+    type === 'select' ||
+    type === 'textarea' ||
+    type === Input ||
+    type === Select ||
+    type === Textarea
+  );
 }
 
-export function FormField({ label, description, error, children, className, htmlFor }: FormFieldProps) {
+export function FormField({
+  label,
+  description,
+  error,
+  children,
+  className,
+  htmlFor,
+}: FormFieldProps) {
   const generatedId = useId();
   const messageId = `${generatedId}-message`;
   const labelId = `${generatedId}-label`;
@@ -43,13 +68,21 @@ export function FormField({ label, description, error, children, className, html
         return cloneElement(child, {
           id: controlId,
           'aria-invalid': error ? true : child.props['aria-invalid'],
-          'aria-describedby': [child.props['aria-describedby'], error || description ? messageId : undefined].filter(Boolean).join(' ') || undefined,
+          'aria-describedby':
+            [
+              child.props['aria-describedby'],
+              error || description ? messageId : undefined,
+            ]
+              .filter(Boolean)
+              .join(' ') || undefined,
         });
       }
       // Only traverse native layout containers. Composite selectors manage
       // their own controls; the labelled group supplies their outer context.
       if (typeof child.type === 'string' && child.props.children) {
-        return cloneElement(child, { children: associate(child.props.children) });
+        return cloneElement(child, {
+          children: associate(child.props.children),
+        });
       }
       return child;
     });
@@ -64,11 +97,31 @@ export function FormField({ label, description, error, children, className, html
       aria-labelledby={linked ? undefined : labelId}
       aria-describedby={!linked && message ? messageId : undefined}
     >
-      <label id={labelId} htmlFor={controlId} className="block text-sm font-medium leading-5 text-foreground">
-        {label}{required ? <span className="ml-1 text-danger-700" aria-hidden="true">*</span> : null}
+      <label
+        id={labelId}
+        htmlFor={controlId}
+        className="block text-sm font-medium leading-5 text-foreground"
+      >
+        {label}
+        {required ? (
+          <span className="ml-1 text-danger-700" aria-hidden="true">
+            *
+          </span>
+        ) : null}
       </label>
       {fields}
-      {message ? <p id={messageId} role={error ? 'alert' : undefined} className={cn('text-xs leading-5', error ? 'text-danger-700' : 'text-muted-foreground')}>{message}</p> : null}
+      {message ? (
+        <p
+          id={messageId}
+          role={error ? 'alert' : undefined}
+          className={cn(
+            'text-xs leading-5',
+            error ? 'text-danger-700' : 'text-muted-foreground',
+          )}
+        >
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -193,7 +193,12 @@ export function Sidebar({
 
   return (
     <>
-      <Sheet open={mobileOpen} onOpenChange={(open) => { if (!open) onMobileClose(); }}>
+      <Sheet
+        open={mobileOpen}
+        onOpenChange={(open) => {
+          if (!open) onMobileClose();
+        }}
+      >
         <SheetContent
           id="school-navigation-drawer"
           side="left"
@@ -205,18 +210,20 @@ export function Sidebar({
           }}
           className="w-[280px] max-w-[calc(100vw-2rem)] gap-0 p-0 sm:max-w-[280px]"
         >
-          <SheetTitle className="sr-only">School operations navigation</SheetTitle>
-        <SidebarContent
-          collapsed={false}
-          groups={groupsToRender}
-          activeHref={activeHref}
-          schoolName={schoolName}
-          roleLabel={roleLabel}
-          settingsItem={visibleSettings}
-          userLabel={userLabel}
-          navigationLoading={entitlementsLoading}
-          onMobileClose={onMobileClose}
-        />
+          <SheetTitle className="sr-only">
+            School operations navigation
+          </SheetTitle>
+          <SidebarContent
+            collapsed={false}
+            groups={groupsToRender}
+            activeHref={activeHref}
+            schoolName={schoolName}
+            roleLabel={roleLabel}
+            settingsItem={visibleSettings}
+            userLabel={userLabel}
+            navigationLoading={entitlementsLoading}
+            onMobileClose={onMobileClose}
+          />
         </SheetContent>
       </Sheet>
 
@@ -348,7 +355,11 @@ function SidebarContent({
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={navigationLoading ? 'Loading workspaces...' : 'Find a workspace...'}
+              placeholder={
+                navigationLoading
+                  ? 'Loading workspaces...'
+                  : 'Find a workspace...'
+              }
               disabled={navigationLoading}
               className="h-9 w-full rounded-lg border border-[var(--line)] bg-[var(--sidebar-hover)] pl-8 pr-7 text-[0.8rem] font-medium text-[var(--sidebar-label)] outline-none transition-colors placeholder:text-[var(--sidebar-heading)] focus:border-[var(--primary)] focus:bg-[var(--surface)] focus:ring-2 focus:ring-[var(--primary-soft)] disabled:cursor-wait disabled:opacity-70"
             />

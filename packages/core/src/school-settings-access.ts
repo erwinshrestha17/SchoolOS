@@ -1,6 +1,6 @@
 export const SCHOOL_SETTINGS_AUTHORITY_ROLES = [
-  'admin',
-  'school_config_owner',
+  "admin",
+  "school_config_owner",
 ] as const;
 
 /**
@@ -15,7 +15,7 @@ export function isPrincipalRestrictedFromInstitutionalSettings(
   roles: readonly string[] | undefined,
 ): boolean {
   const currentRoles = roles ?? [];
-  if (!currentRoles.includes('principal')) return false;
+  if (!currentRoles.includes("principal")) return false;
   return !SCHOOL_SETTINGS_AUTHORITY_ROLES.some((role) =>
     currentRoles.includes(role),
   );

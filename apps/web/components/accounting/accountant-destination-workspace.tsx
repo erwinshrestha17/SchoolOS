@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import type { ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
-import { WorkSurface } from "../ui/work-surface";
-import { PageState } from "../ui/page-state";
+import Link from 'next/link';
+import type { ReactNode } from 'react';
+import { ArrowRight } from 'lucide-react';
+import { WorkSurface } from '../ui/work-surface';
+import { PageState } from '../ui/page-state';
 
 type DestinationLink = {
   href: string;
@@ -36,7 +36,10 @@ export function AccountantDestinationWorkspace({
               >
                 <span className="flex items-center justify-between gap-3 font-semibold text-slate-900">
                   {link.label}
-                  <ArrowRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  <ArrowRight
+                    className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5"
+                    aria-hidden
+                  />
                 </span>
                 <span className="mt-1 block text-sm leading-6 text-slate-600">
                   {link.description}
@@ -45,7 +48,11 @@ export function AccountantDestinationWorkspace({
             ))}
           </div>
         ) : null}
-        {children ? <div className={(links?.length ?? 0) > 0 ? "mt-6" : undefined}>{children}</div> : null}
+        {children ? (
+          <div className={(links?.length ?? 0) > 0 ? 'mt-6' : undefined}>
+            {children}
+          </div>
+        ) : null}
       </WorkSurface>
     </div>
   );

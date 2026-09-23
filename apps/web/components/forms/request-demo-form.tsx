@@ -3,29 +3,42 @@
 import * as React from 'react';
 import { useState } from 'react';
 import Link from 'next/link';
-import { 
-  Check, 
-  CheckCircle2, 
-  Building, 
-  User, 
-  Briefcase, 
-  Layout, 
+import {
+  Check,
+  CheckCircle2,
+  Building,
+  User,
+  Briefcase,
+  Layout,
   ArrowLeft,
   Phone,
   Mail,
   MapPin,
   ClipboardList,
-  ChevronDown
+  ChevronDown,
 } from 'lucide-react';
 
 import { Button } from '../ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '../ui/card';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { Textarea } from '../ui/textarea';
 import { Progress } from '../ui/progress';
 import { api } from '../../lib/api';
-import { isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
+import {
+  isValidEmail,
+  isValidPersonName,
+  normalizeEmail,
+  normalizeNepalPhone,
+  normalizePersonName,
+  tryNormalizeNepalPhone,
+} from '@schoolos/core';
 
 const MODULES = [
   'Admissions & Student Profiles',
@@ -62,11 +75,15 @@ export function RequestDemoForm() {
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [submittedRequestId, setSubmittedRequestId] = useState<string | null>(null);
+  const [submittedRequestId, setSubmittedRequestId] = useState<string | null>(
+    null,
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -83,28 +100,35 @@ export function RequestDemoForm() {
     setSelectedModules((prev) =>
       prev.includes(moduleName)
         ? prev.filter((m) => m !== moduleName)
-        : [...prev, moduleName]
+        : [...prev, moduleName],
     );
   };
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.schoolName.trim()) newErrors.schoolName = 'Enter your school name';
+    if (!formData.schoolName.trim())
+      newErrors.schoolName = 'Enter your school name';
     if (!formData.schoolType) newErrors.schoolType = 'Select a school type';
-    if (!formData.location.trim()) newErrors.location = 'Enter the school location';
-    if (!formData.studentsCount) newErrors.studentsCount = 'Select the number of students';
-    
-    if (!isValidPersonName(formData.contactName)) newErrors.contactName = 'Enter a valid contact name';
-    if (!formData.role.trim()) newErrors.role = 'Enter your role or designation';
-    if (!tryNormalizeNepalPhone(formData.phone)) newErrors.phone = 'Enter a valid NTC or Ncell mobile number';
-    
+    if (!formData.location.trim())
+      newErrors.location = 'Enter the school location';
+    if (!formData.studentsCount)
+      newErrors.studentsCount = 'Select the number of students';
+
+    if (!isValidPersonName(formData.contactName))
+      newErrors.contactName = 'Enter a valid contact name';
+    if (!formData.role.trim())
+      newErrors.role = 'Enter your role or designation';
+    if (!tryNormalizeNepalPhone(formData.phone))
+      newErrors.phone = 'Enter a valid NTC or Ncell mobile number';
+
     if (!formData.email.trim()) {
       newErrors.email = 'Enter your email address';
     } else if (!isValidEmail(formData.email)) {
       newErrors.email = 'Enter a valid email address';
     }
-    
-    if (!formData.expectedTimeline) newErrors.expectedTimeline = 'Select an expected timeline';
+
+    if (!formData.expectedTimeline)
+      newErrors.expectedTimeline = 'Select an expected timeline';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -149,10 +173,12 @@ export function RequestDemoForm() {
     formData.role,
     formData.phone,
     formData.email,
-    formData.expectedTimeline
+    formData.expectedTimeline,
   ];
-  const filledCount = requiredFields.filter(f => f.trim() !== '').length;
-  const progressPercent = Math.round((filledCount / requiredFields.length) * 100);
+  const filledCount = requiredFields.filter((f) => f.trim() !== '').length;
+  const progressPercent = Math.round(
+    (filledCount / requiredFields.length) * 100,
+  );
 
   if (isSubmitted) {
     return (
@@ -160,39 +186,56 @@ export function RequestDemoForm() {
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600 border border-blue-100">
           <CheckCircle2 size={28} />
         </div>
-        
+
         <div className="space-y-2">
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
             Demo request submitted.
           </h1>
           <p className="text-slate-500 max-w-md mx-auto text-xs leading-relaxed">
-            Thank you. The SchoolOS team will contact you for verification and onboarding planning.
+            Thank you. The SchoolOS team will contact you for verification and
+            onboarding planning.
           </p>
         </div>
 
         <div className="rounded-xl bg-slate-50 p-5 text-left border border-slate-100 space-y-3 text-xs">
           <div className="flex justify-between border-b border-slate-200/50 pb-2">
             <span className="text-slate-400 font-semibold">School Name:</span>
-            <span className="text-slate-900 font-bold">{formData.schoolName}</span>
-          </div>
-          <div className="flex justify-between border-b border-slate-200/50 pb-2">
-            <span className="text-slate-400 font-semibold">Contact Person:</span>
-            <span className="text-slate-900 font-bold">{formData.contactName} ({formData.role})</span>
-          </div>
-          <div className="flex justify-between border-b border-slate-200/50 pb-2">
-            <span className="text-slate-400 font-semibold">Preferred Contact:</span>
             <span className="text-slate-900 font-bold">
-              {formData.preferredContact ? `${formData.preferredContact} (${formData.phone})` : formData.phone}
+              {formData.schoolName}
+            </span>
+          </div>
+          <div className="flex justify-between border-b border-slate-200/50 pb-2">
+            <span className="text-slate-400 font-semibold">
+              Contact Person:
+            </span>
+            <span className="text-slate-900 font-bold">
+              {formData.contactName} ({formData.role})
+            </span>
+          </div>
+          <div className="flex justify-between border-b border-slate-200/50 pb-2">
+            <span className="text-slate-400 font-semibold">
+              Preferred Contact:
+            </span>
+            <span className="text-slate-900 font-bold">
+              {formData.preferredContact
+                ? `${formData.preferredContact} (${formData.phone})`
+                : formData.phone}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-400 font-semibold">Expected Timeline:</span>
-            <span className="text-slate-900 font-bold">{formData.expectedTimeline}</span>
+            <span className="text-slate-400 font-semibold">
+              Expected Timeline:
+            </span>
+            <span className="text-slate-900 font-bold">
+              {formData.expectedTimeline}
+            </span>
           </div>
           {submittedRequestId && (
             <div className="flex justify-between border-t border-slate-200/50 pt-2">
               <span className="text-slate-400 font-semibold">Request ID:</span>
-              <span className="text-slate-900 font-bold">{submittedRequestId}</span>
+              <span className="text-slate-900 font-bold">
+                {submittedRequestId}
+              </span>
             </div>
           )}
         </div>
@@ -219,10 +262,14 @@ export function RequestDemoForm() {
   return (
     <Card className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
       <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
-        <CardTitle className="text-base font-bold text-slate-950">School details</CardTitle>
-        <CardDescription className="text-xs text-slate-500">Required fields are marked with *</CardDescription>
+        <CardTitle className="text-base font-bold text-slate-950">
+          School details
+        </CardTitle>
+        <CardDescription className="text-xs text-slate-500">
+          Required fields are marked with *
+        </CardDescription>
       </CardHeader>
-      
+
       <CardContent className="p-6 space-y-6">
         {/* Form Progress */}
         <div className="space-y-1.5">
@@ -239,17 +286,22 @@ export function RequestDemoForm() {
               {errors.form}
             </div>
           )}
-          
+
           {/* Section 1: School Information */}
           <div className="space-y-3.5">
             <div className="pb-1 border-b border-slate-150 flex items-center gap-2">
               <Building size={14} className="text-slate-500" />
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">1. School Information</h3>
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                1. School Information
+              </h3>
             </div>
-            
+
             <div className="grid gap-3.5 sm:grid-cols-2">
               <div className="space-y-1">
-                <label htmlFor="schoolName" className="text-xs font-semibold text-slate-700 block">
+                <label
+                  htmlFor="schoolName"
+                  className="text-xs font-semibold text-slate-700 block"
+                >
                   School Name *
                 </label>
                 <Input
@@ -262,11 +314,18 @@ export function RequestDemoForm() {
                   className={`h-9 text-xs focus:ring-blue-600 focus:border-blue-600 ${errors.schoolName ? 'border-red-300 bg-red-50/10 focus:ring-red-500' : 'border-slate-200'}`}
                   aria-required="true"
                 />
-                {errors.schoolName && <p className="text-[10px] text-red-650 font-medium">{errors.schoolName}</p>}
+                {errors.schoolName && (
+                  <p className="text-[10px] text-red-650 font-medium">
+                    {errors.schoolName}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="location" className="text-xs font-semibold text-slate-700 block">
+                <label
+                  htmlFor="location"
+                  className="text-xs font-semibold text-slate-700 block"
+                >
                   School Location *
                 </label>
                 <Input
@@ -279,11 +338,18 @@ export function RequestDemoForm() {
                   className={`h-9 text-xs focus:ring-blue-600 focus:border-blue-600 ${errors.location ? 'border-red-300 bg-red-50/10 focus:ring-red-500' : 'border-slate-200'}`}
                   aria-required="true"
                 />
-                {errors.location && <p className="text-[10px] text-red-650 font-medium">{errors.location}</p>}
+                {errors.location && (
+                  <p className="text-[10px] text-red-650 font-medium">
+                    {errors.location}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="schoolType" className="text-xs font-semibold text-slate-700 block">
+                <label
+                  htmlFor="schoolType"
+                  className="text-xs font-semibold text-slate-700 block"
+                >
                   School Type *
                 </label>
                 <div className="relative">
@@ -295,7 +361,9 @@ export function RequestDemoForm() {
                     className={`h-9 text-xs focus:ring-blue-600 focus:border-blue-600 ${errors.schoolType ? 'border-red-300 bg-red-50/10 focus:ring-red-500' : 'border-slate-200'}`}
                     aria-required="true"
                   >
-                    <option value="" disabled>Select Type</option>
+                    <option value="" disabled>
+                      Select Type
+                    </option>
                     <option value="Basic School">Basic School</option>
                     <option value="Secondary School">Secondary School</option>
                     <option value="Higher Secondary">Higher Secondary</option>
@@ -305,11 +373,18 @@ export function RequestDemoForm() {
                     <ChevronDown className="h-3 w-3" />
                   </div>
                 </div>
-                {errors.schoolType && <p className="text-[10px] text-red-650 font-medium">{errors.schoolType}</p>}
+                {errors.schoolType && (
+                  <p className="text-[10px] text-red-650 font-medium">
+                    {errors.schoolType}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="studentsCount" className="text-xs font-semibold text-slate-700 block">
+                <label
+                  htmlFor="studentsCount"
+                  className="text-xs font-semibold text-slate-700 block"
+                >
                   Number of Students *
                 </label>
                 <div className="relative">
@@ -321,7 +396,9 @@ export function RequestDemoForm() {
                     className={`h-9 text-xs focus:ring-blue-600 focus:border-blue-600 ${errors.studentsCount ? 'border-red-300 bg-red-50/10 focus:ring-red-500' : 'border-slate-200'}`}
                     aria-required="true"
                   >
-                    <option value="" disabled>Select Range</option>
+                    <option value="" disabled>
+                      Select Range
+                    </option>
                     <option value="Below 200">Below 200</option>
                     <option value="200–500">200–500</option>
                     <option value="500–1,000">500–1,000</option>
@@ -332,9 +409,12 @@ export function RequestDemoForm() {
                     <ChevronDown className="h-3 w-3" />
                   </div>
                 </div>
-                {errors.studentsCount && <p className="text-[10px] text-red-650 font-medium">{errors.studentsCount}</p>}
+                {errors.studentsCount && (
+                  <p className="text-[10px] text-red-650 font-medium">
+                    {errors.studentsCount}
+                  </p>
+                )}
               </div>
-
             </div>
           </div>
 
@@ -342,12 +422,17 @@ export function RequestDemoForm() {
           <div className="space-y-3.5">
             <div className="pb-1 border-b border-slate-150 flex items-center gap-2">
               <User size={14} className="text-slate-500" />
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">2. Contact Person</h3>
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                2. Contact Person
+              </h3>
             </div>
 
             <div className="grid gap-3.5 sm:grid-cols-2">
               <div className="space-y-1">
-                <label htmlFor="contactName" className="text-xs font-semibold text-slate-700 block">
+                <label
+                  htmlFor="contactName"
+                  className="text-xs font-semibold text-slate-700 block"
+                >
                   Contact Person Name *
                 </label>
                 <Input
@@ -360,11 +445,18 @@ export function RequestDemoForm() {
                   className={`h-9 text-xs focus:ring-blue-600 focus:border-blue-600 ${errors.contactName ? 'border-red-300 bg-red-50/10 focus:ring-red-500' : 'border-slate-200'}`}
                   aria-required="true"
                 />
-                {errors.contactName && <p className="text-[10px] text-red-650 font-medium">{errors.contactName}</p>}
+                {errors.contactName && (
+                  <p className="text-[10px] text-red-650 font-medium">
+                    {errors.contactName}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="role" className="text-xs font-semibold text-slate-700 block">
+                <label
+                  htmlFor="role"
+                  className="text-xs font-semibold text-slate-700 block"
+                >
                   Role / Designation *
                 </label>
                 <Input
@@ -377,11 +469,18 @@ export function RequestDemoForm() {
                   className={`h-9 text-xs focus:ring-blue-600 focus:border-blue-600 ${errors.role ? 'border-red-300 bg-red-50/10 focus:ring-red-500' : 'border-slate-200'}`}
                   aria-required="true"
                 />
-                {errors.role && <p className="text-[10px] text-red-650 font-medium">{errors.role}</p>}
+                {errors.role && (
+                  <p className="text-[10px] text-red-650 font-medium">
+                    {errors.role}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="phone" className="text-xs font-semibold text-slate-700 block">
+                <label
+                  htmlFor="phone"
+                  className="text-xs font-semibold text-slate-700 block"
+                >
                   Phone Number *
                 </label>
                 <Input
@@ -394,11 +493,18 @@ export function RequestDemoForm() {
                   className={`h-9 text-xs focus:ring-blue-600 focus:border-blue-600 ${errors.phone ? 'border-red-300 bg-red-50/10 focus:ring-red-500' : 'border-slate-200'}`}
                   aria-required="true"
                 />
-                {errors.phone && <p className="text-[10px] text-red-650 font-medium">{errors.phone}</p>}
+                {errors.phone && (
+                  <p className="text-[10px] text-red-650 font-medium">
+                    {errors.phone}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="email" className="text-xs font-semibold text-slate-700 block">
+                <label
+                  htmlFor="email"
+                  className="text-xs font-semibold text-slate-700 block"
+                >
                   Email Address *
                 </label>
                 <Input
@@ -411,11 +517,18 @@ export function RequestDemoForm() {
                   className={`h-9 text-xs focus:ring-blue-600 focus:border-blue-600 ${errors.email ? 'border-red-300 bg-red-50/10 focus:ring-red-500' : 'border-slate-200'}`}
                   aria-required="true"
                 />
-                {errors.email && <p className="text-[10px] text-red-650 font-medium">{errors.email}</p>}
+                {errors.email && (
+                  <p className="text-[10px] text-red-650 font-medium">
+                    {errors.email}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1 sm:col-span-2">
-                <label htmlFor="preferredContact" className="text-xs font-semibold text-slate-700 block">
+                <label
+                  htmlFor="preferredContact"
+                  className="text-xs font-semibold text-slate-700 block"
+                >
                   Preferred Contact Method
                 </label>
                 <div className="relative">
@@ -426,7 +539,9 @@ export function RequestDemoForm() {
                     onChange={handleInputChange}
                     className="h-9 text-xs focus:ring-blue-600 focus:border-blue-600 border-slate-200"
                   >
-                    <option value="" disabled>Select Method</option>
+                    <option value="" disabled>
+                      Select Method
+                    </option>
                     <option value="Phone">Phone</option>
                     <option value="Email">Email</option>
                     <option value="WhatsApp / Viber">WhatsApp / Viber</option>
@@ -444,7 +559,9 @@ export function RequestDemoForm() {
           <div className="space-y-3">
             <div className="pb-1 border-b border-slate-150 flex items-center gap-2">
               <Layout size={14} className="text-slate-500" />
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">3. Modules Interested In</h3>
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                3. Modules Interested In
+              </h3>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
@@ -481,12 +598,17 @@ export function RequestDemoForm() {
           <div className="space-y-3.5">
             <div className="pb-1 border-b border-slate-150 flex items-center gap-2">
               <Briefcase size={14} className="text-slate-500" />
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">4. Rollout Plan</h3>
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                4. Rollout Plan
+              </h3>
             </div>
 
             <div className="grid gap-3.5 sm:grid-cols-2">
               <div className="space-y-1">
-                <label htmlFor="currentSystem" className="text-xs font-semibold text-slate-700 block">
+                <label
+                  htmlFor="currentSystem"
+                  className="text-xs font-semibold text-slate-700 block"
+                >
                   Current system used
                 </label>
                 <Input
@@ -501,7 +623,10 @@ export function RequestDemoForm() {
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="expectedTimeline" className="text-xs font-semibold text-slate-700 block">
+                <label
+                  htmlFor="expectedTimeline"
+                  className="text-xs font-semibold text-slate-700 block"
+                >
                   Expected rollout timeline *
                 </label>
                 <div className="relative">
@@ -513,7 +638,9 @@ export function RequestDemoForm() {
                     className={`h-9 text-xs focus:ring-blue-600 focus:border-blue-600 ${errors.expectedTimeline ? 'border-red-300 bg-red-50/10 focus:ring-red-500' : 'border-slate-200'}`}
                     aria-required="true"
                   >
-                    <option value="" disabled>Select Timeline</option>
+                    <option value="" disabled>
+                      Select Timeline
+                    </option>
                     <option value="Immediately">Immediately</option>
                     <option value="Within 1 month">Within 1 month</option>
                     <option value="Within 3 months">Within 3 months</option>
@@ -523,11 +650,18 @@ export function RequestDemoForm() {
                     <ChevronDown className="h-3 w-3" />
                   </div>
                 </div>
-                {errors.expectedTimeline && <p className="text-[10px] text-red-650 font-medium">{errors.expectedTimeline}</p>}
+                {errors.expectedTimeline && (
+                  <p className="text-[10px] text-red-650 font-medium">
+                    {errors.expectedTimeline}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1 sm:col-span-2">
-                <label htmlFor="message" className="text-xs font-semibold text-slate-700 block">
+                <label
+                  htmlFor="message"
+                  className="text-xs font-semibold text-slate-700 block"
+                >
                   Message / Requirements
                 </label>
                 <Textarea
@@ -554,10 +688,10 @@ export function RequestDemoForm() {
               Submit Demo Request
             </Button>
             <p className="text-center text-[10px] text-slate-400 font-semibold leading-relaxed">
-              Submitting this form does not create a school workspace automatically.
+              Submitting this form does not create a school workspace
+              automatically.
             </p>
           </div>
-
         </form>
       </CardContent>
     </Card>

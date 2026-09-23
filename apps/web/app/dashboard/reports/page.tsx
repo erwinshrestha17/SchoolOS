@@ -1,20 +1,20 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   formatBsDateTime,
   type ReportDefinition,
   type ReportFormat,
-} from "@schoolos/core";
-import { api } from "@/lib/api";
-import type { ReportSnapshot } from "@/lib/api/finance";
-import { SectionCard } from "@/components/ui/section-card";
-import { PageHeader } from "@/components/ui/page-header";
-import { Select, Input } from "@/components/ui/form-field";
-import { Button } from "@/components/ui/button";
-import { Toast, type ToastTone } from "@/components/ui/toast";
-import { Badge } from "@/components/ui/badge";
+} from '@schoolos/core';
+import { api } from '@/lib/api';
+import type { ReportSnapshot } from '@/lib/api/finance';
+import { SectionCard } from '@/components/ui/section-card';
+import { PageHeader } from '@/components/ui/page-header';
+import { Select, Input } from '@/components/ui/form-field';
+import { Button } from '@/components/ui/button';
+import { Toast, type ToastTone } from '@/components/ui/toast';
+import { Badge } from '@/components/ui/badge';
 import {
   ClipboardList,
   Download,
@@ -24,8 +24,8 @@ import {
   ChevronRight,
   RefreshCw,
   RotateCcw,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function ReportsPage() {
   return (
@@ -57,24 +57,24 @@ function ReportsWorkspace() {
   } | null>(null);
 
   const reportsQuery = useQuery({
-    queryKey: ["report-definitions"],
+    queryKey: ['report-definitions'],
     queryFn: api.listReports,
   });
   const snapshotsQuery = useQuery({
-    queryKey: ["report-snapshots", 1, 8],
+    queryKey: ['report-snapshots', 1, 8],
     queryFn: () => api.listReportSnapshots({ page: 1, limit: 8 }),
   });
 
   const academicYearsQuery = useQuery({
-    queryKey: ["academic-years"],
+    queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
   });
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
   const examsQuery = useQuery({
-    queryKey: ["exam-terms"],
+    queryKey: ['exam-terms'],
     queryFn: api.listExamTerms,
   });
 
@@ -96,25 +96,25 @@ function ReportsWorkspace() {
         filters,
         async: queueExport,
       });
-      await queryClient.invalidateQueries({ queryKey: ["report-snapshots"] });
+      await queryClient.invalidateQueries({ queryKey: ['report-snapshots'] });
       const queued =
         result &&
-        typeof result === "object" &&
-        "status" in result &&
-        result.status === "QUEUED";
+        typeof result === 'object' &&
+        'status' in result &&
+        result.status === 'QUEUED';
       setExportNotice({
-        title: queued ? "Export queued" : "Export ready",
+        title: queued ? 'Export queued' : 'Export ready',
         description: queued
-          ? `${selectedReport?.name ?? "Report"} will appear in recent exports when processing finishes.`
-          : `${selectedReport?.name ?? "Report"} ${format.toUpperCase()} export completed.`,
-        tone: "success",
+          ? `${selectedReport?.name ?? 'Report'} will appear in recent exports when processing finishes.`
+          : `${selectedReport?.name ?? 'Report'} ${format.toUpperCase()} export completed.`,
+        tone: 'success',
       });
     } catch (error: unknown) {
       setExportNotice({
-        title: "Export failed",
+        title: 'Export failed',
         description:
-          error instanceof Error ? error.message : "The report export failed.",
-        tone: "danger",
+          error instanceof Error ? error.message : 'The report export failed.',
+        tone: 'danger',
       });
     } finally {
       setExporting(null);
@@ -126,12 +126,12 @@ function ReportsWorkspace() {
       await api.downloadReportSnapshot(id);
     } catch (error: unknown) {
       setExportNotice({
-        title: "Download failed",
+        title: 'Download failed',
         description:
           error instanceof Error
             ? error.message
-            : "The protected report snapshot could not be opened.",
-        tone: "danger",
+            : 'The protected report snapshot could not be opened.',
+        tone: 'danger',
       });
     }
   };
@@ -140,20 +140,20 @@ function ReportsWorkspace() {
     setRetryingSnapshotId(snapshot.id);
     try {
       await api.retryReportSnapshot(snapshot.id);
-      await queryClient.invalidateQueries({ queryKey: ["report-snapshots"] });
+      await queryClient.invalidateQueries({ queryKey: ['report-snapshots'] });
       setExportNotice({
-        title: "Export retry queued",
+        title: 'Export retry queued',
         description: `${reportName(snapshot.reportKey, reports)} will move back into recent exports when the worker finishes it.`,
-        tone: "success",
+        tone: 'success',
       });
     } catch (error: unknown) {
       setExportNotice({
-        title: "Retry failed",
+        title: 'Retry failed',
         description:
           error instanceof Error
             ? error.message
-            : "The report export could not be queued again.",
-        tone: "danger",
+            : 'The report export could not be queued again.',
+        tone: 'danger',
       });
     } finally {
       setRetryingSnapshotId(null);
@@ -200,10 +200,10 @@ function ReportsWorkspace() {
                         setFilters({});
                       }}
                       className={cn(
-                        "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl text-left text-sm transition-all",
+                        'w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl text-left text-sm transition-all',
                         selectedReportKey === report.key
-                          ? "border border-slate-200 bg-slate-100 text-slate-950 font-bold"
-                          : "hover:bg-slate-50 text-slate-600",
+                          ? 'border border-slate-200 bg-slate-100 text-slate-950 font-bold'
+                          : 'hover:bg-slate-50 text-slate-600',
                       )}
                     >
                       <div className="flex items-center gap-3">
@@ -211,8 +211,8 @@ function ReportsWorkspace() {
                           size={16}
                           className={
                             selectedReportKey === report.key
-                              ? "text-slate-700"
-                              : "text-slate-400"
+                              ? 'text-slate-700'
+                              : 'text-slate-400'
                           }
                         />
                         <span>{report.name}</span>
@@ -221,8 +221,8 @@ function ReportsWorkspace() {
                         size={14}
                         className={
                           selectedReportKey === report.key
-                            ? "text-slate-600"
-                            : "text-slate-300"
+                            ? 'text-slate-600'
+                            : 'text-slate-300'
                         }
                       />
                     </button>
@@ -258,9 +258,9 @@ function ReportsWorkspace() {
                     <label className="text-xs font-bold text-slate-700">
                       {filter.label}
                     </label>
-                    {filter.type === "class" ? (
+                    {filter.type === 'class' ? (
                       <Select
-                        value={filters[filter.key] || ""}
+                        value={filters[filter.key] || ''}
                         onChange={(e) =>
                           handleFilterChange(filter.key, e.target.value)
                         }
@@ -272,10 +272,10 @@ function ReportsWorkspace() {
                           </option>
                         ))}
                       </Select>
-                    ) : filter.type === "select" &&
-                      filter.key === "academicYearId" ? (
+                    ) : filter.type === 'select' &&
+                      filter.key === 'academicYearId' ? (
                       <Select
-                        value={filters[filter.key] || ""}
+                        value={filters[filter.key] || ''}
                         onChange={(e) =>
                           handleFilterChange(filter.key, e.target.value)
                         }
@@ -287,10 +287,10 @@ function ReportsWorkspace() {
                           </option>
                         ))}
                       </Select>
-                    ) : filter.type === "select" &&
-                      filter.key === "examTermId" ? (
+                    ) : filter.type === 'select' &&
+                      filter.key === 'examTermId' ? (
                       <Select
-                        value={filters[filter.key] || ""}
+                        value={filters[filter.key] || ''}
                         onChange={(e) =>
                           handleFilterChange(filter.key, e.target.value)
                         }
@@ -302,9 +302,9 @@ function ReportsWorkspace() {
                           </option>
                         ))}
                       </Select>
-                    ) : filter.type === "select" && filter.options ? (
+                    ) : filter.type === 'select' && filter.options ? (
                       <Select
-                        value={filters[filter.key] || ""}
+                        value={filters[filter.key] || ''}
                         onChange={(e) =>
                           handleFilterChange(filter.key, e.target.value)
                         }
@@ -318,9 +318,9 @@ function ReportsWorkspace() {
                       </Select>
                     ) : (
                       <Input
-                        type={filter.type === "date" ? "date" : "text"}
+                        type={filter.type === 'date' ? 'date' : 'text'}
                         placeholder={filter.label}
-                        value={filters[filter.key] || ""}
+                        value={filters[filter.key] || ''}
                         onChange={(e) =>
                           handleFilterChange(filter.key, e.target.value)
                         }
@@ -349,9 +349,9 @@ function ReportsWorkspace() {
               </label>
 
               <div className="flex flex-wrap gap-3 pt-4 border-t border-slate-100">
-                {selectedFormats.includes("csv") && (
+                {selectedFormats.includes('csv') && (
                   <Button
-                    onClick={() => handleExport("csv")}
+                    onClick={() => handleExport('csv')}
                     disabled={!!exporting}
                     variant="outline"
                     className="rounded-2xl"
@@ -360,23 +360,23 @@ function ReportsWorkspace() {
                       size={16}
                       className="mr-2 text-emerald-600"
                     />
-                    {exporting === "csv" ? "Exporting..." : "Download CSV"}
+                    {exporting === 'csv' ? 'Exporting...' : 'Download CSV'}
                   </Button>
                 )}
-                {selectedFormats.includes("pdf") && (
+                {selectedFormats.includes('pdf') && (
                   <Button
-                    onClick={() => handleExport("pdf")}
+                    onClick={() => handleExport('pdf')}
                     disabled={!!exporting}
                     variant="outline"
                     className="rounded-2xl"
                   >
                     <FileText size={16} className="mr-2 text-rose-600" />
-                    {exporting === "pdf" ? "Exporting..." : "Download PDF"}
+                    {exporting === 'pdf' ? 'Exporting...' : 'Download PDF'}
                   </Button>
                 )}
-                {selectedFormats.includes("json") && (
+                {selectedFormats.includes('json') && (
                   <Button
-                    onClick={() => handleExport("json")}
+                    onClick={() => handleExport('json')}
                     disabled={!!exporting}
                     variant="ghost"
                     className="rounded-2xl"
@@ -458,7 +458,7 @@ function ReportsWorkspace() {
                       Requested {formatDateTime(snapshot.createdAt)}
                       {snapshot.completedAt
                         ? ` • Completed ${formatDateTime(snapshot.completedAt)}`
-                        : ""}
+                        : ''}
                     </p>
                     <p className="truncate text-xs text-slate-400">
                       {snapshot.errorSummary ||
@@ -483,7 +483,7 @@ function ReportsWorkspace() {
                       variant="outline"
                       size="sm"
                       disabled={
-                        snapshot.status !== "COMPLETED" || !snapshot.fileAssetId
+                        snapshot.status !== 'COMPLETED' || !snapshot.fileAssetId
                       }
                       onClick={() => void handleDownloadSnapshot(snapshot.id)}
                     >
@@ -503,7 +503,7 @@ function ReportsWorkspace() {
 
 function groupReportsByCategory(reports: ReportDefinition[]) {
   return reports.reduce<Record<string, ReportDefinition[]>>((acc, report) => {
-    const category = report.category || "general";
+    const category = report.category || 'general';
     acc[category] = [...(acc[category] ?? []), report];
     return acc;
   }, {});
@@ -518,24 +518,24 @@ function reportName(
 
 function statusVariant(
   status: string,
-): "success" | "warning" | "destructive" | "neutral" {
-  if (status === "COMPLETED") return "success";
-  if (status === "FAILED" || status === "CANCELLED") return "destructive";
-  if (status === "QUEUED" || status === "RUNNING") return "warning";
-  return "neutral";
+): 'success' | 'warning' | 'destructive' | 'neutral' {
+  if (status === 'COMPLETED') return 'success';
+  if (status === 'FAILED' || status === 'CANCELLED') return 'destructive';
+  if (status === 'QUEUED' || status === 'RUNNING') return 'warning';
+  return 'neutral';
 }
 
 function canRetrySnapshot(snapshot: ReportSnapshot) {
-  return snapshot.status === "FAILED" || snapshot.status === "CANCELLED";
+  return snapshot.status === 'FAILED' || snapshot.status === 'CANCELLED';
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return "—";
+  if (!value) return '—';
   return formatBsDateTime(value);
 }
 
-function summarizeFilters(filters: ReportSnapshot["filters"]) {
+function summarizeFilters(filters: ReportSnapshot['filters']) {
   const entries = Object.entries(filters ?? {}).filter(([, value]) => value);
-  if (entries.length === 0) return "No filters applied";
-  return entries.map(([key, value]) => `${key}: ${String(value)}`).join(" • ");
+  if (entries.length === 0) return 'No filters applied';
+  return entries.map(([key, value]) => `${key}: ${String(value)}`).join(' • ');
 }

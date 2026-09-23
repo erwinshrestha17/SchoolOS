@@ -40,7 +40,8 @@ export function AssessmentComponentsDialog({
   onClose,
 }: AssessmentComponentsDialogProps) {
   const queryClient = useQueryClient();
-  const [deleteTarget, setDeleteTarget] = useState<AssessmentComponentSummary | null>(null);
+  const [deleteTarget, setDeleteTarget] =
+    useState<AssessmentComponentSummary | null>(null);
   const [notice, setNotice] = useState<ComponentNotice | null>(null);
 
   const subjectsQuery = useQuery({
@@ -54,7 +55,8 @@ export function AssessmentComponentsDialog({
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: ComponentFormValues) => api.createAssessmentComponent({ ...data, examTermId: exam.id }),
+    mutationFn: (data: ComponentFormValues) =>
+      api.createAssessmentComponent({ ...data, examTermId: exam.id }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['components', exam.id] });
       void queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
@@ -107,7 +109,11 @@ export function AssessmentComponentsDialog({
     createMutation.mutate(data);
   };
 
-  const totalWeight = componentsQuery.data?.reduce((acc, c) => acc + Number(c.weightPercent), 0) ?? 0;
+  const totalWeight =
+    componentsQuery.data?.reduce(
+      (acc, c) => acc + Number(c.weightPercent),
+      0,
+    ) ?? 0;
 
   return (
     <div className="space-y-6">
@@ -122,23 +128,36 @@ export function AssessmentComponentsDialog({
 
       <div className="rounded-2xl bg-slate-50 p-4 flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Weighting</p>
-          <p className={`text-xl font-black ${totalWeight > 100 ? 'text-rose-600' : 'text-slate-900'}`}>
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+            Total Weighting
+          </p>
+          <p
+            className={`text-xl font-black ${totalWeight > 100 ? 'text-rose-600' : 'text-slate-900'}`}
+          >
             {totalWeight}% / 100%
           </p>
         </div>
         {totalWeight > 100 && (
-          <p className="text-xs font-bold text-rose-500">Weighting exceeds 100%!</p>
+          <p className="text-xs font-bold text-rose-500">
+            Weighting exceeds 100%!
+          </p>
         )}
       </div>
 
       <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
         {componentsQuery.data?.map((comp) => (
-          <div key={comp.id} className="group relative flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-4 transition-all hover:border-[var(--color-mod-academics-border)] hover:shadow-sm">
+          <div
+            key={comp.id}
+            className="group relative flex items-center justify-between rounded-2xl border border-slate-100 bg-white p-4 transition-all hover:border-[var(--color-mod-academics-border)] hover:shadow-sm"
+          >
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-tight text-slate-900">{comp.subject?.name}</span>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">{comp.type}</span>
+                <span className="text-xs font-black uppercase tracking-tight text-slate-900">
+                  {comp.subject?.name}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                  {comp.type}
+                </span>
               </div>
               <p className="text-sm font-bold text-slate-700">{comp.name}</p>
               <div className="mt-1 flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -158,18 +177,27 @@ export function AssessmentComponentsDialog({
           </div>
         ))}
         {componentsQuery.data?.length === 0 && (
-          <p className="py-8 text-center text-sm font-medium text-slate-400">No components added yet.</p>
+          <p className="py-8 text-center text-sm font-medium text-slate-400">
+            No components added yet.
+          </p>
         )}
       </div>
 
       <div className="border-t border-slate-100 pt-6">
-        <h4 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-900">Add New Component</h4>
-        <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 md:grid-cols-2">
+        <h4 className="mb-4 text-xs font-black uppercase tracking-widest text-slate-900">
+          Add New Component
+        </h4>
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="grid gap-4 md:grid-cols-2"
+        >
           <FormField label="Subject" error={errors.subjectId?.message}>
             <Select {...register('subjectId')}>
               <option value="">Select Subject</option>
               {subjectsQuery.data?.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
               ))}
             </Select>
           </FormField>
@@ -190,13 +218,22 @@ export function AssessmentComponentsDialog({
 
           <div className="grid grid-cols-3 gap-3">
             <FormField label="Max Marks" error={errors.maxMarks?.message}>
-              <Input type="number" {...register('maxMarks', { valueAsNumber: true })} />
+              <Input
+                type="number"
+                {...register('maxMarks', { valueAsNumber: true })}
+              />
             </FormField>
             <FormField label="Pass Marks" error={errors.passMarks?.message}>
-              <Input type="number" {...register('passMarks', { valueAsNumber: true })} />
+              <Input
+                type="number"
+                {...register('passMarks', { valueAsNumber: true })}
+              />
             </FormField>
             <FormField label="Weight %" error={errors.weightPercent?.message}>
-              <Input type="number" {...register('weightPercent', { valueAsNumber: true })} />
+              <Input
+                type="number"
+                {...register('weightPercent', { valueAsNumber: true })}
+              />
             </FormField>
           </div>
 

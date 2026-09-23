@@ -1,4 +1,10 @@
-import { API_BASE_URL, JsonBody, parseApiErrorMessage, request, withQuery } from './client';
+import {
+  API_BASE_URL,
+  JsonBody,
+  parseApiErrorMessage,
+  request,
+  withQuery,
+} from './client';
 
 export type SchoolServiceRequestType = 'GENERAL_COMPLAINT' | 'PAYMENT_DISPUTE';
 

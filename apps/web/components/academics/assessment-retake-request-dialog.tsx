@@ -143,11 +143,7 @@ export function AssessmentRetakeRequestDialog({
           >
             Cancel
           </Button>
-          <Button
-            type="button"
-            onClick={submit}
-            isLoading={mutation.isPending}
-          >
+          <Button type="button" onClick={submit} isLoading={mutation.isPending}>
             <RotateCcw className="mr-2 h-4 w-4" />
             Request review
           </Button>

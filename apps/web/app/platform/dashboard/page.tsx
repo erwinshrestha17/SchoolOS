@@ -35,10 +35,16 @@ export default function PlatformDashboard() {
     { label: 'Active schools', key: 'activeTenants', icon: Users },
     { label: 'Suspended schools', key: 'suspendedTenants', icon: ShieldCheck },
     { label: 'Failed jobs', key: 'failedJobsCount', icon: ServerCog },
-    { label: 'Onboarding follow-up', key: 'onboardingIncompleteTenants', icon: Link2 },
+    {
+      label: 'Onboarding follow-up',
+      key: 'onboardingIncompleteTenants',
+      icon: Link2,
+    },
   ];
   const usageWarnings = asArray(summary.usageWarnings);
-  const recentAudit = asArray(summary.recentAudit ?? summary.recentAuditLogs).slice(0, 5);
+  const recentAudit = asArray(
+    summary.recentAudit ?? summary.recentAuditLogs,
+  ).slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -61,8 +67,12 @@ export default function PlatformDashboard() {
             <SectionCard key={card.key} className="min-h-[144px]" noPadding>
               <div className="flex h-full items-start justify-between p-5">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{card.label}</p>
-                  <p className="mt-3 text-3xl font-black text-slate-950">{displayValue(summary[card.key])}</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    {card.label}
+                  </p>
+                  <p className="mt-3 text-3xl font-black text-slate-950">
+                    {displayValue(summary[card.key])}
+                  </p>
                 </div>
                 <Icon className="h-5 w-5 text-slate-500" />
               </div>
@@ -78,12 +88,16 @@ export default function PlatformDashboard() {
         <div className="grid gap-3 md:grid-cols-2">
           <AttentionQueueItem
             label="Overdue SaaS invoices"
-            value={displayValue(summary.overdueSaasInvoices ?? summary.overdueInvoices)}
+            value={displayValue(
+              summary.overdueSaasInvoices ?? summary.overdueInvoices,
+            )}
             detail="SchoolOS subscription billing only. M3 student fee collection and M11 school accounting stay inside the school workspace."
           />
           <AttentionQueueItem
             label="Provider issues"
-            value={displayValue(summary.providerIssues ?? summary.providerIssueCount)}
+            value={displayValue(
+              summary.providerIssues ?? summary.providerIssueCount,
+            )}
             detail="Provider readiness is reviewed without exposing credentials, callback secrets, or tenant-private records."
           />
         </div>
@@ -97,13 +111,18 @@ export default function PlatformDashboard() {
           {usageWarnings.length ? (
             <ul className="space-y-2">
               {usageWarnings.slice(0, 8).map((warning, index) => (
-                <li key={index} className="rounded-lg border border-warning-100 bg-warning-50 p-3 text-sm text-warning-900">
+                <li
+                  key={index}
+                  className="rounded-lg border border-warning-100 bg-warning-50 p-3 text-sm text-warning-900"
+                >
                   {safeText(warning)}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">No usage warnings need attention right now.</p>
+            <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+              No usage warnings need attention right now.
+            </p>
           )}
         </SectionCard>
 
@@ -114,13 +133,18 @@ export default function PlatformDashboard() {
           {recentAudit.length ? (
             <ul className="space-y-2">
               {recentAudit.map((item, index) => (
-                <li key={index} className="rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+                <li
+                  key={index}
+                  className="rounded-lg border border-slate-200 p-3 text-sm text-slate-700"
+                >
                   {safeText(item)}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">No recent platform activity is available.</p>
+            <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+              No recent platform activity is available.
+            </p>
           )}
         </SectionCard>
       </div>
@@ -130,7 +154,8 @@ export default function PlatformDashboard() {
         description="Platform operators manage SchoolOS subscriptions, provider readiness, and tenant lifecycle here. M3 student fee collection and M11 school accounting remain separate school-owned workflows."
       >
         <p className="rounded-xl border border-[var(--color-mod-platform-accent)] bg-[var(--color-mod-platform-bg)] p-4 text-sm font-semibold text-[var(--color-mod-platform-text)]">
-          Use this page for operator attention only; do not inspect or reconcile school-private fee, payroll, or journal data from the platform plane.
+          Use this page for operator attention only; do not inspect or reconcile
+          school-private fee, payroll, or journal data from the platform plane.
         </p>
       </SectionCard>
     </div>
@@ -166,7 +191,8 @@ function asArray(value: unknown): unknown[] {
 }
 
 function displayValue(value: unknown): string {
-  if (typeof value === 'number' || typeof value === 'string') return String(value);
+  if (typeof value === 'number' || typeof value === 'string')
+    return String(value);
   return '—';
 }
 
@@ -174,7 +200,13 @@ function safeText(value: unknown): string {
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object') {
     const record = value as Record<string, unknown>;
-    for (const key of ['label', 'message', 'action', 'eventType', 'description']) {
+    for (const key of [
+      'label',
+      'message',
+      'action',
+      'eventType',
+      'description',
+    ]) {
       if (typeof record[key] === 'string') return record[key] as string;
     }
   }

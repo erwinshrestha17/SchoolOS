@@ -147,8 +147,7 @@ export function AcademicStructureWorkspace() {
       sectionId: string;
       staffId: string;
       academicYearId?: string;
-    }) =>
-      api.assignSectionClassTeacher(sectionId, { staffId, academicYearId }),
+    }) => api.assignSectionClassTeacher(sectionId, { staffId, academicYearId }),
     onSuccess: async () => {
       setNotice('Class teacher assigned.');
       setFormError(null);
@@ -202,7 +201,8 @@ export function AcademicStructureWorkspace() {
       [...sections].sort((left, right) => {
         const leftClass = left.class?.name ?? '';
         const rightClass = right.class?.name ?? '';
-        if (leftClass !== rightClass) return leftClass.localeCompare(rightClass);
+        if (leftClass !== rightClass)
+          return leftClass.localeCompare(rightClass);
         return left.name.localeCompare(right.name);
       }),
     [sections],
@@ -519,9 +519,7 @@ export function AcademicStructureWorkspace() {
               <p className="mt-1 text-sm text-slate-600">
                 Assign the homeroom teacher for each section. Class teachers can
                 mark daily attendance for their assigned section
-                {currentAcademicYear
-                  ? ` in ${currentAcademicYear.name}.`
-                  : '.'}
+                {currentAcademicYear ? ` in ${currentAcademicYear.name}.` : '.'}
               </p>
             </div>
           </div>
@@ -579,7 +577,9 @@ export function AcademicStructureWorkspace() {
                       <td className="px-5 py-4 font-semibold text-slate-900">
                         {section.class?.name ?? '—'}
                       </td>
-                      <td className="px-5 py-4 text-slate-700">{section.name}</td>
+                      <td className="px-5 py-4 text-slate-700">
+                        {section.name}
+                      </td>
                       <td className="px-5 py-4 text-slate-600">
                         {section.studentCount ?? 0}
                       </td>

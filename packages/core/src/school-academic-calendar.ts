@@ -13,11 +13,16 @@ export type SchoolCalendarDaySettings = {
   isWorkingDay: boolean;
   label: string | null;
   holidayType: string | null;
-  category?: 'WORKING_DAY' | 'HOLIDAY' | 'WORKING_DAY_EXCEPTION' | 'SCHOOL_EVENT' | 'CLOSURE';
+  category?:
+    | "WORKING_DAY"
+    | "HOLIDAY"
+    | "WORKING_DAY_EXCEPTION"
+    | "SCHOOL_EVENT"
+    | "CLOSURE";
 };
 
 export type AcademicCalendarSettings = {
-  timeZone: 'Asia/Kathmandu';
+  timeZone: "Asia/Kathmandu";
   academicYears: AcademicCalendarYearSettings[];
   selectedAcademicYearId: string | null;
   calendarDays: SchoolCalendarDaySettings[];

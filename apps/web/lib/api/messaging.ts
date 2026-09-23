@@ -10,11 +10,7 @@ import type {
   ParentTeacherThreadSummary,
   SendParentTeacherMessageResult,
 } from '@schoolos/core';
-import {
-  JsonBody,
-  request,
-  withQuery,
-} from './client';
+import { JsonBody, request, withQuery } from './client';
 
 export const messagingApi = {
   listConversations: () =>

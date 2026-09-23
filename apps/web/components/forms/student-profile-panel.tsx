@@ -51,9 +51,16 @@ export function StudentProfilePanel({
 }: StudentProfilePanelProps) {
   const guardians = student.guardians ?? admission?.guardians ?? [];
   const studentName = getStudentName(student, admission);
-  const className = student.className ?? student.class?.name ?? admission?.className ?? 'Not assigned';
+  const className =
+    student.className ??
+    student.class?.name ??
+    admission?.className ??
+    'Not assigned';
   const sectionName =
-    student.sectionName ?? student.section ?? admission?.sectionName ?? 'No section';
+    student.sectionName ??
+    student.section ??
+    admission?.sectionName ??
+    'No section';
   const rollNumber = student.rollNumber ?? admission?.rollNumber ?? null;
 
   return (
@@ -108,9 +115,12 @@ export function StudentProfilePanel({
                       ) : null}
                     </p>
                     <p className="mt-1 text-gray-500">
-                      {guardian.relation} / {guardian.primaryPhone || 'No phone'}
+                      {guardian.relation} /{' '}
+                      {guardian.primaryPhone || 'No phone'}
                     </p>
-                    {email ? <p className="mt-1 text-gray-500">{email}</p> : null}
+                    {email ? (
+                      <p className="mt-1 text-gray-500">{email}</p>
+                    ) : null}
                   </div>
                 );
               })}
@@ -122,7 +132,8 @@ export function StudentProfilePanel({
 
         <ProfileSection title="Documents & Certificates">
           <p className="text-sm leading-6 text-gray-500">
-            Open generated student documents through the existing secure PDF helper.
+            Open generated student documents through the existing secure PDF
+            helper.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {generatedDocumentActions.map(([kind, label]) => (
@@ -136,21 +147,29 @@ export function StudentProfilePanel({
               </button>
             ))}
           </div>
-          {pdfError ? <p className="mt-3 text-sm text-danger-600">{pdfError}</p> : null}
+          {pdfError ? (
+            <p className="mt-3 text-sm text-danger-600">{pdfError}</p>
+          ) : null}
           <div className="mt-4 grid gap-2">
-            {[...generatedDocuments, ...documents].slice(0, 5).map((document) => (
-              <div
-                key={document.id}
-                className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600"
-              >
-                <p className="font-semibold text-gray-900">{document.fileName}</p>
-                <p className="mt-1">
-                  {document.kind} / {getDocumentSizeLabel(document)}
-                </p>
-              </div>
-            ))}
+            {[...generatedDocuments, ...documents]
+              .slice(0, 5)
+              .map((document) => (
+                <div
+                  key={document.id}
+                  className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600"
+                >
+                  <p className="font-semibold text-gray-900">
+                    {document.fileName}
+                  </p>
+                  <p className="mt-1">
+                    {document.kind} / {getDocumentSizeLabel(document)}
+                  </p>
+                </div>
+              ))}
             {generatedDocuments.length === 0 && documents.length === 0 ? (
-              <p className="text-xs text-gray-500">No stored document history yet.</p>
+              <p className="text-xs text-gray-500">
+                No stored document history yet.
+              </p>
             ) : null}
           </div>
         </ProfileSection>
@@ -164,12 +183,14 @@ export function StudentProfilePanel({
                   className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="font-semibold text-gray-900">{invoice.invoiceNumber}</p>
+                    <p className="font-semibold text-gray-900">
+                      {invoice.invoiceNumber}
+                    </p>
                     <span className="rounded-full bg-white px-2 py-1 text-xs text-gray-500">
-                    {invoice.status}
-                  </span>
-                </div>
-                <p className="mt-1 text-gray-500">
+                      {invoice.status}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-gray-500">
                     Rs. {formatMoney(invoice.totalAmount)} / paid Rs.{' '}
                     {formatMoney(invoice.paidAmount ?? 0)}
                   </p>
@@ -198,7 +219,8 @@ export function StudentProfilePanel({
           ) : attendanceSummary?.studentMonthly ? (
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm">
               <p className="font-semibold text-gray-900">
-                {attendanceSummary.studentMonthly.attendancePercent}% monthly attendance
+                {attendanceSummary.studentMonthly.attendancePercent}% monthly
+                attendance
               </p>
               <p className="mt-1 text-gray-500">
                 Consecutive absences:{' '}
@@ -274,7 +296,10 @@ function EmptyLine({ text }: { text: string }) {
   );
 }
 
-function getStudentName(student: StudentProfile, admission: AdmissionSummary | null) {
+function getStudentName(
+  student: StudentProfile,
+  admission: AdmissionSummary | null,
+) {
   return (
     student.fullNameEn ||
     [student.firstNameEn, student.lastNameEn].filter(Boolean).join(' ') ||

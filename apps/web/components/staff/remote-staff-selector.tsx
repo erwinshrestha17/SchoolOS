@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useCallback } from "react";
-import type { StaffLookupOption } from "@schoolos/core";
-import { payrollApi } from "../../lib/api/payroll";
-import { RemoteCombobox } from "../ui/remote-combobox";
+import { useCallback } from 'react';
+import type { StaffLookupOption } from '@schoolos/core';
+import { payrollApi } from '../../lib/api/payroll';
+import { RemoteCombobox } from '../ui/remote-combobox';
 
-const STAFF_OPTIONS_QUERY_KEY = ["remote-staff-options"] as const;
+const STAFF_OPTIONS_QUERY_KEY = ['remote-staff-options'] as const;
 
 type RemoteStaffSelectorProps = {
   value: string;
@@ -25,8 +25,8 @@ export function RemoteStaffSelector({
   onChange,
   selectedOption,
   selectedLabel,
-  label = "Staff member",
-  placeholder = "Search for a staff member",
+  label = 'Staff member',
+  placeholder = 'Search for a staff member',
   disabled,
   clearable,
   hideLabel,
@@ -59,7 +59,7 @@ export function RemoteStaffSelector({
       getOptionDescription={(option) =>
         [option.employeeId, option.designation, option.department]
           .filter(Boolean)
-          .join(" · ")
+          .join(' · ')
       }
       label={label}
       placeholder={placeholder}

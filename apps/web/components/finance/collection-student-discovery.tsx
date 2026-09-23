@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
-import type { CollectionStudentSearchResult } from "@schoolos/core";
-import { Search, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ErrorState } from "@/components/ui/error-state";
-import { SearchInput } from "@/components/ui/search-input";
-import { SectionCard } from "@/components/ui/section-card";
+import type { CollectionStudentSearchResult } from '@schoolos/core';
+import { Search, Users } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { SearchInput } from '@/components/ui/search-input';
+import { SectionCard } from '@/components/ui/section-card';
 
 const formatCurrency = (amount: string) =>
-  new Intl.NumberFormat("en-NP", {
-    style: "currency",
-    currency: "NPR",
+  new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(amount));
@@ -90,14 +90,14 @@ export function CollectionStudentDiscovery({
                     </span>
                     <span className="mt-1 block text-xs text-slate-600">
                       {student.studentSystemId} · {student.className}
-                      {student.sectionName ? ` · ${student.sectionName}` : ""}
+                      {student.sectionName ? ` · ${student.sectionName}` : ''}
                     </span>
                     {student.guardianName || student.guardianPhone ? (
                       <span className="mt-2 block truncate text-xs text-slate-500">
-                        {student.guardianName ?? "Guardian"}
+                        {student.guardianName ?? 'Guardian'}
                         {student.guardianPhone
                           ? ` · ${student.guardianPhone}`
-                          : ""}
+                          : ''}
                       </span>
                     ) : null}
                   </span>
@@ -106,8 +106,8 @@ export function CollectionStudentDiscovery({
                       {formatCurrency(student.totalOutstanding)}
                     </span>
                     <span className="mt-1 block text-xs text-slate-500">
-                      {student.openInvoiceCount} open{" "}
-                      {student.openInvoiceCount === 1 ? "invoice" : "invoices"}
+                      {student.openInvoiceCount} open{' '}
+                      {student.openInvoiceCount === 1 ? 'invoice' : 'invoices'}
                     </span>
                   </span>
                 </span>

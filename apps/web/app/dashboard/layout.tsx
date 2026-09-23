@@ -1,414 +1,414 @@
-"use client";
+'use client';
 
-import type { PermissionKey, SupportOverrideScope } from "@schoolos/core";
-import { ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useSession } from "../../components/session-provider";
-import { useEntitlements } from "../../components/entitlements-provider";
-import { useTeacherAccess } from "../../lib/teacher-access";
-import { DashboardShell } from "../../components/layout/dashboard-shell";
-import { UpgradePrompt } from "../../components/layout/upgrade-prompt";
-import { PermissionDenied } from "../../components/ui/permission-denied";
-import { OfflineLockedState } from "../../components/ui/offline-locked-state";
+import type { PermissionKey, SupportOverrideScope } from '@schoolos/core';
+import { ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useSession } from '../../components/session-provider';
+import { useEntitlements } from '../../components/entitlements-provider';
+import { useTeacherAccess } from '../../lib/teacher-access';
+import { DashboardShell } from '../../components/layout/dashboard-shell';
+import { UpgradePrompt } from '../../components/layout/upgrade-prompt';
+import { PermissionDenied } from '../../components/ui/permission-denied';
+import { OfflineLockedState } from '../../components/ui/offline-locked-state';
 import {
   SETTINGS_NAVIGATION,
   settingsDefinitionMatchesPath,
-} from "../../components/settings/settings-navigation.config";
-import { getRequiredModuleForHref } from "../../lib/nav-module-map";
+} from '../../components/settings/settings-navigation.config';
+import { getRequiredModuleForHref } from '../../lib/nav-module-map';
 import {
   hasAllPermissions,
   hasAnyPermission,
   type BrowserSession,
-} from "../../lib/session";
+} from '../../lib/session';
 
 type RouteGate = {
   prefix: string;
   label: string;
   permissions: PermissionKey[];
-  permissionMode?: "any" | "all";
+  permissionMode?: 'any' | 'all';
 };
 
 const dashboardRouteGates: RouteGate[] = [
   {
-    prefix: "/dashboard/attendance/mark",
-    label: "Attendance marking",
-    permissions: ["attendance:mark"],
+    prefix: '/dashboard/attendance/mark',
+    label: 'Attendance marking',
+    permissions: ['attendance:mark'],
   },
   {
-    prefix: "/dashboard/attendance/offline-drafts",
-    label: "Attendance drafts",
-    permissions: ["attendance:mark"],
+    prefix: '/dashboard/attendance/offline-drafts',
+    label: 'Attendance drafts',
+    permissions: ['attendance:mark'],
   },
   {
-    prefix: "/dashboard/homework/new",
-    label: "Homework creation",
-    permissions: ["homework:create"],
+    prefix: '/dashboard/homework/new',
+    label: 'Homework creation',
+    permissions: ['homework:create'],
   },
   {
-    prefix: "/dashboard/homework/review",
-    label: "Homework review",
-    permissions: ["homework:review"],
+    prefix: '/dashboard/homework/review',
+    label: 'Homework review',
+    permissions: ['homework:review'],
   },
   {
-    prefix: "/dashboard/admissions/new",
-    label: "New admission",
-    permissions: ["enrollments:create", "students:create", "guardians:create"],
-    permissionMode: "all",
+    prefix: '/dashboard/admissions/new',
+    label: 'New admission',
+    permissions: ['enrollments:create', 'students:create', 'guardians:create'],
+    permissionMode: 'all',
   },
   {
-    prefix: "/dashboard/students",
-    label: "Students",
-    permissions: ["students:read", "students:create"],
+    prefix: '/dashboard/students',
+    label: 'Students',
+    permissions: ['students:read', 'students:create'],
   },
   {
-    prefix: "/dashboard/admissions",
-    label: "Admissions",
-    permissions: ["students:read", "students:create"],
+    prefix: '/dashboard/admissions',
+    label: 'Admissions',
+    permissions: ['students:read', 'students:create'],
   },
   {
-    prefix: "/dashboard/attendance",
-    label: "Attendance",
-    permissions: ["attendance:read", "attendance:mark"],
+    prefix: '/dashboard/attendance',
+    label: 'Attendance',
+    permissions: ['attendance:read', 'attendance:mark'],
   },
   {
-    prefix: "/dashboard/academics",
-    label: "Academics",
-    permissions: ["academics:read", "academics:manage"],
+    prefix: '/dashboard/academics',
+    label: 'Academics',
+    permissions: ['academics:read', 'academics:manage'],
   },
   {
-    prefix: "/dashboard/homework",
-    label: "Homework",
-    permissions: ["homework:read_published"],
+    prefix: '/dashboard/homework',
+    label: 'Homework',
+    permissions: ['homework:read_published'],
   },
   {
-    prefix: "/dashboard/learning",
-    label: "Learning",
+    prefix: '/dashboard/learning',
+    label: 'Learning',
     permissions: [
-      "learning:read",
-      "learning:create",
-      "learning:update",
-      "learning:launch",
-      "learning:progress",
+      'learning:read',
+      'learning:create',
+      'learning:update',
+      'learning:launch',
+      'learning:progress',
     ],
   },
   {
-    prefix: "/dashboard/timetable/builder",
-    label: "Timetable builder",
-    permissions: ["timetable:create", "timetable:update"],
+    prefix: '/dashboard/timetable/builder',
+    label: 'Timetable builder',
+    permissions: ['timetable:create', 'timetable:update'],
   },
   {
-    prefix: "/dashboard/timetable/conflicts",
-    label: "Timetable conflict review",
-    permissions: ["timetable:read"],
+    prefix: '/dashboard/timetable/conflicts',
+    label: 'Timetable conflict review',
+    permissions: ['timetable:read'],
   },
   {
-    prefix: "/dashboard/timetable/substitutions",
-    label: "Timetable substitutions",
-    permissions: ["timetable:read"],
+    prefix: '/dashboard/timetable/substitutions',
+    label: 'Timetable substitutions',
+    permissions: ['timetable:read'],
   },
   {
-    prefix: "/dashboard/timetable/replacements",
-    label: "Teacher replacements",
-    permissions: ["timetable:read"],
+    prefix: '/dashboard/timetable/replacements',
+    label: 'Teacher replacements',
+    permissions: ['timetable:read'],
   },
   {
-    prefix: "/dashboard/timetable/versions",
-    label: "Timetable versions",
-    permissions: ["timetable:read"],
+    prefix: '/dashboard/timetable/versions',
+    label: 'Timetable versions',
+    permissions: ['timetable:read'],
   },
   {
-    prefix: "/dashboard/timetable/workload",
-    label: "Timetable workload",
-    permissions: ["timetable:read"],
+    prefix: '/dashboard/timetable/workload',
+    label: 'Timetable workload',
+    permissions: ['timetable:read'],
   },
   {
-    prefix: "/dashboard/timetable",
-    label: "Timetable",
-    permissions: ["timetable:read_published"],
+    prefix: '/dashboard/timetable',
+    label: 'Timetable',
+    permissions: ['timetable:read_published'],
   },
   {
-    prefix: "/dashboard/fees",
-    label: "Fees",
+    prefix: '/dashboard/fees',
+    label: 'Fees',
     permissions: [
-      "fees:manage",
-      "fees:bill",
-      "fees:discount",
-      "fees:adjust",
-      "payments:collect",
-      "payments:refund",
-      "payments:reverse",
-      "payments:close",
-      "receipts:read",
-      "receipts:manage",
-      "ledger:read",
+      'fees:manage',
+      'fees:bill',
+      'fees:discount',
+      'fees:adjust',
+      'payments:collect',
+      'payments:refund',
+      'payments:reverse',
+      'payments:close',
+      'receipts:read',
+      'receipts:manage',
+      'ledger:read',
     ],
   },
   {
-    prefix: "/dashboard/finance",
-    label: "Finance",
+    prefix: '/dashboard/finance',
+    label: 'Finance',
     permissions: [
-      "fees:manage",
-      "fees:bill",
-      "fees:discount",
-      "fees:adjust",
-      "payments:collect",
-      "payments:refund",
-      "payments:reverse",
-      "payments:close",
-      "receipts:read",
-      "receipts:manage",
-      "ledger:read",
+      'fees:manage',
+      'fees:bill',
+      'fees:discount',
+      'fees:adjust',
+      'payments:collect',
+      'payments:refund',
+      'payments:reverse',
+      'payments:close',
+      'receipts:read',
+      'receipts:manage',
+      'ledger:read',
     ],
   },
   {
-    prefix: "/dashboard/activity",
-    label: "Activity Feed",
-    permissions: ["activity_feed:read", "activity_feed:create"],
+    prefix: '/dashboard/activity',
+    label: 'Activity Feed',
+    permissions: ['activity_feed:read', 'activity_feed:create'],
   },
   {
-    prefix: "/dashboard/communications",
-    label: "Notices",
-    permissions: ["notices:read", "notices:create"],
+    prefix: '/dashboard/communications',
+    label: 'Notices',
+    permissions: ['notices:read', 'notices:create'],
   },
   {
-    prefix: "/dashboard/notifications/deliveries",
-    label: "Delivery logs",
-    permissions: ["notifications:view_delivery_diagnostics"],
+    prefix: '/dashboard/notifications/deliveries',
+    label: 'Delivery logs',
+    permissions: ['notifications:view_delivery_diagnostics'],
   },
   {
-    prefix: "/dashboard/notifications/failures",
-    label: "Failure and retry center",
+    prefix: '/dashboard/notifications/failures',
+    label: 'Failure and retry center',
     permissions: [
-      "notifications:view_delivery_diagnostics",
-      "notifications:retry_deliveries",
+      'notifications:view_delivery_diagnostics',
+      'notifications:retry_deliveries',
     ],
   },
   {
-    prefix: "/dashboard/notices/deliveries",
-    label: "Legacy delivery logs",
-    permissions: ["notifications:view_delivery_diagnostics"],
+    prefix: '/dashboard/notices/deliveries',
+    label: 'Legacy delivery logs',
+    permissions: ['notifications:view_delivery_diagnostics'],
   },
   {
-    prefix: "/dashboard/notices/failures",
-    label: "Legacy failure and retry center",
+    prefix: '/dashboard/notices/failures',
+    label: 'Legacy failure and retry center',
     permissions: [
-      "notifications:view_delivery_diagnostics",
-      "notifications:retry_deliveries",
+      'notifications:view_delivery_diagnostics',
+      'notifications:retry_deliveries',
     ],
   },
   {
-    prefix: "/dashboard/notices/new",
-    label: "New notice",
-    permissions: ["notices:create"],
+    prefix: '/dashboard/notices/new',
+    label: 'New notice',
+    permissions: ['notices:create'],
   },
   {
-    prefix: "/dashboard/notices/scheduled",
-    label: "Scheduled notices",
-    permissions: ["notices:schedule", "notices:read_reports"],
+    prefix: '/dashboard/notices/scheduled',
+    label: 'Scheduled notices',
+    permissions: ['notices:schedule', 'notices:read_reports'],
   },
   {
-    prefix: "/dashboard/notices/approvals",
-    label: "Notice approvals",
-    permissions: ["notices:approve"],
+    prefix: '/dashboard/notices/approvals',
+    label: 'Notice approvals',
+    permissions: ['notices:approve'],
   },
   {
-    prefix: "/dashboard/notices",
-    label: "Notices",
-    permissions: ["notices:read", "notices:create"],
+    prefix: '/dashboard/notices',
+    label: 'Notices',
+    permissions: ['notices:read', 'notices:create'],
   },
   {
-    prefix: "/dashboard/notifications",
-    label: "Notifications",
-    permissions: ["notifications:view_own"],
+    prefix: '/dashboard/notifications',
+    label: 'Notifications',
+    permissions: ['notifications:view_own'],
   },
   {
-    prefix: "/dashboard/service-requests",
-    label: "Action Centre",
-    permissions: ["service_requests:read", "service_requests:manage"],
+    prefix: '/dashboard/service-requests',
+    label: 'Action Centre',
+    permissions: ['service_requests:read', 'service_requests:manage'],
   },
   {
-    prefix: "/dashboard/messages",
-    label: "Chat removed",
-    permissions: ["notices:read"],
+    prefix: '/dashboard/messages',
+    label: 'Chat removed',
+    permissions: ['notices:read'],
   },
   {
-    prefix: "/dashboard/my-workspace",
-    label: "My Workspace",
-    permissions: ["staff:read"],
+    prefix: '/dashboard/my-workspace',
+    label: 'My Workspace',
+    permissions: ['staff:read'],
   },
   {
-    prefix: "/dashboard/my-profile",
-    label: "My Workspace",
-    permissions: ["staff:read"],
+    prefix: '/dashboard/my-profile',
+    label: 'My Workspace',
+    permissions: ['staff:read'],
   },
   {
-    prefix: "/dashboard/my-students",
-    label: "My Students",
-    permissions: ["students:read"],
+    prefix: '/dashboard/my-students',
+    label: 'My Students',
+    permissions: ['students:read'],
   },
   {
-    prefix: "/dashboard/messaging",
-    label: "Chat removed",
-    permissions: ["notices:read"],
+    prefix: '/dashboard/messaging',
+    label: 'Chat removed',
+    permissions: ['notices:read'],
   },
   {
-    prefix: "/dashboard/hr",
-    label: "HR",
-    permissions: ["hr:read", "payroll:read", "payroll:manage"],
+    prefix: '/dashboard/hr',
+    label: 'HR',
+    permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
   },
   {
-    prefix: "/dashboard/payroll",
-    label: "Payroll",
-    permissions: ["payroll:read", "payroll:manage"],
+    prefix: '/dashboard/payroll',
+    label: 'Payroll',
+    permissions: ['payroll:read', 'payroll:manage'],
   },
   {
-    prefix: "/dashboard/accounting/audit",
-    label: "Accounting audit",
-    permissions: ["accounting:audit:read", "accounting:read"],
+    prefix: '/dashboard/accounting/audit',
+    label: 'Accounting audit',
+    permissions: ['accounting:audit:read', 'accounting:read'],
   },
   {
-    prefix: "/dashboard/accounting",
-    label: "Accounting",
+    prefix: '/dashboard/accounting',
+    label: 'Accounting',
     permissions: [
-      "accounting:read",
-      "accounting:accounts:read",
-      "accounting:reports:read",
+      'accounting:read',
+      'accounting:accounts:read',
+      'accounting:reports:read',
     ],
   },
   {
-    prefix: "/dashboard/operations",
-    label: "School Operations",
+    prefix: '/dashboard/operations',
+    label: 'School Operations',
     permissions: [
-      "library:read",
-      "library:manage",
-      "transport:read",
-      "transport:manage",
-      "transport:operate",
-      "canteen:menu:read",
-      "canteen:plans:read",
-      "canteen:enrollments:read",
+      'library:read',
+      'library:manage',
+      'transport:read',
+      'transport:manage',
+      'transport:operate',
+      'canteen:menu:read',
+      'canteen:plans:read',
+      'canteen:enrollments:read',
     ],
   },
   {
-    prefix: "/dashboard/library",
-    label: "Library",
+    prefix: '/dashboard/library',
+    label: 'Library',
     permissions: [
-      "library:read",
-      "library:manage",
-      "library:books:read",
-      "library:copies:read",
-      "library:issues:read",
+      'library:read',
+      'library:manage',
+      'library:books:read',
+      'library:copies:read',
+      'library:issues:read',
     ],
   },
   {
-    prefix: "/dashboard/transport",
-    label: "Transport",
-    permissions: ["transport:read", "transport:manage", "transport:operate"],
+    prefix: '/dashboard/transport',
+    label: 'Transport',
+    permissions: ['transport:read', 'transport:manage', 'transport:operate'],
   },
   {
-    prefix: "/dashboard/canteen",
-    label: "Canteen",
+    prefix: '/dashboard/canteen',
+    label: 'Canteen',
     permissions: [
-      "canteen:menu:read",
-      "canteen:plans:read",
-      "canteen:enrollments:read",
+      'canteen:menu:read',
+      'canteen:plans:read',
+      'canteen:enrollments:read',
     ],
   },
   {
-    prefix: "/dashboard/reports",
-    label: "Reports",
+    prefix: '/dashboard/reports',
+    label: 'Reports',
     permissions: [
-      "accounting:reports:read",
-      "library:reports:read",
-      "reports:read",
-      "settings:manage",
+      'accounting:reports:read',
+      'library:reports:read',
+      'reports:read',
+      'settings:manage',
     ],
   },
 ];
 
 const settingsRouteGates: RouteGate[] = [
   {
-    prefix: "/dashboard/settings/school/identity",
-    label: "School identity settings",
+    prefix: '/dashboard/settings/school/identity',
+    label: 'School identity settings',
     permissions: [
-      "settings:read_public",
-      "settings:identity:manage",
-      "settings:manage",
+      'settings:read_public',
+      'settings:identity:manage',
+      'settings:manage',
     ],
   },
   {
-    prefix: "/dashboard/settings/school/branding",
-    label: "School branding settings",
-    permissions: ["settings:identity:manage", "settings:manage"],
+    prefix: '/dashboard/settings/school/branding',
+    label: 'School branding settings',
+    permissions: ['settings:identity:manage', 'settings:manage'],
   },
   {
-    prefix: "/dashboard/settings/school/academic-year",
-    label: "Academic year settings",
-    permissions: ["settings:academic:manage", "settings:manage"],
+    prefix: '/dashboard/settings/school/academic-year',
+    label: 'Academic year settings',
+    permissions: ['settings:academic:manage', 'settings:manage'],
   },
   {
-    prefix: "/dashboard/settings/school/academic-structure",
-    label: "Academic structure settings",
-    permissions: ["classes:read", "sections:read"],
-    permissionMode: "all",
+    prefix: '/dashboard/settings/school/academic-structure',
+    label: 'Academic structure settings',
+    permissions: ['classes:read', 'sections:read'],
+    permissionMode: 'all',
   },
   {
-    prefix: "/dashboard/settings/school/modules",
-    label: "School module settings",
-    permissions: ["settings:read"],
+    prefix: '/dashboard/settings/school/modules',
+    label: 'School module settings',
+    permissions: ['settings:read'],
   },
   {
-    prefix: "/dashboard/settings/policies/attendance",
-    label: "Attendance settings",
-    permissions: ["attendance:read"],
+    prefix: '/dashboard/settings/policies/attendance',
+    label: 'Attendance settings',
+    permissions: ['attendance:read'],
   },
   {
-    prefix: "/dashboard/settings/policies/exams",
-    label: "Exams and report-card settings",
+    prefix: '/dashboard/settings/policies/exams',
+    label: 'Exams and report-card settings',
     permissions: [
-      "settings:read",
-      "settings:academic:manage",
-      "settings:manage",
+      'settings:read',
+      'settings:academic:manage',
+      'settings:manage',
     ],
   },
   {
-    prefix: "/dashboard/settings/policies/homework",
-    label: "Homework settings",
+    prefix: '/dashboard/settings/policies/homework',
+    label: 'Homework settings',
     permissions: [
-      "settings:read",
-      "settings:academic:manage",
-      "settings:manage",
+      'settings:read',
+      'settings:academic:manage',
+      'settings:manage',
     ],
   },
   {
-    prefix: "/dashboard/settings/policies/activity-consent",
-    label: "Activity consent settings",
+    prefix: '/dashboard/settings/policies/activity-consent',
+    label: 'Activity consent settings',
     permissions: [
-      "settings:read",
-      "settings:communication:manage",
-      "settings:manage",
+      'settings:read',
+      'settings:communication:manage',
+      'settings:manage',
     ],
   },
   {
-    prefix: "/dashboard/settings/access/roles",
-    label: "Roles and permissions",
-    permissions: ["roles:read"],
+    prefix: '/dashboard/settings/access/roles',
+    label: 'Roles and permissions',
+    permissions: ['roles:read'],
   },
   {
-    prefix: "/dashboard/settings/access/users",
-    label: "Users and access",
-    permissions: ["users:read"],
+    prefix: '/dashboard/settings/access/users',
+    label: 'Users and access',
+    permissions: ['users:read'],
   },
   {
-    prefix: "/dashboard/settings/system/integrations",
-    label: "Integration settings",
-    permissions: ["settings:read"],
+    prefix: '/dashboard/settings/system/integrations',
+    label: 'Integration settings',
+    permissions: ['settings:read'],
   },
   {
-    prefix: "/dashboard/settings/system/audit-log",
-    label: "Settings audit log",
-    permissions: ["settings:audit:read", "settings:manage"],
+    prefix: '/dashboard/settings/system/audit-log',
+    label: 'Settings audit log',
+    permissions: ['settings:audit:read', 'settings:manage'],
   },
 ];
 
@@ -416,15 +416,15 @@ function getRouteGateForHref(href: string): RouteGate | null {
   if (/^\/dashboard\/notices\/[^/]+\/edit$/.test(href)) {
     return {
       prefix: href,
-      label: "Notice editing",
-      permissions: ["notices:edit"],
+      label: 'Notice editing',
+      permissions: ['notices:edit'],
     };
   }
   if (/^\/dashboard\/notices\/[^/]+\/review$/.test(href)) {
     return {
       prefix: href,
-      label: "Notice review and publication",
-      permissions: ["notices:publish", "notices:schedule"],
+      label: 'Notice review and publication',
+      permissions: ['notices:publish', 'notices:schedule'],
     };
   }
 
@@ -432,12 +432,12 @@ function getRouteGateForHref(href: string): RouteGate | null {
   // Each purpose-limited API (password, profile, notification preferences)
   // remains the backend authorization authority for its own data.
   if (
-    href === "/dashboard/settings" ||
-    href.startsWith("/dashboard/settings/personal/")
+    href === '/dashboard/settings' ||
+    href.startsWith('/dashboard/settings/personal/')
   ) {
     return null;
   }
-  if (href.startsWith("/dashboard/settings")) {
+  if (href.startsWith('/dashboard/settings')) {
     const definition = SETTINGS_NAVIGATION.find((item) =>
       settingsDefinitionMatchesPath(item, href),
     );
@@ -467,7 +467,7 @@ function isResourceDetailPath(
   const remainder = pathname.slice(collectionPath.length + 1);
   return (
     remainder.length > 0 &&
-    !remainder.includes("/") &&
+    !remainder.includes('/') &&
     !reservedSegments.includes(remainder)
   );
 }
@@ -484,39 +484,39 @@ function supportOverrideRouteAllowed(
 ) {
   return scopes.some((scope) => {
     switch (scope) {
-      case "SCHOOL_PROFILE":
-        return pathname === "/dashboard/settings/school/identity";
-      case "STUDENT_RECORDS":
+      case 'SCHOOL_PROFILE':
+        return pathname === '/dashboard/settings/school/identity';
+      case 'STUDENT_RECORDS':
         return (
-          pathname === "/dashboard/students" ||
-          isResourceDetailPath(pathname, "/dashboard/students", ["new"])
+          pathname === '/dashboard/students' ||
+          isResourceDetailPath(pathname, '/dashboard/students', ['new'])
         );
-      case "ATTENDANCE":
-        return pathname === "/dashboard/attendance";
-      case "ACADEMICS":
-        return pathname === "/dashboard/academics";
-      case "HOMEWORK_TIMETABLE":
+      case 'ATTENDANCE':
+        return pathname === '/dashboard/attendance';
+      case 'ACADEMICS':
+        return pathname === '/dashboard/academics';
+      case 'HOMEWORK_TIMETABLE':
         return (
-          pathname === "/dashboard/homework" ||
-          isResourceDetailPath(pathname, "/dashboard/homework", [
-            "new",
-            "review",
+          pathname === '/dashboard/homework' ||
+          isResourceDetailPath(pathname, '/dashboard/homework', [
+            'new',
+            'review',
           ]) ||
-          pathname === "/dashboard/timetable"
+          pathname === '/dashboard/timetable'
         );
-      case "NOTICES_DELIVERY":
+      case 'NOTICES_DELIVERY':
         return (
-          pathname === "/dashboard/notices" ||
-          pathname === "/dashboard/notifications/deliveries" ||
-          pathname === "/dashboard/notifications/failures" ||
-          pathname === "/dashboard/notices/deliveries" ||
-          pathname === "/dashboard/notices/failures" ||
-          isResourceDetailPath(pathname, "/dashboard/notices", [
-            "new",
-            "scheduled",
-            "approvals",
-            "deliveries",
-            "failures",
+          pathname === '/dashboard/notices' ||
+          pathname === '/dashboard/notifications/deliveries' ||
+          pathname === '/dashboard/notifications/failures' ||
+          pathname === '/dashboard/notices/deliveries' ||
+          pathname === '/dashboard/notices/failures' ||
+          isResourceDetailPath(pathname, '/dashboard/notices', [
+            'new',
+            'scheduled',
+            'approvals',
+            'deliveries',
+            'failures',
           ])
         );
     }
@@ -531,7 +531,7 @@ function hasRoutePermission(
     return true;
   }
 
-  return routeGate.permissionMode === "all"
+  return routeGate.permissionMode === 'all'
     ? hasAllPermissions(session, routeGate.permissions)
     : hasAnyPermission(session, routeGate.permissions);
 }
@@ -554,23 +554,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   // activity moderator, timetable coordinator, teacher-librarian) hold the
   // matching capability, so this resolves to null for them and the route
   // opens normally. The backend @Permissions guards remain the authority.
-  const teacherRestriction = teacherAccess.restrictionFor(pathname || "");
+  const teacherRestriction = teacherAccess.restrictionFor(pathname || '');
   const isParentOnlySession = Boolean(
     session?.user.roles.length &&
-    session.user.roles.every((role) => role === "parent"),
+    session.user.roles.every((role) => role === 'parent'),
   );
 
   useEffect(() => {
-    if (status === "anonymous") {
+    if (status === 'anonymous') {
       router.replace(
-        `/login?next=${encodeURIComponent(pathname || "/dashboard")}`,
+        `/login?next=${encodeURIComponent(pathname || '/dashboard')}`,
       );
     }
   }, [pathname, router, status]);
 
   useEffect(() => {
-    if (status === "authenticated" && isParentOnlySession) {
-      router.replace("/login?notice=parent-mobile-only");
+    if (status === 'authenticated' && isParentOnlySession) {
+      router.replace('/login?notice=parent-mobile-only');
     }
   }, [isParentOnlySession, router, status]);
 
@@ -578,20 +578,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     if (
       !isParentOnlySession &&
       session?.user.mustChangePassword &&
-      pathname !== "/dashboard/settings/personal/security"
+      pathname !== '/dashboard/settings/personal/security'
     ) {
-      router.replace("/dashboard/settings/personal/security");
+      router.replace('/dashboard/settings/personal/security');
     }
   }, [isParentOnlySession, pathname, router, session?.user.mustChangePassword]);
 
   useEffect(() => {
-    if (status === "authenticated" && teacherRestriction) {
+    if (status === 'authenticated' && teacherRestriction) {
       router.replace(teacherRestriction.redirectTo);
     }
   }, [router, status, teacherRestriction]);
 
   useEffect(() => {
-    if (status !== "loading") {
+    if (status !== 'loading') {
       setShowSlowSessionHelp(false);
       return;
     }
@@ -603,15 +603,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timeoutId);
   }, [status]);
 
-  if (status === "offline_locked" || status === "verification_failed") {
+  if (status === 'offline_locked' || status === 'verification_failed') {
     return (
       <OfflineLockedState
-        reason={status === "verification_failed" ? "server" : "network"}
+        reason={status === 'verification_failed' ? 'server' : 'network'}
       />
     );
   }
 
-  if (status === "loading") {
+  if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
         <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -652,7 +652,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-100"
                   onClick={() =>
                     router.replace(
-                      `/login?next=${encodeURIComponent(pathname || "/dashboard")}`,
+                      `/login?next=${encodeURIComponent(pathname || '/dashboard')}`,
                     )
                   }
                 >
@@ -699,7 +699,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (
     session.user.mustChangePassword &&
-    pathname !== "/dashboard/settings/personal/security"
+    pathname !== '/dashboard/settings/personal/security'
   ) {
     return (
       <DashboardShell>
@@ -733,7 +733,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   // Enforce frontend entitlement gating on direct URL access
-  const isPlatformUser = session.user.securityDomain === "PLATFORM";
+  const isPlatformUser = session.user.securityDomain === 'PLATFORM';
   if (isPlatformUser && !session.user.isSupportOverride) {
     return (
       <DashboardShell>
@@ -750,7 +750,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   if (
     session.user.isSupportOverride &&
     !supportOverrideRouteAllowed(
-      pathname || "",
+      pathname || '',
       session.user.supportOverrideScopes ?? [],
     )
   ) {
@@ -766,7 +766,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  const requiredModule = getRequiredModuleForHref(pathname || "");
+  const requiredModule = getRequiredModuleForHref(pathname || '');
   if (requiredModule && entitlementsLoading) {
     return (
       <DashboardShell>
@@ -795,7 +795,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
 
-  const routeGate = getRouteGateForHref(pathname || "");
+  const routeGate = getRouteGateForHref(pathname || '');
   if (routeGate && !hasRoutePermission(session, routeGate)) {
     return (
       <DashboardShell>
@@ -803,7 +803,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           title={`${routeGate.label} access is restricted`}
           description="Your current role cannot open this workspace. Ask a school administrator to add the required permission, or switch to an account with the correct access."
           resource={routeGate.label}
-          action={routeGate.permissions.join(" or ")}
+          action={routeGate.permissions.join(' or ')}
         />
       </DashboardShell>
     );

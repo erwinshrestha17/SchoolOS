@@ -1,6 +1,10 @@
 'use client';
 
-import type { PaginatedResult, PlatformPlanSummary, PlatformTenantSummary } from '@schoolos/core';
+import type {
+  PaginatedResult,
+  PlatformPlanSummary,
+  PlatformTenantSummary,
+} from '@schoolos/core';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -30,7 +34,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { Textarea } from '@/components/ui/textarea';
 import { hasAllPermissions, hasPermission } from '@/lib/session';
@@ -51,8 +62,13 @@ export default function PlatformSchools() {
   const billingWorkflow = getBillingWorkflow(searchParams.get('workflow'));
   const canReadBilling = hasPermission(session, 'platform:billing:read');
   const canChangeStatus = hasPermission(session, 'platform:tenants:status');
-  const canOnboard = hasAllPermissions(session, ['tenants:manage', 'platform:plans:read', 'platform:billing:manage']);
-  const [data, setData] = useState<PaginatedResult<PlatformTenantSummary>>(initialTenantPage);
+  const canOnboard = hasAllPermissions(session, [
+    'tenants:manage',
+    'platform:plans:read',
+    'platform:billing:manage',
+  ]);
+  const [data, setData] =
+    useState<PaginatedResult<PlatformTenantSummary>>(initialTenantPage);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -88,7 +104,10 @@ export default function PlatformSchools() {
         const arr = asArray(res);
         setDbPlans(arr);
         if (arr.length > 0) {
-          const defaultPlan = arr.find((p) => p.key === 'premium') || arr.find((p) => p.key === 'standard') || arr[0];
+          const defaultPlan =
+            arr.find((p) => p.key === 'premium') ||
+            arr.find((p) => p.key === 'standard') ||
+            arr[0];
           setNewSchoolPlan(defaultPlan.id);
         }
       })
@@ -108,12 +127,16 @@ export default function PlatformSchools() {
       return;
     }
     if (!/^[a-z0-9-]+$/.test(newSchoolSlug.trim())) {
-      setOnboardError('Slug must contain only lowercase letters, numbers, and hyphens');
+      setOnboardError(
+        'Slug must contain only lowercase letters, numbers, and hyphens',
+      );
       return;
     }
     if (
       newSchoolAdminPassword.length < 8 ||
-      !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/.test(newSchoolAdminPassword)
+      !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/.test(
+        newSchoolAdminPassword,
+      )
     ) {
       setOnboardError(
         'Password must be at least 8 characters and include uppercase, lowercase, number, and symbol characters',
@@ -195,7 +218,11 @@ export default function PlatformSchools() {
 
     setSubmitting(true);
     try {
-      await api.updatePlatformTenantStatus(statusChange.tenantId, !statusChange.isActive, reason);
+      await api.updatePlatformTenantStatus(
+        statusChange.tenantId,
+        !statusChange.isActive,
+        reason,
+      );
       setStatusChange(null);
       setReason('');
       void fetchTenants();
@@ -209,18 +236,26 @@ export default function PlatformSchools() {
   const tenants = asArray(data.items);
   const activeCount = tenants.filter((tenant) => tenant.isActive).length;
   const suspendedCount = tenants.filter((tenant) => !tenant.isActive).length;
-  const totalStudents = tenants.reduce((sum, tenant) => sum + Number(tenant.studentCount ?? 0), 0);
-  const totalStaff = tenants.reduce((sum, tenant) => sum + Number(tenant.staffCount ?? 0), 0);
+  const totalStudents = tenants.reduce(
+    (sum, tenant) => sum + Number(tenant.studentCount ?? 0),
+    0,
+  );
+  const totalStaff = tenants.reduce(
+    (sum, tenant) => sum + Number(tenant.staffCount ?? 0),
+    0,
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <Badge variant="neutral">Tenant Operations</Badge>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-900">Schools</h1>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-900">
+            Schools
+          </h1>
           <p className="mt-2 max-w-3xl text-slate-500">
-            Find a school, review status and plan context, open billing or support workflows, and perform audited
-            lifecycle actions.
+            Find a school, review status and plan context, open billing or
+            support workflows, and perform audited lifecycle actions.
           </p>
         </div>
         {canOnboard ? (
@@ -244,8 +279,9 @@ export default function PlatformSchools() {
             <div>
               <p className="font-black">{billingWorkflow.heading}</p>
               <p className="mt-1 leading-6 text-cyan-800">
-                Select a school to manage SchoolOS SaaS billing for that tenant. This is platform subscription billing
-                only, not M3 student fee collection or M11 school accounting.
+                Select a school to manage SchoolOS SaaS billing for that tenant.
+                This is platform subscription billing only, not M3 student fee
+                collection or M11 school accounting.
               </p>
             </div>
           </div>
@@ -253,8 +289,16 @@ export default function PlatformSchools() {
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Visible schools" value={data.total} helper="Matching current filters" />
-        <SummaryCard label="Active on page" value={activeCount} helper="Can access SchoolOS" />
+        <SummaryCard
+          label="Visible schools"
+          value={data.total}
+          helper="Matching current filters"
+        />
+        <SummaryCard
+          label="Active on page"
+          value={activeCount}
+          helper="Can access SchoolOS"
+        />
         <SummaryCard
           label="Suspended on page"
           value={suspendedCount}
@@ -278,7 +322,10 @@ export default function PlatformSchools() {
           </div>
           <div className="grid w-full gap-3 md:grid-cols-[minmax(240px,1fr)_160px_160px] xl:max-w-3xl">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <Search
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                size={18}
+              />
               <Input
                 placeholder="Search school name or slug"
                 className="h-12 rounded-2xl border-slate-200 bg-white pl-12"
@@ -327,7 +374,11 @@ export default function PlatformSchools() {
             Schools unavailable
           </div>
           <p className="mt-2 text-sm">{error}</p>
-          <Button className="mt-4" variant="outline" onClick={() => void fetchTenants()}>
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => void fetchTenants()}
+          >
             Try again
           </Button>
         </div>
@@ -343,7 +394,9 @@ export default function PlatformSchools() {
               <TableHead className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
                 Status
               </TableHead>
-              <TableHead className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">Plan</TableHead>
+              <TableHead className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+                Plan
+              </TableHead>
               <TableHead className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
                 Record counts
               </TableHead>
@@ -369,8 +422,12 @@ export default function PlatformSchools() {
                       <Search size={40} />
                     </div>
                     <div>
-                      <p className="text-lg font-black text-slate-900">No schools found</p>
-                      <p className="text-sm">Try a different search, status, or plan filter.</p>
+                      <p className="text-lg font-black text-slate-900">
+                        No schools found
+                      </p>
+                      <p className="text-sm">
+                        Try a different search, status, or plan filter.
+                      </p>
                     </div>
                   </div>
                 </TableCell>
@@ -390,22 +447,33 @@ export default function PlatformSchools() {
                         {tenant.name}
                       </Link>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="neutral" className="font-mono text-[10px] uppercase">
+                        <Badge
+                          variant="neutral"
+                          className="font-mono text-[10px] uppercase"
+                        >
                           {tenant.slug}
                         </Badge>
-                        <span className="text-[10px] font-mono text-slate-300">{tenant.id.slice(0, 8)}</span>
+                        <span className="text-[10px] font-mono text-slate-300">
+                          {tenant.id.slice(0, 8)}
+                        </span>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>{renderStatusBadge(tenant.isActive)}</TableCell>
                   <TableCell>
-                    <Badge variant="neutral" className="uppercase font-black text-[10px] tracking-widest">
+                    <Badge
+                      variant="neutral"
+                      className="uppercase font-black text-[10px] tracking-widest"
+                    >
                       {tenant.plan || 'unassigned'}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-4">
-                      <Metric label="Student records" value={tenant.studentCount} />
+                      <Metric
+                        label="Student records"
+                        value={tenant.studentCount}
+                      />
                       <Metric label="Staff records" value={tenant.staffCount} />
                     </div>
                   </TableCell>
@@ -436,23 +504,35 @@ export default function PlatformSchools() {
                           {
                             label: 'View details',
                             icon: <ArrowRight size={16} />,
-                            onClick: () => router.push(`/platform/schools/${tenant.id}`),
+                            onClick: () =>
+                              router.push(`/platform/schools/${tenant.id}`),
                           },
                           ...(canReadBilling
                             ? [
                                 {
                                   label: 'Open SaaS billing',
                                   icon: <CreditCard size={16} />,
-                                  onClick: () => router.push(`/platform/schools/${tenant.id}/billing`),
+                                  onClick: () =>
+                                    router.push(
+                                      `/platform/schools/${tenant.id}/billing`,
+                                    ),
                                 },
                               ]
                             : []),
                           ...(canChangeStatus
                             ? [
                                 {
-                                  label: tenant.isActive ? 'Suspend school' : 'Reactivate school',
-                                  icon: tenant.isActive ? <ShieldOff size={16} /> : <Shield size={16} />,
-                                  variant: tenant.isActive ? ('danger' as const) : ('success' as const),
+                                  label: tenant.isActive
+                                    ? 'Suspend school'
+                                    : 'Reactivate school',
+                                  icon: tenant.isActive ? (
+                                    <ShieldOff size={16} />
+                                  ) : (
+                                    <Shield size={16} />
+                                  ),
+                                  variant: tenant.isActive
+                                    ? ('danger' as const)
+                                    : ('success' as const),
                                   onClick: () =>
                                     setStatusChange({
                                       tenantId: tenant.id,
@@ -473,7 +553,12 @@ export default function PlatformSchools() {
         </Table>
 
         <div className="border-t border-slate-100 bg-slate-50/70 px-6 py-5">
-          <TablePagination page={page} pageSize={pageSize} total={data.total} onPageChange={setPage} />
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            total={data.total}
+            onPageChange={setPage}
+          />
         </div>
       </div>
 
@@ -499,17 +584,21 @@ export default function PlatformSchools() {
                     <Shield size={24} />
                   </div>
                 )}
-                {statusChange?.isActive ? 'Suspend school access' : 'Reactivate school access'}
+                {statusChange?.isActive
+                  ? 'Suspend school access'
+                  : 'Reactivate school access'}
               </DialogTitle>
               <DialogDescription className="pt-2">
-                This changes platform access for <strong>{statusChange?.name}</strong> and will be recorded in audit
-                logs.
+                This changes platform access for{' '}
+                <strong>{statusChange?.name}</strong> and will be recorded in
+                audit logs.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
               <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">
-                Lifecycle changes can affect school users immediately. Enter a clear reason for future audit review.
+                Lifecycle changes can affect school users immediately. Enter a
+                clear reason for future audit review.
               </div>
               <div className="space-y-2">
                 <Label className="font-bold text-slate-700">Audit reason</Label>
@@ -519,7 +608,9 @@ export default function PlatformSchools() {
                   onChange={(event) => setReason(event.target.value)}
                   className="min-h-[110px] rounded-2xl border-slate-200"
                 />
-                <p className="text-xs text-slate-400">Minimum 5 characters. Stored in platform audit logs.</p>
+                <p className="text-xs text-slate-400">
+                  Minimum 5 characters. Stored in platform audit logs.
+                </p>
               </div>
             </div>
 
@@ -571,7 +662,8 @@ export default function PlatformSchools() {
                 Onboard new school
               </DialogTitle>
               <DialogDescription className="pt-2 text-slate-500 font-medium">
-                Create a new school tenant, setup default roles, and assign their active platform subscription.
+                Create a new school tenant, setup default roles, and assign
+                their active platform subscription.
               </DialogDescription>
             </DialogHeader>
 
@@ -585,7 +677,9 @@ export default function PlatformSchools() {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="font-bold text-slate-700">School name</Label>
+                  <Label className="font-bold text-slate-700">
+                    School name
+                  </Label>
                   <Input
                     placeholder="e.g. Antigravity Academy"
                     value={newSchoolName}
@@ -596,24 +690,31 @@ export default function PlatformSchools() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="font-bold text-slate-700">School URL slug</Label>
+                  <Label className="font-bold text-slate-700">
+                    School URL slug
+                  </Label>
                   <Input
                     placeholder="e.g. antigravity-academy"
                     value={newSchoolSlug}
                     onChange={(e) => {
-                      setNewSchoolSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+                      setNewSchoolSlug(
+                        e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''),
+                      );
                     }}
                     className="rounded-2xl border-slate-200 h-11 font-mono text-sm"
                     required
                   />
                   <p className="text-[10px] text-slate-400 font-medium">
-                    Only lowercase letters, numbers, and hyphens. Used for school logins.
+                    Only lowercase letters, numbers, and hyphens. Used for
+                    school logins.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="font-bold text-slate-700">Admin email</Label>
+                    <Label className="font-bold text-slate-700">
+                      Admin email
+                    </Label>
                     <Input
                       type="email"
                       placeholder="admin@school.com"
@@ -625,24 +726,30 @@ export default function PlatformSchools() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="font-bold text-slate-700">Admin password</Label>
+                    <Label className="font-bold text-slate-700">
+                      Admin password
+                    </Label>
                     <Input
                       type="password"
                       placeholder="Use a strong password"
                       value={newSchoolAdminPassword}
-                      onChange={(e) => setNewSchoolAdminPassword(e.target.value)}
+                      onChange={(e) =>
+                        setNewSchoolAdminPassword(e.target.value)
+                      }
                       className="rounded-2xl border-slate-200 h-11"
                       required
                     />
                     <p className="text-[10px] text-slate-400 font-medium">
-                      Use 8+ characters with uppercase, lowercase, a number,
-                      and a symbol. Avoid the school name, slug, or admin email.
+                      Use 8+ characters with uppercase, lowercase, a number, and
+                      a symbol. Avoid the school name, slug, or admin email.
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="font-bold text-slate-700">Active subscription plan</Label>
+                  <Label className="font-bold text-slate-700">
+                    Active subscription plan
+                  </Label>
                   <Select
                     value={newSchoolPlan}
                     onChange={(e) => setNewSchoolPlan(e.target.value)}
@@ -662,7 +769,8 @@ export default function PlatformSchools() {
                     )}
                   </Select>
                   <p className="text-[10px] text-slate-400 font-medium">
-                    This plan subscription will be created and activated immediately.
+                    This plan subscription will be created and activated
+                    immediately.
                   </p>
                 </div>
               </div>
@@ -713,9 +821,21 @@ function SummaryCard({
 }) {
   return (
     <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
-      <p className="mt-2 text-3xl font-black text-slate-900">{value.toLocaleString()}</p>
-      <p className={warning ? 'mt-1 text-sm font-semibold text-amber-700' : 'mt-1 text-sm text-slate-500'}>{helper}</p>
+      <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+        {label}
+      </p>
+      <p className="mt-2 text-3xl font-black text-slate-900">
+        {value.toLocaleString()}
+      </p>
+      <p
+        className={
+          warning
+            ? 'mt-1 text-sm font-semibold text-amber-700'
+            : 'mt-1 text-sm text-slate-500'
+        }
+      >
+        {helper}
+      </p>
     </div>
   );
 }
@@ -723,8 +843,12 @@ function SummaryCard({
 function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="min-w-20">
-      <span className="block text-base font-black text-slate-900">{Number(value ?? 0).toLocaleString()}</span>
-      <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="block text-base font-black text-slate-900">
+        {Number(value ?? 0).toLocaleString()}
+      </span>
+      <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+        {label}
+      </span>
     </div>
   );
 }

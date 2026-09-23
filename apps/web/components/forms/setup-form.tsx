@@ -1,7 +1,13 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { api } from '../../lib/api';
 import { PageHeader } from '../ui/page-header';
 import { StatCard } from '../ui/stat-card';
@@ -56,19 +62,25 @@ export function SetupForm() {
   });
   const classMutation = useMutation({
     mutationFn: api.createClass,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['classes'] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ['classes'] }),
   });
   const sectionMutation = useMutation({
     mutationFn: api.createSection,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['sections'] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ['sections'] }),
   });
 
   const academicYears = academicYearsQuery.data ?? [];
   const classes = useMemo(() => classesQuery.data ?? [], [classesQuery.data]);
-  const sections = useMemo(() => sectionsQuery.data ?? [], [sectionsQuery.data]);
+  const sections = useMemo(
+    () => sectionsQuery.data ?? [],
+    [sectionsQuery.data],
+  );
 
   const totalStudents = useMemo(
-    () => classes.reduce((sum, item) => sum + Number(item.studentCount ?? 0), 0),
+    () =>
+      classes.reduce((sum, item) => sum + Number(item.studentCount ?? 0), 0),
     [classes],
   );
   const totalCapacity = useMemo(
@@ -77,7 +89,9 @@ export function SetupForm() {
   );
   const currentAcademicYear = academicYears.find((item) => item.isCurrent);
   const isAnyLoading =
-    academicYearsQuery.isLoading || classesQuery.isLoading || sectionsQuery.isLoading;
+    academicYearsQuery.isLoading ||
+    classesQuery.isLoading ||
+    sectionsQuery.isLoading;
 
   function createAcademicYear(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -115,7 +129,11 @@ export function SetupForm() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Academic Years" value={academicYears.length} tone="neutral" />
+        <StatCard
+          title="Academic Years"
+          value={academicYears.length}
+          tone="neutral"
+        />
         <StatCard title="Classes" value={classes.length} tone="success" />
         <StatCard title="Sections" value={sections.length} tone="warning" />
         <StatCard title="Students" value={totalStudents} tone="info" />
@@ -138,7 +156,9 @@ export function SetupForm() {
         />
         <SetupStatusCard
           title="Setup health"
-          value={classes.length > 0 && sections.length > 0 ? 'Ready' : 'Needs data'}
+          value={
+            classes.length > 0 && sections.length > 0 ? 'Ready' : 'Needs data'
+          }
           description="Create at least one class and one section before assigning students."
         />
       </section>
@@ -155,7 +175,10 @@ export function SetupForm() {
               <input
                 value={academicYear.name}
                 onChange={(event) =>
-                  setAcademicYear((current) => ({ ...current, name: event.target.value }))
+                  setAcademicYear((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
                 }
                 placeholder="2026-2027"
                 className="min-h-11"
@@ -211,9 +234,14 @@ export function SetupForm() {
                 academicYearMutation.isPending
               }
             >
-              {academicYearMutation.isPending ? 'Creating...' : 'Create academic year'}
+              {academicYearMutation.isPending
+                ? 'Creating...'
+                : 'Create academic year'}
             </ActionButton>
-            <MutationMessage mutation={academicYearMutation} successText="Academic year saved." />
+            <MutationMessage
+              mutation={academicYearMutation}
+              successText="Academic year saved."
+            />
           </div>
         </SetupFormCard>
 
@@ -228,7 +256,10 @@ export function SetupForm() {
               <input
                 value={classroom.name}
                 onChange={(event) =>
-                  setClassroom((current) => ({ ...current, name: event.target.value }))
+                  setClassroom((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
                 }
                 placeholder="Class 1"
                 className="min-h-11"
@@ -250,13 +281,19 @@ export function SetupForm() {
               />
             </Field>
             <p className="rounded-2xl bg-gray-50 p-3 text-xs leading-5 text-[var(--muted)]">
-              Use lower sort levels for lower classes. This keeps lists, report cards, and
-              promotion flows ordered correctly.
+              Use lower sort levels for lower classes. This keeps lists, report
+              cards, and promotion flows ordered correctly.
             </p>
-            <ActionButton tone="teal" disabled={!classroom.name || classMutation.isPending}>
+            <ActionButton
+              tone="teal"
+              disabled={!classroom.name || classMutation.isPending}
+            >
               {classMutation.isPending ? 'Creating...' : 'Create class'}
             </ActionButton>
-            <MutationMessage mutation={classMutation} successText="Class saved." />
+            <MutationMessage
+              mutation={classMutation}
+              successText="Class saved."
+            />
           </div>
         </SetupFormCard>
 
@@ -271,7 +308,10 @@ export function SetupForm() {
               <select
                 value={section.classId}
                 onChange={(event) =>
-                  setSection((current) => ({ ...current, classId: event.target.value }))
+                  setSection((current) => ({
+                    ...current,
+                    classId: event.target.value,
+                  }))
                 }
                 className="min-h-11"
               >
@@ -287,7 +327,10 @@ export function SetupForm() {
               <input
                 value={section.name}
                 onChange={(event) =>
-                  setSection((current) => ({ ...current, name: event.target.value }))
+                  setSection((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
                 }
                 placeholder="Section A"
                 className="min-h-11"
@@ -310,11 +353,16 @@ export function SetupForm() {
             </Field>
             <ActionButton
               tone="accent"
-              disabled={!section.classId || !section.name || sectionMutation.isPending}
+              disabled={
+                !section.classId || !section.name || sectionMutation.isPending
+              }
             >
               {sectionMutation.isPending ? 'Creating...' : 'Create section'}
             </ActionButton>
-            <MutationMessage mutation={sectionMutation} successText="Section saved." />
+            <MutationMessage
+              mutation={sectionMutation}
+              successText="Section saved."
+            />
           </div>
         </SetupFormCard>
       </div>
@@ -386,7 +434,9 @@ function SetupFormCard({
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <p className="label">{title}</p>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{subtitle}</p>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+            {subtitle}
+          </p>
         </div>
         <span className="shrink-0 rounded-full bg-gray-950 px-3 py-1 text-xs font-semibold text-white">
           {badge}
@@ -397,13 +447,7 @@ function SetupFormCard({
   );
 }
 
-function Field({
-  children,
-  label,
-}: {
-  children: ReactNode;
-  label: string;
-}) {
+function Field({ children, label }: { children: ReactNode; label: string }) {
   return (
     <label className="block">
       <span className="label mb-2 block">{label}</span>
@@ -450,7 +494,9 @@ function SetupStatusCard({
     <article className="rounded-2xl border border-[var(--line)] bg-white p-5 shadow-sm">
       <p className="label">{title}</p>
       <h3 className="mt-2 text-xl font-bold text-gray-950">{value}</h3>
-      <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{description}</p>
+      <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+        {description}
+      </p>
     </article>
   );
 }
@@ -462,7 +508,12 @@ function SetupList({
 }: {
   description: string;
   title: string;
-  items: Array<{ id: string; primary: string; secondary: string; badge?: string }>;
+  items: Array<{
+    id: string;
+    primary: string;
+    secondary: string;
+    badge?: string;
+  }>;
 }) {
   return (
     <section className="rounded-2xl border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
@@ -485,7 +536,9 @@ function SetupList({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold text-gray-950">{item.primary}</p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">{item.secondary}</p>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    {item.secondary}
+                  </p>
                 </div>
                 {item.badge ? (
                   <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -520,7 +573,10 @@ function SetupListSkeleton() {
       <div className="h-4 w-32 animate-pulse rounded-full bg-gray-200" />
       <div className="mt-5 grid gap-3">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="rounded-2xl border border-[var(--line)] bg-white p-4">
+          <div
+            key={index}
+            className="rounded-2xl border border-[var(--line)] bg-white p-4"
+          >
             <div className="h-4 w-40 animate-pulse rounded-full bg-gray-200" />
             <div className="mt-3 h-3 w-28 animate-pulse rounded-full bg-gray-100" />
           </div>

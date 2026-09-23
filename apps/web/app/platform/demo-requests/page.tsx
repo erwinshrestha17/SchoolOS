@@ -98,12 +98,15 @@ export default function PlatformDemoRequestsPage() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(15);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<PlatformDemoRequestStatus | 'all'>('all');
+  const [status, setStatus] = useState<PlatformDemoRequestStatus | 'all'>(
+    'all',
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<PlatformDemoRequestDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
-  const [nextStatus, setNextStatus] = useState<PlatformDemoRequestStatus>('NEW');
+  const [nextStatus, setNextStatus] =
+    useState<PlatformDemoRequestStatus>('NEW');
   const [internalNotes, setInternalNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -185,8 +188,8 @@ export default function PlatformDemoRequestsPage() {
             Demo Requests
           </h1>
           <p className="mt-1 text-slate-500">
-            Review public marketing intake leads, follow up, and track conversion
-            status.
+            Review public marketing intake leads, follow up, and track
+            conversion status.
           </p>
         </div>
         <Button
@@ -264,7 +267,9 @@ export default function PlatformDemoRequestsPage() {
                     <div className="font-semibold text-slate-900">
                       {item.schoolName}
                     </div>
-                    <div className="text-xs text-slate-500">{item.schoolType}</div>
+                    <div className="text-xs text-slate-500">
+                      {item.schoolType}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="font-medium text-slate-800">
@@ -388,7 +393,9 @@ export default function PlatformDemoRequestsPage() {
                     id="demo-status"
                     value={nextStatus}
                     onChange={(event) =>
-                      setNextStatus(event.target.value as PlatformDemoRequestStatus)
+                      setNextStatus(
+                        event.target.value as PlatformDemoRequestStatus,
+                      )
                     }
                     className="mt-1"
                   >

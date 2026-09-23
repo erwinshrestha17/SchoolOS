@@ -45,7 +45,9 @@ export function BsDateField({
         aria-invalid={Boolean(error)}
         className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5 disabled:bg-slate-100"
       />
-      {error ? <p className="mt-1 text-xs font-semibold text-rose-700">{error}</p> : null}
+      {error ? (
+        <p className="mt-1 text-xs font-semibold text-rose-700">{error}</p>
+      ) : null}
     </label>
   );
 }

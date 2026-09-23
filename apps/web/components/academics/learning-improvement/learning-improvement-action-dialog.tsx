@@ -25,10 +25,7 @@ import {
 } from '@/components/ui/primitives/dialog';
 import { Input } from '@/components/ui/primitives/input';
 import { Textarea } from '@/components/ui/primitives/textarea';
-import {
-  api,
-  type UpdateCurriculumProgressPayload,
-} from '@/lib/api';
+import { api, type UpdateCurriculumProgressPayload } from '@/lib/api';
 import { schoolFacingErrorMessage } from '@/lib/school-facing-error';
 
 export type LearningImprovementActionTarget =
@@ -80,13 +77,13 @@ function ActionForm({
       : formatBsDateForInput(new Date()),
   );
   const [missedReason, setMissedReason] = useState(
-    target.kind === 'curriculum' ? target.record.missedReason ?? '' : '',
+    target.kind === 'curriculum' ? (target.record.missedReason ?? '') : '',
   );
   const [reteachPlan, setReteachPlan] = useState(
-    target.kind === 'curriculum' ? target.record.reteachPlan ?? '' : '',
+    target.kind === 'curriculum' ? (target.record.reteachPlan ?? '') : '',
   );
   const [resourceUrl, setResourceUrl] = useState(
-    target.kind === 'curriculum' ? target.record.resourceUrl ?? '' : '',
+    target.kind === 'curriculum' ? (target.record.resourceUrl ?? '') : '',
   );
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -159,8 +156,7 @@ function ActionForm({
       }
       if (target.kind === 'curriculum') {
         return api.updateCurriculumProgress(target.record.id, {
-          status:
-            status as UpdateCurriculumProgressPayload['status'],
+          status: status as UpdateCurriculumProgressPayload['status'],
           ...(status === 'COMPLETED'
             ? { completedOn: gregorianDateString(completedOnBs) }
             : {}),
@@ -401,7 +397,9 @@ function currentNextStatus(target: LearningImprovementActionTarget) {
   return target.record.status;
 }
 
-function statusOptions(target: Exclude<LearningImprovementActionTarget, { kind: 'outcome' }>) {
+function statusOptions(
+  target: Exclude<LearningImprovementActionTarget, { kind: 'outcome' }>,
+) {
   if (target.kind === 'remedial') {
     return {
       PLANNED: ['PLANNED', 'ACTIVE', 'CANCELLED'],

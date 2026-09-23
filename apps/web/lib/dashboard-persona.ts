@@ -1,6 +1,4 @@
-export type {
-  DashboardCompositionPersona,
-} from "@schoolos/core";
+export type { DashboardCompositionPersona } from '@schoolos/core';
 export {
   ADMIN_DASHBOARD_MODULES,
   PRINCIPAL_DASHBOARD_MODULES,
@@ -17,4 +15,4 @@ export {
   resolveDashboardCompositionPersona,
   resolveDashboardCompositionPersonaFromAuth,
   shouldShowReadinessPanel,
-} from "@schoolos/core";
+} from '@schoolos/core';

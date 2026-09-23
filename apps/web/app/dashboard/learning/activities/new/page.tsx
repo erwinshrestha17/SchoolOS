@@ -14,7 +14,11 @@ export default function NewLearningActivityPage() {
         description="Create a school-only Learning activity with questions, difficulty, language, and launch-ready mode."
       />
       <div className="mb-6">
-        <ModuleTabs items={learningWorkspaceTabs} accentColor="emerald" variant="light" />
+        <ModuleTabs
+          items={learningWorkspaceTabs}
+          accentColor="emerald"
+          variant="light"
+        />
       </div>
       <LearningWorkspace initialTab="builder" />
     </DashboardPageShell>

@@ -2,19 +2,25 @@
 
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  X, 
-  FileText, 
-  Download, 
-  MessageSquare, 
-  CheckCircle2, 
+import {
+  X,
+  FileText,
+  Download,
+  MessageSquare,
+  CheckCircle2,
   AlertCircle,
   Clock,
-  ShieldCheck
+  ShieldCheck,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -43,17 +49,23 @@ export function HomeworkReviewModal({
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const reviewMutation = useMutation({
-    mutationFn: (data: any) => api.reviewHomeworkSubmissionById(submission.id, data),
+    mutationFn: (data: any) =>
+      api.reviewHomeworkSubmissionById(submission.id, data),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['homework-submissions', homework.id] });
+      void queryClient.invalidateQueries({
+        queryKey: ['homework-submissions', homework.id],
+      });
       onClose();
     },
   });
 
   const requestCorrectionMutation = useMutation({
-    mutationFn: (data: any) => api.requestHomeworkCorrection(submission.id, data),
+    mutationFn: (data: any) =>
+      api.requestHomeworkCorrection(submission.id, data),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['homework-submissions', homework.id] });
+      void queryClient.invalidateQueries({
+        queryKey: ['homework-submissions', homework.id],
+      });
       onClose();
     },
   });
@@ -70,7 +82,9 @@ export function HomeworkReviewModal({
   const handleRequestCorrection = () => {
     const trimmedFeedback = feedback.trim();
     if (!trimmedFeedback) {
-      setActionNotice('Teacher feedback is required before requesting a correction.');
+      setActionNotice(
+        'Teacher feedback is required before requesting a correction.',
+      );
       return;
     }
     setActionNotice(null);
@@ -91,7 +105,10 @@ export function HomeworkReviewModal({
                 Review Submission
               </DialogTitle>
               <p className="text-sm font-medium mt-1 text-[var(--color-mod-homework-text)]">
-                Student: {submission.student?.fullNameEn?.trim() || 'Student name not set'} ({submission.student?.studentSystemId || 'ID not set'})
+                Student:{' '}
+                {submission.student?.fullNameEn?.trim() ||
+                  'Student name not set'}{' '}
+                ({submission.student?.studentSystemId || 'ID not set'})
               </p>
             </div>
             <StatusBadge status={submission.status} />
@@ -106,7 +123,11 @@ export function HomeworkReviewModal({
               Student Content
             </div>
             <div className="p-6 rounded-2xl bg-slate-50 text-slate-700 border border-slate-100 min-h-[100px] whitespace-pre-wrap leading-relaxed">
-              {submission.content?.trim() || <span className="italic opacity-50">No text content provided.</span>}
+              {submission.content?.trim() || (
+                <span className="italic opacity-50">
+                  No text content provided.
+                </span>
+              )}
             </div>
           </div>
 
@@ -119,7 +140,7 @@ export function HomeworkReviewModal({
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {submission.attachments.map((attachment: any) => (
-                  <div 
+                  <div
                     key={attachment.id}
                     className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-[var(--color-mod-homework-border)] transition-colors group"
                   >
@@ -129,10 +150,14 @@ export function HomeworkReviewModal({
                       </div>
                       <div className="flex flex-col">
                         <span className="text-sm font-bold text-slate-900 truncate max-w-[150px]">
-                          {attachment.fileAsset?.originalFilename?.trim() || 'File name not set'}
+                          {attachment.fileAsset?.originalFilename?.trim() ||
+                            'File name not set'}
                         </span>
                         <span className="text-[10px] text-slate-500 font-medium">
-                          {Math.round((attachment.fileAsset?.sizeBytes || 0) / 1024)} KB
+                          {Math.round(
+                            (attachment.fileAsset?.sizeBytes || 0) / 1024,
+                          )}{' '}
+                          KB
                         </span>
                       </div>
                     </div>
@@ -142,9 +167,13 @@ export function HomeworkReviewModal({
                       className="gap-2 rounded-xl text-slate-500 hover:text-[var(--color-mod-homework-text)] hover:bg-[var(--color-mod-homework-bg)]"
                       onClick={async () => {
                         try {
-                          await api.openHomeworkAttachmentPreview(attachment.id);
+                          await api.openHomeworkAttachmentPreview(
+                            attachment.id,
+                          );
                         } catch (err) {
-                          setFileNotice('The file view link could not be created.');
+                          setFileNotice(
+                            'The file view link could not be created.',
+                          );
                         }
                       }}
                     >
@@ -179,7 +208,7 @@ export function HomeworkReviewModal({
             <div className="grid gap-6 sm:grid-cols-3">
               <FormField label="Score" className="sm:col-span-1">
                 <div className="relative">
-                  <Input 
+                  <Input
                     type="number"
                     value={score}
                     onChange={(e) => setScore(e.target.value)}
@@ -191,7 +220,7 @@ export function HomeworkReviewModal({
                   </div>
                 </div>
               </FormField>
-              
+
               <div className="sm:col-span-2 space-y-2">
                 <label className="text-[0.65rem] font-black uppercase tracking-widest text-slate-500 ml-1">
                   Workflow Action
@@ -200,8 +229,10 @@ export function HomeworkReviewModal({
                   <Button
                     variant="outline"
                     className={cn(
-                      "rounded-xl font-bold h-12",
-                      !isCorrectionRequested ? "border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]" : "bg-white"
+                      'rounded-xl font-bold h-12',
+                      !isCorrectionRequested
+                        ? 'border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)] text-[var(--color-mod-homework-text)]'
+                        : 'bg-white',
                     )}
                     onClick={() => setIsCorrectionRequested(false)}
                   >
@@ -211,8 +242,10 @@ export function HomeworkReviewModal({
                   <Button
                     variant="outline"
                     className={cn(
-                      "rounded-xl font-bold h-12",
-                      isCorrectionRequested ? "border-amber-500 bg-amber-50 text-amber-700" : "bg-white"
+                      'rounded-xl font-bold h-12',
+                      isCorrectionRequested
+                        ? 'border-amber-500 bg-amber-50 text-amber-700'
+                        : 'bg-white',
                     )}
                     onClick={() => setIsCorrectionRequested(true)}
                   >
@@ -224,7 +257,7 @@ export function HomeworkReviewModal({
             </div>
 
             <FormField label="Teacher Feedback">
-              <Textarea 
+              <Textarea
                 placeholder="Excellent work! Please pay more attention to..."
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
@@ -241,20 +274,24 @@ export function HomeworkReviewModal({
             Audit logged review
           </div>
           <div className="flex gap-3">
-            <Button variant="ghost" onClick={onClose} className="rounded-xl font-bold">
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              className="rounded-xl font-bold"
+            >
               Cancel
             </Button>
             {isCorrectionRequested ? (
-              <Button 
-                onClick={handleRequestCorrection} 
+              <Button
+                onClick={handleRequestCorrection}
                 className="bg-amber-600 hover:bg-amber-700 rounded-xl font-bold px-8 shadow-lg shadow-amber-200"
                 disabled={requestCorrectionMutation.isPending}
               >
                 Request Correction
               </Button>
             ) : (
-              <Button 
-                onClick={handleReview} 
+              <Button
+                onClick={handleReview}
                 className="bg-[var(--color-mod-homework-accent)] hover:bg-[var(--color-mod-homework-text)] rounded-xl font-bold px-8 shadow-sm"
                 disabled={reviewMutation.isPending}
               >

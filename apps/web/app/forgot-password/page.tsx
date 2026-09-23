@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { CheckCircle2, CircleAlert, KeyRound } from "lucide-react";
-import { api } from "../../lib/api";
+import Link from 'next/link';
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { CheckCircle2, CircleAlert, KeyRound } from 'lucide-react';
+import { api } from '../../lib/api';
 
 export default function ForgotPasswordPage() {
-  const [tenantSlug, setTenantSlug] = useState("");
-  const [email, setEmail] = useState("");
+  const [tenantSlug, setTenantSlug] = useState('');
+  const [email, setEmail] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
 
   const mutation = useMutation({
@@ -19,7 +19,7 @@ export default function ForgotPasswordPage() {
       }),
     onSuccess: () => {
       setNotice(
-        "If this account can reset its password, SchoolOS has sent a reset code to the registered email.",
+        'If this account can reset its password, SchoolOS has sent a reset code to the registered email.',
       );
     },
   });
@@ -74,7 +74,7 @@ export default function ForgotPasswordPage() {
             disabled={mutation.isPending || !tenantSlug.trim() || !email.trim()}
             className="h-11 rounded-2xl bg-[var(--primary)] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {mutation.isPending ? "Sending reset code..." : "Send reset code"}
+            {mutation.isPending ? 'Sending reset code...' : 'Send reset code'}
           </button>
         </form>
         {notice ? (

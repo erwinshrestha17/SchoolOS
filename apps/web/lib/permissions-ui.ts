@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import type { PermissionKey } from "@schoolos/core";
-import { useSession } from "@/components/session-provider";
-import type { BrowserSession } from "@/lib/session";
-import { useTeacherAccess } from "@/lib/teacher-access";
+import type { PermissionKey } from '@schoolos/core';
+import { useSession } from '@/components/session-provider';
+import type { BrowserSession } from '@/lib/session';
+import { useTeacherAccess } from '@/lib/teacher-access';
 import {
   hasAllPermissions,
   hasAnyPermission,
   hasPermission,
-} from "@/lib/session";
+} from '@/lib/session';
 
-export type PermissionResolution = "loading" | "denied" | "granted";
+export type PermissionResolution = 'loading' | 'denied' | 'granted';
 
 /** Fail-closed session permission list — never treat missing data as granted. */
 export function resolveSessionPermissions(
@@ -22,7 +22,7 @@ export function resolveSessionPermissions(
   }
   return permissions.filter(
     (permission): permission is PermissionKey =>
-      typeof permission === "string" && permission.length > 0,
+      typeof permission === 'string' && permission.length > 0,
   );
 }
 
@@ -30,13 +30,13 @@ export function resolvePermissionAccess(
   session: BrowserSession | null,
   sessionStatus: string,
 ): PermissionResolution {
-  if (sessionStatus === "loading") {
-    return "loading";
+  if (sessionStatus === 'loading') {
+    return 'loading';
   }
-  if (sessionStatus !== "authenticated" || !session) {
-    return "denied";
+  if (sessionStatus !== 'authenticated' || !session) {
+    return 'denied';
   }
-  return "granted";
+  return 'granted';
 }
 
 /**
@@ -46,7 +46,7 @@ export function resolvePermissionAccess(
 export function usePermissionAccess() {
   const { session, status } = useSession();
   const resolution = resolvePermissionAccess(session, status);
-  const granted = resolution === "granted";
+  const granted = resolution === 'granted';
 
   return {
     resolution,
@@ -76,14 +76,14 @@ export function useHasAllPermissions(permissions: PermissionKey[]): boolean {
 }
 
 export type NoticeAudienceScope =
-  | "ALL"
-  | "CLASS"
-  | "SECTION"
-  | "ROLE"
-  | "STAFF"
-  | "STUDENT"
-  | "GUARDIANS"
-  | "RECIPIENTS";
+  | 'ALL'
+  | 'CLASS'
+  | 'SECTION'
+  | 'ROLE'
+  | 'STAFF'
+  | 'STUDENT'
+  | 'GUARDIANS'
+  | 'RECIPIENTS';
 
 export type NoticeCapabilities = {
   canView: boolean;
@@ -101,44 +101,44 @@ export type NoticeCapabilities = {
 };
 
 const TEACHER_NOTICE_AUDIENCE: NoticeAudienceScope[] = [
-  "CLASS",
-  "SECTION",
-  "GUARDIANS",
-  "RECIPIENTS",
+  'CLASS',
+  'SECTION',
+  'GUARDIANS',
+  'RECIPIENTS',
 ];
 
 const FULL_NOTICE_AUDIENCE: NoticeAudienceScope[] = [
-  "ALL",
-  "CLASS",
-  "SECTION",
-  "ROLE",
-  "STAFF",
-  "STUDENT",
-  "GUARDIANS",
-  "RECIPIENTS",
+  'ALL',
+  'CLASS',
+  'SECTION',
+  'ROLE',
+  'STAFF',
+  'STUDENT',
+  'GUARDIANS',
+  'RECIPIENTS',
 ];
 
 export function getNoticeCapabilities(
   session: BrowserSession | null,
   options: { isTeacherPersona?: boolean } = {},
 ): NoticeCapabilities {
-  const canView = hasPermission(session, "notices:read");
-  const canCreate = hasPermission(session, "notices:create");
-  const canEdit = hasPermission(session, "notices:edit");
-  const canPublish = hasPermission(session, "notices:publish");
-  const canSchedule = hasPermission(session, "notices:schedule");
+  const canView = hasPermission(session, 'notices:read');
+  const canCreate = hasPermission(session, 'notices:create');
+  const canEdit = hasPermission(session, 'notices:edit');
+  const canPublish = hasPermission(session, 'notices:publish');
+  const canSchedule = hasPermission(session, 'notices:schedule');
   const canApprove =
-    hasPermission(session, "notices:approve") ||
-    hasPermission(session, "advanced:approvals:decide");
-  const canCancel = hasPermission(session, "notices:cancel");
-  const canArchive = hasPermission(session, "notices:archive");
-  const canReadReports = hasPermission(session, "notices:read_reports");
-  const canSendEmergency = hasPermission(session, "notices:send_emergency");
+    hasPermission(session, 'notices:approve') ||
+    hasPermission(session, 'advanced:approvals:decide');
+  const canCancel = hasPermission(session, 'notices:cancel');
+  const canArchive = hasPermission(session, 'notices:archive');
+  const canReadReports = hasPermission(session, 'notices:read_reports');
+  const canSendEmergency = hasPermission(session, 'notices:send_emergency');
   const canTargetWholeSchool =
     !options.isTeacherPersona ||
     canApprove ||
     canSendEmergency ||
-    hasPermission(session, "notices:publish");
+    hasPermission(session, 'notices:publish');
 
   return {
     canView,
@@ -163,7 +163,7 @@ export function useNoticeCapabilities(options?: {
 }): NoticeCapabilities & { resolution: PermissionResolution } {
   const access = usePermissionAccess();
   const capabilities = getNoticeCapabilities(access.session, options);
-  if (access.resolution !== "granted") {
+  if (access.resolution !== 'granted') {
     return {
       ...capabilities,
       canView: false,
@@ -196,15 +196,15 @@ export type AttendanceCapabilities = {
 export function getAttendanceCapabilities(
   session: BrowserSession | null,
 ): AttendanceCapabilities {
-  const canView = hasAnyPermission(session, ["attendance:read"]);
-  const canMark = hasPermission(session, "attendance:mark");
-  const canManageAll = hasPermission(session, "attendance:manage_all");
+  const canView = hasAnyPermission(session, ['attendance:read']);
+  const canMark = hasPermission(session, 'attendance:mark');
+  const canManageAll = hasPermission(session, 'attendance:manage_all');
   const canReviewConflicts = hasPermission(
     session,
-    "attendance:review_conflicts",
+    'attendance:review_conflicts',
   );
-  const canOverrideLock = hasPermission(session, "attendance:override_lock");
-  const canExport = canView && hasPermission(session, "reports:export");
+  const canOverrideLock = hasPermission(session, 'attendance:override_lock');
+  const canExport = canView && hasPermission(session, 'reports:export');
 
   return {
     canView,
@@ -221,7 +221,7 @@ export function useAttendanceCapabilities(): AttendanceCapabilities & {
 } {
   const access = usePermissionAccess();
   const capabilities = getAttendanceCapabilities(access.session);
-  if (access.resolution !== "granted") {
+  if (access.resolution !== 'granted') {
     return {
       canView: false,
       canMark: false,
@@ -236,18 +236,18 @@ export function useAttendanceCapabilities(): AttendanceCapabilities & {
 }
 
 const INSTITUTIONAL_SETTINGS_PREFIXES = [
-  "settings:",
-  "users:",
-  "roles:",
-  "admission_policy:",
+  'settings:',
+  'users:',
+  'roles:',
+  'admission_policy:',
 ] as const;
 
 const INSTITUTIONAL_SETTINGS_KEYS = [
-  "settings:read",
-  "settings:manage",
-  "classes:read",
-  "academic_years:read",
-  "attendance:read",
+  'settings:read',
+  'settings:manage',
+  'classes:read',
+  'academic_years:read',
+  'attendance:read',
 ] as const satisfies PermissionKey[];
 
 function hasInstitutionalSettingsPermission(
@@ -293,28 +293,28 @@ export type SettingsCapabilities = {
 export function getSettingsCapabilities(
   session: BrowserSession | null,
 ): SettingsCapabilities {
-  const canReadSettings = hasPermission(session, "settings:read");
-  const canManage = hasPermission(session, "settings:manage");
-  const canManageIdentity = hasPermission(session, "settings:identity:manage");
-  const canManageAcademic = hasPermission(session, "settings:academic:manage");
-  const canCreateUsers = hasPermission(session, "users:create");
-  const canReadRoles = hasPermission(session, "roles:read");
-  const canUpdateUserStatus = hasPermission(session, "users:update_status");
-  const canResetPassword = hasPermission(session, "users:reset_password");
-  const canCreateClass = hasPermission(session, "classes:create");
-  const canCreateSection = hasPermission(session, "sections:create");
-  const canCreateStream = hasPermission(session, "streams:create");
+  const canReadSettings = hasPermission(session, 'settings:read');
+  const canManage = hasPermission(session, 'settings:manage');
+  const canManageIdentity = hasPermission(session, 'settings:identity:manage');
+  const canManageAcademic = hasPermission(session, 'settings:academic:manage');
+  const canCreateUsers = hasPermission(session, 'users:create');
+  const canReadRoles = hasPermission(session, 'roles:read');
+  const canUpdateUserStatus = hasPermission(session, 'users:update_status');
+  const canResetPassword = hasPermission(session, 'users:reset_password');
+  const canCreateClass = hasPermission(session, 'classes:create');
+  const canCreateSection = hasPermission(session, 'sections:create');
+  const canCreateStream = hasPermission(session, 'streams:create');
   const canReadStreams =
-    canCreateStream || hasPermission(session, "streams:read");
-  const canAssignClassTeacher = hasPermission(session, "academics:update");
-  const canReadAudit = hasPermission(session, "settings:audit:read");
-  const canViewStaffSelf = hasPermission(session, "staff:read");
+    canCreateStream || hasPermission(session, 'streams:read');
+  const canAssignClassTeacher = hasPermission(session, 'academics:update');
+  const canReadAudit = hasPermission(session, 'settings:audit:read');
+  const canViewStaffSelf = hasPermission(session, 'staff:read');
   const canAccessInstitutionalSettings =
     hasInstitutionalSettingsPermission(session);
   const canAccessPersonalSettings = Boolean(session?.user);
   const canOpenActivity = hasAnyPermission(session, [
-    "activity_feed:read",
-    "activity_feed:create",
+    'activity_feed:read',
+    'activity_feed:create',
   ]);
   const canOpenHistory = canReadAudit || canManage;
 
@@ -348,7 +348,7 @@ export function useSettingsCapabilities(): SettingsCapabilities & {
 } {
   const access = usePermissionAccess();
   const capabilities = getSettingsCapabilities(access.session);
-  if (access.resolution !== "granted") {
+  if (access.resolution !== 'granted') {
     return {
       ...capabilities,
       canView: false,
@@ -396,12 +396,12 @@ export function getHomeworkCapabilities(
 ): HomeworkCapabilities {
   const teacherScoped =
     options.isTeacherPersona && options.hasAssignmentScope === false;
-  const canView = hasPermission(session, "homework:read_published");
-  const canCreate = hasPermission(session, "homework:create") && !teacherScoped;
-  const canReview = hasPermission(session, "homework:review") && !teacherScoped;
-  const canUpdate = hasPermission(session, "homework:update") && !teacherScoped;
-  const canDelete = hasPermission(session, "homework:delete") && !teacherScoped;
-  const canNotify = hasPermission(session, "homework:notify") && !teacherScoped;
+  const canView = hasPermission(session, 'homework:read_published');
+  const canCreate = hasPermission(session, 'homework:create') && !teacherScoped;
+  const canReview = hasPermission(session, 'homework:review') && !teacherScoped;
+  const canUpdate = hasPermission(session, 'homework:update') && !teacherScoped;
+  const canDelete = hasPermission(session, 'homework:delete') && !teacherScoped;
+  const canNotify = hasPermission(session, 'homework:notify') && !teacherScoped;
 
   return {
     canView,
@@ -422,7 +422,7 @@ export function useHomeworkCapabilities(options?: {
     isTeacherPersona,
     hasAssignmentScope: options?.hasAssignmentScope,
   });
-  if (access.resolution !== "granted") {
+  if (access.resolution !== 'granted') {
     return {
       canView: false,
       canCreate: false,
@@ -450,14 +450,14 @@ export type PayrollCapabilities = {
 export function getPayrollCapabilities(
   session: BrowserSession | null,
 ): PayrollCapabilities {
-  const canView = hasPermission(session, "payroll:read");
-  const canPrepare = hasPermission(session, "payroll:run:create");
-  const canReview = hasPermission(session, "payroll:run:review");
-  const canApprove = hasPermission(session, "payroll:run:approve");
-  const canFinalize = hasPermission(session, "payroll:run:post");
-  const canViewSalary = hasPermission(session, "payroll:salary:read");
-  const canExport = hasPermission(session, "payroll:exports:create");
-  const canGeneratePayslip = hasPermission(session, "payroll:payslip:generate");
+  const canView = hasPermission(session, 'payroll:read');
+  const canPrepare = hasPermission(session, 'payroll:run:create');
+  const canReview = hasPermission(session, 'payroll:run:review');
+  const canApprove = hasPermission(session, 'payroll:run:approve');
+  const canFinalize = hasPermission(session, 'payroll:run:post');
+  const canViewSalary = hasPermission(session, 'payroll:salary:read');
+  const canExport = hasPermission(session, 'payroll:exports:create');
+  const canGeneratePayslip = hasPermission(session, 'payroll:payslip:generate');
 
   return {
     canView,
@@ -476,7 +476,7 @@ export function usePayrollCapabilities(): PayrollCapabilities & {
 } {
   const access = usePermissionAccess();
   const capabilities = getPayrollCapabilities(access.session);
-  if (access.resolution !== "granted") {
+  if (access.resolution !== 'granted') {
     return {
       canView: false,
       canPrepare: false,
@@ -504,17 +504,17 @@ export function getCommunicationsCapabilities(
 ): CommunicationsCapabilities {
   const canViewDeliveries = hasPermission(
     session,
-    "communications:read_deliveries",
+    'communications:read_deliveries',
   );
   const canViewDiagnostics =
-    hasPermission(session, "notifications:view_delivery_diagnostics") ||
+    hasPermission(session, 'notifications:view_delivery_diagnostics') ||
     canViewDeliveries;
   const canRetry =
-    hasPermission(session, "communications:retry_deliveries") ||
-    hasPermission(session, "notifications:retry_deliveries");
+    hasPermission(session, 'communications:retry_deliveries') ||
+    hasPermission(session, 'notifications:retry_deliveries');
   const canManageTemplates =
-    hasPermission(session, "communications:manage_templates") ||
-    hasPermission(session, "notifications:manage_templates");
+    hasPermission(session, 'communications:manage_templates') ||
+    hasPermission(session, 'notifications:manage_templates');
 
   return {
     canViewDeliveries,
@@ -529,7 +529,7 @@ export function useCommunicationsCapabilities(): CommunicationsCapabilities & {
 } {
   const access = usePermissionAccess();
   const capabilities = getCommunicationsCapabilities(access.session);
-  if (access.resolution !== "granted") {
+  if (access.resolution !== 'granted') {
     return {
       canViewDeliveries: false,
       canViewDiagnostics: false,

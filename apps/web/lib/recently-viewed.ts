@@ -24,7 +24,9 @@ export const RECENTLY_VIEWED_MAX_ENTRIES = 8;
 type ReadableStorage = Pick<Storage, 'getItem'>;
 type WritableStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
-export function readRecentlyViewed(storage: ReadableStorage): RecentlyViewedEntry[] {
+export function readRecentlyViewed(
+  storage: ReadableStorage,
+): RecentlyViewedEntry[] {
   const raw = storage.getItem(RECENTLY_VIEWED_STORAGE_KEY);
   if (!raw) return [];
 

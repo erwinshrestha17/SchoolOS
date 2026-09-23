@@ -1,8 +1,18 @@
 'use client';
 
-import { getNepalSchoolDay, type PlatformPlanSummary, type PlatformTenantDetail } from '@schoolos/core';
+import {
+  getNepalSchoolDay,
+  type PlatformPlanSummary,
+  type PlatformTenantDetail,
+} from '@schoolos/core';
 import type { AssignPlatformTenantSubscriptionPayload } from '@/lib/api';
-import { ArrowLeft, CheckCircle2, CreditCard, RefreshCw, ShieldAlert } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  CreditCard,
+  RefreshCw,
+  ShieldAlert,
+} from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
@@ -10,24 +20,43 @@ import { PermissionDenied } from '@/components/platform/PermissionDenied';
 import { useSession } from '@/components/session-provider';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
-type SubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'EXPIRED' | 'CANCELLED';
+type SubscriptionStatus =
+  | 'TRIAL'
+  | 'ACTIVE'
+  | 'GRACE'
+  | 'SUSPENDED'
+  | 'EXPIRED'
+  | 'CANCELLED';
 
 export default function PlatformChangePlanPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const router = useRouter();
   const { hasPermissions } = useSession();
-  const canChangePlan = hasPermissions(['platform:plans:read', 'platform:billing:manage']);
+  const canChangePlan = hasPermissions([
+    'platform:plans:read',
+    'platform:billing:manage',
+  ]);
 
   const [tenant, setTenant] = useState<PlatformTenantDetail | null>(null);
   const [plans, setPlans] = useState<PlatformPlanSummary[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [status, setStatus] = useState<SubscriptionStatus>('ACTIVE');
-  const [startsAt, setStartsAt] = useState(() => getNepalSchoolDay().gregorianDate);
-  const [renewsAt, setRenewsAt] = useState(() => addYearsToDate(getNepalSchoolDay().gregorianDate, 1));
+  const [startsAt, setStartsAt] = useState(
+    () => getNepalSchoolDay().gregorianDate,
+  );
+  const [renewsAt, setRenewsAt] = useState(() =>
+    addYearsToDate(getNepalSchoolDay().gregorianDate, 1),
+  );
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,11 +72,19 @@ export default function PlatformChangePlanPage() {
         api.getPlatformTenantDetail(tenantId),
         api.listPlatformPlans(),
       ]);
-      const activePlans = planResult.filter((plan) => plan.status !== 'ARCHIVED');
+      const activePlans = planResult.filter(
+        (plan) => plan.status !== 'ARCHIVED',
+      );
 
       setTenant(tenantResult);
       setPlans(activePlans);
-      setSelectedPlanId((current) => current || tenantResult.subscription?.planId || activePlans[0]?.id || '');
+      setSelectedPlanId(
+        (current) =>
+          current ||
+          tenantResult.subscription?.planId ||
+          activePlans[0]?.id ||
+          '',
+      );
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -61,9 +98,13 @@ export default function PlatformChangePlanPage() {
     }
   }, [canChangePlan, load, tenantId]);
 
-  const selectedPlan = useMemo(() => plans.find((plan) => plan.id === selectedPlanId), [plans, selectedPlanId]);
+  const selectedPlan = useMemo(
+    () => plans.find((plan) => plan.id === selectedPlanId),
+    [plans, selectedPlanId],
+  );
 
-  const canSubmit = Boolean(selectedPlan) && reason.trim().length >= 5 && !saving;
+  const canSubmit =
+    Boolean(selectedPlan) && reason.trim().length >= 5 && !saving;
 
   const submit = async () => {
     if (!tenant || !selectedPlan || !canSubmit) {
@@ -75,9 +116,10 @@ export default function PlatformChangePlanPage() {
     setSuccess(null);
 
     const currentPlanName = tenant.subscription?.planName ?? 'No plan';
-    const notes = [`Plan changed from ${currentPlanName} to ${selectedPlan.name}.`, `Reason: ${reason.trim()}`].join(
-      ' ',
-    );
+    const notes = [
+      `Plan changed from ${currentPlanName} to ${selectedPlan.name}.`,
+      `Reason: ${reason.trim()}`,
+    ].join(' ');
 
     const payload: AssignPlatformTenantSubscriptionPayload = {
       planId: selectedPlanId,
@@ -88,8 +130,13 @@ export default function PlatformChangePlanPage() {
     };
 
     try {
-      await api.assignPlatformTenantSubscription(tenant.id, compactPayload(payload));
-      setSuccess(`Subscription changed to ${selectedPlan.name}. Tenant detail has been reloaded.`);
+      await api.assignPlatformTenantSubscription(
+        tenant.id,
+        compactPayload(payload),
+      );
+      setSuccess(
+        `Subscription changed to ${selectedPlan.name}. Tenant detail has been reloaded.`,
+      );
       await load();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -123,8 +170,14 @@ export default function PlatformChangePlanPage() {
           <ShieldAlert size={20} />
           School unavailable
         </div>
-        <p className="mt-2 text-sm">{error ?? 'The school could not be loaded.'}</p>
-        <Button className="mt-6" variant="outline" onClick={() => router.push('/platform/schools')}>
+        <p className="mt-2 text-sm">
+          {error ?? 'The school could not be loaded.'}
+        </p>
+        <Button
+          className="mt-6"
+          variant="outline"
+          onClick={() => router.push('/platform/schools')}
+        >
           Back to schools
         </Button>
       </div>
@@ -147,27 +200,41 @@ export default function PlatformChangePlanPage() {
           <Badge variant="neutral" className="bg-indigo-50 text-indigo-700">
             SaaS Billing
           </Badge>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-900">Change Subscription Plan</h1>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-900">
+            Change Subscription Plan
+          </h1>
           <p className="mt-2 max-w-2xl text-slate-500">
-            Update the SchoolOS subscription for {tenant.name}. This is platform SaaS billing only and does not affect
-            school fee collection.
+            Update the SchoolOS subscription for {tenant.name}. This is platform
+            SaaS billing only and does not affect school fee collection.
           </p>
         </div>
         <Card className="min-w-[260px] rounded-3xl border-slate-100 shadow-sm">
           <CardContent className="p-5">
-            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Current plan</p>
-            <p className="mt-1 text-xl font-black text-slate-900">{tenant.subscription?.planName ?? 'No plan'}</p>
+            <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+              Current plan
+            </p>
+            <p className="mt-1 text-xl font-black text-slate-900">
+              {tenant.subscription?.planName ?? 'No plan'}
+            </p>
             <p className="mt-1 text-sm font-semibold uppercase text-slate-500">
               {tenant.subscription?.status ?? 'UNASSIGNED'}
             </p>
             <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
               <div>
-                <dt className="font-black uppercase tracking-widest text-slate-400">Effective</dt>
-                <dd className="mt-1 font-bold text-slate-700">{formatDate(tenant.subscription?.startsAt)}</dd>
+                <dt className="font-black uppercase tracking-widest text-slate-400">
+                  Effective
+                </dt>
+                <dd className="mt-1 font-bold text-slate-700">
+                  {formatDate(tenant.subscription?.startsAt)}
+                </dd>
               </div>
               <div>
-                <dt className="font-black uppercase tracking-widest text-slate-400">Renewal</dt>
-                <dd className="mt-1 font-bold text-slate-700">{formatDate(tenant.subscription?.renewsAt)}</dd>
+                <dt className="font-black uppercase tracking-widest text-slate-400">
+                  Renewal
+                </dt>
+                <dd className="mt-1 font-bold text-slate-700">
+                  {formatDate(tenant.subscription?.renewsAt)}
+                </dd>
               </div>
             </dl>
           </CardContent>
@@ -193,7 +260,9 @@ export default function PlatformChangePlanPage() {
               <CreditCard className="text-slate-400" size={22} />
               New subscription
             </CardTitle>
-            <CardDescription>Choose the new plan and effective subscription dates.</CardDescription>
+            <CardDescription>
+              Choose the new plan and effective subscription dates.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -207,7 +276,8 @@ export default function PlatformChangePlanPage() {
                 <option value="">Select a plan</option>
                 {plans.map((plan) => (
                   <option key={plan.id} value={plan.id}>
-                    {plan.name} · NPR {Number(plan.priceNpr ?? 0).toLocaleString()} /{' '}
+                    {plan.name} · NPR{' '}
+                    {Number(plan.priceNpr ?? 0).toLocaleString()} /{' '}
                     {plan.billingCycle?.toLowerCase?.() ?? 'billing cycle'}
                   </option>
                 ))}
@@ -220,7 +290,9 @@ export default function PlatformChangePlanPage() {
                 <select
                   className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 outline-none focus:border-slate-900"
                   value={status}
-                  onChange={(event) => setStatus(event.target.value as SubscriptionStatus)}
+                  onChange={(event) =>
+                    setStatus(event.target.value as SubscriptionStatus)
+                  }
                 >
                   <option value="ACTIVE">Active</option>
                   <option value="TRIAL">Trial</option>
@@ -259,13 +331,15 @@ export default function PlatformChangePlanPage() {
                 onChange={(event) => setReason(event.target.value)}
               />
               <p className="text-xs text-slate-400">
-                At least 5 characters. The reason is saved in subscription notes and audit context.
+                At least 5 characters. The reason is saved in subscription notes
+                and audit context.
               </p>
             </div>
 
             <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
-              This changes SchoolOS subscription billing only. It does not create student fee invoices, post to school
-              M3 Fees, or post to tenant M11 Accounting.
+              This changes SchoolOS subscription billing only. It does not
+              create student fee invoices, post to school M3 Fees, or post to
+              tenant M11 Accounting.
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
@@ -281,7 +355,9 @@ export default function PlatformChangePlanPage() {
                 disabled={!canSubmit}
                 onClick={() => void submit()}
               >
-                {saving ? <RefreshCw size={16} className="mr-2 animate-spin" /> : null}
+                {saving ? (
+                  <RefreshCw size={16} className="mr-2 animate-spin" />
+                ) : null}
                 Change Plan
               </Button>
             </div>
@@ -290,42 +366,66 @@ export default function PlatformChangePlanPage() {
 
         <Card className="rounded-3xl border-slate-100 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg font-black">Selected plan preview</CardTitle>
-            <CardDescription>Plan features and usage limits come from platform settings.</CardDescription>
+            <CardTitle className="text-lg font-black">
+              Selected plan preview
+            </CardTitle>
+            <CardDescription>
+              Plan features and usage limits come from platform settings.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {selectedPlan ? (
               <>
                 <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm sm:grid-cols-2">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">Current</p>
-                    <p className="mt-1 font-black text-slate-900">{tenant.subscription?.planName ?? 'No plan'}</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                      Current
+                    </p>
+                    <p className="mt-1 font-black text-slate-900">
+                      {tenant.subscription?.planName ?? 'No plan'}
+                    </p>
                     <p className="mt-1 font-semibold uppercase text-slate-500">
                       {tenant.subscription?.status ?? 'UNASSIGNED'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">New</p>
-                    <p className="mt-1 font-black text-slate-900">{selectedPlan.name}</p>
-                    <p className="mt-1 font-semibold uppercase text-slate-500">{status}</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                      New
+                    </p>
+                    <p className="mt-1 font-black text-slate-900">
+                      {selectedPlan.name}
+                    </p>
+                    <p className="mt-1 font-semibold uppercase text-slate-500">
+                      {status}
+                    </p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-400">Plan</p>
-                  <p className="mt-1 text-2xl font-black text-slate-900">{selectedPlan.name}</p>
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                    Plan
+                  </p>
+                  <p className="mt-1 text-2xl font-black text-slate-900">
+                    {selectedPlan.name}
+                  </p>
                   <p className="mt-1 text-sm font-semibold text-slate-500">
                     NPR {Number(selectedPlan.priceNpr ?? 0).toLocaleString()} /{' '}
                     {selectedPlan.billingCycle?.toLowerCase?.() ?? 'cycle'}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-xs font-black uppercase tracking-widest text-slate-400">Enabled features</p>
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                    Enabled features
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {(selectedPlan.features ?? [])
                       .filter((feature) => feature.enabled)
                       .slice(0, 10)
                       .map((feature) => (
-                        <Badge key={feature.featureKey} variant="neutral" className="bg-slate-100 text-slate-700">
+                        <Badge
+                          key={feature.featureKey}
+                          variant="neutral"
+                          className="bg-slate-100 text-slate-700"
+                        >
                           {feature.featureKey}
                         </Badge>
                       ))}
@@ -333,18 +433,28 @@ export default function PlatformChangePlanPage() {
                 </div>
                 <div className="grid gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-2">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">Effective date</p>
-                    <p className="mt-1 font-bold text-slate-900">{formatDate(dateInputToIso(startsAt))}</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                      Effective date
+                    </p>
+                    <p className="mt-1 font-bold text-slate-900">
+                      {formatDate(dateInputToIso(startsAt))}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">Renewal date</p>
-                    <p className="mt-1 font-bold text-slate-900">{formatDate(dateInputToIso(renewsAt))}</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                      Renewal date
+                    </p>
+                    <p className="mt-1 font-bold text-slate-900">
+                      {formatDate(dateInputToIso(renewsAt))}
+                    </p>
                   </div>
                 </div>
               </>
             ) : (
               <p className="text-sm font-semibold text-slate-400">
-                {plans.length === 0 ? 'No active platform plans are available.' : 'Select a plan to preview details.'}
+                {plans.length === 0
+                  ? 'No active platform plans are available.'
+                  : 'Select a plan to preview details.'}
               </p>
             )}
           </CardContent>
@@ -363,9 +473,13 @@ function dateInputToIso(value: string) {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
-function compactPayload(payload: AssignPlatformTenantSubscriptionPayload): AssignPlatformTenantSubscriptionPayload {
+function compactPayload(
+  payload: AssignPlatformTenantSubscriptionPayload,
+): AssignPlatformTenantSubscriptionPayload {
   return Object.fromEntries(
-    Object.entries(payload).filter(([, value]) => value !== undefined && value !== ''),
+    Object.entries(payload).filter(
+      ([, value]) => value !== undefined && value !== '',
+    ),
   ) as AssignPlatformTenantSubscriptionPayload;
 }
 
@@ -376,7 +490,9 @@ function addYearsToDate(value: string, years: number) {
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'This action could not be completed. Try again.';
+  return error instanceof Error
+    ? error.message
+    : 'This action could not be completed. Try again.';
 }
 
 function formatDate(dateString: string | null | undefined) {

@@ -1,43 +1,43 @@
-import type { Browser, Locator, Page } from "@playwright/test";
+import type { Browser, Locator, Page } from '@playwright/test';
 import {
   expect,
   test,
   type SchoolE2eRole,
   type StorageState,
-} from "./fixtures/auth";
+} from './fixtures/auth';
 
 const API_BASE_URL =
   process.env.SCHOOLOS_E2E_API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "http://localhost:4000/api/v1";
+  'http://localhost:4000/api/v1';
 const WEB_BASE_URL =
   process.env.PLAYWRIGHT_BASE_URL ??
-  `http://localhost:${process.env.SCHOOLOS_WEB_E2E_PORT ?? "3101"}`;
+  `http://localhost:${process.env.SCHOOLOS_WEB_E2E_PORT ?? '3101'}`;
 
 const voucherCases = [
   {
-    label: "Journal Voucher",
+    label: 'Journal Voucher',
     accountLabels: [/^5010 - /, /^2200 - /],
   },
   {
-    label: "Expense Voucher",
+    label: 'Expense Voucher',
     accountLabels: [/^5040 - /, /^1000 - /],
   },
   {
-    label: "Payment Voucher",
+    label: 'Payment Voucher',
     accountLabels: [/^2200 - /, /^1010 - /],
   },
   {
-    label: "Receipt Voucher",
+    label: 'Receipt Voucher',
     accountLabels: [/^4000 - /, /^1000 - /],
   },
   {
-    label: "Contra Voucher",
+    label: 'Contra Voucher',
     accountLabels: [/^1000 - /, /^1010 - /],
   },
 ] as const;
 
-test("M11 voucher and journal lifecycle preserves approval and immutable correction boundaries", async ({
+test('M11 voucher and journal lifecycle preserves approval and immutable correction boundaries', async ({
   authStateFor,
   browser,
 }) => {
@@ -46,7 +46,7 @@ test("M11 voucher and journal lifecycle preserves approval and immutable correct
     (voucher, index) => `E2E ${voucher.label} ${runKey}-${index + 1}`,
   );
 
-  const preparer = await rolePage(browser, authStateFor, "e2eAccountant");
+  const preparer = await rolePage(browser, authStateFor, 'e2eAccountant');
   for (let index = 0; index < voucherCases.length; index += 1) {
     await createAndSubmitVoucher(
       preparer.page,
@@ -64,10 +64,10 @@ test("M11 voucher and journal lifecycle preserves approval and immutable correct
     },
   );
   expect(unbalanced.status()).toBe(409);
-  expect(await unbalanced.text()).toContain("must be balanced");
+  expect(await unbalanced.text()).toContain('must be balanced');
   await preparer.context.close();
 
-  const approver = await rolePage(browser, authStateFor, "accountingApprover");
+  const approver = await rolePage(browser, authStateFor, 'accountingApprover');
   for (const narration of narrations) {
     await approveAndPostVoucher(approver.page, narration);
   }
@@ -88,7 +88,7 @@ test("M11 voucher and journal lifecycle preserves approval and immutable correct
     postedItems.find((entry) => entry.narration === narration),
   );
   for (const entry of created) {
-    expect(entry?.status).toBe("POSTED");
+    expect(entry?.status).toBe('POSTED');
     expect(Number(entry?.totalDebit)).toBe(Number(entry?.totalCredit));
   }
 
@@ -101,7 +101,7 @@ test("M11 voucher and journal lifecycle preserves approval and immutable correct
     `${API_BASE_URL}/accounting/journals/${originalReversedId}/reverse`,
     {
       headers: csrfHeaders(approver.state),
-      data: { reason: "Duplicate E2E reversal must remain blocked" },
+      data: { reason: 'Duplicate E2E reversal must remain blocked' },
     },
   );
   expect(duplicateReversal.status()).toBe(409);
@@ -142,69 +142,69 @@ async function createAndSubmitVoucher(
   amount: number,
 ) {
   await page.goto(`${WEB_BASE_URL}/dashboard/accounting`);
-  await expect(page.getByText("Operational Quick Actions")).toBeVisible();
-  await page.locator("button").filter({ hasText: voucher.label }).click();
+  await expect(page.getByText('Operational Quick Actions')).toBeVisible();
+  await page.locator('button').filter({ hasText: voucher.label }).click();
 
-  const dialog = page.getByRole("dialog");
+  const dialog = page.getByRole('dialog');
   await expect(dialog.getByText(`Create ${voucher.label}`)).toBeVisible();
-  await dialog.getByLabel("Amount").fill(String(amount));
-  await dialog.getByLabel("Narration").fill(narration);
+  await dialog.getByLabel('Amount').fill(String(amount));
+  await dialog.getByLabel('Narration').fill(narration);
   await dialog.getByLabel(/Reference/).fill(`REF-${narration.slice(-15)}`);
-  const accountSelects = dialog.getByRole("combobox");
+  const accountSelects = dialog.getByRole('combobox');
   await selectOptionByText(accountSelects.nth(0), voucher.accountLabels[0]);
   await selectOptionByText(accountSelects.nth(1), voucher.accountLabels[1]);
   await dialog
-    .getByRole("button", { name: `Save Draft ${voucher.label}` })
+    .getByRole('button', { name: `Save Draft ${voucher.label}` })
     .click();
   await expect(dialog).not.toBeVisible();
 
   await openJournal(page, narration);
-  const detail = page.getByRole("dialog");
-  await expect(detail.getByText("DRAFT", { exact: true })).toBeVisible();
-  await detail.getByRole("button", { name: "Submit for Approval" }).click();
+  const detail = page.getByRole('dialog');
+  await expect(detail.getByText('DRAFT', { exact: true })).toBeVisible();
+  await detail.getByRole('button', { name: 'Submit for Approval' }).click();
   await expect(detail).not.toBeVisible();
 }
 
 async function approveAndPostVoucher(page: Page, narration: string) {
   await openJournal(page, narration);
-  let detail = page.getByRole("dialog");
-  await expect(detail.getByText("SUBMITTED", { exact: true })).toBeVisible();
-  await detail.getByRole("button", { name: "Approve Journal" }).click();
+  let detail = page.getByRole('dialog');
+  await expect(detail.getByText('SUBMITTED', { exact: true })).toBeVisible();
+  await detail.getByRole('button', { name: 'Approve Journal' }).click();
   await expect(detail).not.toBeVisible();
 
   await openJournal(page, narration);
-  detail = page.getByRole("dialog");
-  await expect(detail.getByText("APPROVED", { exact: true })).toBeVisible();
-  await detail.getByRole("button", { name: "Post Journal" }).click();
+  detail = page.getByRole('dialog');
+  await expect(detail.getByText('APPROVED', { exact: true })).toBeVisible();
+  await detail.getByRole('button', { name: 'Post Journal' }).click();
   await expect(detail).not.toBeVisible();
 
   await expect(
-    journalRow(page, narration).getByText("POSTED", { exact: true }),
+    journalRow(page, narration).getByText('POSTED', { exact: true }),
   ).toBeVisible();
 }
 
 async function reverseVoucher(page: Page, narration: string) {
   await openJournal(page, narration);
-  const detail = page.getByRole("dialog");
-  await detail.getByRole("button", { name: "Reverse", exact: true }).click();
+  const detail = page.getByRole('dialog');
+  await detail.getByRole('button', { name: 'Reverse', exact: true }).click();
   await detail
-    .locator("textarea")
-    .fill("E2E reversal with required audit reason");
-  await detail.getByRole("button", { name: "Confirm Reversal" }).click();
+    .locator('textarea')
+    .fill('E2E reversal with required audit reason');
+  await detail.getByRole('button', { name: 'Confirm Reversal' }).click();
   await expect(detail).not.toBeVisible();
   await expect(
-    journalRow(page, narration).getByText("REVERSED", { exact: true }),
+    journalRow(page, narration).getByText('REVERSED', { exact: true }),
   ).toBeVisible();
 }
 
 async function correctVoucher(page: Page, narration: string) {
   await openJournal(page, narration);
-  const detail = page.getByRole("dialog");
-  await detail.getByRole("button", { name: "Correct", exact: true }).click();
+  const detail = page.getByRole('dialog');
+  await detail.getByRole('button', { name: 'Correct', exact: true }).click();
   await detail
-    .locator("textarea")
-    .fill("E2E correction with required audit reason");
-  await detail.getByRole("button", { name: "Confirm Correction" }).click();
+    .locator('textarea')
+    .fill('E2E correction with required audit reason');
+  await detail.getByRole('button', { name: 'Confirm Correction' }).click();
   await expect(detail).not.toBeVisible();
 }
 
@@ -212,18 +212,18 @@ async function openJournal(page: Page, narration: string) {
   await page.goto(`${WEB_BASE_URL}/dashboard/accounting/journals`);
   const row = journalRow(page, narration);
   await expect(row).toBeVisible();
-  await row.getByTitle("View Details").click();
+  await row.getByTitle('View Details').click();
 }
 
 function journalRow(page: Page, narration: string) {
-  return page.getByRole("row").filter({ hasText: narration });
+  return page.getByRole('row').filter({ hasText: narration });
 }
 
 async function selectOptionByText(select: Locator, text: RegExp) {
   const value = await select
-    .locator("option")
+    .locator('option')
     .filter({ hasText: text })
-    .getAttribute("value");
+    .getAttribute('value');
   if (!value) throw new Error(`Account option ${text} was not available.`);
   await select.selectOption(value);
 }
@@ -252,15 +252,15 @@ async function unbalancedJournalPayload(
   const payload = (await response.json()) as {
     data: Array<{ id: string; code: string }>;
   };
-  const debit = payload.data.find((account) => account.code === "5000");
-  const credit = payload.data.find((account) => account.code === "1000");
+  const debit = payload.data.find((account) => account.code === '5000');
+  const credit = payload.data.find((account) => account.code === '1000');
   expect(debit && credit).toBeTruthy();
   return {
     entryDate: new Date().toISOString().slice(0, 10),
     narration: `E2E unbalanced journal ${runKey}`,
     lines: [
-      { chartAccountId: debit!.id, side: "DEBIT", amount: 100 },
-      { chartAccountId: credit!.id, side: "CREDIT", amount: 99 },
+      { chartAccountId: debit!.id, side: 'DEBIT', amount: 100 },
+      { chartAccountId: credit!.id, side: 'CREDIT', amount: 99 },
     ],
   };
 }
@@ -268,9 +268,9 @@ async function unbalancedJournalPayload(
 function csrfHeaders(state: StorageState) {
   const csrfCookie = state.cookies.find(
     (cookie) =>
-      cookie.name === "__Host-schoolos_csrf" || cookie.name === "schoolos_csrf",
+      cookie.name === '__Host-schoolos_csrf' || cookie.name === 'schoolos_csrf',
   );
   if (!csrfCookie)
-    throw new Error("Authenticated E2E state is missing its CSRF cookie.");
-  return { "X-CSRF-Token": csrfCookie.value };
+    throw new Error('Authenticated E2E state is missing its CSRF cookie.');
+  return { 'X-CSRF-Token': csrfCookie.value };
 }

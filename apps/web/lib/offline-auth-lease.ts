@@ -1,4 +1,4 @@
-const LEASE_STORAGE_KEY = "schoolos.offline-auth-lease.v1";
+const LEASE_STORAGE_KEY = 'schoolos.offline-auth-lease.v1';
 export const OFFLINE_AUTH_LEASE_MS = 8 * 60 * 60 * 1000;
 
 export type OfflineAuthLease = {
@@ -6,12 +6,12 @@ export type OfflineAuthLease = {
   userId: string;
   capturedAt: string;
   expiresAt: string;
-  securityDomain: "SCHOOL" | "PLATFORM";
+  securityDomain: 'SCHOOL' | 'PLATFORM';
   authorizationFingerprint: string;
 };
 
 function canUseStorage() {
-  return typeof window !== "undefined" && typeof localStorage !== "undefined";
+  return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 }
 
 export function buildAuthorizationFingerprint(input: {
@@ -23,15 +23,15 @@ export function buildAuthorizationFingerprint(input: {
   return [
     input.tenantId,
     input.userId,
-    [...input.roles].sort().join(","),
-    [...input.permissions].sort().join(","),
-  ].join("|");
+    [...input.roles].sort().join(','),
+    [...input.permissions].sort().join(','),
+  ].join('|');
 }
 
 export function createOfflineAuthLease(input: {
   tenantId: string;
   userId: string;
-  securityDomain?: "SCHOOL" | "PLATFORM";
+  securityDomain?: 'SCHOOL' | 'PLATFORM';
   permissions: readonly string[];
   roles: readonly string[];
   now?: Date;
@@ -44,7 +44,7 @@ export function createOfflineAuthLease(input: {
     userId: input.userId,
     capturedAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + ttlMs).toISOString(),
-    securityDomain: input.securityDomain ?? "SCHOOL",
+    securityDomain: input.securityDomain ?? 'SCHOOL',
     authorizationFingerprint: buildAuthorizationFingerprint(input),
   };
 }
@@ -71,12 +71,12 @@ export function readOfflineAuthLease(): OfflineAuthLease | null {
   try {
     const parsed = JSON.parse(raw) as OfflineAuthLease;
     if (
-      typeof parsed.tenantId !== "string" ||
-      typeof parsed.userId !== "string" ||
-      typeof parsed.capturedAt !== "string" ||
-      typeof parsed.expiresAt !== "string" ||
-      !["SCHOOL", "PLATFORM"].includes(parsed.securityDomain) ||
-      typeof parsed.authorizationFingerprint !== "string"
+      typeof parsed.tenantId !== 'string' ||
+      typeof parsed.userId !== 'string' ||
+      typeof parsed.capturedAt !== 'string' ||
+      typeof parsed.expiresAt !== 'string' ||
+      !['SCHOOL', 'PLATFORM'].includes(parsed.securityDomain) ||
+      typeof parsed.authorizationFingerprint !== 'string'
     ) {
       return null;
     }
@@ -104,16 +104,13 @@ export function isOfflineAuthLeaseValid(
   if (!lease) {
     return false;
   }
-  if (lease.securityDomain === "PLATFORM") {
+  if (lease.securityDomain === 'PLATFORM') {
     return false;
   }
-  if (session.securityDomain === "PLATFORM") {
+  if (session.securityDomain === 'PLATFORM') {
     return false;
   }
-  if (
-    lease.tenantId !== session.tenantId ||
-    lease.userId !== session.userId
-  ) {
+  if (lease.tenantId !== session.tenantId || lease.userId !== session.userId) {
     return false;
   }
   const capturedAt = Date.parse(lease.capturedAt);

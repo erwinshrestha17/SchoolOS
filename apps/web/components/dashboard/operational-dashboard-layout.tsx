@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import type { OperationalDashboardSummary } from "@schoolos/core";
-import type { DashboardCompositionPersona } from "@/lib/dashboard-persona";
-import { LatestSchoolActivityPanel } from "./dashboard-activity-panel";
-import { DashboardAttentionPanel } from "./dashboard-attention-panel";
-import { TodayOperationsPanel } from "./dashboard-operations-panel";
-import { SchoolReadinessSection } from "./dashboard-readiness-section";
-import { DashboardSummaryStrip } from "./dashboard-summary-strip";
+import type { OperationalDashboardSummary } from '@schoolos/core';
+import type { DashboardCompositionPersona } from '@/lib/dashboard-persona';
+import { LatestSchoolActivityPanel } from './dashboard-activity-panel';
+import { DashboardAttentionPanel } from './dashboard-attention-panel';
+import { TodayOperationsPanel } from './dashboard-operations-panel';
+import { SchoolReadinessSection } from './dashboard-readiness-section';
+import { DashboardSummaryStrip } from './dashboard-summary-strip';
 
 /**
  * Shared dashboard grid used by Admin and Principal compositions. Persona

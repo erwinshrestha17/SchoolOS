@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
 import type {
   AdmissionDocumentReminderBatchResult,
   AdmissionDocumentReminderSkipReason,
   AdmissionDocumentRequestItem,
   AdmissionDocumentTiming,
-} from "@schoolos/core";
-import { formatBsDate } from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+} from '@schoolos/core';
+import { formatBsDate } from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   Bell,
@@ -18,57 +18,57 @@ import {
   Loader2,
   Phone,
   RefreshCw,
-} from "lucide-react";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { admissionCasesApi } from "../../lib/api/admission-cases";
-import { admissionPoliciesApi } from "../../lib/api/admission-policies";
+} from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import { admissionCasesApi } from '../../lib/api/admission-cases';
+import { admissionPoliciesApi } from '../../lib/api/admission-policies';
 import {
   classOptionLabel,
   educationProgramLabel,
-} from "../../lib/education-program";
-import { api } from "../../lib/api";
-import { useUrlFilters } from "../../lib/hooks/use-url-filters";
-import { ApiRequestError } from "../../lib/api/client";
-import { Button } from "../ui/button";
-import { ConfirmDialog } from "../ui/confirm-dialog";
-import { EmptyState } from "../ui/empty-state";
-import { KpiCard, KpiGrid } from "../ui/kpi-card";
-import { ModuleLockedState } from "../ui/module-locked-state";
-import { PageState } from "../ui/page-state";
-import { StatusBadge } from "../ui/status-badge";
-import { useSession } from "../session-provider";
+} from '../../lib/education-program';
+import { api } from '../../lib/api';
+import { useUrlFilters } from '../../lib/hooks/use-url-filters';
+import { ApiRequestError } from '../../lib/api/client';
+import { Button } from '../ui/button';
+import { ConfirmDialog } from '../ui/confirm-dialog';
+import { EmptyState } from '../ui/empty-state';
+import { KpiCard, KpiGrid } from '../ui/kpi-card';
+import { ModuleLockedState } from '../ui/module-locked-state';
+import { PageState } from '../ui/page-state';
+import { StatusBadge } from '../ui/status-badge';
+import { useSession } from '../session-provider';
 
 const DOCUMENT_KIND_OPTIONS = [
-  "BIRTH_CERTIFICATE",
-  "TRANSFER_CERTIFICATE",
-  "PRIOR_MARKSHEET",
-  "PREVIOUS_REPORT_CARD",
-  "CITIZENSHIP",
-  "MEDICAL_REPORT",
-  "PHOTO",
-  "OTHER",
+  'BIRTH_CERTIFICATE',
+  'TRANSFER_CERTIFICATE',
+  'PRIOR_MARKSHEET',
+  'PREVIOUS_REPORT_CARD',
+  'CITIZENSHIP',
+  'MEDICAL_REPORT',
+  'PHOTO',
+  'OTHER',
 ];
 
 const PENDING_DAY_OPTIONS = [0, 3, 7, 14, 30];
 
 const REMINDER_SKIP_COPY: Record<AdmissionDocumentReminderSkipReason, string> =
   {
-    CASE_UNAVAILABLE: "Case unavailable",
-    CASE_CLOSED: "Case closed",
-    NO_GUARDIAN_PHONE: "No guardian phone",
-    NO_LONGER_MISSING: "Documents already complete",
-    DELIVERY_UNAVAILABLE: "Delivery unavailable",
+    CASE_UNAVAILABLE: 'Case unavailable',
+    CASE_CLOSED: 'Case closed',
+    NO_GUARDIAN_PHONE: 'No guardian phone',
+    NO_LONGER_MISSING: 'Documents already complete',
+    DELIVERY_UNAVAILABLE: 'Delivery unavailable',
   };
 
 export function DocumentRequestCenter() {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
   const [filters, setFilters] = useUrlFilters({
-    policyId: "",
-    classId: "",
-    documentKind: "",
-    timing: "",
+    policyId: '',
+    classId: '',
+    documentKind: '',
+    timing: '',
     minDaysPending: 0,
     page: 1,
   });
@@ -78,13 +78,13 @@ export function DocumentRequestCenter() {
     useState<AdmissionDocumentReminderBatchResult | null>(null);
 
   const requestQuery = useQuery({
-    queryKey: ["admission-document-requests", filters],
+    queryKey: ['admission-document-requests', filters],
     queryFn: () =>
       admissionCasesApi.listDocumentRequests({
         policyId: filters.policyId || undefined,
         classId: filters.classId || undefined,
         documentKind: filters.documentKind || undefined,
-        timing: filters.timing as AdmissionDocumentTiming | "",
+        timing: filters.timing as AdmissionDocumentTiming | '',
         minDaysPending:
           filters.minDaysPending > 0 ? filters.minDaysPending : undefined,
         page: filters.page,
@@ -92,11 +92,11 @@ export function DocumentRequestCenter() {
       }),
   });
   const policiesQuery = useQuery({
-    queryKey: ["admission-policies"],
+    queryKey: ['admission-policies'],
     queryFn: admissionPoliciesApi.list,
   });
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
 
@@ -113,8 +113,8 @@ export function DocumentRequestCenter() {
   );
   const selectedWithPhones = selectedRows.filter((row) => row.guardianPhone);
   const canQueueReminders = hasPermissions([
-    "students:manage_lifecycle",
-    "guardians:read",
+    'students:manage_lifecycle',
+    'guardians:read',
   ]);
 
   useEffect(() => {
@@ -137,7 +137,7 @@ export function DocumentRequestCenter() {
       setReminderResult(result);
       setSelectedIds(new Set());
       await queryClient.invalidateQueries({
-        queryKey: ["admission-document-requests"],
+        queryKey: ['admission-document-requests'],
       });
     },
     onError: () => setReminderResult(null),
@@ -180,28 +180,28 @@ export function DocumentRequestCenter() {
         <KpiCard
           title="Cases"
           loading={requestQuery.isLoading}
-          value={summary?.casesWithRequests ?? "Unavailable"}
+          value={summary?.casesWithRequests ?? 'Unavailable'}
           icon={<FileWarning size={18} />}
-          tone={(summary?.casesWithRequests ?? 0) > 0 ? "warning" : "neutral"}
+          tone={(summary?.casesWithRequests ?? 0) > 0 ? 'warning' : 'neutral'}
           description="Cases with at least one missing required document."
         />
         <KpiCard
           title="Missing Documents"
           loading={requestQuery.isLoading}
-          value={summary?.totalMissingDocuments ?? "Unavailable"}
+          value={summary?.totalMissingDocuments ?? 'Unavailable'}
           icon={<FileWarning size={18} />}
           tone={
-            (summary?.totalMissingDocuments ?? 0) > 0 ? "warning" : "neutral"
+            (summary?.totalMissingDocuments ?? 0) > 0 ? 'warning' : 'neutral'
           }
           description="Missing requirements in the current filter."
         />
         <KpiCard
           title="Before Review"
           loading={requestQuery.isLoading}
-          value={summary?.beforeReviewDocuments ?? "Unavailable"}
+          value={summary?.beforeReviewDocuments ?? 'Unavailable'}
           icon={<FileWarning size={18} />}
           tone={
-            (summary?.beforeReviewDocuments ?? 0) > 0 ? "danger" : "neutral"
+            (summary?.beforeReviewDocuments ?? 0) > 0 ? 'danger' : 'neutral'
           }
           description="Requirements due before review."
         />
@@ -210,22 +210,22 @@ export function DocumentRequestCenter() {
           loading={requestQuery.isLoading}
           value={
             summary
-              ? `${summary.oldestDaysPending} day${summary.oldestDaysPending === 1 ? "" : "s"}`
-              : "Unavailable"
+              ? `${summary.oldestDaysPending} day${summary.oldestDaysPending === 1 ? '' : 's'}`
+              : 'Unavailable'
           }
           icon={<RefreshCw size={18} />}
-          tone={(summary?.oldestDaysPending ?? 0) >= 7 ? "warning" : "neutral"}
+          tone={(summary?.oldestDaysPending ?? 0) >= 7 ? 'warning' : 'neutral'}
           description="Age of the oldest matching document request."
         />
         <KpiCard
           title="No Phone"
           loading={requestQuery.isLoading}
-          value={summary?.casesWithoutGuardianPhone ?? "Unavailable"}
+          value={summary?.casesWithoutGuardianPhone ?? 'Unavailable'}
           icon={<Phone size={18} />}
           tone={
             (summary?.casesWithoutGuardianPhone ?? 0) > 0
-              ? "warning"
-              : "neutral"
+              ? 'warning'
+              : 'neutral'
           }
           description="Cases without a guardian phone for reminder follow-up."
         />
@@ -325,7 +325,7 @@ export function DocumentRequestCenter() {
             >
               {PENDING_DAY_OPTIONS.map((days) => (
                 <option key={days} value={days}>
-                  {days === 0 ? "Any age" : `${days}+ days`}
+                  {days === 0 ? 'Any age' : `${days}+ days`}
                 </option>
               ))}
             </select>
@@ -341,7 +341,7 @@ export function DocumentRequestCenter() {
           <p className="mt-1 text-sm text-slate-600">
             {selectedRows.length
               ? `${selectedRows.length} selected; ${selectedWithPhones.length} have guardian phones.`
-              : "Select cases for reminder follow-up."}
+              : 'Select cases for reminder follow-up.'}
           </p>
           {!canQueueReminders ? (
             <p
@@ -359,7 +359,7 @@ export function DocumentRequestCenter() {
             disabled={!rows.length}
             onClick={() => togglePageRows(!allPageRowsSelected)}
           >
-            {allPageRowsSelected ? "Clear page" : "Select page"}
+            {allPageRowsSelected ? 'Clear page' : 'Select page'}
           </Button>
           <Button
             type="button"
@@ -369,7 +369,7 @@ export function DocumentRequestCenter() {
               reminderMutation.isPending
             }
             aria-describedby={
-              canQueueReminders ? undefined : "reminder-permission-note"
+              canQueueReminders ? undefined : 'reminder-permission-note'
             }
             onClick={() => {
               reminderMutation.reset();
@@ -460,7 +460,7 @@ export function DocumentRequestCenter() {
         <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
           <span>
             {requestQuery.data.total} case
-            {requestQuery.data.total === 1 ? "" : "s"}
+            {requestQuery.data.total === 1 ? '' : 's'}
           </span>
           <div className="flex gap-2">
             <Button
@@ -528,7 +528,7 @@ function ReminderBatchResult({
   const skipCounts = result.results.reduce<
     Partial<Record<AdmissionDocumentReminderSkipReason, number>>
   >((counts, item) => {
-    if (item.state === "SKIPPED" && item.reason) {
+    if (item.state === 'SKIPPED' && item.reason) {
       counts[item.reason] = (counts[item.reason] ?? 0) + 1;
     }
     return counts;
@@ -548,7 +548,7 @@ function ReminderBatchResult({
         <div className="min-w-0">
           <p className="font-bold">Reminder requests checked</p>
           <p className="mt-1 text-sm text-success-800">
-            {result.queued} queued · {result.alreadyQueued} already queued ·{" "}
+            {result.queued} queued · {result.alreadyQueued} already queued ·{' '}
             {result.skipped} skipped out of {result.requested} selected.
           </p>
           {skippedReasons.length > 0 ? (
@@ -579,7 +579,7 @@ function DocumentRequestRow({
   onSelectedChange: (selected: boolean) => void;
 }) {
   return (
-    <tr className={selected ? "bg-blue-50/70" : "hover:bg-slate-50"}>
+    <tr className={selected ? 'bg-blue-50/70' : 'hover:bg-slate-50'}>
       <td className="px-4 py-4 align-top">
         <input
           type="checkbox"
@@ -592,18 +592,18 @@ function DocumentRequestRow({
       <td className="px-4 py-4 align-top">
         <p className="font-bold text-slate-950">{row.applicantName}</p>
         <p className="mt-1 text-xs text-slate-500">
-          {row.guardianFullName ?? "Guardian not recorded"}
+          {row.guardianFullName ?? 'Guardian not recorded'}
         </p>
         <p className="mt-1 text-xs font-semibold text-slate-600">
-          {row.guardianPhone ?? "No guardian phone"}
+          {row.guardianPhone ?? 'No guardian phone'}
         </p>
       </td>
       <td className="px-4 py-4 align-top">
         <p className="font-semibold text-slate-800">
-          {row.policyName ?? "No matched policy"}
+          {row.policyName ?? 'No matched policy'}
         </p>
         <p className="mt-1 text-xs text-slate-500">
-          {row.className ?? "Class not selected"} ·{" "}
+          {row.className ?? 'Class not selected'} ·{' '}
           {educationProgramLabel(row.program)}
         </p>
         <div className="mt-2">
@@ -619,9 +619,9 @@ function DocumentRequestRow({
             >
               {document.label || humanize(document.documentKind)}
               <span className="text-warning-700/80">
-                {document.timing === "BEFORE_REVIEW"
-                  ? "before review"
-                  : "before enrollment"}
+                {document.timing === 'BEFORE_REVIEW'
+                  ? 'before review'
+                  : 'before enrollment'}
               </span>
             </span>
           ))}
@@ -634,7 +634,7 @@ function DocumentRequestRow({
       </td>
       <td className="px-4 py-4 align-top">
         <p className="font-bold text-slate-900">
-          {row.daysPending} day{row.daysPending === 1 ? "" : "s"}
+          {row.daysPending} day{row.daysPending === 1 ? '' : 's'}
         </p>
         <p className="mt-1 text-xs text-slate-500">
           Opened {formatBsDate(row.createdAt)}
@@ -709,27 +709,27 @@ function isModuleLockedError(error: unknown) {
     return false;
   const message = error.message.toLowerCase();
   return (
-    message.includes("subscription plan") ||
-    message.includes("not enabled") ||
-    message.includes("module.students")
+    message.includes('subscription plan') ||
+    message.includes('not enabled') ||
+    message.includes('module.students')
   );
 }
 
 function reminderErrorMessage(error: unknown) {
   if (error instanceof ApiRequestError) {
     if (error.statusCode === 403) {
-      return "You do not have permission to queue these reminders, or Admissions is not enabled for this school.";
+      return 'You do not have permission to queue these reminders, or Admissions is not enabled for this school.';
     }
     if (error.statusCode === 409) {
-      return "The selected cases changed before the reminders could be queued. Refresh the list and try again.";
+      return 'The selected cases changed before the reminders could be queued. Refresh the list and try again.';
     }
   }
-  return "Your admission cases were not changed. Check your connection and try again.";
+  return 'Your admission cases were not changed. Check your connection and try again.';
 }
 
 function humanize(value: string) {
   return value
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replaceAll("_", " ")
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replaceAll('_', ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

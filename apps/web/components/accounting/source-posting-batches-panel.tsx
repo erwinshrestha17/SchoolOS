@@ -1,42 +1,45 @@
-"use client";
+'use client';
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { formatBsDate, type AccountingPostingBatchSummary } from "@schoolos/core";
-import { accountingApi } from "../../lib/api/accounting";
-import { useSession } from "../session-provider";
-import { Button } from "../ui/button";
-import { StatusBadge } from "../ui/status-badge";
-import { WorkSurface } from "../ui/work-surface";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import {
+  formatBsDate,
+  type AccountingPostingBatchSummary,
+} from '@schoolos/core';
+import { accountingApi } from '../../lib/api/accounting';
+import { useSession } from '../session-provider';
+import { Button } from '../ui/button';
+import { StatusBadge } from '../ui/status-badge';
+import { WorkSurface } from '../ui/work-surface';
 import {
   ReportTable,
   type ReportTableColumn,
   type ReportTableRow,
-} from "./report-table";
+} from './report-table';
 
 const columns: readonly ReportTableColumn[] = [
-  { id: "source", label: "Source ID", width: 260 },
-  { id: "type", label: "Posting" },
-  { id: "sourceTotal", label: "Source total", align: "right" },
-  { id: "postedTotal", label: "Posted total", align: "right" },
-  { id: "difference", label: "Difference", align: "right" },
-  { id: "status", label: "Status" },
-  { id: "postedAt", label: "Posted" },
-  { id: "action", label: "Action", align: "right" },
+  { id: 'source', label: 'Source ID', width: 260 },
+  { id: 'type', label: 'Posting' },
+  { id: 'sourceTotal', label: 'Source total', align: 'right' },
+  { id: 'postedTotal', label: 'Posted total', align: 'right' },
+  { id: 'difference', label: 'Difference', align: 'right' },
+  { id: 'status', label: 'Status' },
+  { id: 'postedAt', label: 'Posted' },
+  { id: 'action', label: 'Action', align: 'right' },
 ];
 
 export function SourcePostingBatchesPanel({
   sourceModule,
 }: {
-  sourceModule?: "M3" | "M7";
+  sourceModule?: 'M3' | 'M7';
 }) {
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
-  const canRead = hasPermissions(["accounting:posting-batches:read"]);
-  const canRetry = hasPermissions(["accounting:posting-batches:retry"]);
+  const canRead = hasPermissions(['accounting:posting-batches:read']);
+  const canRetry = hasPermissions(['accounting:posting-batches:retry']);
   const query = useQuery({
-    queryKey: ["accounting-posting-batches", sourceModule ?? "ALL", page],
+    queryKey: ['accounting-posting-batches', sourceModule ?? 'ALL', page],
     queryFn: () =>
       accountingApi.listPostingBatches({ page, limit: 20, sourceModule }),
     enabled: canRead,
@@ -46,7 +49,7 @@ export function SourcePostingBatchesPanel({
     mutationFn: accountingApi.retryPostingBatch,
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ["accounting-posting-batches"],
+        queryKey: ['accounting-posting-batches'],
       });
     },
   });
@@ -65,14 +68,18 @@ export function SourcePostingBatchesPanel({
 
   return (
     <WorkSurface
-      title={sourceModule ? `${sourceModule} posting history` : "Source posting history"}
+      title={
+        sourceModule
+          ? `${sourceModule} posting history`
+          : 'Source posting history'
+      }
       description="Official source totals, posted totals, journal lineage, retry state, and exact reconciliation differences."
     >
       {retry.isError ? (
         <p role="alert" className="mb-3 text-sm font-medium text-rose-700">
           {retry.error instanceof Error
             ? retry.error.message
-            : "The posting retry could not be completed."}
+            : 'The posting retry could not be completed.'}
         </p>
       ) : null}
       <ReportTable
@@ -83,7 +90,7 @@ export function SourcePostingBatchesPanel({
         stale={query.isStale && query.isSuccess}
         error={query.error instanceof Error ? query.error.message : null}
         onRetry={() => void query.refetch()}
-        ariaLabel={`${sourceModule ?? "M3 and M7"} source posting batches`}
+        ariaLabel={`${sourceModule ?? 'M3 and M7'} source posting batches`}
         pagination={{
           page,
           totalPages,
@@ -111,17 +118,17 @@ function mapBatchRow(
         ),
       },
       type: { value: `${batch.sourceModule} · ${batch.postingType}` },
-      sourceTotal: { value: batch.sourceTotal, type: "currency" },
-      postedTotal: { value: batch.postedTotal, type: "currency" },
-      difference: { value: batch.reconciliationDifference, type: "currency" },
+      sourceTotal: { value: batch.sourceTotal, type: 'currency' },
+      postedTotal: { value: batch.postedTotal, type: 'currency' },
+      difference: { value: batch.reconciliationDifference, type: 'currency' },
       status: { value: <StatusBadge status={batch.status} /> },
       postedAt: {
-        value: batch.postedAt ? formatBsDate(batch.postedAt) : "Not posted",
+        value: batch.postedAt ? formatBsDate(batch.postedAt) : 'Not posted',
       },
       action: {
-        align: "right",
+        align: 'right',
         value:
-          action.canRetry && batch.status === "FAILED" ? (
+          action.canRetry && batch.status === 'FAILED' ? (
             <Button
               type="button"
               size="sm"
@@ -129,7 +136,7 @@ function mapBatchRow(
               disabled={action.retrying}
               onClick={action.onRetry}
             >
-              {action.retrying ? "Retrying…" : "Retry"}
+              {action.retrying ? 'Retrying…' : 'Retry'}
             </Button>
           ) : batch.journalEntryId ? (
             <span className="text-xs text-slate-500">Journal linked</span>

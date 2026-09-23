@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import type { OperationalDashboardSummary } from "@schoolos/core";
-import { OperationalDashboardLayout } from "./operational-dashboard-layout";
+import type { OperationalDashboardSummary } from '@schoolos/core';
+import { OperationalDashboardLayout } from './operational-dashboard-layout';
 
 /** Admin operational execution dashboard composition. */
 export function AdminDashboard({

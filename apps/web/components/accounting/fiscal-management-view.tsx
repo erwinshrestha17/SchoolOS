@@ -1,27 +1,27 @@
-"use client";
+'use client';
 
-import { useQuery } from "@tanstack/react-query";
-import { Lock, Unlock } from "lucide-react";
-import { api } from "../../lib/api";
-import { SectionCard } from "../ui/section-card";
-import { Button } from "../ui/button";
-import { cn } from "../../lib/utils";
-import { useState } from "react";
-import { FiscalPeriodActions } from "./fiscal-period-actions";
-import { FiscalYearCloseDialog } from "./fiscal-year-close-dialog";
-import { formatBsDate } from "@schoolos/core";
-import { useSession } from "../session-provider";
+import { useQuery } from '@tanstack/react-query';
+import { Lock, Unlock } from 'lucide-react';
+import { api } from '../../lib/api';
+import { SectionCard } from '../ui/section-card';
+import { Button } from '../ui/button';
+import { cn } from '../../lib/utils';
+import { useState } from 'react';
+import { FiscalPeriodActions } from './fiscal-period-actions';
+import { FiscalYearCloseDialog } from './fiscal-year-close-dialog';
+import { formatBsDate } from '@schoolos/core';
+import { useSession } from '../session-provider';
 
 export function FiscalManagementView() {
   const { hasPermissions } = useSession();
   const canManageFiscalYear = hasPermissions(['accounting:fiscal:manage']);
   const canReopenFiscalYear = hasPermissions(['accounting:fiscal:reopen']);
   const [fyCloseOpen, setFyCloseOpen] = useState(false);
-  const [fyMode, setFyMode] = useState<"CLOSE" | "REOPEN">("CLOSE");
+  const [fyMode, setFyMode] = useState<'CLOSE' | 'REOPEN'>('CLOSE');
   const [selectedFy, setSelectedFy] = useState<any>(null);
 
   const fiscalYearsQuery = useQuery({
-    queryKey: ["fiscal-years"],
+    queryKey: ['fiscal-years'],
     queryFn: () => api.listFiscalYears(),
   });
 
@@ -42,29 +42,29 @@ export function FiscalManagementView() {
                 <div>
                   <p className="font-bold text-slate-900">{year.name}</p>
                   <p className="text-sm text-slate-500">
-                    {formatBsDate(year.startDate)} -{" "}
+                    {formatBsDate(year.startDate)} -{' '}
                     {formatBsDate(year.endDate)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <span
                     className={cn(
-                      "rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider",
-                      year.status === "OPEN"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-slate-200 text-slate-600",
+                      'rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider',
+                      year.status === 'OPEN'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-slate-200 text-slate-600',
                     )}
                   >
                     {year.status}
                   </span>
-                  {year.status === "OPEN" && canManageFiscalYear ? (
+                  {year.status === 'OPEN' && canManageFiscalYear ? (
                     <Button
                       type="button"
                       variant="destructive"
                       size="sm"
                       onClick={() => {
                         setSelectedFy(year);
-                        setFyMode("CLOSE");
+                        setFyMode('CLOSE');
                         setFyCloseOpen(true);
                       }}
                       className="h-8 gap-2 rounded-lg px-3 text-xs"
@@ -72,13 +72,13 @@ export function FiscalManagementView() {
                       <Lock size={14} />
                       Close Year
                     </Button>
-                  ) : year.status !== "OPEN" && canReopenFiscalYear ? (
+                  ) : year.status !== 'OPEN' && canReopenFiscalYear ? (
                     <Button
                       type="button"
                       size="sm"
                       onClick={() => {
                         setSelectedFy(year);
-                        setFyMode("REOPEN");
+                        setFyMode('REOPEN');
                         setFyCloseOpen(true);
                       }}
                       className="h-8 gap-2 rounded-lg bg-[var(--color-mod-accounting-accent)] px-3 text-xs hover:bg-[var(--color-mod-accounting-text)]"
@@ -102,12 +102,12 @@ export function FiscalManagementView() {
                       </span>
                       <span
                         className={cn(
-                          "h-2 w-2 rounded-full",
-                          period.status === "OPEN"
-                            ? "bg-emerald-500"
-                            : period.status === "LOCKED"
-                              ? "bg-amber-500"
-                              : "bg-slate-400",
+                          'h-2 w-2 rounded-full',
+                          period.status === 'OPEN'
+                            ? 'bg-emerald-500'
+                            : period.status === 'LOCKED'
+                              ? 'bg-amber-500'
+                              : 'bg-slate-400',
                         )}
                       />
                     </div>

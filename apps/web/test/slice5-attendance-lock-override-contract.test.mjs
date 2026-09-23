@@ -1,15 +1,15 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
-const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (path) => readFileSync(join(webRoot, path), "utf8");
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 
-describe("Slice 5 attendance reopen / correction / re-lock contracts", () => {
-  it("exposes the locked-session override API client", () => {
-    const attendanceApi = read("lib/api/attendance.ts");
+describe('Slice 5 attendance reopen / correction / re-lock contracts', () => {
+  it('exposes the locked-session override API client', () => {
+    const attendanceApi = read('lib/api/attendance.ts');
 
     assert.match(
       attendanceApi,
@@ -18,8 +18,8 @@ describe("Slice 5 attendance reopen / correction / re-lock contracts", () => {
     assert.match(attendanceApi, /AttendanceSessionOverrideResult/);
   });
 
-  it("wires mark attendance override mode to capabilities and audited re-lock copy", () => {
-    const form = read("components/forms/attendance-form.tsx");
+  it('wires mark attendance override mode to capabilities and audited re-lock copy', () => {
+    const form = read('components/forms/attendance-form.tsx');
 
     assert.match(form, /useAttendanceCapabilities\(\)/);
     assert.match(form, /canOverrideLock/);
@@ -31,15 +31,15 @@ describe("Slice 5 attendance reopen / correction / re-lock contracts", () => {
     assert.match(form, /computeOverrideChanges/);
   });
 
-  it("gates correction review surfaces on canReviewConflicts", () => {
+  it('gates correction review surfaces on canReviewConflicts', () => {
     const inlineReview = read(
-      "components/attendance/attendance-correction-review.tsx",
+      'components/attendance/attendance-correction-review.tsx',
     );
     const detailWorkspace = read(
-      "components/attendance/attendance-m2-workspaces.tsx",
+      'components/attendance/attendance-m2-workspaces.tsx',
     );
     const conflictReview = read(
-      "components/attendance/attendance-conflict-review.tsx",
+      'components/attendance/attendance-conflict-review.tsx',
     );
 
     assert.match(inlineReview, /useAttendanceCapabilities\(\)/);
@@ -54,8 +54,8 @@ describe("Slice 5 attendance reopen / correction / re-lock contracts", () => {
     assert.match(conflictReview, /canReviewConflicts/);
   });
 
-  it("keeps teacher read-only lock messaging when override authority is absent", () => {
-    const form = read("components/forms/attendance-form.tsx");
+  it('keeps teacher read-only lock messaging when override authority is absent', () => {
+    const form = read('components/forms/attendance-form.tsx');
 
     assert.match(form, /Request a correction/);
     assert.match(

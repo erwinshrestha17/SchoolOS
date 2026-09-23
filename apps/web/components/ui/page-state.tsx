@@ -11,7 +11,13 @@ import {
 import { cn } from '../../lib/utils';
 import { Button } from './button';
 
-type PageStateTone = 'info' | 'success' | 'warning' | 'danger' | 'permission' | 'loading';
+type PageStateTone =
+  | 'info'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'permission'
+  | 'loading';
 
 type PageStateProps = {
   tone?: PageStateTone;
@@ -70,7 +76,9 @@ export function PageState({
   return (
     <div
       role={tone === 'danger' || tone === 'permission' ? 'alert' : 'status'}
-      aria-live={tone === 'danger' || tone === 'permission' ? 'assertive' : 'polite'}
+      aria-live={
+        tone === 'danger' || tone === 'permission' ? 'assertive' : 'polite'
+      }
       aria-busy={tone === 'loading' || undefined}
       className={cn(
         'flex min-h-56 flex-col items-center justify-center rounded-xl border p-6 text-center sm:p-8',
@@ -78,12 +86,17 @@ export function PageState({
         className,
       )}
     >
-      <div aria-hidden="true" className="mb-4 flex h-10 w-10 items-center justify-center">
+      <div
+        aria-hidden="true"
+        className="mb-4 flex h-10 w-10 items-center justify-center"
+      >
         <StateIcon tone={tone} />
       </div>
       <h3 className="text-base font-semibold text-foreground">{title}</h3>
       {description && (
-        <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">{description}</p>
+        <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
+          {description}
+        </p>
       )}
       {children && <div className="mt-5 w-full max-w-xl">{children}</div>}
       {(actionLabel && onAction) || secondaryAction ? (

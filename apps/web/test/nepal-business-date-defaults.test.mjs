@@ -73,7 +73,9 @@ describe('Nepal business-date defaults', () => {
 
   it('derives BS admission and attendance defaults from the Nepal school day', () => {
     const admission = read('components/m1/admission-case-wizard.tsx');
-    const attendance = read('components/attendance/attendance-m2-workspaces.tsx');
+    const attendance = read(
+      'components/attendance/attendance-m2-workspaces.tsx',
+    );
 
     assert.match(
       admission,

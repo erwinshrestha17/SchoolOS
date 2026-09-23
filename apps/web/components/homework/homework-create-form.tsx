@@ -42,10 +42,26 @@ const SUBMISSION_METHOD_OPTIONS: { value: string; label: string }[] = [
   { value: 'NO_SUBMISSION_REQUIRED', label: 'No submission required' },
 ];
 
-const NOTIFY_OPTIONS: { value: HomeworkPublishNotifyChoice; label: string; description: string }[] = [
-  { value: 'NOTIFY_NOW', label: 'Notify parents now', description: 'Send through the usual parent channels (SMS/app/push).' },
-  { value: 'IN_APP_ONLY', label: 'In-app notification only', description: 'Skip SMS/push, show only inside the parent app.' },
-  { value: 'DO_NOT_SEND', label: 'Do not send a notification', description: 'Publish without notifying parents.' },
+const NOTIFY_OPTIONS: {
+  value: HomeworkPublishNotifyChoice;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: 'NOTIFY_NOW',
+    label: 'Notify parents now',
+    description: 'Send through the usual parent channels (SMS/app/push).',
+  },
+  {
+    value: 'IN_APP_ONLY',
+    label: 'In-app notification only',
+    description: 'Skip SMS/push, show only inside the parent app.',
+  },
+  {
+    value: 'DO_NOT_SEND',
+    label: 'Do not send a notification',
+    description: 'Publish without notifying parents.',
+  },
 ];
 
 function todayDateInputValue() {
@@ -114,16 +130,25 @@ export function HomeworkCreateForm() {
   // teachers never have to touch this field.
   useEffect(() => {
     if (!formData.academicYearId && academicYearsQuery.data?.length) {
-      const current = academicYearsQuery.data.find((y) => y.isCurrent) ?? academicYearsQuery.data[0];
+      const current =
+        academicYearsQuery.data.find((y) => y.isCurrent) ??
+        academicYearsQuery.data[0];
       if (current) {
-        setFormData((prev) => (prev.academicYearId ? prev : { ...prev, academicYearId: current.id }));
+        setFormData((prev) =>
+          prev.academicYearId ? prev : { ...prev, academicYearId: current.id },
+        );
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [academicYearsQuery.data]);
 
   const workloadQuery = useQuery({
-    queryKey: ['homework-workload', formData.classId, formData.sectionId, formData.dueDate],
+    queryKey: [
+      'homework-workload',
+      formData.classId,
+      formData.sectionId,
+      formData.dueDate,
+    ],
     queryFn: () =>
       api.getHomeworkWorkload({
         classId: formData.classId,
@@ -133,14 +158,26 @@ export function HomeworkCreateForm() {
     enabled: Boolean(formData.classId && formData.dueDate),
   });
 
-  const selectedClassName = classesQuery.data?.find((c) => c.id === formData.classId)?.name;
-  const selectedSectionName = sectionsQuery.data?.find((s) => s.id === formData.sectionId)?.name;
-  const workloadScopeLabel = [selectedClassName, selectedSectionName].filter(Boolean).join(' - ') || 'This class';
-  const workloadDateLabel = formData.dueDate ? formatBsDate(formData.dueDate) : '';
+  const selectedClassName = classesQuery.data?.find(
+    (c) => c.id === formData.classId,
+  )?.name;
+  const selectedSectionName = sectionsQuery.data?.find(
+    (s) => s.id === formData.sectionId,
+  )?.name;
+  const workloadScopeLabel =
+    [selectedClassName, selectedSectionName].filter(Boolean).join(' - ') ||
+    'This class';
+  const workloadDateLabel = formData.dueDate
+    ? formatBsDate(formData.dueDate)
+    : '';
 
   const createMutation = useMutation({
     mutationFn: async ({ publish }: { publish: boolean }) => {
-      if (publish && typeof navigator !== 'undefined' && navigator.onLine === false) {
+      if (
+        publish &&
+        typeof navigator !== 'undefined' &&
+        navigator.onLine === false
+      ) {
         throw new Error(
           'Publishing homework needs an internet connection. Save a local draft instead.',
         );
@@ -160,7 +197,8 @@ export function HomeworkCreateForm() {
         description: formData.description.trim() || undefined,
         parentInstructions: formData.parentInstructions.trim() || undefined,
         submissionMethod: formData.submissionMethod,
-        submissionRequired: formData.submissionMethod !== 'NO_SUBMISSION_REQUIRED',
+        submissionRequired:
+          formData.submissionMethod !== 'NO_SUBMISSION_REQUIRED',
         assignedDate: assignedDateIso,
         dueDate: dueDateIso,
         dueAt: dueDateIso,
@@ -170,7 +208,9 @@ export function HomeworkCreateForm() {
         ...authorityFenceFields(readSchoolAuthorityFence()),
         // No dedicated backend field for chapter/lesson yet - carried in the
         // same generic JSON metadata bag already used for template bookkeeping.
-        attachmentMetadata: formData.chapter.trim() ? { chapter: formData.chapter.trim() } : undefined,
+        attachmentMetadata: formData.chapter.trim()
+          ? { chapter: formData.chapter.trim() }
+          : undefined,
         saveAsTemplate: formData.saveAsTemplate,
         templateName: formData.saveAsTemplate
           ? formData.templateName.trim() || formData.title.trim()
@@ -194,7 +234,11 @@ export function HomeworkCreateForm() {
       }
 
       if (publish && created.items?.length) {
-        await Promise.all(created.items.map((item) => api.assignHomework(item.id, formData.notify)));
+        await Promise.all(
+          created.items.map((item) =>
+            api.assignHomework(item.id, formData.notify),
+          ),
+        );
       }
 
       return created;
@@ -211,7 +255,9 @@ export function HomeworkCreateForm() {
     onError: async (error: unknown) => {
       if (error instanceof OfflineMutationError) {
         if (!session?.tenant.id || !session.user.id) {
-          setErrors({ submit: 'Sign in again before saving a local homework draft.' });
+          setErrors({
+            submit: 'Sign in again before saving a local homework draft.',
+          });
           return;
         }
         await upsertOfflineModuleDraft({
@@ -231,7 +277,8 @@ export function HomeworkCreateForm() {
             description: formData.description.trim() || undefined,
             parentInstructions: formData.parentInstructions.trim() || undefined,
             submissionMethod: formData.submissionMethod,
-            submissionRequired: formData.submissionMethod !== 'NO_SUBMISSION_REQUIRED',
+            submissionRequired:
+              formData.submissionMethod !== 'NO_SUBMISSION_REQUIRED',
             assignedDate: formData.assignedDate,
             dueDate: formData.dueDate,
             maxScore: formData.maxScore,
@@ -290,11 +337,13 @@ export function HomeworkCreateForm() {
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.academicYearId) newErrors.academicYearId = 'Select an academic year';
+    if (!formData.academicYearId)
+      newErrors.academicYearId = 'Select an academic year';
     if (!formData.classId) newErrors.classId = 'Select a class';
     if (!formData.subjectId) newErrors.subjectId = 'Select a subject';
     if (!formData.title.trim()) newErrors.title = 'Enter a homework title';
-    if (!formData.instructions.trim()) newErrors.instructions = 'Homework instructions are required';
+    if (!formData.instructions.trim())
+      newErrors.instructions = 'Homework instructions are required';
     if (!formData.dueDate) newErrors.dueDate = 'Select a due date';
     if (formData.dueDate) {
       const startOfToday = new Date();
@@ -305,14 +354,16 @@ export function HomeworkCreateForm() {
     }
     if (formData.recurrenceEnabled) {
       if (formData.recurrenceInterval < 1 || formData.recurrenceInterval > 12) {
-        newErrors.recurrenceInterval = 'Repeat interval must be between 1 and 12';
+        newErrors.recurrenceInterval =
+          'Repeat interval must be between 1 and 12';
       }
       if (!formData.recurrenceRepeatUntil) {
         if (
           formData.recurrenceOccurrenceCount < 2 ||
           formData.recurrenceOccurrenceCount > 60
         ) {
-          newErrors.recurrenceOccurrenceCount = 'Occurrences must be between 2 and 60';
+          newErrors.recurrenceOccurrenceCount =
+            'Occurrences must be between 2 and 60';
         }
       }
       if (
@@ -320,7 +371,8 @@ export function HomeworkCreateForm() {
         formData.dueDate &&
         new Date(formData.recurrenceRepeatUntil) <= new Date(formData.dueDate)
       ) {
-        newErrors.recurrenceRepeatUntil = 'Repeat until must be after the first due date';
+        newErrors.recurrenceRepeatUntil =
+          'Repeat until must be after the first due date';
       }
     }
 
@@ -356,11 +408,15 @@ export function HomeworkCreateForm() {
             <FormField label="Academic Year" error={errors.academicYearId}>
               <Select
                 value={formData.academicYearId}
-                onChange={(e) => setFormData({ ...formData, academicYearId: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, academicYearId: e.target.value })
+                }
               >
                 <option value="">Select Year</option>
                 {academicYearsQuery.data?.map((y) => (
-                  <option key={y.id} value={y.id}>{y.name}</option>
+                  <option key={y.id} value={y.id}>
+                    {y.name}
+                  </option>
                 ))}
               </Select>
             </FormField>
@@ -368,11 +424,20 @@ export function HomeworkCreateForm() {
             <FormField label="Class" error={errors.classId}>
               <Select
                 value={formData.classId}
-                onChange={(e) => setFormData({ ...formData, classId: e.target.value, sectionId: '', subjectId: '' })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    classId: e.target.value,
+                    sectionId: '',
+                    subjectId: '',
+                  })
+                }
               >
                 <option value="">Select Class</option>
                 {classesQuery.data?.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
                 ))}
               </Select>
             </FormField>
@@ -380,25 +445,35 @@ export function HomeworkCreateForm() {
             <FormField label="Section">
               <Select
                 value={formData.sectionId}
-                onChange={(e) => setFormData({ ...formData, sectionId: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, sectionId: e.target.value })
+                }
                 disabled={!formData.classId}
               >
                 <option value="">All Sections</option>
-                {sectionsQuery.data?.filter((s) => s.classId === formData.classId).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
+                {sectionsQuery.data
+                  ?.filter((s) => s.classId === formData.classId)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
               </Select>
             </FormField>
 
             <FormField label="Subject" error={errors.subjectId}>
               <Select
                 value={formData.subjectId}
-                onChange={(e) => setFormData({ ...formData, subjectId: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, subjectId: e.target.value })
+                }
                 disabled={!formData.classId}
               >
                 <option value="">Select Subject</option>
                 {subjectsQuery.data?.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
                 ))}
               </Select>
             </FormField>
@@ -408,7 +483,9 @@ export function HomeworkCreateForm() {
             <Input
               placeholder="e.g. Weekly Math Quiz Review"
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
               className="text-base font-bold"
               maxLength={160}
             />
@@ -418,7 +495,9 @@ export function HomeworkCreateForm() {
             <Textarea
               placeholder="What should students do? (English, Nepali, or mixed script - type naturally)"
               value={formData.instructions}
-              onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, instructions: e.target.value })
+              }
               rows={4}
               maxLength={5000}
             />
@@ -429,14 +508,18 @@ export function HomeworkCreateForm() {
               <Input
                 type="date"
                 value={formData.assignedDate}
-                onChange={(e) => setFormData({ ...formData, assignedDate: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, assignedDate: e.target.value })
+                }
               />
             </FormField>
             <FormField label="Due Date" error={errors.dueDate}>
               <Input
                 type="date"
                 value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, dueDate: e.target.value })
+                }
               />
             </FormField>
           </div>
@@ -447,8 +530,11 @@ export function HomeworkCreateForm() {
               <div>
                 <p className="font-bold">Homework load may be heavy</p>
                 <p className="mt-0.5 opacity-90">
-                  {workloadScopeLabel} already has {workloadQuery.data.count} homework assignment
-                  {workloadQuery.data.count === 1 ? '' : 's'} due {workloadDateLabel || 'that date'}. You can still assign this one.
+                  {workloadScopeLabel} already has {workloadQuery.data.count}{' '}
+                  homework assignment
+                  {workloadQuery.data.count === 1 ? '' : 's'} due{' '}
+                  {workloadDateLabel || 'that date'}. You can still assign this
+                  one.
                 </p>
               </div>
             </div>
@@ -457,8 +543,10 @@ export function HomeworkCreateForm() {
             <div className="flex items-start gap-3 rounded-2xl border border-info-100 bg-info-50 p-4 text-sm font-medium text-info-800">
               <Info className="mt-0.5 shrink-0" size={18} />
               <p className="opacity-90">
-                {workloadScopeLabel} already has {workloadQuery.data.count} other homework assignment
-                {workloadQuery.data.count === 1 ? '' : 's'} due {workloadDateLabel || 'that date'}.
+                {workloadScopeLabel} already has {workloadQuery.data.count}{' '}
+                other homework assignment
+                {workloadQuery.data.count === 1 ? '' : 's'} due{' '}
+                {workloadDateLabel || 'that date'}.
               </p>
             </div>
           )}
@@ -468,23 +556,36 @@ export function HomeworkCreateForm() {
       <details className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <summary className="cursor-pointer list-none px-5 py-4 text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-slate-950">
           More options
-          <span className="ml-2 text-xs font-semibold text-slate-500">Chapter, attachment, teacher note, submission method, parent instructions</span>
+          <span className="ml-2 text-xs font-semibold text-slate-500">
+            Chapter, attachment, teacher note, submission method, parent
+            instructions
+          </span>
         </summary>
         <div className="space-y-4 border-t border-slate-100 p-5">
-          <FormField label="Chapter / Lesson" description="Short reference, e.g. 'Chapter 4: Fractions'">
+          <FormField
+            label="Chapter / Lesson"
+            description="Short reference, e.g. 'Chapter 4: Fractions'"
+          >
             <Input
               placeholder="e.g. Chapter 4: Fractions"
               value={formData.chapter}
-              onChange={(e) => setFormData({ ...formData, chapter: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, chapter: e.target.value })
+              }
               maxLength={160}
             />
           </FormField>
 
-          <FormField label="Teacher Note" description="Private note for your own reference - not shown as the main instructions.">
+          <FormField
+            label="Teacher Note"
+            description="Private note for your own reference - not shown as the main instructions."
+          >
             <Textarea
               placeholder="Optional note to yourself or other staff..."
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               rows={3}
               maxLength={1000}
             />
@@ -494,10 +595,14 @@ export function HomeworkCreateForm() {
             <FormField label="Submission Method">
               <Select
                 value={formData.submissionMethod}
-                onChange={(e) => setFormData({ ...formData, submissionMethod: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, submissionMethod: e.target.value })
+                }
               >
                 {SUBMISSION_METHOD_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
                 ))}
               </Select>
             </FormField>
@@ -506,22 +611,32 @@ export function HomeworkCreateForm() {
                 type="number"
                 min={0}
                 value={formData.maxScore}
-                onChange={(e) => setFormData({ ...formData, maxScore: Number(e.target.value) })}
+                onChange={(e) =>
+                  setFormData({ ...formData, maxScore: Number(e.target.value) })
+                }
               />
             </FormField>
           </div>
 
-          <FormField label="Instruction for Parents" description='e.g. "Please help the child revise multiplication tables from 2 to 10."'>
+          <FormField
+            label="Instruction for Parents"
+            description='e.g. "Please help the child revise multiplication tables from 2 to 10."'
+          >
             <Textarea
               placeholder="Optional message shown to parents alongside the homework..."
               value={formData.parentInstructions}
-              onChange={(e) => setFormData({ ...formData, parentInstructions: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, parentInstructions: e.target.value })
+              }
               rows={3}
               maxLength={1000}
             />
           </FormField>
 
-          <FormField label="Attachment" description="Upload a worksheet, image, or reference file if needed.">
+          <FormField
+            label="Attachment"
+            description="Upload a worksheet, image, or reference file if needed."
+          >
             <FileUploader
               module="homework"
               onUploadComplete={(id) => {
@@ -533,7 +648,9 @@ export function HomeworkCreateForm() {
               onRemove={(id) => {
                 setFormData((prev) => ({
                   ...prev,
-                  attachmentFileIds: prev.attachmentFileIds.filter((fid) => fid !== id),
+                  attachmentFileIds: prev.attachmentFileIds.filter(
+                    (fid) => fid !== id,
+                  ),
                 }));
               }}
             />
@@ -548,13 +665,19 @@ export function HomeworkCreateForm() {
         <div className="space-y-4 border-t border-slate-100 p-5">
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
             <div className="flex flex-col">
-              <span className="text-sm font-bold text-slate-900">Save as Template</span>
-              <span className="text-xs text-slate-500">Make this assignment reusable in the template library.</span>
+              <span className="text-sm font-bold text-slate-900">
+                Save as Template
+              </span>
+              <span className="text-xs text-slate-500">
+                Make this assignment reusable in the template library.
+              </span>
             </div>
             <input
               type="checkbox"
               checked={formData.saveAsTemplate}
-              onChange={(e) => setFormData({ ...formData, saveAsTemplate: e.target.checked })}
+              onChange={(e) =>
+                setFormData({ ...formData, saveAsTemplate: e.target.checked })
+              }
               className="h-5 w-5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary-soft)]"
             />
           </div>
@@ -563,7 +686,9 @@ export function HomeworkCreateForm() {
             <FormField label="Template Name">
               <Input
                 value={formData.templateName}
-                onChange={(e) => setFormData({ ...formData, templateName: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, templateName: e.target.value })
+                }
                 placeholder="Defaults to assignment title"
               />
             </FormField>
@@ -571,13 +696,22 @@ export function HomeworkCreateForm() {
 
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
             <div className="flex flex-col">
-              <span className="text-sm font-bold text-slate-900">Repeat Assignment</span>
-              <span className="text-xs text-slate-500">Create a recurring series within the selected date range.</span>
+              <span className="text-sm font-bold text-slate-900">
+                Repeat Assignment
+              </span>
+              <span className="text-xs text-slate-500">
+                Create a recurring series within the selected date range.
+              </span>
             </div>
             <input
               type="checkbox"
               checked={formData.recurrenceEnabled}
-              onChange={(e) => setFormData({ ...formData, recurrenceEnabled: e.target.checked })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  recurrenceEnabled: e.target.checked,
+                })
+              }
               className="h-5 w-5 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary-soft)]"
             />
           </div>
@@ -588,51 +722,70 @@ export function HomeworkCreateForm() {
                 <FormField label="Frequency">
                   <Select
                     value={formData.recurrenceFrequency}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      recurrenceFrequency: e.target.value as 'DAILY' | 'WEEKLY',
-                    })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        recurrenceFrequency: e.target.value as
+                          | 'DAILY'
+                          | 'WEEKLY',
+                      })
+                    }
                   >
                     <option value="WEEKLY">Weekly</option>
                     <option value="DAILY">Daily</option>
                   </Select>
                 </FormField>
-                <FormField label="Repeat Every" error={errors.recurrenceInterval}>
+                <FormField
+                  label="Repeat Every"
+                  error={errors.recurrenceInterval}
+                >
                   <Input
                     type="number"
                     min={1}
                     max={12}
                     value={formData.recurrenceInterval}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      recurrenceInterval: Number(e.target.value),
-                    })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        recurrenceInterval: Number(e.target.value),
+                      })
+                    }
                   />
                 </FormField>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <FormField label="Occurrences" error={errors.recurrenceOccurrenceCount}>
+                <FormField
+                  label="Occurrences"
+                  error={errors.recurrenceOccurrenceCount}
+                >
                   <Input
                     type="number"
                     min={2}
                     max={60}
                     value={formData.recurrenceOccurrenceCount}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      recurrenceOccurrenceCount: Number(e.target.value),
-                    })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        recurrenceOccurrenceCount: Number(e.target.value),
+                      })
+                    }
                     disabled={Boolean(formData.recurrenceRepeatUntil)}
                   />
                 </FormField>
-                <FormField label="Or Repeat Until" error={errors.recurrenceRepeatUntil}>
+                <FormField
+                  label="Or Repeat Until"
+                  error={errors.recurrenceRepeatUntil}
+                >
                   <Input
                     type="date"
                     value={formData.recurrenceRepeatUntil}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      recurrenceRepeatUntil: e.target.value,
-                    })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        recurrenceRepeatUntil: e.target.value,
+                      })
+                    }
                   />
                 </FormField>
               </div>
@@ -641,7 +794,10 @@ export function HomeworkCreateForm() {
         </div>
       </details>
 
-      <SectionCard title="Notify parents" description="Applies when you publish immediately below.">
+      <SectionCard
+        title="Notify parents"
+        description="Applies when you publish immediately below."
+      >
         <div className="grid gap-3 sm:grid-cols-3">
           {NOTIFY_OPTIONS.map((opt) => (
             <label
@@ -658,7 +814,9 @@ export function HomeworkCreateForm() {
                   name="notify"
                   value={opt.value}
                   checked={formData.notify === opt.value}
-                  onChange={() => setFormData({ ...formData, notify: opt.value })}
+                  onChange={() =>
+                    setFormData({ ...formData, notify: opt.value })
+                  }
                   className="h-4 w-4 text-[var(--primary)] focus:ring-[var(--primary-soft)]"
                 />
                 {opt.label}

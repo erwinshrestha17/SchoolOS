@@ -1,8 +1,8 @@
 export enum SubscriptionTier {
-  STARTER = 'STARTER',
-  STANDARD = 'STANDARD',
-  PROFESSIONAL = 'PROFESSIONAL',
-  ENTERPRISE = 'ENTERPRISE',
+  STARTER = "STARTER",
+  STANDARD = "STANDARD",
+  PROFESSIONAL = "PROFESSIONAL",
+  ENTERPRISE = "ENTERPRISE",
 }
 
 export const CUSTOMER_TIERS = [
@@ -14,110 +14,110 @@ export const CUSTOMER_TIERS = [
 
 // Customer Modules only (excl M0). Module keys remain stable even when display numbering changes.
 export const CUSTOMER_MODULES = [
-  'students', // M1 Admissions & Student Profiles
-  'attendance', // M2 Smart Attendance
-  'fees', // M3 Fees & Receipts
-  'exams', // M4 Exams / CAS / Report Cards
-  'activity', // M5 Activity Feed & Milestones
-  'homework', // M6 Homework & Timetable
-  'hr', // M7 HR & Payroll
-  'library', // M8 Library
-  'transport', // M9 Transport
-  'canteen', // M10 Canteen
-  'accounting', // M11 Accounting & Finance
-  'notifications', // M12 Notifications & Delivery
-  'notices', // M15 Notices & Announcements (stable key retained)
-  'learning', // M13 Learning Layer
+  "students", // M1 Admissions & Student Profiles
+  "attendance", // M2 Smart Attendance
+  "fees", // M3 Fees & Receipts
+  "exams", // M4 Exams / CAS / Report Cards
+  "activity", // M5 Activity Feed & Milestones
+  "homework", // M6 Homework & Timetable
+  "hr", // M7 HR & Payroll
+  "library", // M8 Library
+  "transport", // M9 Transport
+  "canteen", // M10 Canteen
+  "accounting", // M11 Accounting & Finance
+  "notifications", // M12 Notifications & Delivery
+  "notices", // M15 Notices & Announcements (stable key retained)
+  "learning", // M13 Learning Layer
   // Cross-module reporting and export centre. Enforced as `module.reports` by
   // ReportsController; the `feature.reports.*` keys below grade its depth, but
   // without the module every report export is refused outright.
-  'reports',
+  "reports",
 ];
 
 export const FEATURE_KEYS = {
   // M3 Fees & Receipts
-  FEES_BASIC: 'feature.fees.basic',
-  FEES_FULL: 'feature.fees.full',
-  FEES_REVERSALS: 'feature.fees.reversals',
-  FEES_CASHIER_CLOSE: 'feature.fees.cashier_close',
-  FEES_DEFAULTER_AGING: 'feature.fees.defaulter_aging',
+  FEES_BASIC: "feature.fees.basic",
+  FEES_FULL: "feature.fees.full",
+  FEES_REVERSALS: "feature.fees.reversals",
+  FEES_CASHIER_CLOSE: "feature.fees.cashier_close",
+  FEES_DEFAULTER_AGING: "feature.fees.defaulter_aging",
 
   // M4 Exams / CAS / Report Cards
-  EXAMS_BASIC: 'feature.exams.basic',
-  EXAMS_FULL: 'feature.exams.full',
-  EXAMS_CUSTOM_TEMPLATES: 'feature.exams.custom_templates',
+  EXAMS_BASIC: "feature.exams.basic",
+  EXAMS_FULL: "feature.exams.full",
+  EXAMS_CUSTOM_TEMPLATES: "feature.exams.custom_templates",
 
   // M5 Activity Feed & Milestones
-  ACTIVITY_BASIC: 'feature.activity.basic',
-  ACTIVITY_FULL: 'feature.activity.full',
-  ACTIVITY_MODERATION: 'feature.activity.moderation',
-  ACTIVITY_CONSENT_MEDIA: 'feature.activity.consent_media',
+  ACTIVITY_BASIC: "feature.activity.basic",
+  ACTIVITY_FULL: "feature.activity.full",
+  ACTIVITY_MODERATION: "feature.activity.moderation",
+  ACTIVITY_CONSENT_MEDIA: "feature.activity.consent_media",
 
   // M6 Homework & Timetable
-  HOMEWORK_BASIC: 'feature.homework.basic',
-  HOMEWORK_FULL: 'feature.homework.full',
-  TIMETABLE_VIEW: 'feature.timetable.view',
-  TIMETABLE_BASIC: 'feature.timetable.basic',
-  TIMETABLE_CONFLICTS: 'feature.timetable.conflicts',
-  TIMETABLE_ADVANCED: 'feature.timetable.advanced',
+  HOMEWORK_BASIC: "feature.homework.basic",
+  HOMEWORK_FULL: "feature.homework.full",
+  TIMETABLE_VIEW: "feature.timetable.view",
+  TIMETABLE_BASIC: "feature.timetable.basic",
+  TIMETABLE_CONFLICTS: "feature.timetable.conflicts",
+  TIMETABLE_ADVANCED: "feature.timetable.advanced",
 
   // M13 Learning Layer
-  LEARNING_BASIC: 'feature.learning.basic',
-  LEARNING_FULL: 'feature.learning.full',
+  LEARNING_BASIC: "feature.learning.basic",
+  LEARNING_FULL: "feature.learning.full",
 
   // M7 HR & Payroll
-  HR_STAFF_RECORDS: 'feature.hr.staff_records',
-  HR_FULL: 'feature.hr.full',
-  HR_SELF_SERVICE: 'feature.hr.self_service',
+  HR_STAFF_RECORDS: "feature.hr.staff_records",
+  HR_FULL: "feature.hr.full",
+  HR_SELF_SERVICE: "feature.hr.self_service",
 
   // M8 Library
-  LIBRARY_BASIC: 'feature.library.basic',
-  LIBRARY_FULL: 'feature.library.full',
+  LIBRARY_BASIC: "feature.library.basic",
+  LIBRARY_FULL: "feature.library.full",
 
   // M9 Transport
-  TRANSPORT_BASIC: 'feature.transport.basic',
-  TRANSPORT_FULL: 'feature.transport.full',
-  GPS_LIVE_TRACKING: 'feature.transport.gps_live',
+  TRANSPORT_BASIC: "feature.transport.basic",
+  TRANSPORT_FULL: "feature.transport.full",
+  GPS_LIVE_TRACKING: "feature.transport.gps_live",
 
   // M10 Canteen
-  CANTEEN_BASIC: 'feature.canteen.basic',
-  CANTEEN_FULL: 'feature.canteen.full',
-  CANTEEN_WALLET_CONTROLS: 'feature.canteen.wallet_controls',
+  CANTEEN_BASIC: "feature.canteen.basic",
+  CANTEEN_FULL: "feature.canteen.full",
+  CANTEEN_WALLET_CONTROLS: "feature.canteen.wallet_controls",
 
   // M11 Accounting & Finance
-  ACCOUNTING_BASIC_FINANCE: 'feature.accounting.basic_finance',
-  ACCOUNTING_FULL: 'feature.accounting.full',
-  ACCOUNTING_AUDIT: 'feature.accounting.audit',
+  ACCOUNTING_BASIC_FINANCE: "feature.accounting.basic_finance",
+  ACCOUNTING_FULL: "feature.accounting.full",
+  ACCOUNTING_AUDIT: "feature.accounting.audit",
 
   // M12 Notifications & Delivery
-  NOTIFICATIONS_IN_APP: 'feature.notifications.in_app',
-  NOTIFICATIONS_PUSH: 'feature.notifications.push',
-  NOTIFICATIONS_SMS: 'feature.notifications.sms',
-  NOTIFICATIONS_EMAIL: 'feature.notifications.email',
-  NOTIFICATIONS_PREFERENCES: 'feature.notifications.preferences',
+  NOTIFICATIONS_IN_APP: "feature.notifications.in_app",
+  NOTIFICATIONS_PUSH: "feature.notifications.push",
+  NOTIFICATIONS_SMS: "feature.notifications.sms",
+  NOTIFICATIONS_EMAIL: "feature.notifications.email",
+  NOTIFICATIONS_PREFERENCES: "feature.notifications.preferences",
   NOTIFICATIONS_DELIVERY_DIAGNOSTICS:
-    'feature.notifications.delivery_diagnostics',
+    "feature.notifications.delivery_diagnostics",
 
   // M15 Notices & Announcements. Existing keys remain compatibility-stable.
-  NOTICES_BASIC: 'feature.notices.basic',
-  NOTICES_FULL: 'feature.notices.full',
-  NOTICES_READ_TRACKING: 'feature.notices.read_tracking',
+  NOTICES_BASIC: "feature.notices.basic",
+  NOTICES_FULL: "feature.notices.full",
+  NOTICES_READ_TRACKING: "feature.notices.read_tracking",
 
   // Reports
-  REPORTS_BASIC: 'feature.reports.basic',
-  REPORTS_STANDARD: 'feature.reports.standard',
-  REPORTS_ADVANCED: 'feature.reports.advanced',
-  REPORTS_CUSTOM: 'feature.reports.custom',
+  REPORTS_BASIC: "feature.reports.basic",
+  REPORTS_STANDARD: "feature.reports.standard",
+  REPORTS_ADVANCED: "feature.reports.advanced",
+  REPORTS_CUSTOM: "feature.reports.custom",
 
   // Mobile Features
-  MOBILE_PARENT_BASIC: 'feature.mobile.parent_basic',
-  MOBILE_TEACHER_PARENT: 'feature.mobile.teacher_parent',
-  MOBILE_FULL_ROLE: 'feature.mobile.full_role',
+  MOBILE_PARENT_BASIC: "feature.mobile.parent_basic",
+  MOBILE_TEACHER_PARENT: "feature.mobile.teacher_parent",
+  MOBILE_FULL_ROLE: "feature.mobile.full_role",
   /** @deprecated Chat is removed; retained only to recognize legacy data. */
-  MOBILE_PARENT_TEACHER_CHAT: 'feature.mobile.parent_teacher_chat',
+  MOBILE_PARENT_TEACHER_CHAT: "feature.mobile.parent_teacher_chat",
 
   // Imports/Exports
-  IMPORTS_EXPORTS_ADVANCED: 'feature.general.advanced_imports_exports',
+  IMPORTS_EXPORTS_ADVANCED: "feature.general.advanced_imports_exports",
 };
 
 // M13 Learning keys remain compatibility-stable above, but Learning is omitted
@@ -132,15 +132,15 @@ export const ENTITLEMENT_MATRIX: Record<
 > = {
   [SubscriptionTier.STARTER]: {
     modules: [
-      'students',
-      'attendance',
-      'fees',
-      'exams',
-      'activity',
-      'homework',
-      'notifications',
-      'notices',
-      'reports',
+      "students",
+      "attendance",
+      "fees",
+      "exams",
+      "activity",
+      "homework",
+      "notifications",
+      "notices",
+      "reports",
     ],
     features: [
       FEATURE_KEYS.FEES_BASIC,
@@ -156,15 +156,15 @@ export const ENTITLEMENT_MATRIX: Record<
   },
   [SubscriptionTier.STANDARD]: {
     modules: [
-      'students',
-      'attendance',
-      'fees',
-      'exams',
-      'activity',
-      'homework',
-      'notifications',
-      'notices',
-      'reports',
+      "students",
+      "attendance",
+      "fees",
+      "exams",
+      "activity",
+      "homework",
+      "notifications",
+      "notices",
+      "reports",
     ],
     features: [
       FEATURE_KEYS.FEES_BASIC,
@@ -191,20 +191,20 @@ export const ENTITLEMENT_MATRIX: Record<
   },
   [SubscriptionTier.PROFESSIONAL]: {
     modules: [
-      'students',
-      'attendance',
-      'fees',
-      'exams',
-      'activity',
-      'homework',
-      'hr',
-      'library',
-      'transport',
-      'canteen',
-      'accounting',
-      'notifications',
-      'notices',
-      'reports',
+      "students",
+      "attendance",
+      "fees",
+      "exams",
+      "activity",
+      "homework",
+      "hr",
+      "library",
+      "transport",
+      "canteen",
+      "accounting",
+      "notifications",
+      "notices",
+      "reports",
     ],
     features: [
       FEATURE_KEYS.FEES_BASIC,
@@ -248,20 +248,20 @@ export const ENTITLEMENT_MATRIX: Record<
   },
   [SubscriptionTier.ENTERPRISE]: {
     modules: [
-      'students',
-      'attendance',
-      'fees',
-      'exams',
-      'activity',
-      'homework',
-      'hr',
-      'library',
-      'transport',
-      'canteen',
-      'accounting',
-      'notifications',
-      'notices',
-      'reports',
+      "students",
+      "attendance",
+      "fees",
+      "exams",
+      "activity",
+      "homework",
+      "hr",
+      "library",
+      "transport",
+      "canteen",
+      "accounting",
+      "notifications",
+      "notices",
+      "reports",
     ],
     features: [
       FEATURE_KEYS.FEES_BASIC,
@@ -318,4 +318,4 @@ export const ENTITLEMENT_MATRIX: Record<
 };
 
 // Standard allows add-ons: M8 Library, M9 Transport, M10 Canteen.
-export const STANDARD_ALLOWED_ADDONS = ['library', 'transport', 'canteen'];
+export const STANDARD_ALLOWED_ADDONS = ["library", "transport", "canteen"];

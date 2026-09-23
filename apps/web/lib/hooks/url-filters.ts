@@ -24,7 +24,7 @@ export function parseUrlFilters<T extends FilterDefaults>(
     const raw = searchParams.get(key);
     if (raw === null) continue;
     const defaultValue = defaults[key as keyof T];
-    if (typeof defaultValue === "number") {
+    if (typeof defaultValue === 'number') {
       const parsed = Number(raw);
       (result as Record<string, FilterPrimitive>)[key] = Number.isFinite(parsed)
         ? parsed
@@ -51,14 +51,14 @@ export function buildFilterQuery<T extends FilterDefaults>(
   const params = new URLSearchParams(currentSearchParams.toString());
 
   for (const key of Object.keys(updates)) {
-    const value = (updates as Record<string, FilterPrimitive | undefined | null>)[
-      key
-    ];
+    const value = (
+      updates as Record<string, FilterPrimitive | undefined | null>
+    )[key];
     const defaultValue = defaults[key as keyof T];
     const isDefault =
       value === undefined ||
       value === null ||
-      value === "" ||
+      value === '' ||
       value === defaultValue;
     if (isDefault) {
       params.delete(key);
@@ -67,7 +67,7 @@ export function buildFilterQuery<T extends FilterDefaults>(
     }
   }
 
-  const pageKey = options?.pageKey ?? (("page" in defaults) ? "page" : undefined);
+  const pageKey = options?.pageKey ?? ('page' in defaults ? 'page' : undefined);
   if (options?.resetPage && pageKey && !(String(pageKey) in updates)) {
     params.delete(String(pageKey));
   }

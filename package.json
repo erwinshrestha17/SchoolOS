@@ -7,7 +7,7 @@
     "compile:artifacts": "node scripts/compile-artifacts.mjs",
     "dev": "pnpm compile:artifacts && pnpm check:core-imports && pnpm --filter @schoolos/core build && pnpm check:core-dist && pnpm --parallel --filter @schoolos/api --filter @schoolos/web dev",
     "build": "pnpm compile:artifacts && pnpm check:core-imports && pnpm --filter @schoolos/core build && pnpm check:core-dist && pnpm --filter @schoolos/api build && pnpm --filter @schoolos/web build",
-    "lint": "pnpm compile:artifacts && pnpm check:core-imports && pnpm --filter @schoolos/api format:check && pnpm --filter @schoolos/web lint",
+    "lint": "pnpm compile:artifacts && pnpm check:core-imports && pnpm format:check && pnpm --filter @schoolos/api lint:check && pnpm --filter @schoolos/web lint",
     "typecheck": "pnpm compile:artifacts && pnpm check:core-imports && pnpm --filter @schoolos/core typecheck && pnpm --filter @schoolos/core build && pnpm check:core-dist && pnpm --filter @schoolos/api typecheck && pnpm --filter @schoolos/web typecheck",
     "test": "pnpm compile:artifacts && pnpm check:core-imports && pnpm --filter @schoolos/api test && pnpm --filter @schoolos/web test",
     "test:e2e": "pnpm --filter @schoolos/api test:e2e",
@@ -96,6 +96,10 @@
     "ga:verify:wave3": "node scripts/ga-program-verify.mjs wave3",
     "ga:verify:wave4": "node scripts/ga-program-verify.mjs wave4",
     "ga:verify:wave5": "node scripts/ga-program-verify.mjs wave5",
-    "ga:verify:wave6": "node scripts/ga-program-verify.mjs wave6"
+    "ga:verify:wave6": "node scripts/ga-program-verify.mjs wave6",
+    "format:check": "pnpm --filter @schoolos/core format:check && pnpm --filter @schoolos/api format:check && pnpm --filter @schoolos/web format:check"
+  },
+  "devDependencies": {
+    "prettier": "3.8.3"
   }
 }

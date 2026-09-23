@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useId, useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useId, useMemo, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import {
   CheckCircle2,
   Circle,
@@ -10,14 +10,14 @@ import {
   EyeOff,
   KeyRound,
   ShieldCheck,
-} from "lucide-react";
-import { api, ApiRequestError } from "../../lib/api";
-import { useSession } from "../session-provider";
-import { SettingsPageHeader } from "../settings/settings-page-header";
-import { Button } from "../ui/button";
+} from 'lucide-react';
+import { api, ApiRequestError } from '../../lib/api';
+import { useSession } from '../session-provider';
+import { SettingsPageHeader } from '../settings/settings-page-header';
+import { Button } from '../ui/button';
 
 type Notice = {
-  kind: "success" | "error";
+  kind: 'success' | 'error';
   text: string;
 };
 
@@ -29,9 +29,9 @@ type PasswordDraft = {
 };
 
 type PasswordFieldName =
-  | "currentPassword"
-  | "newPassword"
-  | "confirmNewPassword";
+  | 'currentPassword'
+  | 'newPassword'
+  | 'confirmNewPassword';
 
 type PasswordFieldErrors = Partial<Record<PasswordFieldName, string>>;
 
@@ -43,26 +43,26 @@ type PasswordRule = {
 };
 
 const initialDraft: PasswordDraft = {
-  currentPassword: "",
-  newPassword: "",
-  confirmNewPassword: "",
+  currentPassword: '',
+  newPassword: '',
+  confirmNewPassword: '',
   logoutOtherDevices: true,
 };
 
 const COMMON_PASSWORDS = new Set([
-  "admin123",
-  "password123",
-  "school123",
-  "qwerty123",
-  "welcome123",
-  "letmein123",
+  'admin123',
+  'password123',
+  'school123',
+  'qwerty123',
+  'welcome123',
+  'letmein123',
 ]);
 
 export function AccountSecurityWorkspace({
-  plane = "dashboard",
+  plane = 'dashboard',
   embedded,
 }: {
-  plane?: "dashboard" | "platform";
+  plane?: 'dashboard' | 'platform';
   embedded?: boolean;
 }) {
   const { session, refreshSession } = useSession();
@@ -74,7 +74,7 @@ export function AccountSecurityWorkspace({
   >({});
   const [serverFieldErrors, setServerFieldErrors] =
     useState<PasswordFieldErrors>({});
-  const isEmbedded = embedded ?? plane === "dashboard";
+  const isEmbedded = embedded ?? plane === 'dashboard';
 
   const passwordRules = useMemo(
     () => getPasswordRules(draft.newPassword, session?.user.email ?? null),
@@ -99,13 +99,13 @@ export function AccountSecurityWorkspace({
       draft.confirmNewPassword.length > 0;
 
     if (showCurrentError && !draft.currentPassword) {
-      errors.currentPassword = "Enter your current password.";
+      errors.currentPassword = 'Enter your current password.';
     }
 
     if (showNewError) {
       const newPasswordError = draft.newPassword
         ? passwordIssues[0]
-        : "Enter a new password.";
+        : 'Enter a new password.';
       if (newPasswordError) {
         errors.newPassword = newPasswordError;
       }
@@ -113,9 +113,9 @@ export function AccountSecurityWorkspace({
 
     if (showConfirmationError) {
       const confirmationError = !draft.confirmNewPassword
-        ? "Confirm your new password."
+        ? 'Confirm your new password.'
         : draft.newPassword !== draft.confirmNewPassword
-          ? "Confirm password must match new password."
+          ? 'Confirm password must match new password.'
           : undefined;
       if (confirmationError) {
         errors.confirmNewPassword = confirmationError;
@@ -148,10 +148,10 @@ export function AccountSecurityWorkspace({
       setServerFieldErrors({});
       await refreshSession();
       setNotice({
-        kind: "success",
+        kind: 'success',
         text:
           result.message ||
-          "Password changed. For your security, other sessions have been signed out.",
+          'Password changed. For your security, other sessions have been signed out.',
       });
     },
     onError: (error) => {
@@ -164,7 +164,7 @@ export function AccountSecurityWorkspace({
         return;
       }
       setNotice({
-        kind: "error",
+        kind: 'error',
         text: friendlyPasswordError(error),
       });
     },
@@ -211,17 +211,17 @@ export function AccountSecurityWorkspace({
 
   const forceChange = session?.user.mustChangePassword ?? false;
   const accent =
-    plane === "platform"
-      ? "border-indigo-200 bg-indigo-50 text-indigo-950"
-      : "border-slate-200 bg-white text-slate-950";
+    plane === 'platform'
+      ? 'border-indigo-200 bg-indigo-50 text-indigo-950'
+      : 'border-slate-200 bg-white text-slate-950';
 
   return (
-    <div className={isEmbedded ? "space-y-6 p-6 pb-24" : "space-y-6"}>
+    <div className={isEmbedded ? 'space-y-6 p-6 pb-24' : 'space-y-6'}>
       {isEmbedded ? (
         <SettingsPageHeader
           title="Account & Security"
           description="Change your password and control what happens to other signed-in devices."
-          scope={{ type: "personal", label: "Personal setting" }}
+          scope={{ type: 'personal', label: 'Personal setting' }}
           access="can-manage"
         />
       ) : (
@@ -238,8 +238,8 @@ export function AccountSecurityWorkspace({
                 Account &amp; Security
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Change your SchoolOS password
-                session. Other signed-in devices are signed out by default.
+                Change your SchoolOS password session. Other signed-in devices
+                are signed out by default.
               </p>
             </div>
           </div>
@@ -258,15 +258,15 @@ export function AccountSecurityWorkspace({
 
       {notice ? (
         <div
-          role={notice.kind === "error" ? "alert" : "status"}
+          role={notice.kind === 'error' ? 'alert' : 'status'}
           aria-live="polite"
           className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${
-            notice.kind === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-rose-200 bg-rose-50 text-rose-800"
+            notice.kind === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              : 'border-rose-200 bg-rose-50 text-rose-800'
           }`}
         >
-          {notice.kind === "success" ? (
+          {notice.kind === 'success' ? (
             <CheckCircle2
               className="mt-0.5 h-4 w-4 shrink-0"
               aria-hidden="true"
@@ -300,24 +300,24 @@ export function AccountSecurityWorkspace({
               autoComplete="current-password"
               value={draft.currentPassword}
               error={fieldErrors.currentPassword}
-              onBlur={() => markFieldTouched("currentPassword")}
-              onChange={(value) => updateField("currentPassword", value)}
+              onBlur={() => markFieldTouched('currentPassword')}
+              onChange={(value) => updateField('currentPassword', value)}
             />
             <PasswordField
               label="New password"
               autoComplete="new-password"
               value={draft.newPassword}
               error={fieldErrors.newPassword}
-              onBlur={() => markFieldTouched("newPassword")}
-              onChange={(value) => updateField("newPassword", value)}
+              onBlur={() => markFieldTouched('newPassword')}
+              onChange={(value) => updateField('newPassword', value)}
             />
             <PasswordField
               label="Confirm new password"
               autoComplete="new-password"
               value={draft.confirmNewPassword}
               error={fieldErrors.confirmNewPassword}
-              onBlur={() => markFieldTouched("confirmNewPassword")}
-              onChange={(value) => updateField("confirmNewPassword", value)}
+              onBlur={() => markFieldTouched('confirmNewPassword')}
+              onChange={(value) => updateField('confirmNewPassword', value)}
             />
             <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <input
@@ -345,7 +345,7 @@ export function AccountSecurityWorkspace({
           <div className="mt-5 flex justify-end">
             <Button type="submit" disabled={mutation.isPending}>
               <KeyRound className="h-4 w-4" aria-hidden="true" />
-              {mutation.isPending ? "Changing password..." : "Change password"}
+              {mutation.isPending ? 'Changing password...' : 'Change password'}
             </Button>
           </div>
         </form>
@@ -356,14 +356,14 @@ export function AccountSecurityWorkspace({
             {passwordRules.map((rule) => {
               const status =
                 draft.newPassword.length === 0
-                  ? "neutral"
+                  ? 'neutral'
                   : rule.met
-                    ? "met"
-                    : "unmet";
+                    ? 'met'
+                    : 'unmet';
               const Icon =
-                status === "met"
+                status === 'met'
                   ? CheckCircle2
-                  : status === "unmet"
+                  : status === 'unmet'
                     ? CircleAlert
                     : Circle;
 
@@ -375,11 +375,11 @@ export function AccountSecurityWorkspace({
                   <span className="flex min-w-0 gap-2">
                     <Icon
                       className={`mt-0.5 h-4 w-4 shrink-0 ${
-                        status === "met"
-                          ? "text-emerald-600"
-                          : status === "unmet"
-                            ? "text-rose-600"
-                            : "text-slate-300"
+                        status === 'met'
+                          ? 'text-emerald-600'
+                          : status === 'unmet'
+                            ? 'text-rose-600'
+                            : 'text-slate-300'
                       }`}
                       aria-hidden="true"
                     />
@@ -387,18 +387,18 @@ export function AccountSecurityWorkspace({
                   </span>
                   <span
                     className={`shrink-0 text-xs font-bold ${
-                      status === "met"
-                        ? "text-emerald-700"
-                        : status === "unmet"
-                          ? "text-rose-700"
-                          : "text-slate-400"
+                      status === 'met'
+                        ? 'text-emerald-700'
+                        : status === 'unmet'
+                          ? 'text-rose-700'
+                          : 'text-slate-400'
                     }`}
                   >
-                    {status === "met"
-                      ? "Met"
-                      : status === "unmet"
-                        ? "Not met"
-                        : "Required"}
+                    {status === 'met'
+                      ? 'Met'
+                      : status === 'unmet'
+                        ? 'Not met'
+                        : 'Required'}
                   </span>
                 </li>
               );
@@ -440,7 +440,7 @@ function PasswordField({
       <div className="relative mt-2">
         <input
           id={inputId}
-          type={visible ? "text" : "password"}
+          type={visible ? 'text' : 'password'}
           value={value}
           required
           autoComplete={autoComplete}
@@ -450,14 +450,14 @@ function PasswordField({
           onChange={(event) => onChange(event.target.value)}
           className={`h-11 w-full rounded-lg border bg-white px-3 pr-12 text-sm outline-none focus:ring-2 ${
             error
-              ? "border-rose-300 focus:border-rose-500 focus:ring-rose-100"
-              : "border-slate-200 focus:border-slate-500 focus:ring-slate-900/5"
+              ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-100'
+              : 'border-slate-200 focus:border-slate-500 focus:ring-slate-900/5'
           }`}
         />
         <button
           type="button"
           className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--primary)]"
-          aria-label={`${visible ? "Hide" : "Show"} ${label.toLowerCase()}`}
+          aria-label={`${visible ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
           aria-pressed={visible}
           onClick={() => setVisible((current) => !current)}
         >
@@ -487,45 +487,45 @@ function getPasswordRules(password: string, email: string | null) {
 
   return [
     {
-      id: "length",
-      label: "Minimum 8 characters",
-      issue: "Password must be at least 8 characters.",
+      id: 'length',
+      label: 'Minimum 8 characters',
+      issue: 'Password must be at least 8 characters.',
       met: password.length >= 8,
     },
     {
-      id: "uppercase",
-      label: "At least 1 uppercase letter",
-      issue: "Password needs an uppercase letter.",
+      id: 'uppercase',
+      label: 'At least 1 uppercase letter',
+      issue: 'Password needs an uppercase letter.',
       met: /[A-Z]/.test(password),
     },
     {
-      id: "lowercase",
-      label: "At least 1 lowercase letter",
-      issue: "Password needs a lowercase letter.",
+      id: 'lowercase',
+      label: 'At least 1 lowercase letter',
+      issue: 'Password needs a lowercase letter.',
       met: /[a-z]/.test(password),
     },
     {
-      id: "number",
-      label: "At least 1 number",
-      issue: "Password needs a number.",
+      id: 'number',
+      label: 'At least 1 number',
+      issue: 'Password needs a number.',
       met: /\d/.test(password),
     },
     {
-      id: "symbol",
-      label: "At least 1 symbol",
-      issue: "Password needs a symbol.",
+      id: 'symbol',
+      label: 'At least 1 symbol',
+      issue: 'Password needs a symbol.',
       met: /[^A-Za-z0-9]/.test(password),
     },
     {
-      id: "identity",
-      label: "Does not include your email",
-      issue: "Password must not include your account details.",
+      id: 'identity',
+      label: 'Does not include your email',
+      issue: 'Password must not include your account details.',
       met: !emailParts.some((part) => normalized.includes(part)),
     },
     {
-      id: "common",
-      label: "Is not a common school password",
-      issue: "Password must not use a common school password.",
+      id: 'common',
+      label: 'Is not a common school password',
+      issue: 'Password must not use a common school password.',
       met: !COMMON_PASSWORDS.has(normalized),
     },
   ] satisfies PasswordRule[];
@@ -539,27 +539,27 @@ function getServerFieldError(
   }
 
   const normalizedMessage = error.message.toLowerCase();
-  if (normalizedMessage.includes("confirm password")) {
+  if (normalizedMessage.includes('confirm password')) {
     return {
-      field: "confirmNewPassword",
-      message: "Confirm password must match new password.",
+      field: 'confirmNewPassword',
+      message: 'Confirm password must match new password.',
     };
   }
   if (
-    normalizedMessage.includes("new password") ||
-    normalizedMessage.includes("password must")
+    normalizedMessage.includes('new password') ||
+    normalizedMessage.includes('password must')
   ) {
     return {
-      field: "newPassword",
-      message: normalizedMessage.includes("same as current")
-        ? "Choose a new password that is different from your current password."
-        : "Choose a stronger password that meets every requirement.",
+      field: 'newPassword',
+      message: normalizedMessage.includes('same as current')
+        ? 'Choose a new password that is different from your current password.'
+        : 'Choose a stronger password that meets every requirement.',
     };
   }
-  if (normalizedMessage.includes("current password")) {
+  if (normalizedMessage.includes('current password')) {
     return {
-      field: "currentPassword",
-      message: "Current password is incorrect.",
+      field: 'currentPassword',
+      message: 'Current password is incorrect.',
     };
   }
 
@@ -568,20 +568,20 @@ function getServerFieldError(
 
 function friendlyPasswordError(error: unknown) {
   if (!(error instanceof ApiRequestError)) {
-    return "Network error. Please retry when your connection is stable.";
+    return 'Network error. Please retry when your connection is stable.';
   }
 
   if (error.statusCode === 401) {
-    return "Your session expired. Sign in again before changing your password.";
+    return 'Your session expired. Sign in again before changing your password.';
   }
 
   if (error.statusCode === 403) {
-    return "This account is not allowed to change password right now.";
+    return 'This account is not allowed to change password right now.';
   }
 
   if (error.statusCode === 429) {
-    return "Too many password attempts. Wait a moment, then try again.";
+    return 'Too many password attempts. Wait a moment, then try again.';
   }
 
-  return "Could not change password. Please try again.";
+  return 'Could not change password. Please try again.';
 }

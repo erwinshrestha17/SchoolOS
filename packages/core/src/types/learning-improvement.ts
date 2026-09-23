@@ -1,67 +1,61 @@
 export type LearningOutcomeDomain =
-  | 'GENERAL'
-  | 'FOUNDATIONAL_READING'
-  | 'FOUNDATIONAL_NUMERACY';
+  | "GENERAL"
+  | "FOUNDATIONAL_READING"
+  | "FOUNDATIONAL_NUMERACY";
 
 export type LearningMasteryStatus =
-  | 'BEGINNING'
-  | 'DEVELOPING'
-  | 'SECURE'
-  | 'EXTENDING';
+  | "BEGINNING"
+  | "DEVELOPING"
+  | "SECURE"
+  | "EXTENDING";
 
 export type FormativeAssessmentKind =
-  | 'OBSERVATION'
-  | 'EXIT_TICKET'
-  | 'QUIZ'
-  | 'ORAL'
-  | 'PRACTICAL'
-  | 'CHECKLIST'
-  | 'REASSESSMENT';
+  | "OBSERVATION"
+  | "EXIT_TICKET"
+  | "QUIZ"
+  | "ORAL"
+  | "PRACTICAL"
+  | "CHECKLIST"
+  | "REASSESSMENT";
 
 export type StudentInterventionStatus =
-  | 'OPEN'
-  | 'IN_PROGRESS'
-  | 'MONITORING'
-  | 'RESOLVED'
-  | 'CLOSED';
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "MONITORING"
+  | "RESOLVED"
+  | "CLOSED";
 
-export type StudentInterventionPriority =
-  | 'ROUTINE'
-  | 'IMPORTANT'
-  | 'URGENT';
+export type StudentInterventionPriority = "ROUTINE" | "IMPORTANT" | "URGENT";
 
 export type StudentInterventionEntryType =
-  | 'NOTE'
-  | 'PARENT_CONTACT'
-  | 'ACTION'
-  | 'FOLLOW_UP'
-  | 'PROGRESS'
-  | 'ESCALATION'
-  | 'RESOLUTION';
+  | "NOTE"
+  | "PARENT_CONTACT"
+  | "ACTION"
+  | "FOLLOW_UP"
+  | "PROGRESS"
+  | "ESCALATION"
+  | "RESOLUTION";
 
 export type RemedialGroupStatus =
-  | 'PLANNED'
-  | 'ACTIVE'
-  | 'COMPLETED'
-  | 'CANCELLED';
+  | "PLANNED"
+  | "ACTIVE"
+  | "COMPLETED"
+  | "CANCELLED";
 
 export type CurriculumProgressStatus =
-  | 'PLANNED'
-  | 'COMPLETED'
-  | 'MISSED'
-  | 'RETEACH_REQUIRED';
+  | "PLANNED"
+  | "COMPLETED"
+  | "MISSED"
+  | "RETEACH_REQUIRED";
 
-export type ParentLearningGuidanceStatus =
-  | 'DRAFT'
-  | 'PUBLISHED'
-  | 'ARCHIVED';
+export type ParentLearningGuidanceStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 
 export type LearningImprovementSourceState =
-  | 'available'
-  | 'empty'
-  | 'partial'
-  | 'locked'
-  | 'unavailable';
+  | "available"
+  | "empty"
+  | "partial"
+  | "locked"
+  | "unavailable";
 
 export type LearningImprovementPage<T> = {
   items: T[];
@@ -104,10 +98,7 @@ export type LearningOutcomeRecord = {
 
 export type FormativeAssessmentEvidenceRecord = {
   id: string;
-  outcome: Pick<
-    LearningOutcomeRecord,
-    'id' | 'code' | 'title' | 'domain'
-  >;
+  outcome: Pick<LearningOutcomeRecord, "id" | "code" | "title" | "domain">;
   student: LearningImprovementStudentRef;
   academicYearId: string;
   subject: LearningImprovementSubjectRef;
@@ -125,10 +116,7 @@ export type FormativeAssessmentEvidenceRecord = {
 };
 
 export type LearningOutcomeProgress = {
-  outcome: Pick<
-    LearningOutcomeRecord,
-    'id' | 'code' | 'title' | 'domain'
-  >;
+  outcome: Pick<LearningOutcomeRecord, "id" | "code" | "title" | "domain">;
   latestMasteryStatus: LearningMasteryStatus;
   latestAssessedOn: string;
   previousMasteryStatus: LearningMasteryStatus | null;
@@ -137,14 +125,14 @@ export type LearningOutcomeProgress = {
 };
 
 export type StudentEarlyWarningReasonCode =
-  | 'ATTENDANCE_PATTERN'
-  | 'FORMATIVE_SUPPORT'
-  | 'HOMEWORK_FOLLOW_UP';
+  | "ATTENDANCE_PATTERN"
+  | "FORMATIVE_SUPPORT"
+  | "HOMEWORK_FOLLOW_UP";
 
 export type StudentEarlyWarningItem = {
   signalKey: string;
   student: LearningImprovementStudentRef;
-  attentionLevel: 'WATCH' | 'NEEDS_ATTENTION';
+  attentionLevel: "WATCH" | "NEEDS_ATTENTION";
   reasons: Array<{
     code: StudentEarlyWarningReasonCode;
     label: string;
@@ -161,11 +149,12 @@ export type StudentEarlyWarningItem = {
   generatedAt: string;
 };
 
-export type StudentEarlyWarningResponse = LearningImprovementPage<StudentEarlyWarningItem> & {
-  generatedAt: string;
-  rulesVersion: 'stage3-v1';
-  nonPredictive: true;
-};
+export type StudentEarlyWarningResponse =
+  LearningImprovementPage<StudentEarlyWarningItem> & {
+    generatedAt: string;
+    rulesVersion: "stage3-v1";
+    nonPredictive: true;
+  };
 
 export type StudentInterventionEntryRecord = {
   id: string;
@@ -204,7 +193,7 @@ export type RemedialGroupRecord = {
   classId: string;
   sectionId: string | null;
   subject: LearningImprovementSubjectRef;
-  outcome: Pick<LearningOutcomeRecord, 'id' | 'code' | 'title'> | null;
+  outcome: Pick<LearningOutcomeRecord, "id" | "code" | "title"> | null;
   teacher: { id: string; fullName: string };
   name: string;
   purpose: string;
@@ -224,7 +213,7 @@ export type CurriculumProgressItemRecord = {
   classId: string;
   sectionId: string | null;
   subject: LearningImprovementSubjectRef;
-  outcome: Pick<LearningOutcomeRecord, 'id' | 'code' | 'title'> | null;
+  outcome: Pick<LearningOutcomeRecord, "id" | "code" | "title"> | null;
   teacher: { id: string; fullName: string };
   title: string;
   status: CurriculumProgressStatus;
@@ -245,7 +234,7 @@ export type CurriculumProgressSummary = {
   missed: number;
   reteachRequired: number;
   completionPercent: number | null;
-  paceState: 'on_track' | 'attention_needed' | 'unavailable';
+  paceState: "on_track" | "attention_needed" | "unavailable";
 };
 
 export type ParentLearningGuidanceRecord = {
@@ -254,7 +243,10 @@ export type ParentLearningGuidanceRecord = {
   student: LearningImprovementStudentRef;
   academicYearId: string;
   subject: LearningImprovementSubjectRef;
-  outcome: Pick<LearningOutcomeRecord, 'id' | 'code' | 'title' | 'domain'> | null;
+  outcome: Pick<
+    LearningOutcomeRecord,
+    "id" | "code" | "title" | "domain"
+  > | null;
   remedialGroup: {
     id: string;
     name: string;

@@ -4,7 +4,15 @@ import type {
   AdmissionApplication,
   CreateAdmissionApplicationPayload,
 } from '@schoolos/core';
-import { isValidDateOfBirth, isValidEmail, isValidPersonName, normalizeEmail, normalizeNepalPhone, normalizePersonName, tryNormalizeNepalPhone } from '@schoolos/core';
+import {
+  isValidDateOfBirth,
+  isValidEmail,
+  isValidPersonName,
+  normalizeEmail,
+  normalizeNepalPhone,
+  normalizePersonName,
+  tryNormalizeNepalPhone,
+} from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ClipboardList, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -87,18 +95,48 @@ export function AdmissionApplicationForm() {
     event.preventDefault();
     setValidationError('');
 
-    if (!isValidPersonName(form.firstNameEn) || !isValidPersonName(form.lastNameEn)) {
-      setValidationError('Enter valid student names using Nepali or English letters.');
+    if (
+      !isValidPersonName(form.firstNameEn) ||
+      !isValidPersonName(form.lastNameEn)
+    ) {
+      setValidationError(
+        'Enter valid student names using Nepali or English letters.',
+      );
       return;
     }
-    if (form.dateOfBirth && !isValidDateOfBirth(form.dateOfBirth)) { setValidationError('Enter a valid date of birth.'); return; }
-    if (form.guardianFullName && !isValidPersonName(form.guardianFullName)) { setValidationError('Enter a valid guardian name.'); return; }
-    if (form.guardianPhone && !tryNormalizeNepalPhone(form.guardianPhone)) { setValidationError('Enter a valid NTC or Ncell guardian number.'); return; }
-    if (form.guardianEmail && !isValidEmail(form.guardianEmail)) { setValidationError('Enter a valid guardian email.'); return; }
+    if (form.dateOfBirth && !isValidDateOfBirth(form.dateOfBirth)) {
+      setValidationError('Enter a valid date of birth.');
+      return;
+    }
+    if (form.guardianFullName && !isValidPersonName(form.guardianFullName)) {
+      setValidationError('Enter a valid guardian name.');
+      return;
+    }
+    if (form.guardianPhone && !tryNormalizeNepalPhone(form.guardianPhone)) {
+      setValidationError('Enter a valid NTC or Ncell guardian number.');
+      return;
+    }
+    if (form.guardianEmail && !isValidEmail(form.guardianEmail)) {
+      setValidationError('Enter a valid guardian email.');
+      return;
+    }
 
     mutation.mutate(
       Object.fromEntries(
-        Object.entries({ ...form, firstNameEn: normalizePersonName(form.firstNameEn), lastNameEn: normalizePersonName(form.lastNameEn), guardianFullName: form.guardianFullName ? normalizePersonName(form.guardianFullName) : '', guardianPhone: form.guardianPhone ? normalizeNepalPhone(form.guardianPhone) : '', guardianEmail: form.guardianEmail ? normalizeEmail(form.guardianEmail) : '' }).filter(([, value]) => value !== ''),
+        Object.entries({
+          ...form,
+          firstNameEn: normalizePersonName(form.firstNameEn),
+          lastNameEn: normalizePersonName(form.lastNameEn),
+          guardianFullName: form.guardianFullName
+            ? normalizePersonName(form.guardianFullName)
+            : '',
+          guardianPhone: form.guardianPhone
+            ? normalizeNepalPhone(form.guardianPhone)
+            : '',
+          guardianEmail: form.guardianEmail
+            ? normalizeEmail(form.guardianEmail)
+            : '',
+        }).filter(([, value]) => value !== ''),
       ) as CreateAdmissionApplicationPayload,
     );
   }
@@ -137,8 +175,8 @@ export function AdmissionApplicationForm() {
               <StatusBadge status={created.status} />
             </div>
             <p className="mt-2 text-sm text-slate-600">
-              {created.fullNameEn} is now in the persisted admission
-              application workflow.
+              {created.fullNameEn} is now in the persisted admission application
+              workflow.
             </p>
             {duplicateCount > 0 ? (
               <p className="mt-3 rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm font-semibold text-warning-800">
@@ -230,9 +268,7 @@ export function AdmissionApplicationForm() {
           <Field label="Academic year">
             <select
               value={form.academicYearId}
-              onChange={(event) =>
-                update('academicYearId', event.target.value)
-              }
+              onChange={(event) => update('academicYearId', event.target.value)}
               disabled={setupLoading}
             >
               <option value="">Not selected</option>
@@ -401,7 +437,9 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className={`block space-y-2 text-sm font-bold text-slate-700 ${className}`}>
+    <label
+      className={`block space-y-2 text-sm font-bold text-slate-700 ${className}`}
+    >
       <span>
         {label}
         {required ? <span className="text-danger-600"> *</span> : null}

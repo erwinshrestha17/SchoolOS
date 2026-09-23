@@ -119,7 +119,9 @@ export function GlobalStudentSearch() {
   function goToResult(entry: SearchResultEntry) {
     clearSearch();
     if (entry.kind === 'student') {
-      router.push(`/dashboard/students/${encodeURIComponent(entry.student.id)}`);
+      router.push(
+        `/dashboard/students/${encodeURIComponent(entry.student.id)}`,
+      );
       return;
     }
 
@@ -198,9 +200,7 @@ export function GlobalStudentSearch() {
               Type at least 2 characters to search.
             </div>
           ) : isSearching ? (
-            <div className="px-4 py-3 text-sm text-gray-500">
-              Searching...
-            </div>
+            <div className="px-4 py-3 text-sm text-gray-500">Searching...</div>
           ) : searchError ? (
             <div className="px-4 py-3 text-sm text-danger-700">
               Could not search: {searchError.message}
@@ -221,15 +221,22 @@ export function GlobalStudentSearch() {
                     type="button"
                     data-testid="global-student-search-result"
                     className={`grid w-full gap-1 px-4 py-3 text-left transition hover:bg-[var(--primary-soft)] ${
-                      index === activeIndex ? 'bg-[var(--primary-soft)]' : 'bg-white'
+                      index === activeIndex
+                        ? 'bg-[var(--primary-soft)]'
+                        : 'bg-white'
                     }`}
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => goToResult(entry)}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <p className="flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-gray-950">
-                        <UserRound size={13} className="shrink-0 text-gray-400" />
-                        <span className="truncate">{entry.student.fullNameEn}</span>
+                        <UserRound
+                          size={13}
+                          className="shrink-0 text-gray-400"
+                        />
+                        <span className="truncate">
+                          {entry.student.fullNameEn}
+                        </span>
                       </p>
                       <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[0.68rem] font-semibold text-gray-600">
                         {entry.student.studentSystemId}
@@ -237,15 +244,21 @@ export function GlobalStudentSearch() {
                     </div>
                     <p className="truncate text-xs text-gray-500">
                       {entry.student.className}
-                      {entry.student.sectionName ? ` - ${entry.student.sectionName}` : ''}
-                      {entry.student.rollNumber ? ` / Roll ${entry.student.rollNumber}` : ''}
+                      {entry.student.sectionName
+                        ? ` - ${entry.student.sectionName}`
+                        : ''}
+                      {entry.student.rollNumber
+                        ? ` / Roll ${entry.student.rollNumber}`
+                        : ''}
                       {entry.student.admissionNumber
                         ? ` / Admission ${entry.student.admissionNumber}`
                         : ''}
                     </p>
                     <p className="truncate text-xs text-gray-400">
                       {entry.student.guardianName || 'Guardian unavailable'}
-                      {entry.student.guardianPhone ? ` / ${entry.student.guardianPhone}` : ''}
+                      {entry.student.guardianPhone
+                        ? ` / ${entry.student.guardianPhone}`
+                        : ''}
                     </p>
                   </button>
                 ) : (
@@ -254,15 +267,22 @@ export function GlobalStudentSearch() {
                     type="button"
                     data-testid="global-invoice-search-result"
                     className={`grid w-full gap-1 px-4 py-3 text-left transition hover:bg-[var(--primary-soft)] ${
-                      index === activeIndex ? 'bg-[var(--primary-soft)]' : 'bg-white'
+                      index === activeIndex
+                        ? 'bg-[var(--primary-soft)]'
+                        : 'bg-white'
                     }`}
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => goToResult(entry)}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <p className="flex min-w-0 items-center gap-1.5 truncate text-sm font-semibold text-gray-950">
-                        <FileText size={13} className="shrink-0 text-gray-400" />
-                        <span className="truncate">{entry.invoice.invoiceNumber}</span>
+                        <FileText
+                          size={13}
+                          className="shrink-0 text-gray-400"
+                        />
+                        <span className="truncate">
+                          {entry.invoice.invoiceNumber}
+                        </span>
                       </p>
                       <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[0.68rem] font-semibold text-gray-600">
                         {entry.invoice.status}
@@ -295,7 +315,10 @@ async function searchStudents(query: string) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
+    throw new Error(
+      parseApiErrorMessage(text) ||
+        `Request failed with status ${response.status}`,
+    );
   }
 
   const payload = (await response.json()) as ApiResponse<StudentSearchResult[]>;
@@ -308,7 +331,10 @@ function parseApiErrorMessage(text: string) {
   }
 
   try {
-    const payload = JSON.parse(text) as { message?: string | string[]; error?: string };
+    const payload = JSON.parse(text) as {
+      message?: string | string[];
+      error?: string;
+    };
     return Array.isArray(payload.message)
       ? payload.message.join(', ')
       : payload.message || payload.error || text;

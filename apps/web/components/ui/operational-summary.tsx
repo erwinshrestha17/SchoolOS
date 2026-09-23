@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   formatBsDateTime,
@@ -7,82 +7,82 @@ import {
   type OperationalSummaryMetricValue,
   type OperationalSummaryRouteModule,
   type OperationalSummaryStatus,
-} from "@schoolos/core";
-import { AlertTriangle, ArrowRight, Clock3, RefreshCw } from "lucide-react";
-import Link from "next/link";
-import { useMemo } from "react";
-import { ErrorState } from "./error-state";
-import { LoadingState } from "./loading-state";
-import { ModuleLockedState } from "./module-locked-state";
-import { SectionCard } from "./section-card";
-import { StatusBadge, type StatusTone } from "./status-badge";
+} from '@schoolos/core';
+import { AlertTriangle, ArrowRight, Clock3, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
+import { useMemo } from 'react';
+import { ErrorState } from './error-state';
+import { LoadingState } from './loading-state';
+import { ModuleLockedState } from './module-locked-state';
+import { SectionCard } from './section-card';
+import { StatusBadge, type StatusTone } from './status-badge';
 
 const moduleLabels: Record<OperationalSummaryRouteModule, string> = {
-  students: "Students",
-  attendance: "Attendance",
-  fees: "Fees",
-  academics: "Academics",
-  activity: "Activity Feed",
-  "homework-timetable": "Homework & Timetable",
-  "hr-payroll": "HR & Payroll",
-  library: "Library",
-  transport: "Transport",
-  canteen: "Canteen",
-  accounting: "Accounting",
-  communications: "Notices & Announcements",
-  intelligence: "M14 Intelligence / AI",
-  learning: "M13 Learning",
+  students: 'Students',
+  attendance: 'Attendance',
+  fees: 'Fees',
+  academics: 'Academics',
+  activity: 'Activity Feed',
+  'homework-timetable': 'Homework & Timetable',
+  'hr-payroll': 'HR & Payroll',
+  library: 'Library',
+  transport: 'Transport',
+  canteen: 'Canteen',
+  accounting: 'Accounting',
+  communications: 'Notices & Announcements',
+  intelligence: 'M14 Intelligence / AI',
+  learning: 'M13 Learning',
 };
 
 /** Never navigate with an arbitrary route sent by an API response. */
 const APPROVED_DASHBOARD_ROUTES = new Set([
-  "/dashboard/students",
-  "/dashboard/admissions",
-  "/dashboard/admissions/documents",
-  "/dashboard/admissions/duplicates",
-  "/dashboard/admissions/qr",
-  "/dashboard/admissions/iemis",
-  "/dashboard/attendance",
-  "/dashboard/attendance/register",
-  "/dashboard/attendance/corrections",
-  "/dashboard/fees",
-  "/dashboard/fees/invoices",
-  "/dashboard/fees/adjustments",
-  "/dashboard/fees/cashier-close",
-  "/dashboard/academics",
-  "/dashboard/academics/marks",
-  "/dashboard/academics/report-cards",
-  "/dashboard/activity",
-  "/dashboard/activity/moderation",
-  "/dashboard/activity/gallery",
-  "/dashboard/activity/deliveries",
-  "/dashboard/homework",
-  "/dashboard/homework/review",
-  "/dashboard/timetable/substitutions",
-  "/dashboard/hr",
-  "/dashboard/hr/leave",
-  "/dashboard/hr/attendance",
-  "/dashboard/hr/contracts",
-  "/dashboard/payroll",
-  "/dashboard/payroll/runs",
-  "/dashboard/library",
-  "/dashboard/library/overdue",
-  "/dashboard/transport",
-  "/dashboard/transport/trips",
-  "/dashboard/transport/location",
-  "/dashboard/transport/vehicles",
-  "/dashboard/canteen",
-  "/dashboard/canteen/stock",
-  "/dashboard/accounting",
-  "/dashboard/accounting/journals",
-  "/dashboard/accounting/reconciliation",
-  "/dashboard/accounting/fiscal-periods",
-  "/dashboard/notices",
-  "/dashboard/notifications/deliveries",
-  "/dashboard/learning",
-  "/dashboard/learning/sessions",
-  "/dashboard/learning/resources",
-  "/dashboard/settings",
+  '/dashboard/students',
+  '/dashboard/admissions',
+  '/dashboard/admissions/documents',
+  '/dashboard/admissions/duplicates',
+  '/dashboard/admissions/qr',
+  '/dashboard/admissions/iemis',
+  '/dashboard/attendance',
+  '/dashboard/attendance/register',
+  '/dashboard/attendance/corrections',
+  '/dashboard/fees',
+  '/dashboard/fees/invoices',
+  '/dashboard/fees/adjustments',
+  '/dashboard/fees/cashier-close',
+  '/dashboard/academics',
+  '/dashboard/academics/marks',
+  '/dashboard/academics/report-cards',
+  '/dashboard/activity',
+  '/dashboard/activity/moderation',
+  '/dashboard/activity/gallery',
+  '/dashboard/activity/deliveries',
+  '/dashboard/homework',
+  '/dashboard/homework/review',
+  '/dashboard/timetable/substitutions',
+  '/dashboard/hr',
+  '/dashboard/hr/leave',
+  '/dashboard/hr/attendance',
+  '/dashboard/hr/contracts',
+  '/dashboard/payroll',
+  '/dashboard/payroll/runs',
+  '/dashboard/library',
+  '/dashboard/library/overdue',
+  '/dashboard/transport',
+  '/dashboard/transport/trips',
+  '/dashboard/transport/location',
+  '/dashboard/transport/vehicles',
+  '/dashboard/canteen',
+  '/dashboard/canteen/stock',
+  '/dashboard/accounting',
+  '/dashboard/accounting/journals',
+  '/dashboard/accounting/reconciliation',
+  '/dashboard/accounting/fiscal-periods',
+  '/dashboard/notices',
+  '/dashboard/notifications/deliveries',
+  '/dashboard/learning',
+  '/dashboard/learning/sessions',
+  '/dashboard/learning/resources',
+  '/dashboard/settings',
 ]);
 
 export function resolveOperationalSummaryAction(
@@ -97,19 +97,19 @@ export function SummaryStatusBadge({
   status: OperationalSummaryStatus;
 }) {
   const label = {
-    ready: "Ready",
-    empty: "No items need attention",
-    partial: "Some information unavailable",
-    locked: "Module locked",
-    permissionDenied: "Access limited",
+    ready: 'Ready',
+    empty: 'No items need attention',
+    partial: 'Some information unavailable',
+    locked: 'Module locked',
+    permissionDenied: 'Access limited',
   }[status];
 
   const tones: Record<OperationalSummaryStatus, StatusTone> = {
-    ready: "active",
-    empty: "info",
-    partial: "partial",
-    locked: "locked",
-    permissionDenied: "inactive",
+    ready: 'active',
+    empty: 'info',
+    partial: 'partial',
+    locked: 'locked',
+    permissionDenied: 'inactive',
   };
   const tone = tones[status];
 
@@ -141,11 +141,11 @@ export function OperationalSummaryPanel({
 
   const moduleName = moduleLabels[module];
 
-  if (summary.status === "locked") {
+  if (summary.status === 'locked') {
     return <ModuleLockedState moduleName={moduleName} className="py-8" />;
   }
 
-  if (summary.status === "permissionDenied") {
+  if (summary.status === 'permissionDenied') {
     return (
       <SectionCard
         title="Operational summary"
@@ -165,9 +165,9 @@ export function OperationalSummaryPanel({
     <SectionCard
       title="Operational summary"
       description={
-        summary.status === "partial"
-          ? "Available information is shown below. Some information is temporarily unavailable."
-          : "A lightweight view of the work that needs attention."
+        summary.status === 'partial'
+          ? 'Available information is shown below. Some information is temporarily unavailable.'
+          : 'A lightweight view of the work that needs attention.'
       }
       headerAction={<SummaryStatusBadge status={summary.status} />}
       footer={
@@ -236,7 +236,7 @@ export function OperationalSummaryMetric({
 export function AttentionItemsList({
   items,
 }: {
-  items: OperationalModuleSummary["attentionItems"];
+  items: OperationalModuleSummary['attentionItems'];
 }) {
   return (
     <div className="mt-5 border-t border-slate-100 pt-5">
@@ -282,7 +282,7 @@ export function AttentionItemsList({
 export function RecentSummaryItems({
   items,
 }: {
-  items: OperationalModuleSummary["recentItems"];
+  items: OperationalModuleSummary['recentItems'];
 }) {
   return (
     <div className="mt-5 border-t border-slate-100 pt-5">
@@ -313,9 +313,9 @@ export function SummaryUnavailableState({
   status: OperationalSummaryStatus;
 }) {
   const description =
-    status === "partial"
-      ? "Some information is temporarily unavailable. You can refresh the summary to try again."
-      : "No items need attention right now.";
+    status === 'partial'
+      ? 'Some information is temporarily unavailable. You can refresh the summary to try again.'
+      : 'No items need attention right now.';
   return (
     <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
       {description}
@@ -353,13 +353,13 @@ export function RefreshSummaryButton({
       className="inline-flex h-9 w-9 items-center justify-center rounded-xl border-2 border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
       onClick={onClick}
       disabled={isLoading}
-      aria-label={isLoading ? "Refreshing dashboard" : "Refresh dashboard"}
-      title={isLoading ? "Refreshing dashboard" : "Refresh dashboard"}
+      aria-label={isLoading ? 'Refreshing dashboard' : 'Refresh dashboard'}
+      title={isLoading ? 'Refreshing dashboard' : 'Refresh dashboard'}
     >
       <RefreshCw
         size={18}
         strokeWidth={2.25}
-        className={isLoading ? "animate-spin" : undefined}
+        className={isLoading ? 'animate-spin' : undefined}
       />
     </button>
   );
@@ -367,17 +367,17 @@ export function RefreshSummaryButton({
 
 function toLabel(key: string) {
   return key
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/^./, (value) => value.toUpperCase());
 }
 
 function formatMetricValue(value: OperationalSummaryMetricValue) {
-  if (value === null) return "—";
+  if (value === null) return '—';
   return String(value);
 }
 
 function formatRecentDate(value: string) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Recently";
+  if (Number.isNaN(date.getTime())) return 'Recently';
   return formatBsDateTime(date);
 }

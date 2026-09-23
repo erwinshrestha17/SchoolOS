@@ -25,10 +25,7 @@ import { LoadingState } from '@/components/ui/loading-state';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { WorkspaceTabs } from '@/components/ui/module-tabs';
-import {
-  formatLabelledSchoolDate,
-  formatSchoolDate,
-} from '@/lib/date-utils';
+import { formatLabelledSchoolDate, formatSchoolDate } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 
 const DAY_LABELS = [
@@ -82,7 +79,11 @@ export function TeacherScheduleWorkspace() {
   }, [schoolNow.day, schoolNow.month, schoolNow.year, todayKey]);
 
   const scheduleQuery = useQuery({
-    queryKey: ['teacher-schedule', view, view === 'today' ? todayKey : weekStart],
+    queryKey: [
+      'teacher-schedule',
+      view,
+      view === 'today' ? todayKey : weekStart,
+    ],
     queryFn: () =>
       view === 'today'
         ? api.getTeacherSchedule({ date: todayKey, days: 1 })
@@ -186,12 +187,14 @@ export function TeacherScheduleWorkspace() {
                 <StatusBadge status={substitution.status} />
                 <span className="font-bold text-slate-900">
                   {substitution.className}
-                  {substitution.sectionName ? ` ${substitution.sectionName}` : ''} ·{' '}
-                  {substitution.subjectName}
+                  {substitution.sectionName
+                    ? ` ${substitution.sectionName}`
+                    : ''}{' '}
+                  · {substitution.subjectName}
                 </span>
                 <span className="text-slate-600">
-                  {formatSchoolDate(substitution.date)} · {substitution.startsAt}–
-                  {substitution.endsAt}
+                  {formatSchoolDate(substitution.date)} ·{' '}
+                  {substitution.startsAt}–{substitution.endsAt}
                 </span>
                 <span className="text-slate-600">
                   {substitution.role === 'SUBSTITUTE'
@@ -206,7 +209,11 @@ export function TeacherScheduleWorkspace() {
 
       {slotsByDay.length === 0 ? (
         <EmptyState
-          title={view === 'today' ? 'No periods scheduled today' : 'No periods this week'}
+          title={
+            view === 'today'
+              ? 'No periods scheduled today'
+              : 'No periods this week'
+          }
           description="You have no published timetable periods for this range. If that looks wrong, report a timetable issue to the school office."
           icon={<CalendarDays size={28} aria-hidden="true" />}
         />
@@ -220,7 +227,9 @@ export function TeacherScheduleWorkspace() {
                 title={`${DAY_LABELS[slots[0]?.dayOfWeek ?? 0] ?? ''}${isToday ? ' · Today' : ''}`}
                 // Labelled BS with the AD equivalent: a teacher cross-references this
                 // against AD-dated school notices and exam schedules.
-                description={formatLabelledSchoolDate(dateKey, { withGregorian: true })}
+                description={formatLabelledSchoolDate(dateKey, {
+                  withGregorian: true,
+                })}
               >
                 <ul className="space-y-2">
                   {slots.map((slot) => {
@@ -246,16 +255,24 @@ export function TeacherScheduleWorkspace() {
                           {slot.className}
                           {slot.sectionName ? ` ${slot.sectionName}` : ''}
                         </span>
-                        <span className="text-slate-600">{slot.subjectName}</span>
+                        <span className="text-slate-600">
+                          {slot.subjectName}
+                        </span>
                         {slot.room && (
                           <span className="inline-flex items-center gap-1 text-slate-500">
-                            <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                            <MapPin
+                              className="h-3.5 w-3.5"
+                              aria-hidden="true"
+                            />
                             {slot.room}
                           </span>
                         )}
                         {isCurrent && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-primary-100 px-2 py-0.5 text-xs font-bold text-primary-700">
-                            <UserRoundCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                            <UserRoundCheck
+                              className="h-3.5 w-3.5"
+                              aria-hidden="true"
+                            />
                             Now
                           </span>
                         )}

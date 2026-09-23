@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import type { AuthSession, PermissionKey } from "@schoolos/core";
-import { useQueryClient } from "@tanstack/react-query";
+import type { AuthSession, PermissionKey } from '@schoolos/core';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   createContext,
   PropsWithChildren,
@@ -10,13 +10,13 @@ import {
   useEffect,
   useRef,
   useState,
-} from "react";
-import { api, ApiRequestError, type AuthProfile } from "../lib/api";
+} from 'react';
+import { api, ApiRequestError, type AuthProfile } from '../lib/api';
 import {
   getBrowserSessionIdentity,
   hasSameBrowserSessionIdentity,
   isConfirmedSessionFailureStatus,
-} from "../lib/offline-policy";
+} from '../lib/offline-policy';
 import {
   type BrowserSession,
   clearAllAttendanceDrafts,
@@ -29,25 +29,25 @@ import {
   SESSION_CLEARED_EVENT,
   storeSession,
   toBrowserSession,
-} from "../lib/session";
+} from '../lib/session';
 import {
   clearOfflineAuthLease,
   createOfflineAuthLease,
   isOfflineAuthLeaseValid,
   readOfflineAuthLease,
   storeOfflineAuthLease,
-} from "../lib/offline-auth-lease";
-import { clearOfflineOutbox } from "../lib/offline-sync-outbox";
-import { clearOfflineModuleDrafts } from "../lib/offline-module-drafts";
-import { clearOfflineReadCache } from "../lib/offline-read-cache";
-import { clearSchoolAuthorityFence } from "../lib/school-authority-discovery";
+} from '../lib/offline-auth-lease';
+import { clearOfflineOutbox } from '../lib/offline-sync-outbox';
+import { clearOfflineModuleDrafts } from '../lib/offline-module-drafts';
+import { clearOfflineReadCache } from '../lib/offline-read-cache';
+import { clearSchoolAuthorityFence } from '../lib/school-authority-discovery';
 
 type SessionStatus =
-  | "loading"
-  | "authenticated"
-  | "offline_locked"
-  | "verification_failed"
-  | "anonymous";
+  | 'loading'
+  | 'authenticated'
+  | 'offline_locked'
+  | 'verification_failed'
+  | 'anonymous';
 
 type SessionContextValue = {
   session: BrowserSession | null;
@@ -73,7 +73,7 @@ function statusForUnconfirmedSessionError(
   existingSession: BrowserSession | null,
 ): SessionStatus {
   if (error instanceof ApiRequestError) {
-    return "verification_failed";
+    return 'verification_failed';
   }
 
   if (
@@ -86,10 +86,10 @@ function statusForUnconfirmedSessionError(
       roles: existingSession.user.roles ?? [],
     })
   ) {
-    return "authenticated";
+    return 'authenticated';
   }
 
-  return "offline_locked";
+  return 'offline_locked';
 }
 
 function browserSessionFromProfile(
@@ -128,12 +128,12 @@ export function isConfirmedSupportOverrideTransition(
 
   const projectedScopes = [...(nextSession.user.supportOverrideScopes ?? [])]
     .sort()
-    .join("|");
-  const storedScopes = [...context.scopes].sort().join("|");
+    .join('|');
+  const storedScopes = [...context.scopes].sort().join('|');
 
   return (
     nextSession.user.id === currentSession.user.id &&
-    nextSession.user.securityDomain === "PLATFORM" &&
+    nextSession.user.securityDomain === 'PLATFORM' &&
     nextSession.user.supportOverrideReadOnly === true &&
     nextSession.user.originalTenantId === currentSession.tenant.id &&
     nextSession.tenant.id === context.tenantId &&
@@ -144,7 +144,7 @@ export function isConfirmedSupportOverrideTransition(
 export function SessionProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const [session, setSessionState] = useState<BrowserSession | null>(null);
-  const [status, setStatus] = useState<SessionStatus>("loading");
+  const [status, setStatus] = useState<SessionStatus>('loading');
   const sessionRef = useRef<BrowserSession | null>(null);
   const sessionGenerationRef = useRef(0);
   const revalidationPromiseRef = useRef<Promise<BrowserSession | null> | null>(
@@ -184,7 +184,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     const cleanupPromise = clearPrivateBrowserState();
     storeSession(null, { notify: false });
     setCurrentSession(null);
-    setStatus("anonymous");
+    setStatus('anonymous');
     await cleanupPromise;
   }, [
     clearPrivateBrowserState,
@@ -207,7 +207,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       if (nextSession.user.isSupportOverride && !confirmedSupportTransition) {
         clearSupportOverride();
         setCurrentSession(null);
-        setStatus("verification_failed");
+        setStatus('verification_failed');
         return null;
       }
 
@@ -217,7 +217,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       ) {
         const cleanupPromise = clearPrivateBrowserState();
         setCurrentSession(null);
-        setStatus("loading");
+        setStatus('loading');
         await cleanupPromise;
       }
 
@@ -243,7 +243,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
         }),
       );
       setCurrentSession(nextSession);
-      setStatus("authenticated");
+      setStatus('authenticated');
       return nextSession;
     },
     [clearPrivateBrowserState, setCurrentSession],
@@ -264,7 +264,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       // Keep the UI in loading while the cookie-backed session is verified.
       // Local storage is only a browser display cache and must not be trusted
       // as proof that the httpOnly access/refresh cookies still exist.
-      setStatus("loading");
+      setStatus('loading');
     }
 
     let cancelled = false;
@@ -297,7 +297,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
         clearSupportOverride();
         setCurrentSession(null);
-        setStatus("anonymous");
+        setStatus('anonymous');
       } catch (error) {
         if (cancelled || generation !== sessionGenerationRef.current) {
           return;
@@ -337,7 +337,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     if (!existingSession) {
       setCurrentSession(null);
-      setStatus("anonymous");
+      setStatus('anonymous');
       return Promise.resolve(null);
     }
 
@@ -427,7 +427,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       const synchronizeExternalSession = async () => {
         const cleanupPromise = clearPrivateBrowserState();
         setCurrentSession(null);
-        setStatus("loading");
+        setStatus('loading');
         await cleanupPromise;
 
         if (generation !== sessionGenerationRef.current) {
@@ -440,8 +440,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
       void synchronizeExternalSession();
     }
 
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, [
     clearPrivateBrowserState,
     invalidatePendingSessionWork,
@@ -451,7 +451,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   ]);
 
   useEffect(() => {
-    if (status !== "offline_locked") {
+    if (status !== 'offline_locked') {
       return;
     }
 
@@ -459,9 +459,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
       void revalidateSession();
     };
 
-    window.addEventListener("online", handleOnline);
+    window.addEventListener('online', handleOnline);
 
-    return () => window.removeEventListener("online", handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
   }, [revalidateSession, status]);
 
   async function refreshSession() {
@@ -473,7 +473,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     const generation = invalidatePendingSessionWork();
 
     if (!existingSession) {
-      setStatus("loading");
+      setStatus('loading');
     }
 
     try {
@@ -557,7 +557,7 @@ export function useSession() {
   const context = useContext(SessionContext);
 
   if (!context) {
-    throw new Error("useSession must be used within a SessionProvider");
+    throw new Error('useSession must be used within a SessionProvider');
   }
 
   return context;

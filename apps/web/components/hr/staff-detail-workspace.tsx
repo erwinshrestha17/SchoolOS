@@ -1,14 +1,18 @@
 'use client';
 
-import { formatBsDate, formatNepalTime, type PayrollMoneyAmount } from '@schoolos/core';
+import {
+  formatBsDate,
+  formatNepalTime,
+  type PayrollMoneyAmount,
+} from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { 
-  Save, 
-  User, 
-  Briefcase, 
-  CalendarDays, 
-  History, 
-  Calculator, 
+import {
+  Save,
+  User,
+  Briefcase,
+  CalendarDays,
+  History,
+  Calculator,
   Landmark,
   ClipboardCheck,
   ShieldCheck,
@@ -18,7 +22,7 @@ import {
   FileText,
   Sliders,
   AlertTriangle,
-  Receipt
+  Receipt,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { api, type StaffLifecycleHistoryEvent } from '../../lib/api';
@@ -66,7 +70,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
     queryKey: ['staff-history', staffId],
     queryFn: () => api.listStaffHistory(staffId),
   });
-  
+
   const staff = staffQuery.data;
 
   // Form states
@@ -89,18 +93,28 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
     panNumber: '',
   });
 
-  const [toastMsg, setToastMsg] = useState<{ title: string; desc: string; tone: 'success' | 'danger' } | null>(null);
+  const [toastMsg, setToastMsg] = useState<{
+    title: string;
+    desc: string;
+    tone: 'success' | 'danger';
+  } | null>(null);
 
   // Dialog triggers
   const [isLifecycleOpen, setIsLifecycleOpen] = useState(false);
   const [isRequestLeaveOpen, setIsRequestLeaveOpen] = useState(false);
   const [isAdjustBalanceOpen, setIsAdjustBalanceOpen] = useState(false);
   const [isSalaryStructureOpen, setIsSalaryStructureOpen] = useState(false);
-  
+
   // Selected items for correction/review/edit
-  const [selectedAttendanceRecord, setSelectedAttendanceRecord] = useState<any | null>(null);
-  const [selectedLeaveRequest, setSelectedLeaveRequest] = useState<any | null>(null);
-  const [selectedSalaryStructure, setSelectedSalaryStructure] = useState<any | null>(null);
+  const [selectedAttendanceRecord, setSelectedAttendanceRecord] = useState<
+    any | null
+  >(null);
+  const [selectedLeaveRequest, setSelectedLeaveRequest] = useState<any | null>(
+    null,
+  );
+  const [selectedSalaryStructure, setSelectedSalaryStructure] = useState<
+    any | null
+  >(null);
 
   useEffect(() => {
     if (staff) {
@@ -118,7 +132,10 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
         emergencyRelation: staff.personal?.emergencyContact?.relation ?? '',
         qualifications: (staff as any).qualifications ?? '',
         experience: (staff as any).experience ?? '',
-        teacherRegistryId: (staff as any).employment?.teacherRegistryId ?? (staff as any).teacherRegistryId ?? '',
+        teacherRegistryId:
+          (staff as any).employment?.teacherRegistryId ??
+          (staff as any).teacherRegistryId ??
+          '',
         citizenshipNo: (staff as any).citizenshipNo ?? '',
         panNumber: (staff as any).panNumber ?? '',
       });
@@ -161,7 +178,9 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
       });
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['staff-detail', staffId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-detail', staffId],
+      });
       void queryClient.invalidateQueries({ queryKey: ['staff'] });
       setToastMsg({
         title: 'Profile Updated',
@@ -181,7 +200,9 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
   const activateStructureMutation = useMutation({
     mutationFn: (id: string) => api.activateSalaryStructure(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['staff-detail', staffId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-detail', staffId],
+      });
       void queryClient.invalidateQueries({ queryKey: ['payroll-preview'] });
       setToastMsg({
         title: 'Salary Structure Activated',
@@ -194,7 +215,9 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
   const archiveStructureMutation = useMutation({
     mutationFn: (id: string) => api.archiveSalaryStructure(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['staff-detail', staffId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-detail', staffId],
+      });
       setToastMsg({
         title: 'Salary Structure Archived',
         desc: 'The salary structure has been archived.',
@@ -204,7 +227,12 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
   });
 
   const handleSaveProfile = () => {
-    const requiredText = [draft.firstName, draft.lastName, draft.email, draft.address];
+    const requiredText = [
+      draft.firstName,
+      draft.lastName,
+      draft.email,
+      draft.address,
+    ];
     if (requiredText.some((value) => value.trim().length === 0)) {
       setToastMsg({
         title: 'Validation Error',
@@ -231,12 +259,16 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
   if (!staff) {
     return (
       <div className="bg-rose-50 border border-rose-100 p-8 rounded-2xl text-center">
-        <p className="text-rose-600 font-bold">Staff member not found or access denied.</p>
+        <p className="text-rose-600 font-bold">
+          Staff member not found or access denied.
+        </p>
       </div>
     );
   }
 
-  const activeSalaryStructure = staff.salaryStructures?.find((ss) => ss.status === 'ACTIVE');
+  const activeSalaryStructure = staff.salaryStructures?.find(
+    (ss) => ss.status === 'ACTIVE',
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -261,29 +293,38 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
               <h2 className="text-3xl font-black text-slate-900">
                 {staff.firstName} {staff.lastName}
               </h2>
-              <Badge className={cn(
-                "font-black uppercase tracking-widest text-[10px] px-3 py-1",
-                staff.status === 'ACTIVE' || !staff.status
-                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/10"
-                  : staff.status === 'TERMINATED'
-                  ? "bg-rose-500/10 text-rose-600 border-rose-500/10"
-                  : "bg-slate-100 text-slate-500"
-              )}>
+              <Badge
+                className={cn(
+                  'font-black uppercase tracking-widest text-[10px] px-3 py-1',
+                  staff.status === 'ACTIVE' || !staff.status
+                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/10'
+                    : staff.status === 'TERMINATED'
+                      ? 'bg-rose-500/10 text-rose-600 border-rose-500/10'
+                      : 'bg-slate-100 text-slate-500',
+                )}
+              >
                 {staff.status ?? 'ACTIVE'}
               </Badge>
             </div>
             <div className="flex flex-wrap gap-6 text-sm text-slate-500 font-medium">
               <span className="flex items-center gap-2">
-                <ShieldCheck size={16} className="text-[var(--color-mod-hr-text)]" />
+                <ShieldCheck
+                  size={16}
+                  className="text-[var(--color-mod-hr-text)]"
+                />
                 {staff.employeeId}
               </span>
               <span className="flex items-center gap-2">
                 <Briefcase size={16} className="text-slate-400" />
-                {staff.employment?.designation ?? staff.designation ?? 'No designation'}
+                {staff.employment?.designation ??
+                  staff.designation ??
+                  'No designation'}
               </span>
               <span className="flex items-center gap-2">
                 <Landmark size={16} className="text-slate-400" />
-                {staff.employment?.department ?? staff.department ?? 'No department'}
+                {staff.employment?.department ??
+                  staff.department ??
+                  'No department'}
               </span>
             </div>
           </div>
@@ -299,7 +340,9 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
             <button
               type="button"
               onClick={handleSaveProfile}
-              disabled={updateMutation.isPending || staff.status === 'TERMINATED'}
+              disabled={
+                updateMutation.isPending || staff.status === 'TERMINATED'
+              }
               className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[var(--color-mod-hr-accent)] text-white font-bold hover:bg-[var(--color-mod-hr-text)] transition-all shadow-sm disabled:opacity-50 text-sm"
             >
               <Save size={18} />
@@ -313,7 +356,9 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
         <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex gap-3 text-xs text-rose-800 leading-relaxed items-center">
           <AlertTriangle className="text-rose-600 shrink-0" size={18} />
           <div>
-            <strong>Termination Notice:</strong> This profile is locked. Terminated profiles cannot be edited or modified without shifting the user lifecycle status back to ACTIVE.
+            <strong>Termination Notice:</strong> This profile is locked.
+            Terminated profiles cannot be edited or modified without shifting
+            the user lifecycle status back to ACTIVE.
           </div>
         </div>
       )}
@@ -363,46 +408,61 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                 </h3>
                 <div className="grid md:grid-cols-2 gap-6">
                   <FormField label="First Name">
-                    <Input 
-                      value={draft.firstName} 
-                      onChange={(e: any) => setDraft(c => ({ ...c, firstName: e.target.value }))}
+                    <Input
+                      value={draft.firstName}
+                      onChange={(e: any) =>
+                        setDraft((c) => ({ ...c, firstName: e.target.value }))
+                      }
                       disabled={staff.status === 'TERMINATED'}
                     />
                   </FormField>
                   <FormField label="Last Name">
-                    <Input 
-                      value={draft.lastName} 
-                      onChange={(e: any) => setDraft(c => ({ ...c, lastName: e.target.value }))}
+                    <Input
+                      value={draft.lastName}
+                      onChange={(e: any) =>
+                        setDraft((c) => ({ ...c, lastName: e.target.value }))
+                      }
                       disabled={staff.status === 'TERMINATED'}
                     />
                   </FormField>
                   <FormField label="Email Address">
-                    <Input 
-                      type="email" 
-                      value={draft.email} 
+                    <Input
+                      type="email"
+                      value={draft.email}
                       disabled={staff.status === 'TERMINATED'}
-                      onChange={(e: any) => setDraft(c => ({ ...c, email: e.target.value }))}
+                      onChange={(e: any) =>
+                        setDraft((c) => ({ ...c, email: e.target.value }))
+                      }
                     />
                   </FormField>
                   <FormField label="Residential Address">
-                    <Input 
-                      value={draft.address} 
+                    <Input
+                      value={draft.address}
                       disabled={staff.status === 'TERMINATED'}
-                      onChange={(e: any) => setDraft(c => ({ ...c, address: e.target.value }))}
+                      onChange={(e: any) =>
+                        setDraft((c) => ({ ...c, address: e.target.value }))
+                      }
                     />
                   </FormField>
                   <FormField label="Academic Qualifications">
-                    <TextArea 
-                      value={draft.qualifications} 
+                    <TextArea
+                      value={draft.qualifications}
                       disabled={staff.status === 'TERMINATED'}
-                      onChange={(e: any) => setDraft(c => ({ ...c, qualifications: e.target.value }))}
+                      onChange={(e: any) =>
+                        setDraft((c) => ({
+                          ...c,
+                          qualifications: e.target.value,
+                        }))
+                      }
                     />
                   </FormField>
                   <FormField label="Prior Experience">
-                    <TextArea 
-                      value={draft.experience} 
+                    <TextArea
+                      value={draft.experience}
                       disabled={staff.status === 'TERMINATED'}
-                      onChange={(e: any) => setDraft(c => ({ ...c, experience: e.target.value }))}
+                      onChange={(e: any) =>
+                        setDraft((c) => ({ ...c, experience: e.target.value }))
+                      }
                     />
                   </FormField>
                 </div>
@@ -415,26 +475,41 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                 </h3>
                 <div className="grid md:grid-cols-3 gap-6">
                   <FormField label="Contact Name">
-                    <Input 
-                      value={draft.emergencyName} 
+                    <Input
+                      value={draft.emergencyName}
                       disabled={staff.status === 'TERMINATED'}
-                      onChange={(e: any) => setDraft(c => ({ ...c, emergencyName: e.target.value }))}
+                      onChange={(e: any) =>
+                        setDraft((c) => ({
+                          ...c,
+                          emergencyName: e.target.value,
+                        }))
+                      }
                       placeholder="Contact full name"
                     />
                   </FormField>
                   <FormField label="Contact Phone">
-                    <Input 
-                      value={draft.emergencyPhone} 
+                    <Input
+                      value={draft.emergencyPhone}
                       disabled={staff.status === 'TERMINATED'}
-                      onChange={(e: any) => setDraft(c => ({ ...c, emergencyPhone: e.target.value }))}
+                      onChange={(e: any) =>
+                        setDraft((c) => ({
+                          ...c,
+                          emergencyPhone: e.target.value,
+                        }))
+                      }
                       placeholder="Emergency contact phone"
                     />
                   </FormField>
                   <FormField label="Relation">
-                    <Input 
-                      value={draft.emergencyRelation} 
+                    <Input
+                      value={draft.emergencyRelation}
                       disabled={staff.status === 'TERMINATED'}
-                      onChange={(e: any) => setDraft(c => ({ ...c, emergencyRelation: e.target.value }))}
+                      onChange={(e: any) =>
+                        setDraft((c) => ({
+                          ...c,
+                          emergencyRelation: e.target.value,
+                        }))
+                      }
                       placeholder="e.g. Spouse, Father, Friend"
                     />
                   </FormField>
@@ -453,48 +528,70 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                 </h3>
                 <div className="grid md:grid-cols-2 gap-6">
                   <FormField label="Department">
-                    <Input 
-                      value={draft.department} 
+                    <Input
+                      value={draft.department}
                       disabled={staff.status === 'TERMINATED'}
-                      onChange={(e: any) => setDraft(c => ({ ...c, department: e.target.value }))}
+                      onChange={(e: any) =>
+                        setDraft((c) => ({ ...c, department: e.target.value }))
+                      }
                     />
                   </FormField>
                   <FormField label="Designation">
-                    <Input 
-                      value={draft.designation} 
+                    <Input
+                      value={draft.designation}
                       disabled={staff.status === 'TERMINATED'}
-                      onChange={(e: any) => setDraft(c => ({ ...c, designation: e.target.value }))}
+                      onChange={(e: any) =>
+                        setDraft((c) => ({ ...c, designation: e.target.value }))
+                      }
                     />
                   </FormField>
                   <FormField label="Teacher Registry ID">
-                    <Input 
-                      value={draft.teacherRegistryId} 
+                    <Input
+                      value={draft.teacherRegistryId}
                       disabled={staff.status === 'TERMINATED'}
-                      onChange={(e: any) => setDraft(c => ({ ...c, teacherRegistryId: e.target.value }))}
+                      onChange={(e: any) =>
+                        setDraft((c) => ({
+                          ...c,
+                          teacherRegistryId: e.target.value,
+                        }))
+                      }
                       placeholder="TRN registry ID"
                     />
                   </FormField>
                   <FormField label="Citizenship / National ID">
                     <Input
                       value={draft.citizenshipNo}
-                      disabled={staff.status === 'TERMINATED' || !canSeeSensitiveHrData}
-                      onChange={(e: any) => setDraft(c => ({ ...c, citizenshipNo: e.target.value }))}
+                      disabled={
+                        staff.status === 'TERMINATED' || !canSeeSensitiveHrData
+                      }
+                      onChange={(e: any) =>
+                        setDraft((c) => ({
+                          ...c,
+                          citizenshipNo: e.target.value,
+                        }))
+                      }
                     />
                     {!canSeeSensitiveHrData && (
                       <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-                        Masked. Requires HR or payroll sensitive-data access to view or edit.
+                        Masked. Requires HR or payroll sensitive-data access to
+                        view or edit.
                       </p>
                     )}
                   </FormField>
                   <FormField label="PAN Number">
                     <Input
                       value={draft.panNumber}
-                      disabled={staff.status === 'TERMINATED' || !canSeeSensitiveHrData}
-                      onChange={(e: any) => setDraft(c => ({ ...c, panNumber: e.target.value }))}
+                      disabled={
+                        staff.status === 'TERMINATED' || !canSeeSensitiveHrData
+                      }
+                      onChange={(e: any) =>
+                        setDraft((c) => ({ ...c, panNumber: e.target.value }))
+                      }
                     />
                     {!canSeeSensitiveHrData && (
                       <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-                        Masked. Requires HR or payroll sensitive-data access to view or edit.
+                        Masked. Requires HR or payroll sensitive-data access to
+                        view or edit.
                       </p>
                     )}
                   </FormField>
@@ -510,8 +607,12 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                   <FormField label="Bank Name">
                     <Input
                       value={draft.bankName}
-                      disabled={staff.status === 'TERMINATED' || !canSeeSensitiveHrData}
-                      onChange={(e: any) => setDraft(c => ({ ...c, bankName: e.target.value }))}
+                      disabled={
+                        staff.status === 'TERMINATED' || !canSeeSensitiveHrData
+                      }
+                      onChange={(e: any) =>
+                        setDraft((c) => ({ ...c, bankName: e.target.value }))
+                      }
                     />
                     {!canSeeSensitiveHrData && (
                       <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
@@ -522,12 +623,17 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                   <FormField label="Account Number">
                     <Input
                       value={draft.bankAccount}
-                      disabled={staff.status === 'TERMINATED' || !canSeeSensitiveHrData}
-                      onChange={(e: any) => setDraft(c => ({ ...c, bankAccount: e.target.value }))}
+                      disabled={
+                        staff.status === 'TERMINATED' || !canSeeSensitiveHrData
+                      }
+                      onChange={(e: any) =>
+                        setDraft((c) => ({ ...c, bankAccount: e.target.value }))
+                      }
                     />
                     {!canSeeSensitiveHrData && (
                       <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-                        Masked. Requires HR or payroll sensitive-data access to view or edit.
+                        Masked. Requires HR or payroll sensitive-data access to
+                        view or edit.
                       </p>
                     )}
                   </FormField>
@@ -550,51 +656,76 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                   Attendance Log
                 </h3>
                 <div className="rounded-2xl border border-slate-100 overflow-hidden">
-                  {staff.attendanceRecords && staff.attendanceRecords.length > 0 ? (
+                  {staff.attendanceRecords &&
+                  staff.attendanceRecords.length > 0 ? (
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-50/50 border-b border-slate-100">
                         <tr>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Date</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Check In</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Remarks</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Check In
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Remarks
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">
+                            Action
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {(staff.attendanceRecords as any[]).slice(0, 15).map((item, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
-                            <td className="px-5 py-3.5 font-bold text-slate-900">
-                              {formatBsDate(item.attendanceDate)}
-                            </td>
-                            <td className="px-5 py-3.5">
-                              <Badge variant="outline" className={cn(
-                                "font-bold text-[9px] uppercase tracking-widest",
-                                item.status === 'PRESENT' ? 'text-emerald-600 bg-emerald-50 border-emerald-100' :
-                                item.status === 'ABSENT' ? 'text-rose-600 bg-rose-50 border-rose-100' :
-                                'text-amber-600 bg-amber-50 border-amber-100'
-                              )}>
-                                {item.status}
-                              </Badge>
-                            </td>
-                            <td className="px-5 py-3.5 text-slate-600 font-medium">
-                              {item.checkIn ? formatNepalTime(item.checkIn) : '-'}
-                            </td>
-                            <td className="px-5 py-3.5 text-slate-500 max-w-xs truncate">
-                              {item.note || '-'}
-                            </td>
-                            <td className="px-5 py-3.5 text-right">
-                              <button
-                                type="button"
-                                disabled={staff.status === 'TERMINATED'}
-                                onClick={() => setSelectedAttendanceRecord(item)}
-                                className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[var(--color-mod-hr-text)] border border-[var(--color-mod-hr-border)] rounded-lg hover:bg-[var(--color-mod-hr-soft)] transition-colors"
-                              >
-                                Correct
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {(staff.attendanceRecords as any[])
+                          .slice(0, 15)
+                          .map((item, idx) => (
+                            <tr
+                              key={idx}
+                              className="hover:bg-slate-50/30 transition-colors"
+                            >
+                              <td className="px-5 py-3.5 font-bold text-slate-900">
+                                {formatBsDate(item.attendanceDate)}
+                              </td>
+                              <td className="px-5 py-3.5">
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'font-bold text-[9px] uppercase tracking-widest',
+                                    item.status === 'PRESENT'
+                                      ? 'text-emerald-600 bg-emerald-50 border-emerald-100'
+                                      : item.status === 'ABSENT'
+                                        ? 'text-rose-600 bg-rose-50 border-rose-100'
+                                        : 'text-amber-600 bg-amber-50 border-amber-100',
+                                  )}
+                                >
+                                  {item.status}
+                                </Badge>
+                              </td>
+                              <td className="px-5 py-3.5 text-slate-600 font-medium">
+                                {item.checkIn
+                                  ? formatNepalTime(item.checkIn)
+                                  : '-'}
+                              </td>
+                              <td className="px-5 py-3.5 text-slate-500 max-w-xs truncate">
+                                {item.note || '-'}
+                              </td>
+                              <td className="px-5 py-3.5 text-right">
+                                <button
+                                  type="button"
+                                  disabled={staff.status === 'TERMINATED'}
+                                  onClick={() =>
+                                    setSelectedAttendanceRecord(item)
+                                  }
+                                  className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[var(--color-mod-hr-text)] border border-[var(--color-mod-hr-border)] rounded-lg hover:bg-[var(--color-mod-hr-soft)] transition-colors"
+                                >
+                                  Correct
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   ) : (
@@ -641,21 +772,44 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                     <table className="w-full text-left text-xs border-collapse">
                       <thead className="bg-slate-50/50 border-b border-slate-100">
                         <tr>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Leave Type</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">Entitlement</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">Used</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">Pending</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center text-[var(--color-mod-hr-text)]">Remaining</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Leave Type
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">
+                            Entitlement
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">
+                            Used
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">
+                            Pending
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center text-[var(--color-mod-hr-text)]">
+                            Remaining
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {(staff.leaveBalances as any[]).map((balance) => (
-                          <tr key={balance.id} className="hover:bg-slate-50/30 transition-colors">
-                            <td className="px-5 py-3.5 font-bold text-slate-900">{balance.leaveType.replace('_', ' ')}</td>
-                            <td className="px-5 py-3.5 text-center text-slate-600 font-medium">{balance.entitlement + balance.carriedForward}</td>
-                            <td className="px-5 py-3.5 text-center text-rose-600 font-bold">{balance.used}</td>
-                            <td className="px-5 py-3.5 text-center text-amber-500 font-bold">{balance.pending}</td>
-                            <td className="px-5 py-3.5 text-center font-black text-emerald-600">{balance.remaining}</td>
+                          <tr
+                            key={balance.id}
+                            className="hover:bg-slate-50/30 transition-colors"
+                          >
+                            <td className="px-5 py-3.5 font-bold text-slate-900">
+                              {balance.leaveType.replace('_', ' ')}
+                            </td>
+                            <td className="px-5 py-3.5 text-center text-slate-600 font-medium">
+                              {balance.entitlement + balance.carriedForward}
+                            </td>
+                            <td className="px-5 py-3.5 text-center text-rose-600 font-bold">
+                              {balance.used}
+                            </td>
+                            <td className="px-5 py-3.5 text-center text-amber-500 font-bold">
+                              {balance.pending}
+                            </td>
+                            <td className="px-5 py-3.5 text-center font-black text-emerald-600">
+                              {balance.remaining}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -681,28 +835,51 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                     <table className="w-full text-left text-xs border-collapse">
                       <thead className="bg-slate-50/50 border-b border-slate-100">
                         <tr>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Leave Type</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Period</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">Days</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Leave Type
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Period
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">
+                            Days
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">
+                            Action
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {(staff.leaveRequests as any[]).map((req) => (
-                          <tr key={req.id} className="hover:bg-slate-50/30 transition-colors">
-                            <td className="px-5 py-3.5 font-bold text-slate-900 uppercase tracking-tight">{req.leaveType.replace('_', ' ')}</td>
-                            <td className="px-5 py-3.5 text-slate-500 font-medium">
-                              {formatBsDate(req.startsOn)} - {formatBsDate(req.endsOn)}
+                          <tr
+                            key={req.id}
+                            className="hover:bg-slate-50/30 transition-colors"
+                          >
+                            <td className="px-5 py-3.5 font-bold text-slate-900 uppercase tracking-tight">
+                              {req.leaveType.replace('_', ' ')}
                             </td>
-                            <td className="px-5 py-3.5 text-center font-bold text-slate-700">{req.days}</td>
+                            <td className="px-5 py-3.5 text-slate-500 font-medium">
+                              {formatBsDate(req.startsOn)} -{' '}
+                              {formatBsDate(req.endsOn)}
+                            </td>
+                            <td className="px-5 py-3.5 text-center font-bold text-slate-700">
+                              {req.days}
+                            </td>
                             <td className="px-5 py-3.5">
-                              <Badge variant="outline" className={cn(
-                                "font-black uppercase tracking-widest text-[8px]",
-                                req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                req.status === 'REJECTED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                                'bg-amber-50 text-amber-600 border-amber-100'
-                              )}>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  'font-black uppercase tracking-widest text-[8px]',
+                                  req.status === 'APPROVED'
+                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                    : req.status === 'REJECTED'
+                                      ? 'bg-rose-50 text-rose-600 border-rose-100'
+                                      : 'bg-amber-50 text-amber-600 border-amber-100',
+                                )}
+                              >
                                 {req.status}
                               </Badge>
                             </td>
@@ -755,35 +932,57 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                   </button>
                 </div>
                 <div className="rounded-2xl border border-slate-100 overflow-hidden">
-                  {staff.salaryStructures && staff.salaryStructures.length > 0 ? (
+                  {staff.salaryStructures &&
+                  staff.salaryStructures.length > 0 ? (
                     <table className="w-full text-left text-xs border-collapse">
                       <thead className="bg-slate-50/50 border-b border-slate-100">
                         <tr>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Effective Period</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Details</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">Basic Pay</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Effective Period
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Details
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">
+                            Basic Pay
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">
+                            Actions
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {(staff.salaryStructures as any[]).map((structure) => (
-                          <tr key={structure.id} className="hover:bg-slate-50/30 transition-colors">
+                          <tr
+                            key={structure.id}
+                            className="hover:bg-slate-50/30 transition-colors"
+                          >
                             <td className="px-5 py-3.5 font-bold text-slate-900">
                               {formatBsDate(structure.effectiveFrom)}
-                              {structure.effectiveTo ? ` - ${formatBsDate(structure.effectiveTo)}` : ' - Present'}
+                              {structure.effectiveTo
+                                ? ` - ${formatBsDate(structure.effectiveTo)}`
+                                : ' - Present'}
                             </td>
                             <td className="px-5 py-3.5 text-slate-500">
-                              {structure.pfEnabled ? 'PF' : 'No PF'} • {structure.tdsEnabled ? 'TDS' : 'No TDS'}
+                              {structure.pfEnabled ? 'PF' : 'No PF'} •{' '}
+                              {structure.tdsEnabled ? 'TDS' : 'No TDS'}
                             </td>
                             <td className="px-5 py-3.5 text-right font-black text-slate-900">
                               {formatMaskableNpr(structure.basicSalary)}
                             </td>
                             <td className="px-5 py-3.5">
-                              <Badge variant="outline" className={cn(
-                                "font-black uppercase tracking-widest text-[8px]",
-                                structure.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-100 text-slate-500'
-                              )}>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  'font-black uppercase tracking-widest text-[8px]',
+                                  structure.status === 'ACTIVE'
+                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                    : 'bg-slate-100 text-slate-500',
+                                )}
+                              >
                                 {structure.status}
                               </Badge>
                             </td>
@@ -791,16 +990,30 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                               <div className="flex justify-end gap-2">
                                 {structure.status !== 'ACTIVE' && (
                                   <button
-                                    onClick={() => activateStructureMutation.mutate(structure.id)}
-                                    disabled={staff.status === 'TERMINATED' || activateStructureMutation.isPending}
+                                    onClick={() =>
+                                      activateStructureMutation.mutate(
+                                        structure.id,
+                                      )
+                                    }
+                                    disabled={
+                                      staff.status === 'TERMINATED' ||
+                                      activateStructureMutation.isPending
+                                    }
                                     className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-600 border border-emerald-100 rounded-lg hover:bg-emerald-50 transition-colors"
                                   >
                                     Activate
                                   </button>
                                 )}
                                 <button
-                                  onClick={() => archiveStructureMutation.mutate(structure.id)}
-                                  disabled={staff.status === 'TERMINATED' || archiveStructureMutation.isPending}
+                                  onClick={() =>
+                                    archiveStructureMutation.mutate(
+                                      structure.id,
+                                    )
+                                  }
+                                  disabled={
+                                    staff.status === 'TERMINATED' ||
+                                    archiveStructureMutation.isPending
+                                  }
                                   className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-rose-600 border border-rose-100 rounded-lg hover:bg-rose-50 transition-colors"
                                 >
                                   Archive
@@ -823,7 +1036,8 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                     </table>
                   ) : (
                     <div className="py-12 text-center text-slate-400 italic">
-                      No salary structure configured. Payroll run will require basic salary details.
+                      No salary structure configured. Payroll run will require
+                      basic salary details.
                     </div>
                   )}
                 </div>
@@ -842,29 +1056,54 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                     <table className="w-full text-left text-xs border-collapse">
                       <thead className="bg-slate-50/50 border-b border-slate-100">
                         <tr>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Payroll Period</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Gross</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Deductions</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">Net Payable</th>
-                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Payment Status</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Payroll Period
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Gross
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Deductions
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">
+                            Net Payable
+                          </th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">
+                            Payment Status
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {(staff.payrollLines as any[]).map((line) => (
-                          <tr key={line.id} className="hover:bg-slate-50/30 transition-colors">
+                          <tr
+                            key={line.id}
+                            className="hover:bg-slate-50/30 transition-colors"
+                          >
                             <td className="px-5 py-3.5 font-bold text-slate-900">
-                              {line.payrollRun?.periodMonth}/{line.payrollRun?.periodYear}
+                              {line.payrollRun?.periodMonth}/
+                              {line.payrollRun?.periodYear}
                             </td>
-                            <td className="px-5 py-3.5 text-slate-600 font-medium">{formatMaskableNpr(line.grossSalary)}</td>
+                            <td className="px-5 py-3.5 text-slate-600 font-medium">
+                              {formatMaskableNpr(line.grossSalary)}
+                            </td>
                             <td className="px-5 py-3.5 text-rose-600 font-medium">
-                              {line.deductions === null || line.deductions === undefined ? 'Restricted' : `- NPR ${Number(line.deductions).toLocaleString()}`}
+                              {line.deductions === null ||
+                              line.deductions === undefined
+                                ? 'Restricted'
+                                : `- NPR ${Number(line.deductions).toLocaleString()}`}
                             </td>
-                            <td className="px-5 py-3.5 text-right font-black text-slate-900">{formatMaskableNpr(line.netSalary)}</td>
+                            <td className="px-5 py-3.5 text-right font-black text-slate-900">
+                              {formatMaskableNpr(line.netSalary)}
+                            </td>
                             <td className="px-5 py-3.5">
-                              <Badge className={cn(
-                                "font-bold text-[8px] uppercase tracking-widest",
-                                line.paymentStatus === 'PAID' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/10' : 'bg-slate-100 text-slate-500'
-                              )}>
+                              <Badge
+                                className={cn(
+                                  'font-bold text-[8px] uppercase tracking-widest',
+                                  line.paymentStatus === 'PAID'
+                                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/10'
+                                    : 'bg-slate-100 text-slate-500',
+                                )}
+                              >
                                 {line.paymentStatus || 'UNPAID'}
                               </Badge>
                             </td>
@@ -883,40 +1122,59 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
 
             {/* Tab: History */}
             <TabsContent value="history" className="m-0 outline-none">
-              <LifecycleHistoryPanel 
-                events={historyQuery.data ?? []} 
-                loading={historyQuery.isLoading} 
-                error={historyQuery.error} 
+              <LifecycleHistoryPanel
+                events={historyQuery.data ?? []}
+                loading={historyQuery.isLoading}
+                error={historyQuery.error}
               />
             </TabsContent>
           </div>
 
           <aside className="space-y-6">
             <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-              <h4 className="font-bold mb-4 text-slate-400 uppercase tracking-widest text-[10px]">Staff Summary</h4>
+              <h4 className="font-bold mb-4 text-slate-400 uppercase tracking-widest text-[10px]">
+                Staff Summary
+              </h4>
               <div className="space-y-4">
                 <div className="flex justify-between items-center gap-4 py-2 border-b border-slate-100">
-                  <span className="text-xs text-slate-400 font-medium">Joined Date</span>
-                  <span className="text-xs font-bold text-slate-900">{formatBsDate(staff.employment?.joiningDate ?? staff.joiningDate)}</span>
+                  <span className="text-xs text-slate-400 font-medium">
+                    Joined Date
+                  </span>
+                  <span className="text-xs font-bold text-slate-900">
+                    {formatBsDate(
+                      staff.employment?.joiningDate ?? staff.joiningDate,
+                    )}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center gap-4 py-2 border-b border-slate-100">
-                  <span className="text-xs text-slate-400 font-medium">Contract Type</span>
-                  <span className="text-xs font-bold uppercase tracking-widest text-[var(--color-mod-hr-text)]">{staff.contractType ?? 'Not set'}</span>
+                  <span className="text-xs text-slate-400 font-medium">
+                    Contract Type
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-widest text-[var(--color-mod-hr-text)]">
+                    {staff.contractType ?? 'Not set'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center gap-4 py-2">
-                  <span className="text-xs text-slate-400 font-medium">Active Salary Structure</span>
+                  <span className="text-xs text-slate-400 font-medium">
+                    Active Salary Structure
+                  </span>
                   <span className="text-xs font-bold text-emerald-600">
-                    {activeSalaryStructure ? formatMaskableNpr(activeSalaryStructure.basicSalary) : 'Not configured'}
+                    {activeSalaryStructure
+                      ? formatMaskableNpr(activeSalaryStructure.basicSalary)
+                      : 'Not configured'}
                   </span>
                 </div>
               </div>
             </div>
 
             <div className="bg-[var(--color-mod-hr-soft)]/70 border border-[var(--color-mod-hr-border)] rounded-2xl p-6">
-              <h4 className="font-bold mb-2 text-[var(--color-mod-hr-text)] text-sm">HR Note</h4>
+              <h4 className="font-bold mb-2 text-[var(--color-mod-hr-text)] text-sm">
+                HR Note
+              </h4>
               <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                Profile updates are audited and synced with user authentication records. 
-                Sensitive financial changes require a separate salary structure update.
+                Profile updates are audited and synced with user authentication
+                records. Sensitive financial changes require a separate salary
+                structure update.
               </p>
             </div>
           </aside>
@@ -975,8 +1233,8 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
             staff: {
               firstName: staff.firstName,
               lastName: staff.lastName,
-              employeeId: staff.employeeId
-            }
+              employeeId: staff.employeeId,
+            },
           }}
         />
       )}
@@ -984,7 +1242,15 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
   );
 }
 
-function LifecycleHistoryPanel({ events, loading, error }: { events: StaffLifecycleHistoryEvent[]; loading: boolean; error: Error | null }) {
+function LifecycleHistoryPanel({
+  events,
+  loading,
+  error,
+}: {
+  events: StaffLifecycleHistoryEvent[];
+  loading: boolean;
+  error: Error | null;
+}) {
   return (
     <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm space-y-6">
       <h3 className="text-xl font-bold flex items-center gap-3">
@@ -997,36 +1263,62 @@ function LifecycleHistoryPanel({ events, loading, error }: { events: StaffLifecy
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="h-20 animate-pulse rounded-2xl bg-slate-50" />
+            <div
+              key={index}
+              className="h-20 animate-pulse rounded-2xl bg-slate-50"
+            />
           ))}
         </div>
       ) : error ? (
-        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{error.message}</div>
+        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">
+          {error.message}
+        </div>
       ) : events.length > 0 ? (
         <div className="space-y-3">
           {events.map((event) => {
-            const actorName = `${event.createdBy?.staff?.firstName ?? ''} ${event.createdBy?.staff?.lastName ?? ''}`.trim() || event.createdBy?.email || 'System';
+            const actorName =
+              `${event.createdBy?.staff?.firstName ?? ''} ${event.createdBy?.staff?.lastName ?? ''}`.trim() ||
+              event.createdBy?.email ||
+              'System';
 
             return (
-              <div key={event.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div
+                key={event.id}
+                className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+              >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <Badge variant="outline" className="font-bold text-[10px] uppercase tracking-widest">
+                    <Badge
+                      variant="outline"
+                      className="font-bold text-[10px] uppercase tracking-widest"
+                    >
                       {formatLifecycleEvent(event.eventType)}
                     </Badge>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{event.reason || event.notes || 'Lifecycle record'}</p>
-                    <p className="mt-1 text-xs font-medium text-slate-500">Performed by: {actorName}</p>
+                    <p className="mt-2 text-sm font-bold text-slate-900">
+                      {event.reason || event.notes || 'Lifecycle record'}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">
+                      Performed by: {actorName}
+                    </p>
                   </div>
-                  <span className="text-xs font-bold text-slate-400">{formatBsDate(event.eventDate)}</span>
+                  <span className="text-xs font-bold text-slate-400">
+                    {formatBsDate(event.eventDate)}
+                  </span>
                 </div>
-                {event.metadata ? <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-medium text-slate-500">{formatMetadata(event.metadata)}</p> : null}
+                {event.metadata ? (
+                  <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-medium text-slate-500">
+                    {formatMetadata(event.metadata)}
+                  </p>
+                ) : null}
               </div>
             );
           })}
         </div>
       ) : (
         <div className="py-12 text-center">
-          <p className="text-sm text-slate-400 font-medium italic">No lifecycle audit records found.</p>
+          <p className="text-sm text-slate-400 font-medium italic">
+            No lifecycle audit records found.
+          </p>
         </div>
       )}
     </section>
@@ -1041,11 +1333,15 @@ function formatLifecycleEvent(value: string) {
 }
 
 function formatMetadata(metadata: Record<string, unknown>) {
-  const entries = Object.entries(metadata).filter(([, value]) => value !== undefined && value !== null && value !== '');
+  const entries = Object.entries(metadata).filter(
+    ([, value]) => value !== undefined && value !== null && value !== '',
+  );
 
   if (entries.length === 0) {
     return 'No metadata';
   }
 
-  return entries.map(([key, value]) => `${formatLifecycleEvent(key)}: ${String(value)}`).join(' • ');
+  return entries
+    .map(([key, value]) => `${formatLifecycleEvent(key)}: ${String(value)}`)
+    .join(' • ');
 }

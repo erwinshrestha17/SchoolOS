@@ -20,7 +20,7 @@ export function AttendanceConflictReview({
 }: AttendanceConflictReviewProps) {
   const queryClient = useQueryClient();
   const { canReviewConflicts, resolution } = useAttendanceCapabilities();
-  const permissionsLoading = resolution === "loading";
+  const permissionsLoading = resolution === 'loading';
 
   const reviewMutation = useMutation({
     mutationFn: ({

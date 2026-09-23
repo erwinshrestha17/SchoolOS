@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   GUARDIAN_RECOVERY_ACTIONS,
   GUARDIAN_RECOVERY_VERIFICATION_METHODS,
@@ -23,7 +23,7 @@ import {
   normalizePersonName,
   toGregorianDateFromBs,
   tryNormalizeNepalPhone,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -37,15 +37,15 @@ import {
   ShieldCheck,
   Smartphone,
   XCircle,
-} from "lucide-react";
-import { api } from "@/lib/api";
-import { useSession } from "@/components/session-provider";
-import { Badge } from "@/components/ui/badge";
-import { SectionCard } from "@/components/ui/section-card";
-import { schoolFacingErrorMessage } from "@/lib/school-facing-error";
+} from 'lucide-react';
+import { api } from '@/lib/api';
+import { useSession } from '@/components/session-provider';
+import { Badge } from '@/components/ui/badge';
+import { SectionCard } from '@/components/ui/section-card';
+import { schoolFacingErrorMessage } from '@/lib/school-facing-error';
 
 const inputClass =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[var(--color-mod-admissions-accent)] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500";
+  'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-[var(--color-mod-admissions-accent)] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500';
 
 const enabledCapabilities: Array<{
   value: GuardianCapability;
@@ -53,29 +53,29 @@ const enabledCapabilities: Array<{
   description: string;
 }> = [
   {
-    value: "ACADEMICS_VIEW",
-    label: "Academic information",
-    description: "Homework, results, library, and school learning records.",
+    value: 'ACADEMICS_VIEW',
+    label: 'Academic information',
+    description: 'Homework, results, library, and school learning records.',
   },
   {
-    value: "ATTENDANCE_VIEW",
-    label: "Attendance",
-    description: "Attendance summaries and approved attendance detail.",
+    value: 'ATTENDANCE_VIEW',
+    label: 'Attendance',
+    description: 'Attendance summaries and approved attendance detail.',
   },
   {
-    value: "FEES_VIEW",
-    label: "Fees and receipts",
-    description: "School-owned fee balances and protected receipts.",
+    value: 'FEES_VIEW',
+    label: 'Fees and receipts',
+    description: 'School-owned fee balances and protected receipts.',
   },
   {
-    value: "EMERGENCY_ALERT_RECEIVE",
-    label: "Emergency alerts",
-    description: "Important safety and emergency notices for this child.",
+    value: 'EMERGENCY_ALERT_RECEIVE',
+    label: 'Emergency alerts',
+    description: 'Important safety and emergency notices for this child.',
   },
   {
-    value: "SCHOOL_COMMUNICATE",
-    label: "School communication",
-    description: "Notices and school communication for this child.",
+    value: 'SCHOOL_COMMUNICATE',
+    label: 'School communication',
+    description: 'Notices and school communication for this child.',
   },
 ];
 
@@ -83,13 +83,13 @@ const deferredCapabilities: Array<{
   value: GuardianCapability;
   label: string;
 }> = [
-  { value: "LEAVE_MANAGE", label: "Leave requests" },
-  { value: "FEES_PAY", label: "Online payments" },
-  { value: "SPECIFIC_CONSENT_GIVE", label: "Specific consent" },
-  { value: "PICKUP_AUTHORIZE", label: "Pickup authorization" },
+  { value: 'LEAVE_MANAGE', label: 'Leave requests' },
+  { value: 'FEES_PAY', label: 'Online payments' },
+  { value: 'SPECIFIC_CONSENT_GIVE', label: 'Specific consent' },
+  { value: 'PICKUP_AUTHORIZE', label: 'Pickup authorization' },
   {
-    value: "COMPLAINT_OR_CORRECTION_SUBMIT",
-    label: "Complaints and corrections",
+    value: 'COMPLAINT_OR_CORRECTION_SUBMIT',
+    label: 'Complaints and corrections',
   },
 ];
 
@@ -127,19 +127,19 @@ export function GuardiansTab({
 }: GuardiansTabProps) {
   const { session, hasPermissions } = useSession();
   const isSupportOverride = session?.user.isSupportOverride === true;
-  const canCreate = !isSupportOverride && hasPermissions(["guardians:create"]);
-  const canUpdate = !isSupportOverride && hasPermissions(["guardians:update"]);
-  const canVerify = !isSupportOverride && hasPermissions(["guardians:verify"]);
+  const canCreate = !isSupportOverride && hasPermissions(['guardians:create']);
+  const canUpdate = !isSupportOverride && hasPermissions(['guardians:update']);
+  const canVerify = !isSupportOverride && hasPermissions(['guardians:verify']);
   const canAdministerRecovery =
     !isSupportOverride &&
     hasPermissions([
-      "guardians:update",
-      "guardians:verify",
-      "users:reset_password",
+      'guardians:update',
+      'guardians:verify',
+      'users:reset_password',
     ]);
   const canProvisionAccount =
     !isSupportOverride &&
-    hasPermissions(["guardians:update", "guardians:verify", "users:create"]);
+    hasPermissions(['guardians:update', 'guardians:verify', 'users:create']);
   const canViewAccessAdministration =
     canAdministerRecovery || canProvisionAccount || canVerify;
   const sortedGuardians = [...guardians].sort(
@@ -199,11 +199,11 @@ export function GuardiansTab({
               <SectionCard
                 key={guardian.id}
                 title={
-                  isEditing ? "Edit guardian relationship" : guardian.fullName
+                  isEditing ? 'Edit guardian relationship' : guardian.fullName
                 }
                 description={
                   isEditing
-                    ? "Contact information and this child’s access authority are stored separately."
+                    ? 'Contact information and this child’s access authority are stored separately.'
                     : formatGuardianRelation(guardian.relation)
                 }
                 headerAction={
@@ -290,14 +290,14 @@ function GuardianSummary({ guardian }: { guardian: GuardianProfile }) {
         <ContactLine icon={<Phone size={14} />} text={guardian.primaryPhone} />
         <ContactLine
           icon={<Mail size={14} />}
-          text={guardian.email || "Email not recorded"}
+          text={guardian.email || 'Email not recorded'}
         />
         <ContactLine
           icon={<MapPin size={14} />}
           text={
             guardian.wardNumber
               ? `Ward ${guardian.wardNumber}`
-              : "Ward not recorded"
+              : 'Ward not recorded'
           }
         />
         <ContactLine
@@ -330,19 +330,19 @@ function GuardianSummary({ guardian }: { guardian: GuardianProfile }) {
             <dd className="mt-0.5 font-semibold text-slate-900">
               {guardian.effectiveUntil
                 ? formatBsDate(guardian.effectiveUntil)
-                : "No scheduled end"}
+                : 'No scheduled end'}
             </dd>
           </div>
           <div>
             <dt className="font-bold text-slate-500">Emergency priority</dt>
             <dd className="mt-0.5 font-semibold text-slate-900">
-              {guardian.emergencyContactPriority ?? "Not assigned"}
+              {guardian.emergencyContactPriority ?? 'Not assigned'}
             </dd>
           </div>
           <div>
             <dt className="font-bold text-slate-500">Restriction reference</dt>
             <dd className="mt-0.5 break-words font-semibold text-slate-900">
-              {guardian.restrictionReasonRef || "No restriction recorded"}
+              {guardian.restrictionReasonRef || 'No restriction recorded'}
             </dd>
           </div>
         </dl>
@@ -394,19 +394,19 @@ function GuardianEditForm({
   onCancel,
   onSave,
 }: GuardianEditFormProps | NewGuardianEditFormProps) {
-  const [fullName, setFullName] = useState(guardian?.fullName ?? "");
+  const [fullName, setFullName] = useState(guardian?.fullName ?? '');
   const [relation, setRelation] = useState(
-    guardian?.relation ?? "LEGAL_GUARDIAN",
+    guardian?.relation ?? 'LEGAL_GUARDIAN',
   );
   const [primaryPhone, setPrimaryPhone] = useState(
-    guardian?.primaryPhone || "",
+    guardian?.primaryPhone || '',
   );
   const [secondaryPhone, setSecondaryPhone] = useState(
-    guardian?.secondaryPhone || "",
+    guardian?.secondaryPhone || '',
   );
-  const [email, setEmail] = useState(guardian?.email || "");
-  const [occupation, setOccupation] = useState(guardian?.occupation || "");
-  const [wardNumber, setWardNumber] = useState(guardian?.wardNumber || "");
+  const [email, setEmail] = useState(guardian?.email || '');
+  const [occupation, setOccupation] = useState(guardian?.occupation || '');
+  const [wardNumber, setWardNumber] = useState(guardian?.wardNumber || '');
   const [isPrimary, setIsPrimary] = useState(
     forcePrimary || guardian?.isPrimary || false,
   );
@@ -414,22 +414,22 @@ function GuardianEditForm({
     guardian?.capabilities ?? [],
   );
   const [verificationStatus, setVerificationStatus] = useState(
-    guardian?.verificationStatus ?? "UNVERIFIED",
+    guardian?.verificationStatus ?? 'UNVERIFIED',
   );
   const [approvalStatus, setApprovalStatus] = useState(
-    guardian?.approvalStatus ?? "PENDING",
+    guardian?.approvalStatus ?? 'PENDING',
   );
   const [effectiveFromBs, setEffectiveFromBs] = useState(
     safeBsInput(guardian?.effectiveFrom ?? new Date()),
   );
   const [effectiveUntilBs, setEffectiveUntilBs] = useState(
-    guardian?.effectiveUntil ? safeBsInput(guardian.effectiveUntil) : "",
+    guardian?.effectiveUntil ? safeBsInput(guardian.effectiveUntil) : '',
   );
   const [emergencyPriority, setEmergencyPriority] = useState(
-    guardian?.emergencyContactPriority?.toString() ?? "",
+    guardian?.emergencyContactPriority?.toString() ?? '',
   );
   const [restrictionReference, setRestrictionReference] = useState(
-    guardian?.restrictionReasonRef ?? "",
+    guardian?.restrictionReasonRef ?? '',
   );
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -444,19 +444,19 @@ function GuardianEditForm({
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!isValidPersonName(fullName)) {
-      setValidationError("Enter a valid guardian name.");
+      setValidationError('Enter a valid guardian name.');
       return;
     }
     if (isNew && !tryNormalizeNepalPhone(primaryPhone)) {
-      setValidationError("Enter a valid NTC or Ncell mobile number.");
+      setValidationError('Enter a valid NTC or Ncell mobile number.');
       return;
     }
     if (secondaryPhone && !tryNormalizeNepalPhone(secondaryPhone)) {
-      setValidationError("Enter a valid secondary NTC or Ncell number.");
+      setValidationError('Enter a valid secondary NTC or Ncell number.');
       return;
     }
     if (email && !isValidEmail(email)) {
-      setValidationError("Enter a valid email address.");
+      setValidationError('Enter a valid email address.');
       return;
     }
 
@@ -467,12 +467,12 @@ function GuardianEditForm({
       effectiveUntil = effectiveUntilBs ? bsDateToApi(effectiveUntilBs) : null;
     } catch {
       setValidationError(
-        "Enter valid Bikram Sambat dates in YYYY-MM-DD format.",
+        'Enter valid Bikram Sambat dates in YYYY-MM-DD format.',
       );
       return;
     }
     if (effectiveUntil && effectiveUntil < effectiveFrom) {
-      setValidationError("The end date must be after the start date.");
+      setValidationError('The end date must be after the start date.');
       return;
     }
     setValidationError(null);
@@ -520,15 +520,15 @@ function GuardianEditForm({
           {validationError ??
             schoolFacingErrorMessage(error, {
               fallback:
-                "The guardian could not be saved. Existing access was not changed.",
+                'The guardian could not be saved. Existing access was not changed.',
               invalid:
-                "Review the relationship, authority, dates, and contact information.",
+                'Review the relationship, authority, dates, and contact information.',
               forbidden:
-                "You do not have permission to change this guardian relationship.",
+                'You do not have permission to change this guardian relationship.',
               notFound:
-                "This student or guardian relationship is no longer available.",
+                'This student or guardian relationship is no longer available.',
               conflict:
-                "This relationship changed while you were editing it. Refresh and try again.",
+                'This relationship changed while you were editing it. Refresh and try again.',
             })}
         </div>
       ) : null}
@@ -563,8 +563,8 @@ function GuardianEditForm({
           label="Primary phone"
           hint={
             isNew
-              ? "Used for the guardian record."
-              : "Use Access & recovery for an audited phone change."
+              ? 'Used for the guardian record.'
+              : 'Use Access & recovery for an audited phone change.'
           }
         >
           <input
@@ -635,8 +635,8 @@ function GuardianEditForm({
           className="h-4 w-4"
         />
         {forcePrimary
-          ? "The first guardian is the primary contact."
-          : "Primary contact for this student"}
+          ? 'The first guardian is the primary contact.'
+          : 'Primary contact for this student'}
       </label>
 
       <div className="rounded-xl border border-slate-200 p-4">
@@ -678,7 +678,7 @@ function GuardianEditForm({
             Pilot-disabled actions
           </p>
           <p className="mt-1 text-[11px] leading-4 text-amber-800">
-            {deferredCapabilities.map((item) => item.label).join(", ")} remain
+            {deferredCapabilities.map((item) => item.label).join(', ')} remain
             unavailable until their end-to-end safety gates pass.
           </p>
         </div>
@@ -691,7 +691,7 @@ function GuardianEditForm({
             value={verificationStatus}
             onChange={(event) =>
               setVerificationStatus(
-                event.target.value as "UNVERIFIED" | "VERIFIED",
+                event.target.value as 'UNVERIFIED' | 'VERIFIED',
               )
             }
             disabled={isSaving || !canVerify}
@@ -706,7 +706,7 @@ function GuardianEditForm({
             value={approvalStatus}
             onChange={(event) =>
               setApprovalStatus(
-                event.target.value as "PENDING" | "APPROVED" | "REJECTED",
+                event.target.value as 'PENDING' | 'APPROVED' | 'REJECTED',
               )
             }
             disabled={isSaving || !canVerify}
@@ -766,7 +766,7 @@ function GuardianEditForm({
           className="rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
           disabled={isSaving}
         >
-          {isSaving ? "Saving…" : isNew ? "Link guardian" : "Save changes"}
+          {isSaving ? 'Saving…' : isNew ? 'Link guardian' : 'Save changes'}
         </button>
       </div>
     </form>
@@ -787,9 +787,9 @@ function GuardianAccessPanel({
   canVerify: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState('');
   const queryClient = useQueryClient();
-  const queryKey = ["guardian-access-administration", studentId, guardian.id];
+  const queryKey = ['guardian-access-administration', studentId, guardian.id];
   const accessQuery = useQuery({
     queryKey,
     queryFn: () => api.getGuardianAccessAdministration(studentId, guardian.id),
@@ -800,7 +800,7 @@ function GuardianAccessPanel({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey }),
       queryClient.invalidateQueries({
-        queryKey: ["student-profile", studentId],
+        queryKey: ['student-profile', studentId],
       }),
     ]);
   };
@@ -809,7 +809,7 @@ function GuardianAccessPanel({
       api.performGuardianRecoveryAction(studentId, guardian.id, body),
     onSuccess: async (result) => {
       setMessage(
-        `${recoveryActionLabel(result.action)} completed. ${result.sessionsRevoked} session${result.sessionsRevoked === 1 ? "" : "s"} revoked.`,
+        `${recoveryActionLabel(result.action)} completed. ${result.sessionsRevoked} session${result.sessionsRevoked === 1 ? '' : 's'} revoked.`,
       );
       await refreshAccess();
     },
@@ -819,7 +819,7 @@ function GuardianAccessPanel({
       api.provisionGuardianAccount(studentId, guardian.id, body),
     onSuccess: async () => {
       setMessage(
-        "Guardian account provisioned. The temporary password must be changed at first sign-in.",
+        'Guardian account provisioned. The temporary password must be changed at first sign-in.',
       );
       await refreshAccess();
     },
@@ -839,7 +839,7 @@ function GuardianAccessPanel({
         evidenceReference,
       }),
     onSuccess: async () => {
-      setMessage("The selected guardian session was revoked.");
+      setMessage('The selected guardian session was revoked.');
       await refreshAccess();
     },
   });
@@ -850,7 +850,7 @@ function GuardianAccessPanel({
       notes?: string;
     }) => api.createGuardianIdentityVerification(guardian.id, body),
     onSuccess: async () => {
-      setMessage("Identity evidence recorded for review.");
+      setMessage('Identity evidence recorded for review.');
       await refreshAccess();
     },
   });
@@ -861,7 +861,7 @@ function GuardianAccessPanel({
       reviewNote,
     }: {
       verificationId: string;
-      status: "VERIFIED" | "REJECTED";
+      status: 'VERIFIED' | 'REJECTED';
       reviewNote: string;
     }) =>
       api.reviewGuardianIdentityVerification(guardian.id, verificationId, {
@@ -869,7 +869,7 @@ function GuardianAccessPanel({
         reviewNote,
       }),
     onSuccess: async () => {
-      setMessage("Identity review decision recorded.");
+      setMessage('Identity review decision recorded.');
       await refreshAccess();
     },
   });
@@ -889,7 +889,7 @@ function GuardianAccessPanel({
         className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50"
       >
         <ShieldCheck size={15} aria-hidden="true" />
-        {isOpen ? "Close access & recovery" : "Access & recovery"}
+        {isOpen ? 'Close access & recovery' : 'Access & recovery'}
       </button>
 
       {isOpen ? (
@@ -901,10 +901,10 @@ function GuardianAccessPanel({
               tone="error"
               text={schoolFacingErrorMessage(accessQuery.error, {
                 fallback:
-                  "Guardian access details are unavailable. No access was changed.",
+                  'Guardian access details are unavailable. No access was changed.',
                 forbidden:
-                  "You do not have permission to view guardian access details.",
-                notFound: "This guardian relationship is no longer available.",
+                  'You do not have permission to view guardian access details.',
+                notFound: 'This guardian relationship is no longer available.',
               })}
             />
           ) : (
@@ -915,13 +915,13 @@ function GuardianAccessPanel({
                   tone="error"
                   text={schoolFacingErrorMessage(mutationError, {
                     fallback:
-                      "The guardian access change could not be completed. Existing access remains unchanged.",
+                      'The guardian access change could not be completed. Existing access remains unchanged.',
                     invalid:
-                      "Review the proof, reason, evidence reference, and requested action.",
+                      'Review the proof, reason, evidence reference, and requested action.',
                     forbidden:
-                      "You do not have permission to complete this guardian access action.",
+                      'You do not have permission to complete this guardian access action.',
                     conflict:
-                      "Guardian access changed while this action was open. Refresh and try again.",
+                      'Guardian access changed while this action was open. Refresh and try again.',
                   })}
                 />
               ) : null}
@@ -981,23 +981,23 @@ function GuardianAccountSummary({
             are never shown.
           </p>
         </div>
-        <Badge variant={data.account.linked ? "success" : "warning"}>
-          {data.account.linked ? "Linked" : "Not linked"}
+        <Badge variant={data.account.linked ? 'success' : 'warning'}>
+          {data.account.linked ? 'Linked' : 'Not linked'}
         </Badge>
       </div>
       <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
         <SummaryValue
           label="Account status"
-          value={data.account.status || "—"}
+          value={data.account.status || '—'}
         />
-        <SummaryValue label="Email" value={data.account.email || "—"} />
-        <SummaryValue label="Phone" value={data.account.phone || "—"} />
+        <SummaryValue label="Email" value={data.account.email || '—'} />
+        <SummaryValue label="Phone" value={data.account.phone || '—'} />
         <SummaryValue
           label="Last sign-in"
           value={
             data.account.lastLoginAt
               ? formatBsDate(data.account.lastLoginAt)
-              : "No sign-in recorded"
+              : 'No sign-in recorded'
           }
         />
       </dl>
@@ -1009,8 +1009,8 @@ function GuardianAccountSummary({
               key={method}
               className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold ${
                 available
-                  ? "bg-emerald-50 text-emerald-800"
-                  : "bg-slate-50 text-slate-500"
+                  ? 'bg-emerald-50 text-emerald-800'
+                  : 'bg-slate-50 text-slate-500'
               }`}
             >
               {available ? (
@@ -1038,13 +1038,13 @@ function GuardianProvisionForm({
   isSaving: boolean;
   onSubmit: (body: Parameters<typeof api.provisionGuardianAccount>[2]) => void;
 }) {
-  const [email, setEmail] = useState(data.account.email ?? "");
-  const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [email, setEmail] = useState(data.account.email ?? '');
+  const [temporaryPassword, setTemporaryPassword] = useState('');
   const [verificationMethod, setVerificationMethod] =
-    useState<GuardianRecoveryVerificationMethod>("SCHOOL_IDENTITY_REVIEW");
-  const [coGuardianId, setCoGuardianId] = useState("");
-  const [reason, setReason] = useState("");
-  const [evidenceReference, setEvidenceReference] = useState("");
+    useState<GuardianRecoveryVerificationMethod>('SCHOOL_IDENTITY_REVIEW');
+  const [coGuardianId, setCoGuardianId] = useState('');
+  const [reason, setReason] = useState('');
+  const [evidenceReference, setEvidenceReference] = useState('');
   const [confirmed, setConfirmed] = useState(false);
 
   if (!canProvision) {
@@ -1066,7 +1066,7 @@ function GuardianProvisionForm({
           reason: reason.trim(),
           evidenceReference: evidenceReference.trim(),
           coGuardianId:
-            verificationMethod === "APPROVED_CO_GUARDIAN"
+            verificationMethod === 'APPROVED_CO_GUARDIAN'
               ? coGuardianId
               : undefined,
         });
@@ -1111,7 +1111,7 @@ function GuardianProvisionForm({
           onChange={setVerificationMethod}
           disabled={isSaving}
         />
-        {verificationMethod === "APPROVED_CO_GUARDIAN" ? (
+        {verificationMethod === 'APPROVED_CO_GUARDIAN' ? (
           <CoGuardianField
             data={data}
             value={coGuardianId}
@@ -1162,11 +1162,11 @@ function GuardianProvisionForm({
             temporaryPassword.length < 8 ||
             reason.trim().length < 5 ||
             evidenceReference.trim().length < 3 ||
-            (verificationMethod === "APPROVED_CO_GUARDIAN" && !coGuardianId)
+            (verificationMethod === 'APPROVED_CO_GUARDIAN' && !coGuardianId)
           }
           className="rounded-xl bg-[var(--color-mod-admissions-accent)] px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
         >
-          {isSaving ? "Provisioning…" : "Provision parent account"}
+          {isSaving ? 'Provisioning…' : 'Provision parent account'}
         </button>
       </div>
     </form>
@@ -1190,15 +1190,15 @@ function IdentityReviewWorkspace({
   }) => void;
   onReview: (body: {
     verificationId: string;
-    status: "VERIFIED" | "REJECTED";
+    status: 'VERIFIED' | 'REJECTED';
     reviewNote: string;
   }) => void;
 }) {
   const [isCreating, setIsCreating] = useState(false);
-  const [documentType, setDocumentType] = useState("citizenship");
-  const [documentNumber, setDocumentNumber] = useState("");
-  const [notes, setNotes] = useState("");
-  const [reviewNote, setReviewNote] = useState("");
+  const [documentType, setDocumentType] = useState('citizenship');
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [notes, setNotes] = useState('');
+  const [reviewNote, setReviewNote] = useState('');
   const [confirmed, setConfirmed] = useState(false);
 
   return (
@@ -1217,7 +1217,7 @@ function IdentityReviewWorkspace({
             onClick={() => setIsCreating((current) => !current)}
             className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700"
           >
-            {isCreating ? "Cancel" : "Record evidence"}
+            {isCreating ? 'Cancel' : 'Record evidence'}
           </button>
         ) : null}
       </div>
@@ -1232,8 +1232,8 @@ function IdentityReviewWorkspace({
               documentNumber: documentNumber.trim(),
               notes: notes.trim() || undefined,
             });
-            setDocumentNumber("");
-            setNotes("");
+            setDocumentNumber('');
+            setNotes('');
             setIsCreating(false);
           }}
         >
@@ -1302,29 +1302,29 @@ function IdentityReviewWorkspace({
                     {formatTokenLabel(verification.documentType)}
                   </p>
                   <p className="mt-1 text-[11px] text-slate-500">
-                    Recorded {formatBsDate(verification.createdAt)} · Number{" "}
+                    Recorded {formatBsDate(verification.createdAt)} · Number{' '}
                     {verification.documentNumberRecorded
-                      ? "recorded"
-                      : "not recorded"}{" "}
-                    · Evidence file{" "}
+                      ? 'recorded'
+                      : 'not recorded'}{' '}
+                    · Evidence file{' '}
                     {verification.evidenceDocumentRecorded
-                      ? "recorded"
-                      : "not recorded"}
+                      ? 'recorded'
+                      : 'not recorded'}
                   </p>
                 </div>
                 <Badge
                   variant={
-                    verification.status === "VERIFIED"
-                      ? "success"
-                      : verification.status === "PENDING"
-                        ? "warning"
-                        : "neutral"
+                    verification.status === 'VERIFIED'
+                      ? 'success'
+                      : verification.status === 'PENDING'
+                        ? 'warning'
+                        : 'neutral'
                   }
                 >
                   {formatTokenLabel(verification.status)}
                 </Badge>
               </div>
-              {verification.status === "PENDING" && canVerify ? (
+              {verification.status === 'PENDING' && canVerify ? (
                 <div className="mt-3 border-t border-slate-200 pt-3">
                   <Field label="Review note">
                     <input
@@ -1348,7 +1348,7 @@ function IdentityReviewWorkspace({
                       onClick={() =>
                         onReview({
                           verificationId: verification.id,
-                          status: "REJECTED",
+                          status: 'REJECTED',
                           reviewNote: reviewNote.trim(),
                         })
                       }
@@ -1364,7 +1364,7 @@ function IdentityReviewWorkspace({
                       onClick={() =>
                         onReview({
                           verificationId: verification.id,
-                          status: "VERIFIED",
+                          status: 'VERIFIED',
                           reviewNote: reviewNote.trim(),
                         })
                       }
@@ -1398,9 +1398,9 @@ function GuardianSessions({
     evidenceReference: string;
   }) => void;
 }) {
-  const [selectedSessionId, setSelectedSessionId] = useState("");
-  const [reason, setReason] = useState("");
-  const [evidenceReference, setEvidenceReference] = useState("");
+  const [selectedSessionId, setSelectedSessionId] = useState('');
+  const [reason, setReason] = useState('');
+  const [evidenceReference, setEvidenceReference] = useState('');
   const [confirmed, setConfirmed] = useState(false);
 
   return (
@@ -1438,16 +1438,16 @@ function GuardianSessions({
               <div className="flex items-center gap-2">
                 <Badge
                   variant={
-                    session.status === "ACTIVE"
-                      ? "success"
-                      : session.status === "REVOKED"
-                        ? "destructive"
-                        : "neutral"
+                    session.status === 'ACTIVE'
+                      ? 'success'
+                      : session.status === 'REVOKED'
+                        ? 'destructive'
+                        : 'neutral'
                   }
                 >
                   {formatTokenLabel(session.status)}
                 </Badge>
-                {session.status === "ACTIVE" && canAdminister ? (
+                {session.status === 'ACTIVE' && canAdminister ? (
                   <button
                     type="button"
                     onClick={() => setSelectedSessionId(session.id)}
@@ -1495,7 +1495,7 @@ function GuardianSessions({
             <button
               type="button"
               className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700"
-              onClick={() => setSelectedSessionId("")}
+              onClick={() => setSelectedSessionId('')}
               disabled={isSaving}
             >
               Cancel
@@ -1515,7 +1515,7 @@ function GuardianSessions({
                   reason: reason.trim(),
                   evidenceReference: evidenceReference.trim(),
                 });
-                setSelectedSessionId("");
+                setSelectedSessionId('');
                 setConfirmed(false);
               }}
             >
@@ -1540,14 +1540,14 @@ function GuardianRecoveryForm({
   onSubmit: (body: GuardianRecoveryActionPayload) => void;
 }) {
   const [action, setAction] = useState<GuardianRecoveryAction>(
-    "REVOKE_ALL_SESSIONS",
+    'REVOKE_ALL_SESSIONS',
   );
   const [verificationMethod, setVerificationMethod] =
-    useState<GuardianRecoveryVerificationMethod>("TRUSTED_SESSION");
-  const [coGuardianId, setCoGuardianId] = useState("");
-  const [newPrimaryPhone, setNewPrimaryPhone] = useState("");
-  const [reason, setReason] = useState("");
-  const [evidenceReference, setEvidenceReference] = useState("");
+    useState<GuardianRecoveryVerificationMethod>('TRUSTED_SESSION');
+  const [coGuardianId, setCoGuardianId] = useState('');
+  const [newPrimaryPhone, setNewPrimaryPhone] = useState('');
+  const [reason, setReason] = useState('');
+  const [evidenceReference, setEvidenceReference] = useState('');
   const [confirmed, setConfirmed] = useState(false);
 
   if (!canAdminister) {
@@ -1558,7 +1558,7 @@ function GuardianRecoveryForm({
 
   const methodAvailable = recoveryMethodAvailable(data, verificationMethod);
   const phoneValid =
-    action !== "APPROVE_PHONE_CHANGE" ||
+    action !== 'APPROVE_PHONE_CHANGE' ||
     Boolean(tryNormalizeNepalPhone(newPrimaryPhone));
 
   return (
@@ -1572,11 +1572,11 @@ function GuardianRecoveryForm({
           reason: reason.trim(),
           evidenceReference: evidenceReference.trim(),
           newPrimaryPhone:
-            action === "APPROVE_PHONE_CHANGE"
+            action === 'APPROVE_PHONE_CHANGE'
               ? normalizeNepalPhone(newPrimaryPhone)
               : undefined,
           coGuardianId:
-            verificationMethod === "APPROVED_CO_GUARDIAN"
+            verificationMethod === 'APPROVED_CO_GUARDIAN'
               ? coGuardianId
               : undefined,
         });
@@ -1621,7 +1621,7 @@ function GuardianRecoveryForm({
           onChange={setVerificationMethod}
           disabled={isSaving}
         />
-        {verificationMethod === "APPROVED_CO_GUARDIAN" ? (
+        {verificationMethod === 'APPROVED_CO_GUARDIAN' ? (
           <CoGuardianField
             data={data}
             value={coGuardianId}
@@ -1629,7 +1629,7 @@ function GuardianRecoveryForm({
             disabled={isSaving}
           />
         ) : null}
-        {action === "APPROVE_PHONE_CHANGE" ? (
+        {action === 'APPROVE_PHONE_CHANGE' ? (
           <Field label="Approved new phone">
             <input
               className={inputClass}
@@ -1683,10 +1683,10 @@ function GuardianRecoveryForm({
             !phoneValid ||
             reason.trim().length < 5 ||
             evidenceReference.trim().length < 3 ||
-            (verificationMethod === "APPROVED_CO_GUARDIAN" && !coGuardianId)
+            (verificationMethod === 'APPROVED_CO_GUARDIAN' && !coGuardianId)
           }
         >
-          {isSaving ? "Recording action…" : "Confirm access action"}
+          {isSaving ? 'Recording action…' : 'Confirm access action'}
         </button>
       </div>
     </form>
@@ -1696,7 +1696,7 @@ function GuardianRecoveryForm({
 function GuardianDecisionHistory({
   history,
 }: {
-  history: GuardianAccessAdministration["history"];
+  history: GuardianAccessAdministration['history'];
 }) {
   return (
     <div className="rounded-xl border border-slate-200 p-4">
@@ -1776,7 +1776,7 @@ function RecoveryMethodField({
             disabled={!recoveryMethodAvailable(data, method)}
           >
             {recoveryMethodLabel(method)}
-            {recoveryMethodAvailable(data, method) ? "" : " — unavailable"}
+            {recoveryMethodAvailable(data, method) ? '' : ' — unavailable'}
           </option>
         ))}
       </select>
@@ -1871,19 +1871,19 @@ function SummaryValue({ label, value }: { label: string; value: string }) {
 
 function PanelState({
   text,
-  tone = "neutral",
+  tone = 'neutral',
 }: {
   text: string;
-  tone?: "neutral" | "success" | "error";
+  tone?: 'neutral' | 'success' | 'error';
 }) {
   return (
     <div
       className={`rounded-xl border p-3 text-xs font-bold ${
-        tone === "success"
-          ? "border-emerald-100 bg-emerald-50 text-emerald-800"
-          : tone === "error"
-            ? "border-rose-100 bg-rose-50 text-rose-700"
-            : "border-slate-100 bg-slate-50 text-slate-600"
+        tone === 'success'
+          ? 'border-emerald-100 bg-emerald-50 text-emerald-800'
+          : tone === 'error'
+            ? 'border-rose-100 bg-rose-50 text-rose-700'
+            : 'border-slate-100 bg-slate-50 text-slate-600'
       }`}
     >
       {text}
@@ -1895,13 +1895,13 @@ function recoveryMethodAvailable(
   data: GuardianAccessAdministration,
   method: GuardianRecoveryVerificationMethod,
 ) {
-  if (method === "TRUSTED_SESSION") {
+  if (method === 'TRUSTED_SESSION') {
     return data.recoveryPaths.trustedSessionAvailable;
   }
-  if (method === "VERIFIED_EMAIL") {
+  if (method === 'VERIFIED_EMAIL') {
     return data.recoveryPaths.verifiedEmailAvailable;
   }
-  if (method === "APPROVED_CO_GUARDIAN") {
+  if (method === 'APPROVED_CO_GUARDIAN') {
     return data.recoveryPaths.approvedCoGuardians.length > 0;
   }
   return data.recoveryPaths.schoolIdentityReviewAvailable;
@@ -1909,23 +1909,23 @@ function recoveryMethodAvailable(
 
 function recoveryMethodLabel(method: GuardianRecoveryVerificationMethod) {
   const labels: Record<GuardianRecoveryVerificationMethod, string> = {
-    TRUSTED_SESSION: "Trusted existing session",
-    VERIFIED_EMAIL: "Completed email recovery",
-    APPROVED_CO_GUARDIAN: "Approved co-guardian",
-    SCHOOL_IDENTITY_REVIEW: "School identity review",
+    TRUSTED_SESSION: 'Trusted existing session',
+    VERIFIED_EMAIL: 'Completed email recovery',
+    APPROVED_CO_GUARDIAN: 'Approved co-guardian',
+    SCHOOL_IDENTITY_REVIEW: 'School identity review',
   };
   return labels[method];
 }
 
 function recoveryActionLabel(action: GuardianRecoveryAction) {
   const labels: Record<GuardianRecoveryAction, string> = {
-    REVOKE_ALL_SESSIONS: "Revoke all sessions",
-    SUSPEND_COMPROMISED_ACCOUNT: "Place compromise hold",
-    RESTORE_ACCOUNT: "Restore account",
-    APPROVE_PHONE_CHANGE: "Approve phone change",
-    EXPIRE_RELATIONSHIP: "Expire relationship",
-    REVOKE_RELATIONSHIP: "Revoke relationship",
-    MARK_DECEASED: "End access after death",
+    REVOKE_ALL_SESSIONS: 'Revoke all sessions',
+    SUSPEND_COMPROMISED_ACCOUNT: 'Place compromise hold',
+    RESTORE_ACCOUNT: 'Restore account',
+    APPROVE_PHONE_CHANGE: 'Approve phone change',
+    EXPIRE_RELATIONSHIP: 'Expire relationship',
+    REVOKE_RELATIONSHIP: 'Revoke relationship',
+    MARK_DECEASED: 'End access after death',
   };
   return labels[action];
 }
@@ -1939,15 +1939,15 @@ function capabilityLabel(capability: GuardianCapability) {
 }
 
 function relationshipStatusVariant(
-  status: GuardianProfile["status"],
-): "success" | "warning" | "destructive" | "neutral" {
-  if (status === "ACTIVE") return "success";
-  if (status === "SUSPENDED") return "warning";
-  if (status === "REVOKED") return "destructive";
-  return "neutral";
+  status: GuardianProfile['status'],
+): 'success' | 'warning' | 'destructive' | 'neutral' {
+  if (status === 'ACTIVE') return 'success';
+  if (status === 'SUSPENDED') return 'warning';
+  if (status === 'REVOKED') return 'destructive';
+  return 'neutral';
 }
 
-function guardianStatusOrder(status: GuardianProfile["status"]) {
+function guardianStatusOrder(status: GuardianProfile['status']) {
   return {
     ACTIVE: 0,
     SUSPENDED: 1,
@@ -1960,24 +1960,24 @@ function safeBsInput(value: Date | string) {
   try {
     return formatBsDateForInput(value);
   } catch {
-    return "";
+    return '';
   }
 }
 
 function bsDateToApi(value: string) {
   const gregorian = toGregorianDateFromBs(value);
-  return `${gregorian.year}-${String(gregorian.month).padStart(2, "0")}-${String(gregorian.day).padStart(2, "0")}T00:00:00.000Z`;
+  return `${gregorian.year}-${String(gregorian.month).padStart(2, '0')}-${String(gregorian.day).padStart(2, '0')}T00:00:00.000Z`;
 }
 
 function formatGuardianRelation(value?: string | null) {
-  if (!value) return "Relation not recorded";
+  if (!value) return 'Relation not recorded';
   return formatTokenLabel(value);
 }
 
 function formatTokenLabel(value: string) {
   return value
     .toLowerCase()
-    .split("_")
+    .split('_')
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-    .join(" ");
+    .join(' ');
 }

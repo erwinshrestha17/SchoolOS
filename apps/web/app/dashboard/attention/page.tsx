@@ -1,33 +1,33 @@
-"use client";
+'use client';
 
-import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { ModuleHeader } from "../../../components/ui/module-header";
-import { DashboardAttentionPanel } from "../../../components/dashboard/dashboard-attention-panel";
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
+import { ModuleHeader } from '../../../components/ui/module-header';
+import { DashboardAttentionPanel } from '../../../components/dashboard/dashboard-attention-panel';
 import {
   OperationalSummaryError,
   OperationalSummaryLoading,
   RefreshSummaryButton,
   SummaryStatusBadge,
-} from "../../../components/ui/operational-summary";
-import { PermissionDenied } from "../../../components/ui/permission-denied";
-import { useSchoolWebPersona } from "../../../lib/school-web-persona";
+} from '../../../components/ui/operational-summary';
+import { PermissionDenied } from '../../../components/ui/permission-denied';
+import { useSchoolWebPersona } from '../../../lib/school-web-persona';
 import {
   assertServerDashboardProjection,
   resolveDashboardCompositionPersona,
-} from "../../../lib/dashboard-persona";
-import { api } from "../../../lib/api";
-import { formatSchoolDate } from "../../../lib/date-utils";
-import { formatBsDateTime } from "@schoolos/core";
+} from '../../../lib/dashboard-persona';
+import { api } from '../../../lib/api';
+import { formatSchoolDate } from '../../../lib/date-utils';
+import { formatBsDateTime } from '@schoolos/core';
 
 export default function PrincipalAttentionPage() {
   const schoolWebPersona = useSchoolWebPersona();
   const expectedPersona = resolveDashboardCompositionPersona(schoolWebPersona);
-  const isPrincipal = expectedPersona === "principal";
+  const isPrincipal = expectedPersona === 'principal';
   const dashboardQuery = useQuery({
-    queryKey: ["principal-attention-centre"],
+    queryKey: ['principal-attention-centre'],
     queryFn: api.getDashboardSummary,
     enabled: isPrincipal,
     staleTime: 30_000,
@@ -36,7 +36,7 @@ export default function PrincipalAttentionPage() {
   const dashboard = useMemo(
     () =>
       dashboardQuery.data && isPrincipal
-        ? assertServerDashboardProjection(dashboardQuery.data, "principal")
+        ? assertServerDashboardProjection(dashboardQuery.data, 'principal')
         : null,
     [dashboardQuery.data, isPrincipal],
   );
@@ -86,7 +86,9 @@ export default function PrincipalAttentionPage() {
 
       {dashboardQuery.isLoading ? <OperationalSummaryLoading /> : null}
       {dashboardQuery.isError ? (
-        <OperationalSummaryError onRetry={() => void dashboardQuery.refetch()} />
+        <OperationalSummaryError
+          onRetry={() => void dashboardQuery.refetch()}
+        />
       ) : null}
       {dashboardQuery.isSuccess && dashboardQuery.data && !dashboard ? (
         <PermissionDenied
@@ -94,7 +96,9 @@ export default function PrincipalAttentionPage() {
           description="The server returned a dashboard projection that does not match your current access. Refresh or sign in again."
         />
       ) : null}
-      {dashboard ? <DashboardAttentionPanel items={dashboard.attentionItems} /> : null}
+      {dashboard ? (
+        <DashboardAttentionPanel items={dashboard.attentionItems} />
+      ) : null}
     </div>
   );
 }

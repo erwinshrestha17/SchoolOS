@@ -8,74 +8,74 @@ import {
   Link2,
   PackageCheck,
   ShieldCheck,
-} from "lucide-react";
-import type { PermissionKey } from "@schoolos/core";
+} from 'lucide-react';
+import type { PermissionKey } from '@schoolos/core';
 
 export type TenantDetailSection =
-  | "overview"
-  | "access"
-  | "modules"
-  | "subscription"
-  | "billing"
-  | "onboarding"
-  | "integrations"
-  | "api-keys"
-  | "audit";
+  | 'overview'
+  | 'access'
+  | 'modules'
+  | 'subscription'
+  | 'billing'
+  | 'onboarding'
+  | 'integrations'
+  | 'api-keys'
+  | 'audit';
 
 export const TENANT_SECTIONS = [
   {
-    key: "overview",
-    label: "Overview",
+    key: 'overview',
+    label: 'Overview',
     icon: Building2,
-    permissions: ["platform:tenants:read"],
+    permissions: ['platform:tenants:read'],
   },
   {
-    key: "access",
-    label: "Access",
+    key: 'access',
+    label: 'Access',
     icon: ShieldCheck,
-    permissions: ["platform:tenants:status", "platform:support:override"],
+    permissions: ['platform:tenants:status', 'platform:support:override'],
   },
   {
-    key: "modules",
-    label: "Modules",
+    key: 'modules',
+    label: 'Modules',
     icon: PackageCheck,
-    permissions: ["platform:subscriptions:read"],
+    permissions: ['platform:subscriptions:read'],
   },
   {
-    key: "subscription",
-    label: "Subscription",
+    key: 'subscription',
+    label: 'Subscription',
     icon: BadgeCheck,
-    permissions: ["platform:subscriptions:read"],
+    permissions: ['platform:subscriptions:read'],
   },
   {
-    key: "billing",
-    label: "SaaS Billing",
+    key: 'billing',
+    label: 'SaaS Billing',
     icon: CreditCard,
-    permissions: ["platform:billing:read"],
+    permissions: ['platform:billing:read'],
   },
   {
-    key: "onboarding",
-    label: "Onboarding",
+    key: 'onboarding',
+    label: 'Onboarding',
     icon: BookOpenCheck,
-    permissions: ["platform:onboarding:read"],
+    permissions: ['platform:onboarding:read'],
   },
   {
-    key: "integrations",
-    label: "Integrations",
+    key: 'integrations',
+    label: 'Integrations',
     icon: Link2,
-    permissions: ["platform:providers:read"],
+    permissions: ['platform:providers:read'],
   },
   {
-    key: "api-keys",
-    label: "API Keys",
+    key: 'api-keys',
+    label: 'API Keys',
     icon: KeyRound,
-    permissions: ["platform:api-keys:read"],
+    permissions: ['platform:api-keys:read'],
   },
   {
-    key: "audit",
-    label: "Audit",
+    key: 'audit',
+    label: 'Audit',
     icon: FileClock,
-    permissions: ["platform:audit:read"],
+    permissions: ['platform:audit:read'],
   },
 ] as const satisfies ReadonlyArray<{
   key: TenantDetailSection;
@@ -85,16 +85,16 @@ export const TENANT_SECTIONS = [
 }>;
 
 export const TENANT_LEGACY_TAB_ROUTES: Record<string, TenantDetailSection> = {
-  overview: "overview",
-  access: "access",
-  entitlements: "modules",
-  modules: "modules",
-  subscription: "subscription",
-  billing: "billing",
-  onboarding: "onboarding",
-  integrations: "integrations",
-  "api-keys": "api-keys",
-  audit: "audit",
+  overview: 'overview',
+  access: 'access',
+  entitlements: 'modules',
+  modules: 'modules',
+  subscription: 'subscription',
+  billing: 'billing',
+  onboarding: 'onboarding',
+  integrations: 'integrations',
+  'api-keys': 'api-keys',
+  audit: 'audit',
 };
 
 export function tenantSectionHref(
@@ -102,5 +102,5 @@ export function tenantSectionHref(
   section: TenantDetailSection,
 ) {
   const base = `/platform/schools/${encodeURIComponent(tenantId)}`;
-  return section === "overview" ? base : `${base}/${section}`;
+  return section === 'overview' ? base : `${base}/${section}`;
 }

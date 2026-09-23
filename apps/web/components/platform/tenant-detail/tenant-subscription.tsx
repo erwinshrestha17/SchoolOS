@@ -1,19 +1,19 @@
-"use client";
+'use client';
 
-import { formatBsDate } from "@schoolos/core";
-import { AlertTriangle, CreditCard, RefreshCw } from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
-import { PlatformBoundaryNote } from "@/app/platform/_components/platform-operator-states";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { formatBsDate } from '@schoolos/core';
+import { AlertTriangle, CreditCard, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
+import { useState } from 'react';
+import { PlatformBoundaryNote } from '@/app/platform/_components/platform-operator-states';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -21,23 +21,23 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useSession } from "@/components/session-provider";
-import { platformApi } from "@/lib/api/platform";
-import { hasPermission } from "@/lib/session";
-import { useTenantDetail } from "./tenant-detail-page";
-import { tenantSectionHref } from "./tenant-detail-routes";
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useSession } from '@/components/session-provider';
+import { platformApi } from '@/lib/api/platform';
+import { hasPermission } from '@/lib/session';
+import { useTenantDetail } from './tenant-detail-page';
+import { tenantSectionHref } from './tenant-detail-routes';
 
 export function TenantSubscription() {
   const { tenant, refreshTenant } = useTenantDetail();
   const { session } = useSession();
-  const canManageBilling = hasPermission(session, "platform:billing:manage");
-  const canReadBilling = hasPermission(session, "platform:billing:read");
-  const canReadUsage = hasPermission(session, "platform:usage:read");
+  const canManageBilling = hasPermission(session, 'platform:billing:manage');
+  const canReadBilling = hasPermission(session, 'platform:billing:read');
+  const canReadUsage = hasPermission(session, 'platform:usage:read');
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,21 +54,21 @@ export function TenantSubscription() {
         tenant.id,
         tenant.subscription.id,
         {
-          status: "CANCELLED",
+          status: 'CANCELLED',
           notes: `Cancelled by platform operator: ${reason.trim()}`,
         },
       );
       await refreshTenant();
       setMessage(
-        "SchoolOS subscription cancelled. Module access now follows backend entitlement state.",
+        'SchoolOS subscription cancelled. Module access now follows backend entitlement state.',
       );
       setCancelOpen(false);
-      setReason("");
+      setReason('');
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "The subscription could not be cancelled.",
+          : 'The subscription could not be cancelled.',
       );
     } finally {
       setSaving(false);
@@ -106,7 +106,7 @@ export function TenantSubscription() {
 
       {message || error ? (
         <div
-          className={`rounded-2xl border p-4 text-sm font-bold ${error ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+          className={`rounded-2xl border p-4 text-sm font-bold ${error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}
         >
           {error ?? message}
         </div>
@@ -124,20 +124,20 @@ export function TenantSubscription() {
           </div>
           <Badge
             variant={
-              subscription?.status === "ACTIVE" ||
-              subscription?.status === "TRIAL"
-                ? "success"
-                : "warning"
+              subscription?.status === 'ACTIVE' ||
+              subscription?.status === 'TRIAL'
+                ? 'success'
+                : 'warning'
             }
           >
-            {subscription?.status ?? "UNASSIGNED"}
+            {subscription?.status ?? 'UNASSIGNED'}
           </Badge>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <RecordValue
               label="Plan"
-              value={subscription?.planName ?? "No plan"}
+              value={subscription?.planName ?? 'No plan'}
             />
             <RecordValue
               label="Starts"
@@ -154,7 +154,7 @@ export function TenantSubscription() {
           </div>
           {canManageBilling &&
           subscription &&
-          subscription.status !== "CANCELLED" ? (
+          subscription.status !== 'CANCELLED' ? (
             <div className="flex justify-end border-t border-slate-100 pt-5">
               <Button
                 variant="destructive"
@@ -189,7 +189,7 @@ export function TenantSubscription() {
                   return (
                     <div
                       key={`${counter.usageKey}-${counter.period}`}
-                      className={`rounded-2xl border p-4 ${ratio >= 0.9 ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}
+                      className={`rounded-2xl border p-4 ${ratio >= 0.9 ? 'border-amber-200 bg-amber-50' : 'border-slate-100 bg-slate-50'}`}
                     >
                       <div className="flex items-center justify-between gap-4">
                         <p className="font-mono text-sm font-bold text-slate-900">
@@ -203,8 +203,8 @@ export function TenantSubscription() {
                         {counter.value.toLocaleString()}
                       </p>
                       <p className="mt-1 text-xs font-semibold text-slate-500">
-                        Limit{" "}
-                        {counter.limit?.toLocaleString() ?? "not configured"} ·{" "}
+                        Limit{' '}
+                        {counter.limit?.toLocaleString() ?? 'not configured'} ·{' '}
                         {counter.period}
                       </p>
                     </div>
@@ -218,7 +218,7 @@ export function TenantSubscription() {
             )}
             {warnings.length ? (
               <p className="mt-4 text-sm font-bold text-amber-800">
-                {warnings.length} counter{warnings.length === 1 ? "" : "s"} at
+                {warnings.length} counter{warnings.length === 1 ? '' : 's'} at
                 or above 90% of the configured limit.
               </p>
             ) : null}
@@ -229,7 +229,7 @@ export function TenantSubscription() {
       {canReadBilling ? (
         <div className="text-sm">
           <Link
-            href={tenantSectionHref(tenant.id, "billing")}
+            href={tenantSectionHref(tenant.id, 'billing')}
             className="font-bold text-[var(--color-mod-platform-accent)] hover:underline"
           >
             Open SaaS invoices and billing profile
@@ -291,9 +291,7 @@ function RecordValue({ label, value }: { label: string; value: string }) {
 }
 
 function formatDate(value: string | null | undefined) {
-  if (!value) return "Not recorded";
+  if (!value) return 'Not recorded';
   const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "Not recorded"
-    : formatBsDate(date);
+  return Number.isNaN(date.getTime()) ? 'Not recorded' : formatBsDate(date);
 }

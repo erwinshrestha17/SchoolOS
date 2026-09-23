@@ -4,8 +4,8 @@ export type AttendanceDraftStorageTicket = Readonly<{
 
 export class AttendanceDraftStorageInvalidatedError extends Error {
   constructor() {
-    super("Attendance draft storage authority changed");
-    this.name = "AttendanceDraftStorageInvalidatedError";
+    super('Attendance draft storage authority changed');
+    this.name = 'AttendanceDraftStorageInvalidatedError';
   }
 }
 

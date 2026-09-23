@@ -97,8 +97,7 @@ export function DocumentsTab({
 }: DocumentsTabProps) {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
-  const [activeTab, setActiveTab] =
-    useState<DocumentWorkspaceTab>('all-files');
+  const [activeTab, setActiveTab] = useState<DocumentWorkspaceTab>('all-files');
   const [selectedDocument, setSelectedDocument] =
     useState<StudentDocument | null>(null);
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
@@ -167,8 +166,13 @@ export function DocumentsTab({
   });
 
   const archiveDocumentMutation = useMutation({
-    mutationFn: ({ documentId, reason }: { documentId: string; reason: string }) =>
-      api.archiveStudentDocument(documentId, { reason }),
+    mutationFn: ({
+      documentId,
+      reason,
+    }: {
+      documentId: string;
+      reason: string;
+    }) => api.archiveStudentDocument(documentId, { reason }),
     onSuccess: async () => {
       setDocumentToArchive(null);
       setArchiveReason('');
@@ -284,9 +288,7 @@ export function DocumentsTab({
 
       <Tabs
         value={activeTab}
-        onValueChange={(value) =>
-          setActiveTab(value as DocumentWorkspaceTab)
-        }
+        onValueChange={(value) => setActiveTab(value as DocumentWorkspaceTab)}
       >
         <div className="overflow-x-auto border-b border-slate-200">
           <TabsList
@@ -586,7 +588,10 @@ function AllFilesTable({
                     />
                   </td>
                   <td className="px-4 py-3 text-slate-600">
-                    {formatDateTime(document.uploadedAt, 'Upload time unavailable')}
+                    {formatDateTime(
+                      document.uploadedAt,
+                      'Upload time unavailable',
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
@@ -1031,7 +1036,9 @@ function DocumentDetail({
             {formatDateTime(document.uploadedAt, 'Upload time unavailable')}
           </DetailRow>
           <DetailRow label="Uploaded by">
-            {document.uploadedById ? 'Uploader name unavailable' : 'Not supplied'}
+            {document.uploadedById
+              ? 'Uploader name unavailable'
+              : 'Not supplied'}
           </DetailRow>
           <DetailRow label="File type">{document.contentType}</DetailRow>
           <DetailRow label="File size">
@@ -1051,7 +1058,9 @@ function DocumentDetail({
               : 'Not verified'}
           </DetailRow>
           <DetailRow label="Verified by">
-            {document.verifiedById ? 'Verifier name unavailable' : 'Not supplied'}
+            {document.verifiedById
+              ? 'Verifier name unavailable'
+              : 'Not supplied'}
           </DetailRow>
         </dl>
 
@@ -1237,8 +1246,9 @@ function StudentDocumentAccessButton({
   disabled?: boolean;
   showStatus?: boolean;
 }) {
-  const [status, setStatus] =
-    useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<
+    'idle' | 'loading' | 'success' | 'error'
+  >('idle');
   const [message, setMessage] = useState('');
 
   async function openDocument() {

@@ -1,27 +1,27 @@
-"use client";
+'use client';
 
 import {
   formatBsDate,
   getNepalSchoolDay,
   type PlatformSaaSInvoiceSummary,
-} from "@schoolos/core";
-import { CreditCard, FileClock, Plus, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+} from '@schoolos/core';
+import { CreditCard, FileClock, Plus, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   PlatformBoundaryNote,
   PlatformEmptyState,
   PlatformInlineError,
   PlatformSectionSkeleton,
-} from "@/app/platform/_components/platform-operator-states";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from '@/app/platform/_components/platform-operator-states';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -29,25 +29,25 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { useSession } from "@/components/session-provider";
-import { platformApi } from "@/lib/api/platform";
-import { hasPermission } from "@/lib/session";
-import { useTenantDetail } from "./tenant-detail-page";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useSession } from '@/components/session-provider';
+import { platformApi } from '@/lib/api/platform';
+import { hasPermission } from '@/lib/session';
+import { useTenantDetail } from './tenant-detail-page';
 
 type InvoiceAction =
-  | { mode: "view"; invoice: PlatformSaaSInvoiceSummary }
-  | { mode: "payment"; invoice: PlatformSaaSInvoiceSummary }
-  | { mode: "cancel"; invoice: PlatformSaaSInvoiceSummary };
+  | { mode: 'view'; invoice: PlatformSaaSInvoiceSummary }
+  | { mode: 'payment'; invoice: PlatformSaaSInvoiceSummary }
+  | { mode: 'cancel'; invoice: PlatformSaaSInvoiceSummary };
 
 export function TenantBilling() {
   const { tenant, refreshTenant } = useTenantDetail();
   const { session } = useSession();
-  const canManageBilling = hasPermission(session, "platform:billing:manage");
+  const canManageBilling = hasPermission(session, 'platform:billing:manage');
   const [invoices, setInvoices] = useState<PlatformSaaSInvoiceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -60,7 +60,7 @@ export function TenantBilling() {
     null,
   );
   const [paymentForm, setPaymentForm] = useState(makeDefaultPaymentForm);
-  const [cancelReason, setCancelReason] = useState("");
+  const [cancelReason, setCancelReason] = useState('');
   const [billingDialogOpen, setBillingDialogOpen] = useState(false);
   const [billingForm, setBillingForm] = useState(makeDefaultBillingForm);
 
@@ -84,15 +84,15 @@ export function TenantBilling() {
   function openBillingProfile() {
     if (!canManageBilling) return;
     setBillingForm({
-      billingContactName: tenant.billingProfile?.billingContactName ?? "",
-      billingEmail: tenant.billingProfile?.billingEmail ?? "",
-      billingPhone: tenant.billingProfile?.billingPhone ?? "",
-      billingAddress: tenant.billingProfile?.billingAddress ?? "",
+      billingContactName: tenant.billingProfile?.billingContactName ?? '',
+      billingEmail: tenant.billingProfile?.billingEmail ?? '',
+      billingPhone: tenant.billingProfile?.billingPhone ?? '',
+      billingAddress: tenant.billingProfile?.billingAddress ?? '',
       panVatNumber:
-        tenant.billingProfile?.panVatNumber ?? tenant.panNumber ?? "",
+        tenant.billingProfile?.panVatNumber ?? tenant.panNumber ?? '',
       preferredBillingCycle:
-        tenant.billingProfile?.preferredBillingCycle ?? "MONTHLY",
-      notes: tenant.billingProfile?.notes ?? "",
+        tenant.billingProfile?.preferredBillingCycle ?? 'MONTHLY',
+      notes: tenant.billingProfile?.notes ?? '',
     });
     setBillingDialogOpen(true);
   }
@@ -124,7 +124,7 @@ export function TenantBilling() {
         ],
       });
       await loadInvoices();
-      setMessage("SchoolOS subscription invoice created.");
+      setMessage('SchoolOS subscription invoice created.');
       setInvoiceDialogOpen(false);
       setInvoiceForm(makeDefaultInvoiceForm());
     } catch (caught) {
@@ -138,7 +138,7 @@ export function TenantBilling() {
     if (
       !canManageBilling ||
       !invoiceAction ||
-      invoiceAction.mode !== "payment"
+      invoiceAction.mode !== 'payment'
     ) {
       return;
     }
@@ -157,7 +157,7 @@ export function TenantBilling() {
         },
       );
       await loadInvoices();
-      setMessage("SaaS payment recorded.");
+      setMessage('SaaS payment recorded.');
       setInvoiceAction(null);
       setPaymentForm(makeDefaultPaymentForm());
     } catch (caught) {
@@ -171,7 +171,7 @@ export function TenantBilling() {
     if (
       !canManageBilling ||
       !invoiceAction ||
-      invoiceAction.mode !== "cancel" ||
+      invoiceAction.mode !== 'cancel' ||
       cancelReason.trim().length < 5
     ) {
       return;
@@ -187,9 +187,9 @@ export function TenantBilling() {
         },
       );
       await loadInvoices();
-      setMessage("SaaS invoice cancelled.");
+      setMessage('SaaS invoice cancelled.');
       setInvoiceAction(null);
-      setCancelReason("");
+      setCancelReason('');
     } catch (caught) {
       setActionError(getErrorMessage(caught));
     } finally {
@@ -203,7 +203,7 @@ export function TenantBilling() {
       billingForm.billingEmail &&
       !EMAIL_PATTERN.test(billingForm.billingEmail)
     ) {
-      setActionError("Enter a valid billing email address.");
+      setActionError('Enter a valid billing email address.');
       return;
     }
     setSaving(true);
@@ -214,7 +214,7 @@ export function TenantBilling() {
         compactPayload(billingForm),
       );
       await refreshTenant();
-      setMessage("Billing profile updated.");
+      setMessage('Billing profile updated.');
       setBillingDialogOpen(false);
     } catch (caught) {
       setActionError(getErrorMessage(caught));
@@ -253,7 +253,7 @@ export function TenantBilling() {
 
       {message || actionError ? (
         <div
-          className={`rounded-2xl border p-4 text-sm font-bold ${actionError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+          className={`rounded-2xl border p-4 text-sm font-bold ${actionError ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}
         >
           {actionError ?? message}
         </div>
@@ -327,11 +327,11 @@ export function TenantBilling() {
                         <td className="px-5 py-4">
                           <Badge
                             variant={
-                              invoice.status === "PAID"
-                                ? "success"
-                                : invoice.status === "OVERDUE"
-                                  ? "destructive"
-                                  : "neutral"
+                              invoice.status === 'PAID'
+                                ? 'success'
+                                : invoice.status === 'OVERDUE'
+                                  ? 'destructive'
+                                  : 'neutral'
                             }
                           >
                             {invoice.status}
@@ -343,7 +343,7 @@ export function TenantBilling() {
                               variant="ghost"
                               size="sm"
                               onClick={() =>
-                                setInvoiceAction({ mode: "view", invoice })
+                                setInvoiceAction({ mode: 'view', invoice })
                               }
                             >
                               View
@@ -353,8 +353,8 @@ export function TenantBilling() {
                                 variant="outline"
                                 size="sm"
                                 disabled={
-                                  invoice.status === "PAID" ||
-                                  invoice.status === "CANCELLED"
+                                  invoice.status === 'PAID' ||
+                                  invoice.status === 'CANCELLED'
                                 }
                                 onClick={() => {
                                   setPaymentForm({
@@ -362,7 +362,7 @@ export function TenantBilling() {
                                     amount: invoice.balanceAmount,
                                   });
                                   setInvoiceAction({
-                                    mode: "payment",
+                                    mode: 'payment',
                                     invoice,
                                   });
                                 }}
@@ -376,11 +376,11 @@ export function TenantBilling() {
                                 size="sm"
                                 className="text-rose-700"
                                 disabled={
-                                  invoice.status === "PAID" ||
-                                  invoice.status === "CANCELLED"
+                                  invoice.status === 'PAID' ||
+                                  invoice.status === 'CANCELLED'
                                 }
                                 onClick={() =>
-                                  setInvoiceAction({ mode: "cancel", invoice })
+                                  setInvoiceAction({ mode: 'cancel', invoice })
                                 }
                               >
                                 Cancel
@@ -407,17 +407,17 @@ export function TenantBilling() {
             <ProfileValue
               label="Billing email"
               value={
-                tenant.billingProfile?.billingEmail ?? "Same as school admin"
+                tenant.billingProfile?.billingEmail ?? 'Same as school admin'
               }
             />
             <ProfileValue
               label="Billing address"
-              value={tenant.billingProfile?.billingAddress ?? "Not provided"}
+              value={tenant.billingProfile?.billingAddress ?? 'Not provided'}
             />
             <ProfileValue
               label="Billing cycle"
               value={
-                tenant.billingProfile?.preferredBillingCycle ?? "Not configured"
+                tenant.billingProfile?.preferredBillingCycle ?? 'Not configured'
               }
             />
             {canManageBilling ? (
@@ -542,7 +542,7 @@ export function TenantBilling() {
       ) : null}
 
       <Dialog
-        open={invoiceAction?.mode === "view"}
+        open={invoiceAction?.mode === 'view'}
         onOpenChange={(open: boolean) => {
           if (!open) setInvoiceAction(null);
         }}
@@ -561,7 +561,7 @@ export function TenantBilling() {
 
       {canManageBilling ? (
         <Dialog
-          open={invoiceAction?.mode === "payment"}
+          open={invoiceAction?.mode === 'payment'}
           onOpenChange={(open: boolean) => {
             if (!open) setInvoiceAction(null);
           }}
@@ -570,7 +570,7 @@ export function TenantBilling() {
             <DialogHeader>
               <DialogTitle>Record SaaS payment</DialogTitle>
               <DialogDescription>
-                Record a SchoolOS subscription payment against{" "}
+                Record a SchoolOS subscription payment against{' '}
                 {invoiceAction?.invoice.invoiceNumber}.
               </DialogDescription>
             </DialogHeader>
@@ -650,7 +650,7 @@ export function TenantBilling() {
 
       {canManageBilling ? (
         <Dialog
-          open={invoiceAction?.mode === "cancel"}
+          open={invoiceAction?.mode === 'cancel'}
           onOpenChange={(open: boolean) => {
             if (!open) setInvoiceAction(null);
           }}
@@ -803,14 +803,14 @@ function Field({
   label,
   value,
   onChange,
-  type = "text",
+  type = 'text',
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
 }) {
-  const id = `billing-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const id = `billing-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
@@ -884,33 +884,33 @@ function makeDefaultInvoiceForm() {
   return {
     issueDate: today,
     dueDate: addDays(today, 15),
-    lineType: "SUBSCRIPTION",
-    description: "SchoolOS subscription billing",
-    quantity: "1",
-    unitAmount: "",
-    notes: "",
+    lineType: 'SUBSCRIPTION',
+    description: 'SchoolOS subscription billing',
+    quantity: '1',
+    unitAmount: '',
+    notes: '',
   };
 }
 
 function makeDefaultPaymentForm() {
   return {
-    amount: "",
+    amount: '',
     paymentDate: getNepalSchoolDay().gregorianDate,
-    method: "BANK_TRANSFER",
-    reference: "",
-    notes: "",
+    method: 'BANK_TRANSFER',
+    reference: '',
+    notes: '',
   };
 }
 
 function makeDefaultBillingForm() {
   return {
-    billingContactName: "",
-    billingEmail: "",
-    billingPhone: "",
-    billingAddress: "",
-    panVatNumber: "",
-    preferredBillingCycle: "MONTHLY",
-    notes: "",
+    billingContactName: '',
+    billingEmail: '',
+    billingPhone: '',
+    billingAddress: '',
+    panVatNumber: '',
+    preferredBillingCycle: 'MONTHLY',
+    notes: '',
   };
 }
 
@@ -926,14 +926,14 @@ function toIsoDate(value: string) {
 
 function compactPayload(values: Record<string, string>) {
   return Object.fromEntries(
-    Object.entries(values).filter(([, value]) => value.trim() !== ""),
+    Object.entries(values).filter(([, value]) => value.trim() !== ''),
   );
 }
 
 function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
-    ? "Date not recorded"
+    ? 'Date not recorded'
     : formatBsDate(date);
 }
 
@@ -944,5 +944,5 @@ function formatMoney(currency: string, value: string) {
 function getErrorMessage(error: unknown) {
   return error instanceof Error
     ? error.message
-    : "This billing action could not be completed.";
+    : 'This billing action could not be completed.';
 }

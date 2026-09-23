@@ -1,9 +1,4 @@
-import {
-  downloadCsv,
-  JsonBody,
-  request,
-  withQuery,
-} from './client';
+import { downloadCsv, JsonBody, request, withQuery } from './client';
 
 export type LibraryCopyStatus =
   | 'AVAILABLE'
@@ -21,7 +16,11 @@ export type LibraryFineStatus =
   | 'PARTIALLY_PAID'
   | 'WAIVED';
 
-export type LibraryReservationStatus = 'ACTIVE' | 'FULFILLED' | 'CANCELLED' | 'EXPIRED';
+export type LibraryReservationStatus =
+  | 'ACTIVE'
+  | 'FULFILLED'
+  | 'CANCELLED'
+  | 'EXPIRED';
 
 export type LibraryPaginationMeta = {
   page: number;
@@ -245,7 +244,10 @@ export type LibraryIssuePayload = {
   notes?: string;
 };
 
-export type ScannerIssueLibraryCopyPayload = Omit<LibraryIssuePayload, 'copyId'> & {
+export type ScannerIssueLibraryCopyPayload = Omit<
+  LibraryIssuePayload,
+  'copyId'
+> & {
   code: string;
 };
 
@@ -377,10 +379,13 @@ export const libraryApi = {
       json: body,
     }),
   returnIssue: (issueId: string, body: ReturnLibraryIssuePayload) =>
-    request<LibraryIssue>(`/library/issues/${encodeURIComponent(issueId)}/return`, {
-      method: 'PATCH',
-      json: body,
-    }),
+    request<LibraryIssue>(
+      `/library/issues/${encodeURIComponent(issueId)}/return`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   returnIssueByScanner: (body: ScannerReturnLibraryIssuePayload) =>
     request<LibraryIssue>('/library/returns/scanner', {
       method: 'POST',
@@ -452,7 +457,9 @@ export const libraryApi = {
       withQuery('/library/reports/popular', params ?? {}),
     ),
   getLostDamagedReport: () =>
-    request<LibraryPaginatedResult<LibraryCopy>>('/library/reports/lost-damaged'),
+    request<LibraryPaginatedResult<LibraryCopy>>(
+      '/library/reports/lost-damaged',
+    ),
   getFineSummary: () =>
     request<LibraryFineSummaryReport>('/library/reports/fines'),
   getBorrowerHistory: (params?: {

@@ -4,7 +4,13 @@ import { formatBsDate } from '@schoolos/core';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../ui/dialog';
 import { Button } from '../ui/button';
 import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
@@ -42,17 +48,26 @@ export function StaffAttendanceCorrectionDialog({
   const [status, setStatus] = useState(record.status);
   const [reason, setReason] = useState('');
   const [checkInTime, setCheckInTime] = useState(
-    record.checkIn ? formatNepalDateTimeLocalInput(record.checkIn).slice(11, 16) : ''
+    record.checkIn
+      ? formatNepalDateTimeLocalInput(record.checkIn).slice(11, 16)
+      : '',
   );
   const [leaveType, setLeaveType] = useState(record.leaveType ?? '');
   const [note, setNote] = useState(record.note ?? '');
 
   const correctMutation = useMutation({
-    mutationFn: (payload: any) => api.correctStaffAttendance(record.id, payload),
+    mutationFn: (payload: any) =>
+      api.correctStaffAttendance(record.id, payload),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['staff-attendance-summary'] });
-      void queryClient.invalidateQueries({ queryKey: ['staff-detail', staffId] });
-      void queryClient.invalidateQueries({ queryKey: ['staff-attendance', staffId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-attendance-summary'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-detail', staffId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-attendance', staffId],
+      });
       void queryClient.invalidateQueries({ queryKey: ['payroll-preview'] });
       onClose();
     },
@@ -93,11 +108,15 @@ export function StaffAttendanceCorrectionDialog({
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle className="flex items-center gap-2">
-              <ClipboardCheck size={20} className="text-[var(--color-mod-hr-text)]" />
+              <ClipboardCheck
+                size={20}
+                className="text-[var(--color-mod-hr-text)]"
+              />
               Correct Attendance Record
             </DialogTitle>
             <p className="text-xs text-slate-500 mt-1">
-              Correcting entry for {fullName} on {formatBsDate(record.attendanceDate)}
+              Correcting entry for {fullName} on{' '}
+              {formatBsDate(record.attendanceDate)}
             </p>
           </div>
           <button
@@ -123,13 +142,18 @@ export function StaffAttendanceCorrectionDialog({
           <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4 flex gap-3 text-xs text-amber-800 leading-relaxed">
             <AlertTriangle className="shrink-0 text-amber-600" size={18} />
             <div>
-              <strong>Recalculation Alert:</strong> Correcting historical attendance records may trigger salary deductions or recalculations on active/pending payroll runs.
+              <strong>Recalculation Alert:</strong> Correcting historical
+              attendance records may trigger salary deductions or recalculations
+              on active/pending payroll runs.
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Status">
-              <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+              <Select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
                 <option value="PRESENT">Present</option>
                 <option value="LATE">Late</option>
                 <option value="ABSENT">Absent</option>
@@ -149,7 +173,10 @@ export function StaffAttendanceCorrectionDialog({
 
           {status === 'LEAVE' && (
             <FormField label="Leave Type">
-              <Select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
+              <Select
+                value={leaveType}
+                onChange={(e) => setLeaveType(e.target.value)}
+              >
                 <option value="">Choose leave type...</option>
                 <option value="SICK">Sick Leave</option>
                 <option value="CASUAL">Casual Leave</option>

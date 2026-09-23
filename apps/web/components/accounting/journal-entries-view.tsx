@@ -1,51 +1,51 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Plus, Eye } from "lucide-react";
-import { api } from "../../lib/api";
-import { SectionCard } from "../ui/section-card";
-import { PageState } from "../ui/page-state";
-import { Button } from "@/components/ui/button";
-import { ReportTable } from "./report-table";
-import { VoucherDialog } from "./voucher-dialog";
-import { JournalDetailDialog } from "./journal-detail-dialog";
-import { JournalEntryView } from "@schoolos/core";
-import { cn } from "../../lib/utils";
-import { showWarning } from "../../lib/toast";
-import { useSession } from "../session-provider";
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Plus, Eye } from 'lucide-react';
+import { api } from '../../lib/api';
+import { SectionCard } from '../ui/section-card';
+import { PageState } from '../ui/page-state';
+import { Button } from '@/components/ui/button';
+import { ReportTable } from './report-table';
+import { VoucherDialog } from './voucher-dialog';
+import { JournalDetailDialog } from './journal-detail-dialog';
+import { JournalEntryView } from '@schoolos/core';
+import { cn } from '../../lib/utils';
+import { showWarning } from '../../lib/toast';
+import { useSession } from '../session-provider';
 
 export function JournalEntriesView() {
   const { hasPermissions } = useSession();
-  const canCreateJournal = hasPermissions(["accounting:journals:create"]);
+  const canCreateJournal = hasPermissions(['accounting:journals:create']);
   const [voucherOpen, setVoucherOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<JournalEntryView | null>(
     null,
   );
 
   const accountsQuery = useQuery({
-    queryKey: ["chart-accounts"],
+    queryKey: ['chart-accounts'],
     queryFn: () => api.listChartAccounts(),
   });
 
   const journalsQuery = useQuery({
-    queryKey: ["ledger-entries"],
+    queryKey: ['ledger-entries'],
     queryFn: () => api.listJournalEntries(),
   });
 
   const fiscalYearsQuery = useQuery({
-    queryKey: ["fiscal-years"],
+    queryKey: ['fiscal-years'],
     queryFn: () => api.listFiscalYears(),
   });
 
   const activePeriod = (fiscalYearsQuery.data ?? [])
-    .find((y) => y.status === "OPEN")
-    ?.periods?.find((period) => period.status === "OPEN");
+    .find((y) => y.status === 'OPEN')
+    ?.periods?.find((period) => period.status === 'OPEN');
 
   const handleCreateVoucher = () => {
     if (!activePeriod) {
       showWarning(
-        "No active fiscal period found. Open a period in Accounting Management before creating a voucher.",
+        'No active fiscal period found. Open a period in Accounting Management before creating a voucher.',
       );
       return;
     }
@@ -64,16 +64,16 @@ export function JournalEntriesView() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "POSTED":
-        return "text-emerald-600 bg-emerald-50";
-      case "DRAFT":
-        return "text-slate-600 bg-slate-50";
-      case "SUBMITTED":
-        return "text-amber-600 bg-amber-50";
-      case "REVERSED":
-        return "text-rose-600 bg-rose-50";
+      case 'POSTED':
+        return 'text-emerald-600 bg-emerald-50';
+      case 'DRAFT':
+        return 'text-slate-600 bg-slate-50';
+      case 'SUBMITTED':
+        return 'text-amber-600 bg-amber-50';
+      case 'REVERSED':
+        return 'text-rose-600 bg-rose-50';
       default:
-        return "text-slate-600 bg-slate-50";
+        return 'text-slate-600 bg-slate-50';
     }
   };
 
@@ -87,8 +87,8 @@ export function JournalEntriesView() {
             disabled={!activePeriod}
             className={cn(
               activePeriod
-                ? "bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]"
-                : "bg-slate-400",
+                ? 'bg-[var(--color-mod-accounting-accent)] hover:bg-[var(--color-mod-accounting-text)]'
+                : 'bg-slate-400',
             )}
           >
             <Plus size={18} />
@@ -107,26 +107,26 @@ export function JournalEntriesView() {
             title="Failed to load journal entries"
             description={
               journalsQuery.error?.message ??
-              "Journal entries could not be loaded."
+              'Journal entries could not be loaded.'
             }
           />
         ) : (
           <ReportTable
             columns={[
-              { id: "date", label: "Date", width: 150 },
-              { id: "number", label: "Number", width: 160 },
-              { id: "narration", label: "Narration", width: 280 },
-              { id: "type", label: "Type" },
-              { id: "status", label: "Status" },
-              { id: "amount", label: "Amount", align: "right" },
-              { id: "action", label: "Action", align: "center", width: 96 },
+              { id: 'date', label: 'Date', width: 150 },
+              { id: 'number', label: 'Number', width: 160 },
+              { id: 'narration', label: 'Narration', width: 280 },
+              { id: 'type', label: 'Type' },
+              { id: 'status', label: 'Status' },
+              { id: 'amount', label: 'Amount', align: 'right' },
+              { id: 'action', label: 'Action', align: 'center', width: 96 },
             ]}
             rows={(journalsQuery.data ?? []).map((entry) => ({
               id: entry.id,
               accessibleLabel: `Open journal ${entry.entryNumber ?? entry.id}`,
               onActivate: () => setSelectedEntry(entry),
               cells: {
-                date: { value: entry.entryDate, type: "date" },
+                date: { value: entry.entryDate, type: 'date' },
                 number: { value: entry.entryNumber, bold: true },
                 narration: { value: entry.narration },
                 type: { value: entry.sourceType },
@@ -134,7 +134,7 @@ export function JournalEntriesView() {
                   value: (
                     <span
                       className={cn(
-                        "rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-tighter",
+                        'rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-tighter',
                         getStatusColor(entry.status),
                       )}
                     >
@@ -144,7 +144,7 @@ export function JournalEntriesView() {
                 },
                 amount: {
                   value: entry.totalDebit || entry.totalCredit || 0,
-                  type: "currency",
+                  type: 'currency',
                 },
                 action: {
                   value: (

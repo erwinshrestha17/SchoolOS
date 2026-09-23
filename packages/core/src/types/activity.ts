@@ -25,10 +25,16 @@ export type ActivityPost = {
   teacherName?: string | null;
   activityDate?: string | null;
   parentVisible?: boolean;
-  language?: 'ENGLISH' | 'NEPALI' | 'BOTH';
+  language?: "ENGLISH" | "NEPALI" | "BOTH";
   category: string;
   audienceType: string;
-  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'NEEDS_CORRECTION' | 'ARCHIVED';
+  status?:
+    | "DRAFT"
+    | "PENDING_APPROVAL"
+    | "APPROVED"
+    | "REJECTED"
+    | "NEEDS_CORRECTION"
+    | "ARCHIVED";
   moderationReason?: string | null;
   moderatedAt?: string | null;
   editedAt?: string | null;
@@ -54,7 +60,7 @@ export type ActivityReaction = {
   activityPostId: string;
   guardianId: string | null;
   studentId: string | null;
-  reaction: 'HEART' | 'CLAP' | 'STAR' | 'SEEN' | 'THANK_YOU' | 'APPRECIATED';
+  reaction: "HEART" | "CLAP" | "STAR" | "SEEN" | "THANK_YOU" | "APPRECIATED";
   createdAt: string;
 };
 
@@ -75,7 +81,7 @@ export type DevelopmentalMilestone = {
   studentId: string;
   domain: string;
   milestone: string;
-  status: 'EMERGING' | 'PROGRESSING' | 'ACHIEVED' | 'NEEDS_SUPPORT';
+  status: "EMERGING" | "PROGRESSING" | "ACHIEVED" | "NEEDS_SUPPORT";
   observationNote: string | null;
   photoObjectKey: string | null;
   photoUrl: string | null;

@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,14 +8,14 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { api } from "@/lib/api";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Clock3, Loader2 } from "lucide-react";
-import { ProtectedFileButton } from "@/components/ui/protected-file";
-import { formatBsDateTime } from "@schoolos/core";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { api } from '@/lib/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, Clock3, Loader2 } from 'lucide-react';
+import { ProtectedFileButton } from '@/components/ui/protected-file';
+import { formatBsDateTime } from '@schoolos/core';
 
 interface ReprintDialogProps {
   receiptId: string;
@@ -31,24 +31,24 @@ export function ReprintDialog({
   onClose,
 }: ReprintDialogProps) {
   const queryClient = useQueryClient();
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reprintFile, setReprintFile] = useState<{
     fileAssetId: string;
     fileName: string;
-    disposition: "SUCCEEDED" | "REPLAYED";
+    disposition: 'SUCCEEDED' | 'REPLAYED';
   } | null>(null);
   const attemptRef = useRef<{ reason: string; key: string } | null>(null);
   const historyQuery = useQuery({
-    queryKey: ["receipt-reprint-history", receiptId],
+    queryKey: ['receipt-reprint-history', receiptId],
     queryFn: () => api.getReceiptReprintHistory(receiptId),
     enabled: isOpen && Boolean(receiptId),
   });
 
   const handleReprint = async () => {
     if (!reason.trim()) {
-      setError("Enter a reason for the reprint");
+      setError('Enter a reason for the reprint');
       return;
     }
 
@@ -67,14 +67,14 @@ export function ReprintDialog({
         idempotencyKey: attemptRef.current.key,
       });
       await queryClient.invalidateQueries({
-        queryKey: ["receipt-reprint-history", receiptId],
+        queryKey: ['receipt-reprint-history', receiptId],
       });
       setReprintFile(result);
       attemptRef.current = null;
     } catch (err) {
       attemptRef.current = null;
       setError(
-        err instanceof Error ? err.message : "Failed to reprint receipt",
+        err instanceof Error ? err.message : 'Failed to reprint receipt',
       );
     } finally {
       setIsLoading(false);
@@ -89,7 +89,7 @@ export function ReprintDialog({
             Reprint Receipt
           </DialogTitle>
           <DialogDescription className="text-slate-500 font-medium">
-            You are reprinting receipt{" "}
+            You are reprinting receipt{' '}
             <span className="font-bold text-slate-900">{receiptNumber}</span>. A
             mandatory audit reason is required.
           </DialogDescription>
@@ -111,9 +111,9 @@ export function ReprintDialog({
           {reprintFile ? (
             <div className="rounded-2xl border border-success-100 bg-success-50 p-4">
               <p className="text-xs font-bold text-success-800">
-                {reprintFile.disposition === "REPLAYED"
-                  ? "The existing reprint was returned safely."
-                  : "The protected reprint is ready."}
+                {reprintFile.disposition === 'REPLAYED'
+                  ? 'The existing reprint was returned safely.'
+                  : 'The protected reprint is ready.'}
               </p>
               <ProtectedFileButton
                 fileAssetId={reprintFile.fileAssetId}
@@ -151,7 +151,7 @@ export function ReprintDialog({
                 <span>
                   {historyQuery.error instanceof Error
                     ? historyQuery.error.message
-                    : "Could not load reprint history."}
+                    : 'Could not load reprint history.'}
                 </span>
               </div>
             ) : historyQuery.data?.items.length ? (
@@ -173,7 +173,7 @@ export function ReprintDialog({
                       {formatBsDateTime(entry.reprintedAt)}
                       {entry.reprintedBy?.email
                         ? ` by ${entry.reprintedBy.email}`
-                        : ""}
+                        : ''}
                     </p>
                   </div>
                 ))}
@@ -204,7 +204,7 @@ export function ReprintDialog({
             disabled={isLoading || !reason.trim()}
             className="rounded-xl font-bold bg-[var(--color-mod-fees-accent)] text-white hover:bg-[var(--color-mod-fees-text)]"
           >
-            {isLoading ? "Preparing..." : "Prepare Protected Reprint"}
+            {isLoading ? 'Preparing...' : 'Prepare Protected Reprint'}
           </Button>
         </DialogFooter>
       </DialogContent>

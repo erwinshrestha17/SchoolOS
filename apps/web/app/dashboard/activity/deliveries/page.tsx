@@ -11,7 +11,8 @@ import { StatusBadge } from '../../../../components/ui/status-badge';
 export default function ActivityDeliveriesPage() {
   const deliveriesQuery = useQuery({
     queryKey: ['activity-deliveries'],
-    queryFn: () => api.listNotificationDeliveries({ sourceType: 'activity_post' }),
+    queryFn: () =>
+      api.listNotificationDeliveries({ sourceType: 'activity_post' }),
   });
 
   const deliveries = deliveriesQuery.data ?? [];

@@ -60,7 +60,7 @@ describe('School Settings workspaces', () => {
     const calendar = read(
       'app/dashboard/settings/school/academic-year/page.tsx',
     );
-    assert.match(overview, /redirect\('\/dashboard\/settings'\)/);
+    assert.match(overview, /redirect\(['"]\/dashboard\/settings['"]\)/);
     assert.match(profile, /SchoolProfileWorkspace/);
     assert.match(branding, /BrandingDocumentsWorkspace/);
     assert.match(calendar, /AcademicCalendarWorkspace/);

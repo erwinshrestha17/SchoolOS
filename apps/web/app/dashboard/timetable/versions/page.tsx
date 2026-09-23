@@ -70,7 +70,9 @@ export default function TimetableVersionsPage() {
         </label>
       </SectionCard>
 
-      <TimetableVersionsList academicYearId={selectedAcademicYearId || undefined} />
+      <TimetableVersionsList
+        academicYearId={selectedAcademicYearId || undefined}
+      />
     </div>
   );
 }

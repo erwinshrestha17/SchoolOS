@@ -1,16 +1,16 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
-const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (path) => readFileSync(join(webRoot, path), "utf8");
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 
-describe("Student profile to finance collection UX contract", () => {
-  it("uses backend fee clearance before exposing Collect fees", () => {
-    const detail = read("components/students/student-detail-page.tsx");
-    const header = read("components/students/profile/profile-header.tsx");
+describe('Student profile to finance collection UX contract', () => {
+  it('uses backend fee clearance before exposing Collect fees', () => {
+    const detail = read('components/students/student-detail-page.tsx');
+    const header = read('components/students/profile/profile-header.tsx');
 
     assert.match(detail, /api\.getStudentFeeClearance\(studentId\)/);
     assert.match(detail, /enabled: Boolean\(studentId\)/);
@@ -18,29 +18,29 @@ describe("Student profile to finance collection UX contract", () => {
       header,
       /feeClearance && !feeClearance\.cleared && feeClearance\.outstandingAmount > 0/,
     );
-    assert.match(header, /label: 'Collect fees'/);
+    assert.match(header, /label: ['"]Collect fees['"]/);
     assert.match(
       header,
       /\/dashboard\/fees\/collect\?studentId=\$\{encodeURIComponent\(student\.id\)\}&source=student-profile/,
     );
-    assert.match(header, /label: 'View fee history'/);
+    assert.match(header, /label: ['"]View fee history['"]/);
     assert.doesNotMatch(
       header,
-      /items=\{\[\s*\{\s*label: 'Collect fees'[\s\S]*router\.push/,
+      /items=\{\[\s*\{\s*label: ['"]Collect fees['"][\s\S]*router\.push/,
     );
   });
 
-  it("keeps finance collection contextual for selected students", () => {
-    const page = read("components/finance/fees-workspace.tsx");
-    const section = read("components/finance/collection-section.tsx");
-    const counter = read("components/finance/collection-counter.tsx");
-    const financeApi = read("lib/api/finance.ts");
+  it('keeps finance collection contextual for selected students', () => {
+    const page = read('components/finance/fees-workspace.tsx');
+    const section = read('components/finance/collection-section.tsx');
+    const counter = read('components/finance/collection-counter.tsx');
+    const financeApi = read('lib/api/finance.ts');
 
     assert.match(
       financeApi,
       /\/fees\/students\/\$\{encodeURIComponent\(studentId\)\}\/collection-context/,
     );
-    assert.match(page, /section === "collect" && canCollect/);
+    assert.match(page, /section === ['"]collect['"] && canCollect/);
     assert.match(page, /enabled: Boolean\(studentId\)/);
     assert.match(
       page,
@@ -66,12 +66,12 @@ describe("Student profile to finance collection UX contract", () => {
     );
   });
 
-  it("normalizes profile labels and persisted relation copy", () => {
-    const header = read("components/students/profile/profile-header.tsx");
-    const profileTab = read("components/students/profile/tabs/profile-tab.tsx");
-    const overview = read("components/students/profile/tabs/overview-tab.tsx");
+  it('normalizes profile labels and persisted relation copy', () => {
+    const header = read('components/students/profile/profile-header.tsx');
+    const profileTab = read('components/students/profile/tabs/profile-tab.tsx');
+    const overview = read('components/students/profile/tabs/overview-tab.tsx');
     const guardians = read(
-      "components/students/profile/tabs/guardians-tab.tsx",
+      'components/students/profile/tabs/guardians-tab.tsx',
     );
 
     assert.match(header, /function formatClassLabel/);
@@ -81,18 +81,18 @@ describe("Student profile to finance collection UX contract", () => {
     assert.match(profileTab, /currentEnrollment\.status \? \(/);
     assert.match(header, /formatGuardianRelation\(primaryGuardian\.relation\)/);
     assert.match(guardians, /formatGuardianRelation\(guardian\.relation\)/);
-    assert.match(guardians, /value="FATHER">Father/);
+    assert.match(guardians, /value=['"]FATHER['"]>Father/);
   });
 
-  it("keeps attendance and documents inside student-profile context", () => {
-    const detail = read("components/students/student-detail-page.tsx");
+  it('keeps attendance and documents inside student-profile context', () => {
+    const detail = read('components/students/student-detail-page.tsx');
     const attendance = read(
-      "components/students/profile/tabs/attendance-tab.tsx",
+      'components/students/profile/tabs/attendance-tab.tsx',
     );
     const documents = read(
-      "components/students/profile/tabs/documents-tab.tsx",
+      'components/students/profile/tabs/documents-tab.tsx',
     );
-    const overview = read("components/students/profile/tabs/overview-tab.tsx");
+    const overview = read('components/students/profile/tabs/overview-tab.tsx');
 
     assert.match(detail, /AttendanceTab\s+profile=\{profile\}/);
     assert.doesNotMatch(attendance, /Back to profile/);
@@ -112,22 +112,25 @@ describe("Student profile to finance collection UX contract", () => {
     );
   });
 
-  it("renders ActionMenu through a viewport-aware portal", () => {
-    const menu = read("components/ui/action-menu.tsx");
+  it('renders ActionMenu through a viewport-aware portal', () => {
+    const menu = read('components/ui/action-menu.tsx');
 
     assert.match(menu, /createPortal/);
     assert.match(menu, /document\.body/);
     assert.match(menu, /getBoundingClientRect/);
     assert.match(
       menu,
-      /window\.addEventListener\('scroll', updatePosition, true\)/,
+      /window\.addEventListener\(['"]scroll['"], updatePosition, true\)/,
     );
-    assert.match(menu, /window\.addEventListener\('resize', updatePosition\)/);
+    assert.match(
+      menu,
+      /window\.addEventListener\(['"]resize['"], updatePosition\)/,
+    );
     assert.match(menu, /spaceBelow < menuHeight && spaceAbove > spaceBelow/);
     assert.match(menu, /z-\[2147483647\]/);
-    assert.match(menu, /aria-haspopup': 'menu'/);
-    assert.match(menu, /aria-expanded': open/);
-    assert.match(menu, /event\.key === 'Escape'/);
+    assert.match(menu, /aria-haspopup['"]: ['"]menu['"]/);
+    assert.match(menu, /aria-expanded['"]: open/);
+    assert.match(menu, /event\.key === ['"]Escape['"]/);
     assert.match(menu, /ArrowDown/);
     assert.match(menu, /minWidth: MENU_MIN_WIDTH/);
   });

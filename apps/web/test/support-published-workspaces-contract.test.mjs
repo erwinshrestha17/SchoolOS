@@ -44,26 +44,26 @@ describe('purpose-limited published support workspaces', () => {
       'apps/api/src/timetable/timetable.controller.ts',
     );
 
-    assert.match(block, /"homework:read_published"/);
-    assert.match(block, /"timetable:read_published"/);
-    assert.doesNotMatch(block, /"homework:read",/);
-    assert.doesNotMatch(block, /"timetable:read",/);
+    assert.match(block, /['"]homework:read_published['"]/);
+    assert.match(block, /['"]timetable:read_published['"]/);
+    assert.doesNotMatch(block, /['"]homework:read['"],/);
+    assert.doesNotMatch(block, /['"]timetable:read['"],/);
 
     assert.match(
       homeworkController,
-      /@Get\(\)[\s\S]{0,100}@Permissions\('homework:read_published'\)/,
+      /@Get\(\)[\s\S]{0,100}@Permissions\(['"]homework:read_published['"]\)/,
     );
     assert.match(
       homeworkController,
-      /@Get\(':id'\)[\s\S]{0,100}@Permissions\('homework:read_published'\)/,
+      /@Get\(['"]:id['"]\)[\s\S]{0,100}@Permissions\(['"]homework:read_published['"]\)/,
     );
     assert.match(
       homeworkController,
-      /@Get\('summary\/today'\)[\s\S]{0,100}@Permissions\('homework:read'\)/,
+      /@Get\(['"]summary\/today['"]\)[\s\S]{0,100}@Permissions\(['"]homework:read['"]\)/,
     );
     assert.match(
       timetableController,
-      /@Get\(\)[\s\S]{0,100}@Permissions\('timetable:read_published'\)/,
+      /@Get\(\)[\s\S]{0,100}@Permissions\(['"]timetable:read_published['"]\)/,
     );
   });
 
@@ -81,15 +81,15 @@ describe('purpose-limited published support workspaces', () => {
     assert.match(layout, /hasAnyPermission\(session, routeGate\.permissions\)/);
     assert.match(
       layout,
-      /prefix: "\/dashboard\/homework"[\s\S]{0,100}"homework:read_published"/,
+      /prefix: ['"]\/dashboard\/homework['"][\s\S]{0,100}['"]homework:read_published['"]/,
     );
     assert.match(
       layout,
-      /prefix: "\/dashboard\/timetable\/builder"[\s\S]{0,140}"timetable:create"/,
+      /prefix: ['"]\/dashboard\/timetable\/builder['"][\s\S]{0,140}['"]timetable:create['"]/,
     );
     assert.match(
       layout,
-      /prefix: "\/dashboard\/timetable"[\s\S]{0,100}"timetable:read_published"/,
+      /prefix: ['"]\/dashboard\/timetable['"][\s\S]{0,100}['"]timetable:read_published['"]/,
     );
     assert.ok(
       layout.includes(
@@ -108,11 +108,14 @@ describe('purpose-limited published support workspaces', () => {
       layout,
       /session\.user\.isSupportOverride &&[\s\S]{0,180}!supportOverrideRouteAllowed/,
     );
-    assert.match(layout, /pathname === "\/dashboard\/academics"/);
-    assert.match(layout, /pathname === "\/dashboard\/attendance"/);
-    assert.match(layout, /pathname === "\/dashboard\/timetable"/);
-    assert.match(layout, /"new",\s*"review"/);
-    assert.match(layout, /"new",\s*"scheduled",\s*"approvals"/);
+    assert.match(layout, /pathname === ['"]\/dashboard\/academics['"]/);
+    assert.match(layout, /pathname === ['"]\/dashboard\/attendance['"]/);
+    assert.match(layout, /pathname === ['"]\/dashboard\/timetable['"]/);
+    assert.match(layout, /['"]new['"],\s*['"]review['"]/);
+    assert.match(
+      layout,
+      /['"]new['"],\s*['"]scheduled['"],\s*['"]approvals['"]/,
+    );
     assert.match(layout, /Outside the approved support scope/);
   });
 
@@ -126,10 +129,13 @@ describe('purpose-limited published support workspaces', () => {
     assert.match(homework, /enabled: !isSupportOverride/);
     assert.match(
       homework,
-      /!isSupportOverride &&[\s\S]{0,100}activeTab === "completion"/,
+      /!isSupportOverride &&[\s\S]{0,100}activeTab === ['"]completion['"]/,
     );
     assert.match(homework, /const SUPPORT_HOMEWORK_TABS/);
-    assert.match(homework, /tab\.value === "today" \|\| tab\.value === "all"/);
+    assert.match(
+      homework,
+      /tab\.value === ['"]today['"] \|\| tab\.value === ['"]all['"]/,
+    );
     assert.match(
       homework,
       /isSupportOverride[\s\S]{0,80}\[\.\.\.SUPPORT_HOMEWORK_TABS\]/,
@@ -160,7 +166,7 @@ describe('purpose-limited published support workspaces', () => {
       /api\.listSupportPublishedTimetable\(\{ page, limit: PAGE_SIZE \}\)/,
     );
     assert.match(supportTimetable, /<TablePagination/);
-    assert.match(supportTimetable, /<caption className="sr-only">/);
+    assert.match(supportTimetable, /<caption className=['"]sr-only['"]>/);
     assert.doesNotMatch(
       supportTimetable,
       /listTimetableVersions|listTimetablePeriods|listSubstitutions|validateTimetableVersion|useMutation/,
@@ -213,7 +219,7 @@ describe('purpose-limited published support workspaces', () => {
     );
     assert.match(
       list,
-      /const lifecycleStatus = isSupportOverride[\s\S]{0,80}\? ""/,
+      /const lifecycleStatus = isSupportOverride[\s\S]{0,80}\? ['"]['"]/,
     );
     assert.match(list, /!fixedLifecycleStatus && !isSupportOverride/);
     assert.match(

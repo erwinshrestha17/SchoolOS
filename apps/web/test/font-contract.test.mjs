@@ -48,24 +48,24 @@ describe('Typography Standardization Contract', () => {
   it('prohibits font-serif and arbitrary font-family classes', () => {
     for (const file of files) {
       const content = readFileSync(join(webRoot, file), 'utf8');
-      
+
       assert.doesNotMatch(
-        content, 
-        /font-serif/, 
-        `Forbidden 'font-serif' found in ${file}. Use 'font-sans' (Inter) instead.`
+        content,
+        /font-serif/,
+        `Forbidden 'font-serif' found in ${file}. Use 'font-sans' (Inter) instead.`,
       );
 
       assert.doesNotMatch(
-        content, 
-        /font-\[.*\]/, 
-        `Forbidden arbitrary font class 'font-[...]' found in ${file}.`
+        content,
+        /font-\[.*\]/,
+        `Forbidden arbitrary font class 'font-[...]' found in ${file}.`,
       );
 
       if (file.endsWith('.tsx')) {
         assert.doesNotMatch(
-          content, 
-          /fontFamily:|font-family:/, 
-          `Forbidden inline font-family style found in ${file}. Use Tailwind classes.`
+          content,
+          /fontFamily:|font-family:/,
+          `Forbidden inline font-family style found in ${file}. Use Tailwind classes.`,
         );
       }
     }
@@ -100,14 +100,14 @@ describe('Typography Standardization Contract', () => {
     ];
 
     for (const file of files) {
-      if (whitelistedPaths.some(p => file.endsWith(p))) continue;
+      if (whitelistedPaths.some((p) => file.endsWith(p))) continue;
 
       const content = readFileSync(join(webRoot, file), 'utf8');
-      
+
       assert.doesNotMatch(
-        content, 
-        /font-mono/, 
-        `Unauthorized 'font-mono' found in ${file}. Monospaced fonts are restricted to technical IDs in whitelisted files.`
+        content,
+        /font-mono/,
+        `Unauthorized 'font-mono' found in ${file}. Monospaced fonts are restricted to technical IDs in whitelisted files.`,
       );
     }
   });
@@ -120,7 +120,7 @@ describe('Typography Standardization Contract', () => {
       assert.doesNotMatch(
         content,
         /next\/font\/google/,
-        `Forbidden 'next/font/google' import found in ${file}. Fonts should be managed in globals.css and applied via --font-sans.`
+        `Forbidden 'next/font/google' import found in ${file}. Fonts should be managed in globals.css and applied via --font-sans.`,
       );
     }
   });

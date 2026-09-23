@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { formatBsDateTime } from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatBsDateTime } from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   CalendarClock,
@@ -11,27 +11,24 @@ import {
   Send,
   ShieldCheck,
   UsersRound,
-} from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useNoticeCapabilities } from "@/lib/permissions-ui";
+} from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useNoticeCapabilities } from '@/lib/permissions-ui';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/loading-state";
-import { PermissionDenied } from "@/components/ui/permission-denied";
-import { ProtectedFileButton } from "@/components/ui/protected-file";
-import {
-  communicationsApi,
-  type NoticeDetail,
-} from "@/lib/api/communications";
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ErrorState } from '@/components/ui/error-state';
+import { LoadingState } from '@/components/ui/loading-state';
+import { PermissionDenied } from '@/components/ui/permission-denied';
+import { ProtectedFileButton } from '@/components/ui/protected-file';
+import { communicationsApi, type NoticeDetail } from '@/lib/api/communications';
 import {
   formatNepalDateTimeLocalInput,
   nepalDateTimeLocalInputToUtc,
-} from "@/lib/date-utils";
+} from '@/lib/date-utils';
 
-type ReviewAction = "publish" | "schedule" | "approval";
+type ReviewAction = 'publish' | 'schedule' | 'approval';
 
 export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
   const router = useRouter();
@@ -41,11 +38,11 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
   const canPublish = noticeCaps.canPublish;
   const canSchedule = noticeCaps.canSchedule;
   const [pendingAction, setPendingAction] = useState<ReviewAction | null>(null);
-  const [scheduledFor, setScheduledFor] = useState("");
-  const [approvalReason, setApprovalReason] = useState("");
+  const [scheduledFor, setScheduledFor] = useState('');
+  const [approvalReason, setApprovalReason] = useState('');
 
   const detailQuery = useQuery({
-    queryKey: ["notice-detail", noticeId],
+    queryKey: ['notice-detail', noticeId],
     queryFn: () => communicationsApi.getNoticeDetail(noticeId),
     enabled: Boolean(noticeId),
   });
@@ -61,11 +58,11 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
   const validationError = notice ? validateNoticeForReview(notice) : null;
   const isReviewable = Boolean(
     notice &&
-      ["DRAFT", "APPROVED", "SCHEDULED"].includes(notice.lifecycleStatus),
+    ['DRAFT', 'APPROVED', 'SCHEDULED'].includes(notice.lifecycleStatus),
   );
 
   const previewQuery = useQuery({
-    queryKey: ["notice-recipient-preview", noticeId, notice?.updatedAt],
+    queryKey: ['notice-recipient-preview', noticeId, notice?.updatedAt],
     queryFn: () =>
       communicationsApi.previewNoticeRecipients({
         title: notice!.title,
@@ -80,15 +77,15 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
 
   const actionMutation = useMutation({
     mutationFn: async (action: ReviewAction) => {
-      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         throw new Error(
-          "Publishing, scheduling, or requesting approval needs a connection. The draft stays unpublished.",
+          'Publishing, scheduling, or requesting approval needs a connection. The draft stays unpublished.',
         );
       }
-      if (action === "publish") {
+      if (action === 'publish') {
         return communicationsApi.publishNotice(noticeId);
       }
-      if (action === "schedule") {
+      if (action === 'schedule') {
         return communicationsApi.scheduleNotice(
           noticeId,
           toScheduledIso(scheduledFor),
@@ -96,21 +93,19 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
       }
       return communicationsApi.requestNoticeApproval(noticeId, {
         reason: approvalReason.trim(),
-        ...(scheduledFor
-          ? { scheduledFor: toScheduledIso(scheduledFor) }
-          : {}),
+        ...(scheduledFor ? { scheduledFor: toScheduledIso(scheduledFor) } : {}),
       });
     },
     onSuccess: async () => {
       setPendingAction(null);
       await Promise.all([
         queryClient.refetchQueries({
-          queryKey: ["notice-detail", noticeId],
+          queryKey: ['notice-detail', noticeId],
           exact: true,
         }),
-        queryClient.invalidateQueries({ queryKey: ["notices"] }),
+        queryClient.invalidateQueries({ queryKey: ['notices'] }),
         queryClient.invalidateQueries({
-          queryKey: ["communications-summary"],
+          queryKey: ['communications-summary'],
         }),
       ]);
       router.replace(`/dashboard/notices/${noticeId}`);
@@ -121,16 +116,16 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
       setPendingAction(null);
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["notice-detail", noticeId],
+          queryKey: ['notice-detail', noticeId],
           exact: true,
         }),
-        queryClient.invalidateQueries({ queryKey: ["notices"] }),
-        queryClient.invalidateQueries({ queryKey: ["communications-summary"] }),
+        queryClient.invalidateQueries({ queryKey: ['notices'] }),
+        queryClient.invalidateQueries({ queryKey: ['communications-summary'] }),
       ]);
     },
   });
 
-  if (noticeCaps.resolution === "loading") {
+  if (noticeCaps.resolution === 'loading') {
     return <LoadingState label="Checking notice permissions…" />;
   }
 
@@ -162,7 +157,10 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
           title="This notice is no longer awaiting publication"
           message="Open the notice detail to review its current status."
         />
-        <Button variant="outline" onClick={() => router.push(`/dashboard/notices/${noticeId}`)}>
+        <Button
+          variant="outline"
+          onClick={() => router.push(`/dashboard/notices/${noticeId}`)}
+        >
           Review current notice status
         </Button>
       </div>
@@ -170,7 +168,7 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
   }
 
   const requiresApproval =
-    notice.priority !== "NORMAL" && notice.lifecycleStatus === "DRAFT";
+    notice.priority !== 'NORMAL' && notice.lifecycleStatus === 'DRAFT';
   const previewReady =
     previewQuery.isSuccess &&
     previewQuery.data.allowedRecipientCount > 0 &&
@@ -193,8 +191,8 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
           <div>
             <h1 className="text-2xl font-bold text-slate-950">Review notice</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Confirm the saved content, resolved audience, channels,
-              schedule, and approval requirement before publication.
+              Confirm the saved content, resolved audience, channels, schedule,
+              and approval requirement before publication.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -204,7 +202,7 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
             >
               <ArrowLeft size={16} /> Back to notice
             </Link>
-            {notice.lifecycleStatus === "DRAFT" ? (
+            {notice.lifecycleStatus === 'DRAFT' ? (
               <Link
                 href={`/dashboard/notices/${noticeId}/edit`}
                 className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700"
@@ -218,13 +216,16 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <ReviewSection title="Notice content" icon={<CheckCircle2 size={18} />}>
+          <ReviewSection
+            title="Notice content"
+            icon={<CheckCircle2 size={18} />}
+          >
             <ReviewFact label="Title" value={notice.title} />
             <ReviewFact label="Message" value={notice.body} multiline />
             <ReviewFact label="Priority" value={formatEnum(notice.priority)} />
             <ReviewFact
               label="Attachment"
-              value={attachmentFileId ? "Protected attachment" : "None"}
+              value={attachmentFileId ? 'Protected attachment' : 'None'}
               action={
                 attachmentFileId ? (
                   <ProtectedFileButton
@@ -243,21 +244,21 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
             <ReviewFact
               label="Audience"
               value={
-                notice.audienceType === "ALL"
-                  ? "Whole school"
+                notice.audienceType === 'ALL'
+                  ? 'Whole school'
                   : formatEnum(notice.audienceType)
               }
             />
-            {notice.audienceType !== "ALL" ? (
+            {notice.audienceType !== 'ALL' ? (
               <ReviewFact
                 label="Class"
-                value={notice.className ?? "Class unavailable"}
+                value={notice.className ?? 'Class unavailable'}
               />
             ) : null}
-            {notice.audienceType === "SECTION" ? (
+            {notice.audienceType === 'SECTION' ? (
               <ReviewFact
                 label="Section"
-                value={notice.sectionName ?? "Section unavailable"}
+                value={notice.sectionName ?? 'Section unavailable'}
               />
             ) : null}
           </ReviewSection>
@@ -267,10 +268,10 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
               label="Approval requirement"
               value={
                 requiresApproval
-                  ? "Approval required before publication"
-                  : notice.lifecycleStatus === "APPROVED"
-                    ? "Approved"
-                    : "No approval required"
+                  ? 'Approval required before publication'
+                  : notice.lifecycleStatus === 'APPROVED'
+                    ? 'Approved'
+                    : 'No approval required'
               }
             />
             <ReviewFact
@@ -278,10 +279,10 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
               value={
                 scheduledFor && !scheduleError
                   ? formatBsDateTime(toScheduledIso(scheduledFor))
-                  : "Publish immediately"
+                  : 'Publish immediately'
               }
             />
-            {(canSchedule || requiresApproval) ? (
+            {canSchedule || requiresApproval ? (
               <label className="grid gap-2 text-sm font-semibold text-slate-700">
                 Optional Nepal-local schedule
                 <input
@@ -304,9 +305,7 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-3">
               <ShieldCheck className="h-5 w-5 text-rose-700" />
-              <h2 className="font-bold text-slate-950">
-                Recipient preview
-              </h2>
+              <h2 className="font-bold text-slate-950">Recipient preview</h2>
             </div>
             {previewQuery.isLoading ? (
               <div className="mt-4">
@@ -343,8 +342,8 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
                     Selected delivery channels
                   </dt>
                   <dd className="mt-1 text-sm font-semibold text-slate-900">
-                    {previewQuery.data.channels.map(formatEnum).join(", ") ||
-                      "No channels available"}
+                    {previewQuery.data.channels.map(formatEnum).join(', ') ||
+                      'No channels available'}
                   </dd>
                 </div>
               </dl>
@@ -374,7 +373,7 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
               <Button
                 type="button"
                 className="w-full"
-                onClick={() => setPendingAction("approval")}
+                onClick={() => setPendingAction('approval')}
                 disabled={actionBlocked || Boolean(scheduleError)}
               >
                 <ShieldCheck size={17} /> Submit for approval
@@ -385,7 +384,7 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
                   <Button
                     type="button"
                     className="w-full"
-                    onClick={() => setPendingAction("publish")}
+                    onClick={() => setPendingAction('publish')}
                     disabled={actionBlocked}
                   >
                     <Send size={17} /> Publish now
@@ -396,7 +395,7 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
                     type="button"
                     variant="outline"
                     className="w-full"
-                    onClick={() => setPendingAction("schedule")}
+                    onClick={() => setPendingAction('schedule')}
                     disabled={
                       actionBlocked || !scheduledFor || Boolean(scheduleError)
                     }
@@ -424,9 +423,9 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
         isConfirming={actionMutation.isPending}
         confirmDisabled={
           actionBlocked ||
-          (pendingAction === "schedule" &&
+          (pendingAction === 'schedule' &&
             (!scheduledFor || Boolean(scheduleError))) ||
-          (pendingAction === "approval" && approvalReason.trim().length < 3)
+          (pendingAction === 'approval' && approvalReason.trim().length < 3)
         }
         onClose={() => {
           if (!actionMutation.isPending) setPendingAction(null);
@@ -437,7 +436,7 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
           }
         }}
       >
-        {pendingAction === "approval" ? (
+        {pendingAction === 'approval' ? (
           <label className="grid gap-2 text-sm font-semibold text-slate-700">
             Approval reason
             <textarea
@@ -452,9 +451,9 @@ export function NoticeReviewWorkspace({ noticeId }: { noticeId: string }) {
         ) : (
           <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
             {previewQuery.data?.allowedRecipientCount ?? 0} eligible recipients
-            across{" "}
-            {previewQuery.data?.channels.map(formatEnum).join(", ") ||
-              "no available channels"}
+            across{' '}
+            {previewQuery.data?.channels.map(formatEnum).join(', ') ||
+              'no available channels'}
             .
           </p>
         )}
@@ -500,8 +499,8 @@ function ReviewFact({
       <dd
         className={
           multiline
-            ? "whitespace-pre-wrap text-sm leading-7 text-slate-800"
-            : "text-sm font-semibold text-slate-900"
+            ? 'whitespace-pre-wrap text-sm leading-7 text-slate-800'
+            : 'text-sm font-semibold text-slate-900'
         }
       >
         {value}
@@ -521,13 +520,13 @@ function CountFact({ label, value }: { label: string; value: number }) {
 }
 
 function validateNoticeForReview(notice: NoticeDetail) {
-  if (!notice.title.trim()) return "The saved notice title is required.";
-  if (!notice.body.trim()) return "The saved notice message is required.";
-  if (notice.audienceType !== "ALL" && !notice.classId) {
-    return "The saved audience requires a class.";
+  if (!notice.title.trim()) return 'The saved notice title is required.';
+  if (!notice.body.trim()) return 'The saved notice message is required.';
+  if (notice.audienceType !== 'ALL' && !notice.classId) {
+    return 'The saved audience requires a class.';
   }
-  if (notice.audienceType === "SECTION" && !notice.sectionId) {
-    return "The saved audience requires a section.";
+  if (notice.audienceType === 'SECTION' && !notice.sectionId) {
+    return 'The saved audience requires a section.';
   }
   return null;
 }
@@ -536,10 +535,10 @@ function validateScheduledFor(value: string) {
   try {
     const date = new Date(nepalDateTimeLocalInputToUtc(value));
     if (date <= new Date()) {
-      return "Choose a future schedule time.";
+      return 'Choose a future schedule time.';
     }
   } catch {
-    return "Choose a future schedule time.";
+    return 'Choose a future schedule time.';
   }
   return null;
 }
@@ -549,39 +548,39 @@ function toScheduledIso(value: string) {
 }
 
 function reviewActionTitle(action: ReviewAction | null) {
-  if (action === "approval") return "Submit notice for approval?";
-  if (action === "schedule") return "Schedule this notice?";
-  return "Publish this notice now?";
+  if (action === 'approval') return 'Submit notice for approval?';
+  if (action === 'schedule') return 'Schedule this notice?';
+  return 'Publish this notice now?';
 }
 
 function reviewActionDescription(action: ReviewAction | null) {
-  if (action === "approval") {
-    return "The saved notice and current recipient counts will be attached to the approval request.";
+  if (action === 'approval') {
+    return 'The saved notice and current recipient counts will be attached to the approval request.';
   }
-  if (action === "schedule") {
-    return "The notice will remain scheduled until its publication time.";
+  if (action === 'schedule') {
+    return 'The notice will remain scheduled until its publication time.';
   }
-  return "M15 will publish the notice, then M12 will resolve delivery from the persisted publication event.";
+  return 'M15 will publish the notice, then M12 will resolve delivery from the persisted publication event.';
 }
 
 function reviewActionLabel(action: ReviewAction | null) {
-  if (action === "approval") return "Submit for approval";
-  if (action === "schedule") return "Schedule";
-  return "Publish now";
+  if (action === 'approval') return 'Submit for approval';
+  if (action === 'schedule') return 'Schedule';
+  return 'Publish now';
 }
 
 function formatEnum(value: string) {
   return value
     .toLowerCase()
-    .split("_")
+    .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+    .join(' ');
 }
 
 function getProtectedFileId(url: string | null) {
   if (!url) return null;
   try {
-    const pathname = new URL(url, "http://schoolos.local").pathname;
+    const pathname = new URL(url, 'http://schoolos.local').pathname;
     const match = pathname.match(/\/files\/([^/]+)\/preview\/?$/);
     return match?.[1] ? decodeURIComponent(match[1]) : null;
   } catch {

@@ -1,15 +1,15 @@
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   decideAttendanceDraftReceiptDelete,
   decideAttendanceDraftReceiptWrite,
   isAttendanceDraftReceiptProtected,
-} from "../lib/attendance-draft-receipt-fence.ts";
+} from '../lib/attendance-draft-receipt-fence.ts';
 
-const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 function draft(clientSubmissionId, lastSyncStatus) {
   return { clientSubmissionId, lastSyncStatus };
@@ -26,98 +26,98 @@ function commitWrite(transactionState, incoming) {
   return decision;
 }
 
-describe("attendance draft receipt transaction fence", () => {
-  it("fails closed for canonical and future unresolved receipt states", () => {
+describe('attendance draft receipt transaction fence', () => {
+  it('fails closed for canonical and future unresolved receipt states', () => {
     for (const status of [
-      "QUEUED",
-      "PROCESSING",
-      "TRANSPORT_AMBIGUOUS",
-      "SERVER_CHECK_REQUIRED",
-      "AUTHORIZATION_DENIED",
-      "ACCESS_REVALIDATION_REQUIRED",
-      "FUTURE_UNRECOGNIZED_RECEIPT",
+      'QUEUED',
+      'PROCESSING',
+      'TRANSPORT_AMBIGUOUS',
+      'SERVER_CHECK_REQUIRED',
+      'AUTHORIZATION_DENIED',
+      'ACCESS_REVALIDATION_REQUIRED',
+      'FUTURE_UNRECOGNIZED_RECEIPT',
     ]) {
       assert.equal(
-        isAttendanceDraftReceiptProtected(draft("submission-1", status)),
+        isAttendanceDraftReceiptProtected(draft('submission-1', status)),
         true,
         status,
       );
     }
 
-    for (const status of ["ACCEPTED", "SYNCED", "CONFLICTED"]) {
+    for (const status of ['ACCEPTED', 'SYNCED', 'CONFLICTED']) {
       assert.equal(
-        isAttendanceDraftReceiptProtected(draft("submission-1", status)),
+        isAttendanceDraftReceiptProtected(draft('submission-1', status)),
         true,
         status,
       );
     }
 
-    for (const status of [undefined, "", "DRAFT", "SAVED_LOCAL", "REJECTED"]) {
+    for (const status of [undefined, '', 'DRAFT', 'SAVED_LOCAL', 'REJECTED']) {
       assert.equal(
-        isAttendanceDraftReceiptProtected(draft("submission-1", status)),
+        isAttendanceDraftReceiptProtected(draft('submission-1', status)),
         false,
         String(status),
       );
     }
   });
 
-  it("compares a stale tab against the live transaction record", () => {
+  it('compares a stale tab against the live transaction record', () => {
     const transactionState = {
-      value: draft("submission-1", undefined),
+      value: draft('submission-1', undefined),
     };
     const staleEditableSnapshot = structuredClone(transactionState.value);
 
     assert.deepEqual(
-      commitWrite(transactionState, draft("submission-1", "PROCESSING")),
+      commitWrite(transactionState, draft('submission-1', 'PROCESSING')),
       { allowed: true },
     );
     assert.deepEqual(commitWrite(transactionState, staleEditableSnapshot), {
       allowed: false,
-      reason: "protected_status_downgrade",
+      reason: 'protected_status_downgrade',
     });
-    assert.equal(transactionState.value.lastSyncStatus, "PROCESSING");
+    assert.equal(transactionState.value.lastSyncStatus, 'PROCESSING');
 
     assert.deepEqual(
       commitWrite(
         transactionState,
-        draft("different-submission", "TRANSPORT_AMBIGUOUS"),
+        draft('different-submission', 'TRANSPORT_AMBIGUOUS'),
       ),
-      { allowed: false, reason: "different_submission" },
+      { allowed: false, reason: 'different_submission' },
     );
     assert.deepEqual(transactionState.value, {
-      clientSubmissionId: "submission-1",
-      lastSyncStatus: "PROCESSING",
+      clientSubmissionId: 'submission-1',
+      lastSyncStatus: 'PROCESSING',
     });
   });
 
-  it("allows same-intent receipt progress but keeps denial tombstones sticky", () => {
+  it('allows same-intent receipt progress but keeps denial tombstones sticky', () => {
     const transactionState = {
-      value: draft("submission-1", "PROCESSING"),
+      value: draft('submission-1', 'PROCESSING'),
     };
 
     assert.deepEqual(
       commitWrite(
         transactionState,
-        draft("submission-1", "TRANSPORT_AMBIGUOUS"),
+        draft('submission-1', 'TRANSPORT_AMBIGUOUS'),
       ),
       { allowed: true },
     );
     assert.deepEqual(
       commitWrite(
         transactionState,
-        draft("submission-1", "AUTHORIZATION_DENIED"),
+        draft('submission-1', 'AUTHORIZATION_DENIED'),
       ),
       { allowed: true },
     );
     assert.deepEqual(
-      commitWrite(transactionState, draft("submission-1", "PROCESSING")),
-      { allowed: false, reason: "terminal_receipt_tombstone" },
+      commitWrite(transactionState, draft('submission-1', 'PROCESSING')),
+      { allowed: false, reason: 'terminal_receipt_tombstone' },
     );
-    assert.equal(transactionState.value.lastSyncStatus, "AUTHORIZATION_DENIED");
+    assert.equal(transactionState.value.lastSyncStatus, 'AUTHORIZATION_DENIED');
 
     assert.deepEqual(
       commitWrite(transactionState, {
-        ...draft("submission-1", "AUTHORIZATION_DENIED"),
+        ...draft('submission-1', 'AUTHORIZATION_DENIED'),
         exceptions: {},
         remarks: {},
       }),
@@ -125,27 +125,27 @@ describe("attendance draft receipt transaction fence", () => {
     );
     assert.deepEqual(
       commitWrite(transactionState, {
-        ...draft("submission-1", "AUTHORIZATION_DENIED"),
-        exceptions: { "student-1": "ABSENT" },
+        ...draft('submission-1', 'AUTHORIZATION_DENIED'),
+        exceptions: { 'student-1': 'ABSENT' },
         remarks: {},
       }),
-      { allowed: false, reason: "terminal_receipt_tombstone" },
+      { allowed: false, reason: 'terminal_receipt_tombstone' },
     );
   });
 
-  it("blocks record-level deletion of protected receipts", () => {
+  it('blocks record-level deletion of protected receipts', () => {
     assert.deepEqual(
-      decideAttendanceDraftReceiptDelete(draft("submission-1", "PROCESSING")),
-      { allowed: false, reason: "authoritative_receipt_required" },
+      decideAttendanceDraftReceiptDelete(draft('submission-1', 'PROCESSING')),
+      { allowed: false, reason: 'authoritative_receipt_required' },
     );
     assert.deepEqual(
       decideAttendanceDraftReceiptDelete(
-        draft("submission-1", "ACCESS_REVALIDATION_REQUIRED"),
+        draft('submission-1', 'ACCESS_REVALIDATION_REQUIRED'),
       ),
-      { allowed: false, reason: "authoritative_receipt_required" },
+      { allowed: false, reason: 'authoritative_receipt_required' },
     );
     assert.deepEqual(
-      decideAttendanceDraftReceiptDelete(draft("submission-1", "REJECTED")),
+      decideAttendanceDraftReceiptDelete(draft('submission-1', 'REJECTED')),
       { allowed: true },
     );
     assert.deepEqual(decideAttendanceDraftReceiptDelete(undefined), {
@@ -153,21 +153,21 @@ describe("attendance draft receipt transaction fence", () => {
     });
   });
 
-  it("replaces a protected receipt with a purpose-limited tombstone only with matching authoritative proof", () => {
-    const protectedDraft = draft("submission-1", "PROCESSING");
+  it('replaces a protected receipt with a purpose-limited tombstone only with matching authoritative proof', () => {
+    const protectedDraft = draft('submission-1', 'PROCESSING');
     const tombstone = (syncStatus) => ({
-      ...draft("submission-1", syncStatus),
+      ...draft('submission-1', syncStatus),
       exceptions: {},
       remarks: {},
     });
 
-    for (const syncStatus of ["ACCEPTED", "SYNCED", "CONFLICTED"]) {
+    for (const syncStatus of ['ACCEPTED', 'SYNCED', 'CONFLICTED']) {
       assert.deepEqual(
         decideAttendanceDraftReceiptWrite(
           protectedDraft,
           tombstone(syncStatus),
           {
-            clientSubmissionId: "submission-1",
+            clientSubmissionId: 'submission-1',
             syncStatus,
           },
         ),
@@ -176,58 +176,52 @@ describe("attendance draft receipt transaction fence", () => {
     }
 
     assert.deepEqual(
-      decideAttendanceDraftReceiptWrite(protectedDraft, tombstone("ACCEPTED")),
-      { allowed: false, reason: "authoritative_outcome_required" },
+      decideAttendanceDraftReceiptWrite(protectedDraft, tombstone('ACCEPTED')),
+      { allowed: false, reason: 'authoritative_outcome_required' },
     );
     assert.deepEqual(
-      decideAttendanceDraftReceiptWrite(
-        protectedDraft,
-        tombstone("ACCEPTED"),
-        {
-          clientSubmissionId: "different-submission",
-          syncStatus: "ACCEPTED",
-        },
-      ),
-      { allowed: false, reason: "authoritative_outcome_required" },
+      decideAttendanceDraftReceiptWrite(protectedDraft, tombstone('ACCEPTED'), {
+        clientSubmissionId: 'different-submission',
+        syncStatus: 'ACCEPTED',
+      }),
+      { allowed: false, reason: 'authoritative_outcome_required' },
     );
+    assert.deepEqual(decideAttendanceDraftReceiptDelete(protectedDraft), {
+      allowed: false,
+      reason: 'authoritative_receipt_required',
+    });
     assert.deepEqual(
-      decideAttendanceDraftReceiptDelete(protectedDraft),
-      { allowed: false, reason: "authoritative_receipt_required" },
-    );
-    assert.deepEqual(
-      decideAttendanceDraftReceiptDelete(
-        tombstone("ACCEPTED"),
-      ),
-      { allowed: false, reason: "authoritative_receipt_required" },
+      decideAttendanceDraftReceiptDelete(tombstone('ACCEPTED')),
+      { allowed: false, reason: 'authoritative_receipt_required' },
     );
   });
 
-  it("enforces compare-and-write and compare-and-delete inside readwrite transactions", () => {
-    const source = readFileSync(join(webRoot, "lib/session.ts"), "utf8");
+  it('enforces compare-and-write and compare-and-delete inside readwrite transactions', () => {
+    const source = readFileSync(join(webRoot, 'lib/session.ts'), 'utf8');
     const writeStart = source.indexOf(
-      "async function writeIndexedDbDraftWithinCapacity",
+      'async function writeIndexedDbDraftWithinCapacity',
     );
-    const deleteStart = source.indexOf("async function deleteIndexedDbDraft");
-    const clearStart = source.indexOf("function clearIndexedDbDrafts");
+    const deleteStart = source.indexOf('async function deleteIndexedDbDraft');
+    const clearStart = source.indexOf('function clearIndexedDbDrafts');
     const writeSource = source.slice(writeStart, deleteStart);
     const deleteSource = source.slice(deleteStart, clearStart);
 
     assert.ok(writeStart >= 0 && deleteStart > writeStart);
-    assert.match(writeSource, /db\.transaction\([\s\S]*"readwrite"/);
+    assert.match(writeSource, /db\.transaction\([\s\S]*['"]readwrite['"]/);
     assert.match(writeSource, /const request = store\.getAll\(\)/);
     assert.match(writeSource, /decideAttendanceDraftReceiptWrite\(/);
     assert.ok(
-      writeSource.indexOf("decideAttendanceDraftReceiptWrite(") <
-        writeSource.indexOf("store.put("),
+      writeSource.indexOf('decideAttendanceDraftReceiptWrite(') <
+        writeSource.indexOf('store.put('),
     );
 
     assert.ok(clearStart > deleteStart);
-    assert.match(deleteSource, /db\.transaction\([\s\S]*"readwrite"/);
+    assert.match(deleteSource, /db\.transaction\([\s\S]*['"]readwrite['"]/);
     assert.match(deleteSource, /const request = store\.get\(key\)/);
     assert.match(deleteSource, /decideAttendanceDraftReceiptDelete\(/);
     assert.ok(
-      deleteSource.indexOf("decideAttendanceDraftReceiptDelete(") <
-        deleteSource.indexOf("store.delete(key)"),
+      deleteSource.indexOf('decideAttendanceDraftReceiptDelete(') <
+        deleteSource.indexOf('store.delete(key)'),
     );
     assert.match(source, /removeLegacyAttendanceDraftIfUnchanged/);
     assert.match(
@@ -236,16 +230,16 @@ describe("attendance draft receipt transaction fence", () => {
     );
   });
 
-  it("passes authoritative receipt proof only from the accepted sync branch", () => {
+  it('passes authoritative receipt proof only from the accepted sync branch', () => {
     const source = readFileSync(
-      join(webRoot, "components/forms/attendance-form.tsx"),
-      "utf8",
+      join(webRoot, 'components/forms/attendance-form.tsx'),
+      'utf8',
     );
     const clearableStart = source.indexOf(
-      "if (shouldClearLocalAttendanceDraft(syncStatus))",
+      'if (shouldClearLocalAttendanceDraft(syncStatus))',
     );
     const retainedStart = source.indexOf(
-      "const retainedDraft =",
+      'const retainedDraft =',
       clearableStart,
     );
     const clearableSource = source.slice(clearableStart, retainedStart);
@@ -253,7 +247,7 @@ describe("attendance draft receipt transaction fence", () => {
     assert.ok(clearableStart >= 0 && retainedStart > clearableStart);
     assert.match(
       clearableSource,
-      /createPurposeLimitedAttendanceReceipt\(\s*receiptProtectedDraft,\s*syncStatus as "ACCEPTED" \| "SYNCED" \| "CONFLICTED",\s*\)/,
+      /createPurposeLimitedAttendanceReceipt\(\s*receiptProtectedDraft,\s*syncStatus as ['"]ACCEPTED['"] \| ['"]SYNCED['"] \| ['"]CONFLICTED['"],\s*\)/,
     );
     assert.match(
       clearableSource,
@@ -261,23 +255,23 @@ describe("attendance draft receipt transaction fence", () => {
     );
   });
 
-  it("sanitizes access revocation against the live record in one transaction", () => {
-    const session = readFileSync(join(webRoot, "lib/session.ts"), "utf8");
+  it('sanitizes access revocation against the live record in one transaction', () => {
+    const session = readFileSync(join(webRoot, 'lib/session.ts'), 'utf8');
     const form = readFileSync(
-      join(webRoot, "components/forms/attendance-form.tsx"),
-      "utf8",
+      join(webRoot, 'components/forms/attendance-form.tsx'),
+      'utf8',
     );
     const sanitizerStart = session.indexOf(
-      "async function writeIndexedDbAccessRevocationReceipt",
+      'async function writeIndexedDbAccessRevocationReceipt',
     );
     const writeStart = session.indexOf(
-      "async function writeIndexedDbDraftWithinCapacity",
+      'async function writeIndexedDbDraftWithinCapacity',
       sanitizerStart,
     );
     const sanitizerSource = session.slice(sanitizerStart, writeStart);
 
     assert.ok(sanitizerStart >= 0 && writeStart > sanitizerStart);
-    assert.match(sanitizerSource, /db\.transaction\([\s\S]*"readwrite"/);
+    assert.match(sanitizerSource, /db\.transaction\([\s\S]*['"]readwrite['"]/);
     assert.match(sanitizerSource, /const request = store\.get\(key\)/);
     assert.match(sanitizerSource, /resolveAccessRevocationReceipt\(/);
     assert.match(sanitizerSource, /store\.put\(\{ \.\.\.tombstone, key \}\)/);

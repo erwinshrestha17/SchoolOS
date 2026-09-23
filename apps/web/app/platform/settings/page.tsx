@@ -100,7 +100,9 @@ export default function PlatformSettings() {
         module: exportModuleFilter.trim() || undefined,
         status: exportStatusFilter.trim() || undefined,
       });
-      const items = Array.isArray(result) ? result : (result as any)?.items || [];
+      const items = Array.isArray(result)
+        ? result
+        : (result as any)?.items || [];
       setReportExports(items);
     } catch (err: any) {
       setError(err.message ?? 'Failed to load report exports');
@@ -222,27 +224,26 @@ export default function PlatformSettings() {
           prResult,
           whResult,
           whdResult,
-        ] =
-          await Promise.all([
-            api.listPlatformProviders(),
-            api.getPlatformQueueHealth(),
-            api.getPlatformHealth(),
-            api.listPlatformPlans(),
-            api.listPlatformAuditLogs({
-              limit: 20,
-              action: auditFilters.action || undefined,
-              tenantId: auditFilters.tenantId || undefined,
-              resource: auditFilters.resource || undefined,
-              resourceId: auditFilters.resourceId || undefined,
-              userId: auditFilters.userId || undefined,
-              startDate: auditFilters.startDate || undefined,
-              endDate: auditFilters.endDate || undefined,
-            }),
-            api.listPlatformFailedJobs({ limit: 50 }),
-            api.getPlatformProvidersReadiness().catch(() => []),
-            api.listPlatformWebhookEndpoints(),
-            api.listPlatformWebhookDeliveries(),
-          ]);
+        ] = await Promise.all([
+          api.listPlatformProviders(),
+          api.getPlatformQueueHealth(),
+          api.getPlatformHealth(),
+          api.listPlatformPlans(),
+          api.listPlatformAuditLogs({
+            limit: 20,
+            action: auditFilters.action || undefined,
+            tenantId: auditFilters.tenantId || undefined,
+            resource: auditFilters.resource || undefined,
+            resourceId: auditFilters.resourceId || undefined,
+            userId: auditFilters.userId || undefined,
+            startDate: auditFilters.startDate || undefined,
+            endDate: auditFilters.endDate || undefined,
+          }),
+          api.listPlatformFailedJobs({ limit: 50 }),
+          api.getPlatformProvidersReadiness().catch(() => []),
+          api.listPlatformWebhookEndpoints(),
+          api.listPlatformWebhookDeliveries(),
+        ]);
 
         setProviders(asArray<PlatformProviderConfigSummary>(pResult));
         setQueues(asArray<PlatformQueueSummary>(qResult));
@@ -251,9 +252,7 @@ export default function PlatformSettings() {
         setAuditLogs(asArray<PlatformAuditLog>(aResult));
         setFailedJobs(asArray<PlatformFailedJobSummary>(fjResult));
         setProvidersReadiness(asArray<any>(prResult));
-        setWebhookEndpoints(
-          asArray<PlatformWebhookEndpointSummary>(whResult),
-        );
+        setWebhookEndpoints(asArray<PlatformWebhookEndpointSummary>(whResult));
         setWebhookDeliveries(
           asArray<PlatformWebhookDeliverySummary>(whdResult),
         );
@@ -273,10 +272,13 @@ export default function PlatformSettings() {
     try {
       const failedJob = safeFailedJobs.find(
         (job) =>
-          job.queueName === retryDialog.queueName && job.id === retryDialog.jobId,
+          job.queueName === retryDialog.queueName &&
+          job.id === retryDialog.jobId,
       );
       if (!failedJob) {
-        setActionMessage('This failed job is no longer in the visible failed-job list. Refresh queue data before retrying.');
+        setActionMessage(
+          'This failed job is no longer in the visible failed-job list. Refresh queue data before retrying.',
+        );
         return;
       }
 
@@ -408,7 +410,9 @@ export default function PlatformSettings() {
       webhookForm.signingSecret.trim().length < 16 ||
       webhookForm.url.trim().length === 0
     ) {
-      setError('Webhook URL and a signing secret of at least 16 characters are required.');
+      setError(
+        'Webhook URL and a signing secret of at least 16 characters are required.',
+      );
       return;
     }
 
@@ -542,7 +546,10 @@ export default function PlatformSettings() {
             }}
             disabled={refreshing || loadingExports}
           >
-            <RefreshCw size={18} className={refreshing || loadingExports ? 'animate-spin' : ''} />
+            <RefreshCw
+              size={18}
+              className={refreshing || loadingExports ? 'animate-spin' : ''}
+            />
             Refresh State
           </Button>
           <Button
@@ -720,7 +727,8 @@ export default function PlatformSettings() {
                   Operational Dependency Readiness
                 </CardTitle>
                 <CardDescription className="text-base font-medium text-slate-500">
-                  Real-time status check for database, SMS, email, FCM, object storage, and PDF generators.
+                  Real-time status check for database, SMS, email, FCM, object
+                  storage, and PDF generators.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-8">
@@ -731,8 +739,12 @@ export default function PlatformSettings() {
                       className="p-5 rounded-3xl bg-slate-50 border border-slate-100 flex flex-col justify-between"
                     >
                       <div>
-                        <h4 className="text-base font-black text-slate-900 leading-tight">{pr.displayName}</h4>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{pr.providerKey}</p>
+                        <h4 className="text-base font-black text-slate-900 leading-tight">
+                          {pr.displayName}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                          {pr.providerKey}
+                        </p>
                       </div>
                       <div className="mt-6">
                         <Badge
@@ -799,7 +811,8 @@ export default function PlatformSettings() {
                           ? 'success'
                           : provider.validationStatus === 'FAILED'
                             ? 'destructive'
-                            : (provider.validationStatus === 'DEGRADED' || provider.validationStatus === 'NOT_CONFIGURED')
+                            : provider.validationStatus === 'DEGRADED' ||
+                                provider.validationStatus === 'NOT_CONFIGURED'
                               ? 'warning'
                               : 'neutral'
                       }
@@ -826,7 +839,8 @@ export default function PlatformSettings() {
                   <div className="mt-6 flex flex-col gap-2">
                     {['SMS', 'EMAIL'].includes(provider.type) && (
                       <p className="text-[10px] text-amber-600 font-semibold mb-2 bg-amber-50 p-2 rounded-xl border border-amber-100 leading-snug">
-                        “This test uses safe readiness checks and will not send real messages unless configured test mode supports it.”
+                        “This test uses safe readiness checks and will not send
+                        real messages unless configured test mode supports it.”
                       </p>
                     )}
                     <Button
@@ -897,7 +911,8 @@ export default function PlatformSettings() {
                     Endpoint Registry
                   </CardTitle>
                   <CardDescription className="text-base font-medium text-slate-500">
-                    Signed outbound webhooks for platform or tenant integrations.
+                    Signed outbound webhooks for platform or tenant
+                    integrations.
                   </CardDescription>
                 </div>
                 <Button
@@ -913,31 +928,49 @@ export default function PlatformSettings() {
                   <table className="w-full min-w-[780px] text-left text-sm">
                     <thead className="border-b border-slate-100 bg-slate-50">
                       <tr>
-                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Owner</th>
-                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Endpoint</th>
-                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Events</th>
-                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Status</th>
+                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                          Owner
+                        </th>
+                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                          Endpoint
+                        </th>
+                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                          Events
+                        </th>
+                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                          Status
+                        </th>
                         <th className="px-5 py-4 text-right"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {safeWebhookEndpoints.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-6 py-16 text-center text-sm font-bold text-slate-400">
+                          <td
+                            colSpan={5}
+                            className="px-6 py-16 text-center text-sm font-bold text-slate-400"
+                          >
                             No webhook endpoints registered.
                           </td>
                         </tr>
                       ) : (
                         safeWebhookEndpoints.map((endpoint) => (
-                          <tr key={endpoint.id} className="transition-colors hover:bg-slate-50/60">
+                          <tr
+                            key={endpoint.id}
+                            className="transition-colors hover:bg-slate-50/60"
+                          >
                             <td className="px-5 py-4">
-                              <p className="font-black text-slate-900">{endpoint.ownerType}</p>
+                              <p className="font-black text-slate-900">
+                                {endpoint.ownerType}
+                              </p>
                               <p className="mt-1 font-mono text-[10px] font-bold text-slate-400">
                                 {endpoint.tenantId ?? 'platform'}
                               </p>
                             </td>
                             <td className="px-5 py-4">
-                              <p className="max-w-[300px] truncate font-mono text-xs font-bold text-slate-700">{endpoint.url}</p>
+                              <p className="max-w-[300px] truncate font-mono text-xs font-bold text-slate-700">
+                                {endpoint.url}
+                              </p>
                               <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
                                 Updated {formatDate(endpoint.updatedAt)}
                               </p>
@@ -945,14 +978,25 @@ export default function PlatformSettings() {
                             <td className="px-5 py-4">
                               <div className="flex max-w-xs flex-wrap gap-1.5">
                                 {endpoint.eventTypes.map((event) => (
-                                  <Badge key={event} variant="neutral" className="rounded-lg bg-slate-50 font-mono text-[10px]">
+                                  <Badge
+                                    key={event}
+                                    variant="neutral"
+                                    className="rounded-lg bg-slate-50 font-mono text-[10px]"
+                                  >
                                     {event}
                                   </Badge>
                                 ))}
                               </div>
                             </td>
                             <td className="px-5 py-4">
-                              <Badge variant={endpoint.status === 'ACTIVE' ? 'success' : 'neutral'} className="rounded-lg">
+                              <Badge
+                                variant={
+                                  endpoint.status === 'ACTIVE'
+                                    ? 'success'
+                                    : 'neutral'
+                                }
+                                className="rounded-lg"
+                              >
                                 {endpoint.status}
                               </Badge>
                             </td>
@@ -964,7 +1008,9 @@ export default function PlatformSettings() {
                                 disabled={webhookSaving}
                                 onClick={() => toggleWebhookEndpoint(endpoint)}
                               >
-                                {endpoint.status === 'ACTIVE' ? 'Disable' : 'Enable'}
+                                {endpoint.status === 'ACTIVE'
+                                  ? 'Disable'
+                                  : 'Enable'}
                               </Button>
                             </td>
                           </tr>
@@ -983,7 +1029,8 @@ export default function PlatformSettings() {
                   Delivery History
                 </CardTitle>
                 <CardDescription>
-                  Payloads are represented by checksums and safe response summaries only.
+                  Payloads are represented by checksums and safe response
+                  summaries only.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -993,12 +1040,18 @@ export default function PlatformSettings() {
                   </div>
                 ) : (
                   safeWebhookDeliveries.slice(0, 12).map((delivery) => (
-                    <div key={delivery.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <div
+                      key={delivery.id}
+                      className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="font-mono text-xs font-black text-slate-900">{delivery.eventType}</p>
+                          <p className="font-mono text-xs font-black text-slate-900">
+                            {delivery.eventType}
+                          </p>
                           <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                            {formatDate(delivery.createdAt)} · retry {delivery.retryCount}
+                            {formatDate(delivery.createdAt)} · retry{' '}
+                            {delivery.retryCount}
                           </p>
                         </div>
                         <Badge
@@ -1015,10 +1068,16 @@ export default function PlatformSettings() {
                         </Badge>
                       </div>
                       <div className="mt-3 grid gap-2 text-[10px] font-bold text-slate-500">
-                        <span className="truncate font-mono">Endpoint: {delivery.endpointId}</span>
-                        <span className="truncate font-mono">Checksum: {delivery.payloadChecksum}</span>
+                        <span className="truncate font-mono">
+                          Endpoint: {delivery.endpointId}
+                        </span>
+                        <span className="truncate font-mono">
+                          Checksum: {delivery.payloadChecksum}
+                        </span>
                         {delivery.responseMessageSummary ? (
-                          <span className="text-slate-600">{delivery.responseMessageSummary}</span>
+                          <span className="text-slate-600">
+                            {delivery.responseMessageSummary}
+                          </span>
                         ) : null}
                       </div>
                     </div>
@@ -1146,65 +1205,65 @@ export default function PlatformSettings() {
                 ) : (
                   <div className="space-y-4">
                     {failedJobsForInspectingQueue.map((job: any) => (
-                        <div
-                          key={job.id}
-                          className="p-4 rounded-2xl border border-slate-100 bg-white space-y-3"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-mono font-bold bg-slate-100 px-2 py-0.5 rounded">
-                              ID: {job.id}
-                            </span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                              {formatDate(job.timestamp)}
-                            </span>
-                          </div>
-                          <p className="text-sm font-bold text-rose-700">
-                            {job.failureSummary}
-                          </p>
-                          <p className="text-xs font-semibold text-slate-500">
-                            Category: {job.failureCategory.replaceAll('_', ' ')}
-                            {' · '}
-                            {job.retryable
-                              ? 'May be retryable after verification'
-                              : 'Requires investigation before retry'}
-                          </p>
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="rounded-lg font-bold text-rose-500"
-                              onClick={() => setDiscardDialog(job)}
-                            >
-                              Discard
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="rounded-lg font-bold border-slate-200"
-                              disabled={loadingJobDetailId === job.id}
-                              onClick={() =>
-                                inspectJobDetail(job.queueName, job.id)
-                              }
-                            >
-                              Detail
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="rounded-lg font-bold border-slate-200"
-                              onClick={() => {
-                                setRetryDialog({
-                                  queueName: job.queueName,
-                                  jobId: job.id,
-                                });
-                                setRetryReason('');
-                              }}
-                            >
-                              Retry
-                            </Button>
-                          </div>
+                      <div
+                        key={job.id}
+                        className="p-4 rounded-2xl border border-slate-100 bg-white space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-mono font-bold bg-slate-100 px-2 py-0.5 rounded">
+                            ID: {job.id}
+                          </span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            {formatDate(job.timestamp)}
+                          </span>
                         </div>
-                      ))}
+                        <p className="text-sm font-bold text-rose-700">
+                          {job.failureSummary}
+                        </p>
+                        <p className="text-xs font-semibold text-slate-500">
+                          Category: {job.failureCategory.replaceAll('_', ' ')}
+                          {' · '}
+                          {job.retryable
+                            ? 'May be retryable after verification'
+                            : 'Requires investigation before retry'}
+                        </p>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-lg font-bold text-rose-500"
+                            onClick={() => setDiscardDialog(job)}
+                          >
+                            Discard
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg font-bold border-slate-200"
+                            disabled={loadingJobDetailId === job.id}
+                            onClick={() =>
+                              inspectJobDetail(job.queueName, job.id)
+                            }
+                          >
+                            Detail
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg font-bold border-slate-200"
+                            onClick={() => {
+                              setRetryDialog({
+                                queueName: job.queueName,
+                                jobId: job.id,
+                              });
+                              setRetryReason('');
+                            }}
+                          >
+                            Retry
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1257,8 +1316,7 @@ export default function PlatformSettings() {
                         .filter((f) => {
                           const lower = f.featureKey.toLowerCase();
                           return !(
-                            lower.includes('m0') ||
-                            lower.includes('platform')
+                            lower.includes('m0') || lower.includes('platform')
                           );
                         })
                         .slice(0, 6)
@@ -1596,7 +1654,9 @@ export default function PlatformSettings() {
                       <tr>
                         <td colSpan={6} className="px-6 py-20 text-center">
                           <Loader2 className="h-6 w-6 animate-spin mx-auto text-slate-400" />
-                          <p className="mt-2 text-xs font-bold text-slate-400 uppercase tracking-widest">Loading exports...</p>
+                          <p className="mt-2 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                            Loading exports...
+                          </p>
                         </td>
                       </tr>
                     ) : reportExports.length === 0 ? (
@@ -1624,7 +1684,7 @@ export default function PlatformSettings() {
                               {exp.tenantId || 'platform'}
                             </span>
                           </td>
-                           <td className="px-6 py-4">
+                          <td className="px-6 py-4">
                             <Badge className="rounded-lg font-black text-[10px] bg-slate-100 text-slate-600 border-slate-200 uppercase">
                               {exp.scope}
                             </Badge>
@@ -1670,7 +1730,10 @@ export default function PlatformSettings() {
                                 Download
                               </button>
                             ) : exp.errorSummary ? (
-                              <span className="text-xs text-rose-500 font-semibold" title={exp.errorSummary}>
+                              <span
+                                className="text-xs text-rose-500 font-semibold"
+                                title={exp.errorSummary}
+                              >
                                 Error
                               </span>
                             ) : (
@@ -1843,14 +1906,16 @@ export default function PlatformSettings() {
               </div>
               {['SMS', 'EMAIL'].includes(providerReadiness.provider.type) && (
                 <p className="text-xs text-amber-600 font-semibold bg-amber-50 p-3 rounded-xl border border-amber-100 leading-snug">
-                  “This test uses safe readiness checks and will not send real messages unless configured test mode supports it.”
+                  “This test uses safe readiness checks and will not send real
+                  messages unless configured test mode supports it.”
                 </p>
               )}
               <div
                 className={`rounded-2xl border p-4 text-sm font-bold ${
                   providerReadiness.status === 'failed'
                     ? 'border-rose-100 bg-rose-50 text-rose-700'
-                    : (providerReadiness.status === 'degraded' || providerReadiness.status === 'not_configured')
+                    : providerReadiness.status === 'degraded' ||
+                        providerReadiness.status === 'not_configured'
                       ? 'border-amber-100 bg-amber-50 text-amber-800'
                       : 'border-emerald-100 bg-emerald-50 text-emerald-700'
                 }`}
@@ -1991,7 +2056,8 @@ export default function PlatformSettings() {
               Register Webhook Endpoint
             </DialogTitle>
             <DialogDescription>
-              Signing secrets are hashed by the backend. Delivery history stores checksums and safe response summaries only.
+              Signing secrets are hashed by the backend. Delivery history stores
+              checksums and safe response summaries only.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-5 py-6">
@@ -2041,7 +2107,8 @@ export default function PlatformSettings() {
               }
             />
             <p className="-mt-3 text-xs font-semibold text-slate-400">
-              Enter comma-separated event types, for example tenant.updated, invoice.issued.
+              Enter comma-separated event types, for example tenant.updated,
+              invoice.issued.
             </p>
           </div>
           <DialogFooter>
@@ -2267,7 +2334,15 @@ function exportSettingsAuditCsv(logs: PlatformAuditLog[]) {
 function getInitialSettingsTab() {
   if (typeof window === 'undefined') return 'health';
   const tab = new URLSearchParams(window.location.search).get('tab');
-  return ['health', 'providers', 'webhooks', 'queues', 'plans', 'audit', 'exports'].includes(tab ?? '')
+  return [
+    'health',
+    'providers',
+    'webhooks',
+    'queues',
+    'plans',
+    'audit',
+    'exports',
+  ].includes(tab ?? '')
     ? tab!
     : 'health';
 }

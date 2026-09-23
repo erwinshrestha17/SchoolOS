@@ -1,6 +1,9 @@
 'use client';
 
-import type { AdmissionApprovalChain, AdmissionApprovalChainStage } from '@schoolos/core';
+import type {
+  AdmissionApprovalChain,
+  AdmissionApprovalChainStage,
+} from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -47,7 +50,8 @@ export function ApprovalChainBuilder({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => admissionPoliciesApi.deleteApprovalChain(policyId, versionId),
+    mutationFn: () =>
+      admissionPoliciesApi.deleteApprovalChain(policyId, versionId),
     onSuccess: () => {
       setStages([]);
       void invalidate();
@@ -55,7 +59,10 @@ export function ApprovalChainBuilder({
   });
 
   function addStage() {
-    setStages((current) => [...current, { approverRole: null, approverPermission: null }]);
+    setStages((current) => [
+      ...current,
+      { approverRole: null, approverPermission: null },
+    ]);
   }
 
   function removeStage(index: number) {
@@ -74,7 +81,9 @@ export function ApprovalChainBuilder({
 
   function updateStageRole(index: number, role: string) {
     setStages((current) =>
-      current.map((stage, i) => (i === index ? { ...stage, approverRole: role || null } : stage)),
+      current.map((stage, i) =>
+        i === index ? { ...stage, approverRole: role || null } : stage,
+      ),
     );
   }
 
@@ -86,15 +95,17 @@ export function ApprovalChainBuilder({
       <div>
         <p className="text-sm font-bold text-slate-700">Approval chain</p>
         <p className="mt-1 text-xs text-slate-500">
-          Add ordered stages a case must clear before it is fully approved. Each stage names a
-          role — anyone holding that role (or an admin/principal) can decide it. Leave this empty
-          to use the simple &quot;Require principal approval&quot; toggle instead.
+          Add ordered stages a case must clear before it is fully approved. Each
+          stage names a role — anyone holding that role (or an admin/principal)
+          can decide it. Leave this empty to use the simple &quot;Require
+          principal approval&quot; toggle instead.
         </p>
       </div>
 
       {stages.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-          No approval chain configured. Add a stage to require sequential sign-off.
+          No approval chain configured. Add a stage to require sequential
+          sign-off.
         </p>
       ) : (
         <ol className="space-y-3">
@@ -159,9 +170,13 @@ export function ApprovalChainBuilder({
         <Button
           type="button"
           onClick={() => saveMutation.mutate(stages)}
-          disabled={saveMutation.isPending || stages.length === 0 || !hasUnsavedChanges}
+          disabled={
+            saveMutation.isPending || stages.length === 0 || !hasUnsavedChanges
+          }
         >
-          {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {saveMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : null}
           Save chain
         </Button>
         {chain ? (
@@ -171,7 +186,9 @@ export function ApprovalChainBuilder({
             onClick={() => deleteMutation.mutate()}
             disabled={deleteMutation.isPending}
           >
-            {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {deleteMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : null}
             Remove chain
           </Button>
         ) : null}

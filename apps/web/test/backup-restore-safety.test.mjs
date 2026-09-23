@@ -33,7 +33,7 @@ test('local backup rehearsal rejects source-as-target before connecting', () => 
   assert.equal(result.status, 1);
   assert.match(
     result.stderr,
-    /Refusing in-place restore into "schoolos_guard_test"/,
+    /Refusing in-place restore into ['"]schoolos_guard_test['"]/,
   );
   assert.doesNotMatch(result.stdout, /Creating backup|Backup completed/);
 });

@@ -1,31 +1,31 @@
-"use client";
+'use client';
 
 import {
   formatBsDate,
   formatBsDateTime,
   type StudentProfile,
-} from "@schoolos/core";
-import { useQuery } from "@tanstack/react-query";
-import { CreditCard, History, Printer, QrCode, Search } from "lucide-react";
-import { useDeferredValue, useState } from "react";
-import { api } from "../../lib/api";
-import { schoolFacingErrorMessage } from "../../lib/school-facing-error";
-import { StudentQrCard } from "../students/profile/student-qr-card";
-import { Button } from "../ui/button";
-import { EmptyState } from "../ui/empty-state";
-import { ErrorState } from "../ui/error-state";
-import { KpiCard, KpiGrid } from "../ui/kpi-card";
-import { LoadingState } from "../ui/loading-state";
-import { StatusBadge } from "../ui/status-badge";
+} from '@schoolos/core';
+import { useQuery } from '@tanstack/react-query';
+import { CreditCard, History, Printer, QrCode, Search } from 'lucide-react';
+import { useDeferredValue, useState } from 'react';
+import { api } from '../../lib/api';
+import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
+import { StudentQrCard } from '../students/profile/student-qr-card';
+import { Button } from '../ui/button';
+import { EmptyState } from '../ui/empty-state';
+import { ErrorState } from '../ui/error-state';
+import { KpiCard, KpiGrid } from '../ui/kpi-card';
+import { LoadingState } from '../ui/loading-state';
+import { StatusBadge } from '../ui/status-badge';
 
 export function QrIdWorkspace() {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<StudentProfile | null>(null);
 
   const studentsQuery = useQuery({
-    queryKey: ["students", "qr-workspace", deferredSearch, page],
+    queryKey: ['students', 'qr-workspace', deferredSearch, page],
     queryFn: () =>
       api.listStudents({
         search: deferredSearch || undefined,
@@ -34,7 +34,7 @@ export function QrIdWorkspace() {
       }),
   });
   const summaryQuery = useQuery({
-    queryKey: ["student-qr-workspace-summary"],
+    queryKey: ['student-qr-workspace-summary'],
     queryFn: () => api.getStudentQrWorkspaceSummary(),
   });
 
@@ -48,9 +48,9 @@ export function QrIdWorkspace() {
         title="QR card records could not load"
         message={schoolFacingErrorMessage(studentsQuery.error, {
           fallback:
-            "QR card records could not load. No credentials were changed.",
+            'QR card records could not load. No credentials were changed.',
           forbidden:
-            "You do not have permission to view school QR card records.",
+            'You do not have permission to view school QR card records.',
         })}
         onRetry={() => void studentsQuery.refetch()}
       />
@@ -65,46 +65,46 @@ export function QrIdWorkspace() {
       <KpiGrid className="sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="Active QR Cards"
-          value={summary?.activeCredentials ?? "Unavailable"}
+          value={summary?.activeCredentials ?? 'Unavailable'}
           icon={<QrCode size={19} />}
           tone="success"
           description={
             summaryUnavailable
-              ? "School-wide total could not load"
-              : "Ready for protected school workflows"
+              ? 'School-wide total could not load'
+              : 'Ready for protected school workflows'
           }
         />
         <KpiCard
           title="Replacement Files"
-          value={summary?.replacementFilesNeeded ?? "Unavailable"}
+          value={summary?.replacementFilesNeeded ?? 'Unavailable'}
           icon={<Printer size={19} />}
-          tone={summary?.replacementFilesNeeded ? "warning" : "neutral"}
+          tone={summary?.replacementFilesNeeded ? 'warning' : 'neutral'}
           description={
             summaryUnavailable
-              ? "Protected-file status could not load"
-              : "Active credentials missing an ID-card file"
+              ? 'Protected-file status could not load'
+              : 'Active credentials missing an ID-card file'
           }
         />
         <KpiCard
           title="Inactive Credentials"
-          value={summary?.inactiveCredentials ?? "Unavailable"}
+          value={summary?.inactiveCredentials ?? 'Unavailable'}
           icon={<CreditCard size={19} />}
           tone="neutral"
           description={
             summaryUnavailable
-              ? "Credential history could not load"
-              : "Rotated or revoked audit history"
+              ? 'Credential history could not load'
+              : 'Rotated or revoked audit history'
           }
         />
         <KpiCard
           title="Scans Today"
-          value={summary?.successfulScansToday ?? "Unavailable"}
+          value={summary?.successfulScansToday ?? 'Unavailable'}
           icon={<History size={19} />}
           tone="neutral"
           description={
             summary
               ? `Successful scans on ${summary.period.bsDate} BS`
-              : "Nepal school-day total could not load"
+              : 'Nepal school-day total could not load'
           }
         />
       </KpiGrid>
@@ -154,14 +154,14 @@ export function QrIdWorkspace() {
                       student.fullNameEn ||
                       [student.firstNameEn, student.lastNameEn]
                         .filter(Boolean)
-                        .join(" ") ||
-                      "Unnamed student";
+                        .join(' ') ||
+                      'Unnamed student';
                     const active = selected?.id === student.id;
                     return (
                       <tr
                         key={student.id}
                         onClick={() => setSelected(student)}
-                        className={`cursor-pointer transition ${active ? "bg-primary-50" : "hover:bg-slate-50"}`}
+                        className={`cursor-pointer transition ${active ? 'bg-primary-50' : 'hover:bg-slate-50'}`}
                       >
                         <td className="px-4 py-3">
                           <strong className="block text-slate-900">
@@ -174,37 +174,37 @@ export function QrIdWorkspace() {
                         <td className="px-4 py-3 font-semibold text-slate-600">
                           {student.className ??
                             student.class?.name ??
-                            "Not assigned"}{" "}
-                          / {student.sectionName ?? student.section ?? "—"}
+                            'Not assigned'}{' '}
+                          / {student.sectionName ?? student.section ?? '—'}
                         </td>
                         <td className="px-4 py-3 text-xs font-semibold text-slate-600">
                           {student.qrCredential
                             ? `QR-${student.studentSystemId}`
-                            : "—"}
+                            : '—'}
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge
                             status={
-                              student.qrCredential?.status ?? "NOT_GENERATED"
+                              student.qrCredential?.status ?? 'NOT_GENERATED'
                             }
                             tone={
-                              student.qrCredential?.status === "ACTIVE"
-                                ? "active"
-                                : "inactive"
+                              student.qrCredential?.status === 'ACTIVE'
+                                ? 'active'
+                                : 'inactive'
                             }
                           />
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {student.qrCredential?.createdAt
                             ? formatBsDate(student.qrCredential.createdAt)
-                            : "—"}
+                            : '—'}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {student.qrCredential?.lastScannedAt
                             ? formatBsDateTime(
                                 student.qrCredential.lastScannedAt,
                               )
-                            : "Never"}
+                            : 'Never'}
                         </td>
                         <td className="px-4 py-3">
                           <Button

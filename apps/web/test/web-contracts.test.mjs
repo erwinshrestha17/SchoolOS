@@ -126,7 +126,7 @@ describe('SchoolOS web production contracts', () => {
     }
 
     const moneyDisplay = read('components/ui/money-display.tsx');
-    assert.match(moneyDisplay, /currency:\s*'NPR'/);
+    assert.match(moneyDisplay, /currency:\s*['"]NPR['"]/);
 
     const dataTable = read('components/ui/data-table.tsx');
     assert.match(dataTable, /isLoading/);
@@ -188,7 +188,7 @@ describe('SchoolOS web production contracts', () => {
     );
     assert.doesNotMatch(
       sharedPrimitives,
-      /<svg|rounded-\[(?:2rem|28px)\]|rounded-3xl|shadow-xl|shadow-2xl|bg-slate-900|bg-slate-950|focus:border-primary|focus:ring-primary|border-primary|bg-primary|text-primary|from-primary|to-primary|hidden"/,
+      /<svg|rounded-\[(?:2rem|28px)\]|rounded-3xl|shadow-xl|shadow-2xl|bg-slate-900|bg-slate-950|focus:border-primary|focus:ring-primary|border-primary|bg-primary|text-primary|from-primary|to-primary|hidden['"]/,
     );
   });
 
@@ -233,13 +233,13 @@ describe('SchoolOS web production contracts', () => {
     // (Nepal-schools redesign) rather than a separate standalone toggle.
     assert.match(
       form,
-      /submissionRequired: formData\.submissionMethod !== 'NO_SUBMISSION_REQUIRED'/,
+      /submissionRequired:\s*formData\.submissionMethod !== ['"]NO_SUBMISSION_REQUIRED['"]/,
     );
     assert.match(form, /saveAsTemplate: formData\.saveAsTemplate/);
     assert.match(form, /templateName: formData\.saveAsTemplate/);
     assert.match(form, /recurrence: formData\.recurrenceEnabled/);
     assert.match(form, /recurrenceFrequency/);
-    assert.match(form, /Promise\.all\(created\.items\.map/);
+    assert.match(form, /Promise\.all\(\s*created\.items\.map/);
     assert.match(form, /createMutation\.mutate\(\{ publish \}\)/);
     assert.doesNotMatch(form, /isSubmissionRequired/);
     assert.doesNotMatch(form, /status: publish/);
@@ -269,7 +269,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(page, /api\.listHomeworkTemplates/);
     assert.match(page, /api\.getHomeworkCompletionReport/);
     assert.doesNotMatch(page, /\/dashboard\/timetable/);
-    assert.match(workloadRoute, /initialSection="Teacher Workload"/);
+    assert.match(workloadRoute, /initialSection=['"]Teacher Workload['"]/);
     assert.match(
       academicsApi,
       /\/homework\/\$\{encodeURIComponent\(id\)\}\/publish/,
@@ -308,7 +308,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(panel, /StudentProfilePanelProps/);
     assert.match(panel, /student:\s*StudentProfile/);
     assert.match(panel, /onOpenPdf\(student\.id, kind\)/);
-    assert.match(panel, /href="\/dashboard\/fees"/);
+    assert.match(panel, /href=['"]\/dashboard\/fees['"]/);
     assert.match(panel, /bg-\[var\(--primary-soft\)\]/);
     assert.match(panel, /text-\[var\(--primary-dark\)\]/);
     assert.doesNotMatch(
@@ -325,7 +325,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(moduleTabs, /pathname\?\.startsWith\(`\$\{item\.href\}\/`\)/);
     assert.match(
       moduleTabs,
-      /typeof item\.count === 'number' && item\.count > 0/,
+      /typeof item\.count === ['"]number['"] && item\.count > 0/,
     );
     assert.match(
       moduleTabs,
@@ -547,7 +547,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(homeworkCreateForm, /api\.assignHomework/);
     // Today's homework list still supports filtering across every status.
     assert.match(homeworkPage, /All Statuses/);
-    assert.match(homeworkPage, /"CLOSED"/);
+    assert.match(homeworkPage, /['"]CLOSED['"]/);
     // Register + reminder actions on the detail page are real-API-backed.
     assert.match(homeworkDetailPage, /api\.bulkCompleteHomeworkRegister/);
     assert.match(homeworkDetailPage, /api\.updateHomeworkSubmissionStatus/);
@@ -607,11 +607,11 @@ describe('SchoolOS web production contracts', () => {
     assert.match(timetablePage, /substitutionStatsQuery\.data\?\.meta\.total/);
     assert.doesNotMatch(
       timetablePage,
-      /title:\s*'Conflicts'[\s\S]*?value:\s*0/,
+      /title:\s*['"]Conflicts['"][\s\S]*?value:\s*0/,
     );
     assert.doesNotMatch(
       timetablePage,
-      /title:\s*'Substitutions'[\s\S]*?value:\s*0/,
+      /title:\s*['"]Substitutions['"][\s\S]*?value:\s*0/,
     );
   });
 
@@ -650,7 +650,7 @@ describe('SchoolOS web production contracts', () => {
       'Record Absence',
       'timetable-substitution-slots',
       'api.listTimetable',
-      'mode={selectedSub ? "assign" : "create"}',
+      "mode={selectedSub ? 'assign' : 'create'}",
       'Select a class before recording an absence',
       'Seed default chart accounts?',
       'Cancel substitution?',
@@ -811,7 +811,7 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(requestDemoForm, /TODO/);
 
     assert.match(marketingApi, /\/demo-requests/);
-    assert.match(marketingApi, /method:\s*'POST'/);
+    assert.match(marketingApi, /method:\s*['"]POST['"]/);
     assert.match(marketingApi, /auth:\s*false/);
     assert.match(apiIndex, /marketingApi/);
   });
@@ -858,7 +858,7 @@ describe('SchoolOS web production contracts', () => {
       loginPage,
       /<svg|bg-slate-950|primary-(50|100|200|500|600|700|800|900)|blur-3xl|fake|mock|Coming soon/,
     );
-    assert.match(loginForm, /method="post"/);
+    assert.match(loginForm, /method=['"]post['"]/);
   });
 
   it('uses cookie credentials instead of bearer tokens for browser API calls', () => {
@@ -901,26 +901,26 @@ describe('SchoolOS web production contracts', () => {
       read('lib/nav-module-map.ts'),
       /export function getRequiredModuleForHref/,
     );
-    assert.match(sidebar, /aria-label="School operations navigation"/);
+    assert.match(sidebar, /aria-label=['"]School operations navigation['"]/);
 
     for (const label of requiredPhaseOneLabels) {
       assert.match(personaNav, new RegExp(label.replace('/', '\\/')));
     }
 
-    assert.match(personaNav, /href: '\/dashboard\/activity'/);
-    assert.doesNotMatch(personaNav, /href: '\/dashboard\/messages'/);
-    assert.match(personaNav, /href: '\/dashboard\/notices'/);
-    assert.match(personaNav, /href: '\/dashboard\/transport'/);
-    assert.match(personaNav, /href: '\/dashboard\/canteen'/);
-    assert.match(personaNav, /label: 'Staff'/);
-    assert.match(personaNav, /label: 'Payroll'/);
+    assert.match(personaNav, /href: ['"]\/dashboard\/activity['"]/);
+    assert.doesNotMatch(personaNav, /href: ['"]\/dashboard\/messages['"]/);
+    assert.match(personaNav, /href: ['"]\/dashboard\/notices['"]/);
+    assert.match(personaNav, /href: ['"]\/dashboard\/transport['"]/);
+    assert.match(personaNav, /href: ['"]\/dashboard\/canteen['"]/);
+    assert.match(personaNav, /label: ['"]Staff['"]/);
+    assert.match(personaNav, /label: ['"]Payroll['"]/);
     assert.match(
       personaNav,
-      /href: '\/dashboard\/transport'[\s\S]*label: 'Transport'/,
+      /href: ['"]\/dashboard\/transport['"][\s\S]*label: ['"]Transport['"]/,
     );
     assert.match(
       personaNav,
-      /href: '\/dashboard\/library'[\s\S]*label: 'Library'/,
+      /href: ['"]\/dashboard\/library['"][\s\S]*label: ['"]Library['"]/,
     );
   });
 
@@ -1013,7 +1013,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(dashboard, /api\.getDashboardSummary/);
     assert.match(
       dashboard,
-      /request<OperationalDashboardSummary>\('\/dashboard\/summary'\)/,
+      /request<OperationalDashboardSummary>\(['"]\/dashboard\/summary['"]\)/,
     );
     assert.match(dashboard, /AdminDashboard/);
     assert.match(dashboard, /PrincipalDashboard/);
@@ -1198,7 +1198,7 @@ describe('SchoolOS web production contracts', () => {
       studentDirectory,
       /Readiness & duplicate attention panels/,
     );
-    assert.match(studentDirectory, /onOpenPdf\(student\.id, 'id-card'\)/);
+    assert.match(studentDirectory, /onOpenPdf\(student\.id, ['"]id-card['"]\)/);
     assert.match(studentDirectory, /\/dashboard\/fees\/collect\?studentId=/);
     assert.match(
       studentDirectory,
@@ -1264,7 +1264,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(studentQrCard, /STUDENT_QR_REASON_MIN_LENGTH/);
     assert.match(studentQrCard, /STUDENT_QR_REASON_MAX_LENGTH/);
     assert.match(studentQrCard, /QrActionError/);
-    assert.match(studentQrCard, /role="alert"/);
+    assert.match(studentQrCard, /role=['"]alert['"]/);
     assert.match(studentQrCard, /color-mod-admissions-accent/);
     assert.match(studentQrCard, /ProtectedFileButton/);
     assert.match(
@@ -1568,7 +1568,7 @@ describe('SchoolOS web production contracts', () => {
       detailPage,
       /api\.downloadStudentDocument\(studentId, document\.id\)/,
     );
-    assert.match(detailPage, /downloadProtectedFile\(access\.fileAssetId/);
+    assert.match(detailPage, /downloadProtectedFile\(\s*access\.fileAssetId/);
     assert.match(
       detailPage,
       /api\.archiveStudentDocument\(documentId, \{ reason \}\)/,
@@ -1578,7 +1578,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(detailPage, /BsDateField/);
     assert.match(
       detailPage,
-      /toGregorianDateFromBs\(parseBsDateInput\(uploadExpiryDateBs\)\)/,
+      /toGregorianDateFromBs\(\s*parseBsDateInput\(uploadExpiryDateBs\),?\s*\)/,
     );
     assert.match(detailPage, /expiryDate: metadata\.expiryDate/);
     assert.match(detailPage, /notes: metadata\.notes/);
@@ -1590,7 +1590,7 @@ describe('SchoolOS web production contracts', () => {
       /fileAssetId=\{selectedDocument\.fileId\}|fileAssetId=\{document\.fileId\}/,
     );
     assert.doesNotMatch(detailPage, /api\.deleteStudentDocument/);
-    assert.doesNotMatch(detailPage, /href="#"/);
+    assert.doesNotMatch(detailPage, /href=['"]#['"]/);
     assert.match(apiClient, /revokeGeneratedStudentDocument:/);
     assert.match(apiClient, /openStudentDocumentPdf[\s\S]*openPdfBlob/);
     assert.doesNotMatch(
@@ -1616,8 +1616,14 @@ describe('SchoolOS web production contracts', () => {
     assert.match(studentEditCard, /image\/jpeg/);
     assert.match(studentEditCard, /image\/png/);
     assert.match(studentEditCard, /image\/webp/);
-    assert.match(studentEditCard, /data-testid="student-photo-upload-input"/);
-    assert.match(studentEditCard, /data-testid="student-photo-remove-button"/);
+    assert.match(
+      studentEditCard,
+      /data-testid=['"]student-photo-upload-input['"]/,
+    );
+    assert.match(
+      studentEditCard,
+      /data-testid=['"]student-photo-remove-button['"]/,
+    );
     assert.match(studentEditCard, /ConfirmDialog/);
     assert.match(studentEditCard, /color-mod-admissions-accent/);
     assert.doesNotMatch(studentEditCard, /window\.confirm|alert\(/);
@@ -1643,7 +1649,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(apiClient, /content-type/);
     assert.match(apiClient, /application\/pdf/);
     assert.match(apiClient, /blob\.size === 0/);
-    assert.match(apiClient, /header !== '%PDF-'/);
+    assert.match(apiClient, /header !== ['"]%PDF-['"]/);
     assert.match(apiClient, /parseApiErrorMessage/);
     assert.match(apiClient, /openStudentDocumentPdf[\s\S]*openPdfBlob/);
     assert.match(apiClient, /openReceiptPdf[\s\S]*openPdfBlob/);
@@ -1899,7 +1905,7 @@ describe('SchoolOS web production contracts', () => {
     );
 
     for (const marker of [
-      'api.downloadReport("dues-table-report"',
+      "api.downloadReport('dues-table-report'",
       'finance-dues-csv-export',
       'Clear filters',
       'exportMutation.error.message',
@@ -1911,7 +1917,7 @@ describe('SchoolOS web production contracts', () => {
     }
 
     for (const marker of [
-      'api.downloadReport("defaulter-aging-report"',
+      "api.downloadReport('defaulter-aging-report'",
       'finance-defaulter-aging-csv-export',
       'Export Summary',
       'exportMutation.error.message',
@@ -2361,9 +2367,9 @@ describe('SchoolOS web production contracts', () => {
 
     assert.match(
       resolver,
-      /purpose === 'CANTEEN_POS' \|\| purpose === 'CANTEEN_SERVE'/,
+      /purpose === ['"]CANTEEN_POS['"] \|\| purpose === ['"]CANTEEN_SERVE['"]/,
     );
-    assert.match(resolver, /return 'CANTEEN'/);
+    assert.match(resolver, /return ['"]CANTEEN['"]/);
   });
 
   it('keeps canteen inventory and supplier surfaces wired to real APIs', () => {
@@ -2493,7 +2499,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(milestonesPage, /developmental and social milestones/);
     assert.match(milestonesPage, /DevelopmentalMilestone/);
     assert.match(deliveriesPage, /Activity deliveries/);
-    assert.match(deliveriesPage, /sourceType: 'activity_post'/);
+    assert.match(deliveriesPage, /sourceType: ['"]activity_post['"]/);
     assert.match(deliveriesPage, /StatusBadge/);
     // Delivery states render through the shared StatusBadge tone map.
     assert.match(statusBadge, /QUEUED/);
@@ -2532,8 +2538,8 @@ describe('SchoolOS web production contracts', () => {
     const composerPage = read('app/dashboard/activity/new/page.tsx');
     const activitySurfaces = readMany(activitySurfaceFiles);
 
-    assert.match(composerPage, /no permanent public URLs are exposed/);
-    assert.match(composerPage, /signed access only/);
+    assert.match(composerPage, /no permanent public URLs\s+are exposed/);
+    assert.match(composerPage, /signed\s+access only/);
     assert.match(activitySurfaces, /Private media/);
     assert.doesNotMatch(
       activitySurfaces,
@@ -2882,13 +2888,13 @@ describe('SchoolOS web production contracts', () => {
     const payrollApi = read('lib/api/payroll.ts');
     const payslipList = read('components/hr/payslip-list.tsx');
 
-    assert.match(personaNav, /label: 'Staff'/);
-    assert.match(personaNav, /label: 'Payroll'/);
-    assert.match(personaNav, /href: '\/dashboard\/hr'/);
-    assert.match(personaNav, /href: '\/dashboard\/payroll'/);
+    assert.match(personaNav, /label: ['"]Staff['"]/);
+    assert.match(personaNav, /label: ['"]Payroll['"]/);
+    assert.match(personaNav, /href: ['"]\/dashboard\/hr['"]/);
+    assert.match(personaNav, /href: ['"]\/dashboard\/payroll['"]/);
     assert.match(
       personaNav,
-      /permissions: \['hr:read', 'payroll:read', 'payroll:manage'\]/,
+      /permissions: \[['"]hr:read['"], ['"]payroll:read['"], ['"]payroll:manage['"]\]/,
     );
     assert.match(payrollPage, /PayrollDashboardPage/);
     assert.match(payrollPage, /api\.getPayrollDashboardSummary/);
@@ -2896,7 +2902,7 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(hrOverview, /\bN\/A\b/);
     assert.match(
       hrWorkspace,
-      /'Staff Directory'|'Contracts'|'Leave Requests'|'Attendance Summary'|'Leave Balances'/,
+      /['"]Staff Directory['"]|['"]Contracts['"]|['"]Leave Requests['"]|['"]Attendance Summary['"]|['"]Leave Balances['"]/,
     );
     assert.match(hrPage, /<ModuleHeader/);
     assert.match(hrPage, /<SummaryGrid/);
@@ -2906,7 +2912,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(hrPage, /api\.listContractExpiryReminders/);
     assert.match(hrPage, /\/dashboard\/payroll\/runs/);
     assert.match(hrPage, /\/dashboard\/payroll\/payslips/);
-    assert.match(hrPage, /\? "Unavailable"|value="Unavailable"/);
+    assert.match(hrPage, /\? ['"]Unavailable['"]|value=['"]Unavailable['"]/);
     assert.match(hrPage, /Remaining Issues|Known Boundary/);
     assert.doesNotMatch(hrPage, /api\.listStaff\(/);
     assert.doesNotMatch(hrPage, /api\.listLeaveRequests/);
@@ -2922,7 +2928,7 @@ describe('SchoolOS web production contracts', () => {
       payrollPage,
       /salary disbursement\s+remains outside this workspace/i,
     );
-    assert.doesNotMatch(payrollPage, /statuses: \['PAID'\]/);
+    assert.doesNotMatch(payrollPage, /statuses: \[['"]PAID['"]\]/);
     assert.doesNotMatch(
       payrollPage,
       /markPayrollRunPaid|Mark Paid|Disbursement Account Code/,
@@ -2936,8 +2942,8 @@ describe('SchoolOS web production contracts', () => {
     assert.match(contractList, /api\.listStaffContracts/);
     assert.match(contractList, /api\.listStaff/);
     assert.match(contractList, /api\.createStaffContract/);
-    assert.match(contractList, /hasPermissions\(\['payroll:read'\]\)/);
-    assert.match(contractList, /hasPermissions\(\['payroll:manage'\]\)/);
+    assert.match(contractList, /hasPermissions\(\[['"]payroll:read['"]\]\)/);
+    assert.match(contractList, /hasPermissions\(\[['"]payroll:manage['"]\]\)/);
     assert.match(contractList, /Restricted/);
     assert.match(contractList, /Base Salary/);
     assert.match(contractList, /Allowances/);
@@ -2966,9 +2972,9 @@ describe('SchoolOS web production contracts', () => {
     const payrollPreview = read('components/hr/payroll-preview.tsx');
     assert.match(payrollPreview, /api\.getPayrollPreview/);
     assert.match(payrollPreview, /Preview Only/);
-    assert.match(payrollPreview, /No accounting entries/);
+    assert.match(payrollPreview, /No\s+accounting entries/);
     assert.match(payrollPreview, /payroll runs/);
-    assert.match(payrollPreview, /created from this screen/);
+    assert.match(payrollPreview, /created from\s+this screen/);
     assert.match(payrollPreview, /Gross Pay|Net Pay|Deductions/);
 
     // Negative checks: Payroll preview should be read-only and isolated from direct accounting writes in Phase 2C

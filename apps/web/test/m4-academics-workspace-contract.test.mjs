@@ -29,7 +29,7 @@ describe('M4 academics workspace contract', () => {
     assert.match(page, /Retest Queue/);
     assert.match(page, /Marks Lock Review/);
     assert.match(page, /Promotion Readiness/);
-    assert.match(page, /label: 'Publishing'/);
+    assert.match(page, /label: ['"]Publishing['"]/);
   });
 
   it('keeps the primary module navigation within the seven-tab budget', () => {
@@ -46,33 +46,37 @@ describe('M4 academics workspace contract', () => {
     );
 
     const visibleHrefs = (
-      visibleBlock.match(/href: '\/dashboard\/academics/g) ?? []
+      visibleBlock.match(/href: ['"]\/dashboard\/academics/g) ?? []
     ).length;
     assert.ok(
       visibleHrefs > 0 && visibleHrefs <= 7,
       `academics must show between 1 and 7 primary tabs, found ${visibleHrefs}`,
     );
     assert.ok(
-      (overflowBlock?.match(/href: '\/dashboard\/academics/g) ?? []).length > 0,
+      (overflowBlock?.match(/href: ['"]\/dashboard\/academics/g) ?? []).length >
+        0,
       'academics must keep low-frequency destinations in the overflow menu',
     );
 
-    assert.match(tabs, /label: 'Overview'/);
-    assert.doesNotMatch(tabs, /label: 'Subjects'/);
-    assert.doesNotMatch(tabs, /label: 'Retests'|label: 'Locks'|label: 'Promotion'/);
+    assert.match(tabs, /label: ['"]Overview['"]/);
+    assert.doesNotMatch(tabs, /label: ['"]Subjects['"]/);
+    assert.doesNotMatch(
+      tabs,
+      /label: ['"]Retests['"]|label: ['"]Locks['"]|label: ['"]Promotion['"]/,
+    );
   });
 
   it('keeps the overview focused on four core workspaces', () => {
     const page = read('app/dashboard/academics/page.tsx');
     const shell = read('components/layout/dashboard-shell.tsx');
 
-    assert.equal((page.match(/title: '/g) ?? []).length, 4);
+    assert.equal((page.match(/title: ['"]/g) ?? []).length, 4);
     assert.doesNotMatch(page, /Step \{index \+ 1\}/);
     assert.match(page, /Core academic workspaces/);
-    assert.match(page, /href="\/dashboard\/academics\/locks"/);
+    assert.match(page, /href=['"]\/dashboard\/academics\/locks['"]/);
     assert.doesNotMatch(
       shell,
-      /'\/dashboard\/academics':\s*'academics'/,
+      /['"]\/dashboard\/academics['"]:\s*['"]academics['"]/,
     );
   });
 
@@ -82,7 +86,7 @@ describe('M4 academics workspace contract', () => {
     // A real, module-owned, bounded backend summary contract already exists
     // (GET /dashboard/academics/summary via getModuleSummary) — the overview
     // must use it instead of the "Needs a real M4 summary API" stub.
-    assert.match(page, /getModuleSummary\('academics'\)/);
+    assert.match(page, /getModuleSummary\(['"]academics['"]\)/);
     assert.doesNotMatch(page, /Needs a real M4 summary API/);
     assert.doesNotMatch(page, /getStepProgress/);
     assert.doesNotMatch(page, /reportsQuery\.data\?\.length/);
@@ -93,19 +97,19 @@ describe('M4 academics workspace contract', () => {
     // Unavailable, driven by the query's own status, with real drill-through
     // hrefs.
     assert.match(page, /loading=\{summaryQuery\.isLoading\}/);
-    assert.doesNotMatch(page, /isLoading\) return 'Loading'/);
-    assert.match(page, /'Unavailable'/);
-    assert.match(page, /href="\/dashboard\/academics\/marks"/);
+    assert.doesNotMatch(page, /isLoading\) return ['"]Loading['"]/);
+    assert.match(page, /['"]Unavailable['"]/);
+    assert.match(page, /href=['"]\/dashboard\/academics\/marks['"]/);
     assert.match(
       page,
-      /label="Marks Entry Open"[\s\S]{0,300}href="\/dashboard\/academics\/marks"/,
+      /label=['"]Marks Entry Open['"][\s\S]{0,300}href=['"]\/dashboard\/academics\/marks['"]/,
     );
     assert.match(
       page,
-      /label="Mark Lock Requests"[\s\S]{0,300}href="\/dashboard\/academics\/locks"/,
+      /label=['"]Mark Lock Requests['"][\s\S]{0,300}href=['"]\/dashboard\/academics\/locks['"]/,
     );
-    assert.match(page, /href="\/dashboard\/academics\/report-cards"/);
-    assert.match(page, /href="\/dashboard\/academics\/promotion"/);
+    assert.match(page, /href=['"]\/dashboard\/academics\/report-cards['"]/);
+    assert.match(page, /href=['"]\/dashboard\/academics\/promotion['"]/);
   });
 
   it('links only to existing M4 workspaces and preserves protected workflow language', () => {
@@ -160,17 +164,15 @@ describe('M4 academics workspace contract', () => {
     const api = read('lib/api/academics.ts');
 
     assert.match(api, /Object\.entries\(filters \?\? \{\}\)\.filter/);
-    assert.match(api, /value !== ''/);
+    assert.match(api, /value !== ['"]['"]/);
     assert.match(
       api,
-      /withQuery\('\/academics\/cas-records', activeFilters\)/,
+      /withQuery\(['"]\/academics\/cas-records['"], activeFilters\)/,
     );
   });
 
   it('guards unsaved marks against silent loss and respects per-student locks', () => {
-    const workspace = read(
-      'components/academics/tabs/marks-entry-tab.tsx',
-    );
+    const workspace = read('components/academics/tabs/marks-entry-tab.tsx');
 
     // Switching exam/class/subject/component context must not silently
     // discard marks that have not been saved yet.
@@ -193,43 +195,59 @@ describe('M4 academics workspace contract', () => {
     // an explicitly high-risk action that must never fire directly from a
     // single click, unlike every other icon-only/no-confirmation gap found
     // in this module.
-    assert.match(lockTab, /import \{ ConfirmDialog \} from '@\/components\/ui\/confirm-dialog'/);
+    assert.match(
+      lockTab,
+      /import \{ ConfirmDialog \} from ['"]@\/components\/ui\/confirm-dialog['"]/,
+    );
     assert.match(lockTab, /showUnlockConfirm/);
     assert.doesNotMatch(
       lockTab,
       /onClick=\{\(\) => unlockMutation\.mutate\(\{ id: unlockForm\.examTermId/,
     );
-    assert.match(lockTab, /<ConfirmDialog[\s\S]{0,500}variant="destructive"/);
+    assert.match(
+      lockTab,
+      /<ConfirmDialog[\s\S]{0,500}variant=['"]destructive['"]/,
+    );
     assert.doesNotMatch(lockTab, /🔒|🔓/);
   });
 
   it('uses the shared Button component for mark-lock review decisions', () => {
     const lockTab = read('components/academics/tabs/marks-lock-tab.tsx');
 
-    assert.match(lockTab, /import \{ Button \} from '@\/components\/ui\/button'/);
-    assert.match(lockTab, /variant="destructive"[\s\S]{0,400}Reject/);
+    assert.match(
+      lockTab,
+      /import \{ Button \} from ['"]@\/components\/ui\/button['"]/,
+    );
+    assert.match(lockTab, /variant=['"]destructive['"][\s\S]{0,500}Reject/);
   });
 
   it('shows visible text for retest approve/reject/cancel decisions instead of icon-only controls', () => {
-    const retakesTab = read('components/academics/tabs/assessment-retakes-tab.tsx');
+    const retakesTab = read(
+      'components/academics/tabs/assessment-retakes-tab.tsx',
+    );
 
     // Approve/Reject are on the explicit list of actions that must never be
     // icon-only, regardless of how low-risk the surrounding flow looks.
     assert.doesNotMatch(
       retakesTab,
-      /<IconAction[\s\S]{0,40}title="Approve request"/,
+      /<IconAction[\s\S]{0,40}title=['"]Approve request['"]/,
     );
     assert.doesNotMatch(
       retakesTab,
-      /<IconAction[\s\S]{0,40}title="Reject request"/,
+      /<IconAction[\s\S]{0,40}title=['"]Reject request['"]/,
     );
     assert.match(retakesTab, />\s*Approve\s*</);
-    assert.match(retakesTab, /variant="destructive"[\s\S]{0,150}Reject/);
-    assert.match(retakesTab, /import \{ Tooltip \} from '@\/components\/ui\/tooltip'/);
+    assert.match(retakesTab, /variant=['"]destructive['"][\s\S]{0,150}Reject/);
+    assert.match(
+      retakesTab,
+      /import \{ Tooltip \} from ['"]@\/components\/ui\/tooltip['"]/,
+    );
   });
 
   it('wires a real Unpublish control to the previously-unreachable unpublish mutation', () => {
-    const publishingTab = read('components/academics/tabs/result-publishing-tab.tsx');
+    const publishingTab = read(
+      'components/academics/tabs/result-publishing-tab.tsx',
+    );
 
     // unpublishMut existed with a real mutationFn and onSuccess/onError
     // handling but had no button anywhere calling .mutate on it.
@@ -244,16 +262,25 @@ describe('M4 academics workspace contract', () => {
 
     // Delete is on the explicit list of actions that must never be
     // icon-only, and this delete previously fired with zero confirmation.
-    assert.doesNotMatch(casTab, /onClick=\{\(\) => deleteMutation\.mutate\(record\.id\)\}/);
+    assert.doesNotMatch(
+      casTab,
+      /onClick=\{\(\) => deleteMutation\.mutate\(record\.id\)\}/,
+    );
     assert.match(casTab, /setDeleteTarget/);
-    assert.match(casTab, /import \{ ConfirmDialog \} from '@\/components\/ui\/confirm-dialog'/);
-    assert.match(casTab, /variant="destructive"[\s\S]{0,80}Delete/);
+    assert.match(
+      casTab,
+      /import \{ ConfirmDialog \} from ['"]@\/components\/ui\/confirm-dialog['"]/,
+    );
+    assert.match(casTab, /variant=['"]destructive['"][\s\S]{0,80}Delete/);
   });
 
   it('wires the promotion readiness "Details" button to a real dialog instead of a dead click', () => {
     const promotionTab = read('components/academics/tabs/promotion-tab.tsx');
 
-    assert.doesNotMatch(promotionTab, /Scroll to marks\/results if review needed/);
+    assert.doesNotMatch(
+      promotionTab,
+      /Scroll to marks\/results if review needed/,
+    );
     assert.match(promotionTab, /onClick=\{\(\) => setDetailStudent\(s\)\}/);
     assert.match(promotionTab, /detailStudent\?\.reasons/);
   });
@@ -262,7 +289,7 @@ describe('M4 academics workspace contract', () => {
     const examTermsTab = read('components/academics/tabs/exam-terms-tab.tsx');
 
     assert.doesNotMatch(examTermsTab, /function Loader2/);
-    assert.match(examTermsTab, /Loader2\s*$/m);
+    assert.match(examTermsTab, /\bLoader2,?\s*$/m);
     assert.doesNotMatch(examTermsTab, /🔒|🔓/);
   });
 });

@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useCallback, useMemo } from "react";
-import type { StudentLookupOption } from "@schoolos/core";
-import { studentsApi } from "../../lib/api/students";
-import { RemoteCombobox } from "../ui/remote-combobox";
+import { useCallback, useMemo } from 'react';
+import type { StudentLookupOption } from '@schoolos/core';
+import { studentsApi } from '../../lib/api/students';
+import { RemoteCombobox } from '../ui/remote-combobox';
 
 type RemoteStudentSelectorProps = {
   value: string;
@@ -29,8 +29,8 @@ export function RemoteStudentSelector({
   academicYearId,
   classId,
   sectionId,
-  label = "Student",
-  placeholder = "Search for a student",
+  label = 'Student',
+  placeholder = 'Search for a student',
   disabled,
   clearable,
   hideLabel,
@@ -38,7 +38,7 @@ export function RemoteStudentSelector({
 }: RemoteStudentSelectorProps) {
   const queryKey = useMemo(
     () => [
-      "remote-student-options",
+      'remote-student-options',
       academicYearId ?? null,
       classId ?? null,
       sectionId ?? null,
@@ -83,7 +83,7 @@ export function RemoteStudentSelector({
       getOptionDescription={(option) =>
         [option.studentSystemId, option.className, option.sectionName]
           .filter(Boolean)
-          .join(" · ")
+          .join(' · ')
       }
       label={label}
       placeholder={placeholder}

@@ -455,10 +455,7 @@ function resolveRecipientLabel(
   }
 
   return (
-    guardianName ||
-    studentName ||
-    maskedDestination ||
-    'Recipient unavailable'
+    guardianName || studentName || maskedDestination || 'Recipient unavailable'
   );
 }
 

@@ -10,7 +10,11 @@ type AuditInfoProps = {
   className?: string;
 };
 
-export function AuditInfo({ children, tone = 'default', className }: AuditInfoProps) {
+export function AuditInfo({
+  children,
+  tone = 'default',
+  className,
+}: AuditInfoProps) {
   const toneClass =
     tone === 'danger'
       ? 'border-danger-100 bg-danger-50 text-danger-800'

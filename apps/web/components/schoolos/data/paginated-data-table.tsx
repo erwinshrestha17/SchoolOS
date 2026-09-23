@@ -114,7 +114,13 @@ function hideClass(hideBelow: PaginatedDataTableColumn<unknown>['hideBelow']) {
   return undefined;
 }
 
-function TableSkeletonRows({ columnCount, rows = 6 }: { columnCount: number; rows?: number }) {
+function TableSkeletonRows({
+  columnCount,
+  rows = 6,
+}: {
+  columnCount: number;
+  rows?: number;
+}) {
   return (
     <>
       {Array.from({ length: rows }).map((_, rowIndex) => (
@@ -174,7 +180,12 @@ export function PaginatedDataTable<T>({
   }
 
   if (status === 'module-locked') {
-    return <ModuleLockedState moduleName={moduleName} description={moduleLockedDescription} />;
+    return (
+      <ModuleLockedState
+        moduleName={moduleName}
+        description={moduleLockedDescription}
+      />
+    );
   }
 
   if (status === 'error') {
@@ -190,15 +201,22 @@ export function PaginatedDataTable<T>({
   }
 
   const selectable = Boolean(selection && onSelectionChange);
-  const selectedIds = selection?.mode === 'explicit' ? selection.ids : new Set<string>();
+  const selectedIds =
+    selection?.mode === 'explicit' ? selection.ids : new Set<string>();
   const isAllMatchingFilterSelected = selection?.mode === 'all-matching-filter';
 
   const pageRowIds = items.map((row) => getRowId(row));
-  const selectedOnPageCount = pageRowIds.filter((id) => selectedIds.has(id)).length;
+  const selectedOnPageCount = pageRowIds.filter((id) =>
+    selectedIds.has(id),
+  ).length;
   const allOnPageSelected =
-    !isAllMatchingFilterSelected && pageRowIds.length > 0 && selectedOnPageCount === pageRowIds.length;
+    !isAllMatchingFilterSelected &&
+    pageRowIds.length > 0 &&
+    selectedOnPageCount === pageRowIds.length;
   const someOnPageSelected =
-    !isAllMatchingFilterSelected && selectedOnPageCount > 0 && !allOnPageSelected;
+    !isAllMatchingFilterSelected &&
+    selectedOnPageCount > 0 &&
+    !allOnPageSelected;
 
   function toggleRow(id: string, checked: boolean) {
     if (!onSelectionChange) return;
@@ -208,7 +226,9 @@ export function PaginatedDataTable<T>({
     } else {
       next.delete(id);
     }
-    onSelectionChange(next.size === 0 ? { mode: 'none' } : { mode: 'explicit', ids: next });
+    onSelectionChange(
+      next.size === 0 ? { mode: 'none' } : { mode: 'explicit', ids: next },
+    );
   }
 
   function toggleAllOnPage(checked: boolean) {
@@ -239,8 +259,10 @@ export function PaginatedDataTable<T>({
         ? selection.totalCount
         : 0;
 
-  const showEmpty = status === 'ready' && items.length === 0 && !hasActiveFilters;
-  const showNoResults = status === 'ready' && items.length === 0 && hasActiveFilters;
+  const showEmpty =
+    status === 'ready' && items.length === 0 && !hasActiveFilters;
+  const showNoResults =
+    status === 'ready' && items.length === 0 && hasActiveFilters;
 
   return (
     <div className={cn('rounded-xl border border-border bg-card', className)}>
@@ -250,9 +272,12 @@ export function PaginatedDataTable<T>({
           role="status"
         >
           <p className="text-sm font-semibold text-[var(--primary-dark)]">
-            {selectedCount} {selectedCount === 1 ? 'record' : 'records'} selected
+            {selectedCount} {selectedCount === 1 ? 'record' : 'records'}{' '}
+            selected
           </p>
-          <div className="flex flex-wrap items-center gap-2">{bulkActions(selection!)}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            {bulkActions(selection!)}
+          </div>
         </div>
       ) : null}
 
@@ -263,7 +288,12 @@ export function PaginatedDataTable<T>({
       onSelectAllMatchingFilter ? (
         <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-sm text-slate-600">
           All {pageRowIds.length} records on this page are selected.{' '}
-          <Button type="button" variant="link" className="h-auto p-0 text-sm" onClick={onSelectAllMatchingFilter}>
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto p-0 text-sm"
+            onClick={onSelectAllMatchingFilter}
+          >
             Select all {totalItems} records matching your filters
           </Button>
         </div>
@@ -271,7 +301,10 @@ export function PaginatedDataTable<T>({
 
       {isAllMatchingFilterSelected ? (
         <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-sm text-slate-600">
-          All {selection && selection.mode === 'all-matching-filter' ? selection.totalCount : totalItems}{' '}
+          All{' '}
+          {selection && selection.mode === 'all-matching-filter'
+            ? selection.totalCount
+            : totalItems}{' '}
           records matching your filters are selected.{' '}
           <Button
             type="button"
@@ -291,8 +324,16 @@ export function PaginatedDataTable<T>({
             {selectable ? (
               <TableHead scope="col" className="w-10">
                 <Checkbox
-                  checked={isAllMatchingFilterSelected ? true : someOnPageSelected ? 'indeterminate' : allOnPageSelected}
-                  onCheckedChange={(checked) => toggleAllOnPage(checked === true)}
+                  checked={
+                    isAllMatchingFilterSelected
+                      ? true
+                      : someOnPageSelected
+                        ? 'indeterminate'
+                        : allOnPageSelected
+                  }
+                  onCheckedChange={(checked) =>
+                    toggleAllOnPage(checked === true)
+                  }
                   disabled={status === 'loading' || items.length === 0}
                   aria-label="Select all rows on this page"
                 />
@@ -304,8 +345,18 @@ export function PaginatedDataTable<T>({
                 <TableHead
                   key={column.id}
                   scope="col"
-                  className={cn(alignClass(column.align), hideClass(column.hideBelow), column.headerClassName)}
-                  aria-sort={isSorted ? (sort!.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+                  className={cn(
+                    alignClass(column.align),
+                    hideClass(column.hideBelow),
+                    column.headerClassName,
+                  )}
+                  aria-sort={
+                    isSorted
+                      ? sort!.direction === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : undefined
+                  }
                 >
                   {column.sortable && onSortChange ? (
                     <Button
@@ -332,32 +383,58 @@ export function PaginatedDataTable<T>({
                 </TableHead>
               );
             })}
-            {onRowClick || rowActions ? <TableHead scope="col" className="w-20 text-right">Actions</TableHead> : null}
+            {onRowClick || rowActions ? (
+              <TableHead scope="col" className="w-20 text-right">
+                Actions
+              </TableHead>
+            ) : null}
           </TableRow>
         </TableHeader>
         <TableBody>
           {status === 'loading' ? (
-            <TableSkeletonRows columnCount={columns.length + (selectable ? 1 : 0) + (onRowClick || rowActions ? 1 : 0)} />
+            <TableSkeletonRows
+              columnCount={
+                columns.length +
+                (selectable ? 1 : 0) +
+                (onRowClick || rowActions ? 1 : 0)
+              }
+            />
           ) : (
             items.map((row, index) => {
               const id = getRowId(row);
-              const isSelected = isAllMatchingFilterSelected || selectedIds.has(id);
+              const isSelected =
+                isAllMatchingFilterSelected || selectedIds.has(id);
               return (
                 <TableRow
                   key={id}
                   data-state={isSelected ? 'selected' : undefined}
-                  onClick={onRowClick ? (event) => {
-                    if (!(event.target instanceof Element) || event.target.closest('a, button, input, select, textarea, [role="button"], [role="checkbox"]')) return;
-                    onRowClick(row);
-                  } : undefined}
-                  className={cn(onRowClick && 'cursor-pointer', getRowClassName?.(row))}
+                  onClick={
+                    onRowClick
+                      ? (event) => {
+                          if (
+                            !(event.target instanceof Element) ||
+                            event.target.closest(
+                              'a, button, input, select, textarea, [role="button"], [role="checkbox"]',
+                            )
+                          )
+                            return;
+                          onRowClick(row);
+                        }
+                      : undefined
+                  }
+                  className={cn(
+                    onRowClick && 'cursor-pointer',
+                    getRowClassName?.(row),
+                  )}
                 >
                   {selectable ? (
                     <TableCell onClick={(event) => event.stopPropagation()}>
                       <Checkbox
                         checked={isSelected}
                         disabled={isAllMatchingFilterSelected}
-                        onCheckedChange={(checked) => toggleRow(id, checked === true)}
+                        onCheckedChange={(checked) =>
+                          toggleRow(id, checked === true)
+                        }
                         aria-label="Select row"
                       />
                     </TableCell>
@@ -365,15 +442,35 @@ export function PaginatedDataTable<T>({
                   {columns.map((column) => (
                     <TableCell
                       key={column.id}
-                      className={cn(alignClass(column.align), hideClass(column.hideBelow), column.cellClassName)}
+                      className={cn(
+                        alignClass(column.align),
+                        hideClass(column.hideBelow),
+                        column.cellClassName,
+                      )}
                     >
                       {column.cell(row, index)}
                     </TableCell>
                   ))}
                   {onRowClick || rowActions ? (
-                    <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+                    <TableCell
+                      className="text-right"
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <div className="flex items-center justify-end gap-1">
-                        {onRowClick ? <Button type="button" variant="ghost" size="sm" aria-label={getRowActionLabel?.(row, index) ?? `Open row ${index + 1}`} onClick={() => onRowClick(row)}>Open</Button> : null}
+                        {onRowClick ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-label={
+                              getRowActionLabel?.(row, index) ??
+                              `Open row ${index + 1}`
+                            }
+                            onClick={() => onRowClick(row)}
+                          >
+                            Open
+                          </Button>
+                        ) : null}
                         {rowActions?.(row)}
                       </div>
                     </TableCell>
@@ -385,13 +482,28 @@ export function PaginatedDataTable<T>({
         </TableBody>
       </Table>
 
-      {showEmpty ? <EmptyState title={emptyTitle} description={emptyDescription} className="border-0" /> : null}
+      {showEmpty ? (
+        <EmptyState
+          title={emptyTitle}
+          description={emptyDescription}
+          className="border-0"
+        />
+      ) : null}
       {showNoResults ? (
-        <EmptyState title={noResultsTitle} description={noResultsDescription} className="border-0" />
+        <EmptyState
+          title={noResultsTitle}
+          description={noResultsDescription}
+          className="border-0"
+        />
       ) : null}
 
       {status === 'ready' && items.length > 0 ? (
-        <TablePagination page={page} pageSize={pageSize} total={totalItems} onPageChange={onPageChange} />
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          total={totalItems}
+          onPageChange={onPageChange}
+        />
       ) : null}
     </div>
   );

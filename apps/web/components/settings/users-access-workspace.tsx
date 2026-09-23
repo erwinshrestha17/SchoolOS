@@ -37,8 +37,7 @@ type CreateUserDraft = {
 export function UsersAccessWorkspace() {
   const client = useQueryClient();
   const settingsCaps = useSettingsCapabilities();
-  const canCreate =
-    settingsCaps.canCreateUsers && settingsCaps.canReadRoles;
+  const canCreate = settingsCaps.canCreateUsers && settingsCaps.canReadRoles;
   const canUpdateStatus = settingsCaps.canUpdateUserStatus;
   const canResetPassword = settingsCaps.canResetPassword;
   const canManageAny = canCreate || canUpdateStatus || canResetPassword;

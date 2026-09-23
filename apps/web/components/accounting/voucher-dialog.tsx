@@ -1,28 +1,28 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../lib/api";
+import { useEffect, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../../lib/api';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "../ui/dialog";
-import { Input } from "../ui/input";
-import { Select } from "../ui/select";
-import { Button } from "../ui/button";
-import { AlertCircle } from "lucide-react";
-import { showErrorFromUnknown, showSuccess } from "../../lib/toast";
-import { getNepalSchoolDay } from "@schoolos/core";
+} from '../ui/dialog';
+import { Input } from '../ui/input';
+import { Select } from '../ui/select';
+import { Button } from '../ui/button';
+import { AlertCircle } from 'lucide-react';
+import { showErrorFromUnknown, showSuccess } from '../../lib/toast';
+import { getNepalSchoolDay } from '@schoolos/core';
 
 export type VoucherType =
-  | "JOURNAL"
-  | "EXPENSE"
-  | "PAYMENT"
-  | "RECEIPT"
-  | "CONTRA";
+  | 'JOURNAL'
+  | 'EXPENSE'
+  | 'PAYMENT'
+  | 'RECEIPT'
+  | 'CONTRA';
 
 interface VoucherDialogProps {
   isOpen: boolean;
@@ -32,11 +32,11 @@ interface VoucherDialogProps {
 }
 
 const voucherLabels: Record<VoucherType, string> = {
-  JOURNAL: "Journal Voucher",
-  EXPENSE: "Expense Voucher",
-  PAYMENT: "Payment Voucher",
-  RECEIPT: "Receipt Voucher",
-  CONTRA: "Contra Voucher",
+  JOURNAL: 'Journal Voucher',
+  EXPENSE: 'Expense Voucher',
+  PAYMENT: 'Payment Voucher',
+  RECEIPT: 'Receipt Voucher',
+  CONTRA: 'Contra Voucher',
 };
 
 export function VoucherDialog({
@@ -50,43 +50,43 @@ export function VoucherDialog({
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    debitAccountId: "",
-    creditAccountId: "",
-    expenseAccountId: "",
-    paymentAccountId: "",
-    payeeAccountId: "",
-    receiptAccountId: "",
-    depositAccountId: "",
-    fromAccountId: "",
-    toAccountId: "",
+    debitAccountId: '',
+    creditAccountId: '',
+    expenseAccountId: '',
+    paymentAccountId: '',
+    payeeAccountId: '',
+    receiptAccountId: '',
+    depositAccountId: '',
+    fromAccountId: '',
+    toAccountId: '',
     amount: 0,
     entryDate: getNepalSchoolDay().gregorianDate,
-    narration: "",
-    reference: "",
+    narration: '',
+    reference: '',
   });
 
   const mutation = useMutation({
     mutationFn: (data: any) => {
-      if (voucherType === "JOURNAL") return api.createManualJournal(data);
-      if (voucherType === "EXPENSE") return api.createExpenseVoucher(data);
-      if (voucherType === "PAYMENT") return api.createPaymentVoucher(data);
-      if (voucherType === "RECEIPT") return api.createReceiptVoucher(data);
+      if (voucherType === 'JOURNAL') return api.createManualJournal(data);
+      if (voucherType === 'EXPENSE') return api.createExpenseVoucher(data);
+      if (voucherType === 'PAYMENT') return api.createPaymentVoucher(data);
+      if (voucherType === 'RECEIPT') return api.createReceiptVoucher(data);
       return api.createContraVoucher(data);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
-      void queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
+      void queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
       void queryClient.invalidateQueries({
-        queryKey: ["accounting-dashboard-summary"],
+        queryKey: ['accounting-dashboard-summary'],
       });
-      void queryClient.invalidateQueries({ queryKey: ["accounting-report"] });
+      void queryClient.invalidateQueries({ queryKey: ['accounting-report'] });
       showSuccess(`${voucherLabels[voucherType]} saved as draft.`);
       onClose();
     },
     onError: (err: unknown) => {
       showErrorFromUnknown(
         err,
-        "The voucher could not be saved. Check the highlighted fields and try again.",
+        'The voucher could not be saved. Check the highlighted fields and try again.',
       );
     },
     onSettled: () => setLoading(false),
@@ -112,39 +112,39 @@ export function VoucherDialog({
       narration: formData.narration,
     };
 
-    if (voucherType === "JOURNAL") {
+    if (voucherType === 'JOURNAL') {
       payload.sourceId = formData.reference || undefined;
       payload.lines = [
         {
           chartAccountId: formData.debitAccountId,
-          side: "DEBIT",
+          side: 'DEBIT',
           amount: Number(formData.amount),
           description: formData.narration,
         },
         {
           chartAccountId: formData.creditAccountId,
-          side: "CREDIT",
+          side: 'CREDIT',
           amount: Number(formData.amount),
           description: formData.narration,
         },
       ];
     } else {
       payload.amount = Number(formData.amount);
-      if (voucherType !== "CONTRA") {
+      if (voucherType !== 'CONTRA') {
         payload.reference = formData.reference || undefined;
       }
     }
 
-    if (voucherType === "EXPENSE") {
+    if (voucherType === 'EXPENSE') {
       payload.expenseAccountId = formData.expenseAccountId;
       payload.paymentAccountId = formData.paymentAccountId;
-    } else if (voucherType === "PAYMENT") {
+    } else if (voucherType === 'PAYMENT') {
       payload.payeeAccountId = formData.payeeAccountId;
       payload.paymentAccountId = formData.paymentAccountId;
-    } else if (voucherType === "RECEIPT") {
+    } else if (voucherType === 'RECEIPT') {
       payload.receiptAccountId = formData.receiptAccountId;
       payload.depositAccountId = formData.depositAccountId;
-    } else if (voucherType === "CONTRA") {
+    } else if (voucherType === 'CONTRA') {
       payload.fromAccountId = formData.fromAccountId;
       payload.toAccountId = formData.toAccountId;
     }
@@ -206,7 +206,7 @@ export function VoucherDialog({
               />
             </div>
 
-            {voucherType === "JOURNAL" && (
+            {voucherType === 'JOURNAL' && (
               <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">
@@ -259,7 +259,7 @@ export function VoucherDialog({
               </>
             )}
 
-            {voucherType === "EXPENSE" && (
+            {voucherType === 'EXPENSE' && (
               <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">
@@ -276,7 +276,7 @@ export function VoucherDialog({
                   >
                     <option value="">Select account</option>
                     {accounts
-                      .filter((a) => a.type === "EXPENSE")
+                      .filter((a) => a.type === 'EXPENSE')
                       .map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.code} - {a.name}
@@ -299,7 +299,7 @@ export function VoucherDialog({
                   >
                     <option value="">Select account</option>
                     {accounts
-                      .filter((a) => ["ASSET", "LIABILITY"].includes(a.type))
+                      .filter((a) => ['ASSET', 'LIABILITY'].includes(a.type))
                       .map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.code} - {a.name}
@@ -310,7 +310,7 @@ export function VoucherDialog({
               </>
             )}
 
-            {voucherType === "PAYMENT" && (
+            {voucherType === 'PAYMENT' && (
               <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">
@@ -348,7 +348,7 @@ export function VoucherDialog({
                   >
                     <option value="">Select account</option>
                     {accounts
-                      .filter((a) => ["ASSET", "LIABILITY"].includes(a.type))
+                      .filter((a) => ['ASSET', 'LIABILITY'].includes(a.type))
                       .map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.code} - {a.name}
@@ -359,7 +359,7 @@ export function VoucherDialog({
               </>
             )}
 
-            {voucherType === "RECEIPT" && (
+            {voucherType === 'RECEIPT' && (
               <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">
@@ -397,7 +397,7 @@ export function VoucherDialog({
                   >
                     <option value="">Select account</option>
                     {accounts
-                      .filter((a) => ["ASSET", "LIABILITY"].includes(a.type))
+                      .filter((a) => ['ASSET', 'LIABILITY'].includes(a.type))
                       .map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.code} - {a.name}
@@ -408,7 +408,7 @@ export function VoucherDialog({
               </>
             )}
 
-            {voucherType === "CONTRA" && (
+            {voucherType === 'CONTRA' && (
               <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">
@@ -425,7 +425,7 @@ export function VoucherDialog({
                   >
                     <option value="">Select account</option>
                     {accounts
-                      .filter((a) => ["ASSET", "LIABILITY"].includes(a.type))
+                      .filter((a) => ['ASSET', 'LIABILITY'].includes(a.type))
                       .map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.code} - {a.name}
@@ -445,7 +445,7 @@ export function VoucherDialog({
                   >
                     <option value="">Select account</option>
                     {accounts
-                      .filter((a) => ["ASSET", "LIABILITY"].includes(a.type))
+                      .filter((a) => ['ASSET', 'LIABILITY'].includes(a.type))
                       .map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.code} - {a.name}

@@ -180,7 +180,12 @@ function DarkSidebarNavLink({
 
   if (disabled) {
     return (
-      <button type="button" className={linkClassName} disabled aria-disabled="true">
+      <button
+        type="button"
+        className={linkClassName}
+        disabled
+        aria-disabled="true"
+      >
         {content}
       </button>
     );

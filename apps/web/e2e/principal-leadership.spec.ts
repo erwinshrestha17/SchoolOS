@@ -1,60 +1,62 @@
-import {
-  expect,
-  test,
-  type StorageState,
-} from "./fixtures/auth";
+import { expect, test, type StorageState } from './fixtures/auth';
 
 const API_BASE_URL =
   process.env.SCHOOLOS_E2E_API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_BASE_URL ??
-  "http://localhost:4000/api/v1";
+  'http://localhost:4000/api/v1';
 const WEB_BASE_URL =
   process.env.PLAYWRIGHT_BASE_URL ??
-  `http://localhost:${process.env.SCHOOLOS_WEB_E2E_PORT ?? "3101"}`;
+  `http://localhost:${process.env.SCHOOLOS_WEB_E2E_PORT ?? '3101'}`;
 
-test.describe.serial("Principal leadership web", () => {
-  test("opens the Principal home, attention, approval, and oversight workspaces", async ({
+test.describe.serial('Principal leadership web', () => {
+  test('opens the Principal home, attention, approval, and oversight workspaces', async ({
     authStateFor,
     browser,
   }) => {
     const context = await browser.newContext({
       baseURL: WEB_BASE_URL,
-      storageState: await authStateFor("principal"),
+      storageState: await authStateFor('principal'),
     });
     const page = await context.newPage();
 
-    await page.goto("/dashboard");
-    await expect(page.getByRole("heading", { name: "Principal Home" })).toBeVisible();
-    await expect(page.getByText("Finance health", { exact: true })).toBeVisible();
-    await expect(page.getByText("Staff availability", { exact: true })).toBeVisible();
+    await page.goto('/dashboard');
+    await expect(
+      page.getByRole('heading', { name: 'Principal Home' }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Finance health', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Staff availability', { exact: true }),
+    ).toBeVisible();
 
     const routes = [
-      ["/dashboard/attention", "Attention Centre"],
-      ["/dashboard/approvals", "Approval Centre"],
-      ["/dashboard/attendance/overview", "Attendance Oversight"],
-      ["/dashboard/academics/readiness", "Academic Readiness"],
-      ["/dashboard/finance-overview", "Finance Overview"],
-      ["/dashboard/hr/overview", "Staff Overview"],
-      ["/dashboard/students/overview", "Enrollment Overview"],
-      ["/dashboard/admissions/overview", "Admissions Overview"],
-      ["/dashboard/activity/oversight", "Activity Oversight"],
-      ["/dashboard/communications/oversight", "Communication Oversight"],
-      ["/dashboard/operations/overview", "School Operations Overview"],
+      ['/dashboard/attention', 'Attention Centre'],
+      ['/dashboard/approvals', 'Approval Centre'],
+      ['/dashboard/attendance/overview', 'Attendance Oversight'],
+      ['/dashboard/academics/readiness', 'Academic Readiness'],
+      ['/dashboard/finance-overview', 'Finance Overview'],
+      ['/dashboard/hr/overview', 'Staff Overview'],
+      ['/dashboard/students/overview', 'Enrollment Overview'],
+      ['/dashboard/admissions/overview', 'Admissions Overview'],
+      ['/dashboard/activity/oversight', 'Activity Oversight'],
+      ['/dashboard/communications/oversight', 'Communication Oversight'],
+      ['/dashboard/operations/overview', 'School Operations Overview'],
     ] as const;
 
     for (const [route, heading] of routes) {
       await page.goto(route);
-      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+      await expect(page.getByRole('heading', { name: heading })).toBeVisible();
     }
 
     await context.close();
   });
 
-  test("keeps operator write actions unavailable to the Principal", async ({
+  test('keeps operator write actions unavailable to the Principal', async ({
     authStateFor,
     browser,
   }) => {
-    const state = await authStateFor("principal");
+    const state = await authStateFor('principal');
     const context = await browser.newContext({ storageState: state });
     const csrf = csrfHeaders(state);
 
@@ -75,44 +77,48 @@ test.describe.serial("Principal leadership web", () => {
     await context.close();
   });
 
-  test("keeps Principal Settings personal-only and blocks institutional direct URLs", async ({
+  test('keeps Principal Settings personal-only and blocks institutional direct URLs', async ({
     authStateFor,
     browser,
   }) => {
-    const state = await authStateFor("principal");
+    const state = await authStateFor('principal');
     const context = await browser.newContext({
       baseURL: WEB_BASE_URL,
       storageState: state,
     });
     const page = await context.newPage();
 
-    await page.goto("/dashboard/settings");
-    await expect(page.getByRole("heading", { name: "My Account" })).toBeVisible();
-    await expect(page.getByText("Profile", { exact: true })).toBeVisible();
-    await expect(page.getByText("Finance & administration", { exact: true })).toHaveCount(0);
+    await page.goto('/dashboard/settings');
+    await expect(
+      page.getByRole('heading', { name: 'My Account' }),
+    ).toBeVisible();
+    await expect(page.getByText('Profile', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('Finance & administration', { exact: true }),
+    ).toHaveCount(0);
 
     for (const route of [
-      "/dashboard/settings/school/identity",
-      "/dashboard/settings/fees",
-      "/dashboard/settings/accounting",
-      "/dashboard/settings/hr-payroll",
-      "/dashboard/settings/security",
-      "/dashboard/settings/system/audit-log",
+      '/dashboard/settings/school/identity',
+      '/dashboard/settings/fees',
+      '/dashboard/settings/accounting',
+      '/dashboard/settings/hr-payroll',
+      '/dashboard/settings/security',
+      '/dashboard/settings/system/audit-log',
     ]) {
       await page.goto(route);
       await expect(
-        page.getByText("School Settings access needed", { exact: true }),
+        page.getByText('School Settings access needed', { exact: true }),
       ).toBeVisible();
     }
 
     await context.close();
   });
 
-  test("rejects Principal tenant-policy reads and writes at the API boundary", async ({
+  test('rejects Principal tenant-policy reads and writes at the API boundary', async ({
     authStateFor,
     browser,
   }) => {
-    const state = await authStateFor("principal");
+    const state = await authStateFor('principal');
     const context = await browser.newContext({ storageState: state });
     const csrf = csrfHeaders(state);
 
@@ -124,10 +130,10 @@ test.describe.serial("Principal leadership web", () => {
       {
         headers: csrf,
         data: {
-          expectedVersion: "empty",
-          idempotencyKey: "22222222-2222-4222-8222-222222222222",
-          reason: "Principal boundary E2E regression check",
-          changes: [{ key: "school_name", value: "Must not change" }],
+          expectedVersion: 'empty',
+          idempotencyKey: '22222222-2222-4222-8222-222222222222',
+          reason: 'Principal boundary E2E regression check',
+          changes: [{ key: 'school_name', value: 'Must not change' }],
         },
       },
     );
@@ -135,39 +141,41 @@ test.describe.serial("Principal leadership web", () => {
     await context.close();
   });
 
-  test("allows an explicitly seeded Principal + Configuration Owner to enter institutional Settings", async ({
+  test('allows an explicitly seeded Principal + Configuration Owner to enter institutional Settings', async ({
     authStateFor,
     browser,
   }) => {
     test.skip(
       !process.env.SCHOOLOS_E2E_PRINCIPAL_CONFIG_OWNER_EMAIL,
-      "Set SCHOOLOS_E2E_PRINCIPAL_CONFIG_OWNER_EMAIL to exercise the seeded dual-role browser contract.",
+      'Set SCHOOLOS_E2E_PRINCIPAL_CONFIG_OWNER_EMAIL to exercise the seeded dual-role browser contract.',
     );
 
     const context = await browser.newContext({
       baseURL: WEB_BASE_URL,
-      storageState: await authStateFor("principalConfigOwner"),
+      storageState: await authStateFor('principalConfigOwner'),
     });
     const page = await context.newPage();
 
-    await page.goto("/dashboard/settings");
-    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-    await expect(page.getByText("School", { exact: true })).toBeVisible();
+    await page.goto('/dashboard/settings');
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await expect(page.getByText('School', { exact: true })).toBeVisible();
 
-    await page.goto("/dashboard/settings/school/identity");
+    await page.goto('/dashboard/settings/school/identity');
     await expect(
-      page.getByRole("heading", { name: "Identity & general" }),
+      page.getByRole('heading', { name: 'Identity & general' }),
     ).toBeVisible();
-    await expect(page.getByText("School Settings access needed")).toHaveCount(0);
+    await expect(page.getByText('School Settings access needed')).toHaveCount(
+      0,
+    );
     await context.close();
   });
 
-  test("returns purpose-limited operations summaries and not operator records", async ({
+  test('returns purpose-limited operations summaries and not operator records', async ({
     authStateFor,
     browser,
   }) => {
     const context = await browser.newContext({
-      storageState: await authStateFor("principal"),
+      storageState: await authStateFor('principal'),
     });
     const response = await context.request.get(
       `${API_BASE_URL}/dashboard/principal/operations-summary`,
@@ -176,13 +184,13 @@ test.describe.serial("Principal leadership web", () => {
     const payload = await response.json();
     const data = payload.data ?? payload;
     expect(Object.keys(data.modules).sort()).toEqual([
-      "canteen",
-      "library",
-      "transport",
+      'canteen',
+      'library',
+      'transport',
     ]);
-    expect(JSON.stringify(data)).not.toContain("studentWallet");
-    expect(JSON.stringify(data)).not.toContain("locationPings");
-    expect(JSON.stringify(data)).not.toContain("borrowerId");
+    expect(JSON.stringify(data)).not.toContain('studentWallet');
+    expect(JSON.stringify(data)).not.toContain('locationPings');
+    expect(JSON.stringify(data)).not.toContain('borrowerId');
     await context.close();
   });
 });
@@ -190,10 +198,10 @@ test.describe.serial("Principal leadership web", () => {
 function csrfHeaders(state: StorageState) {
   const csrfCookie = state.cookies.find(
     (cookie) =>
-      cookie.name === "__Host-schoolos_csrf" || cookie.name === "schoolos_csrf",
+      cookie.name === '__Host-schoolos_csrf' || cookie.name === 'schoolos_csrf',
   );
   if (!csrfCookie) {
-    throw new Error("Authenticated E2E state is missing its CSRF cookie.");
+    throw new Error('Authenticated E2E state is missing its CSRF cookie.');
   }
-  return { "X-CSRF-Token": csrfCookie.value };
+  return { 'X-CSRF-Token': csrfCookie.value };
 }

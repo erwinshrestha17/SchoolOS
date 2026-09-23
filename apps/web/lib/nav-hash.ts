@@ -3,7 +3,10 @@ type NavHrefItem = {
   activeWhen?: string[];
 };
 
-export function splitNavHref(href: string): { path: string; hash: string | null } {
+export function splitNavHref(href: string): {
+  path: string;
+  hash: string | null;
+} {
   const hashIndex = href.indexOf('#');
   if (hashIndex === -1) {
     return { path: href, hash: null };

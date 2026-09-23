@@ -15,7 +15,9 @@ test.describe('M12 Learning activity builder', () => {
     await login(page);
   });
 
-  test('teacher/admin can open builder and activity routes without fatal errors', async ({ page }) => {
+  test('teacher/admin can open builder and activity routes without fatal errors', async ({
+    page,
+  }) => {
     for (const route of [
       '/dashboard/learning',
       '/dashboard/learning/activities',
@@ -26,10 +28,14 @@ test.describe('M12 Learning activity builder', () => {
     }
 
     await page.goto('/dashboard/learning/activities/new');
-    await expect(page.getByRole('heading', { name: /Teacher Activity Builder/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Teacher Activity Builder/i }),
+    ).toBeVisible();
     await expect(page.getByLabel(/Title/i)).toBeVisible();
     await expect(page.getByLabel(/Difficulty/i)).toBeVisible();
-    await expect(page.getByText(/Multiple choice|True false|Short answer/i)).toBeVisible();
+    await expect(
+      page.getByText(/Multiple choice|True false|Short answer/i),
+    ).toBeVisible();
   });
 });
 
@@ -47,6 +53,8 @@ async function expectUsableLearningRoute(page: Page) {
     timeout: 15_000,
   });
   await expect(
-    page.getByText(/Application error|Unhandled Runtime Error|This page could not be found|Internal Server Error/i),
+    page.getByText(
+      /Application error|Unhandled Runtime Error|This page could not be found|Internal Server Error/i,
+    ),
   ).toHaveCount(0);
 }

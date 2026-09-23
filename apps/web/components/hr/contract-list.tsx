@@ -21,7 +21,9 @@ import {
 } from '../schoolos/data/paginated-data-table';
 import { RemoteStaffSelector } from '../staff/remote-staff-selector';
 
-type StaffContractRow = Awaited<ReturnType<typeof api.listStaffContractsPage>>['items'][number];
+type StaffContractRow = Awaited<
+  ReturnType<typeof api.listStaffContractsPage>
+>['items'][number];
 
 const moneyFormatter = new Intl.NumberFormat('en-NP', {
   style: 'currency',
@@ -39,7 +41,7 @@ export function ContractList() {
   const canCreateContracts = hasPermissions(['hr:manage']);
   const canViewPayrollAmounts =
     hasPermissions(['payroll:read']) || hasPermissions(['payroll:manage']);
-  
+
   const contractsQuery = useQuery({
     queryKey: ['staff-contracts', page, limit, deferredSearch],
     queryFn: () =>
@@ -66,7 +68,8 @@ export function ContractList() {
     useState<StaffLookupOption | null>(null);
 
   const createMutation = useMutation({
-    mutationFn: (body: Parameters<typeof api.createStaffContract>[0]) => api.createStaffContract(body),
+    mutationFn: (body: Parameters<typeof api.createStaffContract>[0]) =>
+      api.createStaffContract(body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['staff-contracts'] });
       setIsCreating(false);
@@ -111,7 +114,9 @@ export function ContractList() {
       });
     } catch (error) {
       setFormError(
-        error instanceof Error ? error.message : 'Enter valid BS contract dates.',
+        error instanceof Error
+          ? error.message
+          : 'Enter valid BS contract dates.',
       );
     }
   };
@@ -124,7 +129,9 @@ export function ContractList() {
       id: 'contractNumber',
       header: 'Contract #',
       cell: (contract) => (
-        <span className="font-mono text-xs font-bold text-slate-500">{contract.contractNumber}</span>
+        <span className="font-mono text-xs font-bold text-slate-500">
+          {contract.contractNumber}
+        </span>
       ),
     },
     {
@@ -135,7 +142,9 @@ export function ContractList() {
           <p className="font-bold text-slate-900">{contract.position}</p>
           <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
             Starts {formatBsDate(contract.startDate)}
-            {contract.endDate ? ` · Ends ${formatBsDate(contract.endDate)}` : ' · Open-ended'}
+            {contract.endDate
+              ? ` · Ends ${formatBsDate(contract.endDate)}`
+              : ' · Open-ended'}
           </p>
         </div>
       ),
@@ -145,7 +154,9 @@ export function ContractList() {
       header: 'Base Salary',
       cell: (contract) => (
         <span className="text-sm font-bold text-slate-900">
-          {canViewPayrollAmounts ? moneyFormatter.format(Number(contract.baseSalary)) : 'Restricted'}
+          {canViewPayrollAmounts
+            ? moneyFormatter.format(Number(contract.baseSalary))
+            : 'Restricted'}
         </span>
       ),
     },
@@ -154,7 +165,9 @@ export function ContractList() {
       header: 'Allowances',
       cell: (contract) => (
         <span className="text-sm font-medium text-slate-500">
-          {canViewPayrollAmounts ? moneyFormatter.format(Number(contract.allowances)) : 'Restricted'}
+          {canViewPayrollAmounts
+            ? moneyFormatter.format(Number(contract.allowances))
+            : 'Restricted'}
         </span>
       ),
     },
@@ -179,7 +192,10 @@ export function ContractList() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            size={18}
+          />
           <Input
             type="text"
             placeholder="Search contracts by number or position..."
@@ -205,8 +221,10 @@ export function ContractList() {
       {isCreating && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-300">
           <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm animate-in zoom-in-95 duration-300 sm:p-8">
-            <h3 className="mb-6 text-xl font-black uppercase tracking-tight text-slate-900">Create Staff Contract</h3>
-            
+            <h3 className="mb-6 text-xl font-black uppercase tracking-tight text-slate-900">
+              Create Staff Contract
+            </h3>
+
             <div className="grid gap-6">
               <RemoteStaffSelector
                 value={newContract.staffId}
@@ -224,13 +242,20 @@ export function ContractList() {
                   <Input
                     type="text"
                     value={newContract.contractNumber}
-                    onChange={(e) => setNewContract({ ...newContract, contractNumber: e.target.value })}
+                    onChange={(e) =>
+                      setNewContract({
+                        ...newContract,
+                        contractNumber: e.target.value,
+                      })
+                    }
                   />
                 </FormField>
                 <BsDateField
                   label="Start date (BS)"
                   value={newContract.startDateBs}
-                  onChange={(value) => setNewContract({ ...newContract, startDateBs: value })}
+                  onChange={(value) =>
+                    setNewContract({ ...newContract, startDateBs: value })
+                  }
                   required
                 />
               </div>
@@ -238,7 +263,9 @@ export function ContractList() {
               <BsDateField
                 label="End date (BS, optional)"
                 value={newContract.endDateBs}
-                onChange={(value) => setNewContract({ ...newContract, endDateBs: value })}
+                onChange={(value) =>
+                  setNewContract({ ...newContract, endDateBs: value })
+                }
               />
 
               <FormField label="Position">
@@ -246,7 +273,9 @@ export function ContractList() {
                   type="text"
                   placeholder="e.g. Senior Teacher, Admin Assistant"
                   value={newContract.position}
-                  onChange={(e) => setNewContract({ ...newContract, position: e.target.value })}
+                  onChange={(e) =>
+                    setNewContract({ ...newContract, position: e.target.value })
+                  }
                 />
               </FormField>
 
@@ -255,21 +284,36 @@ export function ContractList() {
                   <Input
                     type="number"
                     value={newContract.baseSalary}
-                    onChange={(e) => setNewContract({ ...newContract, baseSalary: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setNewContract({
+                        ...newContract,
+                        baseSalary: Number(e.target.value),
+                      })
+                    }
                   />
                 </FormField>
                 <FormField label="Allowances">
                   <Input
                     type="number"
                     value={newContract.allowances}
-                    onChange={(e) => setNewContract({ ...newContract, allowances: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setNewContract({
+                        ...newContract,
+                        allowances: Number(e.target.value),
+                      })
+                    }
                   />
                 </FormField>
                 <FormField label="Deductions">
                   <Input
                     type="number"
                     value={newContract.deductions}
-                    onChange={(e) => setNewContract({ ...newContract, deductions: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setNewContract({
+                        ...newContract,
+                        deductions: Number(e.target.value),
+                      })
+                    }
                   />
                 </FormField>
               </div>
@@ -290,7 +334,13 @@ export function ContractList() {
                 </button>
                 <button
                   type="button"
-                  disabled={!newContract.staffId || !newContract.contractNumber.trim() || !newContract.position.trim() || !newContract.startDateBs.trim() || createMutation.isPending}
+                  disabled={
+                    !newContract.staffId ||
+                    !newContract.contractNumber.trim() ||
+                    !newContract.position.trim() ||
+                    !newContract.startDateBs.trim() ||
+                    createMutation.isPending
+                  }
                   onClick={submitContract}
                   className="flex-1 rounded-2xl bg-[var(--color-mod-hr-accent)] px-5 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-[var(--color-mod-hr-text)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -306,7 +356,13 @@ export function ContractList() {
         columns={contractColumns}
         items={contracts}
         getRowId={(contract) => contract.id}
-        status={contractsQuery.isError ? 'error' : contractsQuery.isLoading ? 'loading' : 'ready'}
+        status={
+          contractsQuery.isError
+            ? 'error'
+            : contractsQuery.isLoading
+              ? 'loading'
+              : 'ready'
+        }
         page={page}
         pageSize={limit}
         totalItems={totalItems}

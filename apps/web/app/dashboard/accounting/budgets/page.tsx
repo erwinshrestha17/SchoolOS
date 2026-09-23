@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ChartAccountSummary, FiscalYearSummary } from "@schoolos/core";
-import { api } from "@/lib/api";
-import { SectionCard } from "@/components/ui/section-card";
-import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
-import { LoadingState } from "@/components/ui/loading-state";
-import { PageState } from "@/components/ui/page-state";
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ChartAccountSummary, FiscalYearSummary } from '@schoolos/core';
+import { api } from '@/lib/api';
+import { SectionCard } from '@/components/ui/section-card';
+import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
+import { LoadingState } from '@/components/ui/loading-state';
+import { PageState } from '@/components/ui/page-state';
 
 type FiscalBudgetView = {
   id: string;
@@ -25,38 +25,42 @@ type FiscalBudgetView = {
 
 export default function AccountingBudgetsPage() {
   const queryClient = useQueryClient();
-  const [selectedYearId, setSelectedYearId] = useState("");
-  const [budgetName, setBudgetName] = useState("Annual Budget");
-  const [selectedBudgetId, setSelectedBudgetId] = useState("");
-  const [selectedAccountId, setSelectedAccountId] = useState("");
-  const [lineAmount, setLineAmount] = useState("");
-  const [approveReason, setApproveReason] = useState("Approved for pilot operations");
+  const [selectedYearId, setSelectedYearId] = useState('');
+  const [budgetName, setBudgetName] = useState('Annual Budget');
+  const [selectedBudgetId, setSelectedBudgetId] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [lineAmount, setLineAmount] = useState('');
+  const [approveReason, setApproveReason] = useState(
+    'Approved for pilot operations',
+  );
 
   const fiscalYearsQuery = useQuery({
-    queryKey: ["fiscal-years"],
+    queryKey: ['fiscal-years'],
     queryFn: () => api.listFiscalYears(),
   });
 
   const accountsQuery = useQuery({
-    queryKey: ["chart-accounts", "budget-entry"],
+    queryKey: ['chart-accounts', 'budget-entry'],
     queryFn: () => api.listChartAccounts(),
   });
 
   const budgetsQuery = useQuery({
-    queryKey: ["fiscal-budgets", selectedYearId],
+    queryKey: ['fiscal-budgets', selectedYearId],
     queryFn: () => api.listFiscalBudgets(selectedYearId || undefined),
     enabled: Boolean(selectedYearId),
   });
 
   const budgets = (budgetsQuery.data as FiscalBudgetView[] | undefined) ?? [];
-  const selectedBudget = budgets.find((budget) => budget.id === selectedBudgetId);
+  const selectedBudget = budgets.find(
+    (budget) => budget.id === selectedBudgetId,
+  );
 
   const activeYear = useMemo(() => {
     const years = (fiscalYearsQuery.data ?? []) as FiscalYearSummary[];
     if (selectedYearId) {
       return years.find((year) => year.id === selectedYearId);
     }
-    return years.find((year) => year.status === "OPEN") ?? years[0];
+    return years.find((year) => year.status === 'OPEN') ?? years[0];
   }, [fiscalYearsQuery.data, selectedYearId]);
 
   useEffect(() => {
@@ -74,7 +78,7 @@ export default function AccountingBudgetsPage() {
     onSuccess: (budget) => {
       const created = budget as FiscalBudgetView;
       setSelectedBudgetId(created.id);
-      queryClient.invalidateQueries({ queryKey: ["fiscal-budgets"] });
+      queryClient.invalidateQueries({ queryKey: ['fiscal-budgets'] });
     },
   });
 
@@ -89,9 +93,9 @@ export default function AccountingBudgetsPage() {
         ],
       }),
     onSuccess: () => {
-      setSelectedAccountId("");
-      setLineAmount("");
-      queryClient.invalidateQueries({ queryKey: ["fiscal-budgets"] });
+      setSelectedAccountId('');
+      setLineAmount('');
+      queryClient.invalidateQueries({ queryKey: ['fiscal-budgets'] });
     },
   });
 
@@ -99,7 +103,7 @@ export default function AccountingBudgetsPage() {
     mutationFn: () =>
       api.approveFiscalBudget(selectedBudgetId, approveReason.trim()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fiscal-budgets"] });
+      queryClient.invalidateQueries({ queryKey: ['fiscal-budgets'] });
     },
   });
 
@@ -118,7 +122,7 @@ export default function AccountingBudgetsPage() {
               value={selectedYearId}
               onChange={(e: ChangeEvent<HTMLSelectElement>) => {
                 setSelectedYearId(e.target.value);
-                setSelectedBudgetId("");
+                setSelectedBudgetId('');
               }}
               className="w-full"
             >
@@ -136,7 +140,9 @@ export default function AccountingBudgetsPage() {
             </label>
             <input
               value={budgetName}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setBudgetName(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setBudgetName(e.target.value)
+              }
               className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold"
             />
           </div>
@@ -190,7 +196,7 @@ export default function AccountingBudgetsPage() {
             )}
           </div>
 
-          {selectedBudget?.status === "DRAFT" && (
+          {selectedBudget?.status === 'DRAFT' && (
             <div className="mb-6 grid gap-4 md:grid-cols-3">
               <Select
                 value={selectedAccountId}
@@ -200,11 +206,13 @@ export default function AccountingBudgetsPage() {
                 className="w-full"
               >
                 <option value="">Select account</option>
-                {(accountsQuery.data ?? []).map((account: ChartAccountSummary) => (
-                  <option key={account.id} value={account.id}>
-                    {account.code} - {account.name}
-                  </option>
-                ))}
+                {(accountsQuery.data ?? []).map(
+                  (account: ChartAccountSummary) => (
+                    <option key={account.id} value={account.id}>
+                      {account.code} - {account.name}
+                    </option>
+                  ),
+                )}
               </Select>
               <input
                 type="number"
@@ -212,7 +220,9 @@ export default function AccountingBudgetsPage() {
                 step="0.01"
                 placeholder="Budget amount"
                 value={lineAmount}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setLineAmount(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setLineAmount(e.target.value)
+                }
                 className="h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold"
               />
               <Button
@@ -254,7 +264,7 @@ export default function AccountingBudgetsPage() {
             </table>
           </div>
 
-          {selectedBudget?.status === "DRAFT" &&
+          {selectedBudget?.status === 'DRAFT' &&
             (selectedBudget.lines?.length ?? 0) > 0 && (
               <div className="mt-6 space-y-3">
                 <textarea

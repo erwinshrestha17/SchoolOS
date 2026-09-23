@@ -177,12 +177,12 @@ export type AttendanceConflict = {
 };
 
 export type AttendanceSyncStatus =
-  | 'PROCESSING'
-  | 'SYNCED'
-  | 'CONFLICTED'
-  | 'REJECTED'
-  | 'DUPLICATE'
-  | 'ACCEPTED';
+  | "PROCESSING"
+  | "SYNCED"
+  | "CONFLICTED"
+  | "REJECTED"
+  | "DUPLICATE"
+  | "ACCEPTED";
 
 export type AttendanceSyncResult = {
   id: string;

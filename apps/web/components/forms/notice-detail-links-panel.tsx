@@ -20,9 +20,12 @@ export function NoticeDetailLinksPanel() {
           <Megaphone size={20} />
         </div>
         <div>
-          <p className="text-sm font-semibold text-gray-950">Notice detail links</p>
+          <p className="text-sm font-semibold text-gray-950">
+            Notice detail links
+          </p>
           <p className="mt-1 text-sm leading-6 text-gray-500">
-            Open notice detail pages using the real notice database ID. Do not manually use the notice title in the URL.
+            Open notice detail pages using the real notice database ID. Do not
+            manually use the notice title in the URL.
           </p>
         </div>
       </div>
@@ -48,9 +51,17 @@ export function NoticeDetailLinksPanel() {
               className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-4 text-sm transition hover:-translate-y-0.5 hover:border-[var(--color-mod-notices-border)] hover:bg-[var(--color-mod-notices-bg)] hover:shadow-sm"
             >
               <div className="min-w-0">
-                <p className="truncate font-semibold text-gray-950">{notice.title}</p>
+                <p className="truncate font-semibold text-gray-950">
+                  {notice.title}
+                </p>
                 <p className="mt-1 text-xs text-gray-500">
-                  {formatEnumLabel(notice.audienceType)} / {formatEnumLabel(notice.priority)} / {notice.publishedAt ? 'Published' : notice.scheduledFor ? 'Scheduled' : 'Draft'}
+                  {formatEnumLabel(notice.audienceType)} /{' '}
+                  {formatEnumLabel(notice.priority)} /{' '}
+                  {notice.publishedAt
+                    ? 'Published'
+                    : notice.scheduledFor
+                      ? 'Scheduled'
+                      : 'Draft'}
                 </p>
               </div>
               <ExternalLink size={16} className="shrink-0 text-gray-400" />

@@ -1,23 +1,23 @@
-"use client";
+'use client';
 
 import {
   formatBsDate,
   type AttendanceAnalytics as AttendanceAnalyticsData,
-} from "@schoolos/core";
-import type { ReactNode } from "react";
-import { SectionCard } from "@/components/ui/section-card";
-import { StatCard } from "@/components/ui/stat-card";
-import { Badge } from "@/components/ui/badge";
-import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/loading-state";
-import type { AttendanceAnomalies } from "@/lib/api/attendance";
+} from '@schoolos/core';
+import type { ReactNode } from 'react';
+import { SectionCard } from '@/components/ui/section-card';
+import { StatCard } from '@/components/ui/stat-card';
+import { Badge } from '@/components/ui/badge';
+import { ErrorState } from '@/components/ui/error-state';
+import { LoadingState } from '@/components/ui/loading-state';
+import type { AttendanceAnomalies } from '@/lib/api/attendance';
 import {
   AlertCircle,
   CalendarX,
   Clock3,
   TrendingDown,
   Users,
-} from "lucide-react";
+} from 'lucide-react';
 
 interface AttendanceAnalyticsProps {
   analytics?: AttendanceAnalyticsData;
@@ -34,7 +34,7 @@ export function AttendanceAnalytics({
   isLoadingAnomalies = false,
   isLoadingAnalytics = false,
   analyticsError = false,
-  anomaliesError = "",
+  anomaliesError = '',
 }: AttendanceAnalyticsProps) {
   if (isLoadingAnalytics) {
     return <LoadingState label="Loading attendance analytics..." />;
@@ -42,7 +42,10 @@ export function AttendanceAnalytics({
 
   if (analyticsError) {
     return (
-      <ErrorState title="Attendance analytics unavailable" onRetry={() => window.location.reload()} />
+      <ErrorState
+        title="Attendance analytics unavailable"
+        onRetry={() => window.location.reload()}
+      />
     );
   }
 
@@ -85,9 +88,9 @@ export function AttendanceAnalytics({
         />
         <StatCard
           title="Anomaly Alerts"
-          value={isLoadingAnomalies ? "..." : totalAnomalies}
+          value={isLoadingAnomalies ? '...' : totalAnomalies}
           icon={<CalendarX size={20} />}
-          tone={totalAnomalies > 0 ? "warning" : "neutral"}
+          tone={totalAnomalies > 0 ? 'warning' : 'neutral'}
         />
       </div>
 
@@ -250,7 +253,7 @@ export function AttendanceAnalytics({
                 anomalies?.anomalies.attendanceDrops
                   .slice(0, 5)
                   .map((item) => ({
-                    key: `${item.classId}-${item.sectionId ?? "none"}-${item.attendanceDate}`,
+                    key: `${item.classId}-${item.sectionId ?? 'none'}-${item.attendanceDate}`,
                     title: classSectionLabel(item.className, item.sectionName),
                     detail: `${formatDate(item.attendanceDate)} - ${item.previousAverage}% average to ${item.currentRate}%`,
                     badge: `-${item.dropPercentage}%`,
@@ -264,10 +267,10 @@ export function AttendanceAnalytics({
                 anomalies?.anomalies.unsubmittedWorkingDays
                   .slice(0, 5)
                   .map((item) => ({
-                    key: `${item.classId}-${item.sectionId ?? "none"}-${item.attendanceDate}`,
+                    key: `${item.classId}-${item.sectionId ?? 'none'}-${item.attendanceDate}`,
                     title: classSectionLabel(item.className, item.sectionName),
                     detail: formatDate(item.attendanceDate),
-                    badge: "Missing",
+                    badge: 'Missing',
                   })) ?? []
               }
             />
@@ -296,7 +299,7 @@ function AnomalyList({
           {icon ? <span className="text-slate-500">{icon}</span> : null}
           <h3 className="text-sm font-black text-slate-900">{title}</h3>
         </div>
-        <Badge variant={count > 0 ? "warning" : "default"}>{count}</Badge>
+        <Badge variant={count > 0 ? 'warning' : 'default'}>{count}</Badge>
       </div>
       <div className="mt-4 space-y-3">
         {rows.length > 0 ? (

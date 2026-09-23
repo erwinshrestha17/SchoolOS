@@ -14,15 +14,15 @@ import type {
   StaffLeaveRequestSummary,
   StaffLeaveReviewResult,
   StudentAttendanceMonthlyRegister,
-} from "@schoolos/core";
-import { getNepalSchoolDay } from "@schoolos/core";
+} from '@schoolos/core';
+import { getNepalSchoolDay } from '@schoolos/core';
 import {
   API_BASE_URL,
   JsonBody,
   parseApiErrorMessage,
   request,
   withQuery,
-} from "./client";
+} from './client';
 
 export type StaffSelfAttendanceRecord = {
   id: string;
@@ -45,12 +45,9 @@ export type StaffSelfLeaveRequest = {
 
 const STAFF_ATTENDANCE_ROSTER_PAGE_SIZE = 100;
 
-function listStaffAttendanceRosterPage(
-  page: number,
-  signal?: AbortSignal,
-) {
+function listStaffAttendanceRosterPage(page: number, signal?: AbortSignal) {
   return request<StaffAttendanceRosterPage>(
-    withQuery("/hr/staff-attendance/roster", {
+    withQuery('/hr/staff-attendance/roster', {
       page,
       limit: STAFF_ATTENDANCE_ROSTER_PAGE_SIZE,
     }),
@@ -75,18 +72,18 @@ async function listStaffAttendanceRoster(
 export const attendanceApi = {
   listStaffAttendanceRoster,
   getAttendanceScopeVersion: () =>
-    request<{ scopeVersion: string }>("/attendance/scope-version"),
+    request<{ scopeVersion: string }>('/attendance/scope-version'),
   getAttendanceRoster: (params: {
     /** Omitted = the backend resolves the tenant's current academic year. */
     academicYearId?: string;
     classId: string;
     sectionId?: string | null;
     attendanceDate?: string | null;
-  }) => request<AttendanceRoster>(withQuery("/attendance/rosters", params)),
+  }) => request<AttendanceRoster>(withQuery('/attendance/rosters', params)),
   listAttendanceAnalytics: () =>
-    request<AttendanceAnalytics>("/attendance/analytics"),
+    request<AttendanceAnalytics>('/attendance/analytics'),
   listAttendanceAnomalies: () =>
-    request<AttendanceAnomalies>("/attendance/anomalies"),
+    request<AttendanceAnomalies>('/attendance/anomalies'),
   getAttendanceSummary: (params: {
     academicYearId: string;
     classId: string;
@@ -97,7 +94,7 @@ export const attendanceApi = {
     year?: number | null;
   }) =>
     request<AttendanceOperationalSummary>(
-      withQuery("/attendance/summary", {
+      withQuery('/attendance/summary', {
         ...params,
         month: params.month ? String(params.month) : null,
         year: params.year ? String(params.year) : null,
@@ -113,7 +110,7 @@ export const attendanceApi = {
     bsYear?: number;
   }) =>
     request<AttendanceMonthlyRegister>(
-      withQuery("/attendance/register", {
+      withQuery('/attendance/register', {
         ...params,
         month: params.month ? String(params.month) : undefined,
         year: params.year ? String(params.year) : undefined,
@@ -126,13 +123,13 @@ export const attendanceApi = {
     limit?: number | null;
   }) =>
     request<AttendanceRegisterExportPage>(
-      withQuery("/attendance/register/exports", {
+      withQuery('/attendance/register/exports', {
         page: params?.page ? String(params.page) : undefined,
         limit: params?.limit ? String(params.limit) : undefined,
       }),
     ),
   listAttendanceDrafts: () =>
-    request<AttendanceDraftSummary[]>("/attendance/drafts"),
+    request<AttendanceDraftSummary[]>('/attendance/drafts'),
   getAttendanceCorrection: (id: string) =>
     request<AttendanceCorrectionDetail>(
       `/attendance/corrections/${encodeURIComponent(id)}`,
@@ -174,43 +171,43 @@ export const attendanceApi = {
       ),
     ),
   getM2Policy: () =>
-    request<M2AttendancePolicyResponse>("/attendance/m2/policy"),
+    request<M2AttendancePolicyResponse>('/attendance/m2/policy'),
   updateM2Policy: (body: JsonBody) =>
-    request<M2AttendancePolicyResponse>("/attendance/m2/policy", {
-      method: "PATCH",
+    request<M2AttendancePolicyResponse>('/attendance/m2/policy', {
+      method: 'PATCH',
       json: body,
     }),
   getM2States: () =>
-    request<M2AttendanceStatesResponse>("/attendance/m2/states"),
+    request<M2AttendanceStatesResponse>('/attendance/m2/states'),
   listM2HardenedAnomalies: (params?: M2WindowParams) =>
     request<M2HardenedAnomalyResponse>(
-      withQuery("/attendance/m2/anomalies/hardened", params ?? {}),
+      withQuery('/attendance/m2/anomalies/hardened', params ?? {}),
     ),
   listM2CorrectionAudit: (params?: M2WindowParams) =>
     request<M2CorrectionAuditResponse>(
-      withQuery("/attendance/m2/corrections/audit", params ?? {}),
+      withQuery('/attendance/m2/corrections/audit', params ?? {}),
     ),
   listM2CalendarPolicy: (params?: M2WindowParams) =>
     request<M2CalendarPolicyResponse>(
-      withQuery("/attendance/m2/calendar-policy", params ?? {}),
+      withQuery('/attendance/m2/calendar-policy', params ?? {}),
     ),
   listM2FollowUps: (params?: M2WindowParams & { threshold?: number | null }) =>
     request<M2FollowUpQueue>(
-      withQuery("/attendance/m2/follow-ups/queue", {
+      withQuery('/attendance/m2/follow-ups/queue', {
         ...(params ?? {}),
         threshold: params?.threshold ? String(params.threshold) : undefined,
       }),
     ),
   runM2FollowUps: (body: JsonBody) =>
-    request<M2FollowUpRunResult>("/attendance/m2/follow-ups/run", {
-      method: "POST",
+    request<M2FollowUpRunResult>('/attendance/m2/follow-ups/run', {
+      method: 'POST',
       json: body,
     }),
   listM2OfflineConflicts: (
     params?: M2WindowParams & { status?: string | null; limit?: number | null },
   ) =>
     request<M2OfflineConflictResponse>(
-      withQuery("/attendance/m2/offline-sync/conflicts", {
+      withQuery('/attendance/m2/offline-sync/conflicts', {
         ...(params ?? {}),
         limit: params?.limit ? String(params.limit) : undefined,
       }),
@@ -223,29 +220,29 @@ export const attendanceApi = {
       bsMonth: number;
       bsYear: number;
     },
-    format: "csv" | "pdf",
+    format: 'csv' | 'pdf',
   ) => {
     const response = await fetch(
-      `${API_BASE_URL}${withQuery("/attendance/register/export", {
+      `${API_BASE_URL}${withQuery('/attendance/register/export', {
         ...params,
         sectionId: params.sectionId ?? undefined,
         format,
       })}`,
-      { credentials: "include" },
+      { credentials: 'include' },
     );
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(parseApiErrorMessage(text) || "Attendance export failed");
+      throw new Error(parseApiErrorMessage(text) || 'Attendance export failed');
     }
 
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
     a.download = `attendance-register-bs-${params.bsYear}-${String(
       params.bsMonth,
-    ).padStart(2, "0")}.${format}`;
+    ).padStart(2, '0')}.${format}`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
@@ -257,21 +254,21 @@ export const attendanceApi = {
     sectionId?: string;
   }) => {
     const response = await fetch(
-      `${API_BASE_URL}${withQuery("/students/roster/export", params ?? {})}`,
+      `${API_BASE_URL}${withQuery('/students/roster/export', params ?? {})}`,
       {
-        credentials: "include",
+        credentials: 'include',
       },
     );
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(parseApiErrorMessage(text) || "Export failed");
+      throw new Error(parseApiErrorMessage(text) || 'Export failed');
     }
 
     const text = await response.text();
-    const blob = new Blob([text], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
     a.download = `class-roster-${getNepalSchoolDay().gregorianDate}.csv`;
     document.body.appendChild(a);
@@ -280,7 +277,7 @@ export const attendanceApi = {
     document.body.removeChild(a);
   },
   listAttendanceConflicts: () =>
-    request<AttendanceConflict[]>("/attendance/conflicts"),
+    request<AttendanceConflict[]>('/attendance/conflicts'),
   listAttendanceCorrections: (params?: {
     status?: string | null;
     studentId?: string | null;
@@ -289,35 +286,32 @@ export const attendanceApi = {
     limit?: number | null;
   }) =>
     request<PaginatedResponse<AttendanceCorrectionRequest>>(
-      withQuery("/attendance/corrections", params ?? {}),
+      withQuery('/attendance/corrections', params ?? {}),
     ),
   getAttendanceCorrectionSummary: () =>
-    request<{ pending: number }>("/attendance/corrections/summary"),
+    request<{ pending: number }>('/attendance/corrections/summary'),
   submitAttendance: (body: JsonBody) =>
-    request("/attendance/sessions", { method: "POST", json: body }),
+    request('/attendance/sessions', { method: 'POST', json: body }),
   syncAttendance: (body: JsonBody) =>
-    request<AttendanceSyncSubmission>("/attendance/sync", {
-      method: "POST",
+    request<AttendanceSyncSubmission>('/attendance/sync', {
+      method: 'POST',
       json: body,
     }),
   saveAttendanceDraft: (body: JsonBody) =>
-    request("/attendance/drafts", { method: "POST", json: body }),
+    request('/attendance/drafts', { method: 'POST', json: body }),
   reviewAttendanceConflict: (id: string, body: JsonBody) =>
     request<AttendanceConflictReviewResult>(
       `/attendance/conflicts/${id}/review`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         json: body,
       },
     ),
-  overrideLockedAttendanceSession: (
-    sessionId: string,
-    body: JsonBody,
-  ) =>
+  overrideLockedAttendanceSession: (sessionId: string, body: JsonBody) =>
     request<AttendanceSessionOverrideResult>(
       `/attendance/sessions/${encodeURIComponent(sessionId)}/override`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         json: body,
       },
     ),
@@ -325,7 +319,7 @@ export const attendanceApi = {
     request<AttendanceCorrectionRequest>(
       `/attendance/corrections/${encodeURIComponent(id)}/approve`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         json: body,
       },
     ),
@@ -333,13 +327,13 @@ export const attendanceApi = {
     request<AttendanceCorrectionRequest>(
       `/attendance/corrections/${encodeURIComponent(id)}/reject`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         json: body,
       },
     ),
   listStaffAttendanceSummary: (params: { month?: number; year?: number }) =>
     request<StaffAttendanceMonthlySummary>(
-      withQuery("/hr/staff-attendance/summary", {
+      withQuery('/hr/staff-attendance/summary', {
         month: params.month ? String(params.month) : undefined,
         year: params.year ? String(params.year) : undefined,
       }),
@@ -347,17 +341,17 @@ export const attendanceApi = {
   listStaffAttendance: (staffId: string) =>
     request<unknown[]>(`/hr/staff/${encodeURIComponent(staffId)}/attendance`),
   listLeaveRequests: () =>
-    request<StaffLeaveRequestSummary[]>("/hr/leave-requests"),
+    request<StaffLeaveRequestSummary[]>('/hr/leave-requests'),
   createLeaveRequest: (body: JsonBody) =>
-    request<StaffLeaveRequestSummary>("/hr/leave-requests", {
-      method: "POST",
+    request<StaffLeaveRequestSummary>('/hr/leave-requests', {
+      method: 'POST',
       json: body,
     }),
   approveLeaveRequest: (id: string, body: JsonBody) =>
     request<StaffLeaveReviewResult>(
       `/hr/leaves/${encodeURIComponent(id)}/approve`,
       {
-        method: "POST",
+        method: 'POST',
         json: body,
       },
     ),
@@ -365,7 +359,7 @@ export const attendanceApi = {
     request<StaffLeaveReviewResult>(
       `/hr/leaves/${encodeURIComponent(id)}/reject`,
       {
-        method: "POST",
+        method: 'POST',
         json: body,
       },
     ),
@@ -374,40 +368,40 @@ export const attendanceApi = {
       `/hr/staff/${encodeURIComponent(staffId)}/leave-balances`,
     ),
   listAllLeaveBalances: () =>
-    request<StaffLeaveBalanceSummary[]>("/hr/leave-balances"),
+    request<StaffLeaveBalanceSummary[]>('/hr/leave-balances'),
   listMyAttendance: () =>
-    request<StaffSelfAttendanceRecord[]>("/hr/me/attendance"),
+    request<StaffSelfAttendanceRecord[]>('/hr/me/attendance'),
   listMyLeaveRequests: () =>
-    request<StaffSelfLeaveRequest[]>("/hr/me/leave-requests"),
+    request<StaffSelfLeaveRequest[]>('/hr/me/leave-requests'),
   createMyLeaveRequest: (body: {
     leaveType: string;
     startsOn: string;
     endsOn: string;
     reason: string;
   }) =>
-    request<StaffSelfLeaveRequest>("/hr/me/leave-requests", {
-      method: "POST",
+    request<StaffSelfLeaveRequest>('/hr/me/leave-requests', {
+      method: 'POST',
       json: body,
     }),
 
   submitStaffAttendance: (body: JsonBody) =>
-    request<unknown>("/hr/staff-attendance", {
-      method: "POST",
+    request<unknown>('/hr/staff-attendance', {
+      method: 'POST',
       json: body,
     }),
   correctStaffAttendance: (id: string, body: JsonBody) =>
     request<unknown>(`/hr/staff-attendance/${encodeURIComponent(id)}/correct`, {
-      method: "PATCH",
+      method: 'PATCH',
       json: body,
     }),
   reviewLeaveRequest: (id: string, body: JsonBody) =>
     request<unknown>(`/hr/leave-requests/${encodeURIComponent(id)}/review`, {
-      method: "PATCH",
+      method: 'PATCH',
       json: body,
     }),
   adjustLeaveBalance: (body: JsonBody) =>
-    request<unknown>("/hr/leave-balances/adjust", {
-      method: "POST",
+    request<unknown>('/hr/leave-balances/adjust', {
+      method: 'POST',
       json: body,
     }),
   getStaffAttendanceHistory: (staffId: string) =>
@@ -472,7 +466,7 @@ export type AttendanceAnomalies = {
 };
 
 export type AttendanceMonthlyRegister = {
-  calendar: "BS" | "AD";
+  calendar: 'BS' | 'AD';
   month: number;
   year: number;
   periodLabel: string;
@@ -531,9 +525,9 @@ export type AttendanceRegisterExportPage = {
 
 export type AttendanceRegisterExportSummary = {
   id: string;
-  reportKey: "attendance_monthly_register";
+  reportKey: 'attendance_monthly_register';
   format: string;
-  status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   filters: Record<string, unknown> | null;
   requestedBy: string | null;
   createdAt: string;
@@ -583,11 +577,11 @@ export type AttendanceSessionOverrideResult = {
 
 export type AttendanceCorrectionDetail = AttendanceCorrectionRequest & {
   lockState:
-    | "OPEN"
-    | "LOCKED"
-    | "OVERRIDE_REQUIRED"
-    | "CORRECTION_WINDOW"
-    | "EXPIRED";
+    | 'OPEN'
+    | 'LOCKED'
+    | 'OVERRIDE_REQUIRED'
+    | 'CORRECTION_WINDOW'
+    | 'EXPIRED';
   lockPolicy: {
     requiresReasonForDecision: boolean;
     explanation: string;
@@ -619,7 +613,7 @@ export type AttendanceCorrectionDetail = AttendanceCorrectionRequest & {
     message: string;
   };
   discussionSupported: boolean;
-  student?: AttendanceCorrectionRequest["student"] & {
+  student?: AttendanceCorrectionRequest['student'] & {
     class?: { id: string; name: string } | null;
     sectionRef?: { id: string; name: string } | null;
   };

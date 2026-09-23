@@ -42,7 +42,7 @@ describe('Platform tenant subscription change workflow contracts', () => {
     assert.match(page, /api\.listPlatformPlans\(\)/);
     assert.match(
       page,
-      /api\.assignPlatformTenantSubscription\(tenant\.id, compactPayload\(payload\)\)/,
+      /api\.assignPlatformTenantSubscription\(\s*tenant\.id,\s*compactPayload\(payload\),?\s*\)/,
     );
   });
 
@@ -60,7 +60,11 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'SchoolOS subscription billing only',
       'does not create student fee invoices',
     ]) {
-      assert.match(page, new RegExp(label), `Missing workflow text: ${label}`);
+      assert.match(
+        page,
+        new RegExp(label.replaceAll(' ', '\\s+')),
+        `Missing workflow text: ${label}`,
+      );
     }
 
     assert.match(page, /color-mod-platform-accent/);
@@ -72,17 +76,14 @@ describe('Platform tenant subscription change workflow contracts', () => {
 
     assert.match(
       page,
-      /const canSubmit = Boolean\(selectedPlan\) && reason\.trim\(\)\.length >= 5 && !saving/,
+      /const canSubmit =\s*Boolean\(selectedPlan\) && reason\.trim\(\)\.length >= 5 && !saving/,
     );
     assert.match(page, /disabled=\{!canSubmit\}/);
     assert.match(page, /No active platform plans are available/);
   });
 
   it('exposes typed API helpers for platform subscription assignment', () => {
-    const apiClient = readMany([
-      'lib/api/platform.ts',
-      'lib/api/client.ts',
-    ]);
+    const apiClient = readMany(['lib/api/platform.ts', 'lib/api/client.ts']);
 
     assert.match(apiClient, /AssignPlatformTenantSubscriptionPayload/);
     assert.match(apiClient, /assignPlatformTenantSubscription:/);
@@ -90,9 +91,7 @@ describe('Platform tenant subscription change workflow contracts', () => {
   });
 
   it('wires remaining tenant detail M0 workflows to real dialogs and helpers', () => {
-    const access = read(
-      'components/platform/tenant-detail/tenant-access.tsx',
-    );
+    const access = read('components/platform/tenant-detail/tenant-access.tsx');
     const billing = read(
       'components/platform/tenant-detail/tenant-billing.tsx',
     );
@@ -127,9 +126,7 @@ describe('Platform tenant subscription change workflow contracts', () => {
     const detailPage = read(
       'components/platform/tenant-detail/tenant-detail-page.tsx',
     );
-    const access = read(
-      'components/platform/tenant-detail/tenant-access.tsx',
-    );
+    const access = read('components/platform/tenant-detail/tenant-access.tsx');
     const subscription = read(
       'components/platform/tenant-detail/tenant-subscription.tsx',
     );
@@ -159,7 +156,7 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'API Keys',
       'Audit',
     ]) {
-      assert.match(routes, new RegExp(`label: "${label}"`));
+      assert.match(routes, new RegExp(`label: ["']${label}["']`));
     }
 
     assert.match(detailPage, /TENANT_SECTIONS/);
@@ -181,10 +178,7 @@ describe('Platform tenant subscription change workflow contracts', () => {
   it('wires platform settings provider, queue, audit, and tab deep-link workflows', () => {
     const settings = read('app/platform/settings/page.tsx');
     const shell = read('components/layout/platform-shell.tsx');
-    const apiClient = readMany([
-      'lib/api/platform.ts',
-      'lib/api/client.ts',
-    ]);
+    const apiClient = readMany(['lib/api/platform.ts', 'lib/api/client.ts']);
 
     for (const expected of [
       'Edit Provider',
@@ -226,7 +220,10 @@ describe('Platform tenant subscription change workflow contracts', () => {
     assert.doesNotMatch(settings, /Promise\.all\(\s*failedInQueue\.map/);
     assert.doesNotMatch(settings, /api\.getFileView/);
     assert.doesNotMatch(settings, /window\.open/);
-    assert.match(apiClient, /removePlatformJob: \(queueName: string, jobId: string, reason: string\)/);
+    assert.match(
+      apiClient,
+      /removePlatformJob: \(queueName: string, jobId: string, reason: string\)/,
+    );
     assert.match(apiClient, /json: \{ reason \}/);
     assert.doesNotMatch(
       settings,
@@ -293,7 +290,7 @@ describe('Platform tenant subscription change workflow contracts', () => {
         new RegExp(
           expected
             .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-            .replace(/'/g, `['"]`),
+            .replace(/['"]/g, `['"]`),
         ),
       );
     }

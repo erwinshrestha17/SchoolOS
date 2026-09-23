@@ -40,7 +40,10 @@ export function ProtectedAvatar({
       ) : null}
       <AvatarFallback className="bg-[linear-gradient(135deg,var(--primary),var(--primary-dark))] font-bold text-white">
         {state === 'loading' ? (
-          <Loader2 className="h-1/2 w-1/2 animate-spin" aria-label="Loading photo" />
+          <Loader2
+            className="h-1/2 w-1/2 animate-spin"
+            aria-label="Loading photo"
+          />
         ) : state === 'denied' || state === 'error' ? (
           <ImageOff className="h-1/2 w-1/2" aria-label="Photo unavailable" />
         ) : (

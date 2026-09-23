@@ -1,71 +1,89 @@
-import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
-const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const read = (path) => readFileSync(join(webRoot, path), "utf8");
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 
-describe("M1 Students and Admissions workspace navigation", () => {
-  const sidebar = read("components/layout/sidebar.tsx");
+describe('M1 Students and Admissions workspace navigation', () => {
+  const sidebar = read('components/layout/sidebar.tsx');
   const personaNav = [
-    read("components/layout/sidebar-persona-nav.config.ts"),
-    read("components/layout/sidebar-persona-nav.base.ts"),
-  ].join("\n");
-  const studentsPage = read("app/dashboard/students/page.tsx");
-  const admissionsPage = read("app/dashboard/admissions/page.tsx");
-  const pageHeader = read("components/m1/m1-page-header.tsx");
-  const studentDirectory = read("components/forms/student-directory.tsx");
-  const admissionQueues = read("components/m1/admission-case-queues.tsx");
-  const summaryCards = read("components/ui/summary-card.tsx");
-  const workspaceTabs = read("components/dashboard/module-tabs.tsx");
+    read('components/layout/sidebar-persona-nav.config.ts'),
+    read('components/layout/sidebar-persona-nav.base.ts'),
+  ].join('\n');
+  const studentsPage = read('app/dashboard/students/page.tsx');
+  const admissionsPage = read('app/dashboard/admissions/page.tsx');
+  const pageHeader = read('components/m1/m1-page-header.tsx');
+  const studentDirectory = read('components/forms/student-directory.tsx');
+  const admissionQueues = read('components/m1/admission-case-queues.tsx');
+  const summaryCards = read('components/ui/summary-card.tsx');
+  const workspaceTabs = read('components/dashboard/module-tabs.tsx');
 
-  it("keeps Students and Admissions as separate sidebar workspaces", () => {
-    assert.match(personaNav, /label: 'Students & Admissions'/);
-    assert.match(personaNav, /href: '\/dashboard\/students',\s*label: 'Students'/);
-    assert.match(personaNav, /href: '\/dashboard\/admissions',\s*label: 'Admissions'/);
-    assert.match(read("lib/nav-hash.ts"), /export function computeActiveNavHref/);
+  it('keeps Students and Admissions as separate sidebar workspaces', () => {
+    assert.match(personaNav, /label: ['"]Students & Admissions['"]/);
+    assert.match(
+      personaNav,
+      /href: ['"]\/dashboard\/students['"],\s*label: ['"]Students['"]/,
+    );
+    assert.match(
+      personaNav,
+      /href: ['"]\/dashboard\/admissions['"],\s*label: ['"]Admissions['"]/,
+    );
+    assert.match(
+      read('lib/nav-hash.ts'),
+      /export function computeActiveNavHref/,
+    );
     assert.match(sidebar, /function isActiveNavItem/);
   });
 
-  it("removes the M1-wide horizontal navigation from both workspace pages", () => {
+  it('removes the M1-wide horizontal navigation from both workspace pages', () => {
     assert.equal(
-      existsSync(join(webRoot, "components/m1/m1-module-nav.tsx")),
+      existsSync(join(webRoot, 'components/m1/m1-module-nav.tsx')),
       false,
     );
-    assert.doesNotMatch(studentsPage + admissionsPage + pageHeader, /M1ModuleNav/);
+    assert.doesNotMatch(
+      studentsPage + admissionsPage + pageHeader,
+      /M1ModuleNav/,
+    );
     assert.doesNotMatch(
       studentsPage + admissionsPage + pageHeader,
       /label: ['"]Students['"].*label: ['"]Admissions['"].*label: ['"]Applications['"]/s,
     );
   });
 
-  it("gives each primary route its approved identity and action path", () => {
-    assert.match(studentsPage, /title="Students"/);
-    assert.doesNotMatch(studentsPage, /title="Admissions & Student Profiles"/);
-    assert.match(admissionsPage, /title="Admissions"/);
-    assert.match(studentsPage, /href="\/dashboard\/admissions\/new"/);
-    assert.match(admissionsPage, /href="\/dashboard\/admissions\/new"/);
+  it('gives each primary route its approved identity and action path', () => {
+    assert.match(studentsPage, /title=['"]Students['"]/);
+    assert.doesNotMatch(
+      studentsPage,
+      /title=['"]Admissions & Student Profiles['"]/,
+    );
+    assert.match(admissionsPage, /title=['"]Admissions['"]/);
+    assert.match(studentsPage, /href=['"]\/dashboard\/admissions\/new['"]/);
+    assert.match(admissionsPage, /href=['"]\/dashboard\/admissions\/new['"]/);
   });
 
-  it("uses URL-backed lifecycle and queue views without client totals", () => {
-    assert.match(studentDirectory, /label="Student lifecycle views"/);
-    assert.match(studentDirectory, /value: 'EXITED', label: 'Withdrawn'/);
-    assert.match(admissionQueues, /label="Admission queue views"/);
+  it('uses URL-backed lifecycle and queue views without client totals', () => {
+    assert.match(studentDirectory, /label=['"]Student lifecycle views['"]/);
+    assert.match(
+      studentDirectory,
+      /value: ['"]EXITED['"], label: ['"]Withdrawn['"]/,
+    );
+    assert.match(admissionQueues, /label=['"]Admission queue views['"]/);
     assert.match(admissionQueues, /useUrlFilters/);
-    assert.match(admissionQueues, /history: "push"/);
-    assert.match(studentDirectory, /history: 'push'/);
+    assert.match(admissionQueues, /history: ['"]push['"]/);
+    assert.match(studentDirectory, /history: ['"]push['"]/);
     assert.match(admissionQueues, /admissionCasesApi\.listQueues/);
     assert.match(admissionQueues, /TablePagination/);
     assert.match(admissionQueues, /<Empty/);
     assert.doesNotMatch(admissionsPage, /items\.length|filter\(/);
   });
 
-  it("uses one compact shared summary-card composition on both workspaces", () => {
+  it('uses one compact shared summary-card composition on both workspaces', () => {
     assert.match(studentDirectory, /SummaryGrid/);
     assert.match(admissionsPage, /SummaryGrid/);
-    assert.match(summaryCards, /data-schoolos-ui="summary-grid"/);
+    assert.match(summaryCards, /data-schoolos-ui=['"]summary-grid['"]/);
     assert.match(summaryCards, /grid gap-4 sm:grid-cols-2 xl:grid-cols-4/);
     assert.match(summaryCards, /<CardHeader/);
     assert.match(summaryCards, /<CardContent/);
@@ -75,7 +93,7 @@ describe("M1 Students and Admissions workspace navigation", () => {
     assert.doesNotMatch(summaryCards, /py-(?:8|10|12|16|20)/);
   });
 
-  it("keeps local tabs compact without a visible desktop scrollbar", () => {
+  it('keeps local tabs compact without a visible desktop scrollbar', () => {
     for (const workspace of [studentDirectory, admissionQueues]) {
       assert.match(workspace, /<WorkspaceTabs/);
       assert.doesNotMatch(workspace, /<TabsList/);
@@ -85,29 +103,38 @@ describe("M1 Students and Admissions workspace navigation", () => {
     assert.doesNotMatch(workspaceTabs, /min-w-\[[^\]]+\]/);
   });
 
-  it("keeps the roster and admission queue as compact cohesive workspaces", () => {
-    assert.match(studentDirectory, /data-testid="student-roster-workspace"/);
-    assert.match(studentDirectory, /role="group"/);
-    assert.match(studentDirectory, /aria-label="Directory filters"/);
-    assert.doesNotMatch(studentDirectory, /Readiness & duplicate attention panels/);
+  it('keeps the roster and admission queue as compact cohesive workspaces', () => {
+    assert.match(
+      studentDirectory,
+      /data-testid=['"]student-roster-workspace['"]/,
+    );
+    assert.match(studentDirectory, /role=['"]group['"]/);
+    assert.match(studentDirectory, /aria-label=['"]Directory filters['"]/);
+    assert.doesNotMatch(
+      studentDirectory,
+      /Readiness & duplicate attention panels/,
+    );
     assert.doesNotMatch(studentDirectory, /Search and filter student records/);
-    assert.match(admissionQueues, /data-testid="admission-queue-workspace"/);
+    assert.match(
+      admissionQueues,
+      /data-testid=['"]admission-queue-workspace['"]/,
+    );
     assert.match(admissionQueues, /<Empty/);
     assert.match(admissionQueues, /More queues/);
     assert.doesNotMatch(admissionQueues, /min-h-64|Additional queues/);
     assert.doesNotMatch(admissionQueues, /sourceId|classId|dateFrom|dateTo/);
   });
 
-  it("keeps every former M1 destination reachable through contextual actions", () => {
+  it('keeps every former M1 destination reachable through contextual actions', () => {
     const combined = studentsPage + admissionsPage;
     for (const route of [
-      "/dashboard/admissions/applications",
-      "/dashboard/admissions/documents",
-      "/dashboard/admissions/duplicates",
-      "/dashboard/admissions/iemis",
-      "/dashboard/admissions/qr",
+      '/dashboard/admissions/applications',
+      '/dashboard/admissions/documents',
+      '/dashboard/admissions/duplicates',
+      '/dashboard/admissions/iemis',
+      '/dashboard/admissions/qr',
     ]) {
-      assert.match(combined, new RegExp(route.replaceAll("/", "\\/")));
+      assert.match(combined, new RegExp(route.replaceAll('/', '\\/')));
     }
   });
 });

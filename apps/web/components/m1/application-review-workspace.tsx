@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   formatBsDate,
@@ -6,8 +6,8 @@ import {
   type AdmissionCase,
   type AdmissionCaseReviewAction,
   type ReviewAdmissionCasePayload,
-} from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+} from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   CalendarClock,
@@ -17,27 +17,27 @@ import {
   Loader2,
   UserCheck,
   UserRound,
-} from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
-import { admissionCasesApi } from "../../lib/api/admission-cases";
-import { educationProgramLabel } from "../../lib/education-program";
-import { schoolFacingErrorMessage } from "../../lib/school-facing-error";
-import { useSession } from "../session-provider";
-import { Button } from "../ui/button";
-import { EmptyState } from "../ui/empty-state";
-import { ErrorState } from "../ui/error-state";
-import { LoadingState } from "../ui/loading-state";
-import { ProtectedFileButton } from "../ui/protected-file";
-import { StatusBadge } from "../ui/status-badge";
+} from 'lucide-react';
+import Link from 'next/link';
+import { useState } from 'react';
+import { admissionCasesApi } from '../../lib/api/admission-cases';
+import { educationProgramLabel } from '../../lib/education-program';
+import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
+import { useSession } from '../session-provider';
+import { Button } from '../ui/button';
+import { EmptyState } from '../ui/empty-state';
+import { ErrorState } from '../ui/error-state';
+import { LoadingState } from '../ui/loading-state';
+import { ProtectedFileButton } from '../ui/protected-file';
+import { StatusBadge } from '../ui/status-badge';
 
 const ACTIONS_REQUIRING_REASON = new Set<AdmissionCaseReviewAction>([
-  "REQUEST_INFORMATION",
-  "APPROVE",
-  "REJECT",
-  "ESCALATE_TO_PRINCIPAL",
-  "CLOSE",
-  "WAITLIST",
+  'REQUEST_INFORMATION',
+  'APPROVE',
+  'REJECT',
+  'ESCALATE_TO_PRINCIPAL',
+  'CLOSE',
+  'WAITLIST',
 ]);
 
 const ACTION_COPY: Record<
@@ -45,40 +45,40 @@ const ACTION_COPY: Record<
   { label: string; confirmation: string }
 > = {
   REQUEST_INFORMATION: {
-    label: "Request information",
-    confirmation: "Request information",
+    label: 'Request information',
+    confirmation: 'Request information',
   },
   ASSIGN_REVIEWER: {
-    label: "Assign to me",
-    confirmation: "Assign to me",
+    label: 'Assign to me',
+    confirmation: 'Assign to me',
   },
   MARK_READY_FOR_REVIEW: {
-    label: "Send for review",
-    confirmation: "Send for review",
+    label: 'Send for review',
+    confirmation: 'Send for review',
   },
   APPROVE: {
-    label: "Approve application",
-    confirmation: "Approve application",
+    label: 'Approve application',
+    confirmation: 'Approve application',
   },
   REJECT: {
-    label: "Do not admit",
-    confirmation: "Confirm decision",
+    label: 'Do not admit',
+    confirmation: 'Confirm decision',
   },
   ESCALATE_TO_PRINCIPAL: {
-    label: "Escalate to principal",
-    confirmation: "Escalate case",
+    label: 'Escalate to principal',
+    confirmation: 'Escalate case',
   },
   CLOSE: {
-    label: "Close case",
-    confirmation: "Close case",
+    label: 'Close case',
+    confirmation: 'Close case',
   },
   WAITLIST: {
-    label: "Waitlist",
-    confirmation: "Waitlist this applicant",
+    label: 'Waitlist',
+    confirmation: 'Waitlist this applicant',
   },
   PROMOTE_FROM_WAITLIST: {
-    label: "Promote from waitlist",
-    confirmation: "Promote from waitlist",
+    label: 'Promote from waitlist',
+    confirmation: 'Promote from waitlist',
   },
 };
 
@@ -91,11 +91,11 @@ export function ApplicationReviewWorkspace({
   const { session, hasPermissions } = useSession();
   const [selectedAction, setSelectedAction] =
     useState<AdmissionCaseReviewAction | null>(null);
-  const [reason, setReason] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const [reason, setReason] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const caseQuery = useQuery({
-    queryKey: ["admission-case", admissionCaseId],
+    queryKey: ['admission-case', admissionCaseId],
     queryFn: () => admissionCasesApi.getCase(admissionCaseId),
   });
 
@@ -105,18 +105,18 @@ export function ApplicationReviewWorkspace({
     onSuccess: async (_, payload) => {
       setSuccessMessage(`${ACTION_COPY[payload.action].label} was recorded.`);
       setSelectedAction(null);
-      setReason("");
+      setReason('');
       await queryClient.invalidateQueries({
-        queryKey: ["admission-case", admissionCaseId],
+        queryKey: ['admission-case', admissionCaseId],
       });
       await queryClient.invalidateQueries({
-        queryKey: ["admission-case-queues"],
+        queryKey: ['admission-case-queues'],
       });
       await queryClient.invalidateQueries({
-        queryKey: ["admission-applications"],
+        queryKey: ['admission-applications'],
       });
     },
-    onError: () => setSuccessMessage(""),
+    onError: () => setSuccessMessage(''),
   });
 
   if (caseQuery.isLoading) {
@@ -134,21 +134,21 @@ export function ApplicationReviewWorkspace({
   }
 
   const admissionCase = caseQuery.data;
-  const canReview = hasPermissions(["students:manage_lifecycle"]);
+  const canReview = hasPermissions(['students:manage_lifecycle']);
   const availableActions = admissionCase.review.availableActions;
   const actionRequiresReason =
     selectedAction !== null && ACTIONS_REQUIRING_REASON.has(selectedAction);
   const actionCanSubmit =
     selectedAction !== null &&
     (!actionRequiresReason || reason.trim().length >= 5) &&
-    (selectedAction !== "ASSIGN_REVIEWER" || Boolean(session?.user.id));
+    (selectedAction !== 'ASSIGN_REVIEWER' || Boolean(session?.user.id));
 
   function submitAction() {
     if (!selectedAction || !actionCanSubmit) return;
     mutation.mutate({
       action: selectedAction,
       ...(reason.trim() ? { reason: reason.trim() } : {}),
-      ...(selectedAction === "ASSIGN_REVIEWER" && session?.user.id
+      ...(selectedAction === 'ASSIGN_REVIEWER' && session?.user.id
         ? { reviewerUserId: session.user.id }
         : {}),
     });
@@ -166,7 +166,7 @@ export function ApplicationReviewWorkspace({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-xl font-black text-slate-950">
-                    {admissionCase.student.firstNameEn}{" "}
+                    {admissionCase.student.firstNameEn}{' '}
                     {admissionCase.student.lastNameEn}
                   </h2>
                   <StatusBadge status={admissionCase.displayStatus} />
@@ -193,43 +193,43 @@ export function ApplicationReviewWorkspace({
             title="Student"
             rows={[
               [
-                "Date of birth",
+                'Date of birth',
                 admissionCase.student.dateOfBirth
                   ? formatBsDate(admissionCase.student.dateOfBirth)
-                  : "Not recorded",
+                  : 'Not recorded',
               ],
-              ["Gender", label(admissionCase.student.gender)],
-              ["Source", label(admissionCase.source)],
+              ['Gender', label(admissionCase.student.gender)],
+              ['Source', label(admissionCase.source)],
             ]}
           />
           <ReviewCard
             title="Guardian"
             rows={[
-              ["Name", admissionCase.guardian.fullName ?? "Not recorded"],
+              ['Name', admissionCase.guardian.fullName ?? 'Not recorded'],
               [
-                "Relationship",
-                admissionCase.guardian.relationship ?? "Not recorded",
+                'Relationship',
+                admissionCase.guardian.relationship ?? 'Not recorded',
               ],
-              ["Phone", admissionCase.guardian.phone ?? "Not recorded"],
+              ['Phone', admissionCase.guardian.phone ?? 'Not recorded'],
             ]}
           />
           <ReviewCard
             title="Requested placement"
             rows={[
               [
-                "Academic year",
-                admissionCase.classSection.academicYearName ?? "Not selected",
+                'Academic year',
+                admissionCase.classSection.academicYearName ?? 'Not selected',
               ],
-              ["Class", admissionCase.classSection.className ?? "Not selected"],
+              ['Class', admissionCase.classSection.className ?? 'Not selected'],
               [
-                "Program",
+                'Program',
                 educationProgramLabel(
                   admissionCase.classSection.program ?? null,
                 ),
               ],
               [
-                "Section",
-                admissionCase.classSection.sectionName ?? "Not selected",
+                'Section',
+                admissionCase.classSection.sectionName ?? 'Not selected',
               ],
             ]}
           />
@@ -250,15 +250,15 @@ export function ApplicationReviewWorkspace({
                 admissionCase.missingRequiredFields.length ||
                 admissionCase.missingRequiredDocuments.length ||
                 admissionCase.duplicateRisk
-                  ? "ACTION NEEDED"
-                  : "CHECKED"
+                  ? 'ACTION NEEDED'
+                  : 'CHECKED'
               }
               tone={
                 admissionCase.missingRequiredFields.length ||
                 admissionCase.missingRequiredDocuments.length ||
                 admissionCase.duplicateRisk
-                  ? "pending"
-                  : "approved"
+                  ? 'pending'
+                  : 'approved'
               }
             />
           </div>
@@ -281,7 +281,7 @@ export function ApplicationReviewWorkspace({
                 warning
               />
             ) : null}
-            {admissionCase.capacityStatus?.state === "FULL" ? (
+            {admissionCase.capacityStatus?.state === 'FULL' ? (
               <ReviewIssue
                 title="Section capacity"
                 items={[
@@ -290,7 +290,7 @@ export function ApplicationReviewWorkspace({
                 warning
               />
             ) : null}
-            {admissionCase.capacityStatus?.state === "NEARLY_FULL" ? (
+            {admissionCase.capacityStatus?.state === 'NEARLY_FULL' ? (
               <ReviewIssue
                 title="Section capacity is nearly full"
                 items={[
@@ -303,7 +303,7 @@ export function ApplicationReviewWorkspace({
               <ReviewIssue
                 title="Approval chain"
                 items={[
-                  `Stage ${admissionCase.approvalChain.currentStageIndex ?? 1}${admissionCase.approvalChain.totalStages ? ` of ${admissionCase.approvalChain.totalStages}` : ""} — waiting on ${admissionCase.approvalChain.currentStageRole ?? admissionCase.approvalChain.currentStagePermission ?? "principal/admin"}.`,
+                  `Stage ${admissionCase.approvalChain.currentStageIndex ?? 1}${admissionCase.approvalChain.totalStages ? ` of ${admissionCase.approvalChain.totalStages}` : ''} — waiting on ${admissionCase.approvalChain.currentStageRole ?? admissionCase.approvalChain.currentStagePermission ?? 'principal/admin'}.`,
                 ]}
               />
             ) : null}
@@ -383,21 +383,21 @@ export function ApplicationReviewWorkspace({
                   key={action}
                   type="button"
                   variant={
-                    action === "APPROVE"
-                      ? "default"
-                      : action === "REJECT"
-                        ? "destructive"
-                        : "outline"
+                    action === 'APPROVE'
+                      ? 'default'
+                      : action === 'REJECT'
+                        ? 'destructive'
+                        : 'outline'
                   }
                   onClick={() => {
                     setSelectedAction(action);
-                    setReason("");
-                    setSuccessMessage("");
+                    setReason('');
+                    setSuccessMessage('');
                   }}
                 >
-                  {action === "APPROVE" ? (
+                  {action === 'APPROVE' ? (
                     <CheckCircle2 className="h-4 w-4" />
-                  ) : action === "ASSIGN_REVIEWER" ? (
+                  ) : action === 'ASSIGN_REVIEWER' ? (
                     <UserCheck className="h-4 w-4" />
                   ) : (
                     <AlertTriangle className="h-4 w-4" />
@@ -413,22 +413,22 @@ export function ApplicationReviewWorkspace({
               <h3 className="text-sm font-black text-slate-900">
                 {ACTION_COPY[selectedAction].label}
               </h3>
-              {selectedAction === "ASSIGN_REVIEWER" ? (
+              {selectedAction === 'ASSIGN_REVIEWER' ? (
                 <p className="mt-2 text-xs leading-5 text-slate-600">
                   This assigns the case to your authenticated school user. A
                   broader reviewer directory is not exposed by this workflow.
                 </p>
               ) : (
                 <label className="mt-3 block text-xs font-bold text-slate-700">
-                  {actionRequiresReason ? "Decision reason" : "Review note"}
+                  {actionRequiresReason ? 'Decision reason' : 'Review note'}
                   <textarea
                     rows={4}
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
                     placeholder={
                       actionRequiresReason
-                        ? "Record a clear reason for the audit history."
-                        : "Optional note for this transition."
+                        ? 'Record a clear reason for the audit history.'
+                        : 'Optional note for this transition.'
                     }
                     className="mt-2 font-normal"
                   />
@@ -447,7 +447,7 @@ export function ApplicationReviewWorkspace({
                   variant="outline"
                   onClick={() => {
                     setSelectedAction(null);
-                    setReason("");
+                    setReason('');
                   }}
                 >
                   Cancel
@@ -473,15 +473,15 @@ export function ApplicationReviewWorkspace({
             >
               {schoolFacingErrorMessage(mutation.error, {
                 fallback:
-                  "The review action could not be recorded. The application was not changed.",
+                  'The review action could not be recorded. The application was not changed.',
                 invalid:
-                  "Review the selected action and required reason before continuing.",
+                  'Review the selected action and required reason before continuing.',
                 forbidden:
-                  "You do not have permission to record this admission review action.",
+                  'You do not have permission to record this admission review action.',
                 notFound:
-                  "This admission case is no longer available for review.",
+                  'This admission case is no longer available for review.',
                 conflict:
-                  "This admission case changed during review. Refresh it before recording another action.",
+                  'This admission case changed during review. Refresh it before recording another action.',
               })}
             </p>
           ) : null}
@@ -505,9 +505,9 @@ export function ApplicationReviewWorkspace({
               <dd className="text-right font-bold text-slate-800">
                 {admissionCase.review.reviewerUserId
                   ? admissionCase.review.reviewerUserId === session?.user.id
-                    ? "Assigned to you"
-                    : "Assigned reviewer"
-                  : "Not assigned"}
+                    ? 'Assigned to you'
+                    : 'Assigned reviewer'
+                  : 'Not assigned'}
               </dd>
             </div>
             <div className="flex justify-between gap-3">
@@ -515,7 +515,7 @@ export function ApplicationReviewWorkspace({
               <dd className="text-right font-bold text-slate-800">
                 {admissionCase.review.dueDate
                   ? formatBsDate(admissionCase.review.dueDate)
-                  : "Not set"}
+                  : 'Not set'}
               </dd>
             </div>
           </dl>
@@ -572,7 +572,7 @@ function AssessmentStatusCard({
   const required = admissionCase.policyRequirements.requireInterview;
   const session = admissionCase.assessmentSession;
   const assessmentHref = session
-    ? "/dashboard/admissions/assessments"
+    ? '/dashboard/admissions/assessments'
     : `/dashboard/admissions/assessments?admissionCaseId=${encodeURIComponent(admissionCase.id)}`;
 
   return (
@@ -587,10 +587,10 @@ function AssessmentStatusCard({
           </h2>
           <p className="mt-1 text-xs leading-5 text-slate-600">
             {!required
-              ? "The matched admission policy does not require an assessment or interview."
+              ? 'The matched admission policy does not require an assessment or interview.'
               : session
-                ? "This persisted session and its result are owned by the admission assessment workflow."
-                : "The matched policy requires an assessment or interview before admission review can finish."}
+                ? 'This persisted session and its result are owned by the admission assessment workflow.'
+                : 'The matched policy requires an assessment or interview before admission review can finish.'}
           </p>
 
           {required ? (
@@ -598,7 +598,7 @@ function AssessmentStatusCard({
               <div className="flex justify-between gap-3">
                 <dt className="text-slate-500">Status</dt>
                 <dd className="text-right font-bold text-slate-800">
-                  {session ? label(session.status) : "Needs scheduling"}
+                  {session ? label(session.status) : 'Needs scheduling'}
                 </dd>
               </div>
               {session ? (
@@ -612,14 +612,14 @@ function AssessmentStatusCard({
                   <div className="flex justify-between gap-3">
                     <dt className="text-slate-500">Result</dt>
                     <dd className="text-right font-bold text-slate-800">
-                      {session.result ? label(session.result) : "Pending"}
+                      {session.result ? label(session.result) : 'Pending'}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-slate-500">Score</dt>
                     <dd className="text-right font-bold text-slate-800">
                       {session.resultScore === null
-                        ? "Not recorded"
+                        ? 'Not recorded'
                         : `${session.resultScore}/100`}
                     </dd>
                   </div>
@@ -634,10 +634,10 @@ function AssessmentStatusCard({
               className="mt-4 inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-mod-admissions-accent)] focus-visible:ring-offset-2"
             >
               {session
-                ? "Open assessment workspace"
+                ? 'Open assessment workspace'
                 : canManage
-                  ? "Schedule assessment"
-                  : "View assessment workspace"}
+                  ? 'Schedule assessment'
+                  : 'View assessment workspace'}
             </Link>
           ) : null}
         </div>
@@ -688,8 +688,8 @@ function ReviewIssue({
     <div
       className={`rounded-xl border p-3 text-xs ${
         warning
-          ? "border-warning-100 bg-warning-50 text-warning-900"
-          : "border-danger-100 bg-danger-50 text-danger-900"
+          ? 'border-warning-100 bg-warning-50 text-warning-900'
+          : 'border-danger-100 bg-danger-50 text-danger-900'
       }`}
     >
       <p className="font-black">{title}</p>
@@ -703,9 +703,9 @@ function ReviewIssue({
 }
 
 function label(value: string | null) {
-  if (!value) return "Not recorded";
+  if (!value) return 'Not recorded';
   return value
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replaceAll("_", " ")
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replaceAll('_', ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

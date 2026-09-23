@@ -4,7 +4,12 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ApiRequestError } from '../api/client';
 
-export type ProtectedImageFetchState = 'idle' | 'loading' | 'ready' | 'denied' | 'error';
+export type ProtectedImageFetchState =
+  | 'idle'
+  | 'loading'
+  | 'ready'
+  | 'denied'
+  | 'error';
 
 type UseProtectedImageOptions = {
   queryKey: unknown[];
@@ -16,7 +21,11 @@ type UseProtectedImageOptions = {
 // owns caching, request dedup, cancellation-on-unmount, and safe retry (the global
 // query client already skips retrying 401/403/404 - see app/providers.tsx); this
 // hook only adds the blob -> object URL lifecycle on top.
-export function useProtectedImage({ queryKey, enabled, fetchBlob }: UseProtectedImageOptions): {
+export function useProtectedImage({
+  queryKey,
+  enabled,
+  fetchBlob,
+}: UseProtectedImageOptions): {
   src: string | null;
   state: ProtectedImageFetchState;
   refetch: () => void;
@@ -43,7 +52,8 @@ export function useProtectedImage({ queryKey, enabled, fetchBlob }: UseProtected
 
   let state: ProtectedImageFetchState;
   if (query.status === 'error') {
-    const statusCode = query.error instanceof ApiRequestError ? query.error.statusCode : null;
+    const statusCode =
+      query.error instanceof ApiRequestError ? query.error.statusCode : null;
     state = statusCode === 403 ? 'denied' : 'error';
   } else if (query.status === 'success' && src) {
     state = 'ready';

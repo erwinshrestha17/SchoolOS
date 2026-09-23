@@ -7,9 +7,7 @@ const read = (path) => readFileSync(new URL(path, webRoot), 'utf8');
 
 describe('Stage 3 M4 learning-improvement workspace contract', () => {
   it('keeps the learning-improvement route fail-closed outside the pilot boundary', () => {
-    const route = read(
-      'app/dashboard/academics/learning-improvement/page.tsx',
-    );
+    const route = read('app/dashboard/academics/learning-improvement/page.tsx');
     const workspace = read(
       'components/academics/learning-improvement/learning-improvement-workspace.tsx',
     );

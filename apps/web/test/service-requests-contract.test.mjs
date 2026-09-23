@@ -13,7 +13,9 @@ function read(relativePath) {
 describe('Service requests Action Centre contracts', () => {
   it('uses real service-request APIs and no fake queue data', () => {
     const apiClient = read('lib/api/service-requests.ts');
-    const workspace = read('components/service-requests/service-requests-workspace.tsx');
+    const workspace = read(
+      'components/service-requests/service-requests-workspace.tsx',
+    );
 
     assert.match(apiClient, /\/service-requests/);
     assert.match(apiClient, /listServiceRequests/);
@@ -26,7 +28,7 @@ describe('Service requests Action Centre contracts', () => {
     assert.doesNotMatch(workspace, /mockRequests|fakeRequests|placeholderData/);
     assert.match(
       workspace,
-      /Independent review required: the requester or current assignee cannot close this case/,
+      /Independent review required: the requester or current\s+assignee cannot close this case/,
     );
   });
 
@@ -37,7 +39,9 @@ describe('Service requests Action Centre contracts', () => {
       read('components/layout/sidebar-persona-nav.base.ts'),
     ].join('\n');
     const listPage = read('app/dashboard/service-requests/page.tsx');
-    const detailPage = read('app/dashboard/service-requests/[requestId]/page.tsx');
+    const detailPage = read(
+      'app/dashboard/service-requests/[requestId]/page.tsx',
+    );
 
     assert.match(layout, /\/dashboard\/service-requests/);
     assert.match(layout, /service_requests:read/);

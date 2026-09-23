@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   isValidElement,
@@ -6,13 +6,13 @@ import {
   useRef,
   type KeyboardEvent,
   type ReactElement,
-} from "react";
-import { Calculator, ChevronDown, ChevronUp } from "lucide-react";
-import { formatBsDate } from "@schoolos/core";
-import { cn } from "../../lib/utils";
-import { MoneyDisplay } from "../ui/money-display";
-import { Button } from "../ui/button";
-import { PageState } from "../ui/page-state";
+} from 'react';
+import { Calculator, ChevronDown, ChevronUp } from 'lucide-react';
+import { formatBsDate } from '@schoolos/core';
+import { cn } from '../../lib/utils';
+import { MoneyDisplay } from '../ui/money-display';
+import { Button } from '../ui/button';
+import { PageState } from '../ui/page-state';
 
 export type ReportTableCellValue =
   | string
@@ -23,10 +23,10 @@ export type ReportTableCellValue =
 
 export type ReportTableCell = {
   value: ReportTableCellValue;
-  type?: "text" | "currency" | "date";
+  type?: 'text' | 'currency' | 'date';
   bold?: boolean;
   indent?: number;
-  align?: "left" | "right" | "center";
+  align?: 'left' | 'right' | 'center';
   className?: string;
 };
 
@@ -34,7 +34,7 @@ export type ReportTableColumn = {
   /** Stable contract key. It must not depend on the visible label or position. */
   id: string;
   label: string;
-  align?: "left" | "right" | "center";
+  align?: 'left' | 'right' | 'center';
   sortable?: boolean;
   width?: number;
 };
@@ -59,8 +59,8 @@ type ReportTableProps = {
   onRetry?: () => void;
   sort?: {
     columnId: string;
-    direction: "asc" | "desc";
-    onChange: (columnId: string, direction: "asc" | "desc") => void;
+    direction: 'asc' | 'desc';
+    onChange: (columnId: string, direction: 'asc' | 'desc') => void;
   };
   pagination?: {
     page: number;
@@ -83,7 +83,7 @@ export function ReportTable({
   sort,
   pagination,
   hiddenColumnIds = [],
-  ariaLabel = "Financial report results",
+  ariaLabel = 'Financial report results',
 }: ReportTableProps) {
   const tableRef = useRef<HTMLTableElement>(null);
   const visibleColumns = useMemo(
@@ -93,7 +93,7 @@ export function ReportTable({
 
   const handleGridKeyDown = (event: KeyboardEvent<HTMLTableElement>) => {
     const target = event.target as HTMLElement;
-    const currentCell = target.closest<HTMLElement>("[data-grid-cell]");
+    const currentCell = target.closest<HTMLElement>('[data-grid-cell]');
     if (!currentCell) return;
 
     const rowIndex = Number(currentCell.dataset.rowIndex);
@@ -101,12 +101,12 @@ export function ReportTable({
     let nextRow = rowIndex;
     let nextColumn = columnIndex;
 
-    if (event.key === "ArrowDown") nextRow += 1;
-    else if (event.key === "ArrowUp") nextRow -= 1;
-    else if (event.key === "ArrowRight") nextColumn += 1;
-    else if (event.key === "ArrowLeft") nextColumn -= 1;
-    else if (event.key === "Home") nextColumn = 0;
-    else if (event.key === "End") nextColumn = visibleColumns.length - 1;
+    if (event.key === 'ArrowDown') nextRow += 1;
+    else if (event.key === 'ArrowUp') nextRow -= 1;
+    else if (event.key === 'ArrowRight') nextColumn += 1;
+    else if (event.key === 'ArrowLeft') nextColumn -= 1;
+    else if (event.key === 'Home') nextColumn = 0;
+    else if (event.key === 'End') nextColumn = visibleColumns.length - 1;
     else return;
 
     const next = tableRef.current?.querySelector<HTMLElement>(
@@ -134,7 +134,7 @@ export function ReportTable({
         tone="danger"
         title="Unable to load the financial report"
         description={error}
-        actionLabel={onRetry ? "Retry report" : undefined}
+        actionLabel={onRetry ? 'Retry report' : undefined}
         onAction={onRetry}
       />
     );
@@ -169,9 +169,9 @@ export function ReportTable({
                     key={column.id}
                     scope="col"
                     className={cn(
-                      "relative border-b border-slate-200 bg-slate-50/95 px-4 py-3.5 text-[0.65rem] font-black uppercase tracking-widest text-slate-500 backdrop-blur-sm first:sticky first:left-0 first:z-30 first:border-r first:bg-slate-50",
-                      column.align === "right" && "text-right",
-                      column.align === "center" && "text-center",
+                      'relative border-b border-slate-200 bg-slate-50/95 px-4 py-3.5 text-[0.65rem] font-black uppercase tracking-widest text-slate-500 backdrop-blur-sm first:sticky first:left-0 first:z-30 first:border-r first:bg-slate-50',
+                      column.align === 'right' && 'text-right',
+                      column.align === 'center' && 'text-center',
                     )}
                     style={{ minWidth: column.width ?? 144 }}
                   >
@@ -179,21 +179,23 @@ export function ReportTable({
                       <button
                         type="button"
                         className={cn(
-                          "inline-flex w-full items-center gap-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-600",
-                          column.align === "right" && "justify-end",
-                          column.align === "center" && "justify-center",
+                          'inline-flex w-full items-center gap-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-600',
+                          column.align === 'right' && 'justify-end',
+                          column.align === 'center' && 'justify-center',
                         )}
                         onClick={() =>
                           sort.onChange(
                             column.id,
-                            activeSort && sort.direction === "asc" ? "desc" : "asc",
+                            activeSort && sort.direction === 'asc'
+                              ? 'desc'
+                              : 'asc',
                           )
                         }
-                        aria-label={`Sort by ${column.label}${activeSort ? `, currently ${sort.direction}ending` : ""}`}
+                        aria-label={`Sort by ${column.label}${activeSort ? `, currently ${sort.direction}ending` : ''}`}
                       >
                         {column.label}
                         {activeSort ? (
-                          sort.direction === "asc" ? (
+                          sort.direction === 'asc' ? (
                             <ChevronUp className="h-3.5 w-3.5" aria-hidden />
                           ) : (
                             <ChevronDown className="h-3.5 w-3.5" aria-hidden />
@@ -231,11 +233,11 @@ export function ReportTable({
                   <tr
                     key={row.id}
                     className={cn(
-                      "group transition-colors hover:bg-slate-50/70 focus-within:bg-blue-50/50",
-                      row.isHeader && "bg-slate-50/40",
+                      'group transition-colors hover:bg-slate-50/70 focus-within:bg-blue-50/50',
+                      row.isHeader && 'bg-slate-50/40',
                       row.isFooter &&
-                        "sticky bottom-0 z-10 bg-slate-50 font-black text-slate-900 shadow-[0_-1px_0_#e2e8f0]",
-                      row.onActivate && "cursor-pointer",
+                        'sticky bottom-0 z-10 bg-slate-50 font-black text-slate-900 shadow-[0_-1px_0_#e2e8f0]',
+                      row.onActivate && 'cursor-pointer',
                       row.className,
                     )}
                     aria-label={row.accessibleLabel}
@@ -243,21 +245,23 @@ export function ReportTable({
                   >
                     {visibleColumns.map((column, columnIndex) => {
                       const cell = row.cells[column.id];
-                      const alignment = cell?.align ?? column.align ?? "left";
+                      const alignment = cell?.align ?? column.align ?? 'left';
                       return (
                         <td
                           key={column.id}
-                          tabIndex={rowIndex === 0 && columnIndex === 0 ? 0 : -1}
+                          tabIndex={
+                            rowIndex === 0 && columnIndex === 0 ? 0 : -1
+                          }
                           data-grid-cell
                           data-row-index={rowIndex}
                           data-column-index={columnIndex}
                           className={cn(
-                            "whitespace-nowrap border-b border-slate-100 bg-inherit px-4 py-4 text-slate-600 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 first:sticky first:left-0 first:z-10 first:border-r first:bg-inherit",
-                            cell?.bold && "font-bold text-slate-900",
+                            'whitespace-nowrap border-b border-slate-100 bg-inherit px-4 py-4 text-slate-600 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 first:sticky first:left-0 first:z-10 first:border-r first:bg-inherit',
+                            cell?.bold && 'font-bold text-slate-900',
                             cell?.className,
-                            row.isFooter && "py-5 text-slate-900",
-                            alignment === "right" && "text-right tabular-nums",
-                            alignment === "center" && "text-center",
+                            row.isFooter && 'py-5 text-slate-900',
+                            alignment === 'right' && 'text-right tabular-nums',
+                            alignment === 'center' && 'text-center',
                           )}
                           style={{
                             paddingLeft: cell?.indent
@@ -267,7 +271,7 @@ export function ReportTable({
                           onKeyDown={(event) => {
                             if (
                               row.onActivate &&
-                              (event.key === "Enter" || event.key === " ")
+                              (event.key === 'Enter' || event.key === ' ')
                             ) {
                               event.preventDefault();
                               row.onActivate();
@@ -288,9 +292,12 @@ export function ReportTable({
             <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)] text-[var(--color-mod-accounting-accent)]">
               <Calculator size={30} aria-hidden />
             </div>
-            <p className="text-base font-bold text-slate-900">No records found</p>
+            <p className="text-base font-bold text-slate-900">
+              No records found
+            </p>
             <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
-              Try adjusting the server filters or selecting a different fiscal period.
+              Try adjusting the server filters or selecting a different fiscal
+              period.
             </p>
           </div>
         ) : null}
@@ -299,7 +306,8 @@ export function ReportTable({
       {pagination ? (
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
           <p aria-live="polite">
-            Page {pagination.page} of {Math.max(1, pagination.totalPages)} · {pagination.totalRows} rows
+            Page {pagination.page} of {Math.max(1, pagination.totalPages)} ·{' '}
+            {pagination.totalRows} rows
           </p>
           <div className="flex gap-2">
             <Button
@@ -329,26 +337,32 @@ export function ReportTable({
 
 function ReportCellContent({ cell }: { cell?: ReportTableCell }) {
   if (!cell) return <span aria-hidden>—</span>;
-  if (cell.type === "currency") {
+  if (cell.type === 'currency') {
     const numericValue =
-      typeof cell.value === "string" || typeof cell.value === "number"
+      typeof cell.value === 'string' || typeof cell.value === 'number'
         ? Number(cell.value)
         : 0;
     return (
       <MoneyDisplay
-        amount={typeof cell.value === "string" || typeof cell.value === "number" ? cell.value : "0"}
-        className={cn("font-bold", numericValue < 0 && "text-rose-600")}
+        amount={
+          typeof cell.value === 'string' || typeof cell.value === 'number'
+            ? cell.value
+            : '0'
+        }
+        className={cn('font-bold', numericValue < 0 && 'text-rose-600')}
         mutedZero
       />
     );
   }
-  if (cell.type === "date") {
+  if (cell.type === 'date') {
     return (
       <span className="font-medium text-slate-500">
-        {typeof cell.value === "string" ? formatBsDate(cell.value) : "Unavailable"}
+        {typeof cell.value === 'string'
+          ? formatBsDate(cell.value)
+          : 'Unavailable'}
       </span>
     );
   }
   if (isValidElement(cell.value)) return cell.value;
-  return String(cell.value ?? "");
+  return String(cell.value ?? '');
 }

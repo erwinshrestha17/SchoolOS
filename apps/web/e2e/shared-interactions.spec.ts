@@ -1,16 +1,31 @@
 import { test, expect } from './fixtures/auth';
 
-test('compact navigation traps focus, restores it and releases the desktop workspace', async ({ page }) => {
+test('compact navigation traps focus, restores it and releases the desktop workspace', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 768, height: 1024 });
   await page.goto('/dashboard');
   const trigger = page.getByRole('button', { name: 'Open navigation menu' });
   await trigger.click();
-  const dialog = page.getByRole('dialog', { name: 'School operations navigation' });
+  const dialog = page.getByRole('dialog', {
+    name: 'School operations navigation',
+  });
   await expect(dialog).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open navigation menu', includeHidden: true })).toHaveAttribute('aria-expanded', 'true');
+  await expect(
+    page.getByRole('button', {
+      name: 'Open navigation menu',
+      includeHidden: true,
+    }),
+  ).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Shift+Tab');
-  await expect.poll(() => dialog.evaluate((node) => node.contains(document.activeElement))).toBe(true);
-  await dialog.getByRole('textbox', { name: 'Find a workspace' }).fill('zzzz-no-match');
+  await expect
+    .poll(() =>
+      dialog.evaluate((node) => node.contains(document.activeElement)),
+    )
+    .toBe(true);
+  await dialog
+    .getByRole('textbox', { name: 'Find a workspace' })
+    .fill('zzzz-no-match');
   await expect(dialog.getByText(/No workspace matches/)).toBeVisible();
   await dialog.getByRole('button', { name: 'Clear search' }).click();
   await page.keyboard.press('Escape');
@@ -23,12 +38,19 @@ test('compact navigation traps focus, restores it and releases the desktop works
   await expect(page.getByRole('menu')).toBeVisible();
 });
 
-test('shared modal, field and table interactions work with the keyboard', async ({ page }) => {
-  test.skip(process.env.SCHOOLOS_VISUAL_FIXTURES !== '1', 'Requires the authenticated, opt-in visual fixture route.');
+test('shared modal, field and table interactions work with the keyboard', async ({
+  page,
+}) => {
+  test.skip(
+    process.env.SCHOOLOS_VISUAL_FIXTURES !== '1',
+    'Requires the authenticated, opt-in visual fixture route.',
+  );
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/dashboard/visual-fixtures/workspace-states');
-  const trigger = page.getByRole('button', { name: 'Open fixture confirmation' });
+  const trigger = page.getByRole('button', {
+    name: 'Open fixture confirmation',
+  });
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Confirm fixture action' });
   await expect(dialog).toBeVisible();
@@ -50,9 +72,13 @@ test('shared modal, field and table interactions work with the keyboard', async 
   await expect(trigger).toBeFocused();
   await page.getByRole('button', { name: 'Open Fixture Alpha' }).focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('status', { name: 'Fixture result' })).toContainText('Alpha opened by row action.');
+  await expect(
+    page.getByRole('status', { name: 'Fixture result' }),
+  ).toContainText('Alpha opened by row action.');
   await page.getByRole('button', { name: 'Open Fixture Beta' }).focus();
   await page.keyboard.press('Space');
-  await expect(page.getByRole('status', { name: 'Fixture result' })).toContainText('Beta opened by row action.');
+  await expect(
+    page.getByRole('status', { name: 'Fixture result' }),
+  ).toContainText('Beta opened by row action.');
   expect(errors).toEqual([]);
 });

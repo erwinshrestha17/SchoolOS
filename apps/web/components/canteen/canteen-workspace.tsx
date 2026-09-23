@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
-import { AlertTriangle, QrCode, Soup, Utensils, Wallet } from "lucide-react";
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
+import { AlertTriangle, QrCode, Soup, Utensils, Wallet } from 'lucide-react';
 import {
   formatBsDateTime,
   getNepalSchoolDay,
   type PermissionKey,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   canteenApi,
   type CanteenEnrollmentPayload,
@@ -25,53 +25,53 @@ import {
   type CanteenSupplierPayload,
   type CanteenTopUpPayload,
   type CanteenWastagePayload,
-} from "../../lib/canteen-api";
-import { EmptyState } from "../ui/empty-state";
-import { LoadingState } from "../ui/loading-state";
-import { WorkSurface } from "../ui/work-surface";
-import { StatusBadge, type StatusTone } from "../ui/status-badge";
-import { cn } from "../../lib/utils";
-import { RemoteStudentSelector } from "../students/remote-student-selector";
-import { MenuItemSelector } from "./menu-item-selector";
-import { QRResolver } from "../ui/qr-resolver";
-import { ConfirmDialog } from "../ui/confirm-dialog";
-import { CanteenReportsWorkspace } from "./canteen-reports-workspace";
-import { PermissionDenied } from "../ui/permission-denied";
-import { usePermissionAccess } from "../../lib/permissions-ui";
+} from '../../lib/canteen-api';
+import { EmptyState } from '../ui/empty-state';
+import { LoadingState } from '../ui/loading-state';
+import { WorkSurface } from '../ui/work-surface';
+import { StatusBadge, type StatusTone } from '../ui/status-badge';
+import { cn } from '../../lib/utils';
+import { RemoteStudentSelector } from '../students/remote-student-selector';
+import { MenuItemSelector } from './menu-item-selector';
+import { QRResolver } from '../ui/qr-resolver';
+import { ConfirmDialog } from '../ui/confirm-dialog';
+import { CanteenReportsWorkspace } from './canteen-reports-workspace';
+import { PermissionDenied } from '../ui/permission-denied';
+import { usePermissionAccess } from '../../lib/permissions-ui';
 
 type CanteenTab =
-  | "overview"
-  | "menu"
-  | "plans"
-  | "enrollments"
-  | "serving"
-  | "wallets"
-  | "pos"
-  | "controls"
-  | "stock"
-  | "reports";
+  | 'overview'
+  | 'menu'
+  | 'plans'
+  | 'enrollments'
+  | 'serving'
+  | 'wallets'
+  | 'pos'
+  | 'controls'
+  | 'stock'
+  | 'reports';
 
 type CanteenWorkspaceProps = { activeTab: CanteenTab };
 
 const canteenTabReadPermissions: Record<
-  Exclude<CanteenTab, "overview">,
+  Exclude<CanteenTab, 'overview'>,
   PermissionKey
 > = {
-  menu: "canteen:menu:read",
-  plans: "canteen:plans:read",
-  enrollments: "canteen:enrollments:read",
-  serving: "canteen:serving:read",
-  wallets: "canteen:wallets:read",
-  pos: "canteen:pos:read",
-  controls: "canteen:controls:read",
-  stock: "canteen:inventory:read",
-  reports: "canteen:reports:read",
+  menu: 'canteen:menu:read',
+  plans: 'canteen:plans:read',
+  enrollments: 'canteen:enrollments:read',
+  serving: 'canteen:serving:read',
+  wallets: 'canteen:wallets:read',
+  pos: 'canteen:pos:read',
+  controls: 'canteen:controls:read',
+  stock: 'canteen:inventory:read',
+  reports: 'canteen:reports:read',
 };
 
 const canteenOverviewReadPermissions: PermissionKey[] = [
-  "canteen:serving:read",
-  "canteen:pos:read",
-  "canteen:reports:read",
+  'canteen:serving:read',
+  'canteen:pos:read',
+  'canteen:reports:read',
 ];
 
 type CanteenQrStudent = {
@@ -92,131 +92,131 @@ const servingAllergyAcknowledgementLabel =
   "I reviewed this student's allergy and medical warnings before";
 
 const emptyMenuForm: CanteenMenuItemPayload = {
-  name: "",
-  category: "",
+  name: '',
+  category: '',
   unitPrice: 0,
   isMealItem: true,
   allergenTags: [],
 };
 const emptyPlanForm: CanteenMealPlanPayload = {
-  name: "",
-  mealType: "LUNCH",
+  name: '',
+  mealType: 'LUNCH',
   price: 0,
-  billingFrequency: "MONTHLY",
+  billingFrequency: 'MONTHLY',
   duplicateServingPrevention: true,
 };
 const emptyEnrollmentForm: CanteenEnrollmentPayload = {
-  studentId: "",
-  mealPlanId: "",
+  studentId: '',
+  mealPlanId: '',
   startsOn: today,
 };
 const emptyServingForm: CanteenMealServingPayload = {
-  studentId: "",
-  mealType: "LUNCH",
+  studentId: '',
+  mealType: 'LUNCH',
   mealDate: today,
   preventDuplicate: true,
 };
 const emptyTopUpForm: CanteenTopUpPayload = {
   amount: 100,
-  note: "",
+  note: '',
   lowBalanceThreshold: 100,
 };
 const emptyPosForm: CanteenPosSalePayload = {
-  studentId: "",
-  paymentMethod: "CASH",
-  items: [{ menuItemId: "", quantity: 1 }],
+  studentId: '',
+  paymentMethod: 'CASH',
+  items: [{ menuItemId: '', quantity: 1 }],
 };
 const emptyControlForm: CanteenSpendingControlPayload = {
-  studentId: "",
+  studentId: '',
   isActive: true,
 };
 const emptySupplierForm: CanteenSupplierPayload = {
-  name: "",
-  contactName: "",
-  phone: "",
-  email: "",
-  address: "",
-  panNumber: "",
+  name: '',
+  contactName: '',
+  phone: '',
+  email: '',
+  address: '',
+  panNumber: '',
 };
 const emptyInventoryItemForm: CanteenInventoryItemPayload = {
-  name: "",
-  sku: "",
-  category: "",
-  unit: "pcs",
+  name: '',
+  sku: '',
+  category: '',
+  unit: 'pcs',
   minStockLevel: 0,
   unitCost: 0,
-  defaultSupplierId: "",
+  defaultSupplierId: '',
 };
 const emptyPurchaseBillForm: CanteenPurchaseBillPayload = {
-  supplierId: "",
-  billNumber: "",
+  supplierId: '',
+  billNumber: '',
   billDate: today,
   taxAmount: 0,
   discountAmount: 0,
-  notes: "",
+  notes: '',
   items: [
     {
-      inventoryItemId: "",
+      inventoryItemId: '',
       quantity: 1,
       unitCost: 0,
-      expiryDate: "",
-      batchNumber: "",
+      expiryDate: '',
+      batchNumber: '',
     },
   ],
 };
 const emptyWastageForm: CanteenWastagePayload = {
-  inventoryItemId: "",
+  inventoryItemId: '',
   quantity: 1,
-  reason: "",
+  reason: '',
   wastageDate: today,
-  notes: "",
+  notes: '',
 };
 const emptyStockAdjustmentForm: CanteenStockAdjustmentPayload = {
-  inventoryItemId: "",
+  inventoryItemId: '',
   quantity: 1,
-  reason: "",
+  reason: '',
 };
 
-const moneyFormatter = new Intl.NumberFormat("en-NP", {
-  style: "currency",
-  currency: "NPR",
+const moneyFormatter = new Intl.NumberFormat('en-NP', {
+  style: 'currency',
+  currency: 'NPR',
   maximumFractionDigits: 0,
 });
 
 function optionalNumber(value: string | number | null | undefined) {
-  if (value === null || value === undefined || value === "") return undefined;
+  if (value === null || value === undefined || value === '') return undefined;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : undefined;
 }
 
 export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
   const access = usePermissionAccess();
-  const canReadMenu = access.hasPermission("canteen:menu:read");
-  const canReadPlans = access.hasPermission("canteen:plans:read");
-  const canReadEnrollments = access.hasPermission("canteen:enrollments:read");
-  const canReadServings = access.hasPermission("canteen:serving:read");
-  const canReadWallets = access.hasPermission("canteen:wallets:read");
-  const canReadPos = access.hasPermission("canteen:pos:read");
-  const canReadControls = access.hasPermission("canteen:controls:read");
-  const canReadInventory = access.hasPermission("canteen:inventory:read");
-  const canReadReports = access.hasPermission("canteen:reports:read");
-  const canCreateMenu = access.hasPermission("canteen:menu:create");
-  const canCreatePlans = access.hasPermission("canteen:plans:create");
+  const canReadMenu = access.hasPermission('canteen:menu:read');
+  const canReadPlans = access.hasPermission('canteen:plans:read');
+  const canReadEnrollments = access.hasPermission('canteen:enrollments:read');
+  const canReadServings = access.hasPermission('canteen:serving:read');
+  const canReadWallets = access.hasPermission('canteen:wallets:read');
+  const canReadPos = access.hasPermission('canteen:pos:read');
+  const canReadControls = access.hasPermission('canteen:controls:read');
+  const canReadInventory = access.hasPermission('canteen:inventory:read');
+  const canReadReports = access.hasPermission('canteen:reports:read');
+  const canCreateMenu = access.hasPermission('canteen:menu:create');
+  const canCreatePlans = access.hasPermission('canteen:plans:create');
   const canCreateEnrollments = access.hasPermission(
-    "canteen:enrollments:create",
+    'canteen:enrollments:create',
   );
   const canUpdateEnrollments = access.hasPermission(
-    "canteen:enrollments:update",
+    'canteen:enrollments:update',
   );
-  const canServeMeals = access.hasPermission("canteen:serving:create");
-  const canCreateWallets = access.hasPermission("canteen:wallets:create");
-  const canUpdateWallets = access.hasPermission("canteen:wallets:update");
-  const canCreatePosSales = access.hasPermission("canteen:pos:create");
-  const canUpdatePosSales = access.hasPermission("canteen:pos:update");
-  const canUpdateInventory = access.hasPermission("canteen:inventory:update");
-  const canCreateControls = access.hasPermission("canteen:controls:create");
+  const canServeMeals = access.hasPermission('canteen:serving:create');
+  const canCreateWallets = access.hasPermission('canteen:wallets:create');
+  const canUpdateWallets = access.hasPermission('canteen:wallets:update');
+  const canCreatePosSales = access.hasPermission('canteen:pos:create');
+  const canUpdatePosSales = access.hasPermission('canteen:pos:update');
+  const canUpdateInventory = access.hasPermission('canteen:inventory:update');
+  const canCreateControls = access.hasPermission('canteen:controls:create');
   const canViewActiveTab =
-    activeTab === "overview"
+    activeTab === 'overview'
       ? access.hasAnyPermission(canteenOverviewReadPermissions)
       : access.hasPermission(canteenTabReadPermissions[activeTab]);
   const [menuForm, setMenuForm] =
@@ -227,7 +227,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     useState<CanteenEnrollmentPayload>(emptyEnrollmentForm);
   const [servingForm, setServingForm] =
     useState<CanteenMealServingPayload>(emptyServingForm);
-  const [walletStudentId, setWalletStudentId] = useState("");
+  const [walletStudentId, setWalletStudentId] = useState('');
   const [topUpForm, setTopUpForm] =
     useState<CanteenTopUpPayload>(emptyTopUpForm);
   const [posForm, setPosForm] = useState<CanteenPosSalePayload>(emptyPosForm);
@@ -252,7 +252,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     transactionId: string;
     label: string;
   } | null>(null);
-  const [walletReversalReason, setWalletReversalReason] = useState("");
+  const [walletReversalReason, setWalletReversalReason] = useState('');
   const [receiptPreview, setReceiptPreview] =
     useState<CanteenPosReceipt | null>(null);
   const [resolvedServingStudent, setResolvedServingStudent] =
@@ -264,101 +264,100 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
 
   const queryClient = useQueryClient();
   const menuQuery = useQuery({
-    queryKey: ["canteen-menu"],
-    queryFn: () => canteenApi.listMenuItems({ status: "" }),
-    enabled: canReadMenu && (activeTab === "menu" || activeTab === "pos"),
+    queryKey: ['canteen-menu'],
+    queryFn: () => canteenApi.listMenuItems({ status: '' }),
+    enabled: canReadMenu && (activeTab === 'menu' || activeTab === 'pos'),
   });
   const plansQuery = useQuery({
-    queryKey: ["canteen-plans"],
-    queryFn: () => canteenApi.listMealPlans({ status: "" }),
+    queryKey: ['canteen-plans'],
+    queryFn: () => canteenApi.listMealPlans({ status: '' }),
     enabled:
-      canReadPlans && (activeTab === "plans" || activeTab === "enrollments"),
+      canReadPlans && (activeTab === 'plans' || activeTab === 'enrollments'),
   });
   const enrollmentsQuery = useQuery({
-    queryKey: ["canteen-enrollments"],
+    queryKey: ['canteen-enrollments'],
     queryFn: () => canteenApi.listEnrollments(),
-    enabled: canReadEnrollments && activeTab === "enrollments",
+    enabled: canReadEnrollments && activeTab === 'enrollments',
   });
   const servingsQuery = useQuery({
-    queryKey: ["canteen-servings", today],
+    queryKey: ['canteen-servings', today],
     queryFn: () => canteenApi.listServings({ date: today }),
     enabled:
-      canReadServings &&
-      (activeTab === "overview" || activeTab === "serving"),
+      canReadServings && (activeTab === 'overview' || activeTab === 'serving'),
   });
   const salesQuery = useQuery({
-    queryKey: ["canteen-pos-sales"],
+    queryKey: ['canteen-pos-sales'],
     queryFn: () => canteenApi.listPosSales(),
-    enabled: canReadPos && (activeTab === "overview" || activeTab === "pos"),
+    enabled: canReadPos && (activeTab === 'overview' || activeTab === 'pos'),
   });
   const lowBalanceQuery = useQuery({
-    queryKey: ["canteen-low-balance"],
+    queryKey: ['canteen-low-balance'],
     queryFn: () => canteenApi.getLowBalanceWallets(),
-    enabled: canReadReports && activeTab === "overview",
+    enabled: canReadReports && activeTab === 'overview',
   });
   const suppliersQuery = useQuery({
-    queryKey: ["canteen-suppliers"],
+    queryKey: ['canteen-suppliers'],
     queryFn: () => canteenApi.listSuppliers({ limit: 50 }),
-    enabled: canReadInventory && activeTab === "stock",
+    enabled: canReadInventory && activeTab === 'stock',
   });
   const inventoryItemsQuery = useQuery({
-    queryKey: ["canteen-inventory-items"],
+    queryKey: ['canteen-inventory-items'],
     queryFn: () => canteenApi.listInventoryItems({ limit: 50 }),
-    enabled: canReadInventory && activeTab === "stock",
+    enabled: canReadInventory && activeTab === 'stock',
   });
   const stockLedgerQuery = useQuery({
-    queryKey: ["canteen-stock-ledger", "stock"],
+    queryKey: ['canteen-stock-ledger', 'stock'],
     queryFn: () => canteenApi.getStockLedger(),
-    enabled: canReadReports && activeTab === "stock",
+    enabled: canReadReports && activeTab === 'stock',
   });
   const walletQuery = useQuery({
-    queryKey: ["canteen-wallet", walletStudentId],
+    queryKey: ['canteen-wallet', walletStudentId],
     queryFn: () => canteenApi.getWalletBalance(walletStudentId),
     enabled:
-      canReadWallets && activeTab === "wallets" && Boolean(walletStudentId),
+      canReadWallets && activeTab === 'wallets' && Boolean(walletStudentId),
   });
   const transactionsQuery = useQuery({
-    queryKey: ["canteen-wallet-transactions", walletStudentId],
+    queryKey: ['canteen-wallet-transactions', walletStudentId],
     queryFn: () => canteenApi.listWalletTransactions(walletStudentId),
     enabled:
-      canReadWallets && activeTab === "wallets" && Boolean(walletStudentId),
+      canReadWallets && activeTab === 'wallets' && Boolean(walletStudentId),
   });
 
   const invalidateCanteen = () => {
-    void queryClient.invalidateQueries({ queryKey: ["canteen-menu"] });
-    void queryClient.invalidateQueries({ queryKey: ["canteen-plans"] });
-    void queryClient.invalidateQueries({ queryKey: ["canteen-enrollments"] });
-    void queryClient.invalidateQueries({ queryKey: ["canteen-servings"] });
-    void queryClient.invalidateQueries({ queryKey: ["canteen-pos-sales"] });
-    void queryClient.invalidateQueries({ queryKey: ["canteen-low-balance"] });
-    void queryClient.invalidateQueries({ queryKey: ["canteen-meal-count"] });
-    void queryClient.invalidateQueries({ queryKey: ["canteen-item-sales"] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-menu'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-plans'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-enrollments'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-servings'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-pos-sales'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-low-balance'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-meal-count'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-item-sales'] });
     void queryClient.invalidateQueries({
-      queryKey: ["canteen-spending-summary"],
+      queryKey: ['canteen-spending-summary'],
     });
-    void queryClient.invalidateQueries({ queryKey: ["canteen-control"] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-control'] });
     void queryClient.invalidateQueries({
-      queryKey: ["canteen-control-preview"],
+      queryKey: ['canteen-control-preview'],
     });
     void queryClient.invalidateQueries({
-      queryKey: ["canteen-serving-control-preview"],
+      queryKey: ['canteen-serving-control-preview'],
     });
-    void queryClient.invalidateQueries({ queryKey: ["canteen-wallet"] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-wallet'] });
     void queryClient.invalidateQueries({
-      queryKey: ["canteen-wallet-transactions"],
+      queryKey: ['canteen-wallet-transactions'],
     });
-    void queryClient.invalidateQueries({ queryKey: ["canteen-suppliers"] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-suppliers'] });
     void queryClient.invalidateQueries({
-      queryKey: ["canteen-inventory-items"],
+      queryKey: ['canteen-inventory-items'],
     });
-    void queryClient.invalidateQueries({ queryKey: ["canteen-stock-ledger"] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-stock-ledger'] });
   };
 
   const menuMutation = useMutation({
     mutationFn: canteenApi.createMenuItem,
     onSuccess: () => {
       setMenuForm(emptyMenuForm);
-      setNotice("Menu item created.");
+      setNotice('Menu item created.');
       invalidateCanteen();
     },
   });
@@ -366,7 +365,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     mutationFn: canteenApi.createMealPlan,
     onSuccess: () => {
       setPlanForm(emptyPlanForm);
-      setNotice("Meal plan created.");
+      setNotice('Meal plan created.');
       invalidateCanteen();
     },
   });
@@ -374,7 +373,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     mutationFn: canteenApi.createEnrollment,
     onSuccess: () => {
       setEnrollmentForm(emptyEnrollmentForm);
-      setNotice("Student enrolled.");
+      setNotice('Student enrolled.');
       invalidateCanteen();
     },
   });
@@ -382,7 +381,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     mutationFn: (enrollmentId: string) =>
       canteenApi.cancelEnrollment(enrollmentId),
     onSuccess: () => {
-      setNotice("Enrollment cancelled.");
+      setNotice('Enrollment cancelled.');
       invalidateCanteen();
     },
   });
@@ -391,14 +390,14 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     onSuccess: () => {
       setServingForm(emptyServingForm);
       setServingAllergyAcknowledged(false);
-      setNotice("Meal served.");
+      setNotice('Meal served.');
       invalidateCanteen();
     },
   });
   const createWalletMutation = useMutation({
     mutationFn: canteenApi.getOrCreateWallet,
     onSuccess: () => {
-      setNotice("Wallet ready.");
+      setNotice('Wallet ready.');
       invalidateCanteen();
     },
   });
@@ -412,7 +411,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     }) => canteenApi.topUpWallet(studentId, body),
     onSuccess: () => {
       setTopUpForm(emptyTopUpForm);
-      setNotice("Wallet topped up.");
+      setNotice('Wallet topped up.');
       invalidateCanteen();
     },
   });
@@ -421,7 +420,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     onSuccess: () => {
       setPosForm(emptyPosForm);
       setNotice(
-        "POS sale created. Complete it from the sales list if required.",
+        'POS sale created. Complete it from the sales list if required.',
       );
       invalidateCanteen();
     },
@@ -429,14 +428,14 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
   const completeSaleMutation = useMutation({
     mutationFn: (saleId: string) => canteenApi.completePosSale(saleId),
     onSuccess: () => {
-      setNotice("POS sale completed.");
+      setNotice('POS sale completed.');
       invalidateCanteen();
     },
   });
   const cancelSaleMutation = useMutation({
     mutationFn: (saleId: string) => canteenApi.cancelPosSale(saleId),
     onSuccess: () => {
-      setNotice("POS sale cancelled.");
+      setNotice('POS sale cancelled.');
       invalidateCanteen();
     },
   });
@@ -449,12 +448,12 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
   });
   const receiptPdfMutation = useMutation({
     mutationFn: canteenApi.openPosReceiptPdf,
-    onSuccess: () => setNotice("Receipt PDF opened."),
+    onSuccess: () => setNotice('Receipt PDF opened.'),
   });
   const controlMutation = useMutation({
     mutationFn: canteenApi.upsertSpendingControl,
     onSuccess: () => {
-      setNotice("Spending control saved.");
+      setNotice('Spending control saved.');
       invalidateCanteen();
     },
   });
@@ -462,7 +461,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     mutationFn: canteenApi.createSupplier,
     onSuccess: () => {
       setSupplierForm(emptySupplierForm);
-      setNotice("Supplier saved.");
+      setNotice('Supplier saved.');
       invalidateCanteen();
     },
   });
@@ -470,7 +469,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     mutationFn: canteenApi.createInventoryItem,
     onSuccess: () => {
       setInventoryItemForm(emptyInventoryItemForm);
-      setNotice("Stock item saved.");
+      setNotice('Stock item saved.');
       invalidateCanteen();
     },
   });
@@ -486,7 +485,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     mutationFn: canteenApi.recordWastage,
     onSuccess: () => {
       setWastageForm(emptyWastageForm);
-      setNotice("Wastage recorded.");
+      setNotice('Wastage recorded.');
       invalidateCanteen();
     },
   });
@@ -494,7 +493,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     mutationFn: canteenApi.adjustStock,
     onSuccess: () => {
       setStockAdjustmentForm(emptyStockAdjustmentForm);
-      setNotice("Stock adjustment recorded.");
+      setNotice('Stock adjustment recorded.');
       invalidateCanteen();
     },
   });
@@ -508,8 +507,8 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     }) => canteenApi.reverseWalletTransaction(transactionId, { reason }),
     onSuccess: () => {
       setWalletReversal(null);
-      setWalletReversalReason("");
-      setNotice("Transaction reversed.");
+      setWalletReversalReason('');
+      setNotice('Transaction reversed.');
       invalidateCanteen();
     },
   });
@@ -532,38 +531,38 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
   const servingHasAllergyWarnings =
     (resolvedServingStudent?.allergyWarnings?.length ?? 0) > 0;
   const servingStudentControlQuery = useQuery({
-    queryKey: ["canteen-serving-control-preview", selectedServingStudent],
+    queryKey: ['canteen-serving-control-preview', selectedServingStudent],
     queryFn: () => canteenApi.getSpendingControl(selectedServingStudent!),
     enabled:
       canReadControls &&
-      activeTab === "serving" &&
+      activeTab === 'serving' &&
       Boolean(selectedServingStudent),
   });
 
   const selectedPosStudent = posForm.studentId;
   const posStudentWalletQuery = useQuery({
-    queryKey: ["canteen-wallet-preview", selectedPosStudent],
+    queryKey: ['canteen-wallet-preview', selectedPosStudent],
     queryFn: () => canteenApi.getWalletBalance(selectedPosStudent!),
     enabled:
       canReadWallets &&
-      activeTab === "pos" &&
-      Boolean(selectedPosStudent && posForm.paymentMethod === "WALLET"),
+      activeTab === 'pos' &&
+      Boolean(selectedPosStudent && posForm.paymentMethod === 'WALLET'),
   });
 
   const posStudentControlQuery = useQuery({
-    queryKey: ["canteen-control-preview", selectedPosStudent],
+    queryKey: ['canteen-control-preview', selectedPosStudent],
     queryFn: () => canteenApi.getSpendingControl(selectedPosStudent!),
     enabled:
-      canReadControls && activeTab === "pos" && Boolean(selectedPosStudent),
+      canReadControls && activeTab === 'pos' && Boolean(selectedPosStudent),
   });
 
   const selectedControlStudent = controlForm.studentId;
   const controlStudentQuery = useQuery({
-    queryKey: ["canteen-control", selectedControlStudent],
+    queryKey: ['canteen-control', selectedControlStudent],
     queryFn: () => canteenApi.getSpendingControl(selectedControlStudent!),
     enabled:
       canReadControls &&
-      activeTab === "controls" &&
+      activeTab === 'controls' &&
       Boolean(selectedControlStudent),
   });
 
@@ -593,11 +592,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
   ]);
 
   const workspaceErrors: Record<CanteenTab, Array<Error | null>> = {
-    overview: [
-      servingsQuery.error,
-      salesQuery.error,
-      lowBalanceQuery.error,
-    ],
+    overview: [servingsQuery.error, salesQuery.error, lowBalanceQuery.error],
     menu: [menuQuery.error],
     plans: [plansQuery.error],
     enrollments: [plansQuery.error, enrollmentsQuery.error],
@@ -626,7 +621,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
     return { ...data, id: studentId };
   }
 
-  if (access.resolution === "loading") {
+  if (access.resolution === 'loading') {
     return <LoadingState label="Checking canteen access..." />;
   }
 
@@ -654,7 +649,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
         <Notice tone="error" message={(firstError as Error).message} />
       ) : null}
 
-      {activeTab === "overview" && (
+      {activeTab === 'overview' && (
         <div className="space-y-6">
           <div className="flex flex-wrap gap-2">
             {lowBalanceWallets.length > 0 ? (
@@ -666,28 +661,30 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
           </div>
           <InfoCard
             lines={[
-              "SchoolOS confirms wallet balances, POS receipts, and meal-plan charges before they are shown here.",
-              "Canteen purchases and revenue follow the school’s accounting controls.",
-              "Review every allergy and dietary warning before serving a meal.",
+              'SchoolOS confirms wallet balances, POS receipts, and meal-plan charges before they are shown here.',
+              'Canteen purchases and revenue follow the school’s accounting controls.',
+              'Review every allergy and dietary warning before serving a meal.',
             ]}
           />
           {canReadReports ? (
             <LowBalanceList wallets={lowBalanceWallets.slice(0, 5)} />
           ) : null}
-          {canReadPos ? <WorkSurface
-            title="Recent POS sales"
-            description="Review the most recently recorded sales, wallet payments, and receipt totals."
-            variant="transaction"
-          >
-            <SaleList
-              sales={sales.slice(0, 5)}
-              emptyTitle="No recent POS sales"
-            />
-          </WorkSurface> : null}
+          {canReadPos ? (
+            <WorkSurface
+              title="Recent POS sales"
+              description="Review the most recently recorded sales, wallet payments, and receipt totals."
+              variant="transaction"
+            >
+              <SaleList
+                sales={sales.slice(0, 5)}
+                emptyTitle="No recent POS sales"
+              />
+            </WorkSurface>
+          ) : null}
         </div>
       )}
 
-      {activeTab === "menu" && (
+      {activeTab === 'menu' && (
         <TwoColumn>
           <Panel
             title="Menu items"
@@ -713,58 +710,62 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
               />
             ) : null}
           </Panel>
-          {canCreateMenu ? <Panel
-            title="Create menu item"
-            description="Use allergen tags like peanut, dairy, gluten, egg."
-          >
-            <form
-              className="space-y-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                menuMutation.mutate(cleanMenu(menuForm));
-              }}
+          {canCreateMenu ? (
+            <Panel
+              title="Create menu item"
+              description="Use allergen tags like peanut, dairy, gluten, egg."
             >
-              <TextInput
-                label="Name"
-                value={menuForm.name}
-                onChange={(name) => setMenuForm({ ...menuForm, name })}
-                required
-              />
-              <TextInput
-                label="Category"
-                value={menuForm.category}
-                onChange={(category) => setMenuForm({ ...menuForm, category })}
-                required
-              />
-              <TextInput
-                label="Unit price"
-                type="number"
-                value={String(menuForm.unitPrice)}
-                onChange={(value) =>
-                  setMenuForm({ ...menuForm, unitPrice: Number(value) || 0 })
-                }
-                required
-              />
-              <TextInput
-                label="Allergen tags"
-                value={menuForm.allergenTags?.join(", ") ?? ""}
-                onChange={(value) =>
-                  setMenuForm({ ...menuForm, allergenTags: splitCsv(value) })
-                }
-              />
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={menuMutation.isPending}
+              <form
+                className="space-y-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  menuMutation.mutate(cleanMenu(menuForm));
+                }}
               >
-                {menuMutation.isPending ? "Saving..." : "Create item"}
-              </button>
-            </form>
-          </Panel> : null}
+                <TextInput
+                  label="Name"
+                  value={menuForm.name}
+                  onChange={(name) => setMenuForm({ ...menuForm, name })}
+                  required
+                />
+                <TextInput
+                  label="Category"
+                  value={menuForm.category}
+                  onChange={(category) =>
+                    setMenuForm({ ...menuForm, category })
+                  }
+                  required
+                />
+                <TextInput
+                  label="Unit price"
+                  type="number"
+                  value={String(menuForm.unitPrice)}
+                  onChange={(value) =>
+                    setMenuForm({ ...menuForm, unitPrice: Number(value) || 0 })
+                  }
+                  required
+                />
+                <TextInput
+                  label="Allergen tags"
+                  value={menuForm.allergenTags?.join(', ') ?? ''}
+                  onChange={(value) =>
+                    setMenuForm({ ...menuForm, allergenTags: splitCsv(value) })
+                  }
+                />
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={menuMutation.isPending}
+                >
+                  {menuMutation.isPending ? 'Saving...' : 'Create item'}
+                </button>
+              </form>
+            </Panel>
+          ) : null}
         </TwoColumn>
       )}
 
-      {activeTab === "plans" && (
+      {activeTab === 'plans' && (
         <TwoColumn>
           <Panel
             title="Meal plans"
@@ -790,63 +791,67 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
               />
             ) : null}
           </Panel>
-          {canCreatePlans ? <Panel
-            title="Create meal plan"
-            description="Duplicate serving prevention is enabled by default."
-          >
-            <form
-              className="space-y-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                planMutation.mutate(cleanPlan(planForm));
-              }}
+          {canCreatePlans ? (
+            <Panel
+              title="Create meal plan"
+              description="Duplicate serving prevention is enabled by default."
             >
-              <TextInput
-                label="Plan name"
-                value={planForm.name}
-                onChange={(name) => setPlanForm({ ...planForm, name })}
-                required
-              />
-              <SelectInput
-                label="Meal type"
-                value={planForm.mealType}
-                onChange={(mealType) => setPlanForm({ ...planForm, mealType })}
-                options={mealTypeOptions()}
-              />
-              <TextInput
-                label="Price"
-                type="number"
-                value={String(planForm.price)}
-                onChange={(value) =>
-                  setPlanForm({ ...planForm, price: Number(value) || 0 })
-                }
-                required
-              />
-              <SelectInput
-                label="Billing frequency"
-                value={planForm.billingFrequency ?? "MONTHLY"}
-                onChange={(billingFrequency) =>
-                  setPlanForm({ ...planForm, billingFrequency })
-                }
-                options={[
-                  { label: "Daily", value: "DAILY" },
-                  { label: "Weekly", value: "WEEKLY" },
-                  { label: "Monthly", value: "MONTHLY" },
-                ]}
-              />
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={planMutation.isPending}
+              <form
+                className="space-y-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  planMutation.mutate(cleanPlan(planForm));
+                }}
               >
-                {planMutation.isPending ? "Saving..." : "Create plan"}
-              </button>
-            </form>
-          </Panel> : null}
+                <TextInput
+                  label="Plan name"
+                  value={planForm.name}
+                  onChange={(name) => setPlanForm({ ...planForm, name })}
+                  required
+                />
+                <SelectInput
+                  label="Meal type"
+                  value={planForm.mealType}
+                  onChange={(mealType) =>
+                    setPlanForm({ ...planForm, mealType })
+                  }
+                  options={mealTypeOptions()}
+                />
+                <TextInput
+                  label="Price"
+                  type="number"
+                  value={String(planForm.price)}
+                  onChange={(value) =>
+                    setPlanForm({ ...planForm, price: Number(value) || 0 })
+                  }
+                  required
+                />
+                <SelectInput
+                  label="Billing frequency"
+                  value={planForm.billingFrequency ?? 'MONTHLY'}
+                  onChange={(billingFrequency) =>
+                    setPlanForm({ ...planForm, billingFrequency })
+                  }
+                  options={[
+                    { label: 'Daily', value: 'DAILY' },
+                    { label: 'Weekly', value: 'WEEKLY' },
+                    { label: 'Monthly', value: 'MONTHLY' },
+                  ]}
+                />
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={planMutation.isPending}
+                >
+                  {planMutation.isPending ? 'Saving...' : 'Create plan'}
+                </button>
+              </form>
+            </Panel>
+          ) : null}
         </TwoColumn>
       )}
 
-      {activeTab === "enrollments" && (
+      {activeTab === 'enrollments' && (
         <TwoColumn>
           <Panel
             title="Student enrollments"
@@ -859,10 +864,10 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                   title={
                     studentLabel(enrollment.student) || enrollment.studentId
                   }
-                  subtitle={`${enrollment.mealPlan?.name ?? enrollment.mealPlanId} • starts ${enrollment.startsOn?.slice(0, 10)}${enrollment.feeInvoiceId ? ` • fee invoice linked ${enrollment.feeInvoiceId.slice(0, 8)}` : ""}`}
+                  subtitle={`${enrollment.mealPlan?.name ?? enrollment.mealPlanId} • starts ${enrollment.startsOn?.slice(0, 10)}${enrollment.feeInvoiceId ? ` • fee invoice linked ${enrollment.feeInvoiceId.slice(0, 8)}` : ''}`}
                   badge={<CanteenStatusBadge status={enrollment.status} />}
                   action={
-                    enrollment.status === "ACTIVE" ||
+                    enrollment.status === 'ACTIVE' ||
                     enrollment.feeInvoiceId ? (
                       <div className="flex flex-wrap gap-2">
                         {enrollment.feeInvoiceId ? (
@@ -873,7 +878,8 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                             Open invoice
                           </Link>
                         ) : null}
-                        {canUpdateEnrollments && enrollment.status === "ACTIVE" ? (
+                        {canUpdateEnrollments &&
+                        enrollment.status === 'ACTIVE' ? (
                           <button
                             type="button"
                             className="btn-secondary text-red-600"
@@ -897,60 +903,62 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
               />
             ) : null}
           </Panel>
-          {canCreateEnrollments && canReadPlans ? <Panel
-            title="Enroll student"
-            description="Enroll a student in a meal plan and choose when it starts."
-          >
-            <form
-              className="space-y-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                enrollmentMutation.mutate(cleanEnrollment(enrollmentForm));
-              }}
+          {canCreateEnrollments && canReadPlans ? (
+            <Panel
+              title="Enroll student"
+              description="Enroll a student in a meal plan and choose when it starts."
             >
-              <RemoteStudentSelector
-                value={enrollmentForm.studentId}
-                onChange={(studentId) =>
-                  setEnrollmentForm({ ...enrollmentForm, studentId })
-                }
-                label="Student"
-              />
-              <SelectInput
-                label="Meal plan"
-                value={enrollmentForm.mealPlanId}
-                onChange={(mealPlanId) =>
-                  setEnrollmentForm({ ...enrollmentForm, mealPlanId })
-                }
-                required
-                options={plans.map((plan) => ({
-                  label: plan.name,
-                  value: plan.id,
-                }))}
-              />
-              <TextInput
-                label="Starts on"
-                type="date"
-                value={enrollmentForm.startsOn}
-                onChange={(startsOn) =>
-                  setEnrollmentForm({ ...enrollmentForm, startsOn })
-                }
-                required
-              />
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={enrollmentMutation.isPending}
+              <form
+                className="space-y-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  enrollmentMutation.mutate(cleanEnrollment(enrollmentForm));
+                }}
               >
-                {enrollmentMutation.isPending
-                  ? "Enrolling..."
-                  : "Enroll student"}
-              </button>
-            </form>
-          </Panel> : null}
+                <RemoteStudentSelector
+                  value={enrollmentForm.studentId}
+                  onChange={(studentId) =>
+                    setEnrollmentForm({ ...enrollmentForm, studentId })
+                  }
+                  label="Student"
+                />
+                <SelectInput
+                  label="Meal plan"
+                  value={enrollmentForm.mealPlanId}
+                  onChange={(mealPlanId) =>
+                    setEnrollmentForm({ ...enrollmentForm, mealPlanId })
+                  }
+                  required
+                  options={plans.map((plan) => ({
+                    label: plan.name,
+                    value: plan.id,
+                  }))}
+                />
+                <TextInput
+                  label="Starts on"
+                  type="date"
+                  value={enrollmentForm.startsOn}
+                  onChange={(startsOn) =>
+                    setEnrollmentForm({ ...enrollmentForm, startsOn })
+                  }
+                  required
+                />
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={enrollmentMutation.isPending}
+                >
+                  {enrollmentMutation.isPending
+                    ? 'Enrolling...'
+                    : 'Enroll student'}
+                </button>
+              </form>
+            </Panel>
+          ) : null}
         </TwoColumn>
       )}
 
-      {activeTab === "serving" && (
+      {activeTab === 'serving' && (
         <TwoColumn>
           <Panel
             title="Meal serving history"
@@ -961,7 +969,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                 <RecordCard
                   key={serving.id}
                   title={studentLabel(serving.student) || serving.studentId}
-                  subtitle={`${serving.mealType} • ${serving.mealDate?.slice(0, 10)}${serving.dietaryWarning ? ` • ${serving.dietaryWarning}` : ""}`}
+                  subtitle={`${serving.mealType} • ${serving.mealDate?.slice(0, 10)}${serving.dietaryWarning ? ` • ${serving.dietaryWarning}` : ''}`}
                   badge={
                     <div className="flex flex-wrap gap-2">
                       <CanteenStatusBadge status={serving.status} />
@@ -980,114 +988,118 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
               />
             ) : null}
           </Panel>
-          {canServeMeals ? <Panel
-            title="Student ID / QR Serving"
-            description="Scan student QR to instantly serve enrolled meals."
-          >
-            <QRResolver
-              purpose="CANTEEN_SERVE"
-              autoFocus
-              helperText="Scan a student QR; the serving form stays ready for meal confirmation."
-              placeholder="Scan canteen serving QR token"
-              submitLabel="Select"
-              onResolved={(data) => {
-                const student = normalizeScannedStudent(data);
-                if (student) {
-                  setResolvedServingStudent(student);
-                  setServingAllergyAcknowledged(false);
-                  setServingForm({
-                    ...servingForm,
-                    studentId: student.id ?? "",
-                  });
-                }
-              }}
-              className="mb-6"
-            />
-            {resolvedServingStudent ? (
-              <CanteenQrStudentCard
-                student={resolvedServingStudent}
-                context="serving"
-              />
-            ) : null}
-            <form
-              className="space-y-4 border-t border-slate-100 pt-6"
-              onSubmit={(event) => {
-                event.preventDefault();
-                servingMutation.mutate(cleanServing(servingForm));
-              }}
+          {canServeMeals ? (
+            <Panel
+              title="Student ID / QR Serving"
+              description="Scan student QR to instantly serve enrolled meals."
             >
-              <RemoteStudentSelector
-                value={servingForm.studentId}
-                selectedLabel={
-                  resolvedServingStudent?.name ??
-                  resolvedServingStudent?.studentCode
-                }
-                onChange={(studentId) => {
-                  setServingForm({ ...servingForm, studentId });
-                  setServingAllergyAcknowledged(false);
-                  if (studentId !== resolvedServingStudent?.id) {
-                    setResolvedServingStudent(null);
+              <QRResolver
+                purpose="CANTEEN_SERVE"
+                autoFocus
+                helperText="Scan a student QR; the serving form stays ready for meal confirmation."
+                placeholder="Scan canteen serving QR token"
+                submitLabel="Select"
+                onResolved={(data) => {
+                  const student = normalizeScannedStudent(data);
+                  if (student) {
+                    setResolvedServingStudent(student);
+                    setServingAllergyAcknowledged(false);
+                    setServingForm({
+                      ...servingForm,
+                      studentId: student.id ?? '',
+                    });
                   }
                 }}
-                label="Or Select Student Manually"
+                className="mb-6"
               />
-              <SelectInput
-                label="Meal type"
-                value={servingForm.mealType ?? "LUNCH"}
-                onChange={(mealType) =>
-                  setServingForm({ ...servingForm, mealType })
-                }
-                options={mealTypeOptions()}
-              />
-              <TextInput
-                label="Meal date"
-                type="date"
-                value={servingForm.mealDate ?? today}
-                onChange={(mealDate) =>
-                  setServingForm({ ...servingForm, mealDate })
-                }
-              />
-
-              {servingStudentControlQuery.data?.blockedCategories?.length ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-800">
-                  Warning: Parent has blocked items:{" "}
-                  {servingStudentControlQuery.data.blockedCategories.join(", ")}
-                </div>
+              {resolvedServingStudent ? (
+                <CanteenQrStudentCard
+                  student={resolvedServingStudent}
+                  context="serving"
+                />
               ) : null}
-
-              {servingHasAllergyWarnings ? (
-                <label className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-800">
-                  <input
-                    type="checkbox"
-                    checked={servingAllergyAcknowledged}
-                    onChange={(event) =>
-                      setServingAllergyAcknowledged(event.target.checked)
-                    }
-                    className="mt-0.5 rounded border-red-300 text-red-600 focus:ring-red-200"
-                  />
-                  <span>
-                    {servingAllergyAcknowledgementLabel} serving the meal.
-                  </span>
-                </label>
-              ) : null}
-
-              <button
-                type="submit"
-                className="btn-primary w-full h-12"
-                disabled={
-                  servingMutation.isPending ||
-                  !servingForm.studentId ||
-                  (servingHasAllergyWarnings && !servingAllergyAcknowledged)
-                }
+              <form
+                className="space-y-4 border-t border-slate-100 pt-6"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  servingMutation.mutate(cleanServing(servingForm));
+                }}
               >
-                {servingMutation.isPending ? "Serving..." : "Serve meal now"}
-              </button>
-            </form>
-          </Panel> : null}
+                <RemoteStudentSelector
+                  value={servingForm.studentId}
+                  selectedLabel={
+                    resolvedServingStudent?.name ??
+                    resolvedServingStudent?.studentCode
+                  }
+                  onChange={(studentId) => {
+                    setServingForm({ ...servingForm, studentId });
+                    setServingAllergyAcknowledged(false);
+                    if (studentId !== resolvedServingStudent?.id) {
+                      setResolvedServingStudent(null);
+                    }
+                  }}
+                  label="Or Select Student Manually"
+                />
+                <SelectInput
+                  label="Meal type"
+                  value={servingForm.mealType ?? 'LUNCH'}
+                  onChange={(mealType) =>
+                    setServingForm({ ...servingForm, mealType })
+                  }
+                  options={mealTypeOptions()}
+                />
+                <TextInput
+                  label="Meal date"
+                  type="date"
+                  value={servingForm.mealDate ?? today}
+                  onChange={(mealDate) =>
+                    setServingForm({ ...servingForm, mealDate })
+                  }
+                />
+
+                {servingStudentControlQuery.data?.blockedCategories?.length ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-800">
+                    Warning: Parent has blocked items:{' '}
+                    {servingStudentControlQuery.data.blockedCategories.join(
+                      ', ',
+                    )}
+                  </div>
+                ) : null}
+
+                {servingHasAllergyWarnings ? (
+                  <label className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-800">
+                    <input
+                      type="checkbox"
+                      checked={servingAllergyAcknowledged}
+                      onChange={(event) =>
+                        setServingAllergyAcknowledged(event.target.checked)
+                      }
+                      className="mt-0.5 rounded border-red-300 text-red-600 focus:ring-red-200"
+                    />
+                    <span>
+                      {servingAllergyAcknowledgementLabel} serving the meal.
+                    </span>
+                  </label>
+                ) : null}
+
+                <button
+                  type="submit"
+                  className="btn-primary w-full h-12"
+                  disabled={
+                    servingMutation.isPending ||
+                    !servingForm.studentId ||
+                    (servingHasAllergyWarnings && !servingAllergyAcknowledged)
+                  }
+                >
+                  {servingMutation.isPending ? 'Serving...' : 'Serve meal now'}
+                </button>
+              </form>
+            </Panel>
+          ) : null}
         </TwoColumn>
       )}
 
-      {activeTab === "wallets" && (
+      {activeTab === 'wallets' && (
         <TwoColumn>
           <Panel
             title="Wallet balance"
@@ -1098,16 +1110,18 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
               onChange={setWalletStudentId}
               label="Student"
             />
-            {canCreateWallets ? <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={!walletStudentId || createWalletMutation.isPending}
-                onClick={() => createWalletMutation.mutate(walletStudentId)}
-              >
-                Create / load wallet
-              </button>
-            </div> : null}
+            {canCreateWallets ? (
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={!walletStudentId || createWalletMutation.isPending}
+                  onClick={() => createWalletMutation.mutate(walletStudentId)}
+                >
+                  Create / load wallet
+                </button>
+              </div>
+            ) : null}
             {walletQuery.data ? (
               <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1117,7 +1131,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                       {money(walletQuery.data.balance)}
                     </p>
                     <p className="text-xs text-slate-400">
-                      Low balance threshold:{" "}
+                      Low balance threshold:{' '}
                       {money(walletQuery.data.lowBalanceThreshold)}
                     </p>
                   </div>
@@ -1183,7 +1197,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                     className="btn-secondary text-xs"
                     onClick={() => {
                       setWalletReversal(null);
-                      setWalletReversalReason("");
+                      setWalletReversalReason('');
                     }}
                   >
                     Cancel
@@ -1196,11 +1210,11 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                 <RecordCard
                   key={tx.id}
                   title={`${tx.type} • ${money(tx.amount)}`}
-                  subtitle={`Balance after: ${money(tx.balanceAfter)} • ${tx.note ?? "No note"}${tx.reversalOfId ? " (Reversal)" : ""}`}
+                  subtitle={`Balance after: ${money(tx.balanceAfter)} • ${tx.note ?? 'No note'}${tx.reversalOfId ? ' (Reversal)' : ''}`}
                   action={
                     canUpdateWallets &&
                     !tx.reversalOfId &&
-                    (tx.type === "TOP_UP" || tx.type === "DEDUCTION") ? (
+                    (tx.type === 'TOP_UP' || tx.type === 'DEDUCTION') ? (
                       <button
                         type="button"
                         className="btn-secondary text-xs"
@@ -1209,7 +1223,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                             transactionId: tx.id,
                             label: `${tx.type} - ${money(tx.amount)}`,
                           });
-                          setWalletReversalReason("");
+                          setWalletReversalReason('');
                         }}
                       >
                         Reverse
@@ -1220,59 +1234,61 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
               ))}
             </div>
           </Panel>
-          {canUpdateWallets ? <Panel
-            title="Manual top-up"
-            description="Each top-up is recorded in wallet history for review."
-          >
-            <form
-              className="space-y-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (walletStudentId)
-                  topUpMutation.mutate({
-                    studentId: walletStudentId,
-                    body: cleanTopUp(topUpForm),
-                  });
-              }}
+          {canUpdateWallets ? (
+            <Panel
+              title="Manual top-up"
+              description="Each top-up is recorded in wallet history for review."
             >
-              <TextInput
-                label="Amount (NPR)"
-                type="number"
-                value={String(topUpForm.amount)}
-                onChange={(value) =>
-                  setTopUpForm({ ...topUpForm, amount: Number(value) || 0 })
-                }
-                required
-              />
-              <TextInput
-                label="Low balance threshold"
-                type="number"
-                value={topUpForm.lowBalanceThreshold?.toString() ?? ""}
-                onChange={(value) =>
-                  setTopUpForm({
-                    ...topUpForm,
-                    lowBalanceThreshold: value ? Number(value) : undefined,
-                  })
-                }
-              />
-              <TextInput
-                label="Internal Note"
-                value={topUpForm.note ?? ""}
-                onChange={(note) => setTopUpForm({ ...topUpForm, note })}
-              />
-              <button
-                type="submit"
-                className="btn-primary w-full"
-                disabled={!walletStudentId || topUpMutation.isPending}
+              <form
+                className="space-y-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (walletStudentId)
+                    topUpMutation.mutate({
+                      studentId: walletStudentId,
+                      body: cleanTopUp(topUpForm),
+                    });
+                }}
               >
-                {topUpMutation.isPending ? "Topping up..." : "Top up wallet"}
-              </button>
-            </form>
-          </Panel> : null}
+                <TextInput
+                  label="Amount (NPR)"
+                  type="number"
+                  value={String(topUpForm.amount)}
+                  onChange={(value) =>
+                    setTopUpForm({ ...topUpForm, amount: Number(value) || 0 })
+                  }
+                  required
+                />
+                <TextInput
+                  label="Low balance threshold"
+                  type="number"
+                  value={topUpForm.lowBalanceThreshold?.toString() ?? ''}
+                  onChange={(value) =>
+                    setTopUpForm({
+                      ...topUpForm,
+                      lowBalanceThreshold: value ? Number(value) : undefined,
+                    })
+                  }
+                />
+                <TextInput
+                  label="Internal Note"
+                  value={topUpForm.note ?? ''}
+                  onChange={(note) => setTopUpForm({ ...topUpForm, note })}
+                />
+                <button
+                  type="submit"
+                  className="btn-primary w-full"
+                  disabled={!walletStudentId || topUpMutation.isPending}
+                >
+                  {topUpMutation.isPending ? 'Topping up...' : 'Top up wallet'}
+                </button>
+              </form>
+            </Panel>
+          ) : null}
         </TwoColumn>
       )}
 
-      {activeTab === "pos" && (
+      {activeTab === 'pos' && (
         <TwoColumn>
           <Panel
             title="POS sales"
@@ -1281,8 +1297,16 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
             <SaleList
               sales={sales}
               emptyTitle="No POS sales"
-              onComplete={canUpdatePosSales ? (saleId) => setConfirmingSaleId(`complete:${saleId}`) : undefined}
-              onCancel={canUpdatePosSales ? (saleId) => setConfirmingSaleId(`cancel:${saleId}`) : undefined}
+              onComplete={
+                canUpdatePosSales
+                  ? (saleId) => setConfirmingSaleId(`complete:${saleId}`)
+                  : undefined
+              }
+              onCancel={
+                canUpdatePosSales
+                  ? (saleId) => setConfirmingSaleId(`cancel:${saleId}`)
+                  : undefined
+              }
               onReceipt={(saleId) => receiptMutation.mutate(saleId)}
               onReceiptPdf={(saleId) => receiptPdfMutation.mutate(saleId)}
               receiptLoadingSaleId={
@@ -1305,142 +1329,149 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
               <ReceiptPreview receipt={receiptPreview} />
             ) : null}
           </Panel>
-          {canCreatePosSales && canReadMenu ? <Panel
-            title="Create POS sale"
-            description="SchoolOS checks wallet balances and spending limits before completing a sale."
-          >
-            <QRResolver
-              purpose="CANTEEN_POS"
-              autoFocus
-              helperText="Scan student QR to select wallet payment and preview balance warnings."
-              placeholder="Scan canteen POS QR token"
-              submitLabel="Select"
-              onResolved={(data) => {
-                const student = normalizeScannedStudent(data);
-                if (student) {
-                  setResolvedPosStudent(student);
-                  setPosForm({
-                    ...posForm,
-                    studentId: student.id ?? "",
-                    paymentMethod: "WALLET",
-                  });
-                }
-              }}
-              className="mb-6"
-            />
-            {resolvedPosStudent ? (
-              <CanteenQrStudentCard
-                student={resolvedPosStudent}
-                context="pos"
-              />
-            ) : null}
-            <form
-              className="space-y-4 border-t border-slate-100 pt-6"
-              onSubmit={(event) => {
-                event.preventDefault();
-                posMutation.mutate(cleanPos(posForm));
-              }}
+          {canCreatePosSales && canReadMenu ? (
+            <Panel
+              title="Create POS sale"
+              description="SchoolOS checks wallet balances and spending limits before completing a sale."
             >
-              <RemoteStudentSelector
-                value={posForm.studentId ?? ""}
-                selectedLabel={
-                  resolvedPosStudent?.name ?? resolvedPosStudent?.studentCode
-                }
-                onChange={(studentId) => {
-                  setPosForm({ ...posForm, studentId });
-                  if (studentId !== resolvedPosStudent?.id) {
-                    setResolvedPosStudent(null);
+              <QRResolver
+                purpose="CANTEEN_POS"
+                autoFocus
+                helperText="Scan student QR to select wallet payment and preview balance warnings."
+                placeholder="Scan canteen POS QR token"
+                submitLabel="Select"
+                onResolved={(data) => {
+                  const student = normalizeScannedStudent(data);
+                  if (student) {
+                    setResolvedPosStudent(student);
+                    setPosForm({
+                      ...posForm,
+                      studentId: student.id ?? '',
+                      paymentMethod: 'WALLET',
+                    });
                   }
                 }}
-                label="Or select student"
-                clearable
+                className="mb-6"
               />
-              <SelectInput
-                label="Payment method"
-                value={posForm.paymentMethod}
-                onChange={(paymentMethod) =>
-                  setPosForm({
-                    ...posForm,
-                    paymentMethod: paymentMethod as CanteenPaymentMethod,
-                  })
-                }
-                options={[
-                  { label: "Cash", value: "CASH" },
-                  { label: "Wallet", value: "WALLET" },
-                  { label: "Staff credit", value: "STAFF_CREDIT" },
-                ]}
-              />
-              <MenuItemSelector
-                items={menuItems}
-                selectedId={posForm.items[0]?.menuItemId ?? ""}
-                onSelect={(menuItemId) =>
-                  setPosForm({
-                    ...posForm,
-                    items: [
-                      { ...(posForm.items[0] ?? { quantity: 1 }), menuItemId },
-                    ],
-                  })
-                }
-                label="Menu Item"
-              />
-              <TextInput
-                label="Quantity"
-                type="number"
-                value={String(posForm.items[0]?.quantity ?? 1)}
-                onChange={(value) =>
-                  setPosForm({
-                    ...posForm,
-                    items: [
-                      {
-                        ...(posForm.items[0] ?? { menuItemId: "" }),
-                        quantity: Number(value) || 1,
-                      },
-                    ],
-                  })
-                }
-              />
-
-              {posStudentWalletQuery.data ? (
-                <div
-                  className={cn(
-                    "rounded-xl border p-3 text-sm font-bold",
-                    isWalletLow(
-                      posStudentWalletQuery.data.balance,
-                      posStudentWalletQuery.data.lowBalanceThreshold,
-                    )
-                      ? "border-amber-200 bg-amber-50 text-amber-800"
-                      : "border-emerald-100 bg-emerald-50 text-emerald-800",
-                  )}
-                >
-                  Wallet Balance: {money(posStudentWalletQuery.data.balance)}
-                </div>
+              {resolvedPosStudent ? (
+                <CanteenQrStudentCard
+                  student={resolvedPosStudent}
+                  context="pos"
+                />
               ) : null}
-
-              {posStudentControlQuery.data?.blockedCategories?.length ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-800">
-                  Warning: blocked categories:{" "}
-                  {posStudentControlQuery.data.blockedCategories.join(", ")}
-                </div>
-              ) : null}
-
-              <button
-                type="submit"
-                className="btn-primary w-full h-12 text-base"
-                disabled={
-                  posMutation.isPending ||
-                  !posForm.studentId ||
-                  !posForm.items[0]?.menuItemId ||
-                  Number(posForm.items[0]?.quantity ?? 0) <= 0
-                }
+              <form
+                className="space-y-4 border-t border-slate-100 pt-6"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  posMutation.mutate(cleanPos(posForm));
+                }}
               >
-                {posMutation.isPending ? "Creating Sale..." : "Create POS sale"}
-              </button>
-            </form>
-          </Panel> : null}
+                <RemoteStudentSelector
+                  value={posForm.studentId ?? ''}
+                  selectedLabel={
+                    resolvedPosStudent?.name ?? resolvedPosStudent?.studentCode
+                  }
+                  onChange={(studentId) => {
+                    setPosForm({ ...posForm, studentId });
+                    if (studentId !== resolvedPosStudent?.id) {
+                      setResolvedPosStudent(null);
+                    }
+                  }}
+                  label="Or select student"
+                  clearable
+                />
+                <SelectInput
+                  label="Payment method"
+                  value={posForm.paymentMethod}
+                  onChange={(paymentMethod) =>
+                    setPosForm({
+                      ...posForm,
+                      paymentMethod: paymentMethod as CanteenPaymentMethod,
+                    })
+                  }
+                  options={[
+                    { label: 'Cash', value: 'CASH' },
+                    { label: 'Wallet', value: 'WALLET' },
+                    { label: 'Staff credit', value: 'STAFF_CREDIT' },
+                  ]}
+                />
+                <MenuItemSelector
+                  items={menuItems}
+                  selectedId={posForm.items[0]?.menuItemId ?? ''}
+                  onSelect={(menuItemId) =>
+                    setPosForm({
+                      ...posForm,
+                      items: [
+                        {
+                          ...(posForm.items[0] ?? { quantity: 1 }),
+                          menuItemId,
+                        },
+                      ],
+                    })
+                  }
+                  label="Menu Item"
+                />
+                <TextInput
+                  label="Quantity"
+                  type="number"
+                  value={String(posForm.items[0]?.quantity ?? 1)}
+                  onChange={(value) =>
+                    setPosForm({
+                      ...posForm,
+                      items: [
+                        {
+                          ...(posForm.items[0] ?? { menuItemId: '' }),
+                          quantity: Number(value) || 1,
+                        },
+                      ],
+                    })
+                  }
+                />
+
+                {posStudentWalletQuery.data ? (
+                  <div
+                    className={cn(
+                      'rounded-xl border p-3 text-sm font-bold',
+                      isWalletLow(
+                        posStudentWalletQuery.data.balance,
+                        posStudentWalletQuery.data.lowBalanceThreshold,
+                      )
+                        ? 'border-amber-200 bg-amber-50 text-amber-800'
+                        : 'border-emerald-100 bg-emerald-50 text-emerald-800',
+                    )}
+                  >
+                    Wallet Balance: {money(posStudentWalletQuery.data.balance)}
+                  </div>
+                ) : null}
+
+                {posStudentControlQuery.data?.blockedCategories?.length ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-800">
+                    Warning: blocked categories:{' '}
+                    {posStudentControlQuery.data.blockedCategories.join(', ')}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  className="btn-primary w-full h-12 text-base"
+                  disabled={
+                    posMutation.isPending ||
+                    !posForm.studentId ||
+                    !posForm.items[0]?.menuItemId ||
+                    Number(posForm.items[0]?.quantity ?? 0) <= 0
+                  }
+                >
+                  {posMutation.isPending
+                    ? 'Creating Sale...'
+                    : 'Create POS sale'}
+                </button>
+              </form>
+            </Panel>
+          ) : null}
         </TwoColumn>
       )}
 
-      {activeTab === "stock" && (
+      {activeTab === 'stock' && (
         <TwoColumn>
           <div className="space-y-6">
             <Panel
@@ -1449,9 +1480,9 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
             >
               <InfoCard
                 lines={[
-                  "Use the stock ledger to review purchase bills, wastage, and approved stock corrections.",
-                  "Supplier links and reorder levels help staff identify items that need attention.",
-                  "Purchase bills follow the school’s accounting approval controls.",
+                  'Use the stock ledger to review purchase bills, wastage, and approved stock corrections.',
+                  'Supplier links and reorder levels help staff identify items that need attention.',
+                  'Purchase bills follow the school’s accounting approval controls.',
                 ]}
               />
               {inventoryItemsQuery.isLoading ? (
@@ -1469,12 +1500,12 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                     <RecordCard
                       key={item.id}
                       title={item.name}
-                      subtitle={`${item.sku ? `${item.sku} • ` : ""}${item.category} • Stock ${formatQuantity(item.currentStock, item.unit)} • Min ${formatQuantity(item.minStockLevel, item.unit)} • Cost ${money(item.unitCost)}${supplier ? ` • ${supplier.name}` : ""}`}
+                      subtitle={`${item.sku ? `${item.sku} • ` : ''}${item.category} • Stock ${formatQuantity(item.currentStock, item.unit)} • Min ${formatQuantity(item.minStockLevel, item.unit)} • Cost ${money(item.unitCost)}${supplier ? ` • ${supplier.name}` : ''}`}
                       badge={
                         <StatusBadge
-                          status={stockIsLow ? "LOW" : "ACTIVE"}
-                          label={stockIsLow ? "Low Stock" : "In Stock"}
-                          tone={stockIsLow ? "pending" : "approved"}
+                          status={stockIsLow ? 'LOW' : 'ACTIVE'}
+                          label={stockIsLow ? 'Low Stock' : 'In Stock'}
+                          tone={stockIsLow ? 'pending' : 'approved'}
                         />
                       }
                     />
@@ -1506,16 +1537,16 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                     >
                       {row.inventoryItem?.name ??
                         row.inventoryItemId?.slice?.(0, 8) ??
-                        "Stock item"}{" "}
-                      • {row.type ?? "MOVEMENT"} •{" "}
+                        'Stock item'}{' '}
+                      • {row.type ?? 'MOVEMENT'} •{' '}
                       {formatQuantity(
                         row.quantity ?? 0,
-                        row.inventoryItem?.unit ?? "",
-                      )}{" "}
-                      • balance{" "}
+                        row.inventoryItem?.unit ?? '',
+                      )}{' '}
+                      • balance{' '}
                       {formatQuantity(
                         row.balanceAfter ?? 0,
-                        row.inventoryItem?.unit ?? "",
+                        row.inventoryItem?.unit ?? '',
                       )}
                     </p>
                   ))}
@@ -1530,61 +1561,270 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
               </div>
             </Panel>
 
-            {canUpdateInventory ? <Panel
-              title="Stock operations"
-              description="Post purchase bills, record wastage, and make audited manual stock corrections."
-            >
-              <form
-                className="space-y-3"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  purchaseBillMutation.mutate(
-                    cleanPurchaseBillPayload(purchaseBillForm),
-                  );
-                }}
+            {canUpdateInventory ? (
+              <Panel
+                title="Stock operations"
+                description="Post purchase bills, record wastage, and make audited manual stock corrections."
               >
-                <h3 className="text-sm font-black uppercase tracking-wide text-slate-500">
-                  Purchase bill
-                </h3>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <SelectInput
-                    label="Supplier"
-                    value={purchaseBillForm.supplierId}
-                    onChange={(supplierId) =>
-                      setPurchaseBillForm({ ...purchaseBillForm, supplierId })
-                    }
-                    required
-                    options={suppliers.map((supplier) => ({
-                      label: supplier.name,
-                      value: supplier.id,
-                    }))}
-                  />
+                <form
+                  className="space-y-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    purchaseBillMutation.mutate(
+                      cleanPurchaseBillPayload(purchaseBillForm),
+                    );
+                  }}
+                >
+                  <h3 className="text-sm font-black uppercase tracking-wide text-slate-500">
+                    Purchase bill
+                  </h3>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <SelectInput
+                      label="Supplier"
+                      value={purchaseBillForm.supplierId}
+                      onChange={(supplierId) =>
+                        setPurchaseBillForm({ ...purchaseBillForm, supplierId })
+                      }
+                      required
+                      options={suppliers.map((supplier) => ({
+                        label: supplier.name,
+                        value: supplier.id,
+                      }))}
+                    />
+                    <TextInput
+                      label="Bill number"
+                      value={purchaseBillForm.billNumber}
+                      onChange={(billNumber) =>
+                        setPurchaseBillForm({ ...purchaseBillForm, billNumber })
+                      }
+                      required
+                    />
+                    <TextInput
+                      label="Bill date"
+                      type="date"
+                      value={purchaseBillForm.billDate}
+                      onChange={(billDate) =>
+                        setPurchaseBillForm({ ...purchaseBillForm, billDate })
+                      }
+                      required
+                    />
+                    <SelectInput
+                      label="Stock item"
+                      value={purchaseBillForm.items[0]?.inventoryItemId ?? ''}
+                      onChange={(inventoryItemId) =>
+                        setPurchaseBillForm(
+                          updateFirstPurchaseBillItem(purchaseBillForm, {
+                            inventoryItemId,
+                          }),
+                        )
+                      }
+                      required
+                      options={inventoryItems.map((item) => ({
+                        label: item.name,
+                        value: item.id,
+                      }))}
+                    />
+                    <TextInput
+                      label="Quantity"
+                      type="number"
+                      value={String(purchaseBillForm.items[0]?.quantity ?? 1)}
+                      onChange={(quantity) =>
+                        setPurchaseBillForm(
+                          updateFirstPurchaseBillItem(purchaseBillForm, {
+                            quantity: Number(quantity) || 0,
+                          }),
+                        )
+                      }
+                      required
+                    />
+                    <TextInput
+                      label="Unit cost (NPR)"
+                      type="number"
+                      value={String(purchaseBillForm.items[0]?.unitCost ?? 0)}
+                      onChange={(unitCost) =>
+                        setPurchaseBillForm(
+                          updateFirstPurchaseBillItem(purchaseBillForm, {
+                            unitCost: Number(unitCost) || 0,
+                          }),
+                        )
+                      }
+                      required
+                    />
+                    <TextInput
+                      label="Batch number"
+                      value={purchaseBillForm.items[0]?.batchNumber ?? ''}
+                      onChange={(batchNumber) =>
+                        setPurchaseBillForm(
+                          updateFirstPurchaseBillItem(purchaseBillForm, {
+                            batchNumber,
+                          }),
+                        )
+                      }
+                    />
+                    <TextInput
+                      label="Expiry date"
+                      type="date"
+                      value={purchaseBillForm.items[0]?.expiryDate ?? ''}
+                      onChange={(expiryDate) =>
+                        setPurchaseBillForm(
+                          updateFirstPurchaseBillItem(purchaseBillForm, {
+                            expiryDate,
+                          }),
+                        )
+                      }
+                    />
+                    <TextInput
+                      label="Tax (NPR)"
+                      type="number"
+                      value={String(purchaseBillForm.taxAmount ?? 0)}
+                      onChange={(taxAmount) =>
+                        setPurchaseBillForm({
+                          ...purchaseBillForm,
+                          taxAmount: Number(taxAmount) || 0,
+                        })
+                      }
+                    />
+                    <TextInput
+                      label="Discount (NPR)"
+                      type="number"
+                      value={String(purchaseBillForm.discountAmount ?? 0)}
+                      onChange={(discountAmount) =>
+                        setPurchaseBillForm({
+                          ...purchaseBillForm,
+                          discountAmount: Number(discountAmount) || 0,
+                        })
+                      }
+                    />
+                  </div>
                   <TextInput
-                    label="Bill number"
-                    value={purchaseBillForm.billNumber}
-                    onChange={(billNumber) =>
-                      setPurchaseBillForm({ ...purchaseBillForm, billNumber })
+                    label="Notes"
+                    value={purchaseBillForm.notes ?? ''}
+                    onChange={(notes) =>
+                      setPurchaseBillForm({ ...purchaseBillForm, notes })
                     }
-                    required
                   />
-                  <TextInput
-                    label="Bill date"
-                    type="date"
-                    value={purchaseBillForm.billDate}
-                    onChange={(billDate) =>
-                      setPurchaseBillForm({ ...purchaseBillForm, billDate })
+                  <button
+                    type="submit"
+                    className="btn-primary w-full"
+                    disabled={
+                      purchaseBillMutation.isPending ||
+                      suppliers.length === 0 ||
+                      inventoryItems.length === 0
                     }
-                    required
-                  />
+                  >
+                    {purchaseBillMutation.isPending
+                      ? 'Posting purchase...'
+                      : 'Post purchase bill'}
+                  </button>
+                  {purchaseBillMutation.error ? (
+                    <InlineError
+                      message={(purchaseBillMutation.error as Error).message}
+                    />
+                  ) : null}
+                </form>
+
+                <div className="my-5 border-t border-slate-100" />
+
+                <form
+                  className="space-y-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    wastageMutation.mutate(cleanWastagePayload(wastageForm));
+                  }}
+                >
+                  <h3 className="text-sm font-black uppercase tracking-wide text-slate-500">
+                    Wastage
+                  </h3>
                   <SelectInput
                     label="Stock item"
-                    value={purchaseBillForm.items[0]?.inventoryItemId ?? ""}
+                    value={wastageForm.inventoryItemId}
                     onChange={(inventoryItemId) =>
-                      setPurchaseBillForm(
-                        updateFirstPurchaseBillItem(purchaseBillForm, {
-                          inventoryItemId,
-                        }),
-                      )
+                      setWastageForm({ ...wastageForm, inventoryItemId })
+                    }
+                    required
+                    options={inventoryItems.map((item) => ({
+                      label: item.name,
+                      value: item.id,
+                    }))}
+                  />
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <TextInput
+                      label="Quantity"
+                      type="number"
+                      value={String(wastageForm.quantity)}
+                      onChange={(quantity) =>
+                        setWastageForm({
+                          ...wastageForm,
+                          quantity: Number(quantity) || 0,
+                        })
+                      }
+                      required
+                    />
+                    <TextInput
+                      label="Wastage date"
+                      type="date"
+                      value={wastageForm.wastageDate}
+                      onChange={(wastageDate) =>
+                        setWastageForm({ ...wastageForm, wastageDate })
+                      }
+                      required
+                    />
+                  </div>
+                  <TextInput
+                    label="Reason"
+                    value={wastageForm.reason}
+                    onChange={(reason) =>
+                      setWastageForm({ ...wastageForm, reason })
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="Notes"
+                    value={wastageForm.notes ?? ''}
+                    onChange={(notes) =>
+                      setWastageForm({ ...wastageForm, notes })
+                    }
+                  />
+                  <button
+                    type="submit"
+                    className="btn-secondary w-full"
+                    disabled={
+                      wastageMutation.isPending || inventoryItems.length === 0
+                    }
+                  >
+                    {wastageMutation.isPending
+                      ? 'Recording wastage...'
+                      : 'Record wastage'}
+                  </button>
+                  {wastageMutation.error ? (
+                    <InlineError
+                      message={(wastageMutation.error as Error).message}
+                    />
+                  ) : null}
+                </form>
+
+                <div className="my-5 border-t border-slate-100" />
+
+                <form
+                  className="space-y-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    stockAdjustmentMutation.mutate(
+                      cleanStockAdjustmentPayload(stockAdjustmentForm),
+                    );
+                  }}
+                >
+                  <h3 className="text-sm font-black uppercase tracking-wide text-slate-500">
+                    Manual adjustment
+                  </h3>
+                  <SelectInput
+                    label="Stock item"
+                    value={stockAdjustmentForm.inventoryItemId}
+                    onChange={(inventoryItemId) =>
+                      setStockAdjustmentForm({
+                        ...stockAdjustmentForm,
+                        inventoryItemId,
+                      })
                     }
                     required
                     options={inventoryItems.map((item) => ({
@@ -1593,406 +1833,205 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                     }))}
                   />
                   <TextInput
-                    label="Quantity"
+                    label="Quantity change"
                     type="number"
-                    value={String(purchaseBillForm.items[0]?.quantity ?? 1)}
+                    value={String(stockAdjustmentForm.quantity)}
                     onChange={(quantity) =>
-                      setPurchaseBillForm(
-                        updateFirstPurchaseBillItem(purchaseBillForm, {
-                          quantity: Number(quantity) || 0,
-                        }),
-                      )
-                    }
-                    required
-                  />
-                  <TextInput
-                    label="Unit cost (NPR)"
-                    type="number"
-                    value={String(purchaseBillForm.items[0]?.unitCost ?? 0)}
-                    onChange={(unitCost) =>
-                      setPurchaseBillForm(
-                        updateFirstPurchaseBillItem(purchaseBillForm, {
-                          unitCost: Number(unitCost) || 0,
-                        }),
-                      )
-                    }
-                    required
-                  />
-                  <TextInput
-                    label="Batch number"
-                    value={purchaseBillForm.items[0]?.batchNumber ?? ""}
-                    onChange={(batchNumber) =>
-                      setPurchaseBillForm(
-                        updateFirstPurchaseBillItem(purchaseBillForm, {
-                          batchNumber,
-                        }),
-                      )
-                    }
-                  />
-                  <TextInput
-                    label="Expiry date"
-                    type="date"
-                    value={purchaseBillForm.items[0]?.expiryDate ?? ""}
-                    onChange={(expiryDate) =>
-                      setPurchaseBillForm(
-                        updateFirstPurchaseBillItem(purchaseBillForm, {
-                          expiryDate,
-                        }),
-                      )
-                    }
-                  />
-                  <TextInput
-                    label="Tax (NPR)"
-                    type="number"
-                    value={String(purchaseBillForm.taxAmount ?? 0)}
-                    onChange={(taxAmount) =>
-                      setPurchaseBillForm({
-                        ...purchaseBillForm,
-                        taxAmount: Number(taxAmount) || 0,
-                      })
-                    }
-                  />
-                  <TextInput
-                    label="Discount (NPR)"
-                    type="number"
-                    value={String(purchaseBillForm.discountAmount ?? 0)}
-                    onChange={(discountAmount) =>
-                      setPurchaseBillForm({
-                        ...purchaseBillForm,
-                        discountAmount: Number(discountAmount) || 0,
-                      })
-                    }
-                  />
-                </div>
-                <TextInput
-                  label="Notes"
-                  value={purchaseBillForm.notes ?? ""}
-                  onChange={(notes) =>
-                    setPurchaseBillForm({ ...purchaseBillForm, notes })
-                  }
-                />
-                <button
-                  type="submit"
-                  className="btn-primary w-full"
-                  disabled={
-                    purchaseBillMutation.isPending ||
-                    suppliers.length === 0 ||
-                    inventoryItems.length === 0
-                  }
-                >
-                  {purchaseBillMutation.isPending
-                    ? "Posting purchase..."
-                    : "Post purchase bill"}
-                </button>
-                {purchaseBillMutation.error ? (
-                  <InlineError
-                    message={(purchaseBillMutation.error as Error).message}
-                  />
-                ) : null}
-              </form>
-
-              <div className="my-5 border-t border-slate-100" />
-
-              <form
-                className="space-y-3"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  wastageMutation.mutate(cleanWastagePayload(wastageForm));
-                }}
-              >
-                <h3 className="text-sm font-black uppercase tracking-wide text-slate-500">
-                  Wastage
-                </h3>
-                <SelectInput
-                  label="Stock item"
-                  value={wastageForm.inventoryItemId}
-                  onChange={(inventoryItemId) =>
-                    setWastageForm({ ...wastageForm, inventoryItemId })
-                  }
-                  required
-                  options={inventoryItems.map((item) => ({
-                    label: item.name,
-                    value: item.id,
-                  }))}
-                />
-                <div className="grid gap-3 md:grid-cols-2">
-                  <TextInput
-                    label="Quantity"
-                    type="number"
-                    value={String(wastageForm.quantity)}
-                    onChange={(quantity) =>
-                      setWastageForm({
-                        ...wastageForm,
+                      setStockAdjustmentForm({
+                        ...stockAdjustmentForm,
                         quantity: Number(quantity) || 0,
                       })
                     }
                     required
                   />
                   <TextInput
-                    label="Wastage date"
-                    type="date"
-                    value={wastageForm.wastageDate}
-                    onChange={(wastageDate) =>
-                      setWastageForm({ ...wastageForm, wastageDate })
+                    label="Reason"
+                    value={stockAdjustmentForm.reason}
+                    onChange={(reason) =>
+                      setStockAdjustmentForm({ ...stockAdjustmentForm, reason })
                     }
                     required
                   />
-                </div>
-                <TextInput
-                  label="Reason"
-                  value={wastageForm.reason}
-                  onChange={(reason) =>
-                    setWastageForm({ ...wastageForm, reason })
-                  }
-                  required
-                />
-                <TextInput
-                  label="Notes"
-                  value={wastageForm.notes ?? ""}
-                  onChange={(notes) =>
-                    setWastageForm({ ...wastageForm, notes })
-                  }
-                />
-                <button
-                  type="submit"
-                  className="btn-secondary w-full"
-                  disabled={
-                    wastageMutation.isPending || inventoryItems.length === 0
-                  }
-                >
-                  {wastageMutation.isPending
-                    ? "Recording wastage..."
-                    : "Record wastage"}
-                </button>
-                {wastageMutation.error ? (
-                  <InlineError
-                    message={(wastageMutation.error as Error).message}
-                  />
-                ) : null}
-              </form>
-
-              <div className="my-5 border-t border-slate-100" />
-
-              <form
-                className="space-y-3"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  stockAdjustmentMutation.mutate(
-                    cleanStockAdjustmentPayload(stockAdjustmentForm),
-                  );
-                }}
-              >
-                <h3 className="text-sm font-black uppercase tracking-wide text-slate-500">
-                  Manual adjustment
-                </h3>
-                <SelectInput
-                  label="Stock item"
-                  value={stockAdjustmentForm.inventoryItemId}
-                  onChange={(inventoryItemId) =>
-                    setStockAdjustmentForm({
-                      ...stockAdjustmentForm,
-                      inventoryItemId,
-                    })
-                  }
-                  required
-                  options={inventoryItems.map((item) => ({
-                    label: item.name,
-                    value: item.id,
-                  }))}
-                />
-                <TextInput
-                  label="Quantity change"
-                  type="number"
-                  value={String(stockAdjustmentForm.quantity)}
-                  onChange={(quantity) =>
-                    setStockAdjustmentForm({
-                      ...stockAdjustmentForm,
-                      quantity: Number(quantity) || 0,
-                    })
-                  }
-                  required
-                />
-                <TextInput
-                  label="Reason"
-                  value={stockAdjustmentForm.reason}
-                  onChange={(reason) =>
-                    setStockAdjustmentForm({ ...stockAdjustmentForm, reason })
-                  }
-                  required
-                />
-                <button
-                  type="submit"
-                  className="btn-secondary w-full"
-                  disabled={
-                    stockAdjustmentMutation.isPending ||
-                    inventoryItems.length === 0
-                  }
-                >
-                  {stockAdjustmentMutation.isPending
-                    ? "Saving adjustment..."
-                    : "Save stock adjustment"}
-                </button>
-                {stockAdjustmentMutation.error ? (
-                  <InlineError
-                    message={(stockAdjustmentMutation.error as Error).message}
-                  />
-                ) : null}
-              </form>
-            </Panel> : null}
+                  <button
+                    type="submit"
+                    className="btn-secondary w-full"
+                    disabled={
+                      stockAdjustmentMutation.isPending ||
+                      inventoryItems.length === 0
+                    }
+                  >
+                    {stockAdjustmentMutation.isPending
+                      ? 'Saving adjustment...'
+                      : 'Save stock adjustment'}
+                  </button>
+                  {stockAdjustmentMutation.error ? (
+                    <InlineError
+                      message={(stockAdjustmentMutation.error as Error).message}
+                    />
+                  ) : null}
+                </form>
+              </Panel>
+            ) : null}
           </div>
           <Panel
             title="Suppliers and stock items"
             description="Maintain supplier records and the canteen stock catalogue."
           >
-            {canUpdateInventory ? <><form
-              className="space-y-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                supplierMutation.mutate(cleanSupplierPayload(supplierForm));
-              }}
-            >
-              <TextInput
-                label="Supplier name"
-                value={supplierForm.name}
-                onChange={(name) => setSupplierForm({ ...supplierForm, name })}
-                required
-              />
-              <TextInput
-                label="Contact person"
-                value={supplierForm.contactName ?? ""}
-                onChange={(contactName) =>
-                  setSupplierForm({ ...supplierForm, contactName })
-                }
-              />
-              <TextInput
-                label="Phone"
-                value={supplierForm.phone ?? ""}
-                onChange={(phone) =>
-                  setSupplierForm({ ...supplierForm, phone })
-                }
-              />
-              <TextInput
-                label="PAN/VAT number"
-                value={supplierForm.panNumber ?? ""}
-                onChange={(panNumber) =>
-                  setSupplierForm({ ...supplierForm, panNumber })
-                }
-              />
-              <button
-                type="submit"
-                className="btn-primary w-full"
-                disabled={supplierMutation.isPending}
-              >
-                {supplierMutation.isPending
-                  ? "Saving supplier..."
-                  : "Save supplier"}
-              </button>
-              {supplierMutation.error ? (
-                <InlineError
-                  message={(supplierMutation.error as Error).message}
-                />
-              ) : null}
-            </form>
+            {canUpdateInventory ? (
+              <>
+                <form
+                  className="space-y-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    supplierMutation.mutate(cleanSupplierPayload(supplierForm));
+                  }}
+                >
+                  <TextInput
+                    label="Supplier name"
+                    value={supplierForm.name}
+                    onChange={(name) =>
+                      setSupplierForm({ ...supplierForm, name })
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="Contact person"
+                    value={supplierForm.contactName ?? ''}
+                    onChange={(contactName) =>
+                      setSupplierForm({ ...supplierForm, contactName })
+                    }
+                  />
+                  <TextInput
+                    label="Phone"
+                    value={supplierForm.phone ?? ''}
+                    onChange={(phone) =>
+                      setSupplierForm({ ...supplierForm, phone })
+                    }
+                  />
+                  <TextInput
+                    label="PAN/VAT number"
+                    value={supplierForm.panNumber ?? ''}
+                    onChange={(panNumber) =>
+                      setSupplierForm({ ...supplierForm, panNumber })
+                    }
+                  />
+                  <button
+                    type="submit"
+                    className="btn-primary w-full"
+                    disabled={supplierMutation.isPending}
+                  >
+                    {supplierMutation.isPending
+                      ? 'Saving supplier...'
+                      : 'Save supplier'}
+                  </button>
+                  {supplierMutation.error ? (
+                    <InlineError
+                      message={(supplierMutation.error as Error).message}
+                    />
+                  ) : null}
+                </form>
 
-            <div className="my-5 border-t border-slate-100" />
+                <div className="my-5 border-t border-slate-100" />
 
-            <form
-              className="space-y-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                inventoryItemMutation.mutate(
-                  cleanInventoryItemPayload(inventoryItemForm),
-                );
-              }}
-            >
-              <TextInput
-                label="Item name"
-                value={inventoryItemForm.name}
-                onChange={(name) =>
-                  setInventoryItemForm({ ...inventoryItemForm, name })
-                }
-                required
-              />
-              <TextInput
-                label="SKU"
-                value={inventoryItemForm.sku ?? ""}
-                onChange={(sku) =>
-                  setInventoryItemForm({ ...inventoryItemForm, sku })
-                }
-              />
-              <TextInput
-                label="Category"
-                value={inventoryItemForm.category}
-                onChange={(category) =>
-                  setInventoryItemForm({ ...inventoryItemForm, category })
-                }
-                required
-              />
-              <SelectInput
-                label="Unit"
-                value={inventoryItemForm.unit}
-                onChange={(unit) =>
-                  setInventoryItemForm({ ...inventoryItemForm, unit })
-                }
-                required
-                options={[
-                  { label: "Pieces", value: "pcs" },
-                  { label: "Kilograms", value: "kg" },
-                  { label: "Litres", value: "ltr" },
-                  { label: "Packets", value: "packet" },
-                ]}
-              />
-              <TextInput
-                label="Minimum stock"
-                type="number"
-                value={String(inventoryItemForm.minStockLevel ?? 0)}
-                onChange={(minStockLevel) =>
-                  setInventoryItemForm({
-                    ...inventoryItemForm,
-                    minStockLevel: Number(minStockLevel) || 0,
-                  })
-                }
-              />
-              <TextInput
-                label="Unit cost (NPR)"
-                type="number"
-                value={String(inventoryItemForm.unitCost ?? 0)}
-                onChange={(unitCost) =>
-                  setInventoryItemForm({
-                    ...inventoryItemForm,
-                    unitCost: Number(unitCost) || 0,
-                  })
-                }
-              />
-              <SelectInput
-                label="Default supplier"
-                value={inventoryItemForm.defaultSupplierId ?? ""}
-                onChange={(defaultSupplierId) =>
-                  setInventoryItemForm({
-                    ...inventoryItemForm,
-                    defaultSupplierId,
-                  })
-                }
-                options={suppliers.map((supplier) => ({
-                  label: supplier.name,
-                  value: supplier.id,
-                }))}
-              />
-              <button
-                type="submit"
-                className="btn-primary w-full"
-                disabled={inventoryItemMutation.isPending}
-              >
-                {inventoryItemMutation.isPending
-                  ? "Saving item..."
-                  : "Save stock item"}
-              </button>
-              {inventoryItemMutation.error ? (
-                <InlineError
-                  message={(inventoryItemMutation.error as Error).message}
-                />
-              ) : null}
-            </form></> : null}
+                <form
+                  className="space-y-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    inventoryItemMutation.mutate(
+                      cleanInventoryItemPayload(inventoryItemForm),
+                    );
+                  }}
+                >
+                  <TextInput
+                    label="Item name"
+                    value={inventoryItemForm.name}
+                    onChange={(name) =>
+                      setInventoryItemForm({ ...inventoryItemForm, name })
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="SKU"
+                    value={inventoryItemForm.sku ?? ''}
+                    onChange={(sku) =>
+                      setInventoryItemForm({ ...inventoryItemForm, sku })
+                    }
+                  />
+                  <TextInput
+                    label="Category"
+                    value={inventoryItemForm.category}
+                    onChange={(category) =>
+                      setInventoryItemForm({ ...inventoryItemForm, category })
+                    }
+                    required
+                  />
+                  <SelectInput
+                    label="Unit"
+                    value={inventoryItemForm.unit}
+                    onChange={(unit) =>
+                      setInventoryItemForm({ ...inventoryItemForm, unit })
+                    }
+                    required
+                    options={[
+                      { label: 'Pieces', value: 'pcs' },
+                      { label: 'Kilograms', value: 'kg' },
+                      { label: 'Litres', value: 'ltr' },
+                      { label: 'Packets', value: 'packet' },
+                    ]}
+                  />
+                  <TextInput
+                    label="Minimum stock"
+                    type="number"
+                    value={String(inventoryItemForm.minStockLevel ?? 0)}
+                    onChange={(minStockLevel) =>
+                      setInventoryItemForm({
+                        ...inventoryItemForm,
+                        minStockLevel: Number(minStockLevel) || 0,
+                      })
+                    }
+                  />
+                  <TextInput
+                    label="Unit cost (NPR)"
+                    type="number"
+                    value={String(inventoryItemForm.unitCost ?? 0)}
+                    onChange={(unitCost) =>
+                      setInventoryItemForm({
+                        ...inventoryItemForm,
+                        unitCost: Number(unitCost) || 0,
+                      })
+                    }
+                  />
+                  <SelectInput
+                    label="Default supplier"
+                    value={inventoryItemForm.defaultSupplierId ?? ''}
+                    onChange={(defaultSupplierId) =>
+                      setInventoryItemForm({
+                        ...inventoryItemForm,
+                        defaultSupplierId,
+                      })
+                    }
+                    options={suppliers.map((supplier) => ({
+                      label: supplier.name,
+                      value: supplier.id,
+                    }))}
+                  />
+                  <button
+                    type="submit"
+                    className="btn-primary w-full"
+                    disabled={inventoryItemMutation.isPending}
+                  >
+                    {inventoryItemMutation.isPending
+                      ? 'Saving item...'
+                      : 'Save stock item'}
+                  </button>
+                  {inventoryItemMutation.error ? (
+                    <InlineError
+                      message={(inventoryItemMutation.error as Error).message}
+                    />
+                  ) : null}
+                </form>
+              </>
+            ) : null}
 
             <div className="mt-5 space-y-2">
               {suppliersQuery.isLoading ? (
@@ -2004,8 +2043,8 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                   className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700"
                 >
                   {supplier.name}
-                  {supplier.contactName ? ` • ${supplier.contactName}` : ""}
-                  {supplier.phone ? ` • ${supplier.phone}` : ""}
+                  {supplier.contactName ? ` • ${supplier.contactName}` : ''}
+                  {supplier.phone ? ` • ${supplier.phone}` : ''}
                 </p>
               ))}
               {!suppliersQuery.isLoading && suppliers.length === 0 ? (
@@ -2019,7 +2058,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
         </TwoColumn>
       )}
 
-      {activeTab === "controls" && (
+      {activeTab === 'controls' && (
         <TwoColumn>
           <Panel
             title="Saved spending control"
@@ -2027,8 +2066,8 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
           >
             <InfoCard
               lines={[
-                "Saved controls are checked before a POS sale can be completed.",
-                "Use comma-separated blocked categories for category rules.",
+                'Saved controls are checked before a POS sale can be completed.',
+                'Use comma-separated blocked categories for category rules.',
               ]}
             />
             {!selectedControlStudent ? (
@@ -2058,7 +2097,7 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                 <div className="flex flex-wrap items-center gap-2">
                   <CanteenStatusBadge
                     status={
-                      controlStudentQuery.data.isActive ? "ACTIVE" : "INACTIVE"
+                      controlStudentQuery.data.isActive ? 'ACTIVE' : 'INACTIVE'
                     }
                   />
                   {controlStudentQuery.data.blockedCategories.length ||
@@ -2067,103 +2106,105 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
                   ) : null}
                 </div>
                 <p className="mt-3 text-sm text-slate-600">
-                  Daily limit:{" "}
+                  Daily limit:{' '}
                   {controlStudentQuery.data.dailySpendingLimit
                     ? money(controlStudentQuery.data.dailySpendingLimit)
-                    : "Not set"}
+                    : 'Not set'}
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
-                  Low balance threshold:{" "}
+                  Low balance threshold:{' '}
                   {controlStudentQuery.data.lowBalanceThreshold
                     ? money(controlStudentQuery.data.lowBalanceThreshold)
-                    : "Not set"}
+                    : 'Not set'}
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
-                  Blocked categories:{" "}
-                  {controlStudentQuery.data.blockedCategories.join(", ") ||
-                    "None selected"}
+                  Blocked categories:{' '}
+                  {controlStudentQuery.data.blockedCategories.join(', ') ||
+                    'None selected'}
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
-                  Blocked item IDs:{" "}
-                  {controlStudentQuery.data.blockedMenuItemIds.join(", ") ||
-                    "None selected"}
+                  Blocked item IDs:{' '}
+                  {controlStudentQuery.data.blockedMenuItemIds.join(', ') ||
+                    'None selected'}
                 </p>
               </div>
             ) : null}
           </Panel>
-          {canCreateControls ? <Panel
-            title="Save control"
-            description="Set daily limits and restrictions for the selected student."
-          >
-            <form
-              className="space-y-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                controlMutation.mutate(cleanControl(controlForm));
-              }}
+          {canCreateControls ? (
+            <Panel
+              title="Save control"
+              description="Set daily limits and restrictions for the selected student."
             >
-              <RemoteStudentSelector
-                onChange={(studentId) =>
-                  setControlForm({ ...controlForm, studentId })
-                }
-                label="Student"
-                value={controlForm.studentId}
-              />
-              <TextInput
-                label="Daily spending limit (NPR)"
-                type="number"
-                value={controlForm.dailySpendingLimit?.toString() ?? ""}
-                onChange={(value) =>
-                  setControlForm({
-                    ...controlForm,
-                    dailySpendingLimit: value ? Number(value) : undefined,
-                  })
-                }
-              />
-              <TextInput
-                label="Blocked categories"
-                value={controlForm.blockedCategories?.join(", ") ?? ""}
-                onChange={(value) =>
-                  setControlForm({
-                    ...controlForm,
-                    blockedCategories: splitCsv(value),
-                  })
-                }
-              />
-              <TextInput
-                label="Blocked menu item IDs"
-                value={controlForm.blockedMenuItemIds?.join(", ") ?? ""}
-                onChange={(value) =>
-                  setControlForm({
-                    ...controlForm,
-                    blockedMenuItemIds: splitCsv(value),
-                  })
-                }
-              />
-              <TextInput
-                label="Low balance threshold"
-                type="number"
-                value={controlForm.lowBalanceThreshold?.toString() ?? ""}
-                onChange={(value) =>
-                  setControlForm({
-                    ...controlForm,
-                    lowBalanceThreshold: value ? Number(value) : undefined,
-                  })
-                }
-              />
-              <button
-                type="submit"
-                className="btn-primary w-full"
-                disabled={controlMutation.isPending}
+              <form
+                className="space-y-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  controlMutation.mutate(cleanControl(controlForm));
+                }}
               >
-                {controlMutation.isPending ? "Saving..." : "Save control"}
-              </button>
-            </form>
-          </Panel> : null}
+                <RemoteStudentSelector
+                  onChange={(studentId) =>
+                    setControlForm({ ...controlForm, studentId })
+                  }
+                  label="Student"
+                  value={controlForm.studentId}
+                />
+                <TextInput
+                  label="Daily spending limit (NPR)"
+                  type="number"
+                  value={controlForm.dailySpendingLimit?.toString() ?? ''}
+                  onChange={(value) =>
+                    setControlForm({
+                      ...controlForm,
+                      dailySpendingLimit: value ? Number(value) : undefined,
+                    })
+                  }
+                />
+                <TextInput
+                  label="Blocked categories"
+                  value={controlForm.blockedCategories?.join(', ') ?? ''}
+                  onChange={(value) =>
+                    setControlForm({
+                      ...controlForm,
+                      blockedCategories: splitCsv(value),
+                    })
+                  }
+                />
+                <TextInput
+                  label="Blocked menu item IDs"
+                  value={controlForm.blockedMenuItemIds?.join(', ') ?? ''}
+                  onChange={(value) =>
+                    setControlForm({
+                      ...controlForm,
+                      blockedMenuItemIds: splitCsv(value),
+                    })
+                  }
+                />
+                <TextInput
+                  label="Low balance threshold"
+                  type="number"
+                  value={controlForm.lowBalanceThreshold?.toString() ?? ''}
+                  onChange={(value) =>
+                    setControlForm({
+                      ...controlForm,
+                      lowBalanceThreshold: value ? Number(value) : undefined,
+                    })
+                  }
+                />
+                <button
+                  type="submit"
+                  className="btn-primary w-full"
+                  disabled={controlMutation.isPending}
+                >
+                  {controlMutation.isPending ? 'Saving...' : 'Save control'}
+                </button>
+              </form>
+            </Panel>
+          ) : null}
         </TwoColumn>
       )}
 
-      {activeTab === "reports" ? <CanteenReportsWorkspace /> : null}
+      {activeTab === 'reports' ? <CanteenReportsWorkspace /> : null}
 
       <ConfirmDialog
         isOpen={canUpdateEnrollments && Boolean(confirmingEnrollmentId)}
@@ -2184,29 +2225,29 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
         isOpen={canUpdatePosSales && Boolean(confirmingSaleId)}
         onClose={() => setConfirmingSaleId(null)}
         onConfirm={() => {
-          const [action, saleId] = confirmingSaleId?.split(":") ?? [];
-          if (action === "complete" && saleId)
+          const [action, saleId] = confirmingSaleId?.split(':') ?? [];
+          if (action === 'complete' && saleId)
             completeSaleMutation.mutate(saleId);
-          if (action === "cancel" && saleId) cancelSaleMutation.mutate(saleId);
+          if (action === 'cancel' && saleId) cancelSaleMutation.mutate(saleId);
           setConfirmingSaleId(null);
         }}
         title={
-          confirmingSaleId?.startsWith("cancel:")
-            ? "Cancel POS sale?"
-            : "Complete POS sale?"
+          confirmingSaleId?.startsWith('cancel:')
+            ? 'Cancel POS sale?'
+            : 'Complete POS sale?'
         }
         description={
-          confirmingSaleId?.startsWith("cancel:")
-            ? "This marks the draft sale as cancelled. Use this only when the canteen transaction should not be collected."
-            : "This completes the sale after wallet, spending-limit, and payment checks. Review student warnings before continuing."
+          confirmingSaleId?.startsWith('cancel:')
+            ? 'This marks the draft sale as cancelled. Use this only when the canteen transaction should not be collected.'
+            : 'This completes the sale after wallet, spending-limit, and payment checks. Review student warnings before continuing.'
         }
         confirmLabel={
-          confirmingSaleId?.startsWith("cancel:")
-            ? "Cancel sale"
-            : "Complete sale"
+          confirmingSaleId?.startsWith('cancel:')
+            ? 'Cancel sale'
+            : 'Complete sale'
         }
         variant={
-          confirmingSaleId?.startsWith("cancel:") ? "destructive" : "default"
+          confirmingSaleId?.startsWith('cancel:') ? 'destructive' : 'default'
         }
         isConfirming={
           completeSaleMutation.isPending || cancelSaleMutation.isPending
@@ -2243,17 +2284,17 @@ function Notice({
   message,
   onDismiss,
 }: {
-  tone: "success" | "error";
+  tone: 'success' | 'error';
   message: string;
   onDismiss?: () => void;
 }) {
   return (
     <div
       className={cn(
-        "flex items-center justify-between rounded-2xl border px-4 py-3 text-sm",
-        tone === "success"
-          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-          : "border-red-200 bg-red-50 text-red-700",
+        'flex items-center justify-between rounded-2xl border px-4 py-3 text-sm',
+        tone === 'success'
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          : 'border-red-200 bg-red-50 text-red-700',
       )}
     >
       <span>{message}</span>
@@ -2339,17 +2380,17 @@ function SaleList({
   return (
     <div className="space-y-3">
       {sales.map((sale) => {
-        const completed = sale.status === "COMPLETED";
+        const completed = sale.status === 'COMPLETED';
         const loadingReceipt = receiptLoadingSaleId === sale.id;
 
         return (
           <RecordCard
             key={sale.id}
             title={`${sale.paymentMethod} • ${money(sale.totalAmount)}`}
-            subtitle={`${sale.receiptNumber ? `${sale.receiptNumber} • ` : ""}${sale.items?.map((item) => `${item.itemName} x${item.quantity}`).join(", ") || sale.studentId || "Walk-in sale"}`}
+            subtitle={`${sale.receiptNumber ? `${sale.receiptNumber} • ` : ''}${sale.items?.map((item) => `${item.itemName} x${item.quantity}`).join(', ') || sale.studentId || 'Walk-in sale'}`}
             badge={<CanteenStatusBadge status={sale.status} />}
             action={
-              sale.status === "DRAFT" ? (
+              sale.status === 'DRAFT' ? (
                 <div className="flex gap-2">
                   {onComplete ? (
                     <button
@@ -2379,7 +2420,7 @@ function SaleList({
                       disabled={loadingReceipt}
                       onClick={() => onReceipt(sale.id)}
                     >
-                      {loadingReceipt ? "Loading..." : "Preview"}
+                      {loadingReceipt ? 'Loading...' : 'Preview'}
                     </button>
                   ) : null}
                   {onReceiptPdf ? (
@@ -2442,9 +2483,9 @@ function ReceiptPreview({ receipt }: { receipt: CanteenPosReceipt }) {
         ) : null}
       </div>
       <p className="mt-3 text-xs text-slate-500">
-        {receipt.student?.name ?? receipt.staff?.name ?? "Walk-in sale"} •{" "}
-        {receipt.paymentMethod} • cashier{" "}
-        {receipt.cashier ?? "Cashier not recorded"}
+        {receipt.student?.name ?? receipt.staff?.name ?? 'Walk-in sale'} •{' '}
+        {receipt.paymentMethod} • cashier{' '}
+        {receipt.cashier ?? 'Cashier not recorded'}
       </p>
     </section>
   );
@@ -2461,8 +2502,8 @@ function ReceiptTotalRow({
   return (
     <div
       className={cn(
-        "flex items-center justify-between",
-        strong ? "text-base font-black text-slate-950" : "text-slate-600",
+        'flex items-center justify-between',
+        strong ? 'text-base font-black text-slate-950' : 'text-slate-600',
       )}
     >
       <span>{label}</span>
@@ -2522,11 +2563,11 @@ function CanteenQrStudentCard({
   context,
 }: {
   student: CanteenQrStudent;
-  context: "serving" | "pos";
+  context: 'serving' | 'pos';
 }) {
   const walletStatus =
     student.walletStatus ??
-    (student.canPurchase === false ? "INSUFFICIENT_FUNDS" : "ACTIVE");
+    (student.canPurchase === false ? 'INSUFFICIENT_FUNDS' : 'ACTIVE');
   const allergies = student.allergyWarnings ?? [];
 
   return (
@@ -2534,17 +2575,17 @@ function CanteenQrStudentCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-black uppercase tracking-wide text-[var(--color-mod-canteen-text)]">
-            {context === "pos"
-              ? "POS QR student selected"
-              : "Serving QR student selected"}
+            {context === 'pos'
+              ? 'POS QR student selected'
+              : 'Serving QR student selected'}
           </p>
           <h3 className="mt-1 truncate font-black text-slate-900">
-            {student.name ?? "Student"}
+            {student.name ?? 'Student'}
           </h3>
           <p className="mt-1 text-xs font-semibold text-slate-500">
             {[student.studentCode, student.classSection]
               .filter(Boolean)
-              .join(" • ") || "Student QR resolved"}
+              .join(' • ') || 'Student QR resolved'}
           </p>
         </div>
         <StatusBadge
@@ -2561,15 +2602,15 @@ function CanteenQrStudentCard({
             {student.walletBalance !== undefined &&
             student.walletBalance !== null
               ? money(student.walletBalance)
-              : "Not loaded"}
+              : 'Not loaded'}
           </p>
         </div>
         <div className="rounded-xl bg-white p-3 text-slate-600 shadow-sm">
           <p className="text-slate-400">Allergy warnings</p>
           <p
             className={cn(
-              "mt-1 text-base",
-              allergies.length > 0 ? "text-red-600" : "text-slate-900",
+              'mt-1 text-base',
+              allergies.length > 0 ? 'text-red-600' : 'text-slate-900',
             )}
           >
             {allergies.length}
@@ -2579,18 +2620,18 @@ function CanteenQrStudentCard({
           <p className="text-slate-400">Purchase status</p>
           <p
             className={cn(
-              "mt-1 text-base",
-              student.canPurchase === false ? "text-red-600" : "text-slate-900",
+              'mt-1 text-base',
+              student.canPurchase === false ? 'text-red-600' : 'text-slate-900',
             )}
           >
-            {student.canPurchase === false ? "Blocked" : "Allowed"}
+            {student.canPurchase === false ? 'Blocked' : 'Allowed'}
           </p>
         </div>
       </div>
 
       {allergies.length > 0 ? (
         <div className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
-          Allergies: {allergies.join(", ")}
+          Allergies: {allergies.join(', ')}
         </div>
       ) : null}
       {student.spendingWarnings ? (
@@ -2605,7 +2646,7 @@ function TextInput({
   label,
   value,
   onChange,
-  type = "text",
+  type = 'text',
   required,
 }: {
   label: string;
@@ -2677,7 +2718,7 @@ function StudentSelect({
 }) {
   return (
     <SelectInput
-      label={optional ? "Student (optional)" : "Student"}
+      label={optional ? 'Student (optional)' : 'Student'}
       value={value}
       onChange={onChange}
       required={!optional}
@@ -2690,11 +2731,11 @@ function StudentSelect({
 }
 function mealTypeOptions() {
   return [
-    { label: "Breakfast", value: "BREAKFAST" },
-    { label: "Lunch", value: "LUNCH" },
-    { label: "Snacks", value: "SNACKS" },
-    { label: "Dinner", value: "DINNER" },
-    { label: "Hostel meal", value: "HOSTEL" },
+    { label: 'Breakfast', value: 'BREAKFAST' },
+    { label: 'Lunch', value: 'LUNCH' },
+    { label: 'Snacks', value: 'SNACKS' },
+    { label: 'Dinner', value: 'DINNER' },
+    { label: 'Hostel meal', value: 'HOSTEL' },
   ];
 }
 function studentLabel(
@@ -2704,8 +2745,8 @@ function studentLabel(
     studentSystemId?: string;
   } | null,
 ) {
-  if (!student) return "";
-  return `${student.firstNameEn ?? ""} ${student.lastNameEn ?? ""} ${student.studentSystemId ? `(${student.studentSystemId})` : ""}`.trim();
+  if (!student) return '';
+  return `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''} ${student.studentSystemId ? `(${student.studentSystemId})` : ''}`.trim();
 }
 function money(value: string | number | null | undefined) {
   return moneyFormatter.format(Number(value ?? 0));
@@ -2718,43 +2759,43 @@ function formatQuantity(
   const formatted = Number.isInteger(numeric)
     ? String(numeric)
     : numeric.toFixed(2);
-  return `${formatted}${unit ? ` ${unit}` : ""}`;
+  return `${formatted}${unit ? ` ${unit}` : ''}`;
 }
 function isWalletLow(balance: string | number, threshold: string | number) {
   return Number(balance) <= Number(threshold);
 }
 function canteenQrWalletTone(status: string): StatusTone {
   const normalized = status.trim().toUpperCase();
-  if (normalized === "ACTIVE") return "approved";
-  if (normalized === "LOW_BALANCE") return "pending";
-  if (normalized === "INSUFFICIENT_FUNDS") return "conflict";
-  return "info";
+  if (normalized === 'ACTIVE') return 'approved';
+  if (normalized === 'LOW_BALANCE') return 'pending';
+  if (normalized === 'INSUFFICIENT_FUNDS') return 'conflict';
+  return 'info';
 }
 function CanteenStatusBadge({ status }: { status: string }) {
   const normalized = status.trim().toUpperCase();
   const badgeMap: Record<string, { label: string; tone: StatusTone }> = {
-    SERVED: { label: "Meal Served", tone: "approved" },
-    MEAL_SERVED: { label: "Meal Served", tone: "approved" },
-    NOT_TAKEN: { label: "Not Served", tone: "pending" },
-    ABSENT: { label: "Not Served", tone: "pending" },
-    NOT_SERVED: { label: "Not Served", tone: "pending" },
-    WALLET_LOW: { label: "Wallet Low", tone: "pending" },
+    SERVED: { label: 'Meal Served', tone: 'approved' },
+    MEAL_SERVED: { label: 'Meal Served', tone: 'approved' },
+    NOT_TAKEN: { label: 'Not Served', tone: 'pending' },
+    ABSENT: { label: 'Not Served', tone: 'pending' },
+    NOT_SERVED: { label: 'Not Served', tone: 'pending' },
+    WALLET_LOW: { label: 'Wallet Low', tone: 'pending' },
     BLOCKED_BY_PARENT_LIMIT: {
-      label: "Blocked by Parent Limit",
-      tone: "conflict",
+      label: 'Blocked by Parent Limit',
+      tone: 'conflict',
     },
-    ALLERGY_WARNING: { label: "Allergy Warning", tone: "conflict" },
-    ACTIVE: { label: "Active", tone: "active" },
-    INACTIVE: { label: "Inactive", tone: "inactive" },
-    DRAFT: { label: "Draft", tone: "draft" },
-    COMPLETED: { label: "Completed", tone: "approved" },
-    CANCELLED: { label: "Cancelled", tone: "inactive" },
-    PAUSED: { label: "Inactive", tone: "inactive" },
-    ENDED: { label: "Completed", tone: "approved" },
+    ALLERGY_WARNING: { label: 'Allergy Warning', tone: 'conflict' },
+    ACTIVE: { label: 'Active', tone: 'active' },
+    INACTIVE: { label: 'Inactive', tone: 'inactive' },
+    DRAFT: { label: 'Draft', tone: 'draft' },
+    COMPLETED: { label: 'Completed', tone: 'approved' },
+    CANCELLED: { label: 'Cancelled', tone: 'inactive' },
+    PAUSED: { label: 'Inactive', tone: 'inactive' },
+    ENDED: { label: 'Completed', tone: 'approved' },
   };
   const config = badgeMap[normalized] ?? {
     label: formatStatus(normalized),
-    tone: "info" as StatusTone,
+    tone: 'info' as StatusTone,
   };
   return (
     <StatusBadge status={normalized} label={config.label} tone={config.tone} />
@@ -2762,13 +2803,13 @@ function CanteenStatusBadge({ status }: { status: string }) {
 }
 function formatStatus(status: string) {
   return status
-    .replaceAll("_", " ")
+    .replaceAll('_', ' ')
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 function splitCsv(value: string) {
   return value
-    .split(",")
+    .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
 }
@@ -2850,7 +2891,7 @@ function cleanInventoryItemPayload(
     name: form.name.trim(),
     sku: form.sku?.trim() || undefined,
     category: form.category.trim(),
-    unit: form.unit || "pcs",
+    unit: form.unit || 'pcs',
     minStockLevel: Number(form.minStockLevel ?? 0),
     unitCost: Number(form.unitCost ?? 0),
     defaultSupplierId: form.defaultSupplierId || undefined,
@@ -2858,7 +2899,7 @@ function cleanInventoryItemPayload(
 }
 function updateFirstPurchaseBillItem(
   form: CanteenPurchaseBillPayload,
-  patch: Partial<CanteenPurchaseBillPayload["items"][number]>,
+  patch: Partial<CanteenPurchaseBillPayload['items'][number]>,
 ): CanteenPurchaseBillPayload {
   const current = form.items[0] ?? emptyPurchaseBillForm.items[0];
 

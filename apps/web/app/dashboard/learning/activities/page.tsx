@@ -14,7 +14,11 @@ export default function LearningActivitiesPage() {
         description="Filter, edit, archive, and launch teacher activity builder records."
       />
       <div className="mb-6">
-        <ModuleTabs items={learningWorkspaceTabs} accentColor="emerald" variant="light" />
+        <ModuleTabs
+          items={learningWorkspaceTabs}
+          accentColor="emerald"
+          variant="light"
+        />
       </div>
       <LearningWorkspace initialTab="activities" />
     </DashboardPageShell>

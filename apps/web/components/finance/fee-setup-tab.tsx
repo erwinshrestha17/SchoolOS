@@ -1,33 +1,33 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { SectionCard } from "@/components/ui/section-card";
-import { Loader2, Plus, Info, Check, AlertCircle } from "lucide-react";
-import type { FeeHeadSummary, FeePlanSummary } from "@schoolos/core";
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { SectionCard } from '@/components/ui/section-card';
+import { Loader2, Plus, Info, Check, AlertCircle } from 'lucide-react';
+import type { FeeHeadSummary, FeePlanSummary } from '@schoolos/core';
 
 export function FeeSetupTab() {
   const queryClient = useQueryClient();
 
   // Fee Head Form State
   const [feeHead, setFeeHead] = useState({
-    code: "",
-    name: "",
-    frequency: "MONTHLY",
+    code: '',
+    name: '',
+    frequency: 'MONTHLY',
     defaultAmount: 0,
     vatApplicable: false,
   });
 
   // Fee Plan Form State
   const [feePlan, setFeePlan] = useState({
-    academicYearId: "",
-    classId: "",
-    feeHeadId: "",
-    code: "",
-    name: "",
+    academicYearId: '',
+    classId: '',
+    feeHeadId: '',
+    code: '',
+    name: '',
     amount: 0,
   });
 
@@ -37,22 +37,22 @@ export function FeeSetupTab() {
 
   // Queries
   const academicYearsQuery = useQuery({
-    queryKey: ["academic-years"],
+    queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
   });
 
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: ['classes'],
     queryFn: api.listClasses,
   });
 
   const feeHeadsQuery = useQuery({
-    queryKey: ["fee-heads"],
+    queryKey: ['fee-heads'],
     queryFn: api.listFeeHeads,
   });
 
   const feePlansQuery = useQuery({
-    queryKey: ["fee-plans"],
+    queryKey: ['fee-plans'],
     queryFn: api.listFeePlans,
   });
 
@@ -60,11 +60,11 @@ export function FeeSetupTab() {
   const feeHeadMutation = useMutation({
     mutationFn: api.createFeeHead,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fee-heads"] });
+      queryClient.invalidateQueries({ queryKey: ['fee-heads'] });
       setFeeHead({
-        code: "",
-        name: "",
-        frequency: "MONTHLY",
+        code: '',
+        name: '',
+        frequency: 'MONTHLY',
         defaultAmount: 0,
         vatApplicable: false,
       });
@@ -76,14 +76,14 @@ export function FeeSetupTab() {
   const feePlanMutation = useMutation({
     mutationFn: api.createFeePlan,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fee-plans"] });
+      queryClient.invalidateQueries({ queryKey: ['fee-plans'] });
       setFeePlan({
         academicYearId:
-          academicYearsQuery.data?.find((y) => y.isCurrent)?.id || "",
-        classId: "",
-        feeHeadId: "",
-        code: "",
-        name: "",
+          academicYearsQuery.data?.find((y) => y.isCurrent)?.id || '',
+        classId: '',
+        feeHeadId: '',
+        code: '',
+        name: '',
         amount: 0,
       });
       setPlanSuccess(true);
@@ -121,9 +121,9 @@ export function FeeSetupTab() {
   };
 
   const formatCurrency = (amount: string) => {
-    return new Intl.NumberFormat("en-NP", {
-      style: "currency",
-      currency: "NPR",
+    return new Intl.NumberFormat('en-NP', {
+      style: 'currency',
+      currency: 'NPR',
       maximumFractionDigits: 0,
     }).format(Number(amount));
   };
@@ -147,7 +147,7 @@ export function FeeSetupTab() {
             {feeHeadMutation.isError && (
               <div className="flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700">
                 <AlertCircle size={14} />
-                {feeHeadMutation.error.message || "Failed to create fee head."}
+                {feeHeadMutation.error.message || 'Failed to create fee head.'}
               </div>
             )}
             <div className="grid gap-4 sm:grid-cols-2">
@@ -217,7 +217,7 @@ export function FeeSetupTab() {
                   type="number"
                   placeholder="0"
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
-                  value={feeHead.defaultAmount || ""}
+                  value={feeHead.defaultAmount || ''}
                   onChange={(e) =>
                     setFeeHead((prev) => ({
                       ...prev,
@@ -286,7 +286,7 @@ export function FeeSetupTab() {
             {feePlanMutation.isError && (
               <div className="flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700">
                 <AlertCircle size={14} />
-                {feePlanMutation.error.message || "Failed to create fee plan."}
+                {feePlanMutation.error.message || 'Failed to create fee plan.'}
               </div>
             )}
 
@@ -310,7 +310,7 @@ export function FeeSetupTab() {
                   <option value="">Select Academic Year</option>
                   {academicYearsQuery.data?.map((y) => (
                     <option key={y.id} value={y.id}>
-                      {y.name} {y.isCurrent ? "(Current)" : ""}
+                      {y.name} {y.isCurrent ? '(Current)' : ''}
                     </option>
                   ))}
                 </select>
@@ -408,7 +408,7 @@ export function FeeSetupTab() {
                   type="number"
                   placeholder="0"
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[var(--color-mod-fees-accent)] focus:outline-none"
-                  value={feePlan.amount || ""}
+                  value={feePlan.amount || ''}
                   onChange={(e) =>
                     setFeePlan((prev) => ({
                       ...prev,
@@ -541,7 +541,7 @@ export function FeeSetupTab() {
                               variant="phase2"
                               className="text-[9px] font-black px-1.5 py-0"
                             >
-                              {plan.academicYear?.name || "Current Year"}
+                              {plan.academicYear?.name || 'Current Year'}
                             </Badge>
                             {plan.class && (
                               <Badge className="bg-indigo-50 text-indigo-700 border-indigo-100 text-[9px] font-black px-1.5 py-0">
@@ -551,7 +551,7 @@ export function FeeSetupTab() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-right font-bold text-slate-700">
-                          {formatCurrency(plan.items?.[0]?.amount ?? "0.00")}
+                          {formatCurrency(plan.items?.[0]?.amount ?? '0.00')}
                         </td>
                       </tr>
                     ))}

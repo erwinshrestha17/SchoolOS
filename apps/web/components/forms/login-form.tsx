@@ -87,31 +87,64 @@ export function LoginForm() {
         description="Enter the school code provided by your school administrator."
         error={errors.tenantSlug?.message}
       >
-        <Input {...register('tenantSlug')} id="tenantSlug" aria-required="true"
-          placeholder="e.g. green-valley-school" autoComplete="organization"
-          autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+        <Input
+          {...register('tenantSlug')}
+          id="tenantSlug"
+          aria-required="true"
+          placeholder="e.g. green-valley-school"
+          autoComplete="organization"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+        />
       </FormField>
       <FormField label="Email" error={errors.email?.message}>
-        <Input {...register('email')} id="email" type="email" aria-required="true"
-          placeholder="admin@school.edu.np" autoComplete="email"
-          autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+        <Input
+          {...register('email')}
+          id="email"
+          type="email"
+          aria-required="true"
+          placeholder="admin@school.edu.np"
+          autoComplete="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+        />
       </FormField>
       <FormField label="Password" error={errors.password?.message}>
         <div className="relative">
-          <Input {...register('password')} id="password" aria-required="true"
-            type={showPassword ? 'text' : 'password'} className="pr-12"
-            placeholder="Enter your password" autoComplete="current-password" />
-          <button type="button" className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-[var(--muted)] hover:text-[var(--ink)]"
-            aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword}
-            onClick={() => setShowPassword((value) => !value)}>
-            {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+          <Input
+            {...register('password')}
+            id="password"
+            aria-required="true"
+            type={showPassword ? 'text' : 'password'}
+            className="pr-12"
+            placeholder="Enter your password"
+            autoComplete="current-password"
+          />
+          <button
+            type="button"
+            className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-[var(--muted)] hover:text-[var(--ink)]"
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            aria-pressed={showPassword}
+            onClick={() => setShowPassword((value) => !value)}
+          >
+            {showPassword ? (
+              <EyeOff size={18} aria-hidden="true" />
+            ) : (
+              <Eye size={18} aria-hidden="true" />
+            )}
           </button>
         </div>
       </FormField>
       <Button type="submit" size="lg" isLoading={mutation.isPending}>
         {mutation.isPending ? 'Signing in...' : 'Sign in'}
       </Button>
-      {mutation.isError ? <p role="alert" className="text-sm text-[var(--danger-text)]">{mutation.error.message}</p> : null}
+      {mutation.isError ? (
+        <p role="alert" className="text-sm text-[var(--danger-text)]">
+          {mutation.error.message}
+        </p>
+      ) : null}
 
       <div className="text-right">
         <a
@@ -123,7 +156,9 @@ export function LoginForm() {
       </div>
 
       {challengeMessage ? (
-        <p role="status" className="text-sm text-[var(--primary)]">{challengeMessage}</p>
+        <p role="status" className="text-sm text-[var(--primary)]">
+          {challengeMessage}
+        </p>
       ) : null}
 
       {mutation.isSuccess && !challengeMessage ? (

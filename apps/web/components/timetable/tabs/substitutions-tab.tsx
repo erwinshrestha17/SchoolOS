@@ -1,28 +1,28 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { SubstitutionSummaryPanel } from "../substitution-summary-panel";
-import { SubstitutionsList } from "../substitutions-list";
-import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
+import { useState } from 'react';
+import { SubstitutionSummaryPanel } from '../substitution-summary-panel';
+import { SubstitutionsList } from '../substitutions-list';
+import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
-} from "lucide-react";
+} from 'lucide-react';
 import {
   formatBsDate,
   getNepalSchoolDay,
   shiftGregorianDateOnly,
-} from "@schoolos/core";
+} from '@schoolos/core';
 
 export function SubstitutionsTab() {
-  const [date, setDate] = useState(
-    () => getNepalSchoolDay().gregorianDate,
-  );
+  const [date, setDate] = useState(() => getNepalSchoolDay().gregorianDate);
 
-  const nextDay = () => setDate((current) => shiftGregorianDateOnly(current, 1));
-  const prevDay = () => setDate((current) => shiftGregorianDateOnly(current, -1));
+  const nextDay = () =>
+    setDate((current) => shiftGregorianDateOnly(current, 1));
+  const prevDay = () =>
+    setDate((current) => shiftGregorianDateOnly(current, -1));
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -32,7 +32,7 @@ export function SubstitutionsTab() {
             Substitution Oversight
           </h3>
           <p className="text-sm font-medium text-slate-500">
-            Monitoring coverage for {formatBsDate(date, { preset: "long" })}
+            Monitoring coverage for {formatBsDate(date, { preset: 'long' })}
           </p>
         </div>
 

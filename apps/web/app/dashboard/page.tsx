@@ -1,40 +1,40 @@
-"use client";
+'use client';
 
-import type { OperationalNextAction } from "@schoolos/core";
-import { formatBsDateTime } from "@schoolos/core";
-import { ArrowRight } from "lucide-react";
-import Link from "next/link";
-import type { ActionMenuItem } from "../../components/ui/action-menu";
-import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { AdminDashboard } from "../../components/dashboard/admin-dashboard";
-import { PrincipalDashboard } from "../../components/dashboard/principal-dashboard";
-import { HrDashboard } from "../../components/dashboard/hr-dashboard";
-import { AccountantDashboard } from "../../components/dashboard/accountant-dashboard";
-import { TeacherTodayWorkspace } from "../../components/dashboard/teacher-today-workspace";
-import { useTeacherAccess } from "../../lib/teacher-access";
-import { useSchoolWebPersona } from "../../lib/school-web-persona";
+import type { OperationalNextAction } from '@schoolos/core';
+import { formatBsDateTime } from '@schoolos/core';
+import { ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import type { ActionMenuItem } from '../../components/ui/action-menu';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { AdminDashboard } from '../../components/dashboard/admin-dashboard';
+import { PrincipalDashboard } from '../../components/dashboard/principal-dashboard';
+import { HrDashboard } from '../../components/dashboard/hr-dashboard';
+import { AccountantDashboard } from '../../components/dashboard/accountant-dashboard';
+import { TeacherTodayWorkspace } from '../../components/dashboard/teacher-today-workspace';
+import { useTeacherAccess } from '../../lib/teacher-access';
+import { useSchoolWebPersona } from '../../lib/school-web-persona';
 import {
   assertServerDashboardProjection,
   isSupportedDashboardPersona,
   resolveDashboardCompositionPersona,
-} from "../../lib/dashboard-persona";
-import { ModuleHeader } from "../../components/ui/module-header";
+} from '../../lib/dashboard-persona';
+import { ModuleHeader } from '../../components/ui/module-header';
 import {
   OperationalSummaryError,
   OperationalSummaryLoading,
   RefreshSummaryButton,
   resolveOperationalSummaryAction,
   SummaryStatusBadge,
-} from "../../components/ui/operational-summary";
-import { EmptyState } from "../../components/ui/empty-state";
-import { LoadingState } from "../../components/ui/loading-state";
-import { PermissionDenied } from "../../components/ui/permission-denied";
-import { usePermissionAccess } from "../../lib/permissions-ui";
-import { useSession } from "../../components/session-provider";
-import { api } from "../../lib/api";
-import { formatSchoolDate } from "../../lib/date-utils";
+} from '../../components/ui/operational-summary';
+import { EmptyState } from '../../components/ui/empty-state';
+import { LoadingState } from '../../components/ui/loading-state';
+import { PermissionDenied } from '../../components/ui/permission-denied';
+import { usePermissionAccess } from '../../lib/permissions-ui';
+import { useSession } from '../../components/session-provider';
+import { api } from '../../lib/api';
+import { formatSchoolDate } from '../../lib/date-utils';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -47,13 +47,13 @@ export default function DashboardPage() {
   const tenantId = session?.tenant.id;
 
   const dashboardQuery = useQuery({
-    queryKey: ["operational-dashboard-summary", tenantId],
+    queryKey: ['operational-dashboard-summary', tenantId],
     queryFn: api.getDashboardSummary,
     staleTime: 30_000,
     enabled:
       canFetchDashboard &&
       !isTeacherPersona &&
-      permissionResolution === "granted" &&
+      permissionResolution === 'granted' &&
       expectedPersona !== null,
   });
 
@@ -69,7 +69,10 @@ export default function DashboardPage() {
     projectedDashboard?.compositionPersona ?? expectedPersona;
 
   const safeNextActions = (projectedDashboard?.nextActions ?? [])
-    .map((action) => ({ action, href: resolveOperationalSummaryAction(action) }))
+    .map((action) => ({
+      action,
+      href: resolveOperationalSummaryAction(action),
+    }))
     .filter((item): item is { action: OperationalNextAction; href: string } =>
       Boolean(item.href),
     );
@@ -79,13 +82,13 @@ export default function DashboardPage() {
   ).length;
   const [firstNextAction, ...remainingNextActions] = safeNextActions;
   const attentionHref =
-    compositionPersona === "principal"
-      ? "/dashboard/attention"
-      : "#needs-attention";
+    compositionPersona === 'principal'
+      ? '/dashboard/attention'
+      : '#needs-attention';
   const primaryAction =
     attentionCount > 0
       ? {
-          label: `Review ${attentionCount} attention item${attentionCount === 1 ? "" : "s"}`,
+          label: `Review ${attentionCount} attention item${attentionCount === 1 ? '' : 's'}`,
           href: attentionHref,
         }
       : firstNextAction
@@ -102,39 +105,39 @@ export default function DashboardPage() {
     }));
 
   const headerCopy =
-    compositionPersona === "principal"
+    compositionPersona === 'principal'
       ? {
-          eyebrow: "School leadership",
-          title: "Principal Home",
+          eyebrow: 'School leadership',
+          title: 'Principal Home',
           description:
-            "See what needs your attention, what is waiting for a decision, and whether the school day is on track.",
+            'See what needs your attention, what is waiting for a decision, and whether the school day is on track.',
         }
-      : compositionPersona === "admin"
+      : compositionPersona === 'admin'
         ? {
-            eyebrow: "School operations",
-            title: "Operations Dashboard",
+            eyebrow: 'School operations',
+            title: 'Operations Dashboard',
             description:
-              "Daily operating snapshot for admissions, attendance, fees, and configuration readiness.",
+              'Daily operating snapshot for admissions, attendance, fees, and configuration readiness.',
           }
-        : compositionPersona === "hr"
+        : compositionPersona === 'hr'
           ? {
-              eyebrow: "People operations",
-              title: "HR Dashboard",
+              eyebrow: 'People operations',
+              title: 'HR Dashboard',
               description:
-                "Staff availability, payroll readiness, and people operations follow-up.",
+                'Staff availability, payroll readiness, and people operations follow-up.',
             }
-          : compositionPersona === "accountant"
+          : compositionPersona === 'accountant'
             ? {
-                eyebrow: "Finance operations",
-                title: "Finance Dashboard",
+                eyebrow: 'Finance operations',
+                title: 'Finance Dashboard',
                 description:
-                  "Fees collections, accounting readiness, and payroll posting status.",
+                  'Fees collections, accounting readiness, and payroll posting status.',
               }
             : {
-                eyebrow: "School workspace",
-                title: "Home",
+                eyebrow: 'School workspace',
+                title: 'Home',
                 description:
-                  "Use the sidebar to open your assigned modules. This account does not receive a school-wide dashboard summary.",
+                  'Use the sidebar to open your assigned modules. This account does not receive a school-wide dashboard summary.',
               };
 
   if (isTeacherPersona) {
@@ -150,7 +153,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (permissionResolution === "loading") {
+  if (permissionResolution === 'loading') {
     return (
       <div className="space-y-6">
         <ModuleHeader
@@ -223,7 +226,9 @@ export default function DashboardPage() {
 
       {dashboardQuery.isLoading ? <OperationalSummaryLoading /> : null}
       {dashboardQuery.isError ? (
-        <OperationalSummaryError onRetry={() => void dashboardQuery.refetch()} />
+        <OperationalSummaryError
+          onRetry={() => void dashboardQuery.refetch()}
+        />
       ) : null}
       {projectionMismatch ? (
         <PermissionDenied
@@ -232,13 +237,13 @@ export default function DashboardPage() {
         />
       ) : null}
       {projectedDashboard ? (
-        compositionPersona === "admin" ? (
+        compositionPersona === 'admin' ? (
           <AdminDashboard dashboard={projectedDashboard} />
-        ) : compositionPersona === "principal" ? (
+        ) : compositionPersona === 'principal' ? (
           <PrincipalDashboard dashboard={projectedDashboard} />
-        ) : compositionPersona === "hr" ? (
+        ) : compositionPersona === 'hr' ? (
           <HrDashboard dashboard={projectedDashboard} />
-        ) : compositionPersona === "accountant" ? (
+        ) : compositionPersona === 'accountant' ? (
           <AccountantDashboard dashboard={projectedDashboard} />
         ) : null
       ) : null}

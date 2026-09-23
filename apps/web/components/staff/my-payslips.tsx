@@ -5,13 +5,13 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import { ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
 import { ApiRequestError, api } from '../../lib/api';
@@ -21,7 +21,9 @@ export function MyPayslips() {
   const [page, setPage] = useState(1);
   const limit = 10;
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [downloadingPayslip, setDownloadingPayslip] = useState<string | null>(null);
+  const [downloadingPayslip, setDownloadingPayslip] = useState<string | null>(
+    null,
+  );
 
   const payslipQuery = useQuery({
     queryKey: ['my-payslips', page, limit],
@@ -42,10 +44,7 @@ export function MyPayslips() {
         setDownloadError(
           'This payslip file is unavailable. Ask your payroll administrator to regenerate it.',
         );
-      } else if (
-        error instanceof ApiRequestError &&
-        error.statusCode === 403
-      ) {
+      } else if (error instanceof ApiRequestError && error.statusCode === 403) {
         setDownloadError('You do not have access to this payslip.');
       } else {
         setDownloadError('Could not download this payslip. Try again later.');
@@ -55,27 +54,30 @@ export function MyPayslips() {
     }
   };
 
-  if (payslipQuery.isLoading) return (
-    <div className="flex justify-center p-8">
-      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-    </div>
-  );
+  if (payslipQuery.isLoading)
+    return (
+      <div className="flex justify-center p-8">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
 
-  if (payslipQuery.isError) return (
-    <Card>
-      <CardContent className="p-8 text-center text-muted-foreground">
-        Payslips could not be loaded. Check your staff access and try again.
-      </CardContent>
-    </Card>
-  );
+  if (payslipQuery.isError)
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          Payslips could not be loaded. Check your staff access and try again.
+        </CardContent>
+      </Card>
+    );
 
-  if (payslips.length === 0) return (
-    <Card>
-      <CardContent className="p-8 text-center text-muted-foreground">
-        No payslips found.
-      </CardContent>
-    </Card>
-  );
+  if (payslips.length === 0)
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground">
+          No payslips found.
+        </CardContent>
+      </Card>
+    );
 
   return (
     <Card>
@@ -113,20 +115,28 @@ export function MyPayslips() {
                     : `${slip.periodMonth ?? 'Period'}/${slip.periodYear ?? 'Unavailable'}`}
                 </TableCell>
                 <TableCell>{slip.payslipNumber}</TableCell>
-                <TableCell>Rs {Number(slip.grossSalary).toLocaleString()}</TableCell>
-                <TableCell>Rs {Number(slip.deductionAmount).toLocaleString()}</TableCell>
+                <TableCell>
+                  Rs {Number(slip.grossSalary).toLocaleString()}
+                </TableCell>
+                <TableCell>
+                  Rs {Number(slip.deductionAmount).toLocaleString()}
+                </TableCell>
                 <TableCell className="font-bold text-green-600">
                   Rs {Number(slip.netSalary).toLocaleString()}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={slip.status === 'PAID' ? 'success' as any : 'secondary'}>
+                  <Badge
+                    variant={
+                      slip.status === 'PAID' ? ('success' as any) : 'secondary'
+                    }
+                  >
                     {slip.status}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     disabled={downloadingPayslip === slip.payslipNumber}
                     onClick={() => downloadPdf(slip.payslipNumber)}
                   >
@@ -145,7 +155,8 @@ export function MyPayslips() {
         {totalItems > 0 ? (
           <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
             <p className="text-xs font-semibold text-slate-500">
-              Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} payslips
+              Showing {(page - 1) * limit + 1} to{' '}
+              {Math.min(page * limit, totalItems)} of {totalItems} payslips
             </p>
             <div className="flex gap-2">
               <Button
@@ -163,7 +174,9 @@ export function MyPayslips() {
                 variant="outline"
                 size="sm"
                 disabled={page >= totalPages}
-                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                onClick={() =>
+                  setPage((current) => Math.min(totalPages, current + 1))
+                }
               >
                 Next
                 <ChevronRight className="h-4 w-4" />

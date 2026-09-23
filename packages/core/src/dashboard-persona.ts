@@ -93,7 +93,10 @@ function attentionKindFromKey(
   key: string,
 ): "approval" | "warning" | "follow-up" {
   const normalized = key.toLowerCase();
-  if (normalized.includes("approval") || normalized.includes("pending_review")) {
+  if (
+    normalized.includes("approval") ||
+    normalized.includes("pending_review")
+  ) {
     return "approval";
   }
   if (

@@ -7,7 +7,13 @@ import { ExamList } from './exam-list';
 import { ExamForm } from './exam-form';
 import { AssessmentComponentsDialog } from './assessment-components-dialog';
 import { ExamTermSummary } from '@schoolos/core';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { StatCard } from '@/components/ui/stat-card';
 import { ClipboardList, CheckCircle2, AlertCircle, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,8 +31,12 @@ export function ExamsWorkspace() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isComponentsOpen, setIsComponentsOpen] = useState(false);
   const [editingExam, setEditingExam] = useState<ExamTermSummary | null>(null);
-  const [selectedExam, setSelectedExam] = useState<ExamTermSummary | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ExamTermSummary | null>(null);
+  const [selectedExam, setSelectedExam] = useState<ExamTermSummary | null>(
+    null,
+  );
+  const [deleteTarget, setDeleteTarget] = useState<ExamTermSummary | null>(
+    null,
+  );
   const [notice, setNotice] = useState<ExamNotice | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -122,9 +132,10 @@ export function ExamsWorkspace() {
     }
   };
 
-  const activeExams = examsQuery.data?.filter(e => e.status === 'ACTIVE').length ?? 0;
+  const activeExams =
+    examsQuery.data?.filter((e) => e.status === 'ACTIVE').length ?? 0;
   const totalExams = examsQuery.data?.length ?? 0;
-  const lockedExams = examsQuery.data?.filter(e => e.isLocked).length ?? 0;
+  const lockedExams = examsQuery.data?.filter((e) => e.isLocked).length ?? 0;
 
   return (
     <div className="space-y-8">
@@ -160,9 +171,16 @@ export function ExamsWorkspace() {
 
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight text-slate-950">
-          Exam <span className="text-[var(--color-mod-academics-text)]">Terms</span>
+          Exam{' '}
+          <span className="text-[var(--color-mod-academics-text)]">Terms</span>
         </h2>
-        <Button onClick={() => { setEditingExam(null); setIsFormOpen(true); }} className="rounded-2xl shadow-lg shadow-[var(--color-mod-academics-border)]/50">
+        <Button
+          onClick={() => {
+            setEditingExam(null);
+            setIsFormOpen(true);
+          }}
+          className="rounded-2xl shadow-lg shadow-[var(--color-mod-academics-border)]/50"
+        >
           <Plus size={18} className="mr-2" />
           Create Exam Term
         </Button>
@@ -184,7 +202,10 @@ export function ExamsWorkspace() {
         <DialogContent className="max-w-2xl rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold tracking-tight text-slate-950">
-              {editingExam ? 'Edit' : 'Create'} <span className="text-[var(--color-mod-academics-text)]">Exam Term</span>
+              {editingExam ? 'Edit' : 'Create'}{' '}
+              <span className="text-[var(--color-mod-academics-text)]">
+                Exam Term
+              </span>
             </DialogTitle>
           </DialogHeader>
           <ExamForm
@@ -202,7 +223,10 @@ export function ExamsWorkspace() {
         <DialogContent className="max-w-3xl rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold tracking-tight text-slate-950">
-              Manage <span className="text-[var(--color-mod-academics-text)]">Components</span>
+              Manage{' '}
+              <span className="text-[var(--color-mod-academics-text)]">
+                Components
+              </span>
             </DialogTitle>
             <DialogDescription className="text-sm font-medium text-slate-500">
               {selectedExam?.name}

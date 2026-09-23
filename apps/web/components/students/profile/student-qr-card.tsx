@@ -193,8 +193,8 @@ export function StudentQrCard({
               Protected ID card generated
             </p>
             <p className="mt-1 text-xs text-slate-500 max-w-[240px] mx-auto">
-              The QR credential is embedded securely. Its secret is never
-              shown in this browser.
+              The QR credential is embedded securely. Its secret is never shown
+              in this browser.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <ProtectedFileButton

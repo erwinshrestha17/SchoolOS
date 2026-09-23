@@ -44,13 +44,13 @@ export function StaffAttendanceSummary() {
         <div className="flex items-center gap-4">
           <h3 className="text-lg font-bold text-gray-900">{periodLabel}</h3>
           <div className="flex items-center gap-1">
-            <button 
+            <button
               onClick={prevMonth}
               className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
             >
               <ChevronLeft size={20} />
             </button>
-            <button 
+            <button
               onClick={nextMonth}
               className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
             >
@@ -69,52 +69,104 @@ export function StaffAttendanceSummary() {
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="px-6 py-4 font-semibold text-gray-500">Staff Member</th>
-                <th className="px-6 py-4 font-semibold text-gray-500 text-center">Present</th>
-                <th className="px-6 py-4 font-semibold text-gray-500 text-center text-amber-600">Late</th>
-                <th className="px-6 py-4 font-semibold text-gray-500 text-center text-danger-600">Absent</th>
-                <th className="px-6 py-4 font-semibold text-gray-500 text-center text-[var(--color-mod-hr-text)]">Leave</th>
-                <th className="px-6 py-4 font-semibold text-gray-500 text-center">Approved Leave</th>
-                <th className="px-6 py-4 font-semibold text-gray-500 text-center">Anomalies</th>
+                <th className="px-6 py-4 font-semibold text-gray-500">
+                  Staff Member
+                </th>
+                <th className="px-6 py-4 font-semibold text-gray-500 text-center">
+                  Present
+                </th>
+                <th className="px-6 py-4 font-semibold text-gray-500 text-center text-amber-600">
+                  Late
+                </th>
+                <th className="px-6 py-4 font-semibold text-gray-500 text-center text-danger-600">
+                  Absent
+                </th>
+                <th className="px-6 py-4 font-semibold text-gray-500 text-center text-[var(--color-mod-hr-text)]">
+                  Leave
+                </th>
+                <th className="px-6 py-4 font-semibold text-gray-500 text-center">
+                  Approved Leave
+                </th>
+                <th className="px-6 py-4 font-semibold text-gray-500 text-center">
+                  Anomalies
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {summaryQuery.isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    <td className="px-6 py-4"><div className="h-4 w-32 bg-gray-100 rounded" /></td>
-                    <td className="px-6 py-4"><div className="h-4 w-8 mx-auto bg-gray-100 rounded" /></td>
-                    <td className="px-6 py-4"><div className="h-4 w-8 mx-auto bg-gray-100 rounded" /></td>
-                    <td className="px-6 py-4"><div className="h-4 w-8 mx-auto bg-gray-100 rounded" /></td>
-                    <td className="px-6 py-4"><div className="h-4 w-8 mx-auto bg-gray-100 rounded" /></td>
-                    <td className="px-6 py-4"><div className="h-4 w-8 mx-auto bg-gray-100 rounded" /></td>
-                    <td className="px-6 py-4"><div className="h-4 w-8 mx-auto bg-gray-100 rounded" /></td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-32 bg-gray-100 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-8 mx-auto bg-gray-100 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-8 mx-auto bg-gray-100 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-8 mx-auto bg-gray-100 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-8 mx-auto bg-gray-100 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-8 mx-auto bg-gray-100 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-8 mx-auto bg-gray-100 rounded" />
+                    </td>
                   </tr>
                 ))
               ) : summaryQuery.data?.items.length ? (
-                summaryQuery.data.items.map((item: StaffAttendanceMonthlySummary['items'][number]) => (
-                  <tr key={item.staffId} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="font-semibold text-gray-900">{item.fullName}</p>
-                      <p className="text-[10px] text-gray-500 font-mono">{item.employeeId}</p>
-                    </td>
-                    <td className="px-6 py-4 text-center font-medium text-success-600">{item.presentDays}</td>
-                    <td className="px-6 py-4 text-center font-medium text-amber-600">{item.lateDays}</td>
-                    <td className="px-6 py-4 text-center font-medium text-danger-600">{item.absentDays}</td>
-                    <td className="px-6 py-4 text-center font-medium text-[var(--color-mod-hr-text)]">{item.leaveDays}</td>
-                    <td className="px-6 py-4 text-center font-medium text-gray-700">{item.approvedLeaveDays}</td>
-                    <td className="px-6 py-4 text-center font-medium">
-                      {item.unresolvedOverlapAnomalies > 0 ? (
-                        <span className="text-danger-600 bg-danger-50 px-2 py-0.5 rounded-full text-xs">
-                          {item.unresolvedOverlapAnomalies}
-                        </span>
-                      ) : '-'}
-                    </td>
-                  </tr>
-                ))
+                summaryQuery.data.items.map(
+                  (item: StaffAttendanceMonthlySummary['items'][number]) => (
+                    <tr
+                      key={item.staffId}
+                      className="hover:bg-gray-50/50 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <p className="font-semibold text-gray-900">
+                          {item.fullName}
+                        </p>
+                        <p className="text-[10px] text-gray-500 font-mono">
+                          {item.employeeId}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4 text-center font-medium text-success-600">
+                        {item.presentDays}
+                      </td>
+                      <td className="px-6 py-4 text-center font-medium text-amber-600">
+                        {item.lateDays}
+                      </td>
+                      <td className="px-6 py-4 text-center font-medium text-danger-600">
+                        {item.absentDays}
+                      </td>
+                      <td className="px-6 py-4 text-center font-medium text-[var(--color-mod-hr-text)]">
+                        {item.leaveDays}
+                      </td>
+                      <td className="px-6 py-4 text-center font-medium text-gray-700">
+                        {item.approvedLeaveDays}
+                      </td>
+                      <td className="px-6 py-4 text-center font-medium">
+                        {item.unresolvedOverlapAnomalies > 0 ? (
+                          <span className="text-danger-600 bg-danger-50 px-2 py-0.5 rounded-full text-xs">
+                            {item.unresolvedOverlapAnomalies}
+                          </span>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                    </tr>
+                  ),
+                )
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                  <td
+                    colSpan={7}
+                    className="px-6 py-12 text-center text-gray-500"
+                  >
                     No attendance records for this period.
                   </td>
                 </tr>

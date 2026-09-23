@@ -21,5 +21,6 @@ export interface MyStudentsClassGroup {
 }
 
 export const teacherStudentsApi = {
-  getMyStudents: () => request<MyStudentsClassGroup[]>('/teacher-workspace/my-students'),
+  getMyStudents: () =>
+    request<MyStudentsClassGroup[]>('/teacher-workspace/my-students'),
 };

@@ -7,17 +7,20 @@ import { LoginForm } from '../../components/forms/login-form';
 const trustItems = [
   {
     title: 'Staff access',
-    description: 'Use the school code and credentials provided by your administrator.',
+    description:
+      'Use the school code and credentials provided by your administrator.',
     icon: LockKeyhole,
   },
   {
     title: 'School workspace',
-    description: 'Each school uses its own workspace for day-to-day operations with school-level data isolation.',
+    description:
+      'Each school uses its own workspace for day-to-day operations with school-level data isolation.',
     icon: ShieldCheck,
   },
   {
     title: 'Organized records',
-    description: 'Attendance, fees, students, and reports stay easier to manage.',
+    description:
+      'Attendance, fees, students, and reports stay easier to manage.',
     icon: ClipboardCheck,
   },
 ];
@@ -29,17 +32,23 @@ export default function LoginPage() {
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.03]"
           style={{
-            backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
+            backgroundImage:
+              'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
             backgroundSize: '40px 40px',
           }}
         />
 
         <div className="relative z-10 flex items-center gap-2">
-          <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
+          <Link
+            href="/"
+            className="flex items-center gap-2 transition-opacity hover:opacity-80"
+          >
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--primary)] text-sm font-semibold text-white">
               S
             </span>
-            <span className="text-xl font-semibold tracking-tight text-white">SchoolOS</span>
+            <span className="text-xl font-semibold tracking-tight text-white">
+              SchoolOS
+            </span>
           </Link>
         </div>
 
@@ -53,7 +62,8 @@ export default function LoginPage() {
           </h1>
 
           <p className="mt-6 text-base leading-relaxed text-slate-300">
-            Sign in to manage attendance, fees, students, reports, and daily school operations from one clear place.
+            Sign in to manage attendance, fees, students, reports, and daily
+            school operations from one clear place.
           </p>
 
           <ul className="mt-10 space-y-5">
@@ -67,7 +77,9 @@ export default function LoginPage() {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-white">{item.title}</p>
-                    <p className="mt-1 text-xs text-slate-300">{item.description}</p>
+                    <p className="mt-1 text-xs text-slate-300">
+                      {item.description}
+                    </p>
                   </div>
                 </li>
               );
@@ -85,19 +97,29 @@ export default function LoginPage() {
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--primary)] text-sm font-semibold text-white">
             S
           </span>
-          <span className="text-xl font-semibold tracking-tight text-slate-900">SchoolOS</span>
+          <span className="text-xl font-semibold tracking-tight text-slate-900">
+            SchoolOS
+          </span>
         </div>
 
         <div className="mt-12 w-full max-w-md lg:mt-0">
           <div className="mb-8 text-center lg:text-left">
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome back</h2>
-            <p className="mt-2 text-sm text-slate-500">Sign in to your school workspace.</p>
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
+              Welcome back
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Sign in to your school workspace.
+            </p>
           </div>
 
           <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm lg:border-none lg:bg-transparent lg:p-0 lg:shadow-none">
             <Suspense
               fallback={
-                <div role="status" aria-label="Loading sign-in form" className="flex animate-pulse space-x-4 p-4">
+                <div
+                  role="status"
+                  aria-label="Loading sign-in form"
+                  className="flex animate-pulse space-x-4 p-4"
+                >
                   <div className="flex-1 space-y-4 py-1">
                     <div className="h-4 w-3/4 rounded bg-slate-200" />
                     <div className="space-y-2">

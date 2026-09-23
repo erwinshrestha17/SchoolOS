@@ -52,7 +52,9 @@ describe('principal dashboard command center', () => {
   });
 
   it('composes the focused one-viewport structure without the old card walls', () => {
-    const layout = read('components/dashboard/operational-dashboard-layout.tsx');
+    const layout = read(
+      'components/dashboard/operational-dashboard-layout.tsx',
+    );
 
     assert.match(layout, /DashboardSummaryStrip/);
     assert.match(layout, /DashboardAttentionPanel/);
@@ -86,14 +88,16 @@ describe('principal dashboard command center', () => {
 
     // Unavailable and permission-missing are never rendered as numbers.
     assert.match(strip, /Information is not available yet\./);
-    assert.match(strip, /"Unavailable"/);
+    assert.match(strip, /['"]Unavailable['"]/);
     assert.match(strip, /permissionDenied/);
   });
 
   it('never presents unstarted attendance as student absence', () => {
     const meta = read('components/dashboard/dashboard-module-meta.tsx');
     const strip = read('components/dashboard/dashboard-summary-strip.tsx');
-    const operations = read('components/dashboard/dashboard-operations-panel.tsx');
+    const operations = read(
+      'components/dashboard/dashboard-operations-panel.tsx',
+    );
 
     // Progress comes from register/session counts (including the
     // teacher-scoped keys), with an explicit notStarted state.
@@ -103,7 +107,7 @@ describe('principal dashboard command center', () => {
     assert.match(meta, /pendingRegistersToday/);
     assert.match(meta, /notStarted/);
 
-    assert.match(strip, /"Not started"/);
+    assert.match(strip, /['"]Not started['"]/);
     assert.match(operations, /Attendance has not started/);
     // The strip and rows must not read absence counts at all.
     assert.doesNotMatch(strip, /absentToday|presentToday\b/);
@@ -116,7 +120,7 @@ describe('principal dashboard command center', () => {
 
     assert.match(meta, /APPROVAL_ATTENTION_KEYS/);
     assert.match(meta, /export function attentionKind/);
-    assert.match(strip, /attentionKind\(item\) === "approval"/);
+    assert.match(strip, /attentionKind\(item\) === ['"]approval['"]/);
     // The old misleading total — summing every attention count into one
     // "Pending Approvals" figure — must not return.
     assert.doesNotMatch(
@@ -130,8 +134,11 @@ describe('principal dashboard command center', () => {
 
     assert.match(panel, /const DEFAULT_VISIBLE_ITEMS = 5/);
     assert.match(panel, /openItems\.slice\(0, DEFAULT_VISIBLE_ITEMS\)/);
-    assert.match(panel, /View all \$\{formatNumber\(openItems\.length\)\} attention items/);
-    assert.match(panel, /id="needs-attention"/);
+    assert.match(
+      panel,
+      /View all \$\{formatNumber\(openItems\.length\)\} attention items/,
+    );
+    assert.match(panel, /id=['"]needs-attention['"]/);
     // Rows resolve through the safe-route allowlist, never raw item.action.
     assert.match(panel, /const href = safeRoute\(\{/);
     // Genuine zero is a distinct, honest state.
@@ -139,9 +146,11 @@ describe('principal dashboard command center', () => {
   });
 
   it('renders today’s operations as compact permitted rows, never cards for locked modules', () => {
-    const operations = read('components/dashboard/dashboard-operations-panel.tsx');
+    const operations = read(
+      'components/dashboard/dashboard-operations-panel.tsx',
+    );
 
-    assert.match(operations, /summary\.status !== "locked"/);
+    assert.match(operations, /summary\.status !== ['"]locked['"]/);
     assert.match(operations, /prioritizeByAttention/);
     assert.match(operations, /Today’s operations/);
     // One meaningful state per module row with honest unavailable/zero split.
@@ -150,11 +159,16 @@ describe('principal dashboard command center', () => {
     assert.match(operations, /No open transport issue/);
     assert.match(operations, /Information is not available yet\./);
     assert.match(operations, /Some information is temporarily unavailable\./);
-    assert.match(operations, /No operations summaries are available for your current access\./);
+    assert.match(
+      operations,
+      /No operations summaries are available for your current access\./,
+    );
   });
 
   it('keeps the readiness section bounded with honest permission and zero states', () => {
-    const readiness = read('components/dashboard/dashboard-readiness-section.tsx');
+    const readiness = read(
+      'components/dashboard/dashboard-readiness-section.tsx',
+    );
 
     assert.match(readiness, /const MAX_ROWS_PER_PANEL = 4/);
     assert.match(readiness, /Academic readiness/);
@@ -168,7 +182,7 @@ describe('principal dashboard command center', () => {
     // Timetable is readiness/exceptions plus a drill-through, not a list.
     assert.match(readiness, /unassignedSubstitutionsToday/);
     assert.match(readiness, /View full timetable/);
-    assert.match(readiness, /href="\/dashboard\/timetable"/);
+    assert.match(readiness, /href=['"]\/dashboard\/timetable['"]/);
   });
 
   it('combines recent activity and notices into one bounded feed from the summary payload', () => {
@@ -187,14 +201,14 @@ describe('principal dashboard command center', () => {
   it('derives the header primary action from real dashboard data, attention first', () => {
     const page = read('app/dashboard/page.tsx');
 
-    assert.match(page, /title: "Operations Dashboard"/);
-    assert.match(page, /title: "Principal Home"/);
-    assert.match(page, /eyebrow: "School leadership"/);
-    assert.doesNotMatch(page, /title: "Executive Dashboard"/);
+    assert.match(page, /title: ['"]Operations Dashboard['"]/);
+    assert.match(page, /title: ['"]Principal Home['"]/);
+    assert.match(page, /eyebrow: ['"]School leadership['"]/);
+    assert.doesNotMatch(page, /title: ['"]Executive Dashboard['"]/);
     assert.match(page, /Review \$\{attentionCount\} attention item/);
     assert.match(
       page,
-      /compositionPersona === "principal"\s*\? "\/dashboard\/attention"\s*: "#needs-attention"/,
+      /compositionPersona === ['"]principal['"]\s*\? ['"]\/dashboard\/attention['"]\s*: ['"]#needs-attention['"]/,
     );
     assert.match(page, /firstNextAction/);
     assert.doesNotMatch(page, /primaryAction=\{\s*<RefreshSummaryButton/);
@@ -222,7 +236,10 @@ describe('principal dashboard command center', () => {
       'Notices & Announcements',
       'Learning Layer',
     ]) {
-      assert.ok(meta.includes(label), `Missing visible product label: ${label}`);
+      assert.ok(
+        meta.includes(label),
+        `Missing visible product label: ${label}`,
+      );
     }
   });
 });

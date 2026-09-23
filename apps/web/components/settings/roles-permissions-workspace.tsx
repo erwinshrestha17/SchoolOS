@@ -162,8 +162,8 @@ export function RolesPermissionsWorkspace() {
             </p>
             <p className="mt-1 leading-6">
               The school dashboard may hide unavailable actions, and each
-              protected action verifies the user’s school, role, permission,
-              and module entitlement.
+              protected action verifies the user’s school, role, permission, and
+              module entitlement.
             </p>
           </div>
         </div>

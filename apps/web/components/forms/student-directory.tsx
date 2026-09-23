@@ -190,13 +190,13 @@ export function StudentDirectory({
         icon={<BookOpenText aria-hidden size={28} />}
         action={
           !isSupportOverride ? (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.push('/dashboard/settings')}
-          >
-            Configure School Settings
-          </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push('/dashboard/settings')}
+            >
+              Configure School Settings
+            </Button>
           ) : undefined
         }
       />

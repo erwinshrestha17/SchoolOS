@@ -72,7 +72,9 @@ export function LifecyclePanel({
   const hasCheckedClearance = clearance !== null;
   const hasOutstanding = clearance ? !clearance.cleared : false;
   const maySelectActiveAction = active && clearance?.cleared === true;
-  const mayMarkAlumni = (status === 'EXITED' || status === 'TRANSFERRED') && clearance?.cleared === true;
+  const mayMarkAlumni =
+    (status === 'EXITED' || status === 'TRANSFERRED') &&
+    clearance?.cleared === true;
 
   const [reason, setReason] = useState('');
   const [effectiveDate, setEffectiveDate] = useState('');
@@ -90,7 +92,14 @@ export function LifecyclePanel({
 
   function submitLifecycleAction(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!action || !reason.trim() || isSaving || hasOutstanding || !clearance?.cleared) return;
+    if (
+      !action ||
+      !reason.trim() ||
+      isSaving ||
+      hasOutstanding ||
+      !clearance?.cleared
+    )
+      return;
     if (action === 'delete' && !deleteAcknowledged) return;
 
     if (action === 'transfer') {
@@ -138,7 +147,9 @@ export function LifecyclePanel({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="space-y-5">
           <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-5">
-            <p className="text-[0.68rem] font-black uppercase tracking-wider text-slate-500">Current status</p>
+            <p className="text-[0.68rem] font-black uppercase tracking-wider text-slate-500">
+              Current status
+            </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Badge className="border-[var(--color-mod-admissions-border)] bg-[var(--color-mod-admissions-bg)] text-[var(--color-mod-admissions-text)]">
                 {formatLifecycleStatus(status)}
@@ -150,28 +161,40 @@ export function LifecyclePanel({
                   disabled={isCheckingClearance}
                   className="text-sm font-bold text-[var(--color-mod-admissions-text)] hover:underline disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isCheckingClearance ? 'Checking fee clearance…' : 'Check fee clearance'}
+                  {isCheckingClearance
+                    ? 'Checking fee clearance…'
+                    : 'Check fee clearance'}
                 </button>
               ) : clearance?.cleared ? (
                 <Badge variant="success">Fee clearance confirmed</Badge>
               ) : (
-                <Badge variant="destructive">Outstanding {formatMoney(clearance?.outstandingAmount ?? 0)}</Badge>
+                <Badge variant="destructive">
+                  Outstanding {formatMoney(clearance?.outstandingAmount ?? 0)}
+                </Badge>
               )}
             </div>
           </div>
 
           {!hasCheckedClearance ? (
             <div className="rounded-2xl border border-info-100 bg-info-50 p-5 text-sm text-info-800">
-              Check fee clearance before starting a transfer, archive, alumni, or record-removal action.
+              Check fee clearance before starting a transfer, archive, alumni,
+              or record-removal action.
             </div>
           ) : null}
 
           {hasOutstanding ? (
             <div className="flex gap-3 rounded-2xl border border-warning-200 bg-warning-50 p-5 text-warning-800">
-              <AlertTriangle size={21} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <AlertTriangle
+                size={21}
+                className="mt-0.5 shrink-0"
+                aria-hidden="true"
+              />
               <div>
                 <p className="font-bold">Lifecycle action blocked</p>
-                <p className="mt-1 text-sm">Outstanding fees must be resolved before the student status can change.</p>
+                <p className="mt-1 text-sm">
+                  Outstanding fees must be resolved before the student status
+                  can change.
+                </p>
               </div>
             </div>
           ) : null}
@@ -216,7 +239,11 @@ export function LifecyclePanel({
         <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
           {message ? (
             <div className="flex gap-3 rounded-xl border border-success-200 bg-success-50 p-4 text-success-800">
-              <CheckCircle2 size={21} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <CheckCircle2
+                size={21}
+                className="mt-0.5 shrink-0"
+                aria-hidden="true"
+              />
               <div>
                 <p className="font-bold">Lifecycle status updated</p>
                 <p className="mt-1 text-sm">{message}</p>
@@ -225,10 +252,19 @@ export function LifecyclePanel({
           ) : action ? (
             <div className="space-y-4">
               {error ? (
-                <div className="flex gap-3 rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger-800" role="alert">
-                  <AlertTriangle size={21} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <div
+                  className="flex gap-3 rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger-800"
+                  role="alert"
+                >
+                  <AlertTriangle
+                    size={21}
+                    className="mt-0.5 shrink-0"
+                    aria-hidden="true"
+                  />
                   <div>
-                    <p className="font-bold">Lifecycle action could not be completed</p>
+                    <p className="font-bold">
+                      Lifecycle action could not be completed
+                    </p>
                     <p className="mt-1 text-sm">
                       {schoolFacingErrorMessage(error, {
                         fallback:
@@ -266,10 +302,17 @@ export function LifecyclePanel({
             </div>
           ) : (
             <div className="flex min-h-[18rem] flex-col items-center justify-center px-6 text-center">
-              <ShieldAlert size={34} className="text-slate-300" aria-hidden="true" />
-              <h4 className="mt-4 text-base font-bold text-slate-800">Choose a lifecycle action</h4>
+              <ShieldAlert
+                size={34}
+                className="text-slate-300"
+                aria-hidden="true"
+              />
+              <h4 className="mt-4 text-base font-bold text-slate-800">
+                Choose a lifecycle action
+              </h4>
               <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
-                Select an eligible action to review its impact, provide a reason, and submit the protected status change.
+                Select an eligible action to review its impact, provide a
+                reason, and submit the protected status change.
               </p>
             </div>
           )}
@@ -320,13 +363,26 @@ function LifecycleReviewForm({
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <div>
-        <p className="text-[0.68rem] font-black uppercase tracking-wider text-slate-500">Review action</p>
-        <h4 className={cn('mt-2 text-xl font-black', isDelete ? 'text-danger-700' : 'text-slate-950')}>{actionLabel}</h4>
-        <p className="mt-2 text-sm leading-6 text-slate-500">{lifecycleActionDescription(action)}</p>
+        <p className="text-[0.68rem] font-black uppercase tracking-wider text-slate-500">
+          Review action
+        </p>
+        <h4
+          className={cn(
+            'mt-2 text-xl font-black',
+            isDelete ? 'text-danger-700' : 'text-slate-950',
+          )}
+        >
+          {actionLabel}
+        </h4>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          {lifecycleActionDescription(action)}
+        </p>
       </div>
 
       <label className="block">
-        <span className="text-sm font-bold text-slate-800">Reason <span className="text-danger-600">*</span></span>
+        <span className="text-sm font-bold text-slate-800">
+          Reason <span className="text-danger-600">*</span>
+        </span>
         <textarea
           value={reason}
           onChange={(event) => onReasonChange(event.target.value)}
@@ -338,7 +394,10 @@ function LifecycleReviewForm({
       </label>
 
       <label className="block">
-        <span className="text-sm font-bold text-slate-800">Effective date <span className="font-normal text-slate-400">(optional)</span></span>
+        <span className="text-sm font-bold text-slate-800">
+          Effective date{' '}
+          <span className="font-normal text-slate-400">(optional)</span>
+        </span>
         <input
           type="date"
           value={effectiveDate}
@@ -350,16 +409,24 @@ function LifecycleReviewForm({
       {action === 'transfer' ? (
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="text-sm font-bold text-slate-800">Destination school <span className="font-normal text-slate-400">(optional)</span></span>
+            <span className="text-sm font-bold text-slate-800">
+              Destination school{' '}
+              <span className="font-normal text-slate-400">(optional)</span>
+            </span>
             <input
               value={destinationSchool}
-              onChange={(event) => onDestinationSchoolChange(event.target.value)}
+              onChange={(event) =>
+                onDestinationSchoolChange(event.target.value)
+              }
               placeholder="School name"
               className="mt-2 min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--color-mod-admissions-accent)] focus:ring-2 focus:ring-[var(--color-mod-admissions-border)]"
             />
           </label>
           <label className="block">
-            <span className="text-sm font-bold text-slate-800">Conduct remark <span className="font-normal text-slate-400">(optional)</span></span>
+            <span className="text-sm font-bold text-slate-800">
+              Conduct remark{' '}
+              <span className="font-normal text-slate-400">(optional)</span>
+            </span>
             <input
               value={conductRemark}
               onChange={(event) => onConductRemarkChange(event.target.value)}
@@ -375,10 +442,15 @@ function LifecycleReviewForm({
           <input
             type="checkbox"
             checked={deleteAcknowledged}
-            onChange={(event) => onDeleteAcknowledgedChange(event.target.checked)}
+            onChange={(event) =>
+              onDeleteAcknowledgedChange(event.target.checked)
+            }
             className="mt-0.5 h-4 w-4 rounded border-danger-300 text-danger-600 focus:ring-danger-500"
           />
-          <span>I understand this is a restricted, audited action and should only be used for an accidental record.</span>
+          <span>
+            I understand this is a restricted, audited action and should only be
+            used for an accidental record.
+          </span>
         </label>
       ) : null}
 
@@ -399,10 +471,17 @@ function LifecycleReviewForm({
         </button>
         <button
           type="submit"
-          disabled={isSaving || blocked || !reason.trim() || (isDelete && !deleteAcknowledged)}
+          disabled={
+            isSaving ||
+            blocked ||
+            !reason.trim() ||
+            (isDelete && !deleteAcknowledged)
+          }
           className={cn(
             'min-h-11 rounded-xl px-5 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-60',
-            isDelete ? 'bg-danger-600 hover:bg-danger-700' : 'bg-[var(--color-mod-admissions-accent)] hover:bg-[var(--color-mod-admissions-text)]',
+            isDelete
+              ? 'bg-danger-600 hover:bg-danger-700'
+              : 'bg-[var(--color-mod-admissions-accent)] hover:bg-[var(--color-mod-admissions-text)]',
           )}
         >
           {isSaving ? 'Saving…' : actionLabel}
@@ -448,7 +527,9 @@ function LifecycleActionButton({
       <span>{icon}</span>
       <span>
         <span className="block text-sm font-black">{label}</span>
-        <span className="mt-1 block text-xs font-medium opacity-80">{description}</span>
+        <span className="mt-1 block text-xs font-medium opacity-80">
+          {description}
+        </span>
       </span>
     </button>
   );

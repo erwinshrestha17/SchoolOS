@@ -33,12 +33,9 @@ export function useRecentlyViewed() {
     };
   }, [reload]);
 
-  const record = useCallback(
-    (entry: Omit<RecentlyViewedEntry, 'viewedAt'>) => {
-      setEntries(recordRecentlyViewed(entry));
-    },
-    [],
-  );
+  const record = useCallback((entry: Omit<RecentlyViewedEntry, 'viewedAt'>) => {
+    setEntries(recordRecentlyViewed(entry));
+  }, []);
 
   return { entries, record };
 }

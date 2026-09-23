@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   FormEvent,
@@ -6,9 +6,9 @@ import {
   useEffect,
   useMemo,
   useState,
-} from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+} from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import {
   BookOpenCheck,
   CheckCircle2,
@@ -19,21 +19,21 @@ import {
   Save,
   Send,
   Users,
-} from "lucide-react";
-import { formatBsDateTime, type PermissionKey } from "@schoolos/core";
-import { learningApi } from "../../lib/api/learning";
+} from 'lucide-react';
+import { formatBsDateTime, type PermissionKey } from '@schoolos/core';
+import { learningApi } from '../../lib/api/learning';
 import type {
   LearningAnswer,
   LearningAttempt,
   LearningQuestion,
   LearningSession,
-} from "../../lib/api/learning";
-import { useEntitlements } from "../entitlements-provider";
-import { useSession } from "../session-provider";
-import { EmptyState } from "../ui/empty-state";
-import { LoadingState } from "../ui/loading-state";
-import { PermissionDenied } from "../ui/permission-denied";
-import { StatusBadge } from "../ui/status-badge";
+} from '../../lib/api/learning';
+import { useEntitlements } from '../entitlements-provider';
+import { useSession } from '../session-provider';
+import { EmptyState } from '../ui/empty-state';
+import { LoadingState } from '../ui/loading-state';
+import { PermissionDenied } from '../ui/permission-denied';
+import { StatusBadge } from '../ui/status-badge';
 
 export function LearningRouteGuard({
   children,
@@ -44,16 +44,16 @@ export function LearningRouteGuard({
   const { session, status } = useSession();
   const { hasModule, loading: entitlementsLoading } = useEntitlements();
 
-  if (status === "loading" || entitlementsLoading) {
+  if (status === 'loading' || entitlementsLoading) {
     return <LoadingState variant="page" label="Checking learning access" />;
   }
 
   if (!session) {
-    router.replace("/login");
+    router.replace('/login');
     return <LoadingState variant="page" label="Redirecting to sign in" />;
   }
 
-  if (!hasModule("learning")) {
+  if (!hasModule('learning')) {
     return (
       <RuntimeShell title={title}>
         <PermissionDenied
@@ -75,7 +75,7 @@ export function LearningRouteGuard({
           title="Learning access restricted"
           description="Your current role cannot open this learning view."
           resource="Learning"
-          action={permissions.join(" or ")}
+          action={permissions.join(' or ')}
         />
       </RuntimeShell>
     );
@@ -110,14 +110,14 @@ function RuntimeShell({
 
 export function SmartBoardSessionView({ sessionId }: { sessionId: string }) {
   const sessionQuery = useQuery({
-    queryKey: ["learning-board-session", sessionId],
+    queryKey: ['learning-board-session', sessionId],
     queryFn: () => learningApi.getSession(sessionId),
   });
 
   return (
     <LearningRouteGuard
       title="Smart Board Session"
-      permissions={["learning:read", "learning:launch"]}
+      permissions={['learning:read', 'learning:launch']}
     >
       <RuntimeShell
         title="Smart Board Session"
@@ -142,7 +142,7 @@ function BoardSession({ session }: { session: LearningSession }) {
   const currentQuestion = questions[questionIndex] ?? null;
 
   useEffect(() => {
-    if (session.status !== "LIVE") return;
+    if (session.status !== 'LIVE') return;
     sendHeartbeat();
     const interval = window.setInterval(() => {
       sendHeartbeat();
@@ -158,7 +158,7 @@ function BoardSession({ session }: { session: LearningSession }) {
             <p className="text-xs font-black uppercase tracking-wide text-slate-500">
               {session.sessionCode
                 ? `Code ${session.sessionCode}`
-                : "Learning session"}
+                : 'Learning session'}
             </p>
             <h2 className="mt-2 text-3xl font-black text-slate-950">
               {session.activity.title}
@@ -180,12 +180,12 @@ function BoardSession({ session }: { session: LearningSession }) {
         </div>
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
           <p className="text-sm font-bold text-slate-600">
-            Expires {formatDateTime(session.expiresAt)} · Heartbeat{" "}
-            {heartbeatPending ? "sending" : "active"}
+            Expires {formatDateTime(session.expiresAt)} · Heartbeat{' '}
+            {heartbeatPending ? 'sending' : 'active'}
           </p>
           <p className="text-sm font-black text-slate-950">
             {questions.length === 0
-              ? "No questions"
+              ? 'No questions'
               : `${questionIndex + 1} of ${questions.length}`}
           </p>
         </div>
@@ -239,8 +239,8 @@ function BoardSession({ session }: { session: LearningSession }) {
 
 export function StudentLearningJoinView() {
   const router = useRouter();
-  const [sessionCode, setSessionCode] = useState("");
-  const [qrToken, setQrToken] = useState("");
+  const [sessionCode, setSessionCode] = useState('');
+  const [qrToken, setQrToken] = useState('');
   const joinMutation = useMutation({
     mutationFn: learningApi.joinSession,
     onSuccess: (result) => {
@@ -259,7 +259,7 @@ export function StudentLearningJoinView() {
   return (
     <LearningRouteGuard
       title="Join Learning Session"
-      permissions={["learning:attempt"]}
+      permissions={['learning:attempt']}
     >
       <RuntimeShell
         title="Join Learning Session"
@@ -322,7 +322,7 @@ export function StudentLearningSessionView({
   const startedAt = useMemo(() => Date.now(), []);
 
   const sessionQuery = useQuery({
-    queryKey: ["student-learning-session", sessionId],
+    queryKey: ['student-learning-session', sessionId],
     queryFn: () => learningApi.getSession(sessionId),
   });
   const attemptMutation = useMutation({
@@ -330,7 +330,7 @@ export function StudentLearningSessionView({
     onSuccess: (attempt) => {
       setAnswers(answersFromAttempt(attempt));
       setNotice(
-        attempt.answers?.length ? "Attempt resumed." : "Attempt started.",
+        attempt.answers?.length ? 'Attempt resumed.' : 'Attempt started.',
       );
     },
   });
@@ -342,9 +342,9 @@ export function StudentLearningSessionView({
       }),
     onSuccess: (attempt) => {
       setLastSavedAt(new Date().toISOString());
-      setNotice("Attempt autosaved.");
+      setNotice('Attempt autosaved.');
       void queryClient.setQueryData(
-        ["student-learning-attempt", attempt.id],
+        ['student-learning-attempt', attempt.id],
         attempt,
       );
     },
@@ -357,9 +357,9 @@ export function StudentLearningSessionView({
       }),
     onSuccess: (attempt) => {
       setConfirmSubmit(false);
-      setNotice("Attempt submitted.");
+      setNotice('Attempt submitted.');
       void queryClient.setQueryData(
-        ["student-learning-attempt", attempt.id],
+        ['student-learning-attempt', attempt.id],
         attempt,
       );
     },
@@ -381,15 +381,15 @@ export function StudentLearningSessionView({
     setConfirmSubmit(true);
     setNotice(
       unansweredCount > 0
-        ? `${unansweredCount} question${unansweredCount === 1 ? "" : "s"} still need an answer.`
-        : "Review once before final submission.",
+        ? `${unansweredCount} question${unansweredCount === 1 ? '' : 's'} still need an answer.`
+        : 'Review once before final submission.',
     );
   }
 
   return (
     <LearningRouteGuard
       title="Learning Session"
-      permissions={["learning:attempt"]}
+      permissions={['learning:attempt']}
     >
       <RuntimeShell
         title="Learning Session"
@@ -413,7 +413,7 @@ export function StudentLearningSessionView({
                     {sessionQuery.data.activity.title}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    {sessionQuery.data.activity.estimatedMinutes ?? 0} minutes ·{" "}
+                    {sessionQuery.data.activity.estimatedMinutes ?? 0} minutes ·{' '}
                     {labelize(sessionQuery.data.activity.difficulty)}
                   </p>
                 </div>
@@ -448,7 +448,7 @@ export function StudentLearningSessionView({
                       </p>
                       <QuestionAnswerInput
                         question={question}
-                        value={answers[question.id ?? ""]}
+                        value={answers[question.id ?? '']}
                         onChange={(answer) =>
                           question.id && setAnswer(question.id, answer)
                         }
@@ -462,7 +462,7 @@ export function StudentLearningSessionView({
                     onClick={() => autosaveMutation.mutate(activeAttempt)}
                     disabled={
                       autosaveMutation.isPending ||
-                      activeAttempt.status === "SUBMITTED"
+                      activeAttempt.status === 'SUBMITTED'
                     }
                     className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
@@ -474,7 +474,7 @@ export function StudentLearningSessionView({
                     onClick={requestSubmit}
                     disabled={
                       submitMutation.isPending ||
-                      activeAttempt.status === "SUBMITTED"
+                      activeAttempt.status === 'SUBMITTED'
                     }
                     className="inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
@@ -487,7 +487,7 @@ export function StudentLearningSessionView({
                     </span>
                   )}
                 </div>
-                {confirmSubmit && activeAttempt.status !== "SUBMITTED" && (
+                {confirmSubmit && activeAttempt.status !== 'SUBMITTED' && (
                   <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
                     <p className="text-sm font-bold text-amber-950">
                       Submit this attempt now? Final submission cannot be
@@ -504,12 +504,12 @@ export function StudentLearningSessionView({
                     </button>
                   </div>
                 )}
-                {activeAttempt.status === "SUBMITTED" && (
+                {activeAttempt.status === 'SUBMITTED' && (
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
                     <div className="flex items-center gap-3">
                       <CheckCircle2 className="text-emerald-700" size={22} />
                       <p className="text-sm font-black text-emerald-950">
-                        Submitted · Score {Math.round(activeAttempt.score ?? 0)}{" "}
+                        Submitted · Score {Math.round(activeAttempt.score ?? 0)}{' '}
                         · Accuracy {Math.round(activeAttempt.accuracy ?? 0)}%
                       </p>
                     </div>
@@ -536,9 +536,9 @@ export function StudentLearningSessionView({
 }
 
 export function ParentLearningSummaryView() {
-  const [selectedChildId, setSelectedChildId] = useState("");
+  const [selectedChildId, setSelectedChildId] = useState('');
   const summaryQuery = useQuery({
-    queryKey: ["parent-learning-summary"],
+    queryKey: ['parent-learning-summary'],
     queryFn: () => learningApi.getParentSummary(),
   });
   const items = summaryQuery.data?.items ?? [];
@@ -548,7 +548,7 @@ export function ParentLearningSummaryView() {
   return (
     <LearningRouteGuard
       title="Parent Learning Summary"
-      permissions={["learning:progress"]}
+      permissions={['learning:progress']}
     >
       <RuntimeShell
         title="Parent Learning Summary"
@@ -572,7 +572,7 @@ export function ParentLearningSummaryView() {
                 Child
               </span>
               <select
-                value={selectedItem?.child.id ?? ""}
+                value={selectedItem?.child.id ?? ''}
                 onChange={(event) => setSelectedChildId(event.target.value)}
                 className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 md:max-w-sm"
               >
@@ -597,10 +597,10 @@ export function ParentLearningSummaryView() {
                     {selectedItem.child.name}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    {selectedItem.child.class?.name ?? "Class"}{" "}
+                    {selectedItem.child.class?.name ?? 'Class'}{' '}
                     {selectedItem.child.section?.name
                       ? `· ${selectedItem.child.section.name}`
-                      : ""}
+                      : ''}
                   </p>
                 </div>
                 <StatusBadge
@@ -638,7 +638,7 @@ export function ParentLearningSummaryView() {
                   title="Practice focus"
                   items={selectedItem.needsPracticeTopics.map(
                     (topic) =>
-                      `${topic.activity?.title ?? topic.subject?.name ?? "Topic"} · ${topic.labelText}`,
+                      `${topic.activity?.title ?? topic.subject?.name ?? 'Topic'} · ${topic.labelText}`,
                   )}
                 />
               </div>
@@ -657,8 +657,8 @@ function QuestionOptions({
   question: LearningQuestion;
   readOnly?: boolean;
 }) {
-  if (question.type !== "MULTIPLE_CHOICE" || !Array.isArray(question.options)) {
-    if (question.type === "MATCHING") {
+  if (question.type !== 'MULTIPLE_CHOICE' || !Array.isArray(question.options)) {
+    if (question.type === 'MATCHING') {
       const pairs = matchingPairs(question.options);
       return (
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -670,7 +670,7 @@ function QuestionOptions({
         </div>
       );
     }
-    if (question.type === "ORDERING") {
+    if (question.type === 'ORDERING') {
       return (
         <OptionList
           title="Items"
@@ -686,7 +686,7 @@ function QuestionOptions({
     <div className="mt-4 grid gap-3 md:grid-cols-2">
       {question.options.map((option, index) => (
         <div
-          key={`${question.id ?? "question"}-${index}`}
+          key={`${question.id ?? 'question'}-${index}`}
           className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700"
         >
           {readOnly ? `${index + 1}. ` : null}
@@ -706,18 +706,18 @@ function QuestionAnswerInput({
   value: unknown;
   onChange: (answer: unknown) => void;
 }) {
-  if (question.type === "TRUE_FALSE") {
+  if (question.type === 'TRUE_FALSE') {
     return (
       <div className="mt-4 flex flex-wrap gap-3">
-        {["true", "false"].map((option) => (
+        {['true', 'false'].map((option) => (
           <button
             key={option}
             type="button"
-            onClick={() => onChange(option === "true")}
+            onClick={() => onChange(option === 'true')}
             className={`rounded-xl border px-4 py-2 text-sm font-black ${
-              value === (option === "true")
-                ? "border-emerald-600 bg-emerald-600 text-white"
-                : "border-slate-200 bg-white text-slate-700"
+              value === (option === 'true')
+                ? 'border-emerald-600 bg-emerald-600 text-white'
+                : 'border-slate-200 bg-white text-slate-700'
             }`}
           >
             {labelize(option)}
@@ -727,18 +727,18 @@ function QuestionAnswerInput({
     );
   }
 
-  if (question.type === "MULTIPLE_CHOICE" && Array.isArray(question.options)) {
+  if (question.type === 'MULTIPLE_CHOICE' && Array.isArray(question.options)) {
     return (
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {question.options.map((option, index) => (
           <button
-            key={`${question.id ?? "question"}-${index}`}
+            key={`${question.id ?? 'question'}-${index}`}
             type="button"
             onClick={() => onChange(option)}
             className={`rounded-xl border px-4 py-3 text-left text-sm font-bold ${
               value === option
-                ? "border-emerald-600 bg-emerald-600 text-white"
-                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                ? 'border-emerald-600 bg-emerald-600 text-white'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
             {String(option)}
@@ -748,7 +748,7 @@ function QuestionAnswerInput({
     );
   }
 
-  if (question.type === "MATCHING") {
+  if (question.type === 'MATCHING') {
     const pairs = matchingPairs(question.options);
     const selected = Array.isArray(value) ? value : [];
     return (
@@ -787,7 +787,7 @@ function QuestionAnswerInput({
     );
   }
 
-  if (question.type === "ORDERING") {
+  if (question.type === 'ORDERING') {
     const items = orderingItems(question.options);
     const order =
       Array.isArray(value) && value.length
@@ -832,7 +832,7 @@ function QuestionAnswerInput({
 
   return (
     <textarea
-      value={typeof value === "string" ? value : ""}
+      value={typeof value === 'string' ? value : ''}
       onChange={(event) => onChange(event.target.value)}
       rows={4}
       className="mt-4 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
@@ -909,7 +909,7 @@ function answersFromAttempt(attempt: LearningAttempt) {
 
 function hasAnswer(value: unknown) {
   if (Array.isArray(value)) return value.length > 0;
-  return value !== undefined && value !== null && String(value).trim() !== "";
+  return value !== undefined && value !== null && String(value).trim() !== '';
 }
 
 function matchingPairs(options: unknown) {
@@ -917,10 +917,10 @@ function matchingPairs(options: unknown) {
   return options.pairs
     .filter(isRecord)
     .map((pair) => ({
-      leftId: String(pair.leftId ?? ""),
-      leftText: String(pair.leftText ?? ""),
-      rightId: String(pair.rightId ?? ""),
-      rightText: String(pair.rightText ?? ""),
+      leftId: String(pair.leftId ?? ''),
+      leftText: String(pair.leftText ?? ''),
+      rightId: String(pair.rightId ?? ''),
+      rightText: String(pair.rightText ?? ''),
     }))
     .filter((pair) => pair.leftId && pair.rightId);
 }
@@ -930,17 +930,17 @@ function orderingItems(options: unknown) {
   return options.items
     .filter(isRecord)
     .map((item) => ({
-      id: String(item.id ?? ""),
-      text: String(item.text ?? ""),
+      id: String(item.id ?? ''),
+      text: String(item.text ?? ''),
     }))
     .filter((item) => item.id);
 }
 
 function matchingAnswerFor(value: unknown[], leftId: string) {
   const match = value.find(
-    (entry) => isRecord(entry) && String(entry.leftId ?? "") === leftId,
+    (entry) => isRecord(entry) && String(entry.leftId ?? '') === leftId,
   );
-  return isRecord(match) ? String(match.rightId ?? "") : "";
+  return isRecord(match) ? String(match.rightId ?? '') : '';
 }
 
 function upsertMatchingAnswer(
@@ -950,12 +950,12 @@ function upsertMatchingAnswer(
 ) {
   const next = value
     .filter(
-      (entry) => !isRecord(entry) || String(entry.leftId ?? "") !== leftId,
+      (entry) => !isRecord(entry) || String(entry.leftId ?? '') !== leftId,
     )
     .filter(isRecord)
     .map((entry) => ({
-      leftId: String(entry.leftId ?? ""),
-      rightId: String(entry.rightId ?? ""),
+      leftId: String(entry.leftId ?? ''),
+      rightId: String(entry.rightId ?? ''),
     }));
   if (rightId) {
     next.push({ leftId, rightId });
@@ -973,13 +973,13 @@ function moveOrderItem(order: string[], index: number, delta: number) {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function RuntimeError({ error }: { error: unknown }) {
   return (
     <div className="mt-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
-      {error instanceof Error ? error.message : "Learning request failed."}
+      {error instanceof Error ? error.message : 'Learning request failed.'}
     </div>
   );
 }
@@ -996,14 +996,14 @@ function elapsedSeconds(startedAt: number) {
 }
 
 function formatDateTime(value?: string | null) {
-  if (!value) return "not set";
+  if (!value) return 'not set';
   return formatBsDateTime(value);
 }
 
 function labelize(value: string) {
   return value
     .toLowerCase()
-    .split("_")
+    .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+    .join(' ');
 }

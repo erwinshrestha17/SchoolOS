@@ -264,8 +264,12 @@ export function PayrollRuns() {
       header: 'Period',
       cell: (run) => (
         <>
-          <p className="font-bold text-gray-900">{formatPeriod(run.periodMonth, run.periodYear)}</p>
-          <p className="text-[10px] text-gray-500">{run.lineCount ?? 0} staff lines</p>
+          <p className="font-bold text-gray-900">
+            {formatPeriod(run.periodMonth, run.periodYear)}
+          </p>
+          <p className="text-[10px] text-gray-500">
+            {run.lineCount ?? 0} staff lines
+          </p>
         </>
       ),
     },
@@ -284,20 +288,28 @@ export function PayrollRuns() {
       id: 'gross',
       header: 'Gross',
       align: 'right',
-      cell: (run) => <span className="text-gray-700">{formatMoney(run.grossAmount)}</span>,
+      cell: (run) => (
+        <span className="text-gray-700">{formatMoney(run.grossAmount)}</span>
+      ),
     },
     {
       id: 'deductions',
       header: 'Deductions',
       align: 'right',
-      cell: (run) => <span className="text-danger-600">-{formatMoney(run.deductionAmount)}</span>,
+      cell: (run) => (
+        <span className="text-danger-600">
+          -{formatMoney(run.deductionAmount)}
+        </span>
+      ),
     },
     {
       id: 'net',
       header: 'Net',
       align: 'right',
       cell: (run) => (
-        <span className="font-bold text-[var(--color-mod-hr-text)]">{formatMoney(run.netAmount)}</span>
+        <span className="font-bold text-[var(--color-mod-hr-text)]">
+          {formatMoney(run.netAmount)}
+        </span>
       ),
     },
   ];
@@ -585,7 +597,13 @@ export function PayrollRuns() {
             columns={runColumns}
             items={runs}
             getRowId={(run) => run.id}
-            status={runsQuery.error ? 'error' : runsQuery.isLoading ? 'loading' : 'ready'}
+            status={
+              runsQuery.error
+                ? 'error'
+                : runsQuery.isLoading
+                  ? 'loading'
+                  : 'ready'
+            }
             page={page}
             pageSize={limit}
             totalItems={totalItems}

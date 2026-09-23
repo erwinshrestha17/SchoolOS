@@ -38,7 +38,7 @@ import type {
   WaiverRecord,
   DiscountRulePage,
   WaiverRecordPage,
-} from "@schoolos/core";
+} from '@schoolos/core';
 import {
   API_BASE_URL,
   JsonBody,
@@ -47,14 +47,14 @@ import {
   parseApiErrorMessage,
   request,
   withQuery,
-} from "./client";
+} from './client';
 
 export type ReportSnapshot = {
   id: string;
   reportKey: string;
   format: string;
   filters: Record<string, unknown>;
-  status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   fileAssetId?: string | null;
   requestedBy?: string | null;
   errorSummary?: string | null;
@@ -91,7 +91,7 @@ export type ReceiptReprintHistory = {
 
 export type ReceiptVerificationResult = {
   verified: true;
-  status: "VALID" | "PARTIALLY_REFUNDED" | "REFUNDED" | "REVERSED";
+  status: 'VALID' | 'PARTIALLY_REFUNDED' | 'REFUNDED' | 'REVERSED';
   warnings: string[];
   receipt: {
     id: string;
@@ -139,10 +139,10 @@ export type CollectedPaymentResult = {
   amount: string;
   method: string;
   paidAt: string;
-  disposition: "SUCCEEDED" | "REPLAYED";
+  disposition: 'SUCCEEDED' | 'REPLAYED';
   receiptNumber: string | null;
   receiptFileAssetId: string | null;
-  receiptFileStatus: "PENDING" | "AVAILABLE" | "UNAVAILABLE";
+  receiptFileStatus: 'PENDING' | 'AVAILABLE' | 'UNAVAILABLE';
 };
 
 export type DefaultersResponse = {
@@ -188,10 +188,10 @@ export const financeApi = {
     timeZone?: string;
   }) =>
     request<FinanceDashboardSummary>(
-      withQuery("/fees/dashboard-summary", params),
+      withQuery('/fees/dashboard-summary', params),
     ),
-  listFeeHeads: () => request<FeeHeadSummary[]>("/fees/heads"),
-  listFeePlans: () => request<FeePlanSummary[]>("/fees/plans"),
+  listFeeHeads: () => request<FeeHeadSummary[]>('/fees/heads'),
+  listFeePlans: () => request<FeePlanSummary[]>('/fees/plans'),
   listInvoicesPage: (params?: {
     page?: number;
     limit?: number;
@@ -203,8 +203,8 @@ export const financeApi = {
     dueTo?: string;
     outstandingOnly?: boolean;
     sortBy?: string;
-    sortDirection?: "asc" | "desc";
-  }) => request<InvoiceSummaryPage>(withQuery("/fees/invoices", params ?? {})),
+    sortDirection?: 'asc' | 'desc';
+  }) => request<InvoiceSummaryPage>(withQuery('/fees/invoices', params ?? {})),
   listInvoices: async (params?: {
     page?: number;
     limit?: number;
@@ -228,7 +228,7 @@ export const financeApi = {
       academicYearId?: string;
       invoiceStatus?: string;
       transactionType?: string;
-      sortDirection?: "asc" | "desc";
+      sortDirection?: 'asc' | 'desc';
     },
   ) =>
     request<StudentFeeLedgerPage>(
@@ -239,11 +239,11 @@ export const financeApi = {
     ),
   searchCollectionStudents: (q: string) =>
     request<CollectionStudentSearchResponse>(
-      withQuery("/fees/collection-students", { q }),
+      withQuery('/fees/collection-students', { q }),
     ),
   searchLedgerStudents: (q: string) =>
     request<LedgerStudentSearchResponse>(
-      withQuery("/fees/ledger-students", { q }),
+      withQuery('/fees/ledger-students', { q }),
     ),
   getStudentCollectionContext: (studentId: string) =>
     request<StudentCollectionContext>(
@@ -259,11 +259,11 @@ export const financeApi = {
     runYear?: number;
     runMonth?: number;
   }) =>
-    request<FeeBillingRunPage>(withQuery("/fees/billing-runs", params ?? {})),
+    request<FeeBillingRunPage>(withQuery('/fees/billing-runs', params ?? {})),
   listBillingRuns: async () =>
     (await financeApi.listBillingRunsPage({ limit: 25 })).items,
   generateBillingRun: (body: JsonBody) =>
-    request("/fees/billing-runs", { method: "POST", json: body }),
+    request('/fees/billing-runs', { method: 'POST', json: body }),
   listDefaulters: (params?: {
     classId?: string | null;
     feeHeadId?: string | null;
@@ -272,29 +272,29 @@ export const financeApi = {
     limit?: number;
     agingBucket?: string | null;
     sortBy?: string;
-    sortDirection?: "asc" | "desc";
+    sortDirection?: 'asc' | 'desc';
   }) =>
-    request<DefaultersResponse>(withQuery("/fees/defaulters", params ?? {})),
+    request<DefaultersResponse>(withQuery('/fees/defaulters', params ?? {})),
   sendDefaulterReminders: (body: JsonBody) =>
-    request<DefaulterReminderResult>("/fees/defaulters/reminders", {
-      method: "POST",
+    request<DefaulterReminderResult>('/fees/defaulters/reminders', {
+      method: 'POST',
       json: body,
     }),
   downloadReport: (reportKey: string, payload: ReportExportRequest) =>
     downloadReport(reportKey, payload),
   getDuesTableReport: (params?: DuesReportFilters) =>
-    request<DuesReportResponse>(withQuery("/fees/reports/dues", params ?? {})),
+    request<DuesReportResponse>(withQuery('/fees/reports/dues', params ?? {})),
   getCollectionReport: (params?: { fromDate?: string; toDate?: string }) =>
     request<FeeCollectionReport>(
-      withQuery("/fees/reports/collections", params ?? {}),
+      withQuery('/fees/reports/collections', params ?? {}),
     ),
   getPaymentMethodReport: (params?: { fromDate?: string; toDate?: string }) =>
     request<PaymentMethodReport>(
-      withQuery("/fees/reports/payment-methods", params ?? {}),
+      withQuery('/fees/reports/payment-methods', params ?? {}),
     ),
   getUnallocatedPaymentReport: (params?: { page?: number; limit?: number }) =>
     request<UnallocatedPaymentReport>(
-      withQuery("/fees/reports/unallocated-payments", params ?? {}),
+      withQuery('/fees/reports/unallocated-payments', params ?? {}),
     ),
   getInvoiceRegister: (params?: {
     fromDate?: string;
@@ -308,7 +308,7 @@ export const financeApi = {
     limit?: number;
   }) =>
     request<InvoiceRegisterReport>(
-      withQuery("/fees/reports/invoices", params ?? {}),
+      withQuery('/fees/reports/invoices', params ?? {}),
     ),
   getReceiptRegister: (params?: {
     fromDate?: string;
@@ -319,7 +319,7 @@ export const financeApi = {
     limit?: number;
   }) =>
     request<ReceiptRegisterReport>(
-      withQuery("/fees/reports/receipts", params ?? {}),
+      withQuery('/fees/reports/receipts', params ?? {}),
     ),
   getReceiptSequenceExceptions: (params?: {
     fiscalYear?: string;
@@ -329,24 +329,24 @@ export const financeApi = {
     limit?: number;
   }) =>
     request<ReceiptSequenceExceptionReport>(
-      withQuery("/fees/reports/receipt-sequence-exceptions", params ?? {}),
+      withQuery('/fees/reports/receipt-sequence-exceptions', params ?? {}),
     ),
   getRefundReversalRegister: (params?: {
     fromDate?: string;
     toDate?: string;
-    recordType?: "REFUND" | "REVERSAL";
+    recordType?: 'REFUND' | 'REVERSAL';
     page?: number;
     limit?: number;
   }) =>
     request<RefundReversalRegisterReport>(
-      withQuery("/fees/reports/refund-reversals", params ?? {}),
+      withQuery('/fees/reports/refund-reversals', params ?? {}),
     ),
   listDiscountsPage: (params?: {
     page?: number;
     limit?: number;
     search?: string;
     isActive?: boolean;
-  }) => request<DiscountRulePage>(withQuery("/fees/discounts", params ?? {})),
+  }) => request<DiscountRulePage>(withQuery('/fees/discounts', params ?? {})),
   listDiscounts: async () =>
     (await financeApi.listDiscountsPage({ limit: 25 })).items,
   listWaiversPage: (params?: {
@@ -355,20 +355,20 @@ export const financeApi = {
     search?: string;
     studentId?: string;
     invoiceId?: string;
-  }) => request<WaiverRecordPage>(withQuery("/fees/waivers", params ?? {})),
+  }) => request<WaiverRecordPage>(withQuery('/fees/waivers', params ?? {})),
   listWaivers: async () =>
     (await financeApi.listWaiversPage({ limit: 25 })).items,
   createDiscount: (body: JsonBody) =>
-    request<DiscountRule>("/fees/discounts", { method: "POST", json: body }),
+    request<DiscountRule>('/fees/discounts', { method: 'POST', json: body }),
   createWaiver: (body: JsonBody) =>
-    request<WaiverRecord>("/fees/waivers", { method: "POST", json: body }),
+    request<WaiverRecord>('/fees/waivers', { method: 'POST', json: body }),
   createFeeHead: (body: JsonBody) =>
-    request("/fees/heads", { method: "POST", json: body }),
+    request('/fees/heads', { method: 'POST', json: body }),
   createFeePlan: (body: JsonBody) =>
-    request("/fees/plans", { method: "POST", json: body }),
+    request('/fees/plans', { method: 'POST', json: body }),
   collectPayment: (body: JsonBody) =>
-    request<CollectedPaymentResult>("/payments", {
-      method: "POST",
+    request<CollectedPaymentResult>('/payments', {
+      method: 'POST',
       json: body,
     }),
   listPaymentsPage: (params?: {
@@ -387,14 +387,14 @@ export const financeApi = {
       page: number;
       limit: number;
       hasNextPage: boolean;
-    }>(withQuery("/payments", params ?? {})),
+    }>(withQuery('/payments', params ?? {})),
   getPaymentGatewayReadiness: () =>
-    request<PaymentGatewayReadiness>("/payments/gateway-readiness"),
+    request<PaymentGatewayReadiness>('/payments/gateway-readiness'),
   refundPayment: (paymentId: string, body: PaymentRefundPayload) =>
     request<PaymentRefundSummary>(
       `/payments/${encodeURIComponent(paymentId)}/refund`,
       {
-        method: "POST",
+        method: 'POST',
         json: body as JsonBody,
       },
     ),
@@ -405,7 +405,7 @@ export const financeApi = {
     paymentMethod?: string | null;
   }) =>
     request<CashierClosePreview>(
-      withQuery("/payments/cashier-close/preview", params),
+      withQuery('/payments/cashier-close/preview', params),
     ),
   listCashierClosesPage: (params?: {
     page?: number;
@@ -415,12 +415,12 @@ export const financeApi = {
     collectorUserId?: string | null;
     paymentMethod?: string | null;
     status?:
-      | "OPEN"
-      | "COUNTED"
-      | "SUBMITTED"
-      | "APPROVED"
-      | "CLOSED"
-      | "DEPOSITED";
+      | 'OPEN'
+      | 'COUNTED'
+      | 'SUBMITTED'
+      | 'APPROVED'
+      | 'CLOSED'
+      | 'DEPOSITED';
   }) =>
     request<{
       items: CashierCloseSummary[];
@@ -428,7 +428,7 @@ export const financeApi = {
       page: number;
       limit: number;
       hasNextPage: boolean;
-    }>(withQuery("/payments/cashier-close", params ?? {})),
+    }>(withQuery('/payments/cashier-close', params ?? {})),
   listCashierCloses: async (params?: {
     openedFrom?: string | null;
     closedTo?: string | null;
@@ -446,8 +446,8 @@ export const financeApi = {
     denominationBreakdown?: Record<string, unknown> | null;
     notes?: string | null;
   }) =>
-    request<CashierCloseSummary>("/payments/cashier-close", {
-      method: "POST",
+    request<CashierCloseSummary>('/payments/cashier-close', {
+      method: 'POST',
       json: body as JsonBody,
     }),
   openCashierClose: (body: {
@@ -456,8 +456,8 @@ export const financeApi = {
     paymentMethod?: string | null;
     notes?: string | null;
   }) =>
-    request<CashierCloseSummary>("/payments/cashier-close/open", {
-      method: "POST",
+    request<CashierCloseSummary>('/payments/cashier-close/open', {
+      method: 'POST',
       json: body as JsonBody,
     }),
   countCashierClose: (
@@ -471,31 +471,31 @@ export const financeApi = {
   ) =>
     request<CashierCloseSummary>(
       `/payments/cashier-close/${encodeURIComponent(closeId)}/count`,
-      { method: "POST", json: body as JsonBody },
+      { method: 'POST', json: body as JsonBody },
     ),
   submitCashierClose: (closeId: string, reason: string) =>
     request<CashierCloseSummary>(
       `/payments/cashier-close/${encodeURIComponent(closeId)}/submit`,
-      { method: "POST", json: { reason } },
+      { method: 'POST', json: { reason } },
     ),
   approveCashierClose: (closeId: string, reason: string) =>
     request<CashierCloseSummary>(
       `/payments/cashier-close/${encodeURIComponent(closeId)}/approve`,
-      { method: "POST", json: { reason } },
+      { method: 'POST', json: { reason } },
     ),
   closeCashierClose: (closeId: string, reason: string) =>
     request<CashierCloseSummary>(
       `/payments/cashier-close/${encodeURIComponent(closeId)}/close`,
-      { method: "POST", json: { reason } },
+      { method: 'POST', json: { reason } },
     ),
   listCashDeposits: (params?: {
     page?: number;
     limit?: number;
-    status?: "DRAFT" | "SUBMITTED" | "DEPOSITED" | "REVERSED";
+    status?: 'DRAFT' | 'SUBMITTED' | 'DEPOSITED' | 'REVERSED';
     cashierCloseId?: string;
   }) =>
     request<CashDepositPage>(
-      withQuery("/payments/cash-deposits", params ?? {}),
+      withQuery('/payments/cash-deposits', params ?? {}),
     ),
   prepareCashDeposit: (body: {
     cashierCloseId: string;
@@ -503,28 +503,28 @@ export const financeApi = {
     referenceNumber?: string;
     idempotencyKey: string;
   }) =>
-    request<CashDepositSummary>("/payments/cash-deposits", {
-      method: "POST",
+    request<CashDepositSummary>('/payments/cash-deposits', {
+      method: 'POST',
       json: body,
     }),
   submitCashDeposit: (depositId: string, reason: string) =>
     request<CashDepositSummary>(
       `/payments/cash-deposits/${encodeURIComponent(depositId)}/submit`,
-      { method: "POST", json: { reason } },
+      { method: 'POST', json: { reason } },
     ),
   completeCashDeposit: (depositId: string, reason: string) =>
     request<CashDepositSummary>(
       `/payments/cash-deposits/${encodeURIComponent(depositId)}/complete`,
-      { method: "POST", json: { reason } },
+      { method: 'POST', json: { reason } },
     ),
   reversePayment: (
     paymentId: string,
     body: { reason: string; idempotencyKey: string },
   ) =>
-    request<{ disposition: "SUCCEEDED" | "REPLAYED" }>(
+    request<{ disposition: 'SUCCEEDED' | 'REPLAYED' }>(
       `/payments/${encodeURIComponent(paymentId)}/reverse`,
       {
-        method: "POST",
+        method: 'POST',
         json: body as JsonBody,
       },
     ),
@@ -535,18 +535,18 @@ export const financeApi = {
     studentId?: string;
     issuedFrom?: string;
     issuedTo?: string;
-  }) => request<ReceiptViewPage>(withQuery("/receipts", params ?? {})),
+  }) => request<ReceiptViewPage>(withQuery('/receipts', params ?? {})),
   listReceipts: async () =>
     (await financeApi.listReceiptsPage({ limit: 25 })).items,
   listFinanceApprovalRequests: (params?: {
     page?: number;
     limit?: number;
     search?: string;
-    type?: "REFUND" | "REVERSAL";
+    type?: 'REFUND' | 'REVERSAL';
     status?: string;
   }) =>
     request<FinanceApprovalRequestPage>(
-      withQuery("/payments/requests", params ?? {}),
+      withQuery('/payments/requests', params ?? {}),
     ),
   requestPaymentRefund: (
     paymentId: string,
@@ -557,7 +557,7 @@ export const financeApi = {
     },
   ) =>
     request(`/payments/${encodeURIComponent(paymentId)}/refund/request`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   requestPaymentReversal: (
@@ -565,15 +565,15 @@ export const financeApi = {
     body: { reason: string; idempotencyKey: string },
   ) =>
     request(`/payments/${encodeURIComponent(paymentId)}/reverse/request`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   reviewFinanceApprovalRequest: (
     requestId: string,
-    body: { status: "APPROVED" | "REJECTED"; reviewNote?: string },
+    body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string },
   ) =>
     request(`/payments/requests/${encodeURIComponent(requestId)}/review`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
   getReceiptReprintHistory: (receiptId: string) =>
@@ -588,7 +588,7 @@ export const financeApi = {
     const response = await fetch(
       `${API_BASE_URL}/receipts/${encodeURIComponent(receiptNumber)}.pdf`,
       {
-        credentials: "include",
+        credentials: 'include',
       },
     );
 
@@ -603,37 +603,37 @@ export const financeApi = {
       reprintHistoryId: string;
       fileAssetId: string;
       fileName: string;
-      disposition: "SUCCEEDED" | "REPLAYED";
+      disposition: 'SUCCEEDED' | 'REPLAYED';
     }>(`/receipts/${encodeURIComponent(receiptId)}/reprint`, {
-      method: "POST",
+      method: 'POST',
       json: body,
     }),
-  listReports: () => request<ReportDefinition[]>("/reports"),
+  listReports: () => request<ReportDefinition[]>('/reports'),
   exportReport: (reportKey: string, payload: ReportExportRequest) =>
     downloadReport(reportKey, payload),
   listReportSnapshots: (params?: { page?: number; limit?: number }) =>
     request<ReportSnapshotsPage>(
-      withQuery("/reports/export-history", params ?? {}),
+      withQuery('/reports/export-history', params ?? {}),
     ),
   retryReportSnapshot: (id: string) =>
-    request<{ id: string; status: "QUEUED"; jobId?: string | number }>(
+    request<{ id: string; status: 'QUEUED'; jobId?: string | number }>(
       `/reports/export-history/${encodeURIComponent(id)}/retry`,
-      { method: "POST" },
+      { method: 'POST' },
     ),
   downloadReportSnapshot: async (id: string) => {
     const response = await fetch(
       `${API_BASE_URL}/reports/export-history/${encodeURIComponent(id)}/download`,
-      { credentials: "include" },
+      { credentials: 'include' },
     );
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(parseApiErrorMessage(text) || "Download failed");
+      throw new Error(parseApiErrorMessage(text) || 'Download failed');
     }
 
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
+    const link = document.createElement('a');
     link.href = url;
     link.download = `finance-report-${id}`;
     document.body.appendChild(link);

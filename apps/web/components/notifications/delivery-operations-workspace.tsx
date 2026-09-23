@@ -1,26 +1,26 @@
-"use client";
+'use client';
 
-import { formatBsDateTime } from "@schoolos/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, RefreshCcw, ShieldCheck } from "lucide-react";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
-import { communicationsApi } from "@/lib/api/communications";
-import { useSession } from "@/components/session-provider";
-import { DashboardPageShell } from "@/components/dashboard/dashboard-page-shell";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { FilterBar } from "@/components/ui/filter-bar";
-import { ModuleHeader } from "@/components/ui/module-header";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { TablePagination } from "@/components/ui/table-pagination";
+import { formatBsDateTime } from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, RefreshCcw, ShieldCheck } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { communicationsApi } from '@/lib/api/communications';
+import { useSession } from '@/components/session-provider';
+import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { ModuleHeader } from '@/components/ui/module-header';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { TablePagination } from '@/components/ui/table-pagination';
 
 const PAGE_SIZE = 25;
 
 export function DeliveryOperationsWorkspace({
-  initialView = "logs",
+  initialView = 'logs',
 }: {
-  initialView?: "logs" | "failures";
+  initialView?: 'logs' | 'failures';
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -31,27 +31,27 @@ export function DeliveryOperationsWorkspace({
   // Alias-aware, matching the guard: delivery diagnostics is also satisfied
   // by `communications:read_deliveries`, and retry by
   // `communications:retry_deliveries`.
-  const canView = hasPermissions(["notifications:view_delivery_diagnostics"]);
+  const canView = hasPermissions(['notifications:view_delivery_diagnostics']);
   const canRetry =
-    !isSupportOverride && hasPermissions(["notifications:retry_deliveries"]);
-  const view = (searchParams.get("view") ?? initialView) as "logs" | "failures";
-  const page = positiveNumber(searchParams.get("page"), 1);
-  const status = searchParams.get("status") ?? "";
-  const channel = searchParams.get("channel") ?? "";
-  const sourceType = searchParams.get("sourceType") ?? "";
-  const effectiveSourceType = isSupportOverride ? "" : sourceType;
+    !isSupportOverride && hasPermissions(['notifications:retry_deliveries']);
+  const view = (searchParams.get('view') ?? initialView) as 'logs' | 'failures';
+  const page = positiveNumber(searchParams.get('page'), 1);
+  const status = searchParams.get('status') ?? '';
+  const channel = searchParams.get('channel') ?? '';
+  const sourceType = searchParams.get('sourceType') ?? '';
+  const effectiveSourceType = isSupportOverride ? '' : sourceType;
   const [retryId, setRetryId] = useState<string | null>(null);
-  const [retryReason, setRetryReason] = useState("");
-  const [retryTarget, setRetryTarget] = useState("");
+  const [retryReason, setRetryReason] = useState('');
+  const [retryTarget, setRetryTarget] = useState('');
 
   const diagnostics = useQuery({
-    queryKey: ["communications-provider-diagnostics"],
+    queryKey: ['communications-provider-diagnostics'],
     queryFn: communicationsApi.getCommunicationsProviderDiagnostics,
     enabled: canView,
   });
   const logs = useQuery({
     queryKey: [
-      "notification-deliveries",
+      'notification-deliveries',
       { page, status, channel, sourceType: effectiveSourceType },
     ],
     queryFn: () =>
@@ -62,11 +62,11 @@ export function DeliveryOperationsWorkspace({
         channel: channel || undefined,
         sourceType: effectiveSourceType || undefined,
       }),
-    enabled: canView && view === "logs",
+    enabled: canView && view === 'logs',
   });
   const failures = useQuery({
     queryKey: [
-      "notification-delivery-failures",
+      'notification-delivery-failures',
       { page, status, channel, sourceType: effectiveSourceType },
     ],
     queryFn: () =>
@@ -77,7 +77,7 @@ export function DeliveryOperationsWorkspace({
         channel: channel || undefined,
         sourceType: effectiveSourceType || undefined,
       }),
-    enabled: canView && view === "failures",
+    enabled: canView && view === 'failures',
   });
   const retry = useMutation({
     mutationFn: ({
@@ -92,10 +92,10 @@ export function DeliveryOperationsWorkspace({
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["notification-deliveries"],
+          queryKey: ['notification-deliveries'],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["notification-delivery-failures"],
+          queryKey: ['notification-delivery-failures'],
         }),
       ]),
   });
@@ -107,32 +107,32 @@ export function DeliveryOperationsWorkspace({
     !retry.isSuccess &&
     !failures.isFetching &&
     !failures.isError &&
-    selectedFailure?.retryStatus === "retryable";
+    selectedFailure?.retryStatus === 'retryable';
 
   function setFilters(next: Record<string, string | number | null>) {
     const params = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(next)) {
-      if (value === null || value === "" || value === 1) params.delete(key);
+      if (value === null || value === '' || value === 1) params.delete(key);
       else params.set(key, String(value));
     }
     router.replace(
-      `${pathname}${params.size > 0 ? `?${params.toString()}` : ""}`,
+      `${pathname}${params.size > 0 ? `?${params.toString()}` : ''}`,
     );
   }
 
-  const currentPage = view === "logs" ? logs.data : failures.data;
-  const isLoading = view === "logs" ? logs.isLoading : failures.isLoading;
-  const isError = view === "logs" ? logs.isError : failures.isError;
+  const currentPage = view === 'logs' ? logs.data : failures.data;
+  const isLoading = view === 'logs' ? logs.isLoading : failures.isLoading;
+  const isError = view === 'logs' ? logs.isError : failures.isError;
 
   return (
     <DashboardPageShell>
       <ModuleHeader
         eyebrow="Notifications"
-        title={view === "logs" ? "Delivery logs" : "Failure and retry center"}
+        title={view === 'logs' ? 'Delivery logs' : 'Failure and retry center'}
         description={
           isSupportOverride
-            ? "Read-only masked delivery diagnostics. Message content, full destinations, retry actions, and provider credentials remain protected."
-            : "Review delivery status and retry eligible failures. Message content and contact details remain protected."
+            ? 'Read-only masked delivery diagnostics. Message content, full destinations, retry actions, and provider credentials remain protected.'
+            : 'Review delivery status and retry eligible failures. Message content and contact details remain protected.'
         }
         secondaryActions={
           <div className="flex gap-2">
@@ -156,7 +156,7 @@ export function DeliveryOperationsWorkspace({
         <ShieldCheck size={18} className="mt-0.5 shrink-0" />
         <div>
           <p className="font-semibold">
-            Provider mode: {diagnostics.data?.overallMode ?? "unavailable"}
+            Provider mode: {diagnostics.data?.overallMode ?? 'unavailable'}
           </p>
           <p className="mt-1">
             Mocked or disabled providers are never presented as confirmed
@@ -174,21 +174,21 @@ export function DeliveryOperationsWorkspace({
               label="Status"
               value={status}
               options={[
-                "",
-                "QUEUED",
-                "SENT",
-                "DELIVERED",
-                "FAILED",
-                "RETRY_PENDING",
-                "CANCELLED",
-                "SKIPPED",
+                '',
+                'QUEUED',
+                'SENT',
+                'DELIVERED',
+                'FAILED',
+                'RETRY_PENDING',
+                'CANCELLED',
+                'SKIPPED',
               ]}
               onChange={(value) => setFilters({ status: value, page: null })}
             />
             <FilterSelect
               label="Channel"
               value={channel}
-              options={["", "IN_APP", "PUSH", "SMS", "EMAIL"]}
+              options={['', 'IN_APP', 'PUSH', 'SMS', 'EMAIL']}
               onChange={(value) => setFilters({ channel: value, page: null })}
             />
             {!isSupportOverride ? (
@@ -196,11 +196,11 @@ export function DeliveryOperationsWorkspace({
                 label="Source"
                 value={sourceType}
                 options={[
-                  "",
-                  "notice",
-                  "notice_acknowledgement_follow_up",
-                  "event",
-                  "activity_post",
+                  '',
+                  'notice',
+                  'notice_acknowledgement_follow_up',
+                  'event',
+                  'activity_post',
                 ]}
                 onChange={(value) =>
                   setFilters({ sourceType: value, page: null })
@@ -233,7 +233,7 @@ export function DeliveryOperationsWorkspace({
       ) : (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="divide-y divide-slate-100">
-            {view === "logs"
+            {view === 'logs'
               ? logs.data!.items.map((item) => (
                   <article
                     key={item.id}
@@ -257,11 +257,11 @@ export function DeliveryOperationsWorkspace({
                         Queued {formatBsDateTime(item.queuedAt)}
                         {item.attemptedAt
                           ? ` · attempted ${formatBsDateTime(item.attemptedAt)}`
-                          : ""}
+                          : ''}
                       </p>
                     </div>
                     <p className="text-xs text-slate-500">
-                      {label(item.recipientType)} · {item.recipientLabel} ·{" "}
+                      {label(item.recipientType)} · {item.recipientLabel} ·{' '}
                       {item.retryCount} retries
                     </p>
                   </article>
@@ -288,27 +288,27 @@ export function DeliveryOperationsWorkspace({
                       </div>
                       <p className="mt-2 text-sm font-semibold text-slate-950">
                         {item.recipientSummary.destinationMasked ??
-                          "Recipient unavailable"}
+                          'Recipient unavailable'}
                       </p>
                       <p className="mt-1 text-sm text-slate-600">
                         {item.lastFailureReason ??
-                          "No safe failure reason available."}
+                          'No safe failure reason available.'}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        {item.retryCount} retries · failed{" "}
+                        {item.retryCount} retries · failed{' '}
                         {item.failedAt
                           ? formatBsDateTime(item.failedAt)
-                          : "time unavailable"}
+                          : 'time unavailable'}
                       </p>
                     </div>
-                    {canRetry && item.retryStatus === "retryable" ? (
+                    {canRetry && item.retryStatus === 'retryable' ? (
                       <button
                         type="button"
                         onClick={() => {
                           retry.reset();
-                          setRetryReason("");
+                          setRetryReason('');
                           setRetryTarget(
-                            `${label(item.channel)} · ${item.recipientSummary.destinationMasked ?? "Recipient unavailable"}`,
+                            `${label(item.channel)} · ${item.recipientSummary.destinationMasked ?? 'Recipient unavailable'}`,
                           );
                           setRetryId(item.id);
                         }}
@@ -335,7 +335,7 @@ export function DeliveryOperationsWorkspace({
           role="status"
           className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700"
         >
-          {retryTarget}:{" "}
+          {retryTarget}:{' '}
           {retryResultMessage(
             retry.data.status,
             Boolean(retry.data.errorMessage),
@@ -351,11 +351,11 @@ export function DeliveryOperationsWorkspace({
         confirmDisabled={!retryReason.trim() || !canSubmitRetry}
         isConfirming={retry.isPending}
         preventCloseWhileConfirming
-        cancelLabel={retry.isSuccess ? "Close" : "Cancel"}
+        cancelLabel={retry.isSuccess ? 'Close' : 'Cancel'}
         onClose={() => {
           if (!retry.isPending) {
             setRetryId(null);
-            setRetryReason("");
+            setRetryReason('');
           }
         }}
         onConfirm={() => {
@@ -384,7 +384,7 @@ export function DeliveryOperationsWorkspace({
               {retryResultMessage(
                 retry.data.status,
                 Boolean(retry.data.errorMessage),
-              )}{" "}
+              )}{' '}
               Your reason is preserved until you close this review. Review the
               refreshed delivery record before starting another retry.
             </p>
@@ -393,10 +393,10 @@ export function DeliveryOperationsWorkspace({
             <div className="space-y-2 text-sm text-slate-700">
               <p>
                 {failures.isError
-                  ? "Current retry eligibility is unavailable. Refresh before taking further action."
+                  ? 'Current retry eligibility is unavailable. Refresh before taking further action.'
                   : selectedFailure
                     ? `Current state: ${label(selectedFailure.status)} · ${label(selectedFailure.retryStatus)}.`
-                    : "This delivery is no longer in the current failure page. Check delivery logs for its current state."}
+                    : 'This delivery is no longer in the current failure page. Check delivery logs for its current state.'}
               </p>
               <button
                 type="button"
@@ -428,23 +428,23 @@ export function DeliveryOperationsWorkspace({
 }
 
 function retryResultMessage(status: string, hasDiagnostic: boolean) {
-  if (["QUEUED", "RETRY_PENDING", "RETRYING", "PENDING"].includes(status)) {
+  if (['QUEUED', 'RETRY_PENDING', 'RETRYING', 'PENDING'].includes(status)) {
     if (hasDiagnostic) {
-      return "The saved delivery is pending, but queue handoff or processing needs review. Do not assume this retry reached the provider.";
+      return 'The saved delivery is pending, but queue handoff or processing needs review. Do not assume this retry reached the provider.';
     }
-    return "The saved delivery is pending. This does not confirm delivery to the recipient.";
+    return 'The saved delivery is pending. This does not confirm delivery to the recipient.';
   }
-  if (status === "DELIVERED") return "The saved delivery status is Delivered.";
-  if (status === "SENT") {
-    return "The saved delivery status is Sent, not confirmation that the recipient received or read it.";
+  if (status === 'DELIVERED') return 'The saved delivery status is Delivered.';
+  if (status === 'SENT') {
+    return 'The saved delivery status is Sent, not confirmation that the recipient received or read it.';
   }
-  if (status === "FAILED")
-    return "The delivery is still failed and needs review.";
-  if (status === "CANCELLED")
-    return "The delivery is cancelled. No new retry is confirmed.";
-  if (status === "SKIPPED")
-    return "The delivery was skipped. No successful delivery is confirmed.";
-  return "The response did not confirm a recognized delivery outcome. Check delivery logs before retrying.";
+  if (status === 'FAILED')
+    return 'The delivery is still failed and needs review.';
+  if (status === 'CANCELLED')
+    return 'The delivery is cancelled. No new retry is confirmed.';
+  if (status === 'SKIPPED')
+    return 'The delivery was skipped. No successful delivery is confirmed.';
+  return 'The response did not confirm a recognized delivery outcome. Check delivery logs before retrying.';
 }
 
 function FilterSelect({
@@ -467,7 +467,7 @@ function FilterSelect({
         className="min-h-10 min-w-36"
       >
         {options.map((option) => (
-          <option key={option || "ALL"} value={option}>
+          <option key={option || 'ALL'} value={option}>
             {option ? label(option) : allFilterLabel(filterLabel)}
           </option>
         ))}
@@ -482,13 +482,13 @@ function positiveNumber(value: string | null, fallback: number) {
 }
 
 function allFilterLabel(filterLabel: string) {
-  if (filterLabel === "Status") return "All statuses";
+  if (filterLabel === 'Status') return 'All statuses';
   return `All ${filterLabel.toLowerCase()}s`;
 }
 
 function label(value: string) {
   return value
     .toLowerCase()
-    .replaceAll("_", " ")
+    .replaceAll('_', ' ')
     .replace(/^./, (letter) => letter.toUpperCase());
 }

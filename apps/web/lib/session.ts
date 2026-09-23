@@ -2,20 +2,20 @@ import type {
   AuthSession,
   PermissionKey,
   SupportOverrideBrowserContext,
-} from "@schoolos/core";
-import { hasEffectivePermission, isSupportOverrideScope } from "@schoolos/core";
+} from '@schoolos/core';
+import { hasEffectivePermission, isSupportOverrideScope } from '@schoolos/core';
 import {
   clearRecentlyViewed as clearRecentlyViewedEntries,
   readRecentlyViewed as readRecentlyViewedEntries,
   recordRecentlyViewed as recordRecentlyViewedEntry,
   type RecentlyViewedEntry,
-} from "./recently-viewed";
-import { canStorePendingAttendanceDraft } from "./offline-policy";
+} from './recently-viewed';
+import { canStorePendingAttendanceDraft } from './offline-policy';
 import {
   AttendanceDraftStorageFence,
   type AttendanceDraftStorageTicket,
-} from "./attendance-draft-storage-fence";
-import { resolveAttendanceDraftRead } from "./attendance-draft-read-result";
+} from './attendance-draft-storage-fence';
+import { resolveAttendanceDraftRead } from './attendance-draft-read-result';
 import {
   AttendanceDraftReceiptFenceError,
   decideAttendanceDraftReceiptDelete,
@@ -25,27 +25,27 @@ import {
   isPurposeLimitedAttendanceReceipt,
   type AttendanceDraftAuthoritativeReceipt,
   type AttendanceDraftReceiptIdentity,
-} from "./attendance-draft-receipt-fence";
+} from './attendance-draft-receipt-fence';
 import {
   resolveAccessRevocationReceipt,
   type AttendanceAccessRevocationStatus,
-} from "./attendance-draft-access-revocation";
-import { ATTENDANCE_ROSTER_VERSION_PATTERN } from "./attendance-roster-version";
+} from './attendance-draft-access-revocation';
+import { ATTENDANCE_ROSTER_VERSION_PATTERN } from './attendance-roster-version';
 
-export const SESSION_STORAGE_KEY = "schoolos.auth-session";
-const ATTENDANCE_DRAFT_KEY_PREFIX = "schoolos.attendance-draft:";
+export const SESSION_STORAGE_KEY = 'schoolos.auth-session';
+const ATTENDANCE_DRAFT_KEY_PREFIX = 'schoolos.attendance-draft:';
 export const ATTENDANCE_DRAFT_RECEIPT_BARRIER_KEY_PREFIX =
-  "schoolos.attendance-draft-receipt-barrier:";
-export const SESSION_CLEARED_EVENT = "schoolos:session-cleared";
-export const SUPPORT_OVERRIDE_STORAGE_KEY = "schoolos.support-override.v1";
-const LEGACY_SUPPORT_OVERRIDE_TENANT_KEY = "x-schoolos-tenant-id";
-const LEGACY_SUPPORT_OVERRIDE_REASON_KEY = "x-schoolos-tenant-override-reason";
+  'schoolos.attendance-draft-receipt-barrier:';
+export const SESSION_CLEARED_EVENT = 'schoolos:session-cleared';
+export const SUPPORT_OVERRIDE_STORAGE_KEY = 'schoolos.support-override.v1';
+const LEGACY_SUPPORT_OVERRIDE_TENANT_KEY = 'x-schoolos-tenant-id';
+const LEGACY_SUPPORT_OVERRIDE_REASON_KEY = 'x-schoolos-tenant-override-reason';
 const attendanceDraftStorageFence = new AttendanceDraftStorageFence();
 
 // Pilot note: browser-persisted session state is metadata-only. API auth is
 // backed by httpOnly cookies; future BFF work should also remove access tokens
 // from browser-visible login/refresh response bodies.
-export type BrowserSession = Omit<AuthSession, "accessToken">;
+export type BrowserSession = Omit<AuthSession, 'accessToken'>;
 export type AttendanceDraftStorageValue = {
   clientSubmissionId: string;
   academicYearId: string;
@@ -98,7 +98,7 @@ export function isAttendanceDraftReceiptBarrierStorageEvent(
   draftKey: string,
 ) {
   return (
-    typeof window !== "undefined" &&
+    typeof window !== 'undefined' &&
     event.storageArea === window.localStorage &&
     event.key === attendanceDraftReceiptBarrierKey(draftKey)
   );
@@ -113,7 +113,7 @@ export function toBrowserSession(session: AuthSession): BrowserSession {
 }
 
 export function readStoredSession() {
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return null;
   }
 
@@ -126,7 +126,7 @@ export function readStoredSession() {
   try {
     const parsed = JSON.parse(rawSession) as Partial<AuthSession>;
 
-    if ("accessToken" in parsed) {
+    if ('accessToken' in parsed) {
       window.localStorage.removeItem(SESSION_STORAGE_KEY);
       return null;
     }
@@ -142,7 +142,7 @@ export function storeSession(
   session: BrowserSession | AuthSession | null,
   options: { notify?: boolean } = {},
 ) {
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return;
   }
 
@@ -157,7 +157,7 @@ export function storeSession(
   }
 
   const browserSession =
-    "accessToken" in session ? toBrowserSession(session) : session;
+    'accessToken' in session ? toBrowserSession(session) : session;
 
   window.localStorage.setItem(
     SESSION_STORAGE_KEY,
@@ -171,7 +171,7 @@ export function clearStoredSession() {
 
 export function isSessionStorageEvent(event: StorageEvent) {
   if (
-    typeof window === "undefined" ||
+    typeof window === 'undefined' ||
     event.storageArea !== window.localStorage
   ) {
     return false;
@@ -181,19 +181,19 @@ export function isSessionStorageEvent(event: StorageEvent) {
 }
 
 export function readRecentlyViewed(): RecentlyViewedEntry[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === 'undefined') return [];
   return readRecentlyViewedEntries(window.localStorage);
 }
 
 export function recordRecentlyViewed(
-  entry: Omit<RecentlyViewedEntry, "viewedAt">,
+  entry: Omit<RecentlyViewedEntry, 'viewedAt'>,
 ): RecentlyViewedEntry[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === 'undefined') return [];
   return recordRecentlyViewedEntry(window.localStorage, entry);
 }
 
 export function clearRecentlyViewed(): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   clearRecentlyViewedEntries(window.localStorage);
 }
 
@@ -201,8 +201,8 @@ export async function readAttendanceDraft(
   key: string | null,
   options: AttendanceDraftStorageOptions = {},
 ) {
-  if (typeof window === "undefined" || !key) {
-    return { status: "missing" } as const;
+  if (typeof window === 'undefined' || !key) {
+    return { status: 'missing' } as const;
   }
 
   const ticket = options.ticket ?? attendanceDraftStorageFence.captureTicket();
@@ -253,7 +253,7 @@ export async function storeAttendanceDraft(
   draft: AttendanceDraftStorageValue,
   options: AttendanceDraftWriteOptions = {},
 ) {
-  if (typeof window === "undefined" || !key) {
+  if (typeof window === 'undefined' || !key) {
     return;
   }
 
@@ -288,7 +288,7 @@ export async function sanitizeAttendanceDraftForAccessRevocation(
   status: AttendanceAccessRevocationStatus,
   options: AttendanceDraftStorageOptions = {},
 ) {
-  if (typeof window === "undefined" || !key) {
+  if (typeof window === 'undefined' || !key) {
     return resolveAccessRevocationReceipt(null, fallbackDraft, status);
   }
 
@@ -325,7 +325,7 @@ export async function clearAttendanceDraft(
   key: string | null,
   options: AttendanceDraftClearOptions = {},
 ) {
-  if (typeof window === "undefined" || !key) {
+  if (typeof window === 'undefined' || !key) {
     return;
   }
 
@@ -337,7 +337,7 @@ export async function clearAttendanceDraft(
 
 export async function clearAllAttendanceDrafts() {
   const cleanupTicket = attendanceDraftStorageFence.invalidate();
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return;
   }
 
@@ -365,7 +365,7 @@ export async function listAttendanceDraftsForCurrentBrowser(scope: {
   userId: string;
 }) {
   if (
-    typeof window === "undefined" ||
+    typeof window === 'undefined' ||
     !scope.tenantId.trim() ||
     !scope.userId.trim()
   ) {
@@ -405,19 +405,19 @@ export async function listAttendanceDraftsForCurrentBrowser(scope: {
 }
 
 export function createAttendanceDraftSubmissionId() {
-  if (typeof globalThis.crypto?.randomUUID === "function") {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
     return `web-attendance-${globalThis.crypto.randomUUID()}`;
   }
 
-  if (typeof globalThis.crypto?.getRandomValues === "function") {
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
     const bytes = new Uint8Array(16);
     globalThis.crypto.getRandomValues(bytes);
     return `web-attendance-${Array.from(bytes, (byte) =>
-      byte.toString(16).padStart(2, "0"),
-    ).join("")}`;
+      byte.toString(16).padStart(2, '0'),
+    ).join('')}`;
   }
 
-  throw new Error("Secure attendance draft IDs are unavailable");
+  throw new Error('Secure attendance draft IDs are unavailable');
 }
 
 /**
@@ -461,7 +461,7 @@ export function hasAnyPermission(
 }
 
 export function readSupportOverrideContext(): SupportOverrideBrowserContext | null {
-  if (typeof window === "undefined") return null;
+  if (typeof window === 'undefined') return null;
   const raw = window.sessionStorage.getItem(SUPPORT_OVERRIDE_STORAGE_KEY);
   if (!raw) return null;
 
@@ -469,7 +469,7 @@ export function readSupportOverrideContext(): SupportOverrideBrowserContext | nu
     const candidate = JSON.parse(raw) as Partial<SupportOverrideBrowserContext>;
     const scopes = candidate.scopes;
     const expiresAt =
-      typeof candidate.expiresAt === "string"
+      typeof candidate.expiresAt === 'string'
         ? Date.parse(candidate.expiresAt)
         : Number.NaN;
     const validScopes =
@@ -477,16 +477,16 @@ export function readSupportOverrideContext(): SupportOverrideBrowserContext | nu
       scopes.length > 0 &&
       new Set(scopes).size === scopes.length &&
       scopes.every(
-        (scope) => typeof scope === "string" && isSupportOverrideScope(scope),
+        (scope) => typeof scope === 'string' && isSupportOverrideScope(scope),
       );
 
     if (
       candidate.version !== 1 ||
-      typeof candidate.overrideId !== "string" ||
+      typeof candidate.overrideId !== 'string' ||
       !candidate.overrideId.trim() ||
-      typeof candidate.tenantId !== "string" ||
+      typeof candidate.tenantId !== 'string' ||
       !candidate.tenantId.trim() ||
-      typeof candidate.reason !== "string" ||
+      typeof candidate.reason !== 'string' ||
       candidate.reason.trim().length < 5 ||
       candidate.reason !== candidate.reason.trim() ||
       candidate.readOnly !== true ||
@@ -514,9 +514,9 @@ export function getSupportOverrideReason(): string | null {
 }
 
 export function setSupportOverride(
-  context: Omit<SupportOverrideBrowserContext, "version">,
+  context: Omit<SupportOverrideBrowserContext, 'version'>,
 ) {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   window.sessionStorage.setItem(
     SUPPORT_OVERRIDE_STORAGE_KEY,
     JSON.stringify({ version: 1, ...context }),
@@ -526,14 +526,14 @@ export function setSupportOverride(
 }
 
 export function clearSupportOverride() {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   window.sessionStorage.removeItem(SUPPORT_OVERRIDE_STORAGE_KEY);
   window.sessionStorage.removeItem(LEGACY_SUPPORT_OVERRIDE_TENANT_KEY);
   window.sessionStorage.removeItem(LEGACY_SUPPORT_OVERRIDE_REASON_KEY);
 }
 
-const ATTENDANCE_DRAFT_DB_NAME = "schoolos-attendance-drafts";
-const ATTENDANCE_DRAFT_STORE_NAME = "drafts";
+const ATTENDANCE_DRAFT_DB_NAME = 'schoolos-attendance-drafts';
+const ATTENDANCE_DRAFT_STORE_NAME = 'drafts';
 const ATTENDANCE_DRAFT_DB_VERSION = 1;
 const ATTENDANCE_DRAFT_TTL_MS = 48 * 60 * 60 * 1000;
 const ATTENDANCE_DRAFT_MAX_RECORDS = 20;
@@ -544,7 +544,7 @@ export class AttendanceDraftCapacityError extends Error {
     super(
       `This browser already has ${ATTENDANCE_DRAFT_MAX_RECORDS} pending attendance drafts. Sync or remove one before saving another.`,
     );
-    this.name = "AttendanceDraftCapacityError";
+    this.name = 'AttendanceDraftCapacityError';
   }
 }
 
@@ -558,7 +558,7 @@ function openAttendanceDraftDb() {
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(ATTENDANCE_DRAFT_STORE_NAME)) {
-        db.createObjectStore(ATTENDANCE_DRAFT_STORE_NAME, { keyPath: "key" });
+        db.createObjectStore(ATTENDANCE_DRAFT_STORE_NAME, { keyPath: 'key' });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -594,7 +594,7 @@ async function withDraftStore<T>(
       reject(
         requestError ??
           transaction.error ??
-          new Error("Attendance draft storage transaction was aborted"),
+          new Error('Attendance draft storage transaction was aborted'),
       );
     };
   });
@@ -602,7 +602,7 @@ async function withDraftStore<T>(
 
 async function readIndexedDbDraft(key: string) {
   const stored = await withDraftStore<StoredAttendanceDraft | undefined>(
-    "readonly",
+    'readonly',
     (store) => store.get(key),
   );
 
@@ -650,7 +650,7 @@ async function writeIndexedDbAccessRevocationReceipt(
   return new Promise<AttendanceDraftStorageValue>((resolve, reject) => {
     const transaction = db.transaction(
       ATTENDANCE_DRAFT_STORE_NAME,
-      "readwrite",
+      'readwrite',
     );
     const store = transaction.objectStore(ATTENDANCE_DRAFT_STORE_NAME);
     const request = store.get(key);
@@ -678,7 +678,7 @@ async function writeIndexedDbAccessRevocationReceipt(
 
       if (!tombstone) {
         reject(
-          new Error("Attendance access revocation receipt was not stored"),
+          new Error('Attendance access revocation receipt was not stored'),
         );
         return;
       }
@@ -690,7 +690,7 @@ async function writeIndexedDbAccessRevocationReceipt(
       reject(
         operationError ??
           transaction.error ??
-          new Error("Attendance access revocation receipt was not stored"),
+          new Error('Attendance access revocation receipt was not stored'),
       );
     };
   });
@@ -706,7 +706,7 @@ async function writeIndexedDbDraftWithinCapacity(
   return new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(
       ATTENDANCE_DRAFT_STORE_NAME,
-      "readwrite",
+      'readwrite',
     );
     const store = transaction.objectStore(ATTENDANCE_DRAFT_STORE_NAME);
     const request = store.getAll();
@@ -789,21 +789,19 @@ async function writeIndexedDbDraftWithinCapacity(
       db.close();
       reject(
         transaction.error ??
-          new Error("Attendance draft could not be saved on this browser"),
+          new Error('Attendance draft could not be saved on this browser'),
       );
     };
   });
 }
 
-async function deleteIndexedDbDraft(
-  key: string,
-) {
+async function deleteIndexedDbDraft(key: string) {
   const db = await openAttendanceDraftDb();
 
   return new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(
       ATTENDANCE_DRAFT_STORE_NAME,
-      "readwrite",
+      'readwrite',
     );
     const store = transaction.objectStore(ATTENDANCE_DRAFT_STORE_NAME);
     const request = store.get(key);
@@ -811,7 +809,8 @@ async function deleteIndexedDbDraft(
 
     request.onsuccess = () => {
       const storedDraft = request.result as StoredAttendanceDraft | undefined;
-      const receiptDeleteDecision = decideAttendanceDraftReceiptDelete(storedDraft);
+      const receiptDeleteDecision =
+        decideAttendanceDraftReceiptDelete(storedDraft);
       if (!receiptDeleteDecision.allowed) {
         receiptFenceError = new AttendanceDraftReceiptFenceError(
           receiptDeleteDecision.reason,
@@ -836,15 +835,13 @@ async function deleteIndexedDbDraft(
       db.close();
       reject(
         transaction.error ??
-          new Error("Attendance draft could not be removed from this browser"),
+          new Error('Attendance draft could not be removed from this browser'),
       );
     };
   });
 }
 
-async function deleteAttendanceDraftStorage(
-  key: string,
-) {
+async function deleteAttendanceDraftStorage(key: string) {
   const barrier = readAttendanceDraftReceiptBarrier(key);
   const barrierDeleteDecision = decideAttendanceDraftReceiptDelete(barrier);
   if (!barrierDeleteDecision.allowed) {
@@ -857,7 +854,8 @@ async function deleteAttendanceDraftStorage(
       const legacyDraft = JSON.parse(
         legacyRaw,
       ) as AttendanceDraftReceiptIdentity;
-      const legacyDeleteDecision = decideAttendanceDraftReceiptDelete(legacyDraft);
+      const legacyDeleteDecision =
+        decideAttendanceDraftReceiptDelete(legacyDraft);
       if (!legacyDeleteDecision.allowed) {
         throw new AttendanceDraftReceiptFenceError(legacyDeleteDecision.reason);
       }
@@ -888,7 +886,7 @@ function persistAttendanceDraftReceiptBarrier(
     !isAttendanceDraftTerminalReceipt(draft) ||
     !isPurposeLimitedAttendanceReceipt(draft)
   ) {
-    throw new Error("Attendance receipt barrier must be purpose-limited");
+    throw new Error('Attendance receipt barrier must be purpose-limited');
   }
 
   assertAttendanceDraftStorageShapeAndSize(draft);
@@ -955,17 +953,17 @@ function removeLegacyAttendanceDraftIfUnchanged(
 }
 
 function clearIndexedDbDrafts() {
-  return withDraftStore<undefined>("readwrite", (store) => store.clear());
+  return withDraftStore<undefined>('readwrite', (store) => store.clear());
 }
 
 function listIndexedDbDrafts() {
-  return withDraftStore<StoredAttendanceDraft[]>("readonly", (store) =>
+  return withDraftStore<StoredAttendanceDraft[]>('readonly', (store) =>
     store.getAll(),
   );
 }
 
 function isExpiredAttendanceDraft(
-  draft: Pick<AttendanceDraftStorageValue, "savedAt">,
+  draft: Pick<AttendanceDraftStorageValue, 'savedAt'>,
 ) {
   const savedAt = new Date(draft.savedAt).getTime();
   return (
@@ -976,21 +974,21 @@ function isExpiredAttendanceDraft(
 function isInvalidStoredAttendanceDraft(draft: StoredAttendanceDraft) {
   return (
     !draft ||
-    typeof draft.key !== "string" ||
+    typeof draft.key !== 'string' ||
     !draft.key.trim() ||
-    typeof draft.academicYearId !== "string" ||
+    typeof draft.academicYearId !== 'string' ||
     !draft.academicYearId.trim() ||
-    typeof draft.classId !== "string" ||
+    typeof draft.classId !== 'string' ||
     !draft.classId.trim() ||
-    typeof draft.attendanceDate !== "string" ||
+    typeof draft.attendanceDate !== 'string' ||
     !draft.attendanceDate.trim() ||
-    typeof draft.savedAt !== "string" ||
+    typeof draft.savedAt !== 'string' ||
     !draft.savedAt.trim() ||
     !draft.exceptions ||
-    typeof draft.exceptions !== "object" ||
+    typeof draft.exceptions !== 'object' ||
     Array.isArray(draft.exceptions) ||
     !draft.remarks ||
-    typeof draft.remarks !== "object" ||
+    typeof draft.remarks !== 'object' ||
     Array.isArray(draft.remarks)
   );
 }
@@ -1001,7 +999,7 @@ function assertAttendanceDraftWithinStoragePolicy(
   assertAttendanceDraftStorageShapeAndSize(draft);
 
   if (isExpiredAttendanceDraft(draft)) {
-    throw new Error("Attendance draft has expired");
+    throw new Error('Attendance draft has expired');
   }
 }
 
@@ -1009,40 +1007,40 @@ function assertAttendanceDraftStorageShapeAndSize(
   draft: AttendanceDraftStorageValue,
 ) {
   if (
-    typeof draft.clientSubmissionId !== "string" ||
+    typeof draft.clientSubmissionId !== 'string' ||
     !draft.clientSubmissionId.trim() ||
-    typeof draft.academicYearId !== "string" ||
+    typeof draft.academicYearId !== 'string' ||
     !draft.academicYearId.trim() ||
-    typeof draft.classId !== "string" ||
+    typeof draft.classId !== 'string' ||
     !draft.classId.trim() ||
-    typeof draft.attendanceDate !== "string" ||
+    typeof draft.attendanceDate !== 'string' ||
     !draft.attendanceDate.trim() ||
-    typeof draft.savedAt !== "string" ||
+    typeof draft.savedAt !== 'string' ||
     !draft.savedAt.trim() ||
     !draft.exceptions ||
-    typeof draft.exceptions !== "object" ||
+    typeof draft.exceptions !== 'object' ||
     Array.isArray(draft.exceptions) ||
     !draft.remarks ||
-    typeof draft.remarks !== "object" ||
+    typeof draft.remarks !== 'object' ||
     Array.isArray(draft.remarks) ||
     (draft.authorizationVersion !== undefined &&
-      (typeof draft.authorizationVersion !== "string" ||
+      (typeof draft.authorizationVersion !== 'string' ||
         !draft.authorizationVersion.trim())) ||
     (draft.expectedRosterVersion !== undefined &&
-      (typeof draft.expectedRosterVersion !== "string" ||
+      (typeof draft.expectedRosterVersion !== 'string' ||
         !ATTENDANCE_ROSTER_VERSION_PATTERN.test(
           draft.expectedRosterVersion,
         ))) ||
     (draft.rejectionReason !== undefined &&
       draft.rejectionReason !== null &&
-      (typeof draft.rejectionReason !== "string" ||
+      (typeof draft.rejectionReason !== 'string' ||
         draft.rejectionReason.length > 128))
   ) {
-    throw new Error("Attendance draft is not valid for browser storage");
+    throw new Error('Attendance draft is not valid for browser storage');
   }
 
   const sizeBytes = new TextEncoder().encode(JSON.stringify(draft)).byteLength;
   if (sizeBytes > ATTENDANCE_DRAFT_MAX_BYTES) {
-    throw new Error("Attendance draft is too large for browser storage");
+    throw new Error('Attendance draft is too large for browser storage');
   }
 }

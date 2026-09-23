@@ -1,31 +1,31 @@
-"use client";
+'use client';
 
 import type {
   OperationalModuleSummary,
   OperationalSummaryModule,
-} from "@schoolos/core";
-import { ArrowRight, CheckCircle2 } from "lucide-react";
-import Link from "next/link";
-import { cn } from "../../lib/utils";
-import { useHasPermission } from "../../lib/permissions-ui";
+} from '@schoolos/core';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { cn } from '../../lib/utils';
+import { useHasPermission } from '../../lib/permissions-ui';
 import {
   shouldShowReadinessPanel,
   type DashboardCompositionPersona,
-} from "@/lib/dashboard-persona";
+} from '@/lib/dashboard-persona';
 import {
   formatMoneyNpr,
   formatNumber,
   metricNumber,
   metricValue,
   safeRoute,
-} from "./dashboard-module-meta";
+} from './dashboard-module-meta';
 
 const MAX_ROWS_PER_PANEL = 4;
 const PRINCIPAL_READINESS_MODULES = new Set<OperationalSummaryModule>([
-  "m4_academics",
-  "m11_accounting",
-  "m7_hr_payroll",
-  "m10_communications",
+  'm4_academics',
+  'm11_accounting',
+  'm7_hr_payroll',
+  'm10_communications',
 ]);
 
 type ReadinessRow = {
@@ -58,128 +58,127 @@ type ReadinessPanelDefinition = {
  */
 const READINESS_PANELS: ReadinessPanelDefinition[] = [
   {
-    key: "academic",
-    title: "Academic readiness",
-    emptyMessage: "No academic blockers reported.",
+    key: 'academic',
+    title: 'Academic readiness',
+    emptyMessage: 'No academic blockers reported.',
     rows: [
       {
-        module: "m4_academics",
-        metricKey: "pendingMarkLocks",
+        module: 'm4_academics',
+        metricKey: 'pendingMarkLocks',
         label: (count) =>
-          `${formatNumber(count)} mark lock request${count === 1 ? "" : "s"} awaiting review`,
-        route: "/dashboard/academics/marks",
+          `${formatNumber(count)} mark lock request${count === 1 ? '' : 's'} awaiting review`,
+        route: '/dashboard/academics/marks',
       },
       {
-        module: "m4_academics",
-        metricKey: "reportCardPublishBlockers",
+        module: 'm4_academics',
+        metricKey: 'reportCardPublishBlockers',
         label: (count) =>
-          `${formatNumber(count)} report card${count === 1 ? "" : "s"} not yet published`,
-        route: "/dashboard/academics/report-cards",
+          `${formatNumber(count)} report card${count === 1 ? '' : 's'} not yet published`,
+        route: '/dashboard/academics/report-cards',
       },
       {
-        module: "m6_homework_timetable",
-        metricKey: "unassignedSubstitutionsToday",
+        module: 'm6_homework_timetable',
+        metricKey: 'unassignedSubstitutionsToday',
         label: (count) =>
-          `${formatNumber(count)} substitution${count === 1 ? "" : "s"} without a teacher today`,
-        route: "/dashboard/timetable/substitutions",
+          `${formatNumber(count)} substitution${count === 1 ? '' : 's'} without a teacher today`,
+        route: '/dashboard/timetable/substitutions',
       },
       {
-        module: "m6_homework_timetable",
-        metricKey: "overdueHomework",
+        module: 'm6_homework_timetable',
+        metricKey: 'overdueHomework',
         label: (count) =>
-          `${formatNumber(count)} homework follow-up${count === 1 ? "" : "s"} past the due date`,
-        route: "/dashboard/homework",
+          `${formatNumber(count)} homework follow-up${count === 1 ? '' : 's'} past the due date`,
+        route: '/dashboard/homework',
       },
       {
-        module: "m4_academics",
-        metricKey: "examSlotsToday",
+        module: 'm4_academics',
+        metricKey: 'examSlotsToday',
         label: (count) =>
-          `${formatNumber(count)} exam period${count === 1 ? "" : "s"} scheduled today`,
-        route: "/dashboard/academics",
+          `${formatNumber(count)} exam period${count === 1 ? '' : 's'} scheduled today`,
+        route: '/dashboard/academics',
       },
     ],
   },
   {
-    key: "finance",
-    title: "Finance readiness",
-    emptyMessage: "No open finance exceptions.",
+    key: 'finance',
+    title: 'Finance readiness',
+    emptyMessage: 'No open finance exceptions.',
     rows: [
       {
-        module: "m3_fees",
-        metricKey: "overdueInvoices",
+        module: 'm3_fees',
+        metricKey: 'overdueInvoices',
         label: (count) =>
-          `${formatNumber(count)} overdue invoice${count === 1 ? "" : "s"} to follow up`,
-        route: "/dashboard/fees/invoices",
+          `${formatNumber(count)} overdue invoice${count === 1 ? '' : 's'} to follow up`,
+        route: '/dashboard/fees/invoices',
       },
       {
-        module: "m3_fees",
-        metricKey: "cashierVarianceRisks",
+        module: 'm3_fees',
+        metricKey: 'cashierVarianceRisks',
         label: (count) =>
-          `${formatNumber(count)} cashier close${count === 1 ? "" : "s"} with a variance`,
-        route: "/dashboard/fees/cashier-close",
+          `${formatNumber(count)} cashier close${count === 1 ? '' : 's'} with a variance`,
+        route: '/dashboard/fees/cashier-close',
       },
       {
-        module: "m3_fees",
-        metricKey: "refundsToday",
+        module: 'm3_fees',
+        metricKey: 'refundsToday',
         label: (count) =>
-          `${formatNumber(count)} refund${count === 1 ? "" : "s"} recorded today`,
-        route: "/dashboard/fees/adjustments",
+          `${formatNumber(count)} refund${count === 1 ? '' : 's'} recorded today`,
+        route: '/dashboard/fees/adjustments',
       },
       {
-        module: "m11_accounting",
-        metricKey: "unreconciledStatements",
+        module: 'm11_accounting',
+        metricKey: 'unreconciledStatements',
         label: (count) =>
-          `${formatNumber(count)} bank statement${count === 1 ? "" : "s"} to reconcile`,
-        route: "/dashboard/accounting/reconciliation",
+          `${formatNumber(count)} bank statement${count === 1 ? '' : 's'} to reconcile`,
+        route: '/dashboard/accounting/reconciliation',
       },
       {
-        module: "m11_accounting",
-        metricKey: "unpostedJournals",
+        module: 'm11_accounting',
+        metricKey: 'unpostedJournals',
         label: (count) =>
-          `${formatNumber(count)} journal${count === 1 ? "" : "s"} awaiting posting`,
-        route: "/dashboard/accounting/journals",
+          `${formatNumber(count)} journal${count === 1 ? '' : 's'} awaiting posting`,
+        route: '/dashboard/accounting/journals',
       },
     ],
   },
   {
-    key: "people-operations",
-    title: "People & operations",
-    emptyMessage: "No open people or operations issues.",
+    key: 'people-operations',
+    title: 'People & operations',
+    emptyMessage: 'No open people or operations issues.',
     rows: [
       {
-        module: "m7_hr_payroll",
-        metricKey: "staffAttendanceAnomalies",
-        label: (count) =>
-          `${formatNumber(count)} staff absent or late today`,
-        route: "/dashboard/hr/attendance",
+        module: 'm7_hr_payroll',
+        metricKey: 'staffAttendanceAnomalies',
+        label: (count) => `${formatNumber(count)} staff absent or late today`,
+        route: '/dashboard/hr/attendance',
       },
       {
-        module: "m1_students",
-        metricKey: "applicationsNeedingReview",
+        module: 'm1_students',
+        metricKey: 'applicationsNeedingReview',
         label: (count) =>
-          `${formatNumber(count)} admission application${count === 1 ? "" : "s"} to review`,
-        route: "/dashboard/admissions",
+          `${formatNumber(count)} admission application${count === 1 ? '' : 's'} to review`,
+        route: '/dashboard/admissions',
       },
       {
-        module: "m7_hr_payroll",
-        metricKey: "contractsExpiringSoon",
+        module: 'm7_hr_payroll',
+        metricKey: 'contractsExpiringSoon',
         label: (count) =>
-          `${formatNumber(count)} staff contract${count === 1 ? "" : "s"} expiring within 30 days`,
-        route: "/dashboard/hr/contracts",
+          `${formatNumber(count)} staff contract${count === 1 ? '' : 's'} expiring within 30 days`,
+        route: '/dashboard/hr/contracts',
       },
       {
-        module: "m8b_transport",
-        metricKey: "vehicleDocumentRisks",
+        module: 'm8b_transport',
+        metricKey: 'vehicleDocumentRisks',
         label: (count) =>
-          `${formatNumber(count)} vehicle document${count === 1 ? "" : "s"} expiring soon`,
-        route: "/dashboard/transport/vehicles",
+          `${formatNumber(count)} vehicle document${count === 1 ? '' : 's'} expiring soon`,
+        route: '/dashboard/transport/vehicles',
       },
       {
-        module: "m10_communications",
-        metricKey: "failedDeliveries",
+        module: 'm10_communications',
+        metricKey: 'failedDeliveries',
         label: (count) =>
-          `${formatNumber(count)} notice deliver${count === 1 ? "y" : "ies"} failed`,
-        route: "/dashboard/notifications/deliveries",
+          `${formatNumber(count)} notice deliver${count === 1 ? 'y' : 'ies'} failed`,
+        route: '/dashboard/notifications/deliveries',
       },
     ],
   },
@@ -187,12 +186,12 @@ const READINESS_PANELS: ReadinessPanelDefinition[] = [
 
 export function SchoolReadinessSection({
   moduleMap,
-  persona = "admin",
+  persona = 'admin',
 }: {
   moduleMap: Map<OperationalSummaryModule, OperationalModuleSummary>;
   persona?: DashboardCompositionPersona;
 }) {
-  const canViewTimetable = useHasPermission("timetable:read_published");
+  const canViewTimetable = useHasPermission('timetable:read_published');
 
   return (
     <section aria-label="School readiness">
@@ -225,22 +224,26 @@ function ReadinessPanel({
   canViewTimetable: boolean;
 }) {
   const panelRows = panel.rows.filter(
-    (row) => persona !== "principal" || PRINCIPAL_READINESS_MODULES.has(row.module),
+    (row) =>
+      persona !== 'principal' || PRINCIPAL_READINESS_MODULES.has(row.module),
   );
   const sourceModules = [...new Set(panelRows.map((row) => row.module))];
   const sourceIsHidden = (summary: OperationalModuleSummary | undefined) =>
     summary !== undefined &&
-    (summary.status === "locked" || summary.status === "permissionDenied" || !summary.permissions.canView);
-  if (sourceModules.every((module) => sourceIsHidden(moduleMap.get(module)))) return null;
+    (summary.status === 'locked' ||
+      summary.status === 'permissionDenied' ||
+      !summary.permissions.canView);
+  if (sourceModules.every((module) => sourceIsHidden(moduleMap.get(module))))
+    return null;
   const visibleModules = sourceModules
     .map((module) => moduleMap.get(module))
     .filter(
       (summary): summary is OperationalModuleSummary =>
         summary !== undefined && !sourceIsHidden(summary),
     );
-  const hasPartialSource = sourceModules.some((module) => !moduleMap.has(module)) || visibleModules.some(
-    (summary) => summary.status === "partial",
-  );
+  const hasPartialSource =
+    sourceModules.some((module) => !moduleMap.has(module)) ||
+    visibleModules.some((summary) => summary.status === 'partial');
 
   const rows: ReadinessRow[] = panelRows
     .map((definition) => {
@@ -254,7 +257,7 @@ function ReadinessPanel({
         count,
         href: safeRoute({
           key: definition.metricKey,
-          label: "",
+          label: '',
           route: definition.route,
         }),
       };
@@ -263,15 +266,15 @@ function ReadinessPanel({
     .slice(0, MAX_ROWS_PER_PANEL);
 
   const financeOverdueAmount =
-    panel.key === "finance"
-      ? metricValue(moduleMap.get("m3_fees"), "overdueFeesAmount")
+    panel.key === 'finance'
+      ? metricValue(moduleMap.get('m3_fees'), 'overdueFeesAmount')
       : null;
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h3 className="text-sm font-bold text-slate-950">{panel.title}</h3>
-        {panel.key === "academic" && canViewTimetable ? (
+        {panel.key === 'academic' && canViewTimetable ? (
           <Link
             href="/dashboard/timetable"
             className="shrink-0 text-xs font-bold text-[var(--primary)] transition hover:text-[var(--primary-dark)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)] focus-visible:ring-offset-2"
@@ -281,7 +284,8 @@ function ReadinessPanel({
         ) : null}
       </div>
 
-      {visibleModules.length === 0 || (hasPartialSource && rows.length === 0) ? (
+      {visibleModules.length === 0 ||
+      (hasPartialSource && rows.length === 0) ? (
         <p className="mt-3 text-sm leading-5 text-slate-600">
           This summary is temporarily unavailable.
         </p>
@@ -303,9 +307,9 @@ function ReadinessPanel({
         </p>
       )}
 
-      {panel.key === "finance" &&
+      {panel.key === 'finance' &&
       financeOverdueAmount !== null &&
-      rows.some((row) => row.key === "m3_fees-overdueInvoices") ? (
+      rows.some((row) => row.key === 'm3_fees-overdueInvoices') ? (
         <p className="mt-2 text-xs font-medium text-slate-500">
           {formatMoneyNpr(financeOverdueAmount)} outstanding on overdue
           invoices.
@@ -337,8 +341,8 @@ function ReadinessRowItem({ row }: { row: ReadinessRow }) {
   );
 
   const className = cn(
-    "group flex items-center gap-2 rounded-lg px-2 py-1.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)]",
-    row.href ? "-mx-2 hover:bg-slate-50" : "-mx-2",
+    'group flex items-center gap-2 rounded-lg px-2 py-1.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)]',
+    row.href ? '-mx-2 hover:bg-slate-50' : '-mx-2',
   );
 
   return row.href ? (

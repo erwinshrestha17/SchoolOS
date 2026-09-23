@@ -8,7 +8,9 @@ const read = (path) => readFileSync(new URL(path, webRoot), 'utf8');
 describe('M15 saved-draft review and publication workflow', () => {
   it('reconciles uncertain mutation outcomes without automatically replaying publication', () => {
     const review = read('components/notices/notice-review-workspace.tsx');
-    const errorHandler = review.split('onError: async () => {')[1]?.split('\n  });')[0];
+    const errorHandler = review
+      .split('onError: async () => {')[1]
+      ?.split('\n  });')[0];
     assert.ok(errorHandler);
     assert.match(errorHandler, /setPendingAction\(null\)/);
     assert.match(errorHandler, /queryClient\.invalidateQueries/);
@@ -19,8 +21,8 @@ describe('M15 saved-draft review and publication workflow', () => {
   it('shows the draft review action without claiming draft content is published', () => {
     const detail = read('app/dashboard/notices/[noticeId]/page.tsx');
 
-    assert.match(detail, /"Preview & publish"/);
-    assert.match(detail, /"Draft notice content"/);
+    assert.match(detail, /['"]Preview & publish['"]/);
+    assert.match(detail, /['"]Draft notice content['"]/);
     assert.doesNotMatch(detail, /Published communication content/);
     assert.match(
       detail,
@@ -52,12 +54,12 @@ describe('M15 saved-draft review and publication workflow', () => {
 
     assert.match(
       composer,
-      /form\.audienceType === "CLASS" \|\| form\.audienceType === "SECTION" \? \(/,
+      /form\.audienceType === ['"]CLASS['"] \|\| form\.audienceType === ['"]SECTION['"] \? \(/,
     );
-    assert.match(composer, /form\.audienceType === "SECTION" \? \(/);
+    assert.match(composer, /form\.audienceType === ['"]SECTION['"] \? \(/);
     assert.match(
       composer,
-      /audienceType,\s+classId: "",\s+sectionId: "",/,
+      /audienceType,\s+classId: ['"]['"],\s+sectionId: ['"]['"],/,
     );
     assert.match(composer, /setPreview\(null\)/);
   });
@@ -66,12 +68,9 @@ describe('M15 saved-draft review and publication workflow', () => {
     const review = read('components/notices/notice-review-workspace.tsx');
 
     assert.match(review, /actionMutation\.isPending/);
-    assert.match(
-      review,
-      /if \(pendingAction && !actionMutation\.isPending\)/,
-    );
+    assert.match(review, /if \(pendingAction && !actionMutation\.isPending\)/);
     assert.match(review, /queryClient\.refetchQueries\(\{/);
-    assert.match(review, /queryKey: \["notice-detail", noticeId\]/);
+    assert.match(review, /queryKey: \[['"]notice-detail['"], noticeId\]/);
     assert.match(review, /exact: true/);
   });
 
@@ -80,8 +79,8 @@ describe('M15 saved-draft review and publication workflow', () => {
     const legacy = read('app/dashboard/communications/recipients/page.tsx');
 
     assert.doesNotMatch(workspace, /Recipient Preview/);
-    assert.doesNotMatch(workspace, /label: 'Compose'/);
-    assert.match(legacy, /redirect\('\/dashboard\/notices\/new'\)/);
+    assert.doesNotMatch(workspace, /label: ['"]Compose['"]/);
+    assert.match(legacy, /redirect\(['"]\/dashboard\/notices\/new['"]\)/);
   });
 
   it('only renders the protected attachment action when an attachment exists', () => {

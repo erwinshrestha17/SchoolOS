@@ -301,7 +301,14 @@ export const SETTINGS_NAVIGATION: SettingsNavigationDefinition[] = [
     scope: 'school',
     backendItemId: 'fees',
     requiredModule: 'fees',
-    searchKeywords: ['fees', 'receipt', 'cashier', 'payment', 'discount', 'waiver'],
+    searchKeywords: [
+      'fees',
+      'receipt',
+      'cashier',
+      'payment',
+      'discount',
+      'waiver',
+    ],
   },
   {
     id: 'administration-accounting',

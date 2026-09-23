@@ -44,8 +44,9 @@ export function LeaveRequestCreateDialog({
   const [toastError, setToastError] = useState<string | null>(null);
 
   const [staffId, setStaffId] = useState(lockedStaffId ?? '');
-  const [staffOption, setStaffOption] =
-    useState<StaffLookupOption | null>(null);
+  const [staffOption, setStaffOption] = useState<StaffLookupOption | null>(
+    null,
+  );
   const [leaveType, setLeaveType] = useState('CASUAL');
   const [startsOnBs, setStartsOnBs] = useState(() =>
     formatBsDateForInput(new Date()),

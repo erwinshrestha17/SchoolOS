@@ -22,13 +22,41 @@ const transportTabs = [
       'transport:reports:read',
     ],
   },
-  { label: 'Routes & Stops', href: '/dashboard/transport/routes', permissions: ['transport:routes:read'] },
-  { label: 'Vehicles', href: '/dashboard/transport/vehicles', permissions: ['transport:vehicles:read'] },
-  { label: 'Assignments', href: '/dashboard/transport/assignments', permissions: ['transport:assignments:read'] },
-  { label: 'Trips', href: '/dashboard/transport/trips', permissions: ['transport:trips:read'] },
-  { label: 'Location Status', href: '/dashboard/transport/location', permissions: ['transport:location:read'] },
-  { label: 'Reports', href: '/dashboard/transport/reports', permissions: ['transport:reports:read'] },
-] satisfies Array<{ label: string; href: string; permissions: PermissionKey[] }>;
+  {
+    label: 'Routes & Stops',
+    href: '/dashboard/transport/routes',
+    permissions: ['transport:routes:read'],
+  },
+  {
+    label: 'Vehicles',
+    href: '/dashboard/transport/vehicles',
+    permissions: ['transport:vehicles:read'],
+  },
+  {
+    label: 'Assignments',
+    href: '/dashboard/transport/assignments',
+    permissions: ['transport:assignments:read'],
+  },
+  {
+    label: 'Trips',
+    href: '/dashboard/transport/trips',
+    permissions: ['transport:trips:read'],
+  },
+  {
+    label: 'Location Status',
+    href: '/dashboard/transport/location',
+    permissions: ['transport:location:read'],
+  },
+  {
+    label: 'Reports',
+    href: '/dashboard/transport/reports',
+    permissions: ['transport:reports:read'],
+  },
+] satisfies Array<{
+  label: string;
+  href: string;
+  permissions: PermissionKey[];
+}>;
 
 export default function TransportLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -76,15 +104,17 @@ export default function TransportLayout({ children }: { children: ReactNode }) {
         eyebrow="School Operations"
         title="Transport"
         description="Manage routes, vehicles, assignments, trips, and location freshness with clear safety boundaries."
-        primaryAction={canReadTrips ? (
-          <Link
-            href="/dashboard/transport/trips"
-            className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 active:scale-[0.98]"
-          >
-            <Navigation className="h-4 w-4" />
-            Open Trips
-          </Link>
-        ) : undefined}
+        primaryAction={
+          canReadTrips ? (
+            <Link
+              href="/dashboard/transport/trips"
+              className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)] focus:ring-offset-2 active:scale-[0.98]"
+            >
+              <Navigation className="h-4 w-4" />
+              Open Trips
+            </Link>
+          ) : undefined
+        }
         moreActionItems={moreActionItems}
       />
       <WorkspaceTabs items={visibleTabs} />
