@@ -8,7 +8,18 @@ import {
 import { NotificationPreferencePolicy } from './notification-preference-policy';
 
 describe('NotificationPreferencePolicy', () => {
-  let prisma: any;
+  let prisma: {
+    notificationDelivery: { findFirst: jest.Mock };
+    notificationPreference: {
+      findUnique: jest.Mock;
+      findMany: jest.Mock;
+      upsert: jest.Mock;
+      deleteMany: jest.Mock;
+    };
+    tenantSetting: { findMany: jest.Mock };
+    studentGuardian: { findFirst: jest.Mock };
+    admissionApplication: { findFirst: jest.Mock };
+  };
   let policy: NotificationPreferencePolicy;
 
   beforeEach(() => {
@@ -40,7 +51,11 @@ describe('NotificationPreferencePolicy', () => {
         }),
       },
     };
-    policy = new NotificationPreferencePolicy(prisma);
+    policy = new NotificationPreferencePolicy(
+      prisma as unknown as ConstructorParameters<
+        typeof NotificationPreferencePolicy
+      >[0],
+    );
   });
 
   it('delays a normal notification during Nepal quiet hours', async () => {

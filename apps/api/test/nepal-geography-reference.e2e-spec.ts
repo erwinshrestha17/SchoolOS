@@ -8,6 +8,21 @@ import {
   nepalLocalLevelSeeds,
 } from '../prisma/data/nepal-geography.data';
 
+interface GeographyQueryArgs {
+  where?: {
+    provinceId?: number;
+    districtId?: number;
+    typeId?: number;
+    OR?: [{ nameEn: { contains: string } }, { nameNe: { contains: string } }];
+  };
+  take?: number;
+}
+
+function requiredSeed<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error('Geography seed fixture is missing');
+  return value;
+}
+
 /**
  * Hand-rolled fake standing in for the real Postgres-backed Prisma client,
  * built directly from the same seed rows the real migration/seed script
@@ -26,7 +41,7 @@ function makePrisma() {
   });
   const withDistrictAndType = (l: (typeof nepalLocalLevelSeeds)[number]) => ({
     ...l,
-    district: withProvince(districtById.get(l.districtId)!),
+    district: withProvince(requiredSeed(districtById.get(l.districtId))),
     type: typeById.get(l.typeId),
   });
 
@@ -35,7 +50,7 @@ function makePrisma() {
 
   return {
     nepalProvince: {
-      findMany: async (args: any = {}) => {
+      findMany: async (args: GeographyQueryArgs = {}) => {
         let rows = [...nepalProvinceSeeds];
         const or = args?.where?.OR;
         if (or) {
@@ -49,14 +64,15 @@ function makePrisma() {
         if (args?.take) rows = rows.slice(0, args.take);
         return rows;
       },
-      findUnique: async ({ where: { id } }: any) =>
+      findUnique: async ({ where: { id } }: { where: { id: number } }) =>
         provinceById.get(id) ?? null,
     },
     nepalDistrict: {
-      findMany: async (args: any = {}) => {
+      findMany: async (args: GeographyQueryArgs = {}) => {
         let rows = nepalDistrictSeeds.map(withProvince);
-        if (args?.where?.provinceId !== undefined) {
-          rows = rows.filter((d) => d.provinceId === args.where.provinceId);
+        const provinceId = args.where?.provinceId;
+        if (provinceId !== undefined) {
+          rows = rows.filter((d) => d.provinceId === provinceId);
         }
         const or = args?.where?.OR;
         if (or) {
@@ -70,21 +86,24 @@ function makePrisma() {
         if (args?.take) rows = rows.slice(0, args.take);
         return rows;
       },
-      findUnique: async ({ where: { id } }: any) =>
+      findUnique: async ({ where: { id } }: { where: { id: number } }) =>
         districtById.get(id) ?? null,
     },
     nepalLocalLevelType: {
       findMany: async () => [...nepalLocalLevelTypeSeeds],
-      findUnique: async ({ where: { id } }: any) => typeById.get(id) ?? null,
+      findUnique: async ({ where: { id } }: { where: { id: number } }) =>
+        typeById.get(id) ?? null,
     },
     nepalLocalLevel: {
-      findMany: async (args: any = {}) => {
+      findMany: async (args: GeographyQueryArgs = {}) => {
         let rows = nepalLocalLevelSeeds.map(withDistrictAndType);
-        if (args?.where?.districtId !== undefined) {
-          rows = rows.filter((l) => l.districtId === args.where.districtId);
+        const districtId = args.where?.districtId;
+        if (districtId !== undefined) {
+          rows = rows.filter((l) => l.districtId === districtId);
         }
-        if (args?.where?.typeId !== undefined) {
-          rows = rows.filter((l) => l.typeId === args.where.typeId);
+        const typeId = args.where?.typeId;
+        if (typeId !== undefined) {
+          rows = rows.filter((l) => l.typeId === typeId);
         }
         const or = args?.where?.OR;
         if (or) {
@@ -98,13 +117,17 @@ function makePrisma() {
         if (args?.take) rows = rows.slice(0, args.take);
         return rows;
       },
-      findUnique: async ({ where: { id } }: any) => {
+      findUnique: async ({ where: { id } }: { where: { id: number } }) => {
         const level = nepalLocalLevelSeeds.find((l) => l.id === id);
         return level ? withDistrictAndType(level) : null;
       },
     },
     referenceDatasetVersion: {
-      findUnique: async ({ where: { datasetKey } }: any) =>
+      findUnique: async ({
+        where: { datasetKey },
+      }: {
+        where: { datasetKey: string };
+      }) =>
         datasetKey === 'nepal-administrative-hierarchy'
           ? {
               id: 'fixture-id',
@@ -162,14 +185,16 @@ describe('Nepal geography reference API (GeographyService)', () => {
 
   it('cascades local levels by districtId and confirms Tilottama -> Rupandehi -> Lumbini Province', async () => {
     const { service } = makeService();
-    const rupandehi = nepalDistrictSeeds.find((d) => d.nameEn === 'Rupandehi')!;
+    const rupandehi = requiredSeed(
+      nepalDistrictSeeds.find((d) => d.nameEn === 'Rupandehi'),
+    );
     const levels = await service.listLocalLevels(rupandehi.id, undefined);
     expect(levels.every((l) => l.districtId === rupandehi.id)).toBe(true);
 
     const tilottama = levels.find((l) => l.nameEn === 'Tilottama');
     expect(tilottama).toBeDefined();
-    expect(tilottama!.district.nameEn).toBe('Rupandehi');
-    expect(tilottama!.province.nameEn).toBe('Lumbini Province');
+    expect(requiredSeed(tilottama).district.nameEn).toBe('Rupandehi');
+    expect(requiredSeed(tilottama).province.nameEn).toBe('Lumbini Province');
   });
 
   it('rejects an invalid districtId when cascading to local levels', async () => {
@@ -181,7 +206,9 @@ describe('Nepal geography reference API (GeographyService)', () => {
 
   it('rejects an invalid typeId filter', async () => {
     const { service } = makeService();
-    const rupandehi = nepalDistrictSeeds.find((d) => d.nameEn === 'Rupandehi')!;
+    const rupandehi = requiredSeed(
+      nepalDistrictSeeds.find((d) => d.nameEn === 'Rupandehi'),
+    );
     await expect(service.listLocalLevels(rupandehi.id, 999999)).rejects.toThrow(
       NotFoundException,
     );
@@ -189,9 +216,9 @@ describe('Nepal geography reference API (GeographyService)', () => {
 
   it('gets a single local level by id with 404 on unknown id', async () => {
     const { service } = makeService();
-    const tilottama = nepalLocalLevelSeeds.find(
-      (l) => l.nameEn === 'Tilottama',
-    )!;
+    const tilottama = requiredSeed(
+      nepalLocalLevelSeeds.find((l) => l.nameEn === 'Tilottama'),
+    );
     const result = await service.getLocalLevelById(tilottama.id);
     expect(result.nameEn).toBe('Tilottama');
     expect(result.type.code).toBe('MUNICIPALITY');

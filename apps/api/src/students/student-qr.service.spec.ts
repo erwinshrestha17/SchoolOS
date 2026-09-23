@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AuthMethod,
   Prisma,
   StudentLifecycleStatus,
   StudentQrStatus,
@@ -72,11 +73,19 @@ function createService() {
   };
 
   const service = new StudentQrService(
-    prisma as any,
-    auditService as any,
-    configService as any,
-    fileRegistryService as any,
-    teacherScopeService as any,
+    prisma as unknown as ConstructorParameters<typeof StudentQrService>[0],
+    auditService as unknown as ConstructorParameters<
+      typeof StudentQrService
+    >[1],
+    configService as unknown as ConstructorParameters<
+      typeof StudentQrService
+    >[2],
+    fileRegistryService as unknown as ConstructorParameters<
+      typeof StudentQrService
+    >[3],
+    teacherScopeService as unknown as ConstructorParameters<
+      typeof StudentQrService
+    >[4],
   );
 
   return {
@@ -93,7 +102,7 @@ const adminAuth = {
   tenantId: 'tenant-1',
   tenantSlug: 'demo-school',
   email: 'admin@example.com',
-  authMethod: 'PASSWORD' as any,
+  authMethod: AuthMethod.PASSWORD,
   roles: ['admin'],
   permissions: [
     'students:qr:generate',
@@ -678,8 +687,11 @@ describe('StudentQrService', () => {
       }),
     );
     // Audit must NOT contain raw token
-    const auditCall = auditService.record.mock.calls.find(
-      (c: any) => c[0].action === 'QR_GENERATED',
+    const auditCalls = auditService.record.mock.calls as [
+      { action: string; after?: Record<string, unknown> },
+    ][];
+    const auditCall = auditCalls.find(
+      (call) => call[0].action === 'QR_GENERATED',
     );
     expect(auditCall?.[0]?.after?.token).toBeUndefined();
     expect(auditCall?.[0]?.after?.rawToken).toBeUndefined();
@@ -825,7 +837,7 @@ describe('StudentQrService', () => {
   });
 
   it('returns complete QR status/scan log including generation, rotation, and revocation events', async () => {
-    const { service, prisma, teacherScopeService } = createService();
+    const { service, prisma } = createService();
     prisma.student.findFirst.mockResolvedValue(credentialArtifactStudent);
     prisma.studentQrCredential.findMany.mockResolvedValue([baseCredential]);
     prisma.user.findMany.mockResolvedValue([

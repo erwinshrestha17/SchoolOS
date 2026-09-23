@@ -2,7 +2,10 @@ import { BadRequestException } from '@nestjs/common';
 
 export const FINANCIAL_AUDITOR_ROLE = 'financial_auditor';
 
-type AssignableRole = { id: string; name: string };
+interface AssignableRole {
+  id: string;
+  name: string;
+}
 
 export function resolveRoleAssignmentExpiries(
   roles: readonly AssignableRole[],

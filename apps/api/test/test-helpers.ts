@@ -1,4 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
+import type { TestingModuleBuilder } from '@nestjs/testing';
+import type { PrismaService } from '../src/prisma/prisma.service';
 
 /**
  * Test helper types and utilities for SchoolOS E2E tests
@@ -94,17 +96,23 @@ export interface MockState {
   [key: string]: Record<string, unknown>[];
 }
 
-export interface PrismaMock {
-  __state: MockState;
-  [key: string]: any;
-}
+export type PrismaMock = {
+  [Key in keyof PrismaService]: PrismaService[Key] extends (
+    ...args: infer Args
+  ) => infer Result
+    ? jest.Mock<Result, Args>
+    : jest.Mocked<PrismaService[Key]>;
+} & { __state: MockState };
+
+export type MockInclude = Record<string, boolean | PrismaQuery>;
 
 export interface PrismaQuery {
   where?: Record<string, unknown>;
   data?: Record<string, unknown>;
   create?: Record<string, unknown>;
   update?: Record<string, unknown>;
-  include?: Record<string, unknown>;
+  include?: MockInclude;
+  select?: MockInclude;
   orderBy?: unknown;
   take?: number;
   skip?: number;
@@ -186,7 +194,7 @@ export function createQueueMock(): Record<string, unknown> {
 
 import { getQueueToken } from '@nestjs/bullmq';
 
-export function mockBullQueues(moduleBuilder: any) {
+export function mockBullQueues(moduleBuilder: TestingModuleBuilder) {
   return moduleBuilder
     .overrideProvider(getQueueToken('notifications'))
     .useValue(createQueueMock())
@@ -245,6 +253,17 @@ import {
 } from '../src/rbac/rbac.defaults';
 
 export function createPrismaMock() {
+  const moneyFixture = (value: unknown): Prisma.Decimal => {
+    if (value === null || value === undefined) return new Prisma.Decimal(0);
+    if (
+      value instanceof Prisma.Decimal ||
+      typeof value === 'string' ||
+      typeof value === 'number'
+    ) {
+      return new Prisma.Decimal(value);
+    }
+    throw new TypeError('Invalid money fixture value');
+  };
   const state: MockState = {
     tenants: [
       {
@@ -407,7 +426,10 @@ export function createPrismaMock() {
     };
   }
 
-  function matchesWhere(item: any, where?: Record<string, any>): boolean {
+  function matchesWhere(
+    item: Record<string, unknown> | undefined,
+    where?: Record<string, unknown>,
+  ): boolean {
     if (!where) return true;
 
     return Object.entries(where).every(([key, value]) => {
@@ -419,21 +441,23 @@ export function createPrismaMock() {
         return value.every((clause) => matchesWhere(item, clause));
       }
       if (value && typeof value === 'object' && 'some' in value) {
-        const itemArray = item?.[key] as any[];
+        const itemArray = item?.[key] as Record<string, unknown>[];
         return Array.isArray(itemArray)
-          ? itemArray.some((subItem) => matchesWhere(subItem, value.some))
+          ? itemArray.some((subItem) =>
+              matchesWhere(subItem, value.some as Record<string, unknown>),
+            )
           : false;
       }
       if (value && typeof value === 'object' && 'in' in value) {
         const array = value.in;
         const target = item?.[key];
-        return array.some((val: any) => {
+        return (array as unknown[]).some((val: unknown) => {
           if (val instanceof Date) {
             if (target === undefined || target === null) return false;
             const targetTime =
               target instanceof Date
                 ? target.getTime()
-                : new Date(target).getTime();
+                : new Date(target as string | number).getTime();
             return targetTime === val.getTime();
           }
           if (target instanceof Date && typeof val === 'string') {
@@ -459,7 +483,9 @@ export function createPrismaMock() {
           const numeric = Number(candidate);
           return Number.isFinite(numeric)
             ? numeric
-            : new Date(String(candidate)).getTime();
+            : new Date(
+                typeof candidate === 'string' ? candidate : Number.NaN,
+              ).getTime();
         };
         const comparableTarget = toComparable(target);
         if (
@@ -492,7 +518,7 @@ export function createPrismaMock() {
           const targetTime =
             target instanceof Date
               ? target.getTime()
-              : new Date(target).getTime();
+              : new Date(target as string | number).getTime();
           return targetTime !== notVal.getTime();
         }
         if (target instanceof Date && typeof notVal === 'string') {
@@ -506,7 +532,7 @@ export function createPrismaMock() {
         const itemTime =
           itemVal instanceof Date
             ? itemVal.getTime()
-            : new Date(itemVal).getTime();
+            : new Date(itemVal as string | number).getTime();
         return itemTime === value.getTime();
       }
       if (
@@ -515,9 +541,17 @@ export function createPrismaMock() {
         'contains' in value &&
         typeof value.contains === 'string'
       ) {
-        const fieldValue = String(item?.[key] ?? '');
+        const field = item?.[key];
+        const fieldValue =
+          typeof field === 'string' ||
+          typeof field === 'number' ||
+          typeof field === 'boolean'
+            ? String(field)
+            : field instanceof Date
+              ? field.toString()
+              : '';
         const needle = value.contains;
-        if (value.mode === 'insensitive') {
+        if ((value as { mode?: string }).mode === 'insensitive') {
           return fieldValue.toLowerCase().includes(needle.toLowerCase());
         }
         return fieldValue.includes(needle);
@@ -536,14 +570,19 @@ export function createPrismaMock() {
         );
       }
       if (value && typeof value === 'object' && !Array.isArray(value)) {
-        return matchesWhere(item?.[key], value);
+        return matchesWhere(
+          item?.[key] as Record<string, unknown> | undefined,
+          value as Record<string, unknown>,
+        );
       }
       const itemVal = item?.[key];
       if (itemVal instanceof Date && typeof value === 'string') {
         return itemVal.getTime() === new Date(value).getTime();
       }
       if (typeof itemVal === 'string' && value instanceof Date) {
-        return new Date(itemVal).getTime() === value.getTime();
+        return (
+          new Date(itemVal as string | number).getTime() === value.getTime()
+        );
       }
       return itemVal === value || (value === null && itemVal === undefined);
     });
@@ -580,7 +619,7 @@ export function createPrismaMock() {
 
   ensureTenantDefaults('tenant-default');
 
-  const prisma: any = {
+  const prisma: Record<string, unknown> = {
     __state: state,
     // Tenant-scope helpers from PrismaService. The mock has no CLS/extension,
     // so both are pass-throughs here; real enforcement is proven against a live
@@ -627,12 +666,16 @@ export function createPrismaMock() {
     },
   );
 
-  prisma.$transaction = jest.fn((arg: any) => {
-    if (typeof arg === 'function') {
-      return arg(prisma);
-    }
-    return Promise.all(arg);
-  });
+  prisma.$transaction = jest.fn(
+    (
+      arg: ((client: Record<string, unknown>) => unknown) | Promise<unknown>[],
+    ) => {
+      if (typeof arg === 'function') {
+        return arg(prisma);
+      }
+      return Promise.all(arg);
+    },
+  );
 
   Object.assign(prisma, {
     tenant: {
@@ -814,7 +857,7 @@ export function createPrismaMock() {
         }
         const role = {
           id: nextId('role'),
-          ...create!,
+          ...create,
         };
         state.roles.push(role as Record<string, unknown>);
         return Promise.resolve(role);
@@ -858,7 +901,7 @@ export function createPrismaMock() {
         }
         const permission = {
           id: nextId('perm'),
-          ...create!,
+          ...create,
         };
         state.permissions.push(permission as Record<string, unknown>);
         return Promise.resolve(permission);
@@ -885,9 +928,12 @@ export function createPrismaMock() {
       // filter that service uses.
       findMany: jest.fn((q: PrismaQuery) => {
         const roleFilter =
-          (q.where?.role as Record<string, any> | undefined) ?? {};
+          (q.where?.role as Record<string, unknown> | undefined) ?? {};
         const tenantId = roleFilter.tenantId as string | undefined;
-        const userId = roleFilter.userRoles?.some?.userId as string | undefined;
+        const userRoles = roleFilter.userRoles as
+          | { some?: { userId?: string } }
+          | undefined;
+        const userId = userRoles?.some?.userId;
 
         const roleIds = state.roles
           .filter((role) => !tenantId || role.tenantId === tenantId)
@@ -1075,7 +1121,7 @@ export function createPrismaMock() {
         }
         const year = {
           id: nextId('year'),
-          ...create!,
+          ...create,
         };
         state.academicYears.push(year as Record<string, unknown>);
         return Promise.resolve(year);
@@ -1116,7 +1162,7 @@ export function createPrismaMock() {
         }
         const account = {
           id: nextId('account'),
-          ...create!,
+          ...create,
         };
         state.chartAccounts.push(account as Record<string, unknown>);
         return Promise.resolve(account);
@@ -1186,7 +1232,7 @@ export function createPrismaMock() {
         }
         const feeHead = {
           id: nextId('fee-head'),
-          ...create!,
+          ...create,
         };
         state.feeHeads.push(feeHead as Record<string, unknown>);
         return Promise.resolve(feeHead);
@@ -1216,7 +1262,9 @@ export function createPrismaMock() {
       }),
     },
     student: (() => {
-      const enrichStudentRelations = (item: any) => {
+      const enrichStudentRelations = (
+        item: Record<string, unknown> | undefined,
+      ) => {
         if (!item) return item;
         const enriched = { ...item };
 
@@ -1406,7 +1454,7 @@ export function createPrismaMock() {
         }
         const item = {
           id: nextId('setting'),
-          ...create!,
+          ...create,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -1575,11 +1623,13 @@ export function createPrismaMock() {
       }),
       createMany: jest.fn((q: PrismaQuery) => {
         const data = q.data ?? [];
-        const items = (Array.isArray(data) ? data : [data]).map((d: any) => ({
-          id: nextId('doc-hist'),
-          ...d,
-          createdAt: new Date(),
-        }));
+        const items = (Array.isArray(data) ? data : [data]).map(
+          (d: Record<string, unknown>) => ({
+            id: nextId('doc-hist'),
+            ...d,
+            createdAt: new Date(),
+          }),
+        );
         state.studentDocumentHistory.push(...items);
         return Promise.resolve({ count: items.length });
       }),
@@ -1602,7 +1652,11 @@ export function createPrismaMock() {
         );
 
         if (q.orderBy) {
-          const orderBy = q.orderBy as any;
+          const orderBy = q.orderBy as {
+            createdAt?: string;
+            sortOrder?: string;
+            dueDate?: string;
+          };
           if (orderBy.createdAt === 'desc') {
             results = [...results].sort(
               (a, b) =>
@@ -1677,7 +1731,7 @@ export function createPrismaMock() {
               (!q.where?.tenantId || a.tenantId === q.where.tenantId) &&
               a.softDeletedAt === null,
           )
-          .reduce((acc, a) => acc + Number(a.sizeBytes || 0), 0);
+          .reduce((acc, a) => acc + Number(a.sizeBytes ?? 0), 0);
         return Promise.resolve({ _sum: { sizeBytes: sum } });
       }),
     },
@@ -1692,8 +1746,8 @@ export function createPrismaMock() {
         return Promise.resolve(logs[0]);
       }),
       findMany: jest.fn((q?: PrismaQuery) => {
-        const skip = q?.skip || 0;
-        const take = q?.take || 25;
+        const skip = q?.skip ?? 0;
+        const take = q?.take === 0 ? 25 : (q?.take ?? 25);
         const logs = state.auditLogs
           .filter((a) => matchesWhere(a, q?.where))
           .sort(
@@ -1860,7 +1914,7 @@ export function createPrismaMock() {
       findUnique: jest.fn(() => Promise.resolve(null)),
       findFirst: jest.fn(() => Promise.resolve(null)),
       findMany: jest.fn(() => Promise.resolve([])),
-      upsert: jest.fn((q: any) => Promise.resolve(q.create || {})),
+      upsert: jest.fn((q: PrismaQuery) => Promise.resolve(q.create ?? {})),
       updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
     },
     examTerm: {
@@ -1870,8 +1924,8 @@ export function createPrismaMock() {
       findFirst: jest.fn(() => Promise.resolve(null)),
       findMany: jest.fn(() => Promise.resolve([])),
       count: jest.fn(() => Promise.resolve(0)),
-      create: jest.fn((q: any) => Promise.resolve(q.data || {})),
-      update: jest.fn((q: any) => Promise.resolve(q.data || {})),
+      create: jest.fn((q: PrismaQuery) => Promise.resolve(q.data ?? {})),
+      update: jest.fn((q: PrismaQuery) => Promise.resolve(q.data ?? {})),
       updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
     },
     invoice: {
@@ -1905,7 +1959,7 @@ export function createPrismaMock() {
           lines: [],
           payments: [],
           ...data,
-          totalAmount: new Prisma.Decimal(String(data.totalAmount ?? 0)),
+          totalAmount: moneyFixture(data.totalAmount),
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -1985,7 +2039,7 @@ export function createPrismaMock() {
           id: data.id ?? nextId('payment'),
           refunds: [],
           ...data,
-          amount: new Prisma.Decimal(String(data.amount ?? 0)),
+          amount: moneyFixture(data.amount),
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -2026,7 +2080,7 @@ export function createPrismaMock() {
       create: jest.fn((q: PrismaQuery) => {
         const data = q.data ?? {};
         const item = {
-          id: data.id ?? `journal-${Date.now()}`,
+          id: data.id ?? `journal-${String(Date.now())}`,
           ...data,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -2370,7 +2424,7 @@ export function createPrismaMock() {
       ),
     },
     timetableSubstitution: {
-      findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),
+      findFirst: jest.fn(() => Promise.resolve(null)),
       findMany: jest.fn(() => Promise.resolve([])),
     },
     homeworkAssignment: {
@@ -2485,34 +2539,34 @@ export function createPrismaMock() {
       ),
     },
     homeworkReminderBatch: {
-      findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),
+      findFirst: jest.fn(() => Promise.resolve(null)),
       findMany: jest.fn(() => Promise.resolve([])),
-      create: jest.fn((q: any) => Promise.resolve(q.data || {})),
-      update: jest.fn((q: any) => Promise.resolve(q.data || {})),
-      upsert: jest.fn((q: any) => Promise.resolve(q.create || {})),
+      create: jest.fn((q: PrismaQuery) => Promise.resolve(q.data ?? {})),
+      update: jest.fn((q: PrismaQuery) => Promise.resolve(q.data ?? {})),
+      upsert: jest.fn((q: PrismaQuery) => Promise.resolve(q.create ?? {})),
     },
     subjectWeeklyRequirement: {
       findFirst: jest.fn(() => Promise.resolve(null)),
       findMany: jest.fn(() => Promise.resolve([])),
-      create: jest.fn((q: any) => Promise.resolve(q.data || {})),
-      update: jest.fn((q: any) => Promise.resolve(q.data || {})),
+      create: jest.fn((q: PrismaQuery) => Promise.resolve(q.data ?? {})),
+      update: jest.fn((q: PrismaQuery) => Promise.resolve(q.data ?? {})),
     },
     teacherAvailability: {
       findFirst: jest.fn(() => Promise.resolve(null)),
       findMany: jest.fn(() => Promise.resolve([])),
-      create: jest.fn((q: any) => Promise.resolve(q.data || {})),
-      update: jest.fn((q: any) => Promise.resolve(q.data || {})),
+      create: jest.fn((q: PrismaQuery) => Promise.resolve(q.data ?? {})),
+      update: jest.fn((q: PrismaQuery) => Promise.resolve(q.data ?? {})),
     },
     teacherWorkloadLimit: {
       findFirst: jest.fn(() => Promise.resolve(null)),
       findMany: jest.fn(() => Promise.resolve([])),
-      upsert: jest.fn((q: any) => Promise.resolve(q.create || {})),
+      upsert: jest.fn((q: PrismaQuery) => Promise.resolve(q.create ?? {})),
     },
   });
 
   prisma.generatedStudentDocument = {
-    findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),
-    findMany: jest.fn((q: PrismaQuery) => Promise.resolve([])),
+    findFirst: jest.fn(() => Promise.resolve(null)),
+    findMany: jest.fn(() => Promise.resolve([])),
     create: jest.fn((q: PrismaQuery) => {
       const item = {
         id: nextId('gen-doc'),
@@ -2538,7 +2592,7 @@ export function createPrismaMock() {
   };
 
   prisma.enrollment = {
-    findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),
+    findFirst: jest.fn(() => Promise.resolve(null)),
     findMany: jest.fn((q: PrismaQuery) =>
       Promise.resolve(
         state.enrollments.filter((item) => matchesWhere(item, q.where)),
@@ -2725,16 +2779,28 @@ export function createPrismaMock() {
   // query uses `assignmentType: { in: [...] }`, `effectiveFrom: { lte }` and an
   // OR over `effectiveUntil`, which the generic dummy-model handler below does
   // not express. Specs seed rows via `prisma.__state.teacherAssignments`.
-  const matchesAssignmentWindow = (row: any, where: any) => {
-    const on: Date = where?.effectiveFrom?.lte ?? new Date();
-    if (row.effectiveFrom && new Date(row.effectiveFrom) > on) return false;
-    if (row.effectiveUntil && new Date(row.effectiveUntil) < on) return false;
+  const matchesAssignmentWindow = (
+    row: Record<string, unknown>,
+    where: Record<string, unknown>,
+  ) => {
+    const on =
+      (where.effectiveFrom as { lte?: Date } | undefined)?.lte ?? new Date();
+    if (
+      row.effectiveFrom &&
+      new Date(row.effectiveFrom as string | number | Date) > on
+    )
+      return false;
+    if (
+      row.effectiveUntil &&
+      new Date(row.effectiveUntil as string | number | Date) < on
+    )
+      return false;
     return true;
   };
   prisma.teacherAssignment = {
-    findMany: jest.fn(({ where = {} }: any = {}) =>
+    findMany: jest.fn(({ where = {} }: PrismaQuery = {}) =>
       Promise.resolve(
-        state.teacherAssignments.filter((row: any) => {
+        state.teacherAssignments.filter((row: Record<string, unknown>) => {
           if (where.tenantId && where.tenantId !== row.tenantId) return false;
           if (where.staffId && where.staffId !== row.staffId) return false;
           if (
@@ -2748,33 +2814,35 @@ export function createPrismaMock() {
           if (where.status && where.status !== (row.status ?? 'ACTIVE'))
             return false;
           if (
-            where.assignmentType?.in &&
-            !where.assignmentType.in.includes(row.assignmentType)
+            (where.assignmentType as { in?: unknown[] } | undefined)?.in &&
+            !(where.assignmentType as { in: unknown[] }).in.includes(
+              row.assignmentType,
+            )
           )
             return false;
           return matchesAssignmentWindow(row, where);
         }),
       ),
     ),
-    findFirst: jest.fn(({ where = {} }: any = {}) =>
+    findFirst: jest.fn(({ where = {} }: PrismaQuery = {}) =>
       Promise.resolve(
         state.teacherAssignments.find(
-          (row: any) =>
+          (row: Record<string, unknown>) =>
             (!where.tenantId || where.tenantId === row.tenantId) &&
             (!where.staffId || where.staffId === row.staffId),
         ) ?? null,
       ),
     ),
-    create: jest.fn(({ data }: any) => {
+    create: jest.fn(({ data = {} }: PrismaQuery) => {
       state.teacherAssignments.push(data);
       return Promise.resolve(data);
     }),
     count: jest.fn(() => Promise.resolve(state.teacherAssignments.length)),
-  } as any;
+  };
   prisma.teacherDelegation = {
-    findMany: jest.fn(({ where = {} }: any = {}) =>
+    findMany: jest.fn(({ where = {} }: PrismaQuery = {}) =>
       Promise.resolve(
-        state.teacherDelegations.filter((row: any) => {
+        state.teacherDelegations.filter((row: Record<string, unknown>) => {
           if (where.tenantId && where.tenantId !== row.tenantId) return false;
           if (
             where.recipientStaffId &&
@@ -2788,7 +2856,7 @@ export function createPrismaMock() {
         }),
       ),
     ),
-  } as any;
+  };
 
   for (const model of dummyModels) {
     if (!prisma[model]) {
@@ -2800,35 +2868,49 @@ export function createPrismaMock() {
           : model.endsWith('s')
             ? model
             : model + 's';
-      const actualStateKey = (state as any)[stateKey]
+      const actualStateKey = state[stateKey]
         ? stateKey
-        : (state as any)[model + 's']
+        : state[model + 's']
           ? model + 's'
-          : (state as any)[model + 'es']
+          : state[model + 'es']
             ? model + 'es'
             : model + 's';
 
-      const applyIncludes = (item: any, qInclude: any) => {
+      const applyIncludes = (
+        item: Record<string, unknown>,
+        qInclude?: MockInclude,
+      ) => {
         if (!item || !qInclude) return item;
         const enriched = { ...item };
         if (model === 'tenantSubscription') {
           if (qInclude.plan) {
-            enriched.plan = state.platformPlans.find(
+            const plan = state.platformPlans.find(
               (p) => p.id === enriched.planId,
             );
-            if (enriched.plan) {
-              enriched.plan = { ...enriched.plan };
-              if (qInclude.plan.include?.features) {
-                const featureWhere = qInclude.plan.include.features.where;
-                enriched.plan.features = state.platformPlanFeatures.filter(
+            if (plan) {
+              const includedPlan = { ...plan };
+              enriched.plan = includedPlan;
+              if (
+                typeof qInclude.plan === 'object' &&
+                qInclude.plan.include?.features
+              ) {
+                const featureSelection = qInclude.plan.include.features;
+                const featureWhere =
+                  typeof featureSelection === 'object'
+                    ? featureSelection.where
+                    : undefined;
+                includedPlan.features = state.platformPlanFeatures.filter(
                   (f) =>
-                    f.planId === enriched.plan.id &&
+                    f.planId === includedPlan.id &&
                     matchesWhere(f, featureWhere),
                 );
               }
-              if (qInclude.plan.include?.usageLimits) {
-                enriched.plan.usageLimits = state.usageLimits.filter(
-                  (l) => l.planId === enriched.plan.id,
+              if (
+                typeof qInclude.plan === 'object' &&
+                qInclude.plan.include?.usageLimits
+              ) {
+                includedPlan.usageLimits = state.usageLimits.filter(
+                  (l) => l.planId === includedPlan.id,
                 );
               }
             }
@@ -2882,8 +2964,14 @@ export function createPrismaMock() {
               typeof qInclude.studentLinks === 'object' &&
               qInclude.studentLinks.where
             ) {
+              const studentLinks = qInclude.studentLinks;
               links = links.filter((link) =>
-                matchesWhere(link, qInclude.studentLinks.where),
+                matchesWhere(
+                  link,
+                  typeof studentLinks === 'object'
+                    ? studentLinks.where
+                    : undefined,
+                ),
               );
             }
             if (
@@ -3066,11 +3154,11 @@ export function createPrismaMock() {
               ? {
                   ...copy,
                   book:
-                    qInclude.copy === true || !qInclude.copy.include?.book
+                    typeof qInclude.copy !== 'object' ||
+                    !qInclude.copy.include?.book
                       ? undefined
-                      : (state.libraryBooks.find(
-                          (b) => b.id === (copy as any).bookId,
-                        ) ?? null),
+                      : (state.libraryBooks.find((b) => b.id === copy.bookId) ??
+                        null),
                 }
               : null;
           }
@@ -3097,26 +3185,29 @@ export function createPrismaMock() {
       };
 
       prisma[model] = {
-        update: jest.fn((q: any) => {
-          const items = (state as any)[actualStateKey] || [];
+        update: jest.fn((q: PrismaQuery) => {
+          const items = state[actualStateKey] ?? [];
           let found;
-          if (q.where?.id) {
-            found = items.find((i: any) => i.id === q.where.id);
+          const where = q.where;
+          if (where?.id) {
+            found = items.find(
+              (i: Record<string, unknown>) => i.id === where.id,
+            );
           } else {
-            const whereKeys = Object.keys(q.where || {});
+            const whereKeys = Object.keys(where ?? {});
             if (
               whereKeys.length === 1 &&
-              typeof q.where[whereKeys[0]] === 'object'
+              typeof where?.[whereKeys[0]] === 'object'
             ) {
-              const compound = q.where[whereKeys[0]];
-              found = items.find((i: any) => {
+              const compound = where[whereKeys[0]] as Record<string, unknown>;
+              found = items.find((i: Record<string, unknown>) => {
                 return Object.entries(compound).every(
                   ([ck, cv]) => i[ck] === cv,
                 );
               });
             } else {
-              found = items.find((item: any) => {
-                return Object.entries(q.where).every(
+              found = items.find((item: Record<string, unknown>) => {
+                return Object.entries(q.where ?? {}).every(
                   ([key, value]) => item[key] === value,
                 );
               });
@@ -3124,82 +3215,78 @@ export function createPrismaMock() {
           }
           if (found && q.data) {
             for (const [uk, uv] of Object.entries(q.data)) {
-              if (uv && typeof uv === 'object' && 'increment' in (uv as any)) {
-                found[uk] =
-                  Number(found[uk] || 0) + Number((uv as any).increment);
-              } else if (
-                uv &&
-                typeof uv === 'object' &&
-                'decrement' in (uv as any)
-              ) {
-                found[uk] =
-                  Number(found[uk] || 0) - Number((uv as any).decrement);
+              if (uv && typeof uv === 'object' && 'increment' in uv) {
+                found[uk] = Number(found[uk] ?? 0) + Number(uv.increment);
+              } else if (uv && typeof uv === 'object' && 'decrement' in uv) {
+                found[uk] = Number(found[uk] ?? 0) - Number(uv.decrement);
               } else {
                 found[uk] = uv;
               }
             }
           }
           if (found) {
-            const enriched = applyIncludes(found, q.include || q.select);
+            const enriched = applyIncludes(found, q.include ?? q.select);
             return Promise.resolve({ ...enriched });
           }
           return Promise.resolve(null);
         }),
-        updateMany: jest.fn((q: any) => {
-          const items = (state as any)[actualStateKey] || [];
+        updateMany: jest.fn((q: PrismaQuery) => {
+          const items = state[actualStateKey] ?? [];
           let count = 0;
           for (const item of items) {
             if (matchesWhere(item, q.where)) {
-              Object.assign(item, q.data || {});
+              Object.assign(item, q.data ?? {});
               count++;
             }
           }
           return Promise.resolve({ count });
         }),
-        deleteMany: jest.fn((q: any) => {
-          if ((state as any)[actualStateKey]) {
-            (state as any)[actualStateKey] = [];
+        deleteMany: jest.fn(() => {
+          if (state[actualStateKey]) {
+            state[actualStateKey] = [];
           }
           return Promise.resolve({ count: 0 });
         }),
-        findMany: jest.fn((q: any) => {
-          let items = (state as any)[actualStateKey] || [];
+        findMany: jest.fn((q: PrismaQuery) => {
+          let items = state[actualStateKey] ?? [];
           if (q?.where) {
-            items = items.filter((item: any) => matchesWhere(item, q.where));
+            items = items.filter((item: Record<string, unknown>) =>
+              matchesWhere(item, q.where),
+            );
           }
           if (q?.take) items = items.slice(0, q.take);
           if (q?.include || q?.select) {
-            items = items.map((item: any) =>
-              applyIncludes(item, q.include || q.select),
+            items = items.map((item: Record<string, unknown>) =>
+              applyIncludes(item, q.include ?? q.select),
             );
           }
           return Promise.resolve(items);
         }),
-        findFirst: jest.fn((q: any) => {
-          const items = (state as any)[actualStateKey] || [];
+        findFirst: jest.fn((q: PrismaQuery) => {
+          const items = state[actualStateKey] ?? [];
           const matchableItems =
             model === 'guardian'
-              ? items.map((item: any) =>
+              ? items.map((item: Record<string, unknown>) =>
                   applyIncludes(item, { studentLinks: true }),
                 )
               : items;
-          let found = matchableItems.find((item: any) =>
+          let found = matchableItems.find((item: Record<string, unknown>) =>
             matchesWhere(item, q?.where),
           );
-          if (found && (q.include || q.select)) {
-            found = applyIncludes(found, q.include || q.select);
+          if (found && (q.include ?? q.select)) {
+            found = applyIncludes(found, q.include ?? q.select);
           }
           return Promise.resolve(found ? { ...found } : null);
         }),
-        findFirstOrThrow: jest.fn((q: any) => {
-          const items = (state as any)[actualStateKey] || [];
+        findFirstOrThrow: jest.fn((q: PrismaQuery) => {
+          const items = state[actualStateKey] ?? [];
           const matchableItems =
             model === 'guardian'
-              ? items.map((item: any) =>
+              ? items.map((item: Record<string, unknown>) =>
                   applyIncludes(item, { studentLinks: true }),
                 )
               : items;
-          let found = matchableItems.find((item: any) =>
+          let found = matchableItems.find((item: Record<string, unknown>) =>
             matchesWhere(item, q?.where),
           );
           if (!found) {
@@ -3208,12 +3295,12 @@ export function createPrismaMock() {
             );
           }
           if (q?.include || q?.select) {
-            found = applyIncludes(found, q.include || q.select);
+            found = applyIncludes(found, q.include ?? q.select);
           }
           return Promise.resolve({ ...found });
         }),
-        findUnique: jest.fn((q: any) => {
-          const items = (state as any)[actualStateKey] || [];
+        findUnique: jest.fn((q: PrismaQuery) => {
+          const items = state[actualStateKey] ?? [];
           if (!q?.where) return Promise.resolve(null);
 
           let found;
@@ -3223,29 +3310,30 @@ export function createPrismaMock() {
             typeof q.where[whereKeys[0]] === 'object' &&
             q.where[whereKeys[0]] !== null
           ) {
-            const compound = q.where[whereKeys[0]];
-            found = items.find((item: any) => {
+            const compound = q.where[whereKeys[0]] as Record<string, unknown>;
+            found = items.find((item: Record<string, unknown>) => {
               return Object.entries(compound).every(
                 ([ck, cv]) => item[ck] === cv,
               );
             });
           } else {
-            found = items.find((item: any) => {
-              return Object.entries(q.where).every(
+            found = items.find((item: Record<string, unknown>) => {
+              return Object.entries(q.where ?? {}).every(
                 ([key, value]) => item[key] === value,
               );
             });
           }
 
-          if (found && (q.include || q.select)) {
-            found = applyIncludes(found, q.include || q.select);
+          if (found && (q.include ?? q.select)) {
+            found = applyIncludes(found, q.include ?? q.select);
           }
           return Promise.resolve(found ? { ...found } : null);
         }),
-        create: jest.fn((q: any) => {
-          const data = q.data || {};
-          const item = {
-            id: data.id || nextId(model),
+        create: jest.fn((q: PrismaQuery) => {
+          const data = q.data ?? {};
+          const item: Record<string, unknown> = {
+            id:
+              typeof data.id === 'string' && data.id ? data.id : nextId(model),
             status: data.status ?? 'NEW',
             ...data,
             createdAt: new Date(),
@@ -3254,8 +3342,8 @@ export function createPrismaMock() {
           };
 
           const applySelect = (
-            record: any,
-            select?: Record<string, boolean>,
+            record: Record<string, unknown>,
+            select?: MockInclude,
           ) => {
             if (!select) {
               return record;
@@ -3268,12 +3356,15 @@ export function createPrismaMock() {
           };
 
           // Handle nested lines for SaaSInvoice
-          if (model === 'saaSInvoice' && data.lines?.create) {
+          const linesInput = data.lines as
+            | { create?: Record<string, unknown> | Record<string, unknown>[] }
+            | undefined;
+          if (model === 'saaSInvoice' && linesInput?.create) {
             const lines = (
-              Array.isArray(data.lines.create)
-                ? data.lines.create
-                : [data.lines.create]
-            ).map((l: any) => ({
+              Array.isArray(linesInput.create)
+                ? linesInput.create
+                : [linesInput.create]
+            ).map((l: Record<string, unknown>) => ({
               id: nextId('saaSInvoiceLine'),
               ...l,
               invoiceId: item.id,
@@ -3283,12 +3374,15 @@ export function createPrismaMock() {
           }
 
           // Handle nested members for SiblingGroup
-          if (model === 'siblingGroup' && data.members?.create) {
+          const membersInput = data.members as
+            | { create?: Record<string, unknown> | Record<string, unknown>[] }
+            | undefined;
+          if (model === 'siblingGroup' && membersInput?.create) {
             const members = (
-              Array.isArray(data.members.create)
-                ? data.members.create
-                : [data.members.create]
-            ).map((m: any) => ({
+              Array.isArray(membersInput.create)
+                ? membersInput.create
+                : [membersInput.create]
+            ).map((m: Record<string, unknown>) => ({
               id: nextId('siblingGroupMember'),
               ...m,
               siblingGroupId: item.id,
@@ -3297,35 +3391,38 @@ export function createPrismaMock() {
             item.members = members;
           }
 
-          if ((state as any)[actualStateKey]) {
-            (state as any)[actualStateKey].push(item);
+          if (state[actualStateKey]) {
+            state[actualStateKey].push(item);
           }
           if (q.include) {
             return Promise.resolve(applyIncludes(item, q.include));
           }
           return Promise.resolve(applySelect(item, q.select));
         }),
-        createMany: jest.fn((q: any) => {
+        createMany: jest.fn((q: PrismaQuery) => {
           const dataArray = Array.isArray(q.data) ? q.data : [q.data];
-          const items: any[] = [];
+          const items: Record<string, unknown>[] = [];
           for (const data of dataArray) {
             const item = {
-              id: data.id || nextId(model),
+              id:
+                typeof data.id === 'string' && data.id
+                  ? data.id
+                  : nextId(model),
               status: data.status ?? 'NEW',
               ...data,
               createdAt: new Date(),
               updatedAt: new Date(),
               changedAt: data.changedAt ?? new Date(),
             };
-            if ((state as any)[actualStateKey]) {
-              (state as any)[actualStateKey].push(item);
+            if (state[actualStateKey]) {
+              state[actualStateKey].push(item);
             }
             items.push(item);
           }
           return Promise.resolve({ count: items.length });
         }),
-        upsert: jest.fn((q: any) => {
-          const items = (state as any)[actualStateKey] || [];
+        upsert: jest.fn((q: PrismaQuery) => {
+          const items = state[actualStateKey] ?? [];
           let existing;
           if (q.where) {
             const whereKeys = Object.keys(q.where);
@@ -3334,8 +3431,8 @@ export function createPrismaMock() {
               typeof q.where[whereKeys[0]] === 'object' &&
               q.where[whereKeys[0]] !== null
             ) {
-              const compound = q.where[whereKeys[0]];
-              existing = items.find((item: any) => {
+              const compound = q.where[whereKeys[0]] as Record<string, unknown>;
+              existing = items.find((item: Record<string, unknown>) => {
                 return Object.entries(compound).every(([ck, cv]) => {
                   if (cv instanceof Date && item[ck] instanceof Date) {
                     return cv.getTime() === item[ck].getTime();
@@ -3350,27 +3447,21 @@ export function createPrismaMock() {
                 });
               });
             } else {
-              existing = items.find((item: any) => matchesWhere(item, q.where));
+              existing = items.find((item: Record<string, unknown>) =>
+                matchesWhere(item, q.where),
+              );
             }
           }
 
           if (existing) {
             if (q.update) {
               for (const [uk, uv] of Object.entries(q.update)) {
-                if (
-                  uv &&
-                  typeof uv === 'object' &&
-                  'increment' in (uv as any)
-                ) {
+                if (uv && typeof uv === 'object' && 'increment' in uv) {
                   existing[uk] =
-                    Number(existing[uk] || 0) + Number((uv as any).increment);
-                } else if (
-                  uv &&
-                  typeof uv === 'object' &&
-                  'decrement' in (uv as any)
-                ) {
+                    Number(existing[uk] ?? 0) + Number(uv.increment);
+                } else if (uv && typeof uv === 'object' && 'decrement' in uv) {
                   existing[uk] =
-                    Number(existing[uk] || 0) - Number((uv as any).decrement);
+                    Number(existing[uk] ?? 0) - Number(uv.decrement);
                 } else {
                   existing[uk] = uv;
                 }
@@ -3378,23 +3469,28 @@ export function createPrismaMock() {
             }
             return Promise.resolve(existing);
           } else {
-            const data = q.create || {};
+            const data = q.create ?? {};
             const item = {
-              id: data.id || nextId(model),
+              id:
+                typeof data.id === 'string' && data.id
+                  ? data.id
+                  : nextId(model),
               ...data,
               createdAt: new Date(),
               updatedAt: new Date(),
             };
-            if ((state as any)[actualStateKey]) {
-              (state as any)[actualStateKey].push(item);
+            if (state[actualStateKey]) {
+              state[actualStateKey].push(item);
             }
             return Promise.resolve(item);
           }
         }),
-        count: jest.fn((q: any) => {
-          let items = (state as any)[actualStateKey] || [];
+        count: jest.fn((q: PrismaQuery) => {
+          let items = state[actualStateKey] ?? [];
           if (q?.where) {
-            items = items.filter((item: any) => matchesWhere(item, q.where));
+            items = items.filter((item: Record<string, unknown>) =>
+              matchesWhere(item, q.where),
+            );
           }
           return Promise.resolve(items.length);
         }),
@@ -3402,7 +3498,9 @@ export function createPrismaMock() {
     }
   }
 
-  return prisma;
+  // This adapter implements the subset exercised by each fixture. Real tenant
+  // enforcement is covered separately against PostgreSQL.
+  return prisma as unknown as PrismaMock;
 }
 
 export function ensureTenantDefaultsWithState(
@@ -3415,8 +3513,8 @@ export function ensureTenantDefaultsWithState(
   ) {
     state.tenants.push({
       id: tenantId,
-      slug: String(tenantId),
-      name: String(tenantId),
+      slug: tenantId,
+      name: tenantId,
       isActive: true,
       plan: 'standard',
       createdAt: new Date(),
@@ -3484,8 +3582,8 @@ export function ensureTenantDefaultsWithState(
  * service's own subject/ownership/lifecycle logic is what gets exercised.
  */
 export function createTeacherScopeServiceForTests(options: {
-  assignments?: Array<Record<string, any>>;
-  delegations?: Array<Record<string, any>>;
+  assignments?: Record<string, unknown>[];
+  delegations?: Record<string, unknown>[];
   staffId?: string | null;
 }) {
   // Read lazily on every query, not captured once: specs both *push into*
@@ -3494,10 +3592,22 @@ export function createTeacherScopeServiceForTests(options: {
   const currentAssignments = () => options.assignments ?? [];
   const currentDelegations = () => options.delegations ?? [];
 
-  const matchesWindow = (row: any, where: any) => {
-    const on: Date = where.effectiveFrom?.lte ?? new Date();
-    if (row.effectiveFrom && new Date(row.effectiveFrom) > on) return false;
-    if (row.effectiveUntil && new Date(row.effectiveUntil) < on) return false;
+  const matchesWindow = (
+    row: Record<string, unknown>,
+    where: Record<string, unknown>,
+  ) => {
+    const on =
+      (where.effectiveFrom as { lte?: Date } | undefined)?.lte ?? new Date();
+    if (
+      row.effectiveFrom &&
+      new Date(row.effectiveFrom as string | number | Date) > on
+    )
+      return false;
+    if (
+      row.effectiveUntil &&
+      new Date(row.effectiveUntil as string | number | Date) < on
+    )
+      return false;
     return true;
   };
 
@@ -3512,7 +3622,7 @@ export function createTeacherScopeServiceForTests(options: {
         ),
     },
     teacherAssignment: {
-      findMany: jest.fn(({ where }: any) =>
+      findMany: jest.fn(({ where = {} }: PrismaQuery) =>
         Promise.resolve(
           currentAssignments().filter((row) => {
             if (where.tenantId && where.tenantId !== row.tenantId) return false;
@@ -3528,8 +3638,10 @@ export function createTeacherScopeServiceForTests(options: {
             if (where.status && where.status !== (row.status ?? 'ACTIVE'))
               return false;
             if (
-              where.assignmentType?.in &&
-              !where.assignmentType.in.includes(row.assignmentType)
+              (where.assignmentType as { in?: unknown[] } | undefined)?.in &&
+              !(where.assignmentType as { in: unknown[] }).in.includes(
+                row.assignmentType,
+              )
             )
               return false;
             return matchesWindow(row, where);
@@ -3538,7 +3650,7 @@ export function createTeacherScopeServiceForTests(options: {
       ),
     },
     teacherDelegation: {
-      findMany: jest.fn(({ where }: any) =>
+      findMany: jest.fn(({ where = {} }: PrismaQuery) =>
         Promise.resolve(
           currentDelegations().filter((row) => {
             if (where.tenantId && where.tenantId !== row.tenantId) return false;
@@ -3561,7 +3673,9 @@ export function createTeacherScopeServiceForTests(options: {
 }
 
 /** Convenience builder for a canonical TeacherAssignment row in specs. */
-export function teacherAssignmentFixture(overrides: Record<string, any> = {}) {
+export function teacherAssignmentFixture(
+  overrides: Record<string, unknown> = {},
+) {
   return {
     id: `assignment-${Math.random().toString(36).slice(2, 8)}`,
     tenantId: 'tenant-a',

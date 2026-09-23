@@ -36,7 +36,7 @@ class FakeCls {
   }
 }
 
-const SUFFIX = `p0-01-file-${Date.now()}`;
+const SUFFIX = `p0-01-file-${String(Date.now())}`;
 
 describe('P0-01 protected file scoping (real database)', () => {
   const cls = new FakeCls();
@@ -126,7 +126,9 @@ describe('P0-01 protected file scoping (real database)', () => {
     await prisma.$disconnect();
   });
 
-  beforeEach(() => cls.setTenant(tenantAId));
+  beforeEach(() => {
+    cls.setTenant(tenantAId);
+  });
 
   it('resolves a protected asset owned by the caller tenant', async () => {
     const asset = await service.getFileMetadata(tenantAId, ownAssetId);

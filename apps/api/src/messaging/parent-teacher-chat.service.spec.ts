@@ -19,9 +19,45 @@ import { CreateParentTeacherMessageDto } from './dto/parent-teacher-chat.dto';
 import { ParentTeacherChatService } from './parent-teacher-chat.service';
 
 describe('ParentTeacherChatService', () => {
-  let prisma: any;
-  let communicationsService: any;
-  let auditService: any;
+  let prisma: {
+    $transaction: jest.Mock;
+    parentTeacherThread: {
+      count: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
+    parentTeacherMessage: {
+      count: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
+    chatAvailabilityRule: { findMany: jest.Mock; upsert: jest.Mock };
+    chatEscalation: {
+      create: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+    };
+    chatAbuseReport: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+    };
+    student: { findFirst: jest.Mock; findMany: jest.Mock };
+    guardian: { findFirst: jest.Mock; findMany: jest.Mock };
+    staff: { findFirst: jest.Mock; findMany: jest.Mock };
+    academicYear: { findFirst: jest.Mock; findMany: jest.Mock };
+    studentGuardian: { findFirst: jest.Mock };
+    subjectTeacherAssignment: { findFirst: jest.Mock };
+    notificationDelivery: { create: jest.Mock };
+  };
+  let communicationsService: { recordDeliveryRecords: jest.Mock };
+  let auditService: { record: jest.Mock };
   let service: ParentTeacherChatService;
 
   const parentActor: AuthContext = {
@@ -147,9 +183,15 @@ describe('ParentTeacherChatService', () => {
       record: jest.fn(),
     };
     service = new ParentTeacherChatService(
-      prisma,
-      communicationsService,
-      auditService,
+      prisma as unknown as ConstructorParameters<
+        typeof ParentTeacherChatService
+      >[0],
+      communicationsService as unknown as ConstructorParameters<
+        typeof ParentTeacherChatService
+      >[1],
+      auditService as unknown as ConstructorParameters<
+        typeof ParentTeacherChatService
+      >[2],
     );
   });
 

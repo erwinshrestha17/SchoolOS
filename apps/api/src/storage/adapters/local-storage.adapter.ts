@@ -42,11 +42,13 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 
   async deleteObject(objectKey: string) {
-    await unlink(this.getLocalObjectPath(objectKey)).catch(() => {});
+    await unlink(this.getLocalObjectPath(objectKey)).catch(() => {
+      // Cleanup remains best effort; existing local adapter callers tolerate missing files.
+    });
   }
 
   async createSignedReadUrl(input: SignedUrlInput) {
-    return this.createSignedLocalUrl(input, 'GET');
+    return Promise.resolve(this.createSignedLocalUrl(input, 'GET'));
   }
 
   async createSignedUploadUrl(
@@ -57,13 +59,16 @@ export class LocalStorageAdapter implements StorageAdapter {
       this.config.signedUploadUrlTtlSeconds,
     );
 
-    return {
+    const headers: Record<string, string> = input.contentType
+      ? { 'content-type': input.contentType }
+      : {};
+    return Promise.resolve({
       url: this.createSignedLocalUrl(input, 'PUT'),
       method: 'PUT',
       objectKey: input.objectKey,
       expiresAt: buildExpiresAt(expiresInSeconds),
-      headers: input.contentType ? { 'content-type': input.contentType } : {},
-    };
+      headers,
+    });
   }
 
   async checkReadiness() {
@@ -85,7 +90,9 @@ export class LocalStorageAdapter implements StorageAdapter {
     }
 
     const signedUrl = await this.createSignedReadUrl({ objectKey: testKey });
-    await unlink(absolutePath).catch(() => {});
+    await unlink(absolutePath).catch(() => {
+      // Cleanup remains best effort; existing local adapter callers tolerate missing files.
+    });
 
     return {
       provider: 'local',

@@ -1,10 +1,10 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { ApiKeyAuthGuard } from './api-key-auth.guard';
 
 describe('ApiKeyAuthGuard', () => {
   let guard: ApiKeyAuthGuard;
-  let platformApiKeysService: any;
-  let cls: any;
+  let platformApiKeysService: { validateApiKey: jest.Mock };
+  let cls: { isActive: jest.Mock; set: jest.Mock };
 
   beforeEach(() => {
     platformApiKeysService = {
@@ -14,7 +14,12 @@ describe('ApiKeyAuthGuard', () => {
       isActive: jest.fn().mockReturnValue(true),
       set: jest.fn(),
     };
-    guard = new ApiKeyAuthGuard(platformApiKeysService, cls);
+    guard = new ApiKeyAuthGuard(
+      platformApiKeysService as unknown as ConstructorParameters<
+        typeof ApiKeyAuthGuard
+      >[0],
+      cls as unknown as ConstructorParameters<typeof ApiKeyAuthGuard>[1],
+    );
   });
 
   it('throws UnauthorizedException if no API key is provided', async () => {
@@ -49,7 +54,7 @@ describe('ApiKeyAuthGuard', () => {
       headers: {
         authorization: 'Bearer sk_schoolos_mykey',
       },
-      auth: null as any,
+      auth: null,
     };
     const context = mockExecutionContext(request);
     platformApiKeysService.validateApiKey.mockResolvedValue({
@@ -73,7 +78,7 @@ describe('ApiKeyAuthGuard', () => {
   it('binds the tenant into CLS so Prisma tenant scoping applies', async () => {
     const request = {
       headers: { authorization: 'Bearer sk_schoolos_mykey' },
-      auth: null as any,
+      auth: null,
     };
     platformApiKeysService.validateApiKey.mockResolvedValue({
       id: 'key-1',
@@ -93,7 +98,7 @@ describe('ApiKeyAuthGuard', () => {
     cls.isActive.mockReturnValue(false);
     const request = {
       headers: { authorization: 'Bearer sk_schoolos_mykey' },
-      auth: null as any,
+      auth: null,
     };
     platformApiKeysService.validateApiKey.mockResolvedValue({
       id: 'key-1',
@@ -108,10 +113,12 @@ describe('ApiKeyAuthGuard', () => {
   });
 });
 
-function mockExecutionContext(request: any): any {
+function mockExecutionContext(
+  request: Record<string, unknown>,
+): ExecutionContext {
   return {
     switchToHttp: () => ({
       getRequest: () => request,
     }),
-  } as any;
+  } as unknown as ExecutionContext;
 }

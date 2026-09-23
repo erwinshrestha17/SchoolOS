@@ -131,7 +131,7 @@ describe('guardian-child capability scope', () => {
           (query: {
             where: {
               studentLinks: {
-                some: { AND: Array<Record<string, unknown>> };
+                some: { AND: Record<string, unknown>[] };
               };
             };
           }) => {

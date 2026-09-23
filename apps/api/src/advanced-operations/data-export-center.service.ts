@@ -198,7 +198,7 @@ export class DataExportCenterService {
           ...(artifact.metadata ?? {}),
         },
       });
-      return this.prisma.dataExportJob.update({
+      return await this.prisma.dataExportJob.update({
         where: { id: job.id },
         data: {
           status: DataExportJobStatus.COMPLETED,

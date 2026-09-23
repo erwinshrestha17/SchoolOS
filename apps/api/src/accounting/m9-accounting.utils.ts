@@ -3,7 +3,7 @@ import { ChartAccountType } from '@prisma/client';
 import { M9_ACCOUNTING_SOURCE_MODULES } from './dto/m9-accounting.dto';
 
 export function normalizeM9Token(value: string) {
-  return String(value ?? '')
+  return (value ?? '')
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '_');

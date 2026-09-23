@@ -277,13 +277,21 @@ function renderTemplate(
   assertTemplateUsesOnlyDeclaredFields(body, fields);
   return body.replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, (_match, key) => {
     const value = data[String(key)];
-    return value === undefined || value === null ? '' : String(value);
+    if (value === undefined || value === null) return '';
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      return String(value);
+    }
+    throw new BadRequestException(`Merge field ${key} must be a scalar value`);
   });
 }
 
 function extractPlaceholders(body: string) {
-  return [...body.matchAll(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g)].map((match) =>
-    String(match[1]),
+  return [...body.matchAll(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g)].map(
+    (match) => match[1],
   );
 }
 

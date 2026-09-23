@@ -6,13 +6,28 @@ import {
   StorageProvider,
 } from '@prisma/client';
 import { FileRegistryService } from './file-registry.service';
-import { UsageService } from '../usage/usage.service';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { TEACHER_SCOPE_DENIED_CODE } from '../teacher-scope/teacher-scope.service';
 
 describe('FileRegistryService tenant scoping', () => {
   let service: FileRegistryService;
-  let prisma: any;
+  let prisma: {
+    fileAsset: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      findMany: jest.Mock;
+    };
+    activityAttachment: { findFirst: jest.Mock };
+    homeworkAttachment: { findFirst: jest.Mock };
+    parentTeacherThread: { findFirst: jest.Mock };
+    subjectTeacherAssignment: { findFirst: jest.Mock };
+    student: { findFirst: jest.Mock };
+    studentDocument: { findFirst: jest.Mock };
+    guardian: { findFirst: jest.Mock };
+    staff: { findFirst: jest.Mock };
+    payslip: { findFirst: jest.Mock };
+  };
   let auditService: { record: jest.Mock };
   let storageService: {
     checkReadiness: jest.Mock;
@@ -122,8 +137,10 @@ describe('FileRegistryService tenant scoping', () => {
     };
 
     service = new FileRegistryService(
-      prisma,
-      auditService as any,
+      prisma as unknown as ConstructorParameters<typeof FileRegistryService>[0],
+      auditService as unknown as ConstructorParameters<
+        typeof FileRegistryService
+      >[1],
       {
         port: 4000,
         storageProvider: 'local',
@@ -132,25 +149,35 @@ describe('FileRegistryService tenant scoping', () => {
           signedReadUrlTtlSeconds: 300,
           signedUploadUrlTtlSeconds: 300,
         },
-      } as any,
-      storageService as any,
-      usageService as any,
-      plansService as any,
-      teacherScopeService as any,
+      } as unknown as ConstructorParameters<typeof FileRegistryService>[2],
+      storageService as unknown as ConstructorParameters<
+        typeof FileRegistryService
+      >[3],
+      usageService as unknown as ConstructorParameters<
+        typeof FileRegistryService
+      >[4],
+      plansService as unknown as ConstructorParameters<
+        typeof FileRegistryService
+      >[5],
+      teacherScopeService as unknown as ConstructorParameters<
+        typeof FileRegistryService
+      >[6],
     );
   });
 
   it('denies protected file access during a support override before tenant or owner checks', async () => {
     await expect(
       service.assertFileAccessForAuth(
-        asset as any,
+        asset as unknown as Parameters<
+          typeof service.assertFileAccessForAuth
+        >[0],
         {
           tenantId: 'tenant-1',
           userId: 'platform-user-1',
           roles: [],
           permissions: ['students:read'],
           isSupportOverride: true,
-        } as any,
+        } as unknown as Parameters<typeof service.assertFileAccessForAuth>[1],
       ),
     ).rejects.toThrow(
       'Protected files are unavailable during support override',
@@ -356,7 +383,7 @@ describe('FileRegistryService tenant scoping', () => {
           userId: 'teacher-1',
           roles: ['teacher'],
           permissions: ['homework:read'],
-        } as any,
+        } as unknown as Parameters<typeof service.createSignedPreviewUrl>[0],
         'file-1',
       ),
     ).resolves.toEqual({
@@ -406,7 +433,7 @@ describe('FileRegistryService tenant scoping', () => {
         userId: 'admin-1',
         roles: ['admin'],
         permissions: ['reports:read'],
-      } as any,
+      } as unknown as Parameters<typeof service.createSignedDownloadUrl>[0],
       'file-1',
     );
 
@@ -442,7 +469,7 @@ describe('FileRegistryService tenant scoping', () => {
           userId: 'staff-user-1',
           roles: ['teacher'],
           permissions: ['staff:read'],
-        } as any,
+        } as unknown as Parameters<typeof service.createSignedPreviewUrl>[0],
         'file-1',
       ),
     ).resolves.toEqual(expect.objectContaining({ id: 'file-1' }));
@@ -454,19 +481,21 @@ describe('FileRegistryService tenant scoping', () => {
           userId: 'staff-user-2',
           roles: ['teacher'],
           permissions: ['staff:read'],
-        } as any,
+        } as unknown as Parameters<typeof service.createSignedPreviewUrl>[0],
         'file-1',
       ),
     ).rejects.toThrow(ForbiddenException);
   });
 
   it('creates pending signed upload intents without leaking storage keys', async () => {
-    prisma.fileAsset.create.mockImplementation(async ({ data }: any) => ({
-      ...asset,
-      ...data,
-      id: 'file-upload-1',
-      status: FileStatus.PENDING,
-    }));
+    prisma.fileAsset.create.mockImplementation(
+      async ({ data }: { data: Record<string, unknown> }) => ({
+        ...asset,
+        ...data,
+        id: 'file-upload-1',
+        status: FileStatus.PENDING,
+      }),
+    );
 
     const result = await service.createSignedUpload(
       {
@@ -474,7 +503,7 @@ describe('FileRegistryService tenant scoping', () => {
         userId: 'teacher-1',
         roles: ['teacher'],
         permissions: ['homework:create'],
-      } as any,
+      } as unknown as Parameters<typeof service.createSignedUpload>[0],
       {
         fileName: 'worksheet.pdf',
         contentType: 'application/pdf',
@@ -533,7 +562,7 @@ describe('FileRegistryService tenant scoping', () => {
           userId: 'other-user',
           roles: ['teacher'],
           permissions: ['homework:create'],
-        } as any,
+        } as unknown as Parameters<typeof service.completeSignedUpload>[0],
         'file-1',
       ),
     ).rejects.toThrow('Only the uploader can complete this upload');
@@ -554,7 +583,7 @@ describe('FileRegistryService tenant scoping', () => {
           userId: 'teacher-1',
           roles: ['teacher'],
           permissions: ['students:read'],
-        } as any,
+        } as unknown as Parameters<typeof service.createSignedPreviewUrl>[0],
         'file-1',
       ),
     ).rejects.toThrow(NotFoundException);
@@ -577,7 +606,7 @@ describe('FileRegistryService tenant scoping', () => {
           userId: 'teacher-1',
           roles: ['teacher'],
           permissions: ['homework:read'],
-        } as any,
+        } as unknown as Parameters<typeof service.createSignedPreviewUrl>[0],
         'file-1',
       ),
     ).rejects.toThrow('You do not have permission to view this file');
@@ -598,7 +627,7 @@ describe('FileRegistryService tenant scoping', () => {
           userId: 'guardian-user-1',
           roles: ['parent'],
           permissions: ['students:read'],
-        } as any,
+        } as unknown as Parameters<typeof service.createSignedPreviewUrl>[0],
         'file-1',
       ),
     ).resolves.toEqual(expect.objectContaining({ id: 'file-1' }));
@@ -614,7 +643,7 @@ describe('FileRegistryService tenant scoping', () => {
           userId: 'guardian-user-2',
           roles: ['parent'],
           permissions: ['students:read'],
-        } as any,
+        } as unknown as Parameters<typeof service.createSignedPreviewUrl>[0],
         'file-1',
       ),
     ).rejects.toThrow('You can only view files for your linked child');
@@ -628,13 +657,15 @@ describe('FileRegistryService tenant scoping', () => {
 
     await expect(
       service.assertFileAccessForAuth(
-        asset as any,
+        asset as unknown as Parameters<
+          typeof service.assertFileAccessForAuth
+        >[0],
         {
           tenantId: 'tenant-1',
           userId: 'admin-1',
           roles: ['admin'],
           permissions: ['student_documents:manage'],
-        } as any,
+        } as unknown as Parameters<typeof service.assertFileAccessForAuth>[1],
       ),
     ).rejects.toThrow('Student document is not active');
 
@@ -658,13 +689,15 @@ describe('FileRegistryService tenant scoping', () => {
 
     await expect(
       service.assertFileAccessForAuth(
-        asset as any,
+        asset as unknown as Parameters<
+          typeof service.assertFileAccessForAuth
+        >[0],
         {
           tenantId: 'tenant-1',
           userId: 'admin-1',
           roles: ['admin'],
           permissions: ['student_documents:manage'],
-        } as any,
+        } as unknown as Parameters<typeof service.assertFileAccessForAuth>[1],
       ),
     ).rejects.toThrow(
       'Student document file binding does not match its student',
@@ -676,13 +709,15 @@ describe('FileRegistryService tenant scoping', () => {
 
     await expect(
       service.assertFileAccessForAuth(
-        { ...asset, module: 'student-documents' } as any,
+        { ...asset, module: 'student-documents' } as unknown as Parameters<
+          typeof service.assertFileAccessForAuth
+        >[0],
         {
           tenantId: 'tenant-1',
           userId: 'admin-1',
           roles: ['admin'],
           permissions: ['student_documents:manage'],
-        } as any,
+        } as unknown as Parameters<typeof service.assertFileAccessForAuth>[1],
       ),
     ).rejects.toThrow(
       'Student document file is not linked to an active document',
@@ -697,13 +732,15 @@ describe('FileRegistryService tenant scoping', () => {
 
     await expect(
       service.assertFileAccessForAuth(
-        { ...asset, module: 'student-documents' } as any,
+        { ...asset, module: 'student-documents' } as unknown as Parameters<
+          typeof service.assertFileAccessForAuth
+        >[0],
         {
           tenantId: 'tenant-1',
           userId: 'admin-1',
           roles: ['admin'],
           permissions: ['student_documents:manage'],
-        } as any,
+        } as unknown as Parameters<typeof service.assertFileAccessForAuth>[1],
       ),
     ).resolves.toBeUndefined();
   });
@@ -715,13 +752,15 @@ describe('FileRegistryService tenant scoping', () => {
     });
     await expect(
       service.assertFileAccessForAuth(
-        asset as any,
+        asset as unknown as Parameters<
+          typeof service.assertFileAccessForAuth
+        >[0],
         {
           tenantId: 'tenant-1',
           userId: 'teacher-user-1',
           roles: ['teacher'],
           permissions: ['students:read', 'students:qr:read'],
-        } as any,
+        } as unknown as Parameters<typeof service.assertFileAccessForAuth>[1],
       ),
     ).resolves.toBeUndefined();
     expect(teacherScopeService.requireActorAccess).toHaveBeenCalledWith(
@@ -748,13 +787,13 @@ describe('FileRegistryService tenant scoping', () => {
     );
 
     const denied = service.assertFileAccessForAuth(
-      asset as any,
+      asset as unknown as Parameters<typeof service.assertFileAccessForAuth>[0],
       {
         tenantId: 'tenant-1',
         userId: 'teacher-user-2',
         roles: ['teacher'],
         permissions: ['students:read', 'students:qr:read'],
-      } as any,
+      } as unknown as Parameters<typeof service.assertFileAccessForAuth>[1],
     );
 
     await expect(denied).rejects.toBeInstanceOf(ForbiddenException);
@@ -781,13 +820,15 @@ describe('FileRegistryService tenant scoping', () => {
 
     await expect(
       service.assertFileAccessForAuth(
-        asset as any,
+        asset as unknown as Parameters<
+          typeof service.assertFileAccessForAuth
+        >[0],
         {
           tenantId: 'tenant-1',
           userId: 'teacher-user-2',
           roles: ['teacher'],
           permissions: ['students:read', 'students:qr:read'],
-        } as any,
+        } as unknown as Parameters<typeof service.assertFileAccessForAuth>[1],
       ),
     ).rejects.toMatchObject({
       response: expect.objectContaining({
@@ -812,13 +853,15 @@ describe('FileRegistryService tenant scoping', () => {
 
     await expect(
       service.assertFileAccessForAuth(
-        chatAsset as any,
+        chatAsset as unknown as Parameters<
+          typeof service.assertFileAccessForAuth
+        >[0],
         {
           tenantId: 'tenant-1',
           userId: 'guardian-user-1',
           roles: ['parent'],
           permissions: ['messaging:read'],
-        } as any,
+        } as unknown as Parameters<typeof service.assertFileAccessForAuth>[1],
       ),
     ).resolves.toBeUndefined();
 
@@ -843,13 +886,15 @@ describe('FileRegistryService tenant scoping', () => {
 
     await expect(
       service.assertFileAccessForAuth(
-        chatAsset as any,
+        chatAsset as unknown as Parameters<
+          typeof service.assertFileAccessForAuth
+        >[0],
         {
           tenantId: 'tenant-1',
           userId: 'guardian-user-2',
           roles: ['parent'],
           permissions: ['messaging:read'],
-        } as any,
+        } as unknown as Parameters<typeof service.assertFileAccessForAuth>[1],
       ),
     ).rejects.toThrow(ForbiddenException);
   });

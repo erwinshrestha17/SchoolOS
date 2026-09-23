@@ -5103,8 +5103,8 @@ function buildService(options: {
    * `teacherAssignments` option below, which feeds the old
    * SubjectTeacherAssignment mock.
    */
-  canonicalAssignments?: Array<Record<string, unknown>>;
-  canonicalDelegations?: Array<Record<string, unknown>>;
+  canonicalAssignments?: Record<string, unknown>[];
+  canonicalDelegations?: Record<string, unknown>[];
   scopeStaffId?: string | null;
   academicYear?: unknown;
   classroom?: unknown;
@@ -5402,7 +5402,7 @@ function buildService(options: {
         return Promise.all(input);
       }
 
-      return (input as (tx: any) => unknown)(tx);
+      return (input as (tx: Record<string, unknown>) => unknown)(tx);
     }),
   };
   const communicationsService = {
@@ -5439,7 +5439,7 @@ function buildService(options: {
         subject?: { id?: string };
       };
       return {
-        assignmentId: row.id ?? `subject-assignment-${index + 1}`,
+        assignmentId: row.id ?? `subject-assignment-${String(index + 1)}`,
         assignmentType: TeacherAssignmentType.SUBJECT_TEACHER,
         academicYearId: row.academicYearId ?? 'ay-current',
         classId: row.classId ?? 'class-1',
@@ -5450,7 +5450,7 @@ function buildService(options: {
     ...(options.classTeacherSections ?? []).map((section, index) => {
       const row = section as { id?: string; classId?: string };
       return {
-        assignmentId: `class-assignment-${index + 1}`,
+        assignmentId: `class-assignment-${String(index + 1)}`,
         assignmentType: TeacherAssignmentType.CLASS_TEACHER,
         academicYearId: 'ay-current',
         classId: row.classId ?? 'class-1',

@@ -13,7 +13,6 @@ import { getParentStudentIds } from '../common/security/parent-scope';
 import { EntitlementsService } from '../plans/entitlements.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  OPERATIONAL_SUMMARY_MODULES,
   type OperationalAttentionItem,
   type OperationalModuleSummary,
   type OperationalRecentItem,
@@ -427,7 +426,9 @@ export class OperationalSummaryService {
         ),
       ],
       m2_attendance: teacherOnly
-        ? this.teacherAttendanceDefinitions(actor, day, teacherScope!)
+        ? teacherScope
+          ? this.teacherAttendanceDefinitions(actor, day, teacherScope)
+          : []
         : [
             this.def('expectedStudents', 'student', {
               tenantId,

@@ -220,7 +220,7 @@ describe('TimetableController M6 contracts', () => {
     expect(
       controller.listTeacherAvailability(actor, {
         staffId: 'teacher-1',
-      } as any),
+      } as unknown as Parameters<typeof controller.listTeacherAvailability>[1]),
     ).toEqual({
       availability: [],
     });

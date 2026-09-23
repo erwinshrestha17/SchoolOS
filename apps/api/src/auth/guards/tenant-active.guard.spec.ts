@@ -1,4 +1,8 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  UnauthorizedException,
+  type ExecutionContext,
+} from '@nestjs/common';
 import { TenantActiveGuard } from './tenant-active.guard';
 import { SUSPENDED_TENANT_MESSAGE } from '../../plans/tenant-access.constants';
 
@@ -7,7 +11,11 @@ describe('TenantActiveGuard', () => {
     assertTenantActive: jest.fn(),
   };
 
-  const guard = new TenantActiveGuard(plansService as any);
+  const guard = new TenantActiveGuard(
+    plansService as unknown as ConstructorParameters<
+      typeof TenantActiveGuard
+    >[0],
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -18,7 +26,7 @@ describe('TenantActiveGuard', () => {
       switchToHttp: () => ({
         getRequest: () => ({ auth: undefined }),
       }),
-    } as any;
+    } as unknown as ExecutionContext;
 
     await expect(guard.canActivate(context)).rejects.toThrow(
       UnauthorizedException,
@@ -30,7 +38,7 @@ describe('TenantActiveGuard', () => {
       switchToHttp: () => ({
         getRequest: () => ({ auth: { tenantId: 'platform' } }),
       }),
-    } as any;
+    } as unknown as ExecutionContext;
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(plansService.assertTenantActive).not.toHaveBeenCalled();
@@ -45,7 +53,7 @@ describe('TenantActiveGuard', () => {
       switchToHttp: () => ({
         getRequest: () => ({ auth: { tenantId: 'tenant-suspended' } }),
       }),
-    } as any;
+    } as unknown as ExecutionContext;
 
     await expect(guard.canActivate(context)).rejects.toThrow(
       ForbiddenException,

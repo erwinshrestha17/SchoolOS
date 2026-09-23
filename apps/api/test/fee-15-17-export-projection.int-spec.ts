@@ -36,7 +36,7 @@ class FakeCls {
   }
 }
 
-const SUFFIX = `fee1517-int-${Date.now()}`;
+const SUFFIX = `fee1517-int-${String(Date.now())}`;
 
 describe('FEE-15 / FEE-17 export projection parity (real database)', () => {
   const cls = new FakeCls();
@@ -205,7 +205,9 @@ describe('FEE-15 / FEE-17 export projection parity (real database)', () => {
     await prisma.$disconnect();
   });
 
-  beforeEach(() => cls.setTenant(tenantId));
+  beforeEach(() => {
+    cls.setTenant(tenantId);
+  });
 
   it('FEE-17 export drain matches every paged screen row and summary totals', async () => {
     const filters = {

@@ -106,5 +106,5 @@ function normalizeSafeImageFileName(
 function isSupportedImageMimeType(
   mimeType: string,
 ): mimeType is SupportedImageMimeType {
-  return Object.prototype.hasOwnProperty.call(IMAGE_SIGNATURES, mimeType);
+  return Object.hasOwn(IMAGE_SIGNATURES, mimeType);
 }

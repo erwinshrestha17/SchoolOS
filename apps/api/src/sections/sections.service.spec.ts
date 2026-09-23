@@ -33,18 +33,18 @@ const adminActor = {
 const YEAR_START = new Date('2026-04-01T00:00:00.000Z');
 const YEAR_END = new Date('2027-03-31T23:59:59.999Z');
 
-type BuildServiceOptions = {
+interface BuildServiceOptions {
   sections?: unknown[];
   assignments?: unknown[];
-  currentYear?: unknown | null;
-  section?: unknown | null;
-  staff?: unknown | null;
-  priorActive?: unknown | null;
-  existingAssignment?: unknown | null;
+  currentYear?: unknown;
+  section?: unknown;
+  staff?: unknown;
+  priorActive?: unknown;
+  existingAssignment?: unknown;
   transactionImpl?: (
     callback: (tx: unknown) => Promise<unknown>,
   ) => Promise<unknown>;
-};
+}
 
 function buildService(options: BuildServiceOptions = {}) {
   const audit = { record: jest.fn() };

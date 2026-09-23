@@ -31,7 +31,7 @@ function buildService() {
 
 function clearIntegrationEnv() {
   for (const key of envKeys) {
-    delete process.env[key];
+    Reflect.deleteProperty(process.env, key);
   }
 }
 

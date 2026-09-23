@@ -1,5 +1,10 @@
 import { ForbiddenException } from '@nestjs/common';
-import { TeacherAssignmentType } from '@prisma/client';
+import {
+  AssessmentType,
+  AuthMethod,
+  TeacherAssignmentComponentScope,
+  TeacherAssignmentType,
+} from '@prisma/client';
 import { TeacherScopeService } from '../src/teacher-scope/teacher-scope.service';
 import { TeacherCapability } from '../src/teacher-scope/teacher-capability';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -14,7 +19,7 @@ interface FakeAssignment {
   classId: string;
   sectionId: string;
   subjectId: string | null;
-  componentScope: string | null;
+  componentScope: TeacherAssignmentComponentScope | null;
   status: string;
   effectiveFrom: Date;
   effectiveUntil: Date | null;
@@ -45,42 +50,72 @@ function makeFakePrisma(
 ) {
   return {
     staff: {
-      findFirst: jest.fn(async ({ where }: any) => {
-        if (where.status && where.status !== 'ACTIVE') return null;
-        return { id: `staff-for-${where.userId}` };
-      }),
+      findFirst: jest.fn(
+        async ({ where }: { where: { status?: string; userId: string } }) => {
+          if (where.status && where.status !== 'ACTIVE') return null;
+          return { id: `staff-for-${where.userId}` };
+        },
+      ),
     },
     teacherAssignment: {
-      findMany: jest.fn(async ({ where }: any) => {
-        const now = new Date();
-        return assignments.filter((a) => {
-          if (a.tenantId !== where.tenantId) return false;
-          if (a.staffId !== where.staffId) return false;
-          if (a.academicYearId !== where.academicYearId) return false;
-          if (a.classId !== where.classId) return false;
-          if (a.sectionId !== where.sectionId) return false;
-          if (a.status !== where.status) return false;
-          if (!where.assignmentType.in.includes(a.assignmentType)) return false;
-          if (a.effectiveFrom > now) return false;
-          if (a.effectiveUntil !== null && a.effectiveUntil < now) return false;
-          return true;
-        });
-      }),
+      findMany: jest.fn(
+        async ({
+          where,
+        }: {
+          where: {
+            tenantId: string;
+            staffId: string;
+            academicYearId?: string;
+            classId: string;
+            sectionId: string;
+            status: string;
+            assignmentType: { in: string[] };
+          };
+        }) => {
+          const now = new Date();
+          return assignments.filter((a) => {
+            if (a.tenantId !== where.tenantId) return false;
+            if (a.staffId !== where.staffId) return false;
+            if (a.academicYearId !== where.academicYearId) return false;
+            if (a.classId !== where.classId) return false;
+            if (a.sectionId !== where.sectionId) return false;
+            if (a.status !== where.status) return false;
+            if (!where.assignmentType.in.includes(a.assignmentType))
+              return false;
+            if (a.effectiveFrom > now) return false;
+            if (a.effectiveUntil !== null && a.effectiveUntil < now)
+              return false;
+            return true;
+          });
+        },
+      ),
     },
     teacherDelegation: {
-      findMany: jest.fn(async ({ where }: any) => {
-        const now = new Date();
-        return delegations.filter((d) => {
-          if (d.tenantId !== where.tenantId) return false;
-          if (d.recipientStaffId !== where.recipientStaffId) return false;
-          if (d.classId !== where.classId) return false;
-          if (d.sectionId !== where.sectionId) return false;
-          if (d.status !== where.status) return false;
-          if (d.effectiveFrom > now) return false;
-          if (d.effectiveUntil < now) return false;
-          return true;
-        });
-      }),
+      findMany: jest.fn(
+        async ({
+          where,
+        }: {
+          where: {
+            tenantId: string;
+            recipientStaffId: string;
+            classId: string;
+            sectionId: string;
+            status: string;
+          };
+        }) => {
+          const now = new Date();
+          return delegations.filter((d) => {
+            if (d.tenantId !== where.tenantId) return false;
+            if (d.recipientStaffId !== where.recipientStaffId) return false;
+            if (d.classId !== where.classId) return false;
+            if (d.sectionId !== where.sectionId) return false;
+            if (d.status !== where.status) return false;
+            if (d.effectiveFrom > now) return false;
+            if (d.effectiveUntil < now) return false;
+            return true;
+          });
+        },
+      ),
     },
   };
 }
@@ -215,7 +250,9 @@ describe('TeacherScopeService authorization (Teacher Persona acceptance criteria
 
   it('denies a PRACTICAL-only teacher from writing THEORY marks', async () => {
     const { service } = makeService([
-      subjectAssignment({ componentScope: 'PRACTICAL' as any }),
+      subjectAssignment({
+        componentScope: TeacherAssignmentComponentScope.PRACTICAL,
+      }),
     ]);
     await expect(
       service.requireAccess({
@@ -225,7 +262,7 @@ describe('TeacherScopeService authorization (Teacher Persona acceptance criteria
         classId: CLASS_1,
         sectionId: SECTION_A,
         subjectId: SUBJECT_MATH,
-        componentType: 'THEORY' as any,
+        componentType: AssessmentType.THEORY,
         capability: TeacherCapability.MARKS_ENTER,
       }),
     ).rejects.toThrow(ForbiddenException);
@@ -233,7 +270,9 @@ describe('TeacherScopeService authorization (Teacher Persona acceptance criteria
 
   it('allows a PRACTICAL-only teacher to write PRACTICAL marks', async () => {
     const { service } = makeService([
-      subjectAssignment({ componentScope: 'PRACTICAL' as any }),
+      subjectAssignment({
+        componentScope: TeacherAssignmentComponentScope.PRACTICAL,
+      }),
     ]);
     const grant = await service.requireAccess({
       tenantId: TENANT_A,
@@ -242,7 +281,7 @@ describe('TeacherScopeService authorization (Teacher Persona acceptance criteria
       classId: CLASS_1,
       sectionId: SECTION_A,
       subjectId: SUBJECT_MATH,
-      componentType: 'PRACTICAL' as any,
+      componentType: TeacherAssignmentComponentScope.PRACTICAL,
       capability: TeacherCapability.MARKS_ENTER,
     });
     expect(grant.componentScope).toBe('PRACTICAL');
@@ -250,13 +289,15 @@ describe('TeacherScopeService authorization (Teacher Persona acceptance criteria
 
   it('an ALL_COMPONENTS assignment covers every component type', async () => {
     const { service } = makeService([
-      subjectAssignment({ componentScope: 'ALL_COMPONENTS' as any }),
+      subjectAssignment({
+        componentScope: TeacherAssignmentComponentScope.ALL_COMPONENTS,
+      }),
     ]);
     for (const componentType of [
-      'THEORY',
-      'PRACTICAL',
-      'INTERNAL',
-      'PROJECT',
+      AssessmentType.THEORY,
+      AssessmentType.PRACTICAL,
+      AssessmentType.INTERNAL,
+      AssessmentType.PROJECT,
     ]) {
       await expect(
         service.requireAccess({
@@ -266,7 +307,7 @@ describe('TeacherScopeService authorization (Teacher Persona acceptance criteria
           classId: CLASS_1,
           sectionId: SECTION_A,
           subjectId: SUBJECT_MATH,
-          componentType: componentType as any,
+          componentType,
           capability: TeacherCapability.MARKS_ENTER,
         }),
       ).resolves.toBeDefined();
@@ -453,7 +494,7 @@ describe('TeacherScopeService authorization (Teacher Persona acceptance criteria
           tenantId: TENANT_A,
           tenantSlug: TENANT_A,
           email: 'teacher@test.com',
-          authMethod: 'PASSWORD' as any,
+          authMethod: AuthMethod.PASSWORD,
           roles: ['subject_teacher'],
           permissions: [],
         },
@@ -479,7 +520,7 @@ describe('TeacherScopeService authorization (Teacher Persona acceptance criteria
     const staffId = await service.resolveActiveStaffId({
       tenantId: TENANT_A,
       userId: 'deactivated-user',
-    } as any);
+    } as unknown as Parameters<typeof service.resolveActiveStaffId>[0]);
     expect(staffId).toBeNull();
   });
 });

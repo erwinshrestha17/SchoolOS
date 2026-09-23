@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { TransportService } from './transport.service';
 import { TransportHardeningService } from './transport-hardening.service';
+import { createAuthContextMock } from '../../test/test-helpers';
 import {
   StaffStatus,
   StudentLifecycleStatus,
@@ -13,32 +14,57 @@ import {
 } from '@prisma/client';
 
 describe('Transport Security Boundaries', () => {
-  let prisma: any;
-  let redisClient: any;
+  let prisma: {
+    transportTrip: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
+    transportDriverAssignment: { findFirst: jest.Mock; findMany: jest.Mock };
+    transportVehicle: { findFirst: jest.Mock };
+    transportRoute: { findFirst: jest.Mock };
+    transportStop: { findFirst: jest.Mock };
+    staff: { findFirst: jest.Mock };
+    student: { findFirst: jest.Mock };
+    studentGuardian: { findFirst: jest.Mock };
+    transportTripStudentStatus: { findFirst: jest.Mock };
+    transportLocationPing: {
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      deleteMany: jest.Mock;
+    };
+  };
+  let redisClient: {
+    set: jest.Mock;
+    get: jest.Mock;
+    publish: jest.Mock;
+    del: jest.Mock;
+  };
   let service: TransportService;
   let hardeningService: TransportHardeningService;
 
   const tenantId = 'tenant-1';
-  const adminActor: any = {
+  const adminActor = createAuthContextMock({
     userId: 'admin-1',
     tenantId,
     roles: ['admin'],
     permissions: ['transport:manage'],
-  };
+  });
 
-  const driverActor: any = {
+  const driverActor = createAuthContextMock({
     userId: 'driver-1',
     tenantId,
     roles: ['staff'],
     permissions: ['transport:operate'],
-  };
+  });
 
-  const parentActor: any = {
+  const parentActor = createAuthContextMock({
     userId: 'parent-1',
     tenantId,
     roles: ['guardian'],
     permissions: ['transport:tracking:parent'],
-  };
+  });
 
   beforeEach(() => {
     prisma = {
@@ -87,15 +113,23 @@ describe('Transport Security Boundaries', () => {
     };
 
     service = new TransportService(
-      prisma as any,
-      {} as any,
-      {} as any,
-      { getClient: () => redisClient } as any,
+      prisma as unknown as ConstructorParameters<typeof TransportService>[0],
+      {} as unknown as ConstructorParameters<typeof TransportService>[1],
+      {} as unknown as ConstructorParameters<typeof TransportService>[2],
+      { getClient: () => redisClient } as unknown as ConstructorParameters<
+        typeof TransportService
+      >[3],
     );
     hardeningService = new TransportHardeningService(
-      prisma as any,
-      {} as any,
-      {} as any,
+      prisma as unknown as ConstructorParameters<
+        typeof TransportHardeningService
+      >[0],
+      {} as unknown as ConstructorParameters<
+        typeof TransportHardeningService
+      >[1],
+      {} as unknown as ConstructorParameters<
+        typeof TransportHardeningService
+      >[2],
       service,
     );
   });

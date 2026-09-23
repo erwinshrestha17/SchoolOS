@@ -29,7 +29,7 @@ class FixtureCls {
 }
 
 describe('Parent homework dashboard summary (real database)', () => {
-  const suffix = `homework-summary-${Date.now()}`;
+  const suffix = `homework-summary-${String(Date.now())}`;
   const cls = new FixtureCls();
   const tenantIds: string[] = [];
   let prisma: PrismaService;
@@ -189,7 +189,7 @@ describe('Parent homework dashboard summary (real database)', () => {
 
         // Seven pending assignments exceed the old five-row dashboard preview.
         for (let index = 0; index < 7; index += 1) {
-          await assignment(`Pending ${index}`, '2026-09-15T06:00:00Z', {
+          await assignment(`Pending ${String(index)}`, '2026-09-15T06:00:00Z', {
             submissionStatus: index === 1 ? 'NOT_SUBMITTED' : undefined,
             sectionId: index === 2 ? null : school.section.id,
           });

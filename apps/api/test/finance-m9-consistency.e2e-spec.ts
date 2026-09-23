@@ -68,10 +68,10 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
     // Payment allocations became the authoritative fee-payment linkage. Keep
     // this focused integration mock aligned with the current Prisma contract
     // rather than falling back to the legacy direct invoice/payment shape.
-    (prisma as any).paymentAllocation = {
-      create: jest.fn(({ data }: any) =>
+    const allocationFixture = {
+      create: jest.fn(({ data }: Prisma.PaymentAllocationCreateArgs) =>
         Promise.resolve({
-          id: `allocation-${++paymentAllocationSequence}`,
+          id: `allocation-${String(++paymentAllocationSequence)}`,
           ...data,
           createdAt: new Date(),
         }),
@@ -84,6 +84,9 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
       count: jest.fn().mockResolvedValue(0),
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     };
+    (
+      prisma as unknown as { paymentAllocation: typeof allocationFixture }
+    ).paymentAllocation = allocationFixture;
 
     (prisma.fiscalPeriod.findFirst as jest.Mock).mockResolvedValue(
       openFiscalPeriod(),
@@ -463,9 +466,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
     });
   });
 
-  function buildInvoice(
-    overrides: Record<string, unknown> = {},
-  ): Record<string, any> {
+  function buildInvoice(overrides: Record<string, unknown> = {}) {
     return {
       id: 'inv-1',
       tenantId,

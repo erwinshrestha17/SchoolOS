@@ -2215,7 +2215,11 @@ export class HomeworkService {
     );
 
     try {
-      let result;
+      let result: {
+        count: number;
+        sentCount?: number;
+        skippedCount?: number;
+      };
       switch (dto.reminderType) {
         case HomeworkReminderType.HOMEWORK_PUBLISHED:
           result = await this.sendHomeworkPublishedReminder(actor, homework.id);
@@ -2783,7 +2787,10 @@ export class HomeworkService {
       status: submission.status,
       submittedAt: submission.submittedAt,
       reviewedAt: submission.reviewedAt,
-      score: submission.score == null ? null : Number(submission.score),
+      score:
+        submission.score === null || submission.score === undefined
+          ? null
+          : Number(submission.score),
       teacherRemarks: submission.teacherRemarks,
       correctionRemarks: submission.correctionRemarks,
       attachmentCount: submission.attachments.length,

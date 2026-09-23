@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import type {
-  SchoolSettingsAccess,
-  SchoolSettingsDomain,
-  SchoolSettingsNavigation,
-  SchoolSettingsNavigationGroup,
-  SchoolSettingsNavigationGroupId,
-  SchoolSettingsNavigationItem,
+import {
+  SCHOOL_SETTINGS_DOMAIN_MANAGE_PERMISSIONS,
+  type SchoolSettingsAccess,
+  type SchoolSettingsDomain,
+  type SchoolSettingsNavigation,
+  type SchoolSettingsNavigationGroup,
+  type SchoolSettingsNavigationGroupId,
+  type SchoolSettingsNavigationItem,
 } from '@schoolos/core';
-import { SCHOOL_SETTINGS_DOMAIN_MANAGE_PERMISSIONS } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
 import { EntitlementsService } from '../plans/entitlements.service';
 
@@ -29,14 +29,14 @@ const GROUP_ORDER: SchoolSettingsNavigationGroupId[] = [
   'module-settings',
 ];
 
-type DomainItemDefinition = {
+interface DomainItemDefinition {
   id: string;
   groupId: SchoolSettingsNavigationGroupId;
   label: string;
   description: string;
   href: string;
   domain: SchoolSettingsDomain;
-};
+}
 
 const DOMAIN_ITEMS: DomainItemDefinition[] = [
   {
@@ -159,7 +159,7 @@ const MANAGE_TO_VIEW_DOMAIN_ITEMS = new Set([
   'academic-calendar',
 ]);
 
-type ModuleItemDefinition = {
+interface ModuleItemDefinition {
   id: string;
   module: string;
   label: string;
@@ -167,7 +167,7 @@ type ModuleItemDefinition = {
   href: string;
   readPermissions: string[];
   managePermissions: string[];
-};
+}
 
 const MODULE_ITEMS: ModuleItemDefinition[] = [
   {

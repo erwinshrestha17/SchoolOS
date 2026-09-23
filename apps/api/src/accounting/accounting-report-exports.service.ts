@@ -364,7 +364,13 @@ export class AccountingReportExportsService {
     options: { mode?: 'sync' | 'background' } = {},
   ): Promise<string> {
     const data = await this.reportsService.getBankBook(tenantId, {
-      ...query,
+      fiscalYearId: query.fiscalYearId,
+      fiscalPeriodId: query.fiscalPeriodId,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      accountId: query.accountId,
+      accountCode: query.accountCode,
+      accountKind: query.accountKind,
       page: options.mode === 'background' ? 1 : query.page,
       limit: this.rowLimitForMode(options.mode),
     });
@@ -410,7 +416,13 @@ export class AccountingReportExportsService {
     options: { mode?: 'sync' | 'background' } = {},
   ) {
     const data = await this.reportsService.getBankBook(tenantId, {
-      ...query,
+      fiscalYearId: query.fiscalYearId,
+      fiscalPeriodId: query.fiscalPeriodId,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      accountId: query.accountId,
+      accountCode: query.accountCode,
+      accountKind: query.accountKind,
       page: options.mode === 'background' ? 1 : query.page,
       limit: this.rowLimitForMode(options.mode),
     });
@@ -454,7 +466,14 @@ export class AccountingReportExportsService {
     query: JournalRegisterQueryDto,
   ): Promise<string> {
     const data = await this.reportsService.getJournalRegister(tenantId, {
-      ...query,
+      fiscalYearId: query.fiscalYearId,
+      fiscalPeriodId: query.fiscalPeriodId,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      status: query.status,
+      sourceType: query.sourceType,
+      voucherType: query.voucherType,
+      page: query.page,
       limit: 5000,
     });
     const rows = data.rows.map((row) => ({
@@ -480,7 +499,14 @@ export class AccountingReportExportsService {
     actor: AuthContext,
   ) {
     const data = await this.reportsService.getJournalRegister(tenantId, {
-      ...query,
+      fiscalYearId: query.fiscalYearId,
+      fiscalPeriodId: query.fiscalPeriodId,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      status: query.status,
+      sourceType: query.sourceType,
+      voucherType: query.voucherType,
+      page: query.page,
       limit: 5000,
     });
     const rows = data.rows.map((row) => ({
@@ -1675,10 +1701,20 @@ export class AccountingReportExportsService {
     actor: AuthContext;
   }) {
     if (input.reportKey === 'accounting.general-ledger') {
+      const filters = input.filters as unknown as GeneralLedgerQueryDto;
       const data = await this.reportsService.getGeneralLedger(
         input.actor.tenantId,
         {
-          ...(input.filters as unknown as GeneralLedgerQueryDto),
+          fiscalYearId: filters.fiscalYearId,
+          accountId: filters.accountId,
+          accountCode: filters.accountCode,
+          fromDate: filters.fromDate,
+          toDate: filters.toDate,
+          fiscalPeriodId: filters.fiscalPeriodId,
+          sourceModule: filters.sourceModule,
+          sourceType: filters.sourceType,
+          sourceId: filters.sourceId,
+          sort: filters.sort,
           page: 1,
           limit: 1,
         },
@@ -1686,8 +1722,15 @@ export class AccountingReportExportsService {
       return data.pagination.total;
     }
 
+    const filters = input.filters as unknown as CashBookQueryDto;
     const data = await this.reportsService.getCashBook(input.actor.tenantId, {
-      ...(input.filters as unknown as CashBookQueryDto),
+      fiscalYearId: filters.fiscalYearId,
+      fiscalPeriodId: filters.fiscalPeriodId,
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      accountId: filters.accountId,
+      accountCode: filters.accountCode,
+      accountKind: filters.accountKind,
       page: 1,
       limit: 1,
     });

@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   TimetableSubstitutionStatus,
@@ -11,6 +11,10 @@ import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { TimetableSubstitutionService } from './timetable-substitution.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { CreateSubstitutionDto } from './dto/timetable-setup.dto';
+
+type TimetableSlotFixture = Awaited<
+  ReturnType<PrismaService['timetableSlot']['findMany']>
+>[number];
 
 describe('TimetableSubstitutionService', () => {
   let service: TimetableSubstitutionService;
@@ -117,11 +121,22 @@ describe('TimetableSubstitutionService', () => {
   describe('listSubstitutions', () => {
     it('returns only bounded teacher identity fields for substitution rows', async () => {
       jest
-        .spyOn(prisma.timetableSubstitution, 'findMany')
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findMany',
+        )
         .mockResolvedValue([]);
-      jest.spyOn(prisma.timetableSubstitution, 'count').mockResolvedValue(0);
+      jest
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'count',
+        )
+        .mockResolvedValue(0);
 
-      await service.listSubstitutions(mockActor as any, {});
+      await service.listSubstitutions(
+        mockActor as unknown as Parameters<typeof service.listSubstitutions>[0],
+        {},
+      );
 
       expect(prisma.timetableSubstitution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -158,13 +173,22 @@ describe('TimetableSubstitutionService', () => {
       };
 
       jest
-        .spyOn(prisma.timetableSlot, 'findFirst')
-        .mockResolvedValue(mockSlot as any);
+        .spyOn(
+          prisma.timetableSlot as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue(mockSlot);
       jest
-        .spyOn(prisma.staff, 'findFirst')
-        .mockResolvedValue({ id: 'teacher-absent' } as any);
+        .spyOn(
+          prisma.staff as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue({ id: 'teacher-absent' });
       jest
-        .spyOn(prisma.timetableSubstitution, 'findFirst')
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
         .mockResolvedValue(null);
       jest
         .spyOn(attendanceService, 'getTeacherAbsenceContext')
@@ -173,14 +197,14 @@ describe('TimetableSubstitutionService', () => {
           attendanceStatus: 'ABSENT',
           leaveType: null,
         });
-      const created = {
-        id: 'sub-1',
-        ...dto,
+      const created = Object.assign({ id: 'sub-1' }, dto, {
         status: TimetableSubstitutionStatus.DRAFT,
         reason: dto.reason,
-      };
+      });
       (prisma.$transaction as jest.Mock).mockImplementation(
-        async (fn: (tx: any) => unknown) =>
+        async (
+          fn: (tx: Record<string, Record<string, jest.Mock>>) => unknown,
+        ) =>
           fn({
             timetableSubstitution: {
               create: jest.fn().mockResolvedValue(created),
@@ -193,7 +217,12 @@ describe('TimetableSubstitutionService', () => {
           }),
       );
 
-      const result = await service.createSubstitution(dto, mockActor as any);
+      const result = await service.createSubstitution(
+        dto,
+        mockActor as unknown as Parameters<
+          typeof service.createSubstitution
+        >[1],
+      );
 
       expect(result).toBeDefined();
       expect(result.id).toBe('sub-1');
@@ -207,9 +236,7 @@ describe('TimetableSubstitutionService', () => {
         date: '2026-05-11',
         reason: 'Sick',
       };
-      const created = {
-        id: 'sub-assigned',
-        ...dto,
+      const created = Object.assign({ id: 'sub-assigned' }, dto, {
         status: TimetableSubstitutionStatus.ASSIGNED,
         reason: dto.reason,
         timetableSlot: {
@@ -223,22 +250,35 @@ describe('TimetableSubstitutionService', () => {
           lastName: 'Teacher',
         },
         date: new Date('2026-05-11'),
-      };
+      });
       const delegationCreate = jest.fn().mockResolvedValue({ id: 'deleg-1' });
 
       jest
-        .spyOn(prisma.timetableSlot, 'findFirst')
-        .mockResolvedValue(mockSlot as any);
-      jest.spyOn(prisma.staff, 'findFirst').mockImplementation(((args: any) => {
-        const id = args?.where?.id;
-        return Promise.resolve({ id } as any);
-      }) as any);
+        .spyOn(
+          prisma.timetableSlot as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue(mockSlot);
       jest
-        .spyOn(prisma.timetableSubstitution, 'findFirst')
+        .spyOn(
+          prisma.staff as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockImplementation(async (args) => {
+          const id = args?.where?.id;
+          return { id } as unknown as Awaited<
+            ReturnType<typeof prisma.staff.findFirst>
+          >;
+        });
+      jest
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
         // 1) duplicate check  2) same-time conflict check  3) notify reload
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(null)
-        .mockResolvedValue(created as any);
+        .mockResolvedValue(created);
       jest
         .spyOn(attendanceService, 'getTeacherAbsenceContext')
         .mockImplementation(async (_tenantId: string, teacherId: string) => {
@@ -251,12 +291,16 @@ describe('TimetableSubstitutionService', () => {
             leaveType: null,
           };
         });
-      const lifecycleService = (service as any).lifecycleService;
+      const lifecycleService = (
+        service as unknown as { lifecycleService: TimetableLifecycleService }
+      ).lifecycleService;
       jest
         .spyOn(lifecycleService, 'validateCandidateSlot')
         .mockResolvedValue({ valid: true, errors: [], warnings: [] });
       (prisma.$transaction as jest.Mock).mockImplementation(
-        async (fn: (tx: any) => unknown) =>
+        async (
+          fn: (tx: Record<string, Record<string, jest.Mock>>) => unknown,
+        ) =>
           fn({
             timetableSubstitution: {
               create: jest.fn().mockResolvedValue(created),
@@ -269,7 +313,12 @@ describe('TimetableSubstitutionService', () => {
           }),
       );
 
-      await service.createSubstitution(dto, mockActor as any);
+      await service.createSubstitution(
+        dto,
+        mockActor as unknown as Parameters<
+          typeof service.createSubstitution
+        >[1],
+      );
 
       expect(delegationCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -290,8 +339,11 @@ describe('TimetableSubstitutionService', () => {
         version: { status: TimetableVersionStatus.DRAFT },
       };
       jest
-        .spyOn(prisma.timetableSlot, 'findFirst')
-        .mockResolvedValue(draftSlot as any);
+        .spyOn(
+          prisma.timetableSlot as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue(draftSlot);
 
       const dto: CreateSubstitutionDto = {
         timetableSlotId: 'slot-1',
@@ -301,14 +353,22 @@ describe('TimetableSubstitutionService', () => {
       };
 
       await expect(
-        service.createSubstitution(dto, mockActor as any),
+        service.createSubstitution(
+          dto,
+          mockActor as unknown as Parameters<
+            typeof service.createSubstitution
+          >[1],
+        ),
       ).rejects.toThrow(ConflictException);
     });
 
     it('should block creation if date does not match slot day of week', async () => {
       jest
-        .spyOn(prisma.timetableSlot, 'findFirst')
-        .mockResolvedValue(mockSlot as any);
+        .spyOn(
+          prisma.timetableSlot as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue(mockSlot);
 
       const dto: CreateSubstitutionDto = {
         timetableSlotId: 'slot-1',
@@ -318,7 +378,12 @@ describe('TimetableSubstitutionService', () => {
       };
 
       await expect(
-        service.createSubstitution(dto, mockActor as any),
+        service.createSubstitution(
+          dto,
+          mockActor as unknown as Parameters<
+            typeof service.createSubstitution
+          >[1],
+        ),
       ).rejects.toThrow(/does not fall on the slot's day of week/);
     });
 
@@ -335,13 +400,22 @@ describe('TimetableSubstitutionService', () => {
       };
 
       jest
-        .spyOn(prisma.timetableSlot, 'findFirst')
-        .mockResolvedValue(sundaySlot as any);
+        .spyOn(
+          prisma.timetableSlot as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue(sundaySlot);
       jest
-        .spyOn(prisma.staff, 'findFirst')
-        .mockResolvedValue({ id: 'teacher-absent' } as any);
+        .spyOn(
+          prisma.staff as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue({ id: 'teacher-absent' });
       jest
-        .spyOn(prisma.timetableSubstitution, 'findFirst')
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
         .mockResolvedValue(null);
       jest
         .spyOn(attendanceService, 'getTeacherAbsenceContext')
@@ -350,15 +424,15 @@ describe('TimetableSubstitutionService', () => {
           attendanceStatus: 'ABSENT',
           leaveType: null,
         });
-      const created = {
-        id: 'sub-sunday',
-        ...dto,
+      const created = Object.assign({ id: 'sub-sunday' }, dto, {
         status: TimetableSubstitutionStatus.DRAFT,
         reason: dto.reason,
-      };
+      });
       const createSpy = jest.fn().mockResolvedValue(created);
       (prisma.$transaction as jest.Mock).mockImplementation(
-        async (fn: (tx: any) => unknown) =>
+        async (
+          fn: (tx: Record<string, Record<string, jest.Mock>>) => unknown,
+        ) =>
           fn({
             timetableSubstitution: {
               create: createSpy,
@@ -372,7 +446,12 @@ describe('TimetableSubstitutionService', () => {
       );
 
       await expect(
-        service.createSubstitution(dto, mockActor as any),
+        service.createSubstitution(
+          dto,
+          mockActor as unknown as Parameters<
+            typeof service.createSubstitution
+          >[1],
+        ),
       ).resolves.toBeDefined();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -386,11 +465,17 @@ describe('TimetableSubstitutionService', () => {
 
     it('should block if absentTeacherId does not match slot teacher', async () => {
       jest
-        .spyOn(prisma.timetableSlot, 'findFirst')
-        .mockResolvedValue(mockSlot as any);
+        .spyOn(
+          prisma.timetableSlot as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue(mockSlot);
       jest
-        .spyOn(prisma.staff, 'findFirst')
-        .mockResolvedValue({ id: 'wrong-teacher' } as any);
+        .spyOn(
+          prisma.staff as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue({ id: 'wrong-teacher' });
 
       const dto: CreateSubstitutionDto = {
         timetableSlotId: 'slot-1',
@@ -400,20 +485,34 @@ describe('TimetableSubstitutionService', () => {
       };
 
       await expect(
-        service.createSubstitution(dto, mockActor as any),
+        service.createSubstitution(
+          dto,
+          mockActor as unknown as Parameters<
+            typeof service.createSubstitution
+          >[1],
+        ),
       ).rejects.toThrow(/Absent teacher must match/);
     });
 
     it('should prevent multiple active substitutions for same slot and date', async () => {
       jest
-        .spyOn(prisma.timetableSlot, 'findFirst')
-        .mockResolvedValue(mockSlot as any);
+        .spyOn(
+          prisma.timetableSlot as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue(mockSlot);
       jest
-        .spyOn(prisma.staff, 'findFirst')
-        .mockResolvedValue({ id: 'teacher-absent' } as any);
+        .spyOn(
+          prisma.staff as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue({ id: 'teacher-absent' });
       jest
-        .spyOn(prisma.timetableSubstitution, 'findFirst')
-        .mockResolvedValue({ id: 'existing-sub' } as any);
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue({ id: 'existing-sub' });
 
       const dto: CreateSubstitutionDto = {
         timetableSlotId: 'slot-1',
@@ -423,7 +522,12 @@ describe('TimetableSubstitutionService', () => {
       };
 
       await expect(
-        service.createSubstitution(dto, mockActor as any),
+        service.createSubstitution(
+          dto,
+          mockActor as unknown as Parameters<
+            typeof service.createSubstitution
+          >[1],
+        ),
       ).rejects.toThrow(/An active substitution already exists/);
     });
   });
@@ -441,11 +545,17 @@ describe('TimetableSubstitutionService', () => {
 
     it('should block assignment if substitute is on approved leave', async () => {
       jest
-        .spyOn(prisma.timetableSubstitution, 'findFirst')
-        .mockResolvedValue(mockSubstitution as any);
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue(mockSubstitution);
       jest
-        .spyOn(prisma.staff, 'findFirst')
-        .mockResolvedValue({ id: 'substitute-teacher' } as any);
+        .spyOn(
+          prisma.staff as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue({ id: 'substitute-teacher' });
       jest
         .spyOn(attendanceService, 'getTeacherAbsenceContext')
         .mockResolvedValue({
@@ -458,18 +568,26 @@ describe('TimetableSubstitutionService', () => {
         service.assignSubstitution(
           'sub-1',
           { substituteTeacherId: 'substitute-teacher' },
-          mockActor as any,
+          mockActor as unknown as Parameters<
+            typeof service.assignSubstitution
+          >[2],
         ),
       ).rejects.toThrow(/Substitute teacher is unavailable/);
     });
 
     it('should block assignment if substitute is marked absent', async () => {
       jest
-        .spyOn(prisma.timetableSubstitution, 'findFirst')
-        .mockResolvedValue(mockSubstitution as any);
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue(mockSubstitution);
       jest
-        .spyOn(prisma.staff, 'findFirst')
-        .mockResolvedValue({ id: 'substitute-teacher' } as any);
+        .spyOn(
+          prisma.staff as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue({ id: 'substitute-teacher' });
       jest
         .spyOn(attendanceService, 'getTeacherAbsenceContext')
         .mockResolvedValue({
@@ -482,51 +600,87 @@ describe('TimetableSubstitutionService', () => {
         service.assignSubstitution(
           'sub-1',
           { substituteTeacherId: 'substitute-teacher' },
-          mockActor as any,
+          mockActor as unknown as Parameters<
+            typeof service.assignSubstitution
+          >[2],
         ),
       ).rejects.toThrow(/Substitute teacher is unavailable/);
     });
 
     it('should block assignment if substitute has a timetable conflict', async () => {
       jest
-        .spyOn(prisma.timetableSubstitution, 'findFirst')
-        .mockResolvedValue(mockSubstitution as any);
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue(mockSubstitution);
       jest
-        .spyOn(prisma.staff, 'findFirst')
-        .mockResolvedValue({ id: 'substitute-teacher' } as any);
+        .spyOn(
+          prisma.staff as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue({ id: 'substitute-teacher' });
       jest
         .spyOn(attendanceService, 'getTeacherAbsenceContext')
-        .mockResolvedValue({ isAbsent: false } as any);
+        .mockResolvedValue({
+          isAbsent: false,
+          attendanceStatus: null,
+          leaveType: null,
+        });
 
-      const lifecycleService = (service as any).lifecycleService;
+      const lifecycleService = (
+        service as unknown as { lifecycleService: TimetableLifecycleService }
+      ).lifecycleService;
       jest.spyOn(lifecycleService, 'validateCandidateSlot').mockResolvedValue({
         valid: false,
-        errors: [{ message: 'Teacher double booked' }],
+        errors: [
+          {
+            type: 'TEACHER_DOUBLE_BOOKED',
+            severity: 'BLOCKING',
+            message: 'Teacher double booked',
+            affectedPeriodIds: [],
+          },
+        ],
+        warnings: [],
       });
 
       await expect(
         service.assignSubstitution(
           'sub-1',
           { substituteTeacherId: 'substitute-teacher' },
-          mockActor as any,
+          mockActor as unknown as Parameters<
+            typeof service.assignSubstitution
+          >[2],
         ),
       ).rejects.toThrow(/Teacher double booked/);
     });
 
     it('should block assignment if substitute is already assigned to another substitution at the same time', async () => {
       jest
-        .spyOn(prisma.timetableSubstitution, 'findFirst')
-        .mockResolvedValueOnce(mockSubstitution as any) // findSubstitutionOrThrow
-        .mockResolvedValueOnce({ id: 'another-sub' } as any); // sameTimeSubstitution check
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValueOnce(mockSubstitution) // findSubstitutionOrThrow
+        .mockResolvedValueOnce({ id: 'another-sub' }); // sameTimeSubstitution check
 
       jest
-        .spyOn(prisma.staff, 'findFirst')
-        .mockResolvedValue({ id: 'substitute-teacher' } as any);
+        .spyOn(
+          prisma.staff as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue({ id: 'substitute-teacher' });
       jest
         .spyOn(attendanceService, 'getTeacherAbsenceContext')
-        .mockResolvedValue({ isAbsent: false } as any);
+        .mockResolvedValue({
+          isAbsent: false,
+          attendanceStatus: null,
+          leaveType: null,
+        });
 
-      const lifecycleService = (service as any).lifecycleService;
+      const lifecycleService = (
+        service as unknown as { lifecycleService: TimetableLifecycleService }
+      ).lifecycleService;
       jest
         .spyOn(lifecycleService, 'validateCandidateSlot')
         .mockResolvedValue({ valid: true, errors: [], warnings: [] });
@@ -535,7 +689,9 @@ describe('TimetableSubstitutionService', () => {
         service.assignSubstitution(
           'sub-1',
           { substituteTeacherId: 'substitute-teacher' },
-          mockActor as any,
+          mockActor as unknown as Parameters<
+            typeof service.assignSubstitution
+          >[2],
         ),
       ).rejects.toThrow(
         /Substitute teacher has a conflicting timetable assignment or substitution/,
@@ -548,20 +704,32 @@ describe('TimetableSubstitutionService', () => {
       normalizedDate.setHours(0, 0, 0, 0);
 
       jest
-        .spyOn(prisma.timetableSubstitution, 'findFirst')
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
         .mockResolvedValueOnce({
           ...mockSubstitution,
           date: nonMidnightDate,
-        } as any)
-        .mockResolvedValueOnce({ id: 'another-sub' } as any);
+        })
+        .mockResolvedValueOnce({ id: 'another-sub' });
       jest
-        .spyOn(prisma.staff, 'findFirst')
-        .mockResolvedValue({ id: 'substitute-teacher' } as any);
+        .spyOn(
+          prisma.staff as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue({ id: 'substitute-teacher' });
       jest
         .spyOn(attendanceService, 'getTeacherAbsenceContext')
-        .mockResolvedValue({ isAbsent: false } as any);
+        .mockResolvedValue({
+          isAbsent: false,
+          attendanceStatus: null,
+          leaveType: null,
+        });
 
-      const lifecycleService = (service as any).lifecycleService;
+      const lifecycleService = (
+        service as unknown as { lifecycleService: TimetableLifecycleService }
+      ).lifecycleService;
       jest
         .spyOn(lifecycleService, 'validateCandidateSlot')
         .mockResolvedValue({ valid: true, errors: [], warnings: [] });
@@ -570,7 +738,9 @@ describe('TimetableSubstitutionService', () => {
         service.assignSubstitution(
           'sub-1',
           { substituteTeacherId: 'substitute-teacher' },
-          mockActor as any,
+          mockActor as unknown as Parameters<
+            typeof service.assignSubstitution
+          >[2],
         ),
       ).rejects.toThrow(
         /Substitute teacher has a conflicting timetable assignment or substitution/,
@@ -590,18 +760,26 @@ describe('TimetableSubstitutionService', () => {
 
   describe('getDailySubstitutionSummary', () => {
     it('uses timetable day 7 for Sunday absence summaries', async () => {
-      jest.spyOn(prisma.timetableSlot, 'findMany').mockResolvedValue([
-        {
-          ...mockSlot,
-          dayOfWeek: 7,
-          subject: { name: 'Mathematics' },
-          class: { name: 'Grade 4' },
-          section: null,
-          staff: { firstName: 'Absent', lastName: 'Teacher' },
-        } as any,
-      ]);
       jest
-        .spyOn(prisma.timetableSubstitution, 'findMany')
+        .spyOn(
+          prisma.timetableSlot as unknown as Record<string, jest.Mock>,
+          'findMany',
+        )
+        .mockResolvedValue([
+          {
+            ...mockSlot,
+            dayOfWeek: 7,
+            subject: { name: 'Mathematics' },
+            class: { name: 'Grade 4' },
+            section: null,
+            staff: { firstName: 'Absent', lastName: 'Teacher' },
+          } as unknown as TimetableSlotFixture,
+        ]);
+      jest
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findMany',
+        )
         .mockResolvedValue([]);
       jest
         .spyOn(attendanceService, 'getTeacherAbsenceContext')
@@ -613,7 +791,9 @@ describe('TimetableSubstitutionService', () => {
 
       const summary = await service.getDailySubstitutionSummary(
         '2026-05-10',
-        mockActor as any,
+        mockActor as unknown as Parameters<
+          typeof service.getDailySubstitutionSummary
+        >[1],
       );
 
       expect(prisma.timetableSlot.findMany).toHaveBeenCalledWith(
@@ -638,26 +818,39 @@ describe('TimetableSubstitutionService', () => {
   describe('handleStaffLeaveApproved', () => {
     it('creates draft substitution tasks for leave-affected timetable slots', async () => {
       const leaveDate = new Date('2026-05-11T00:00:00.000Z');
-      jest.spyOn(prisma.timetableSlot, 'findMany').mockResolvedValue([
-        {
-          ...mockSlot,
-          subject: { name: 'Mathematics' },
-          class: { name: 'Grade 4' },
-          section: null,
-          staff: { firstName: 'Absent', lastName: 'Teacher' },
-        } as any,
-      ]);
       jest
-        .spyOn(prisma.timetableSubstitution, 'findFirst')
+        .spyOn(
+          prisma.timetableSlot as unknown as Record<string, jest.Mock>,
+          'findMany',
+        )
+        .mockResolvedValue([
+          {
+            ...mockSlot,
+            subject: { name: 'Mathematics' },
+            class: { name: 'Grade 4' },
+            section: null,
+            staff: { firstName: 'Absent', lastName: 'Teacher' },
+          } as unknown as TimetableSlotFixture,
+        ]);
+      jest
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
         .mockResolvedValue(null);
-      jest.spyOn(prisma.timetableSubstitution, 'create').mockResolvedValue({
-        id: 'sub-from-leave',
-        tenantId: 'tenant-1',
-        timetableSlotId: 'slot-1',
-        absentTeacherId: 'teacher-absent',
-        date: leaveDate,
-        status: TimetableSubstitutionStatus.DRAFT,
-      } as any);
+      jest
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'create',
+        )
+        .mockResolvedValue({
+          id: 'sub-from-leave',
+          tenantId: 'tenant-1',
+          timetableSlotId: 'slot-1',
+          absentTeacherId: 'teacher-absent',
+          date: leaveDate,
+          status: TimetableSubstitutionStatus.DRAFT,
+        });
 
       const result = await service.handleStaffLeaveApproved({
         tenantId: 'tenant-1',
@@ -703,18 +896,26 @@ describe('TimetableSubstitutionService', () => {
 
     it('does not create duplicate active substitution tasks for the same leave slot', async () => {
       const leaveDate = new Date('2026-05-11T00:00:00.000Z');
-      jest.spyOn(prisma.timetableSlot, 'findMany').mockResolvedValue([
-        {
-          ...mockSlot,
-          subject: { name: 'Mathematics' },
-          class: { name: 'Grade 4' },
-          section: null,
-          staff: { firstName: 'Absent', lastName: 'Teacher' },
-        } as any,
-      ]);
       jest
-        .spyOn(prisma.timetableSubstitution, 'findFirst')
-        .mockResolvedValue({ id: 'existing-sub' } as any);
+        .spyOn(
+          prisma.timetableSlot as unknown as Record<string, jest.Mock>,
+          'findMany',
+        )
+        .mockResolvedValue([
+          {
+            ...mockSlot,
+            subject: { name: 'Mathematics' },
+            class: { name: 'Grade 4' },
+            section: null,
+            staff: { firstName: 'Absent', lastName: 'Teacher' },
+          } as unknown as TimetableSlotFixture,
+        ]);
+      jest
+        .spyOn(
+          prisma.timetableSubstitution as unknown as Record<string, jest.Mock>,
+          'findFirst',
+        )
+        .mockResolvedValue({ id: 'existing-sub' });
 
       const result = await service.handleStaffLeaveApproved({
         tenantId: 'tenant-1',

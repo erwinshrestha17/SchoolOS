@@ -7,7 +7,9 @@ import {
 
 describe('assertConfirmStudentId (P0-07)', () => {
   it('allows matching confirmation', () => {
-    expect(() => assertConfirmStudentId('child-1', 'child-1')).not.toThrow();
+    expect(() => {
+      assertConfirmStudentId('child-1', 'child-1');
+    }).not.toThrow();
   });
 
   it('rejects missing confirmation', () => {
@@ -42,9 +44,9 @@ describe('assertConfirmStudentId (P0-07)', () => {
 
 describe('assertConfirmStudentIdAllowed (P0-07)', () => {
   it('allows confirmation when the child is linked and authorized', () => {
-    expect(() =>
-      assertConfirmStudentIdAllowed('child-1', ['child-1', 'child-2']),
-    ).not.toThrow();
+    expect(() => {
+      assertConfirmStudentIdAllowed('child-1', ['child-1', 'child-2']);
+    }).not.toThrow();
   });
 
   it('rejects confirmation outside the authorized child set', () => {

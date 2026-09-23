@@ -4,9 +4,21 @@ import type { AuthContext } from '../../auth/auth.types';
 import { LearningActivitiesService } from './learning-activities.service';
 
 describe('LearningActivitiesService', () => {
-  let prisma: any;
-  let permissions: any;
-  let auditService: any;
+  let prisma: {
+    learningActivity: {
+      findMany: jest.Mock;
+      count: jest.Mock;
+      findFirst: jest.Mock;
+    };
+    learningQuestion: { createMany: jest.Mock; deleteMany: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let permissions: {
+    resolveActorStaffId: jest.Mock;
+    resolveTeacherIdForWrite: jest.Mock;
+    assertActorCanControlScope: jest.Mock;
+  };
+  let auditService: { record: jest.Mock };
   let service: LearningActivitiesService;
 
   const adminActor = {
@@ -34,7 +46,7 @@ describe('LearningActivitiesService', () => {
         createMany: jest.fn(),
         deleteMany: jest.fn(),
       },
-      $transaction: jest.fn((fn: any) => fn(prisma)),
+      $transaction: jest.fn((fn: (tx: typeof prisma) => unknown) => fn(prisma)),
     };
     permissions = {
       resolveActorStaffId: jest.fn(),
@@ -43,7 +55,17 @@ describe('LearningActivitiesService', () => {
     };
     auditService = { record: jest.fn() };
 
-    service = new LearningActivitiesService(prisma, permissions, auditService);
+    service = new LearningActivitiesService(
+      prisma as unknown as ConstructorParameters<
+        typeof LearningActivitiesService
+      >[0],
+      permissions as unknown as ConstructorParameters<
+        typeof LearningActivitiesService
+      >[1],
+      auditService as unknown as ConstructorParameters<
+        typeof LearningActivitiesService
+      >[2],
+    );
   });
 
   describe("teacher scoping (confirmed gap: previously any learning:read holder could list/read every activity in the tenant, including other teachers' unpublished drafts)", () => {

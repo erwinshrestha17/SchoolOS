@@ -7,7 +7,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   AuthMethod,
   HomeworkAssignmentStatus,
-  HomeworkSubmissionStatus,
   StudentLifecycleStatus,
 } from '@prisma/client';
 import { HomeworkService } from './homework.service';
@@ -25,9 +24,29 @@ import {
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import { getQueueToken } from '@nestjs/bullmq';
 
+type HomeworkPrismaModels = Pick<
+  PrismaService,
+  | 'academicYear'
+  | 'class'
+  | 'homeworkAssignment'
+  | 'homeworkSubmission'
+  | 'section'
+  | 'staff'
+  | 'student'
+  | 'studentGuardian'
+  | 'subject'
+  | 'subjectTeacherAssignment'
+>;
+type HomeworkPrismaFixture = {
+  [Model in keyof HomeworkPrismaModels]: {
+    [Method in keyof HomeworkPrismaModels[Model]]: jest.Mock;
+  };
+} & { $transaction: jest.Mock };
+
 describe('Homework Hardening', () => {
   let homeworkService: HomeworkService;
   let prisma: PrismaMock;
+  const mockedPrisma = () => prisma as unknown as HomeworkPrismaFixture;
 
   const actor: AuthContext = {
     userId: 'user-1',
@@ -52,7 +71,7 @@ describe('Homework Hardening', () => {
 
   // Mutable between tests: each authorization case pushes the canonical
   // TeacherAssignment rows it wants the resolver to see.
-  let teacherAssignments: Array<Record<string, any>>;
+  let teacherAssignments: Record<string, unknown>[];
 
   beforeEach(async () => {
     prisma = createPrismaMock();
@@ -68,7 +87,7 @@ describe('Homework Hardening', () => {
         return teacherAssignments;
       },
       staffId: 'teacher-1',
-    } as never);
+    });
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         HomeworkService,
@@ -96,8 +115,8 @@ describe('Homework Hardening', () => {
           provide: TeacherScopeService,
           useFactory: () =>
             new TeacherScopeService(
-              scopeDeps.prisma as never,
-              scopeDeps.audit as never,
+              scopeDeps.prisma as unknown as PrismaService,
+              scopeDeps.audit as unknown as AuditService,
             ),
         },
       ],
@@ -108,7 +127,7 @@ describe('Homework Hardening', () => {
 
   describe('Tenant Isolation & Ownership', () => {
     it('should reject creating homework for a class from another tenant', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
 
       // Class from another tenant or not found
       p.class.findFirst.mockResolvedValue(null);
@@ -133,7 +152,7 @@ describe('Homework Hardening', () => {
     });
 
     it('should reject submissions from students not in the homework scope', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const assignment = {
         id: 'hw-1',
         tenantId: 'tenant-a',
@@ -162,7 +181,7 @@ describe('Homework Hardening', () => {
 
   describe('Date Integrity', () => {
     it('uses Nepal half-open day bounds for summary and workload queries', async () => {
-      const p = prisma;
+      const p = mockedPrisma();
       const adminActor: AuthContext = { ...actor, roles: ['admin'] };
       p.homeworkAssignment.count.mockResolvedValue(0);
       p.homeworkSubmission.findMany.mockResolvedValue([]);
@@ -205,7 +224,7 @@ describe('Homework Hardening', () => {
     });
 
     it('should reject due date before assigned date', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       p.academicYear.findFirst.mockResolvedValue({
         id: 'year-1',
         tenantId: 'tenant-a',
@@ -244,7 +263,7 @@ describe('Homework Hardening', () => {
 
   describe('Teacher Scoping', () => {
     it('should restrict subject teachers to their assigned subjects', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const teacherActor: AuthContext = {
         ...actor,
         roles: ['subject_teacher'],
@@ -294,7 +313,7 @@ describe('Homework Hardening', () => {
     });
 
     it('should allow a properly assigned subject teacher to create homework', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const teacherActor: AuthContext = {
         ...actor,
         roles: ['subject_teacher'],
@@ -329,7 +348,7 @@ describe('Homework Hardening', () => {
         }),
       );
 
-      const result = (await homeworkService.createAssignment(
+      const result = await homeworkService.createAssignment(
         {
           academicYearId: 'year-1',
           classId: 'class-1',
@@ -340,8 +359,10 @@ describe('Homework Hardening', () => {
           dueDate: '2026-12-31',
         },
         teacherActor,
-      )) as any;
+      );
 
+      if (!('id' in result))
+        throw new Error('Expected one homework assignment');
       expect(result.id).toBeDefined();
       // Authorization now resolves against the canonical TeacherAssignment
       // table rather than the legacy SubjectTeacherAssignment query, so the
@@ -350,7 +371,7 @@ describe('Homework Hardening', () => {
     });
 
     it('replays a draft create with the same clientOperationId', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const teacherActor: AuthContext = {
         ...actor,
         roles: ['subject_teacher'],
@@ -425,7 +446,7 @@ describe('Homework Hardening', () => {
     });
 
     it('rejects reuse of a homework operation ID for different data', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const teacherActor: AuthContext = {
         ...actor,
         roles: ['subject_teacher'],
@@ -480,7 +501,7 @@ describe('Homework Hardening', () => {
     });
 
     it('returns the concurrent winner after the database unique fence rejects a duplicate create', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const teacherActor: AuthContext = {
         ...actor,
         roles: ['subject_teacher'],
@@ -549,7 +570,7 @@ describe('Homework Hardening', () => {
       // English homework for a class whose English another teacher owns.
       // A homeroom teacher who genuinely teaches the subject needs a
       // SUBJECT_TEACHER assignment; that is a data gap, not a permission one.
-      const p = prisma as any;
+      const p = mockedPrisma();
       const teacherActor: AuthContext = {
         ...actor,
         roles: ['subject_teacher'],
@@ -614,7 +635,7 @@ describe('Homework Hardening', () => {
       // section, not the whole class: Section.findFirst is queried with the
       // REQUESTED sectionId, so a class teacher of Section A querying
       // Section B (same class, different homeroom teacher) must still fail.
-      const p = prisma as any;
+      const p = mockedPrisma();
       const teacherActor: AuthContext = {
         ...actor,
         roles: ['subject_teacher'],
@@ -671,7 +692,7 @@ describe('Homework Hardening', () => {
       // The fallback's own Section.findFirst query is tenant-scoped
       // independently of the earlier class/academicYear/subject lookups, so
       // a cross-tenant sectionId collision cannot bypass it.
-      const p = prisma as any;
+      const p = mockedPrisma();
       const teacherActor: AuthContext = {
         ...actor,
         roles: ['subject_teacher'],
@@ -726,7 +747,7 @@ describe('Homework Hardening', () => {
     });
 
     it('should let an admin create homework for any class without an assignment check', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const adminActor: AuthContext = { ...actor, roles: ['admin'] };
 
       p.academicYear.findFirst.mockResolvedValue({
@@ -748,7 +769,7 @@ describe('Homework Hardening', () => {
         userId: 'user-1',
       });
 
-      const result = (await homeworkService.createAssignment(
+      const result = await homeworkService.createAssignment(
         {
           academicYearId: 'year-1',
           classId: 'class-1',
@@ -758,8 +779,10 @@ describe('Homework Hardening', () => {
           dueDate: '2026-12-31',
         },
         adminActor,
-      )) as any;
+      );
 
+      if (!('id' in result))
+        throw new Error('Expected one homework assignment');
       expect(result.id).toBeDefined();
       expect(p.subjectTeacherAssignment.findFirst).not.toHaveBeenCalled();
     });
@@ -767,7 +790,7 @@ describe('Homework Hardening', () => {
 
   describe('Teacher Mobile Homework Scopes Contract', () => {
     it("lists only the current teacher's own assigned class/section/subject combinations", async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const teacherActor: AuthContext = {
         ...actor,
         roles: ['subject_teacher'],
@@ -812,7 +835,7 @@ describe('Homework Hardening', () => {
     });
 
     it('rejects when the actor has no active teacher/staff profile', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       p.staff.findFirst.mockResolvedValue(null);
 
       await expect(
@@ -824,7 +847,7 @@ describe('Homework Hardening', () => {
 
   describe('Teacher "my homework only" self-scope', () => {
     it('filters and paginates more than 100 assignments by Nepal school day without widening teacher scope', async () => {
-      const p = prisma;
+      const p = mockedPrisma();
       teacherAssignments.push(
         teacherAssignmentFixture({
           classId: 'class-1',
@@ -873,7 +896,7 @@ describe('Homework Hardening', () => {
     });
 
     it('resolves `mine` from the caller own staff row, never a client id', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       p.staff.findFirst.mockResolvedValue({
         id: 'staff-me',
         tenantId: 'tenant-a',
@@ -907,7 +930,7 @@ describe('Homework Hardening', () => {
     });
 
     it('returns nothing rather than everything when the caller has no staff row', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       p.staff.findFirst.mockResolvedValue(null);
 
       await expect(
@@ -930,7 +953,7 @@ describe('Homework Hardening', () => {
     };
 
     it('lists only published/closed assignment fields without submissions or attachments', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       p.homeworkAssignment.findMany.mockResolvedValue([
         {
           id: 'homework-1',
@@ -984,7 +1007,7 @@ describe('Homework Hardening', () => {
     });
 
     it('reads assignment detail through the same narrow published projection', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       p.homeworkAssignment.findFirst.mockResolvedValue({
         id: 'homework-1',
         title: 'Fractions practice',
@@ -1017,7 +1040,7 @@ describe('Homework Hardening', () => {
     });
 
     it('denies submission-derived filters and reports before database reads', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
 
       await expect(
         homeworkService.listAssignments(supportActor, {
@@ -1041,7 +1064,7 @@ describe('Homework Hardening', () => {
 
   describe('Parent and student list scoping', () => {
     it('returns an empty homework list instead of tenant-wide rows when a parent has no linked student', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const parentActor: AuthContext = {
         ...actor,
         userId: 'parent-user-1',
@@ -1059,7 +1082,7 @@ describe('Homework Hardening', () => {
     });
 
     it('blocks parent homework list queries for a student outside the guardian link', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const parentActor: AuthContext = {
         ...actor,
         userId: 'parent-user-1',
@@ -1100,7 +1123,7 @@ describe('Homework Hardening', () => {
     });
 
     it('blocks student homework list queries for another student id', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const studentActor: AuthContext = {
         ...actor,
         userId: 'student-user-1',
@@ -1124,7 +1147,7 @@ describe('Homework Hardening', () => {
     });
 
     it('scopes parent submission lists to linked students only', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const parentActor: AuthContext = {
         ...actor,
         userId: 'parent-user-1',
@@ -1164,7 +1187,7 @@ describe('Homework Hardening', () => {
     });
 
     it('blocks student submission detail reads for another student', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const studentFindFirst = (
         prisma as unknown as { student: { findFirst: jest.Mock } }
       ).student.findFirst;
@@ -1236,7 +1259,7 @@ describe('Homework Hardening', () => {
     });
 
     it('blocks direct student homework detail reads outside the active class scope', async () => {
-      const p = prisma as any;
+      const p = mockedPrisma();
       const studentActor: AuthContext = {
         ...actor,
         userId: 'student-user-1',

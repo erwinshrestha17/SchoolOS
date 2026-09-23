@@ -357,7 +357,7 @@ function makeRejectedSyncPrisma() {
       findFirst: jest.fn(async () => null),
       create: jest.fn(async ({ data }) => {
         const created = {
-          id: `sync-${state.syncSubmissions.length + 1}`,
+          id: `sync-${String(state.syncSubmissions.length + 1)}`,
           attendanceSessionId: null,
           conflictId: null,
           createdAt: new Date('2026-05-10T08:01:00.000Z'),

@@ -85,7 +85,13 @@ describe('AccountingReportsController', () => {
     exportsService.exportTrialBalanceCsv.mockResolvedValue('csv-data');
     const query = { fiscalYearId: 'fy-1' };
 
-    await controller.exportTrialBalance(mockAuth as any, query as any, mockRes);
+    await controller.exportTrialBalance(
+      mockAuth as unknown as Parameters<
+        typeof controller.exportTrialBalance
+      >[0],
+      query as unknown as Parameters<typeof controller.exportTrialBalance>[1],
+      mockRes,
+    );
 
     expect(exportsService.exportTrialBalanceCsv).toHaveBeenCalledWith(
       'tenant-1',
@@ -115,8 +121,10 @@ describe('AccountingReportsController', () => {
     const query = { fiscalYearId: 'fy-1' };
 
     await controller.exportGeneralLedger(
-      mockAuth as any,
-      query as any,
+      mockAuth as unknown as Parameters<
+        typeof controller.exportGeneralLedger
+      >[0],
+      query as unknown as Parameters<typeof controller.exportGeneralLedger>[1],
       mockRes,
     );
 
@@ -136,7 +144,11 @@ describe('AccountingReportsController', () => {
     exportsService.exportCashBookCsv.mockResolvedValue('csv-data');
     const query = { fiscalYearId: 'fy-1' };
 
-    await controller.exportCashBook(mockAuth as any, query as any, mockRes);
+    await controller.exportCashBook(
+      mockAuth as unknown as Parameters<typeof controller.exportCashBook>[0],
+      query as unknown as Parameters<typeof controller.exportCashBook>[1],
+      mockRes,
+    );
 
     expect(exportsService.exportCashBookCsv).toHaveBeenCalledWith(
       'tenant-1',
@@ -155,11 +167,23 @@ describe('AccountingReportsController', () => {
       exportId: 'export-1',
       jobId: 'job-1',
       status: 'QUEUED',
-    } as any);
+      totalRows: 1001,
+      syncThreshold: 1000,
+      backgroundThreshold: 50000,
+      reused: false,
+    });
     const query = { fiscalYearId: 'fy-1', accountCode: '1001' };
 
     await expect(
-      controller.queueGeneralLedgerExport(mockAuth as any, query as any, 'pdf'),
+      controller.queueGeneralLedgerExport(
+        mockAuth as unknown as Parameters<
+          typeof controller.queueGeneralLedgerExport
+        >[0],
+        query as unknown as Parameters<
+          typeof controller.queueGeneralLedgerExport
+        >[1],
+        'pdf',
+      ),
     ).resolves.toEqual(
       expect.objectContaining({
         exportId: 'export-1',
@@ -179,10 +203,20 @@ describe('AccountingReportsController', () => {
       exportId: 'export-cash',
       jobId: 'job-cash',
       status: 'QUEUED',
-    } as any);
+      totalRows: 1001,
+      syncThreshold: 1000,
+      backgroundThreshold: 50000,
+      reused: false,
+    });
     const query = { fiscalYearId: 'fy-1', accountKind: 'BANK' };
 
-    await controller.queueCashBookExport(mockAuth as any, query as any, 'csv');
+    await controller.queueCashBookExport(
+      mockAuth as unknown as Parameters<
+        typeof controller.queueCashBookExport
+      >[0],
+      query as unknown as Parameters<typeof controller.queueCashBookExport>[1],
+      'csv',
+    );
 
     expect(exportsService.queueLargeReportExport).toHaveBeenCalledWith({
       reportKey: 'accounting.cash-book',
@@ -195,8 +229,12 @@ describe('AccountingReportsController', () => {
   it('rejects unsupported queued accounting export formats', async () => {
     await expect(
       controller.queueCashBookExport(
-        mockAuth as any,
-        { fiscalYearId: 'fy-1' } as any,
+        mockAuth as unknown as Parameters<
+          typeof controller.queueCashBookExport
+        >[0],
+        { fiscalYearId: 'fy-1' } as unknown as Parameters<
+          typeof controller.queueCashBookExport
+        >[1],
         'xlsx',
       ),
     ).rejects.toThrow('Queued accounting exports support csv or pdf');
@@ -208,8 +246,12 @@ describe('AccountingReportsController', () => {
     const query = { fiscalYearId: 'fy-1' };
 
     await controller.exportIncomeStatement(
-      mockAuth as any,
-      query as any,
+      mockAuth as unknown as Parameters<
+        typeof controller.exportIncomeStatement
+      >[0],
+      query as unknown as Parameters<
+        typeof controller.exportIncomeStatement
+      >[1],
       mockRes,
     );
 
@@ -229,7 +271,13 @@ describe('AccountingReportsController', () => {
     exportsService.exportBalanceSheetCsv.mockResolvedValue('csv-data');
     const query = { fiscalYearId: 'fy-1' };
 
-    await controller.exportBalanceSheet(mockAuth as any, query as any, mockRes);
+    await controller.exportBalanceSheet(
+      mockAuth as unknown as Parameters<
+        typeof controller.exportBalanceSheet
+      >[0],
+      query as unknown as Parameters<typeof controller.exportBalanceSheet>[1],
+      mockRes,
+    );
 
     expect(exportsService.exportBalanceSheetCsv).toHaveBeenCalledWith(
       'tenant-1',
@@ -247,7 +295,11 @@ describe('AccountingReportsController', () => {
     exportsService.exportTaxSummaryCsv.mockResolvedValue('csv-data');
     const query = { fiscalYearId: 'fy-1' };
 
-    await controller.exportTaxSummary(mockAuth as any, query as any, mockRes);
+    await controller.exportTaxSummary(
+      mockAuth as unknown as Parameters<typeof controller.exportTaxSummary>[0],
+      query as unknown as Parameters<typeof controller.exportTaxSummary>[1],
+      mockRes,
+    );
 
     expect(exportsService.exportTaxSummaryCsv).toHaveBeenCalledWith(
       'tenant-1',
@@ -269,7 +321,13 @@ describe('AccountingReportsController', () => {
       toDate: '2024-12-31',
     };
 
-    await controller.exportTrialBalance(mockAuth as any, query as any, mockRes);
+    await controller.exportTrialBalance(
+      mockAuth as unknown as Parameters<
+        typeof controller.exportTrialBalance
+      >[0],
+      query as unknown as Parameters<typeof controller.exportTrialBalance>[1],
+      mockRes,
+    );
 
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -287,7 +345,13 @@ describe('AccountingReportsController', () => {
     exportsService.exportBalanceSheetCsv.mockResolvedValue('csv-data');
     const query = { fiscalYearId: 'fy-1' };
 
-    await controller.exportBalanceSheet(mockAuth as any, query as any, mockRes);
+    await controller.exportBalanceSheet(
+      mockAuth as unknown as Parameters<
+        typeof controller.exportBalanceSheet
+      >[0],
+      query as unknown as Parameters<typeof controller.exportBalanceSheet>[1],
+      mockRes,
+    );
 
     const today = new Date().toISOString().split('T')[0];
     expect(mockRes.setHeader).toHaveBeenCalledWith(
@@ -301,8 +365,10 @@ describe('AccountingReportsController', () => {
     const query = { fiscalYearId: 'fy-1' };
 
     await controller.exportGeneralLedger(
-      mockAuth as any,
-      query as any,
+      mockAuth as unknown as Parameters<
+        typeof controller.exportGeneralLedger
+      >[0],
+      query as unknown as Parameters<typeof controller.exportGeneralLedger>[1],
       mockRes,
     );
 

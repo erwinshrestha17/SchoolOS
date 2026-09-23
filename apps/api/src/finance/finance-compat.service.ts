@@ -322,7 +322,7 @@ export class FinanceCompatService {
   }
 }
 
-function csvEscape(value: unknown) {
+function csvEscape(value: string | number | boolean | Date | null | undefined) {
   const text = String(value ?? '');
   if (/[",\n]/.test(text)) {
     return `"${text.replace(/"/g, '""')}"`;

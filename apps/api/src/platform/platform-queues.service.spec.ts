@@ -24,32 +24,70 @@ describe('PlatformQueuesService', () => {
     auditService = { record: jest.fn().mockResolvedValue({}) };
     prisma = { auditLog: { findMany: jest.fn().mockResolvedValue([]) } };
 
-    const notificationsQueue = makeQueue(queueOverrides.notifications as any);
-    const financeQueue = makeQueue(queueOverrides.finance as any);
-    const payrollQueue = makeQueue(queueOverrides.payroll as any);
-    const activityMediaQueue = makeQueue(
-      queueOverrides['activity-media'] as any,
+    const notificationsQueue = makeQueue(
+      queueOverrides.notifications as unknown as Parameters<
+        typeof makeQueue
+      >[0],
     );
-    const homeworkQueue = makeQueue(queueOverrides.homework as any);
-    const reportsQueue = makeQueue(queueOverrides.reports as any);
+    const financeQueue = makeQueue(
+      queueOverrides.finance as unknown as Parameters<typeof makeQueue>[0],
+    );
+    const payrollQueue = makeQueue(
+      queueOverrides.payroll as unknown as Parameters<typeof makeQueue>[0],
+    );
+    const activityMediaQueue = makeQueue(
+      queueOverrides['activity-media'] as unknown as Parameters<
+        typeof makeQueue
+      >[0],
+    );
+    const homeworkQueue = makeQueue(
+      queueOverrides.homework as unknown as Parameters<typeof makeQueue>[0],
+    );
+    const reportsQueue = makeQueue(
+      queueOverrides.reports as unknown as Parameters<typeof makeQueue>[0],
+    );
     const canteenAlertsQueue = makeQueue(
-      queueOverrides['canteen-alerts'] as any,
+      queueOverrides['canteen-alerts'] as unknown as Parameters<
+        typeof makeQueue
+      >[0],
     );
     const accountingReportsQueue = makeQueue(
-      queueOverrides['accounting-reports'] as any,
+      queueOverrides['accounting-reports'] as unknown as Parameters<
+        typeof makeQueue
+      >[0],
     );
 
     const service = new PlatformQueuesService(
-      auditService as any,
-      prisma as any,
-      notificationsQueue as any,
-      financeQueue as any,
-      payrollQueue as any,
-      activityMediaQueue as any,
-      homeworkQueue as any,
-      reportsQueue as any,
-      canteenAlertsQueue as any,
-      accountingReportsQueue as any,
+      auditService as unknown as ConstructorParameters<
+        typeof PlatformQueuesService
+      >[0],
+      prisma as unknown as ConstructorParameters<
+        typeof PlatformQueuesService
+      >[1],
+      notificationsQueue as unknown as ConstructorParameters<
+        typeof PlatformQueuesService
+      >[2],
+      financeQueue as unknown as ConstructorParameters<
+        typeof PlatformQueuesService
+      >[3],
+      payrollQueue as unknown as ConstructorParameters<
+        typeof PlatformQueuesService
+      >[4],
+      activityMediaQueue as unknown as ConstructorParameters<
+        typeof PlatformQueuesService
+      >[5],
+      homeworkQueue as unknown as ConstructorParameters<
+        typeof PlatformQueuesService
+      >[6],
+      reportsQueue as unknown as ConstructorParameters<
+        typeof PlatformQueuesService
+      >[7],
+      canteenAlertsQueue as unknown as ConstructorParameters<
+        typeof PlatformQueuesService
+      >[8],
+      accountingReportsQueue as unknown as ConstructorParameters<
+        typeof PlatformQueuesService
+      >[9],
     );
 
     return {

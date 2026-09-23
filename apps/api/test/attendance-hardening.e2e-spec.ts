@@ -10,7 +10,6 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
 import { AttendanceController } from '../src/attendance/attendance.controller';
 import { MobileController } from '../src/mobile/mobile.controller';
-import { ReportsService } from '../src/reports/reports.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
 import {
@@ -28,7 +27,6 @@ describe('Attendance Hardening (E2E)', () => {
   let prisma: PrismaMock;
   let attendanceController: AttendanceController;
   let mobileController: MobileController;
-  let reportsService: ReportsService;
 
   const tenantId = 'tenant-1';
   const otherTenantId = 'tenant-2';
@@ -67,16 +65,6 @@ describe('Attendance Hardening (E2E)', () => {
     tenantSlug: 'tenant-one',
     userId: 'parent-1',
     email: 'parent@school.test',
-    authMethod: 'PASSWORD',
-    roles: ['parent'],
-    permissions: ['attendance:read'],
-  };
-
-  const otherParentActor: AuthContext = {
-    tenantId,
-    tenantSlug: 'tenant-one',
-    userId: 'parent-2',
-    email: 'other-parent@school.test',
     authMethod: 'PASSWORD',
     roles: ['parent'],
     permissions: ['attendance:read'],
@@ -122,7 +110,6 @@ describe('Attendance Hardening (E2E)', () => {
 
     attendanceController = moduleRef.get(AttendanceController);
     mobileController = moduleRef.get(MobileController);
-    reportsService = moduleRef.get(ReportsService);
 
     // Setup basic records in mocked Prisma
     prisma.__state.tenants = [

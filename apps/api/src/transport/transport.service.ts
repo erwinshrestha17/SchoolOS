@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   MessageEvent,
   NotFoundException,
 } from '@nestjs/common';
@@ -58,6 +59,8 @@ export interface LocationPayload {
 
 @Injectable()
 export class TransportService {
+  private readonly logger = new Logger(TransportService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
@@ -1270,12 +1273,20 @@ export class TransportService {
         if (!Number.isNaN(new Date(payload.recordedAt).getTime())) {
           return this.enrichLocationPayload(payload, 'cache');
         }
-      } catch {}
+      } catch (error) {
+        this.logger.warn(
+          `Invalid cached trip location for tenant ${tenantId}, trip ${tripId}: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
+      }
       try {
         await this.redisService
           .getClient()
           .del(this.latestLocationKey(tenantId, tripId));
-      } catch {}
+      } catch (error) {
+        this.logger.warn(
+          `Could not remove invalid cached trip location for tenant ${tenantId}, trip ${tripId}: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
+      }
     }
 
     const latest = await this.prisma.transportLocationPing.findFirst({
@@ -1341,27 +1352,40 @@ export class TransportService {
             'stream this trip location',
           ),
         )
-        .then(() => {
-          subClient.subscribe(channel, (err) => {
-            if (err) subscriber.error(err);
-            subscribed = !err;
-          });
+        .then(async () => {
+          await subClient.subscribe(channel);
+          subscribed = true;
         })
-        .catch((err) => {
-          subscriber.error(err);
+        .catch((error: unknown) => {
+          subscriber.error(error);
         });
 
       subClient.on('message', (ch, message) => {
         if (ch === channel) {
-          subscriber.next({ data: JSON.parse(message) });
+          try {
+            const payload: unknown = JSON.parse(message);
+            if (typeof payload !== 'object' || payload === null) {
+              throw new Error('Invalid transport location message');
+            }
+            subscriber.next({ data: payload });
+          } catch (error) {
+            subscriber.error(error);
+          }
         }
       });
 
       return () => {
-        if (subscribed) {
-          subClient.unsubscribe(channel);
-        }
-        subClient.quit();
+        void (async () => {
+          try {
+            if (subscribed) await subClient.unsubscribe(channel);
+          } finally {
+            await subClient.quit();
+          }
+        })().catch((error: unknown) => {
+          this.logger.warn(
+            `Could not close trip location subscription: ${error instanceof Error ? error.message : 'unknown error'}`,
+          );
+        });
       };
     });
   }

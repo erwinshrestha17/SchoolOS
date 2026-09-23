@@ -28,9 +28,23 @@ describe('NotificationEventService', () => {
       value: originalKnownError,
     });
   });
-  let prisma: any;
-  let plansService: any;
-  let auditService: any;
+  let prisma: {
+    notificationEvent: {
+      findFirst: jest.Mock;
+      updateMany: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
+    notice: { findFirst: jest.Mock };
+    user: { findFirst: jest.Mock };
+    student: { findFirst: jest.Mock };
+    payment: { findFirst: jest.Mock };
+    attendanceRecord: { findFirst: jest.Mock };
+    admissionApplication: { findFirst: jest.Mock };
+  };
+  let plansService: { assertTenantActive: jest.Mock };
+  let auditService: { record: jest.Mock };
   let service: NotificationEventService;
 
   beforeEach(() => {
@@ -62,7 +76,17 @@ describe('NotificationEventService', () => {
       assertTenantActive: jest.fn().mockResolvedValue(undefined),
     };
     auditService = { record: jest.fn().mockResolvedValue(undefined) };
-    service = new NotificationEventService(prisma, plansService, auditService);
+    service = new NotificationEventService(
+      prisma as unknown as ConstructorParameters<
+        typeof NotificationEventService
+      >[0],
+      plansService as unknown as ConstructorParameters<
+        typeof NotificationEventService
+      >[1],
+      auditService as unknown as ConstructorParameters<
+        typeof NotificationEventService
+      >[2],
+    );
   });
 
   it('persists a canonical M15 event once with bounded safe metadata', async () => {

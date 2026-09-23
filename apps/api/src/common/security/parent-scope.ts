@@ -1,5 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
-import { GuardianCapability, Prisma } from '@prisma/client';
+import { type GuardianCapability, type Prisma } from '@prisma/client';
 import type { AuditService } from '../../audit/audit.service';
 import type { AuthContext } from '../../auth/auth.types';
 import type { PrismaService } from '../../prisma/prisma.service';
@@ -187,7 +187,7 @@ export async function requireGuardianCapability(
   });
 
   const relationship = guardian?.studentLinks?.[0];
-  if (!relationship || relationship.studentId !== studentId) {
+  if (relationship?.studentId !== studentId) {
     if (audit) {
       await recordAuthorizationDenial(audit, {
         actor,

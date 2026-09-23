@@ -246,11 +246,15 @@ function buildService(options: { subjects?: unknown[] } = {}) {
     },
     assessmentComponent: {
       count: jest.fn(),
-      create: jest.fn().mockImplementation(async ({ data }) => ({
-        id: `component-${data.subjectId}-${data.name}`,
-        ...data,
-        subject: { id: data.subjectId },
-      })),
+      create: jest
+        .fn()
+        .mockImplementation(
+          async ({ data }: { data: { subjectId: string; name: string } }) => ({
+            id: `component-${data.subjectId}-${data.name}`,
+            ...data,
+            subject: { id: data.subjectId },
+          }),
+        ),
     },
     markEntry: { count: jest.fn() },
     reportCard: { count: jest.fn() },

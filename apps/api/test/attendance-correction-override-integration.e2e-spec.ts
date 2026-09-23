@@ -194,7 +194,7 @@ function makeOverridePrisma() {
     class: { id: 'class-1', name: 'Class 1' },
     section: { id: 'section-1', name: 'A' },
   };
-  const prisma: any = {
+  const prisma = {
     $transaction: jest.fn((callback) => callback(prisma)),
     tenantSetting: {
       findUnique: jest.fn(async () => null),

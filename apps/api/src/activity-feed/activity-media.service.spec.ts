@@ -63,9 +63,16 @@ describe('ActivityMediaService protected thumbnails', () => {
     },
   };
 
-  let prisma: any;
-  let storage: any;
-  let audit: any;
+  let prisma: {
+    activityAttachment: { findFirst: jest.Mock };
+    guardian: { findFirst: jest.Mock };
+    guardianConsent: { findFirst: jest.Mock };
+    student: { findFirst: jest.Mock; findMany: jest.Mock };
+    staff: { findFirst: jest.Mock };
+    subjectTeacherAssignment: { findFirst: jest.Mock };
+  };
+  let storage: { getObjectBuffer: jest.Mock };
+  let audit: { record: jest.Mock };
   let teacherScope: {
     requireActorAccess: jest.Mock;
     requireActorAccessAnySectionOfClass: jest.Mock;
@@ -120,10 +127,14 @@ describe('ActivityMediaService protected thumbnails', () => {
       }),
     };
     service = new ActivityMediaService(
-      prisma,
+      prisma as unknown as ConstructorParameters<
+        typeof ActivityMediaService
+      >[0],
       { port: 4000 } as never,
-      storage,
-      audit,
+      storage as unknown as ConstructorParameters<
+        typeof ActivityMediaService
+      >[2],
+      audit as unknown as ConstructorParameters<typeof ActivityMediaService>[3],
       teacherScope as never,
     );
   });

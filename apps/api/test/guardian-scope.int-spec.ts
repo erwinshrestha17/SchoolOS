@@ -41,7 +41,7 @@ class FakeCls {
   }
 }
 
-const SUFFIX = `p0-01-guard-${Date.now()}`;
+const SUFFIX = `p0-01-guard-${String(Date.now())}`;
 const DAY = 24 * 60 * 60 * 1000;
 
 describe('P0-01 guardian scoping (real database)', () => {
@@ -311,9 +311,7 @@ describe('P0-01 guardian scoping (real database)', () => {
       const ids = await getParentStudentIds(prisma, parentActor());
 
       expect(ids).not.toBeNull();
-      expect([...(ids as string[])].sort()).toEqual(
-        [childOneId, childTwoId].sort(),
-      );
+      expect([...(ids ?? [])].sort()).toEqual([childOneId, childTwoId].sort());
       expect(ids).not.toContain(unrelatedChildId);
     });
   });

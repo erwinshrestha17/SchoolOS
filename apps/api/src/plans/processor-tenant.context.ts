@@ -1,5 +1,5 @@
 import { type Logger } from '@nestjs/common';
-import { ClsService } from 'nestjs-cls';
+import { type ClsService } from 'nestjs-cls';
 import { TENANT_ID_KEY } from '../prisma/prisma.service';
 import { type PlansService } from './plans.service';
 import { skipSuspendedTenantJob } from './processor-tenant.guard';

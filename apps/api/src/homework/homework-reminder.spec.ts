@@ -1,11 +1,6 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  AuthMethod,
-  HomeworkAssignmentStatus,
-  HomeworkSubmissionStatus,
-  NotificationChannel,
-} from '@prisma/client';
+import { AuthMethod, HomeworkAssignmentStatus } from '@prisma/client';
 import { HomeworkService } from './homework.service';
 import {
   TEACHER_SCOPE_DENIED_CODE,
@@ -25,8 +20,23 @@ import { getQueueToken } from '@nestjs/bullmq';
 
 describe('Homework Reminders', () => {
   let service: HomeworkService;
-  let prisma: any;
-  let communicationsService: any;
+  let prisma: {
+    homeworkAssignment: { findFirst: jest.Mock; update: jest.Mock };
+    homeworkReminderBatch: {
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+      upsert: jest.Mock;
+      findMany: jest.Mock;
+    };
+    homeworkSubmission: { findMany: jest.Mock };
+    student: { findMany: jest.Mock };
+    staff: { findFirst: jest.Mock };
+    subjectTeacherAssignment: { findFirst: jest.Mock };
+    section: { findFirst: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let communicationsService: { recordDeliveryRecords: jest.Mock };
 
   const mockActor: AuthContext = {
     userId: 'user-1',
@@ -327,7 +337,14 @@ describe('Homework Reminders', () => {
         { studentId: 's1' },
       ]);
 
-      const targets = await (service as any).resolveHomeworkReminderTargets(
+      const targetResolver = service as unknown as {
+        resolveHomeworkReminderTargets: (
+          actor: AuthContext,
+          homework: typeof mockHomework,
+          reminderType: HomeworkReminderType,
+        ) => Promise<{ studentIds: string[] }>;
+      };
+      const targets = await targetResolver.resolveHomeworkReminderTargets(
         mockActor,
         mockHomework,
         HomeworkReminderType.HOMEWORK_DUE_SOON,

@@ -6,10 +6,9 @@ import {
 } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '../src/config/config.service';
 import { EntitlementGuard } from '../src/auth/guards/entitlement.guard';
 import { UsageService } from '../src/usage/usage.service';
+import { UsageInterceptor } from '../src/usage/usage.interceptor';
 import { FileRegistryService } from '../src/file-registry/file-registry.service';
 import { PlatformService } from '../src/platform/platform.service';
 import { PlatformController } from '../src/platform/platform.controller';
@@ -38,13 +37,12 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { SecurityDomain } from '@prisma/client';
+import { AuthMethod, SecurityDomain } from '@prisma/client';
+import { firstValueFrom, of } from 'rxjs';
 
 describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
   let app: INestApplication;
   let prisma: PrismaMock;
-  let jwtService: JwtService;
-  let configService: ConfigService;
   let entitlementGuard: EntitlementGuard;
   let platformService: PlatformService;
   let platformController: PlatformController;
@@ -83,8 +81,6 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
 
-    jwtService = app.get<JwtService>(JwtService);
-    configService = app.get<ConfigService>(ConfigService);
     entitlementGuard = app.get<EntitlementGuard>(EntitlementGuard);
     platformService = app.get<PlatformService>(PlatformService);
     platformController = app.get<PlatformController>(PlatformController);
@@ -178,7 +174,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       }),
       getHandler: () => ({}),
       getClass: () => ({}),
-    } as any;
+    } as unknown as ExecutionContext;
   }
 
   describe('Entitlement Enforcement', () => {
@@ -239,7 +235,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       });
       await prisma.usageLimit.create({
         data: {
-          planId: plan!.id,
+          planId: requiredFixture(plan).id,
           usageKey: 'students.count',
           limit: 10,
         },
@@ -254,7 +250,10 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
 
   describe('SaaS Billing Lifecycle', () => {
     it('manages invoice lifecycle from ISSUED to PAID', async () => {
-      const actor = { tenantId: 'platform', userId: 'admin' } as any;
+      const actor = {
+        tenantId: 'platform',
+        userId: 'admin',
+      } as unknown as import('../src/auth/auth.types').AuthContext;
 
       // 1. Create
       const invoice = await platformService.createSaaSInvoice(
@@ -271,7 +270,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
             },
           ],
         },
-        actor,
+        actor.userId,
       );
 
       expect(invoice).toBeDefined();
@@ -287,7 +286,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           paymentDate: new Date().toISOString(),
           method: 'BANK_TRANSFER',
         },
-        actor,
+        actor.userId,
       );
 
       expect(partial.status).toBe('PARTIAL');
@@ -301,21 +300,24 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           paymentDate: new Date().toISOString(),
           method: 'BANK_TRANSFER',
         },
-        actor,
+        actor.userId,
       );
 
       expect(full.status).toBe('PAID');
     });
 
     it('updates subscription status', async () => {
-      const actor = { tenantId: 'platform', userId: 'admin' } as any;
+      const actor = {
+        tenantId: 'platform',
+        userId: 'admin',
+      } as unknown as import('../src/auth/auth.types').AuthContext;
       const sub = await prisma.tenantSubscription.findFirst({
         where: { tenantId: freeTenantId },
       });
 
       const updated = await platformService.updateSubscriptionStatus(
         freeTenantId,
-        sub!.id,
+        requiredFixture(sub).id,
         { status: 'GRACE', notes: 'Payment overdue' },
         actor.userId,
       );
@@ -324,20 +326,33 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
     });
 
     it('tracks API requests through UsageInterceptor', async () => {
-      // Get initial usage
-      const initialUsage = await prisma.usageCounter.findFirst({
-        where: { tenantId: freeTenantId, usageKey: 'api.requests' },
-      });
-      const initialValue = initialUsage ? Number(initialUsage.value) : 0;
+      const usageService = app.get(UsageService);
+      const incrementUsage = jest
+        .spyOn(usageService, 'incrementUsage')
+        .mockResolvedValue(undefined);
+      const interceptor = new UsageInterceptor(usageService);
+      const requestContext = (tenantId: string) =>
+        ({
+          switchToHttp: () => ({
+            getRequest: () => ({ auth: { tenantId } }),
+          }),
+        }) as unknown as ExecutionContext;
+      const next = { handle: () => of({ ok: true }) };
 
-      // Make a dummy request (platform/me is public-ish but needs auth)
-      // Since we are doing internal testing, we can manually trigger the interceptor or
-      // just assume the app.init() registered it.
+      await firstValueFrom(
+        interceptor.intercept(requestContext(freeTenantId), next),
+      );
+      expect(incrementUsage).toHaveBeenCalledWith(
+        freeTenantId,
+        'api.requests',
+        1,
+      );
 
-      // Let's call an endpoint via supertest if possible, or just check the service
-      // Better: test the interceptor directly if needed, but here we want to see it in action.
-
-      // For this test, we'll just verify the service logic we added to others.
+      incrementUsage.mockClear();
+      await firstValueFrom(
+        interceptor.intercept(requestContext('platform'), next),
+      );
+      expect(incrementUsage).not.toHaveBeenCalled();
     });
 
     it('enforces storage limits in FileRegistryService', async () => {
@@ -349,7 +364,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       });
       await prisma.usageLimit.create({
         data: {
-          planId: plan!.id,
+          planId: requiredFixture(plan).id,
           usageKey: 'storage.bytes',
           limit: 1000,
         },
@@ -391,7 +406,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       });
 
       const providers = await platformController.listProviders();
-      const testProvider = providers.find((p: any) => p.name === 'MaskTest');
+      const testProvider = providers.find((p) => p.name === 'MaskTest');
       if (!testProvider) {
         throw new Error('Expected MaskTest provider to be returned');
       }
@@ -420,7 +435,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
-      } as any;
+      } as unknown as ExecutionContext;
     }
 
     it('platform endpoints require platform auth and granular platform permissions', () => {
@@ -438,7 +453,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         }),
         getHandler: () => PlatformController.prototype.updateTenantStatus,
         getClass: () => PlatformController,
-      } as any;
+      } as unknown as ExecutionContext;
 
       expect(() => platformGuard.canActivate(handlerCtx)).toThrow(
         ForbiddenException,
@@ -458,7 +473,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         }),
         getHandler: () => PlatformController.prototype.updateTenantStatus,
         getClass: () => PlatformController,
-      } as any;
+      } as unknown as ExecutionContext;
 
       expect(platformGuard.canActivate(adminCtx)).toBe(true);
     });
@@ -647,7 +662,8 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       const overrideLog = prisma.__state.auditLogs.find(
         (log) =>
           log.action === 'tenant_feature_override_updated' &&
-          (log as any).after?.featureKey === 'module.exams',
+          (log.after as { featureKey?: string } | null)?.featureKey ===
+            'module.exams',
       );
       expect(overrideLog).toBeDefined();
 
@@ -688,7 +704,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         }),
         getHandler: () => AcademicsController.prototype.createExamTerm,
         getClass: () => AcademicsController,
-      } as any;
+      } as unknown as ExecutionContext;
     }
 
     it('disabled feature rejects access server-side', async () => {
@@ -736,11 +752,11 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         where: { key: 'free-plan' },
       });
       await prisma.usageLimit.deleteMany({
-        where: { planId: plan!.id, usageKey: 'students.count' },
+        where: { planId: requiredFixture(plan).id, usageKey: 'students.count' },
       });
       await prisma.usageLimit.create({
         data: {
-          planId: plan!.id,
+          planId: requiredFixture(plan).id,
           usageKey: 'students.count',
           limit: 1,
         },
@@ -822,14 +838,12 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         }),
         getHandler: () => AdmissionsController.prototype.createAdmission,
         getClass: () => AdmissionsController,
-      } as any;
+      } as unknown as ExecutionContext;
 
-      jest
-        .spyOn(reflector, 'getAllAndOverride')
-        .mockImplementation((key, targets) => {
-          if (key === 'permissions') return ['students.admission.create'];
-          return [];
-        });
+      jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key) => {
+        if (key === 'permissions') return ['students.admission.create'];
+        return [];
+      });
 
       await expect(rolesGuard.canActivate(unprivilegedContext)).rejects.toThrow(
         ForbiddenException,
@@ -839,7 +853,10 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
 
   describe('SaaS Billing Lifecycle Hardening', () => {
     it('manages create tenant subscription, invoice generation, payment recording, and status changes', async () => {
-      const actor = { tenantId: 'platform', userId: 'billing-admin' } as any;
+      const actor = {
+        tenantId: 'platform',
+        userId: 'billing-admin',
+      } as unknown as import('../src/auth/auth.types').AuthContext;
 
       const sub = await platformService.assignSubscription(
         premiumTenantId,
@@ -875,7 +892,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
 
       expect(invoice.invoiceNumber).toMatch(/^SO-\d{4}-\d{5}$/);
       expect(invoice.status).toBe('ISSUED');
-      expect(invoice.amount.toString()).toBe('12000.00');
+      expect(invoice.amount).toBe('12000.00');
 
       const partial = await platformService.recordSaaSPayment(
         premiumTenantId,
@@ -905,7 +922,10 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
     });
 
     it('handles overdue invoice calculation dynamically', async () => {
-      const actor = { tenantId: 'platform', userId: 'billing-admin' } as any;
+      const actor = {
+        tenantId: 'platform',
+        userId: 'billing-admin',
+      } as unknown as import('../src/auth/auth.types').AuthContext;
       const sub = await prisma.tenantSubscription.findFirst({
         where: { tenantId: premiumTenantId },
       });
@@ -914,7 +934,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         premiumTenantId,
         {
           planId: 'plan-premium',
-          subscriptionId: sub!.id,
+          subscriptionId: requiredFixture(sub).id,
           issueDate: new Date(Date.now() - 172800000).toISOString(),
           dueDate: new Date(Date.now() - 86400000).toISOString(),
           lines: [
@@ -936,7 +956,10 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
     });
 
     it('enforces cancellation rules (rejects paid cancellations, records cancels correctly)', async () => {
-      const actor = { tenantId: 'platform', userId: 'billing-admin' } as any;
+      const actor = {
+        tenantId: 'platform',
+        userId: 'billing-admin',
+      } as unknown as import('../src/auth/auth.types').AuthContext;
       const sub = await prisma.tenantSubscription.findFirst({
         where: { tenantId: premiumTenantId },
       });
@@ -945,7 +968,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         premiumTenantId,
         {
           planId: 'plan-premium',
-          subscriptionId: sub!.id,
+          subscriptionId: requiredFixture(sub).id,
           issueDate: new Date().toISOString(),
           dueDate: new Date(Date.now() + 86400000).toISOString(),
           lines: [
@@ -983,7 +1006,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         premiumTenantId,
         {
           planId: 'plan-premium',
-          subscriptionId: sub!.id,
+          subscriptionId: requiredFixture(sub).id,
           issueDate: new Date(Date.now() - 3600000).toISOString(),
           dueDate: new Date(Date.now() + 86400000).toISOString(),
           lines: [
@@ -1008,7 +1031,10 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
     });
 
     it('suspends and reactivates tenants correctly', async () => {
-      const actor = { tenantId: 'platform', userId: 'billing-admin' } as any;
+      const actor = {
+        tenantId: 'platform',
+        userId: 'billing-admin',
+      } as unknown as import('../src/auth/auth.types').AuthContext;
 
       await platformService.updateTenantStatus(
         premiumTenantId,
@@ -1028,7 +1054,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         }),
         getHandler: () => AcademicsController.prototype.createExamTerm,
         getClass: () => AcademicsController,
-      } as any;
+      } as unknown as ExecutionContext;
       jest
         .spyOn(reflector, 'getAllAndOverride')
         .mockReturnValue('module.exams');
@@ -1050,7 +1076,10 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
     });
 
     it('plan upgrades/downgrades dynamically changes entitlements', async () => {
-      const actor = { tenantId: 'platform', userId: 'billing-admin' } as any;
+      const actor = {
+        tenantId: 'platform',
+        userId: 'billing-admin',
+      } as unknown as import('../src/auth/auth.types').AuthContext;
 
       const context = {
         switchToHttp: () => ({
@@ -1058,7 +1087,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         }),
         getHandler: () => ({}),
         getClass: () => ({}),
-      } as any;
+      } as unknown as ExecutionContext;
 
       await platformService.assignSubscription(
         premiumTenantId,
@@ -1099,7 +1128,10 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         ? prisma.__state.journalEntries.length
         : 0;
 
-      const actor = { tenantId: 'platform', userId: 'billing-admin' } as any;
+      const actor = {
+        tenantId: 'platform',
+        userId: 'billing-admin',
+      } as unknown as import('../src/auth/auth.types').AuthContext;
       const sub = await prisma.tenantSubscription.findFirst({
         where: { tenantId: premiumTenantId },
       });
@@ -1108,7 +1140,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         premiumTenantId,
         {
           planId: 'plan-premium',
-          subscriptionId: sub!.id,
+          subscriptionId: requiredFixture(sub).id,
           issueDate: new Date(Date.now() - 7200000).toISOString(),
           dueDate: new Date(Date.now() + 86400000).toISOString(),
           lines: [
@@ -1192,12 +1224,8 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         retry: jest.fn().mockResolvedValue(undefined),
       };
 
-      jest
-        .spyOn(notificationsQueue, 'getFailed')
-        .mockResolvedValue([mockJob] as any);
-      jest
-        .spyOn(notificationsQueue, 'getJob')
-        .mockResolvedValue(mockJob as any);
+      jest.spyOn(notificationsQueue, 'getFailed').mockResolvedValue([mockJob]);
+      jest.spyOn(notificationsQueue, 'getJob').mockResolvedValue(mockJob);
 
       const failedList = await queuesService.listFailedJobs();
       const firstJob = failedList.find((j) => j.id === 'failed-job-1');
@@ -1247,9 +1275,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         retry: jest.fn().mockResolvedValue(undefined),
         attemptsMade: 1,
       };
-      jest
-        .spyOn(notificationsQueue, 'getJob')
-        .mockResolvedValue(mockJob as any);
+      jest.spyOn(notificationsQueue, 'getJob').mockResolvedValue(mockJob);
 
       await queuesService.retryFailedJob(
         {
@@ -1307,7 +1333,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         switchToHttp: () => ({
           getRequest: () => ({ headers: {} }),
         }),
-      } as any;
+      } as unknown as ExecutionContext;
 
       await expect(jwtGuard.canActivate(unauthContext)).rejects.toThrow(
         UnauthorizedException,
@@ -1346,7 +1372,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         tenantId: premiumTenantId,
         userId: 'admin-user',
         permissions: ['student_documents:manage'],
-      } as any;
+      } as unknown as import('../src/auth/auth.types').AuthContext;
 
       await expect(
         fileRegistryController.uploadFile(authCtx, {
@@ -1392,6 +1418,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           scope: 'fees',
           reportKey: 'fee-aging',
           format: 'PDF',
+          filters: {},
           status: 'COMPLETED',
           requestedBy: 'user-alpha',
         },
@@ -1403,6 +1430,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           scope: 'academics',
           reportKey: 'marksheet',
           format: 'PDF',
+          filters: {},
           status: 'COMPLETED',
           requestedBy: 'user-beta',
         },
@@ -1466,7 +1494,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       await prisma.platformPlan.deleteMany({});
 
       // Setup a plan with limits
-      const plan = await prisma.platformPlan.create({
+      await prisma.platformPlan.create({
         data: {
           id: 'test-plan-1',
           key: 'premium-test',
@@ -1498,10 +1526,10 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       // Setup usage counters near limit (e.g. 95 students)
       for (let i = 0; i < 95; i++) {
         prisma.__state.students.push({
-          id: `student-warn-${i}`,
+          id: `student-warn-${String(i)}`,
           tenantId: premiumTenantId,
           firstNameEn: 'Test',
-          lastNameEn: `Student ${i}`,
+          lastNameEn: `Student ${String(i)}`,
         });
       }
 
@@ -1543,7 +1571,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         tenantId: 'platform',
         tenantSlug: 'platform',
         email: 'admin@schoolos.test',
-        authMethod: 'PASSWORD' as any,
+        authMethod: AuthMethod.PASSWORD,
         roles: ['platform_super_admin'],
         permissions: [
           'platform:dashboard:read',
@@ -1576,7 +1604,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         tenantId: 'platform',
         tenantSlug: 'platform',
         email: 'support@schoolos.test',
-        authMethod: 'PASSWORD' as any,
+        authMethod: AuthMethod.PASSWORD,
         roles: ['platform_support'],
         permissions: [
           'platform:dashboard:read',
@@ -1606,14 +1634,14 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
 
       // Setup support override history
       const platformUser = await prisma.user.findFirst();
-      const pUserId = platformUser?.id || 'admin-user-1';
+      const pUserId = platformUser?.id ?? 'admin-user-1';
       if (!platformUser) {
         await prisma.user.create({
           data: {
             id: pUserId,
             email: 'admin@schoolos.com',
             roles: ['platform_super_admin'],
-          },
+          } as unknown as Parameters<typeof prisma.user.create>[0]['data'],
         });
       }
 
@@ -1670,7 +1698,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       expect(storage).toBeDefined();
       expect(pdf).toBeDefined();
       expect(paymentGateway).toBeDefined();
-      expect(pdf!.status).toBe('READY');
+      expect(requiredFixture(pdf).status).toBe('READY');
     });
 
     it('object storage test connection verifies config and cleans up test objects', async () => {
@@ -1712,7 +1740,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       const mockResponse = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
-      } as any;
+      };
       const mockHost = {
         switchToHttp: () => ({
           getRequest: () => ({
@@ -1722,7 +1750,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           }),
           getResponse: () => mockResponse,
         }),
-      } as any;
+      } as unknown as import('@nestjs/common').ArgumentsHost;
 
       const rawError = new Error(
         'Raw Prisma constraint violation details or secrets',
@@ -1760,7 +1788,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
     });
 
     it('platform operator can register a tenant with audit trail', async () => {
-      const slug = `m0-register-${Date.now()}`;
+      const slug = `m0-register-${String(Date.now())}`;
 
       const result = await tenantsController.register(
         {
@@ -1769,7 +1797,9 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           adminEmail: `provision-${slug}@schoolos.test`,
           adminPassword: 'RootAccess1!',
         },
-        platformActor as any,
+        platformActor as unknown as Parameters<
+          typeof tenantsController.register
+        >[1],
       );
 
       expect(result.tenant.slug).toBe(slug);
@@ -1913,3 +1943,10 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
     });
   });
 });
+
+function requiredFixture<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) {
+    throw new Error('Required test fixture was not created');
+  }
+  return value;
+}

@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   AuthMethod,
@@ -25,7 +21,43 @@ import { getQueueToken } from '@nestjs/bullmq';
 
 describe('Homework Workflow', () => {
   let service: HomeworkService;
-  let prisma: any;
+  let communications: { recordDeliveryRecords: jest.Mock };
+  let prisma: {
+    homeworkAssignment: {
+      findFirst: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+      delete: jest.Mock;
+      findMany: jest.Mock;
+    };
+    homeworkSubmission: {
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+      upsert: jest.Mock;
+      createMany: jest.Mock;
+      findMany: jest.Mock;
+    };
+    homeworkAttachment: { createMany: jest.Mock; deleteMany: jest.Mock };
+    fileAsset: { findMany: jest.Mock; updateMany: jest.Mock };
+    academicYear: { findFirst: jest.Mock };
+    class: { findFirst: jest.Mock };
+    section: { findFirst: jest.Mock };
+    subject: { findFirst: jest.Mock };
+    staff: { findFirst: jest.Mock };
+    student: { findFirst: jest.Mock; findMany: jest.Mock };
+    subjectTeacherAssignment: { findFirst: jest.Mock; findMany: jest.Mock };
+    homeworkReminderBatch: {
+      findFirst: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+      upsert: jest.Mock;
+    };
+    tenantAuthorityFence: { findUnique: jest.Mock; create: jest.Mock };
+    $transaction: jest.Mock;
+  };
 
   const mockActor: AuthContext = {
     userId: 'user-1',
@@ -61,6 +93,9 @@ describe('Homework Workflow', () => {
   };
 
   beforeEach(async () => {
+    communications = {
+      recordDeliveryRecords: jest.fn().mockResolvedValue({ sentCount: 1 }),
+    };
     prisma = {
       homeworkAssignment: {
         findFirst: jest.fn(),
@@ -154,11 +189,7 @@ describe('Homework Workflow', () => {
         { provide: AuditService, useValue: { record: jest.fn() } },
         {
           provide: CommunicationsService,
-          useValue: {
-            recordDeliveryRecords: jest
-              .fn()
-              .mockResolvedValue({ sentCount: 1 }),
-          },
+          useValue: communications,
         },
         {
           provide: FileRegistryService,
@@ -308,9 +339,9 @@ describe('Homework Workflow', () => {
         attachmentFileIds: ['file-1'],
       };
 
-      const result = (await service.createAssignment(dto, mockActor)) as any;
+      const result = await service.createAssignment(dto, mockActor);
 
-      expect(result.id).toBe('new-hw');
+      expect(result).toMatchObject({ id: 'new-hw' });
       expect(prisma.homeworkAttachment.createMany).toHaveBeenCalled();
     });
 
@@ -344,8 +375,6 @@ describe('Homework Workflow', () => {
         ...mockAssignment,
         status: HomeworkAssignmentStatus.ASSIGNED,
       });
-      const comms = (service as any).communicationsService;
-
       await service.assignHomework('hw-1', mockActor);
 
       expect(prisma.homeworkAssignment.update).toHaveBeenCalledWith({
@@ -355,7 +384,7 @@ describe('Homework Workflow', () => {
         }),
         include: expect.anything(),
       });
-      expect(comms.recordDeliveryRecords).toHaveBeenCalledWith(
+      expect(communications.recordDeliveryRecords).toHaveBeenCalledWith(
         expect.objectContaining({
           sourceType: 'homework_published',
         }),
@@ -481,8 +510,6 @@ describe('Homework Workflow', () => {
         ...submission,
         status: HomeworkSubmissionStatus.NEEDS_CORRECTION,
       });
-      const comms = (service as any).communicationsService;
-
       await service.reviewSubmission(
         'sub-1',
         {
@@ -492,7 +519,7 @@ describe('Homework Workflow', () => {
         mockActor,
       );
 
-      expect(comms.recordDeliveryRecords).toHaveBeenCalledWith(
+      expect(communications.recordDeliveryRecords).toHaveBeenCalledWith(
         expect.objectContaining({
           sourceType: 'homework_returned_for_correction',
         }),

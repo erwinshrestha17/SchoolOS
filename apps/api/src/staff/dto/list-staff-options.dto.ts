@@ -13,7 +13,9 @@ import type { RemoteLookupPage, StaffLookupOption } from '@schoolos/core';
 
 export class ListStaffOptionsDto {
   @ApiProperty({ minLength: 2, maxLength: 80 })
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @MinLength(2)
   @MaxLength(80)

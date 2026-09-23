@@ -105,7 +105,7 @@ const MISSING_HOMEWORK_STATUSES: HomeworkSubmissionStatus[] = [
   HomeworkSubmissionStatus.ABSENT,
 ];
 
-type TeacherAccess = {
+interface TeacherAccess {
   staffId: string;
   assignments: Array<{
     academicYearId: string;
@@ -114,7 +114,7 @@ type TeacherAccess = {
     subjectId: string;
   }>;
   classTeacherSections: Array<{ classId: string; sectionId: string }>;
-};
+}
 
 @Injectable()
 export class LearningImprovementService {
@@ -472,7 +472,7 @@ export class LearningImprovementService {
     const academicYearId =
       query.academicYearId ??
       (await this.getCurrentAcademicYearId(actor.tenantId));
-    const scopedQuery = { ...query, academicYearId };
+    const scopedQuery = Object.assign({}, query, { academicYearId });
     const progress = await this.getStudentOutcomeProgress(
       actor,
       studentId,
@@ -586,7 +586,7 @@ export class LearningImprovementService {
               orderBy: { _count: { studentId: 'desc' } },
               take: 2000,
             })
-          : Promise.resolve([]),
+          : Promise.resolve<Array<{ studentId: string }>>([]),
         this.prisma.formativeAssessmentEvidence.groupBy({
           by: ['studentId'],
           where: {
@@ -620,7 +620,7 @@ export class LearningImprovementService {
               orderBy: { _count: { studentId: 'desc' } },
               take: 2000,
             })
-          : Promise.resolve([]),
+          : Promise.resolve<Array<{ studentId: string }>>([]),
       ]);
 
     const candidateIds = Array.from(
@@ -702,7 +702,13 @@ export class LearningImprovementService {
               },
               _count: { _all: true },
             })
-          : Promise.resolve([]),
+          : Promise.resolve<
+              Array<{
+                studentId: string;
+                status: AttendanceStatus;
+                _count: { _all: number };
+              }>
+            >([]),
         this.prisma.formativeAssessmentEvidence.findMany({
           where: {
             tenantId: actor.tenantId,
@@ -737,7 +743,13 @@ export class LearningImprovementService {
               },
               _count: { _all: true },
             })
-          : Promise.resolve([]),
+          : Promise.resolve<
+              Array<{
+                studentId: string;
+                status: HomeworkSubmissionStatus;
+                _count: { _all: number };
+              }>
+            >([]),
         this.prisma.studentInterventionCase.findMany({
           where: {
             tenantId: actor.tenantId,
@@ -1727,16 +1739,21 @@ export class LearningImprovementService {
         scheduleNote: group.scheduleNote,
         parentSummary: group.parentSummary,
       })),
-      interventionUpdates: interventions.map((item) => ({
-        caseId: item.id,
-        status: item.status,
-        title: item.title,
-        summary: item.parentVisibleSummary!,
-        nextFollowUpOn: item.nextFollowUpOn
-          ? formatDate(item.nextFollowUpOn)
-          : null,
-        updatedAt: item.updatedAt.toISOString(),
-      })),
+      interventionUpdates: interventions
+        .filter(
+          (item): item is typeof item & { parentVisibleSummary: string } =>
+            item.parentVisibleSummary !== null,
+        )
+        .map((item) => ({
+          caseId: item.id,
+          status: item.status,
+          title: item.title,
+          summary: item.parentVisibleSummary,
+          nextFollowUpOn: item.nextFollowUpOn
+            ? formatDate(item.nextFollowUpOn)
+            : null,
+          updatedAt: item.updatedAt.toISOString(),
+        })),
     };
   }
 
@@ -1951,12 +1968,12 @@ export class LearningImprovementService {
     if (!academicYear)
       throw new NotFoundException('Academic year was not found');
     if (!classroom) throw new NotFoundException('Class was not found');
-    if (!subject || subject.classId !== scope.classId) {
+    if (subject?.classId !== scope.classId) {
       throw new ConflictException(
         'Subject must belong to the selected class and tenant',
       );
     }
-    if (scope.sectionId && (!section || section.classId !== scope.classId)) {
+    if (scope.sectionId && section?.classId !== scope.classId) {
       throw new ConflictException(
         'Section must belong to the selected class and tenant',
       );
@@ -2230,21 +2247,19 @@ function mapTeacher(teacher: {
   };
 }
 
-function mapOutcome<
-  T extends {
-    id: string;
-    academicYearId: string;
-    classId: string;
-    code: string;
-    title: string;
-    description: string | null;
-    domain: LearningOutcomeDomain;
-    isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-    subject: { id: string; code: string; name: string };
-  },
->(outcome: T) {
+function mapOutcome(outcome: {
+  id: string;
+  academicYearId: string;
+  classId: string;
+  code: string;
+  title: string;
+  description: string | null;
+  domain: LearningOutcomeDomain;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  subject: { id: string; code: string; name: string };
+}) {
   return {
     id: outcome.id,
     academicYearId: outcome.academicYearId,
@@ -2453,7 +2468,7 @@ function buildOutcomeProgress(
     grouped.set(item.outcome.id, list);
   }
   return Array.from(grouped.values()).map((items) => {
-    const latest = items[0]!;
+    const latest = items[0];
     return {
       outcome: latest.outcome,
       latestMasteryStatus: latest.masteryStatus,

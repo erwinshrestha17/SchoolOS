@@ -2,9 +2,6 @@ import { ForbiddenException, ExecutionContext } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
-import { AuthController } from '../src/auth/auth.controller';
-import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
-import { RolesPermissionsGuard } from '../src/auth/guards/roles-permissions.guard';
 import { EntitlementGuard } from '../src/auth/guards/entitlement.guard';
 import { AccountingReportsController } from '../src/accounting/accounting-reports.controller';
 import { AdmissionsController } from '../src/admissions/admissions.controller';
@@ -25,21 +22,13 @@ import { RedisService } from '../src/redis/redis.service';
 import { TransportController } from '../src/transport/transport.controller';
 import { AuthContext } from '../src/auth/auth.types';
 import { FEATURE_KEYS } from '@schoolos/core';
-import {
-  PrismaMock,
-  createRequestMock,
-  createPrismaMock,
-  createQueueMock,
-} from './test-helpers';
+import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
 import { AuthenticatedRequest } from '../src/auth/auth-request.interface';
+import { AuthMethod } from '@prisma/client';
 
 describe('Route Denial (Entitlement Hardening) E2E', () => {
   let moduleRef: TestingModule;
   let prisma: PrismaMock;
-  let accountingReportsController: AccountingReportsController;
-  let admissionsController: AdmissionsController;
-  let jwtAuthGuard: JwtAuthGuard;
-  let rolesGuard: RolesPermissionsGuard;
   let entitlementGuard: EntitlementGuard;
 
   beforeEach(async () => {
@@ -65,10 +54,6 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       .useValue(createQueueMock())
       .compile();
 
-    accountingReportsController = moduleRef.get(AccountingReportsController);
-    admissionsController = moduleRef.get(AdmissionsController);
-    jwtAuthGuard = moduleRef.get(JwtAuthGuard);
-    rolesGuard = moduleRef.get(RolesPermissionsGuard);
     entitlementGuard = moduleRef.get(EntitlementGuard);
   });
 
@@ -117,7 +102,7 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       email: 'admin@school.com',
       roles: ['admin'],
       permissions: ['accounting.reports.view'], // Has RBAC permission
-      authMethod: 'PASSWORD' as any,
+      authMethod: AuthMethod.PASSWORD,
     };
 
     // 3. Mock request and context
@@ -181,7 +166,7 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       email: 'registrar@school.com',
       roles: ['admin'],
       permissions: ['students.admission.create'],
-      authMethod: 'PASSWORD' as any,
+      authMethod: AuthMethod.PASSWORD,
     };
 
     const request = {
@@ -243,7 +228,7 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       email: 'admin@school.com',
       roles: ['admin'],
       permissions: ['accounting.reports.view'],
-      authMethod: 'PASSWORD' as any,
+      authMethod: AuthMethod.PASSWORD,
     };
 
     const request = {
@@ -300,7 +285,7 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       email: 'parent@school.com',
       roles: ['parent'],
       permissions: [],
-      authMethod: 'PASSWORD' as any,
+      authMethod: AuthMethod.PASSWORD,
     };
 
     const request = { auth: actor } as unknown as AuthenticatedRequest;
@@ -361,7 +346,7 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       email: 'parent@school.com',
       roles: ['parent'],
       permissions: [],
-      authMethod: 'PASSWORD' as any,
+      authMethod: AuthMethod.PASSWORD,
     };
 
     const request = { auth: actor } as unknown as AuthenticatedRequest;
@@ -414,7 +399,7 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       email: 'parent@school.com',
       roles: ['parent'],
       permissions: [],
-      authMethod: 'PASSWORD' as any,
+      authMethod: AuthMethod.PASSWORD,
     };
 
     const request = { auth: actor } as unknown as AuthenticatedRequest;
@@ -541,7 +526,7 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
         email: `${label}@school.com`,
         roles: ['admin'],
         permissions,
-        authMethod: 'PASSWORD' as any,
+        authMethod: AuthMethod.PASSWORD,
       };
 
       const request = { auth: actor } as unknown as AuthenticatedRequest;
@@ -627,7 +612,7 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       email: 'admin@school.com',
       roles: ['admin'],
       permissions: ['students.admission.create'],
-      authMethod: 'PASSWORD' as any,
+      authMethod: AuthMethod.PASSWORD,
     };
 
     const studentsController = moduleRef.get(AdmissionsController);
@@ -652,7 +637,9 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
               isPrimary: true,
             },
           ],
-        } as any,
+        } as unknown as Parameters<
+          typeof studentsController.createAdmission
+        >[0],
         actor,
       ),
     ).rejects.toThrow(/Plan limit reached for students.count/);
@@ -666,18 +653,18 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       email: 'admin@school.com',
       roles: ['admin'], // NOT a platform role
       permissions: ['platform:dashboard:read'], // Even if they have the permission string
-      authMethod: 'PASSWORD' as any,
+      authMethod: AuthMethod.PASSWORD,
     };
 
-    const request = { auth: actor } as any;
+    const request = { auth: actor } as unknown as AuthenticatedRequest;
     const context = {
       switchToHttp: () => ({ getRequest: () => request }),
       getHandler: () => ({}),
       getClass: () => ({}),
-    } as any;
+    } as unknown as ExecutionContext;
 
     const platformGuard = moduleRef.get(PlatformGuard);
-    await expect(() => platformGuard.canActivate(context)).toThrow(
+    expect(() => platformGuard.canActivate(context)).toThrow(
       /Access restricted to platform administrators only/,
     );
   });
@@ -719,7 +706,7 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       email: 'docs@school.com',
       roles: ['admin'],
       permissions: ['students:read'],
-      authMethod: 'PASSWORD' as any,
+      authMethod: AuthMethod.PASSWORD,
     };
 
     const request = { auth: actor } as unknown as AuthenticatedRequest;
@@ -751,15 +738,15 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       email: 'user@school.com',
       roles: ['admin'],
       permissions: ['students.admission.create'],
-      authMethod: 'PASSWORD' as any,
+      authMethod: AuthMethod.PASSWORD,
     };
 
-    const request = { auth: actor } as any;
+    const request = { auth: actor } as unknown as AuthenticatedRequest;
     const context = {
       switchToHttp: () => ({ getRequest: () => request }),
       getHandler: () => AdmissionsController.prototype.listAdmissions,
       getClass: () => AdmissionsController,
-    } as any;
+    } as unknown as ExecutionContext;
 
     await expect(entitlementGuard.canActivate(context)).rejects.toThrow(
       /Your school account is currently suspended/,

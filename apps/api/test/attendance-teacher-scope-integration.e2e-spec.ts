@@ -72,9 +72,10 @@ describe('Attendance teacher scope integration', () => {
     expect(result.totals).toEqual(
       expect.objectContaining({ totalStudents: 2, late: 1, present: 1 }),
     );
-    expect(prisma.state.records.map((record: any) => record.studentId)).toEqual(
-      ['student-1', 'student-2'],
-    );
+    expect(prisma.state.records.map((record) => record.studentId)).toEqual([
+      'student-1',
+      'student-2',
+    ]);
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'attendance.student.late',
       expect.objectContaining({
@@ -107,16 +108,19 @@ describe('Attendance teacher scope integration', () => {
 });
 
 function makePrisma() {
-  const state = { sessions: [] as any[], records: [] as any[] };
+  const state: {
+    sessions: Record<string, unknown>[];
+    records: { studentId: string; [key: string]: unknown }[];
+  } = { sessions: [], records: [] };
   const tenantId = 'tenant-attendance-scope';
   const students = [
     makeStudent('student-1', true),
     makeStudent('student-2', true),
     makeStudent('student-archived', false),
   ];
-  const prisma: any = {
+  const prisma = {
     state,
-    $transaction: jest.fn((callback) => callback(prisma)),
+    $transaction: jest.fn(),
     tenantSetting: {
       findUnique: jest.fn(async () => null),
     },
@@ -178,14 +182,14 @@ function makePrisma() {
       findMany: jest.fn(async () =>
         students.filter((student) =>
           student.enrollments.some(
-            (enrollment: any) => enrollment.status === EnrollmentStatus.ACTIVE,
+            (enrollment) => enrollment.status === EnrollmentStatus.ACTIVE,
           ),
         ),
       ),
     },
     attendanceSession: {
       findFirst: jest.fn(async () => null),
-      create: jest.fn(async ({ data }) => {
+      create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
         const session = {
           id: 'session-1',
           ...data,
@@ -204,10 +208,16 @@ function makePrisma() {
     },
     attendanceRecord: {
       deleteMany: jest.fn(async () => ({ count: 0 })),
-      createMany: jest.fn(async ({ data }) => {
-        state.records.push(...data);
-        return { count: data.length };
-      }),
+      createMany: jest.fn(
+        async ({
+          data,
+        }: {
+          data: { studentId: string; [key: string]: unknown }[];
+        }) => {
+          state.records.push(...data);
+          return { count: data.length };
+        },
+      ),
       findMany: jest.fn(async () => []),
     },
     attendanceConflict: {
@@ -217,6 +227,9 @@ function makePrisma() {
       findFirst: jest.fn(async () => null),
     },
   };
+  prisma.$transaction.mockImplementation(
+    (callback: (tx: typeof prisma) => unknown) => callback(prisma),
+  );
   return prisma;
 
   function makeStudent(id: string, active: boolean) {

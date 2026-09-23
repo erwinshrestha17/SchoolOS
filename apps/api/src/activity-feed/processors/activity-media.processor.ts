@@ -127,7 +127,7 @@ export class ActivityMediaProcessor extends WorkerHost {
         tenantId,
         attachmentId,
         fileAssetId,
-        requestedById: requestedById,
+        requestedById,
         originalFileName: attachment.fileName,
         content: thumbnailBuffer,
       });

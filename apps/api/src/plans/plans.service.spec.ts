@@ -7,7 +7,11 @@ import { createPassThroughRedisCache } from '../../test/helpers/redis-cache';
 describe('PlansService entitlement and usage enforcement', () => {
   let service: PlansService;
   let entitlementsService: EntitlementsService;
-  let prisma: any;
+  let prisma: {
+    tenant: { findUnique: jest.Mock };
+    tenantFeatureOverride: { findMany: jest.Mock };
+    tenantSubscription: { findFirst: jest.Mock };
+  };
 
   beforeEach(() => {
     prisma = {
@@ -24,12 +28,12 @@ describe('PlansService entitlement and usage enforcement', () => {
 
     const requestCache = createPassThroughRequestCache();
     entitlementsService = new EntitlementsService(
-      prisma as any,
+      prisma as unknown as ConstructorParameters<typeof EntitlementsService>[0],
       requestCache,
       createPassThroughRedisCache(),
     );
     service = new PlansService(
-      prisma as any,
+      prisma as unknown as ConstructorParameters<typeof PlansService>[0],
       entitlementsService,
       requestCache,
     );
@@ -357,7 +361,7 @@ describe('EntitlementsService authority is resolved live', () => {
         }
       }),
     };
-    const prisma: any = {
+    const prisma = {
       tenant: { findUnique: jest.fn().mockResolvedValue({ isActive: true }) },
       tenantFeatureOverride: { findMany: jest.fn().mockResolvedValue([]) },
       tenantSubscription: {
@@ -371,7 +375,7 @@ describe('EntitlementsService authority is resolved live', () => {
       },
     };
     const service = new EntitlementsService(
-      prisma,
+      prisma as unknown as ConstructorParameters<typeof EntitlementsService>[0],
       createPassThroughRequestCache(),
       redisCache as never,
     );

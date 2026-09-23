@@ -250,7 +250,7 @@ describe('TimetableService lifecycle behavior', () => {
         service as unknown as {
           getTeacherTimetableScope(
             actorInput: object,
-          ): Promise<Array<Record<string, string>>>;
+          ): Promise<Record<string, string>[]>;
         }
       ).getTeacherTimetableScope({} as never),
     ).resolves.toEqual([

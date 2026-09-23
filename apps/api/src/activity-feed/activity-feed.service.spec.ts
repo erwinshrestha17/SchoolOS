@@ -12,8 +12,6 @@ import {
   TeacherAssignmentType,
 } from '@prisma/client';
 import { ConflictException, ForbiddenException } from '@nestjs/common';
-import { StorageService } from '../storage/storage.service';
-import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AuthContext } from '../auth/auth.types.js';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import {
@@ -23,14 +21,51 @@ import {
 import { ActivityFeedService } from './activity-feed.service';
 
 describe('ActivityFeedService', () => {
-  let prisma: any;
-  let storageService: any;
-  let communicationsService: any;
-  let auditService: any;
-  let fileRegistry: any;
-  let mediaQueue: any;
-  let teacherScopeService: any;
-  let eventEmitter: any;
+  let prisma: {
+    class: { findFirst: jest.Mock; findMany: jest.Mock };
+    academicYear: { findMany: jest.Mock };
+    section: { findFirst: jest.Mock; findMany: jest.Mock };
+    student: { count: jest.Mock; findMany: jest.Mock; findFirst: jest.Mock };
+    staff: { findFirst: jest.Mock };
+    guardian: { findFirst: jest.Mock };
+    guardianConsent: { findFirst: jest.Mock };
+    activityPost: {
+      create: jest.Mock;
+      deleteMany: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+    };
+    activityReaction: {
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      groupBy: jest.Mock;
+    };
+    activityAttachment: { findFirst: jest.Mock };
+    fileAsset: { delete: jest.Mock; update: jest.Mock };
+    moodLog: { create: jest.Mock; findMany: jest.Mock };
+    developmentalMilestone: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+    };
+  };
+  let storageService: { deleteObject: jest.Mock; saveBase64Object: jest.Mock };
+  let communicationsService: { recordDeliveryRecords: jest.Mock };
+  let auditService: { record: jest.Mock };
+  let fileRegistry: {
+    registerFile: jest.Mock;
+    markUploaded: jest.Mock;
+    getSignedUrl: jest.Mock;
+    auditAccess: jest.Mock;
+  };
+  let mediaQueue: { add: jest.Mock };
+  let teacherScopeService: {
+    listActiveAssignments: jest.Mock;
+    requireActorAccess: jest.Mock;
+    requireActorAccessAnySectionOfClass: jest.Mock;
+    resolveReadableScope: jest.Mock;
+  };
+  let eventEmitter: { emit: jest.Mock };
   let service: ActivityFeedService;
   let actor: AuthContext;
 
@@ -72,6 +107,7 @@ describe('ActivityFeedService', () => {
         create: jest.fn(),
         groupBy: jest.fn(),
       },
+      activityAttachment: { findFirst: jest.fn() },
       fileAsset: {
         delete: jest.fn(),
         update: jest.fn(),
@@ -151,14 +187,28 @@ describe('ActivityFeedService', () => {
     };
 
     service = new ActivityFeedService(
-      prisma,
-      storageService,
-      communicationsService,
-      auditService,
-      eventEmitter,
-      fileRegistry,
-      mediaQueue,
-      teacherScopeService,
+      prisma as unknown as ConstructorParameters<typeof ActivityFeedService>[0],
+      storageService as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[1],
+      communicationsService as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[2],
+      auditService as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[3],
+      eventEmitter as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[4],
+      fileRegistry as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[5],
+      mediaQueue as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[6],
+      teacherScopeService as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[7],
     );
   });
 
@@ -293,17 +343,31 @@ describe('ActivityFeedService', () => {
       publicUrl: '/storage/tenant-1/activity-feed/class-1/photo.jpg',
       sizeBytes: 42,
     });
-    prisma.activityPost.create.mockImplementation(async ({ data }: any) => ({
-      id: 'post-1',
-      classId: data.classId,
-      sectionId: data.sectionId,
-      title: data.title,
-      caption: data.caption,
-      category: data.category,
-      audienceType: data.audienceType,
-      attachments: [{ id: 'attachment-1' }],
-      studentTags: [{ studentId: 'student-1' }],
-    }));
+    prisma.activityPost.create.mockImplementation(
+      ({
+        data,
+      }: {
+        data: {
+          classId: string;
+          sectionId: string;
+          title: string;
+          caption: string;
+          category: ActivityCategory;
+          audienceType: AudienceType;
+        };
+      }) =>
+        Promise.resolve({
+          id: 'post-1',
+          classId: data.classId,
+          sectionId: data.sectionId,
+          title: data.title,
+          caption: data.caption,
+          category: data.category,
+          audienceType: data.audienceType,
+          attachments: [{ id: 'attachment-1' }],
+          studentTags: [{ studentId: 'student-1' }],
+        }),
+    );
 
     const result = await service.createPost(
       {
@@ -967,11 +1031,12 @@ describe('ActivityFeedService', () => {
     });
     prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
     prisma.developmentalMilestone.create.mockImplementation(
-      async ({ data }: any) => ({
-        id: 'milestone-1',
-        ...data,
-        createdAt: new Date('2026-04-28T00:00:01.000Z'),
-      }),
+      ({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve({
+          id: 'milestone-1',
+          ...data,
+          createdAt: new Date('2026-04-28T00:00:01.000Z'),
+        }),
     );
 
     const result = await service.createMilestone(

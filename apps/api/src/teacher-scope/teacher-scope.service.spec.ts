@@ -129,7 +129,7 @@ const RAMESH_ASSIGNMENTS: FakeAssignment[] = [
 
 function buildService(
   assignments: FakeAssignment[] = RAMESH_ASSIGNMENTS,
-  delegations: Array<Record<string, unknown>> = [],
+  delegations: Record<string, unknown>[] = [],
 ) {
   const auditRecord = jest.fn().mockResolvedValue(undefined);
 
@@ -140,30 +140,43 @@ function buildService(
     teacherAssignment: {
       // Faithfully reproduce the real query's filtering so the test exercises
       // the service's own matching logic, not a pre-filtered fixture.
-      findMany: jest.fn(({ where }: any) =>
-        Promise.resolve(
-          assignments.filter((row) => {
-            if (where.tenantId !== TENANT) return false;
-            if (where.staffId !== row.staffId) return false;
-            if (
-              where.academicYearId &&
-              where.academicYearId !== row.academicYearId
-            )
-              return false;
-            if (where.classId && where.classId !== row.classId) return false;
-            if (where.sectionId && where.sectionId !== row.sectionId)
-              return false;
-            if (
-              where.assignmentType?.in &&
-              !where.assignmentType.in.includes(row.assignmentType)
-            )
-              return false;
-            const on: Date = where.effectiveFrom?.lte ?? new Date();
-            if (row.effectiveFrom > on) return false;
-            if (row.effectiveUntil && row.effectiveUntil < on) return false;
-            return true;
-          }),
-        ),
+      findMany: jest.fn(
+        ({
+          where,
+        }: {
+          where: {
+            tenantId: string;
+            staffId: string;
+            academicYearId?: string;
+            classId?: string;
+            sectionId?: string;
+            assignmentType?: { in: TeacherAssignmentType[] };
+            effectiveFrom?: { lte: Date };
+          };
+        }) =>
+          Promise.resolve(
+            assignments.filter((row) => {
+              if (where.tenantId !== TENANT) return false;
+              if (where.staffId !== row.staffId) return false;
+              if (
+                where.academicYearId &&
+                where.academicYearId !== row.academicYearId
+              )
+                return false;
+              if (where.classId && where.classId !== row.classId) return false;
+              if (where.sectionId && where.sectionId !== row.sectionId)
+                return false;
+              if (
+                where.assignmentType?.in &&
+                !where.assignmentType.in.includes(row.assignmentType)
+              )
+                return false;
+              const on: Date = where.effectiveFrom?.lte ?? new Date();
+              if (row.effectiveFrom > on) return false;
+              if (row.effectiveUntil && row.effectiveUntil < on) return false;
+              return true;
+            }),
+          ),
       ),
       aggregate: jest.fn().mockResolvedValue({
         _max: { updatedAt: new Date('2026-07-31T10:00:00.000Z') },
@@ -175,11 +188,14 @@ function buildService(
         _max: { updatedAt: new Date('2026-07-31T12:00:00.000Z') },
       }),
     },
-  } as never;
+  };
 
-  const service = new TeacherScopeService(prisma, {
-    record: auditRecord,
-  } as never);
+  const service = new TeacherScopeService(
+    prisma as never,
+    {
+      record: auditRecord,
+    } as never,
+  );
 
   return { service, auditRecord, prisma };
 }
@@ -663,7 +679,7 @@ describe('TeacherScopeService — assignment-based authorization', () => {
         ),
       ).resolves.toMatchObject({ assignmentId: 'a-mth-1a' });
 
-      expect((prisma as any).staff.findFirst).toHaveBeenCalledWith({
+      expect(prisma.staff.findFirst).toHaveBeenCalledWith({
         where: {
           tenantId: TENANT,
           userId: actor.userId,
@@ -675,7 +691,7 @@ describe('TeacherScopeService — assignment-based authorization', () => {
 
     it('fails closed and audits when the actor has no active staff row', async () => {
       const { service, prisma, auditRecord } = buildService();
-      (prisma as any).staff.findFirst.mockResolvedValue(null);
+      prisma.staff.findFirst.mockResolvedValue(null);
 
       await expect(
         service.requireActorAccess(
@@ -1093,7 +1109,7 @@ describe('TeacherScopeService — assignment-based authorization', () => {
 
     it('returns nothing for a caller with no active staff row', async () => {
       const { service, prisma } = buildService();
-      (prisma as any).staff.findFirst.mockResolvedValue(null);
+      prisma.staff.findFirst.mockResolvedValue(null);
       const scope = await service.resolveReadableScope(actor);
       expect(scope.allSectionIds.size).toBe(0);
     });

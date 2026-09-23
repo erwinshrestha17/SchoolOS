@@ -430,6 +430,7 @@ export class DeliveryRetryService {
       ) {
         throw new Error(`No destination resolved for ${delivery.channel}`);
       }
+      const destination = delivery.destination ?? '';
 
       const metadata: Record<string, string> = {
         tenantId: delivery.tenantId,
@@ -443,14 +444,14 @@ export class DeliveryRetryService {
       handoffStarted = true;
       if (delivery.channel === NotificationChannel.EMAIL) {
         await this.notificationsService.sendEmail({
-          to: delivery.destination!,
+          to: destination,
           subject: delivery.title,
           text: delivery.body,
           metadata,
         });
       } else if (delivery.channel === NotificationChannel.SMS) {
         await this.notificationsService.sendSms({
-          to: delivery.destination!,
+          to: destination,
           message: delivery.body,
           metadata,
         });
@@ -464,7 +465,7 @@ export class DeliveryRetryService {
         await this.notificationsService.sendPushNotification({
           title: delivery.title,
           body: delivery.body,
-          audience: delivery.destination!,
+          audience: destination,
           metadata,
         });
       }

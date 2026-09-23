@@ -17,7 +17,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
-import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import {
   AssignSubstitutionDto,
   CancelSubstitutionDto,

@@ -1,15 +1,15 @@
 import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
-import { ImportBankStatementLineDto } from './dto/import-bank-statement.dto';
+import { type ImportBankStatementLineDto } from './dto/import-bank-statement.dto';
 
-export type NormalizedBankStatementImportLine = {
+export interface NormalizedBankStatementImportLine {
   statementDate: Date;
   description: string;
   reference: string | null;
   debitAmount: Prisma.Decimal;
   creditAmount: Prisma.Decimal;
-};
+}
 
 export function bankStatementImportLineKey(
   line: NormalizedBankStatementImportLine,

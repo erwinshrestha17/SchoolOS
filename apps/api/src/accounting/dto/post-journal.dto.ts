@@ -1,1 +1,3 @@
-export class PostJournalDto {}
+export class PostJournalDto {
+  [key: string]: never;
+}

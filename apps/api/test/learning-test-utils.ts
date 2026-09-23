@@ -33,9 +33,22 @@ import {
 export function createLearningHarness() {
   const prisma = createPrismaMock();
   const auditService = { record: jest.fn(() => Promise.resolve()) };
-  const permissions = new LearningActivityPermissionsService(prisma as any);
-  const access = new LearningSessionAccessService(prisma as any);
-  const progress = new LearningProgressService(prisma as any, permissions);
+  const permissions = new LearningActivityPermissionsService(
+    prisma as unknown as ConstructorParameters<
+      typeof LearningActivityPermissionsService
+    >[0],
+  );
+  const access = new LearningSessionAccessService(
+    prisma as unknown as ConstructorParameters<
+      typeof LearningSessionAccessService
+    >[0],
+  );
+  const progress = new LearningProgressService(
+    prisma as unknown as ConstructorParameters<
+      typeof LearningProgressService
+    >[0],
+    permissions,
+  );
   const evaluator = new LearningAnswerEvaluatorService();
 
   return {
@@ -44,32 +57,52 @@ export function createLearningHarness() {
     permissions,
     access,
     activities: new LearningActivitiesService(
-      prisma as any,
+      prisma as unknown as ConstructorParameters<
+        typeof LearningActivitiesService
+      >[0],
       permissions,
-      auditService as any,
+      auditService as unknown as ConstructorParameters<
+        typeof LearningActivitiesService
+      >[2],
     ),
     sessions: new LearningSessionsService(
-      prisma as any,
+      prisma as unknown as ConstructorParameters<
+        typeof LearningSessionsService
+      >[0],
       permissions,
       access,
-      auditService as any,
+      auditService as unknown as ConstructorParameters<
+        typeof LearningSessionsService
+      >[3],
     ),
     resources: new LearningResourcesService(
-      prisma as any,
+      prisma as unknown as ConstructorParameters<
+        typeof LearningResourcesService
+      >[0],
       permissions,
-      auditService as any,
+      auditService as unknown as ConstructorParameters<
+        typeof LearningResourcesService
+      >[2],
     ),
     attempts: new LearningAttemptsService(
-      prisma as any,
+      prisma as unknown as ConstructorParameters<
+        typeof LearningAttemptsService
+      >[0],
       access,
       evaluator,
       progress,
-      auditService as any,
+      auditService as unknown as ConstructorParameters<
+        typeof LearningAttemptsService
+      >[4],
     ),
     progress,
     parentSummary: new ParentLearningSummaryService(
-      prisma as any,
-      auditService as any,
+      prisma as unknown as ConstructorParameters<
+        typeof ParentLearningSummaryService
+      >[0],
+      auditService as unknown as ConstructorParameters<
+        typeof ParentLearningSummaryService
+      >[1],
     ),
   };
 }

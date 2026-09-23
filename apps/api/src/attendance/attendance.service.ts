@@ -53,14 +53,16 @@ import {
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { CorrectStaffAttendanceDto } from './dto/correct-staff-attendance.dto';
-import { ReviewAttendanceConflictDto } from './dto/review-attendance-conflict.dto';
+import {
+  AttendanceConflictReviewDecision,
+  ReviewAttendanceConflictDto,
+} from './dto/review-attendance-conflict.dto';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
 import {
   CreateStudentLeaveRequestDto,
   mapStudentLeaveTypeToAttendanceStatus,
   ReviewStudentLeaveRequestDto,
 } from './dto/create-student-leave-request.dto';
-import { AttendanceConflictReviewDecision } from './dto/review-attendance-conflict.dto';
 import { ListAttendanceSummaryDto } from './dto/list-attendance-summary.dto';
 import {
   AttendanceOverrideSource,
@@ -78,8 +80,6 @@ import { SyncAttendanceDto } from './dto/sync-attendance.dto';
 import { UpsertCalendarDayDto } from './dto/upsert-calendar-day.dto';
 import {
   buildStudentScopeFilter,
-  getParentStudentIds,
-  getStudentOwnId,
   isParentOnly,
   requireGuardianCapability,
 } from '../common/security/parent-scope';
@@ -1430,8 +1430,7 @@ export class AttendanceService {
 
     const existingPayload = asJsonRecord(existingSync.payload) ?? {};
     if (
-      officialSession &&
-      officialSession.submittedById === actor.userId &&
+      officialSession?.submittedById === actor.userId &&
       officialSession.sourceClientSubmissionId === dto.clientSubmissionId &&
       isMatchingOfficialAttendanceSession(officialSession.records, dto)
     ) {
@@ -1738,7 +1737,12 @@ export class AttendanceService {
     }
 
     const changedRows = dto.exceptions.map((exception) => {
-      const original = recordByStudent.get(exception.studentId)!;
+      const original = recordByStudent.get(exception.studentId);
+      if (!original) {
+        throw new NotFoundException(
+          `Student ${exception.studentId} is not part of this attendance session`,
+        );
+      }
 
       return {
         studentId: exception.studentId,
@@ -2746,7 +2750,7 @@ export class AttendanceService {
       request.metadata &&
       typeof request.metadata === 'object' &&
       !Array.isArray(request.metadata)
-        ? (request.metadata as Prisma.JsonObject)
+        ? request.metadata
         : {};
     const updated = await this.prisma.attendanceCorrectionRequest.update({
       where: { id: request.id },
@@ -6234,10 +6238,9 @@ export class AttendanceService {
     const studentInfoMap = new Map<string, { id: string; name: string }>();
     activeEnrollments.forEach((e) => {
       const key = `${e.classId}:${e.sectionId ?? 'none'}`;
-      if (!expectedRosterMap.has(key)) {
-        expectedRosterMap.set(key, []);
-      }
-      expectedRosterMap.get(key)!.push(e.studentId);
+      const entries = expectedRosterMap.get(key) ?? [];
+      entries.push(e.studentId);
+      expectedRosterMap.set(key, entries);
       studentInfoMap.set(e.studentId, {
         id: e.student.id,
         name: `${e.student.firstNameEn} ${e.student.lastNameEn}`,
@@ -6293,10 +6296,9 @@ export class AttendanceService {
       Array<{ date: Date; status: AttendanceStatus }>
     >();
     allRecentRecords.forEach((r) => {
-      if (!studentRecords.has(r.studentId)) {
-        studentRecords.set(r.studentId, []);
-      }
-      studentRecords.get(r.studentId)!.push({
+      const records = studentRecords.get(r.studentId) ?? [];
+      studentRecords.set(r.studentId, records);
+      records.push({
         date: r.attendanceSession.attendanceDate,
         status: r.status,
       });
@@ -6392,10 +6394,9 @@ export class AttendanceService {
     const sessionsByClassSection = new Map<string, typeof sessions>();
     sessions.forEach((s) => {
       const key = `${s.classId}:${s.sectionId ?? 'none'}`;
-      if (!sessionsByClassSection.has(key)) {
-        sessionsByClassSection.set(key, []);
-      }
-      sessionsByClassSection.get(key)!.push(s);
+      const entries = sessionsByClassSection.get(key) ?? [];
+      entries.push(s);
+      sessionsByClassSection.set(key, entries);
     });
 
     sessions.forEach((session) => {
@@ -6813,7 +6814,7 @@ function uniqueValues<T>(values: T[]): T[] {
   return [...new Set(values)];
 }
 
-type StudentAttendanceSessionRow = {
+interface StudentAttendanceSessionRow {
   attendanceDate: Date;
   submittedAt: Date | null;
   updatedAt: Date;
@@ -6822,14 +6823,14 @@ type StudentAttendanceSessionRow = {
     remark: string | null;
     lateAt: Date | null;
   }>;
-};
+}
 
-type AttendanceCalendarDayMapValue = {
+interface AttendanceCalendarDayMapValue {
   isWorkingDay: boolean;
   label: string | null;
   holidayType?: string | null;
   source?: 'explicit' | 'weekday_fallback';
-};
+}
 
 function getStudentAttendanceDayType(
   calendarDay: AttendanceCalendarDayMapValue | undefined,
@@ -7571,10 +7572,6 @@ function getNepalBusinessDateRange(date: Date) {
   };
 }
 
-function isWeekdayWorkingDay(date: Date) {
-  return getNepalWeekday(date) !== 6;
-}
-
 function isWorkingDayFallback(
   date: Date,
   weekendPolicy: string | null,
@@ -7692,13 +7689,15 @@ function classifyAttendanceSyncRejection(error: unknown) {
   }
 
   if (error instanceof ForbiddenException) {
-    const message = String(error.message ?? '');
+    const message = error.message ?? '';
     const exceptionResponse = error.getResponse();
     const code =
       typeof exceptionResponse === 'object' &&
       exceptionResponse !== null &&
       'code' in exceptionResponse
-        ? String((exceptionResponse as { code?: unknown }).code ?? '')
+        ? typeof exceptionResponse.code === 'string'
+          ? exceptionResponse.code
+          : ''
         : '';
 
     if (code === ATTENDANCE_SCOPE_REVOKED_CODE) {
@@ -7727,7 +7726,9 @@ function classifyAttendanceSyncRejection(error: unknown) {
       typeof exceptionResponse === 'object' &&
       exceptionResponse !== null &&
       'code' in exceptionResponse
-        ? String((exceptionResponse as { code?: unknown }).code ?? '')
+        ? typeof exceptionResponse.code === 'string'
+          ? exceptionResponse.code
+          : ''
         : '';
     if (code === AUTHORITY_FENCED_CODE) {
       return AttendanceSyncRejectionReason.AUTHORITY_FENCED;
@@ -7735,7 +7736,7 @@ function classifyAttendanceSyncRejection(error: unknown) {
     if (code === ATTENDANCE_ROSTER_CHANGED_CODE) {
       return AttendanceSyncRejectionReason.ROSTER_MISMATCH;
     }
-    const message = String(error.message ?? '');
+    const message = error.message ?? '';
     if (
       message.includes('already submitted') ||
       message.includes('request a correction')

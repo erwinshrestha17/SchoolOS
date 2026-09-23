@@ -10,7 +10,20 @@ const D = (value: string | number) => new Prisma.Decimal(value);
 
 describe('AccountingReportsService', () => {
   let service: AccountingReportsService;
-  let prisma: any;
+  let prisma: {
+    fiscalYear: { findUnique: jest.Mock };
+    fiscalPeriod: { findUnique: jest.Mock };
+    chartAccount: { findMany: jest.Mock; findFirst: jest.Mock };
+    journalLine: { groupBy: jest.Mock; count: jest.Mock; findMany: jest.Mock };
+    accountingReportAccountMapping: {
+      findMany: jest.Mock;
+      createMany: jest.Mock;
+      deleteMany: jest.Mock;
+    };
+    fiscalBudget: { findFirst: jest.Mock };
+    journalEntry: { findMany: jest.Mock };
+    $transaction: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -157,7 +170,9 @@ describe('AccountingReportsService', () => {
     it('rejects if no account is provided', async () => {
       prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
       await expect(
-        service.getGeneralLedger('tenant1', { fiscalYearId: 'fy1' } as any),
+        service.getGeneralLedger('tenant1', {
+          fiscalYearId: 'fy1',
+        } as unknown as Parameters<typeof service.getGeneralLedger>[1]),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -366,7 +381,7 @@ describe('AccountingReportsService', () => {
 
       const result = await service.getTaxSummary('tenant1', {
         fiscalYearId: 'fy1',
-      } as any);
+      } as unknown as Parameters<typeof service.getTaxSummary>[1]);
       expect(result.vat?.outputVat.toString()).toBe('100');
       expect(result.vat?.inputVat.toString()).toBe('60');
       expect(result.vat?.netVat.toString()).toBe('40');
@@ -381,7 +396,7 @@ describe('AccountingReportsService', () => {
 
       const result = await service.getCashFlowStatement('tenant1', {
         fiscalYearId: 'fy1',
-      } as any);
+      } as unknown as Parameters<typeof service.getCashFlowStatement>[1]);
 
       expect(result.openingCash.toString()).toBe('0');
       expect(result.sections).toHaveLength(3);
@@ -397,7 +412,7 @@ describe('AccountingReportsService', () => {
       await expect(
         service.getBudgetVsActual('tenant1', {
           fiscalYearId: 'fy1',
-        } as any),
+        } as unknown as Parameters<typeof service.getBudgetVsActual>[1]),
       ).rejects.toThrow('No approved fiscal budget found');
     });
   });

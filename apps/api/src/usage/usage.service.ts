@@ -127,12 +127,13 @@ export class UsageService {
         return this.prisma.staff.count({
           where: { tenantId, status: 'ACTIVE' },
         });
-      case 'storage.bytes':
+      case 'storage.bytes': {
         const storage = await this.prisma.fileAsset.aggregate({
           where: { tenantId, softDeletedAt: null },
           _sum: { sizeBytes: true },
         });
         return Number(storage._sum.sizeBytes || 0);
+      }
       default: {
         // Periodic counters: persisted value plus any delta still buffered in
         // Redis, so limit checks stay accurate between flushes.

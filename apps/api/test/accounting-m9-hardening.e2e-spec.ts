@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   AccountingPeriodStatus,
@@ -11,7 +11,6 @@ import {
 import { AccountingService } from '../src/accounting/accounting.service';
 import { AccountingPostingService } from '../src/accounting/accounting-posting.service';
 import { AppModule } from '../src/app.module';
-import { AuthContext } from '../src/auth/auth.types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
 import {
@@ -68,16 +67,16 @@ describe('Accounting M9 Hardening (E2E)', () => {
     );
 
     // Mock successful period check by default
-    jest
-      .spyOn(postingService as any, 'ensurePostingPeriodIsOpen')
-      .mockResolvedValue({
-        id: 'period-open',
-        tenantId,
-        fiscalYearId: 'fy-2026',
-        label: 'May 2026',
-        status: AccountingPeriodStatus.OPEN,
-        fiscalYear: { status: 'OPEN', name: 'FY 2026' },
-      });
+    jest.spyOn(postingService, 'ensurePostingPeriodIsOpen').mockResolvedValue({
+      id: 'period-open',
+      tenantId,
+      fiscalYearId: 'fy-2026',
+      label: 'May 2026',
+      status: AccountingPeriodStatus.OPEN,
+      fiscalYear: { status: 'OPEN', name: 'FY 2026' },
+    } as unknown as Awaited<
+      ReturnType<AccountingPostingService['ensurePostingPeriodIsOpen']>
+    >);
   });
 
   afterEach(async () => {
@@ -235,12 +234,17 @@ describe('Accounting M9 Hardening (E2E)', () => {
     it('should reject posting to a LOCKED period for regular users', async () => {
       // Mock period as LOCKED
       jest
-        .spyOn(postingService as any, 'ensurePostingPeriodIsOpen')
-        .mockImplementation(async (tx, tid, date, allowLocked) => {
-          if (!allowLocked) {
+        .spyOn(postingService, 'ensurePostingPeriodIsOpen')
+        .mockImplementation((...args) => {
+          if (!args[3]) {
             throw new ConflictException('Fiscal period is locked for posting.');
           }
-          return { id: 'period-locked', status: AccountingPeriodStatus.LOCKED };
+          return Promise.resolve({
+            id: 'period-locked',
+            status: AccountingPeriodStatus.LOCKED,
+          } as unknown as Awaited<
+            ReturnType<AccountingPostingService['ensurePostingPeriodIsOpen']>
+          >);
         });
 
       await expect(

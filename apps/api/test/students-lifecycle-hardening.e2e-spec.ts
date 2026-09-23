@@ -1,10 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  INestApplication,
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { INestApplication, BadRequestException } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StudentsService } from '../src/students/students.service';
@@ -311,7 +306,8 @@ describe('Student Lifecycle Hardening (E2E)', () => {
     );
     expect(qrCode).toContain(`schoolos:std:${tenantId}`);
 
-    const verified = await studentsService.verifyStudentQrCode(qrCode!, actor);
+    if (!qrCode) throw new Error('Student QR fixture was not created');
+    const verified = await studentsService.verifyStudentQrCode(qrCode, actor);
     expect(verified.id).toBe(student.id);
     expect(verified.studentSystemId).toBe(student.studentSystemId);
   });
@@ -519,9 +515,14 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       (t) => t.reason === 'Class placement updated',
     );
     expect(classChange).toBeDefined();
-    expect((classChange?.metadata as any).classChange).toBe(true);
-    expect((classChange?.metadata as any).fromClassId).toBe(classId);
-    expect((classChange?.metadata as any).toClassId).toBe(otherClass.id);
+    const metadata = classChange?.metadata;
+    if (!metadata || typeof metadata !== 'object') {
+      throw new Error('Class change metadata fixture is missing');
+    }
+    const classChangeMetadata = metadata as Record<string, unknown>;
+    expect(classChangeMetadata.classChange).toBe(true);
+    expect(classChangeMetadata.fromClassId).toBe(classId);
+    expect(classChangeMetadata.toClassId).toBe(otherClass.id);
   });
 
   it('should retrieve student iEMIS readiness diagnostics score and details', async () => {

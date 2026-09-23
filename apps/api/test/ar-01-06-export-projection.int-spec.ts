@@ -43,7 +43,7 @@ class FakeCls {
   }
 }
 
-const SUFFIX = `ar0106-int-${Date.now()}`;
+const SUFFIX = `ar0106-int-${String(Date.now())}`;
 
 describe('AR-01 / AR-06 export projection parity (real database)', () => {
   const cls = new FakeCls();
@@ -128,8 +128,8 @@ describe('AR-01 / AR-06 export projection parity (real database)', () => {
           studentId,
           academicYearId,
           invoiceNumber,
-          dueDate: new Date(`2026-07-${10 + index}T00:00:00.000Z`),
-          issuedAt: new Date(`2026-07-${10 + index}T00:00:00.000Z`),
+          dueDate: new Date(`2026-07-${String(10 + index)}T00:00:00.000Z`),
+          issuedAt: new Date(`2026-07-${String(10 + index)}T00:00:00.000Z`),
           status: InvoiceStatus.PARTIAL,
           subtotal: new Prisma.Decimal('5000.00'),
           vatAmount: new Prisma.Decimal(0),
@@ -156,7 +156,7 @@ describe('AR-01 / AR-06 export projection parity (real database)', () => {
           method: PaymentMethod.CASH,
           status: PaymentStatus.SUCCESS,
           amount: new Prisma.Decimal('2000.00'),
-          paidAt: new Date(`2026-07-${12 + index}T00:00:00.000Z`),
+          paidAt: new Date(`2026-07-${String(12 + index)}T00:00:00.000Z`),
         },
       });
       await prisma.paymentAllocation.create({
@@ -166,7 +166,7 @@ describe('AR-01 / AR-06 export projection parity (real database)', () => {
           invoiceId: invoice.id,
           amount: new Prisma.Decimal('2000.00'),
           allocationType: PaymentAllocationType.INVOICE,
-          allocatedAt: new Date(`2026-07-${12 + index}T00:00:00.000Z`),
+          allocatedAt: new Date(`2026-07-${String(12 + index)}T00:00:00.000Z`),
         },
       });
     }
@@ -210,7 +210,9 @@ describe('AR-01 / AR-06 export projection parity (real database)', () => {
     await prisma.$disconnect();
   });
 
-  beforeEach(() => cls.setTenant(tenantId));
+  beforeEach(() => {
+    cls.setTenant(tenantId);
+  });
 
   it('AR-01 export drain matches every paged screen row and summary totals', async () => {
     const filters = { studentId };

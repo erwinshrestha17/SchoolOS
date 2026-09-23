@@ -11,6 +11,19 @@ import { ClsService } from 'nestjs-cls';
 const mockConnect = jest.fn().mockResolvedValue(undefined);
 const mockDisconnect = jest.fn().mockResolvedValue(undefined);
 
+function queryProbe(value: unknown): { success: boolean; args: unknown } {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('success' in value) ||
+    typeof value.success !== 'boolean' ||
+    !('args' in value)
+  ) {
+    throw new Error('Prisma query interceptor did not return its probe result');
+  }
+  return { success: value.success, args: value.args };
+}
+
 // Mock the PrismaClient from @prisma/client
 jest.mock('@prisma/client', () => {
   class MockPrismaClient {
@@ -90,9 +103,11 @@ describe('PrismaService', () => {
       );
 
     // 2. Call findMany on the proxy delegate
-    const result = (await service.student.findMany({
-      where: { firstNameEn: 'Student' },
-    })) as any;
+    const result = queryProbe(
+      await service.student.findMany({
+        where: { firstNameEn: 'Student' },
+      }),
+    );
 
     // 3. Verify that the query was intercepted and tenantId was injected
     expect(result).toBeDefined();
@@ -118,9 +133,11 @@ describe('PrismaService', () => {
   it('should still delegate excluded global models without a tenant context', async () => {
     jest.spyOn(clsService, 'get').mockReturnValue(undefined);
 
-    const result = (await service.tenant.findMany({
-      where: { slug: 'green-valley' },
-    })) as any;
+    const result = queryProbe(
+      await service.tenant.findMany({
+        where: { slug: 'green-valley' },
+      }),
+    );
 
     expect(result.success).toBe(true);
     expect(result.args).toEqual({ where: { slug: 'green-valley' } });
@@ -138,9 +155,11 @@ describe('PrismaService', () => {
       });
     jest.spyOn(clsService, 'isActive').mockReturnValue(true);
 
-    const result = (await service.runWithoutTenantScope('spec sweep', () =>
-      service.student.findMany({ where: { firstNameEn: 'Student' } }),
-    )) as any;
+    const result = queryProbe(
+      await service.runWithoutTenantScope('spec sweep', () =>
+        service.student.findMany({ where: { firstNameEn: 'Student' } }),
+      ),
+    );
 
     expect(result.success).toBe(true);
     expect(result.args).toEqual({ where: { firstNameEn: 'Student' } });
@@ -165,13 +184,15 @@ describe('PrismaService', () => {
       });
     jest.spyOn(clsService, 'isActive').mockReturnValue(true);
 
-    const result = (await service.runWithoutTenantScope(
-      'support override target lookup',
-      () =>
-        service.student.findMany({
-          where: { tenantId: 'school-tenant', firstNameEn: 'Student' },
-        }),
-    )) as any;
+    const result = queryProbe(
+      await service.runWithoutTenantScope(
+        'support override target lookup',
+        () =>
+          service.student.findMany({
+            where: { tenantId: 'school-tenant', firstNameEn: 'Student' },
+          }),
+      ),
+    );
 
     expect(result.success).toBe(true);
     expect(result.args).toEqual({
@@ -179,9 +200,11 @@ describe('PrismaService', () => {
     });
     expect(store.get(TENANT_ID_KEY)).toBe('platform-tenant');
 
-    const scopedResult = (await service.student.findMany({
-      where: { firstNameEn: 'Student' },
-    })) as any;
+    const scopedResult = queryProbe(
+      await service.student.findMany({
+        where: { firstNameEn: 'Student' },
+      }),
+    );
     expect(scopedResult.args).toEqual({
       where: { firstNameEn: 'Student', tenantId: 'platform-tenant' },
     });
@@ -265,15 +288,17 @@ describe('applyTenantScopeToArgs', () => {
 
 describe('assertRawTenantScope', () => {
   it('fails closed when raw SQL has neither tenant context nor an explicit bypass', () => {
-    expect(() => assertRawTenantScope('$queryRaw')).toThrow(
-      MissingTenantScopeError,
-    );
+    expect(() => {
+      assertRawTenantScope('$queryRaw');
+    }).toThrow(MissingTenantScopeError);
   });
 
   it('allows tenant-scoped and explicitly reviewed cross-tenant raw SQL', () => {
-    expect(() => assertRawTenantScope('$queryRaw', 'tenant-a')).not.toThrow();
-    expect(() =>
-      assertRawTenantScope('$executeRaw', undefined, true),
-    ).not.toThrow();
+    expect(() => {
+      assertRawTenantScope('$queryRaw', 'tenant-a');
+    }).not.toThrow();
+    expect(() => {
+      assertRawTenantScope('$executeRaw', undefined, true);
+    }).not.toThrow();
   });
 });

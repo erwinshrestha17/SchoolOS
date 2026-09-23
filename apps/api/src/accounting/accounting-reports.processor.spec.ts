@@ -28,10 +28,18 @@ describe('AccountingReportsProcessor', () => {
       shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
     };
     processor = new AccountingReportsProcessor(
-      prisma as any,
-      exportsService as any,
-      plansService as any,
-      createProcessorClsMock() as any,
+      prisma as unknown as ConstructorParameters<
+        typeof AccountingReportsProcessor
+      >[0],
+      exportsService as unknown as ConstructorParameters<
+        typeof AccountingReportsProcessor
+      >[1],
+      plansService as unknown as ConstructorParameters<
+        typeof AccountingReportsProcessor
+      >[2],
+      createProcessorClsMock() as unknown as ConstructorParameters<
+        typeof AccountingReportsProcessor
+      >[3],
     );
   });
 
@@ -39,7 +47,7 @@ describe('AccountingReportsProcessor', () => {
     await processor.process({
       name: 'generateAccountingReport',
       data: jobData,
-    } as any);
+    } as unknown as Parameters<typeof processor.process>[0]);
 
     expect(prisma.reportExport.update).toHaveBeenCalledWith({
       where: { id: 'export-1' },
@@ -56,7 +64,7 @@ describe('AccountingReportsProcessor', () => {
     await processor.process({
       name: 'generateAccountingReport',
       data: jobData,
-    } as any);
+    } as unknown as Parameters<typeof processor.process>[0]);
 
     expect(exportsService.completeQueuedReportExport).not.toHaveBeenCalled();
     expect(prisma.reportExport.update).toHaveBeenCalledWith({
@@ -77,7 +85,7 @@ describe('AccountingReportsProcessor', () => {
     await processor.process({
       name: 'generateAccountingReport',
       data: jobData,
-    } as any);
+    } as unknown as Parameters<typeof processor.process>[0]);
 
     expect(prisma.reportExport.update).toHaveBeenLastCalledWith({
       where: { id: 'export-1' },

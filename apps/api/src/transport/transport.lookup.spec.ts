@@ -5,7 +5,7 @@ describe('Transport lookup boundaries', () => {
   const tenantId = 'tenant-1';
 
   function createService() {
-    const prisma: any = {
+    const prisma = {
       staff: {
         findMany: jest.fn(),
         count: jest.fn(),
@@ -19,10 +19,10 @@ describe('Transport lookup boundaries', () => {
     };
 
     const service = new TransportService(
-      prisma,
-      {} as any,
-      {} as any,
-      {} as any,
+      prisma as unknown as ConstructorParameters<typeof TransportService>[0],
+      {} as unknown as ConstructorParameters<typeof TransportService>[1],
+      {} as unknown as ConstructorParameters<typeof TransportService>[2],
+      {} as unknown as ConstructorParameters<typeof TransportService>[3],
     );
 
     return { prisma, service };
@@ -50,7 +50,7 @@ describe('Transport lookup boundaries', () => {
         tenantId,
         roles: ['admin'],
         permissions: ['transport:assignments:create'],
-      } as any,
+      } as unknown as Parameters<typeof service.listActiveStaffOptions>[1],
     );
 
     expect(prisma.staff.findMany).toHaveBeenCalledWith(
@@ -105,7 +105,7 @@ describe('Transport lookup boundaries', () => {
       tenantId,
       roles: ['admin'],
       permissions: ['transport:manage', 'transport:operate'],
-    } as any);
+    } as unknown as Parameters<typeof service.listDriverOwnAssignments>[0]);
 
     expect(prisma.transportDriverAssignment.findMany).toHaveBeenCalledWith({
       where: {

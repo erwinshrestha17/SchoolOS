@@ -119,8 +119,8 @@ function buildLine(overrides: Record<string, unknown> = {}) {
 
 function buildPrismaMock(
   options: {
-    lines?: Array<Record<string, unknown>>;
-    existingExceptions?: Array<Record<string, unknown>>;
+    lines?: Record<string, unknown>[];
+    existingExceptions?: Record<string, unknown>[];
   } = {},
 ) {
   const tx = {
@@ -167,7 +167,10 @@ function buildPrismaMock(
     payrollException: {
       findMany: jest.fn().mockResolvedValue(options.existingExceptions ?? []),
       groupBy: jest.fn().mockImplementation(async () => {
-        const creates = (tx.payrollException.create as jest.Mock).mock.calls;
+        const creates = (tx.payrollException.create as jest.Mock).mock
+          .calls as [
+          { data: { severity: string; status?: string; code: string } },
+        ][];
         const counts = new Map<string, number>();
         for (const [{ data }] of creates) {
           const key = `${data.severity}:${data.status ?? 'OPEN'}:${data.code}`;

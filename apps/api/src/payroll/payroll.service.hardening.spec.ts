@@ -1370,7 +1370,7 @@ function buildService(options: {
         return Promise.all(input);
       }
 
-      return (input as any)(tx);
+      return (input as (client: typeof tx) => unknown)(tx);
     }),
   };
 

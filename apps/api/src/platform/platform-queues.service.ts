@@ -231,7 +231,7 @@ export class PlatformQueuesService {
         const groupKey = [queueName, jobName, diagnostic.category].join(
           '\u0000',
         );
-        const timestamp = Number(job.timestamp ?? 0) || undefined;
+        const timestamp = (job.timestamp ?? 0) || undefined;
         const existing = groups.get(groupKey);
 
         if (!existing) {
@@ -247,7 +247,7 @@ export class PlatformQueuesService {
             count: 1,
             firstFailedAt: timestamp,
             latestFailedAt: timestamp,
-            maxAttemptsMade: Number(job.attemptsMade ?? 0),
+            maxAttemptsMade: job.attemptsMade ?? 0,
             sampleJobIds: [String(job.id)],
             affectedTenantCount: 0,
             diagnostic,
@@ -259,7 +259,7 @@ export class PlatformQueuesService {
         existing.count += 1;
         existing.maxAttemptsMade = Math.max(
           existing.maxAttemptsMade,
-          Number(job.attemptsMade ?? 0),
+          job.attemptsMade ?? 0,
         );
         if (timestamp) {
           existing.firstFailedAt =
@@ -422,7 +422,7 @@ export class PlatformQueuesService {
   }
 
   private count(counts: QueueCounts, key: keyof QueueCounts) {
-    return Number(counts[key] ?? 0);
+    return counts[key] ?? 0;
   }
 
   private async getWorkersSafely(queue: Queue) {

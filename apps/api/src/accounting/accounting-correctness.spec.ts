@@ -1,17 +1,29 @@
 import { ConflictException } from '@nestjs/common';
 import {
   AccountingPeriodStatus,
-  ChartAccountType,
   JournalLineSide,
-  JournalSourceType,
   Prisma,
 } from '@prisma/client';
 import { AccountingPostingService } from './accounting-posting.service';
 
 describe('Accounting Correctness Hardening', () => {
   let service: AccountingPostingService;
-  let mockPrisma: any;
-  let mockAudit: any;
+  let mockPrisma: {
+    $queryRaw: jest.Mock;
+    fiscalPeriod: { findFirst: jest.Mock };
+    accountingPeriod: { findFirst: jest.Mock };
+    journalEntry: {
+      count: jest.Mock;
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
+    chartAccount: { findUniqueOrThrow: jest.Mock; upsert: jest.Mock };
+  };
+  let mockAudit: { record: jest.Mock };
+
+  const mockTransaction = () =>
+    mockPrisma as unknown as Prisma.TransactionClient;
 
   beforeEach(() => {
     mockPrisma = {
@@ -51,10 +63,20 @@ describe('Accounting Correctness Hardening', () => {
       record: jest.fn().mockResolvedValue({}),
     };
 
-    service = new AccountingPostingService(mockPrisma as any, mockAudit as any);
+    service = new AccountingPostingService(
+      mockPrisma as unknown as ConstructorParameters<
+        typeof AccountingPostingService
+      >[0],
+      mockAudit as unknown as ConstructorParameters<
+        typeof AccountingPostingService
+      >[1],
+    );
   });
 
-  const authContext = { userId: 'user-1', tenantId: 'tenant-1' } as any;
+  const authContext = {
+    userId: 'user-1',
+    tenantId: 'tenant-1',
+  } as unknown as import('../auth/auth.types').AuthContext;
 
   describe('Double-Entry Balance Enforcement', () => {
     it('should reject an unbalanced manual journal', async () => {
@@ -75,7 +97,11 @@ describe('Accounting Correctness Hardening', () => {
       };
 
       await expect(
-        service.postManualJournal(unbalancedInput, authContext, mockPrisma),
+        service.postManualJournal(
+          unbalancedInput,
+          authContext,
+          mockTransaction(),
+        ),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -105,7 +131,11 @@ describe('Accounting Correctness Hardening', () => {
       // Actually, postManualJournal ALWAYS creates lines.
 
       await expect(
-        service.postManualJournal(singleLineInput, authContext, mockPrisma),
+        service.postManualJournal(
+          singleLineInput,
+          authContext,
+          mockTransaction(),
+        ),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -127,7 +157,7 @@ describe('Accounting Correctness Hardening', () => {
       };
 
       await expect(
-        service.postManualJournal(zeroInput, authContext, mockPrisma),
+        service.postManualJournal(zeroInput, authContext, mockTransaction()),
       ).rejects.toThrow(/must have either a debit or a credit amount/);
     });
 
@@ -149,7 +179,11 @@ describe('Accounting Correctness Hardening', () => {
       };
 
       await expect(
-        service.postManualJournal(negativeInput, authContext, mockPrisma),
+        service.postManualJournal(
+          negativeInput,
+          authContext,
+          mockTransaction(),
+        ),
       ).rejects.toThrow(/Negative debit or credit values/);
     });
 
@@ -172,7 +206,7 @@ describe('Accounting Correctness Hardening', () => {
 
       // Even if balanced (100+100=200 on both sides), each line is invalid
       await expect(
-        service.postManualJournal(bothInput, authContext, mockPrisma),
+        service.postManualJournal(bothInput, authContext, mockTransaction()),
       ).rejects.toThrow(/cannot have both debit and credit/);
     });
 
@@ -204,7 +238,7 @@ describe('Accounting Correctness Hardening', () => {
       const result = await service.postManualJournal(
         balancedInput,
         authContext,
-        mockPrisma,
+        mockTransaction(),
       );
       expect(result).toBeDefined();
     });
@@ -230,7 +264,7 @@ describe('Accounting Correctness Hardening', () => {
       };
 
       await expect(
-        service.postManualJournal(input, authContext, mockPrisma),
+        service.postManualJournal(input, authContext, mockTransaction()),
       ).rejects.toThrow(/closed fiscal period/);
     });
 
@@ -253,7 +287,7 @@ describe('Accounting Correctness Hardening', () => {
       };
 
       await expect(
-        service.postManualJournal(input, authContext, mockPrisma),
+        service.postManualJournal(input, authContext, mockTransaction()),
       ).rejects.toThrow(/locked for posting/);
     });
 
@@ -276,7 +310,7 @@ describe('Accounting Correctness Hardening', () => {
       };
 
       await expect(
-        service.postManualJournal(input, authContext, mockPrisma),
+        service.postManualJournal(input, authContext, mockTransaction()),
       ).rejects.toThrow(/closed fiscal year/);
     });
   });
@@ -310,7 +344,7 @@ describe('Accounting Correctness Hardening', () => {
       const result = await service.postFeePayment(
         input,
         authContext,
-        mockPrisma,
+        mockTransaction(),
       );
 
       expect(result.id).toBe('existing-je');
@@ -352,7 +386,7 @@ describe('Accounting Correctness Hardening', () => {
       const result = await service.postReversal(
         reversalInput,
         authContext,
-        mockPrisma,
+        mockTransaction(),
       );
 
       expect(result).toBeDefined();
@@ -425,7 +459,7 @@ describe('Accounting Correctness Hardening', () => {
       const result = await service.postCorrection(
         correctionInput,
         authContext,
-        mockPrisma,
+        mockTransaction(),
       );
 
       expect(result.reversal).toBeDefined();
@@ -454,7 +488,7 @@ describe('Accounting Correctness Hardening', () => {
       };
 
       await expect(
-        service.postReversal(reversalInput, authContext, mockPrisma),
+        service.postReversal(reversalInput, authContext, mockTransaction()),
       ).rejects.toThrow(/closed fiscal period/);
     });
   });

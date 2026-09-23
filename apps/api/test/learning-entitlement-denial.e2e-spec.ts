@@ -1,5 +1,6 @@
 import { ForbiddenException, ExecutionContext } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
+import { AuthMethod } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { EntitlementGuard } from '../src/auth/guards/entitlement.guard';
@@ -101,7 +102,7 @@ describe('Learning entitlement denial (E2E)', () => {
       email: 'admin@school.com',
       roles: ['admin'],
       permissions: ['learning:read'],
-      authMethod: 'PASSWORD' as any,
+      authMethod: AuthMethod.PASSWORD,
     };
 
     await expect(
@@ -154,7 +155,7 @@ describe('Learning entitlement denial (E2E)', () => {
       email: 'admin@school.com',
       roles: ['admin'],
       permissions: ['learning:read'],
-      authMethod: 'PASSWORD' as any,
+      authMethod: AuthMethod.PASSWORD,
     };
 
     await expect(

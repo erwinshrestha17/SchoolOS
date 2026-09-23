@@ -329,7 +329,8 @@ export class TimetableSubstitutionService {
         date,
         actor,
       );
-      if (!slot.sectionId) {
+      const sectionId = slot.sectionId;
+      if (!sectionId) {
         throw new ConflictException(
           'Substitutions require a section-scoped timetable slot',
         );
@@ -494,7 +495,8 @@ export class TimetableSubstitutionService {
     );
 
     const slot = substitution.timetableSlot;
-    if (!slot.sectionId) {
+    const sectionId = slot.sectionId;
+    if (!sectionId) {
       throw new ConflictException(
         'Substitutions require a section-scoped timetable slot',
       );
@@ -520,7 +522,7 @@ export class TimetableSubstitutionService {
         grantorStaffId: substitution.absentTeacherId,
         recipientStaffId: dto.substituteTeacherId,
         classId: slot.classId,
-        sectionId: slot.sectionId as string,
+        sectionId,
         subjectId: slot.subjectId,
         substitutionId: id,
         reason: substitution.reason,
@@ -980,6 +982,7 @@ export class TimetableSubstitutionService {
         'Substitution operations are limited to authorized coordinators',
       );
     }
+    return Promise.resolve();
   }
 
   private async audit(

@@ -77,7 +77,21 @@ export class MobileTeacherStudentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.learningImprovementService.createFormativeAssessment(auth, {
-      ...dto,
+      outcomeId: dto.outcomeId,
+      academicYearId: dto.academicYearId,
+      classId: dto.classId,
+      sectionId: dto.sectionId,
+      subjectId: dto.subjectId,
+      kind: dto.kind,
+      masteryStatus: dto.masteryStatus,
+      score: dto.score,
+      maxScore: dto.maxScore,
+      assessedOn: dto.assessedOn,
+      note: dto.note,
+      observationChecklist: dto.observationChecklist,
+      parentSummary: dto.parentSummary,
+      reassessmentOfId: dto.reassessmentOfId,
+      clientSubmissionId: dto.clientSubmissionId,
       studentId,
     });
   }
@@ -91,7 +105,15 @@ export class MobileTeacherStudentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.learningImprovementService.createIntervention(auth, {
-      ...dto,
+      academicYearId: dto.academicYearId,
+      ownerStaffId: dto.ownerStaffId,
+      sourceSignalKey: dto.sourceSignalKey,
+      priority: dto.priority,
+      title: dto.title,
+      concernSummary: dto.concernSummary,
+      parentVisibleSummary: dto.parentVisibleSummary,
+      nextFollowUpOn: dto.nextFollowUpOn,
+      clientRequestId: dto.clientRequestId,
       studentId,
     });
   }

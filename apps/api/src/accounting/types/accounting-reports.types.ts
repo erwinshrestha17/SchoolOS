@@ -128,7 +128,7 @@ export interface CashBookResponse {
   setupWarnings?: string[];
 }
 
-export interface BankBookResponse extends CashBookResponse {}
+export type BankBookResponse = CashBookResponse;
 
 export interface JournalRegisterRow {
   journalEntryId: string;

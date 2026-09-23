@@ -81,7 +81,7 @@ describe('ActivityMediaProcessor', () => {
         [SaveBufferInput]
       >(),
     };
-    const generatedAssets: Array<Record<string, unknown>> = [];
+    const generatedAssets: Record<string, unknown>[] = [];
     fileRegistryService = {
       listFilesByEntity: jest.fn(async () => generatedAssets),
       registerGeneratedFile: jest.fn(async (input) => {

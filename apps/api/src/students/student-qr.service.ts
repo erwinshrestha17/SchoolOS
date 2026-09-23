@@ -809,10 +809,9 @@ export class StudentQrService {
               purpose,
               'guardian_capability_denied',
             );
-            throw (
-              parentDenial ??
-              new ForbiddenException('Parent cannot resolve unrelated child')
-            );
+            throw parentDenial instanceof Error
+              ? parentDenial
+              : new ForbiddenException('Parent cannot resolve unrelated child');
           } else {
             await this.recordResolveDenied(
               tenantId,

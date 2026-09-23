@@ -51,7 +51,7 @@ class FakeCls {
   }
 }
 
-const SUFFIX = `ledger-int-${Date.now()}`;
+const SUFFIX = `ledger-int-${String(Date.now())}`;
 
 describe('Student fee ledger bounded projection (real database)', () => {
   const cls = new FakeCls();
@@ -327,7 +327,9 @@ describe('Student fee ledger bounded projection (real database)', () => {
     await prisma.$disconnect();
   });
 
-  beforeEach(() => cls.setTenant(tenantId));
+  beforeEach(() => {
+    cls.setTenant(tenantId);
+  });
 
   it('matches the full in-process projection row for row, including running balances', async () => {
     const full = await service.getStudentFeeLedger(studentId, actor);
@@ -600,9 +602,10 @@ describe('Student fee ledger bounded projection (real database)', () => {
       const academicYear = await prisma.academicYear.findFirst({
         where: { tenantId },
       });
+      if (!academicYear) throw new Error('Expected seeded academic year');
       const yearFiltered = await service.getStudentFeeLedgerPage(
         studentId,
-        { academicYearId: academicYear!.id, page: 1, limit: 5 },
+        { academicYearId: academicYear.id, page: 1, limit: 5 },
         actor,
       );
 
@@ -622,14 +625,14 @@ describe('Student fee ledger bounded projection (real database)', () => {
       expect(invoiceRow?.drilldown).toEqual({
         kind: 'SOURCE_RECORD',
         id: invoiceRow?.invoiceId,
-        route: `/dashboard/fees/invoices/${invoiceRow?.invoiceId}`,
+        route: `/dashboard/fees/invoices/${String(invoiceRow?.invoiceId)}`,
       });
 
       const paymentRow = paged.rows.find((row) => row.paymentId);
       expect(paymentRow?.drilldown).toEqual({
         kind: 'SOURCE_RECORD',
         id: paymentRow?.paymentId,
-        route: `/dashboard/fees/payments/${paymentRow?.paymentId}`,
+        route: `/dashboard/fees/payments/${String(paymentRow?.paymentId)}`,
       });
     });
   });
@@ -736,7 +739,7 @@ describe('Student fee ledger bounded projection (real database)', () => {
           tenantId,
           studentId: bulkStudent.id,
           academicYearId: bulkYear.id,
-          invoiceNumber: `INV-BULK-${index}-${bulkStudentSuffix}`,
+          invoiceNumber: `INV-BULK-${String(index)}-${bulkStudentSuffix}`,
           dueDate: new Date(Date.UTC(2026, 3, 1) + index * 86_400_000),
           issuedAt: new Date(Date.UTC(2026, 3, 1) + index * 86_400_000),
           subtotal: new Prisma.Decimal('100.00'),

@@ -13,9 +13,8 @@ import {
 import {
   AttendanceStatus,
   NoticeLifecycleStatus,
-  NotificationEventPriority,
   NotificationEventStatus,
-  NotificationEventType,
+  type NotificationEvent,
   PaymentStatus,
   Prisma,
   StudentLifecycleStatus,
@@ -32,7 +31,7 @@ type EventMetadataValue = string | number | boolean | null;
 
 export interface AcceptNotificationEventInput {
   tenantId: string;
-  type: ContractEventType | string;
+  type: string;
   sourceEntityId: string;
   actorId?: string | null;
   priority?: ContractEventPriority;
@@ -79,19 +78,18 @@ export class NotificationEventService {
       return existing;
     }
 
-    let notificationEvent;
+    let notificationEvent: NotificationEvent;
     try {
       notificationEvent = await this.prisma.notificationEvent.create({
         data: {
           tenantId: input.tenantId,
-          type: input.type as NotificationEventType,
+          type: input.type,
           sourceModule: catalogueEntry.sourceModule,
           sourceEntityType: catalogueEntry.sourceEntityType,
           sourceEntityId: input.sourceEntityId,
           actorId:
             input.actorId && input.actorId !== 'system' ? input.actorId : null,
-          priority: (input.priority ??
-            catalogueEntry.defaultPriority) as NotificationEventPriority,
+          priority: input.priority ?? catalogueEntry.defaultPriority,
           metadata: metadata ?? Prisma.JsonNull,
           idempotencyKey: input.idempotencyKey,
         },
@@ -300,10 +298,7 @@ export class NotificationEventService {
         },
         select: { updatedAt: true },
       });
-      if (
-        !admissionCase ||
-        admissionCase.updatedAt.toISOString() !== sourceUpdatedAt
-      ) {
+      if (admissionCase?.updatedAt.toISOString() !== sourceUpdatedAt) {
         throw new ConflictException(
           'Admission document reminder source is no longer current',
         );

@@ -14,7 +14,6 @@ import {
   S3CompatibleStorageConfig,
 } from './storage.config';
 import { StorageService } from './storage.service';
-import { StorageOperationError } from './storage.utils';
 
 describe('StorageService', () => {
   const originalEnv = { ...process.env };

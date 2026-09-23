@@ -13,7 +13,6 @@ import { DeliveryRetryService } from '../src/communications/delivery-retry.servi
 import { M10HardeningService } from '../src/communications/m10-hardening.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { UsageService } from '../src/usage/usage.service';
 
 interface CommunicationState {
   notices: Record<string, unknown>[];
@@ -59,7 +58,7 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
     auditService = {
       record: jest.fn(async (entry: Record<string, unknown>) => {
         prisma.__state.auditLogs.push({
-          id: `audit-${prisma.__state.auditLogs.length + 1}`,
+          id: `audit-${String(prisma.__state.auditLogs.length + 1)}`,
           ...entry,
           createdAt: new Date(),
         });
@@ -90,14 +89,14 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
         verifyLimit: jest.fn().mockResolvedValue(undefined),
         checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
-      } as any,
+      } as unknown as ConstructorParameters<typeof CommunicationsService>[3],
       {
         getClient: jest.fn().mockReturnValue({
           set: jest.fn().mockResolvedValue('OK'),
           del: jest.fn().mockResolvedValue(1),
           eval: jest.fn().mockResolvedValue(1),
         }),
-      } as any,
+      } as unknown as ConstructorParameters<typeof CommunicationsService>[4],
       undefined,
       undefined,
       undefined,
@@ -114,7 +113,9 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
       communicationsService,
       deliveryRetryService,
       auditService as unknown as AuditService,
-      { jwtSecret: 'school-os-access-secret' } as any,
+      {
+        jwtSecret: 'school-os-access-secret',
+      } as unknown as ConstructorParameters<typeof M10HardeningService>[4],
     );
   });
 
@@ -489,7 +490,7 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
     prisma.__state.notificationDeliveries.push({
       id:
         overrides.id ??
-        `delivery-${prisma.__state.notificationDeliveries.length + 1}`,
+        `delivery-${String(prisma.__state.notificationDeliveries.length + 1)}`,
       tenantId: overrides.tenantId ?? tenantId,
       channel: overrides.channel ?? NotificationChannel.PUSH,
       status: overrides.status ?? NotificationStatus.FAILED,
@@ -533,7 +534,7 @@ function buildPrismaMock() {
     notice: {
       create: jest.fn(async (q: { data: Record<string, unknown> }) => {
         const notice = {
-          id: `notice-${state.notices.length + 1}`,
+          id: `notice-${String(state.notices.length + 1)}`,
           createdAt: new Date(),
           ...q.data,
         };
@@ -627,7 +628,7 @@ function buildPrismaMock() {
             )
               continue;
             state.notificationDeliveries.push({
-              id: `delivery-${state.notificationDeliveries.length + 1}`,
+              id: `delivery-${String(state.notificationDeliveries.length + 1)}`,
               createdAt: new Date(),
               retryCount: 0,
               ...data,
@@ -639,7 +640,7 @@ function buildPrismaMock() {
       ),
       create: jest.fn(async (q: { data: Record<string, unknown> }) => {
         const delivery = {
-          id: `delivery-${state.notificationDeliveries.length + 1}`,
+          id: `delivery-${String(state.notificationDeliveries.length + 1)}`,
           createdAt: new Date(),
           ...q.data,
         };
@@ -665,7 +666,7 @@ function buildPrismaMock() {
           if (existing) return existing;
 
           const delivery = {
-            id: `delivery-${state.notificationDeliveries.length + 1}`,
+            id: `delivery-${String(state.notificationDeliveries.length + 1)}`,
             createdAt: new Date(),
             ...q.create,
           };
@@ -732,7 +733,7 @@ function buildPrismaMock() {
       updateMany: jest.fn(
         async (q: {
           where: Record<string, unknown>;
-          data: Record<string, any>;
+          data: Record<string, unknown>;
         }) => {
           const deliveries = state.notificationDeliveries.filter((item) =>
             Object.entries(q.where).every(([key, value]) => {
@@ -748,7 +749,8 @@ function buildPrismaMock() {
             if (
               updates.retryCount &&
               typeof updates.retryCount === 'object' &&
-              'increment' in updates.retryCount
+              'increment' in updates.retryCount &&
+              typeof updates.retryCount.increment === 'number'
             ) {
               const current = (delivery.retryCount as number) ?? 0;
               updates.retryCount = current + updates.retryCount.increment;

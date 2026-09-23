@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type {
-  BrandingDocumentsSettings,
-  TenantSettingKey,
-} from '@schoolos/core';
+import type { BrandingDocumentsSettings } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateBrandingDocumentsDto } from './dto/update-branding-documents.dto';

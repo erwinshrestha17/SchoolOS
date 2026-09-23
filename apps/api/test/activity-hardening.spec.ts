@@ -3,9 +3,7 @@ import {
   ActivityPostStatus,
   AudienceType,
   AuthMethod,
-  StorageProvider,
 } from '@prisma/client';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ActivityFeedService } from '../src/activity-feed/activity-feed.service';
 import { ActivityPostLifecycleService } from '../src/activity-feed/activity-post-lifecycle.service';
 import { ActivityMediaProcessor } from '../src/activity-feed/processors/activity-media.processor';
@@ -36,16 +34,46 @@ describe('Activity Hardening Verification', () => {
     roles: ['parent'],
   };
 
-  let prisma: any;
-  let storageService: any;
-  let communicationsService: any;
-  let auditService: any;
-  let eventEmitter: any;
-  let fileRegistry: any;
-  let mediaQueue: any;
+  let prisma: {
+    class: { findFirst: jest.Mock };
+    section: { findFirst: jest.Mock };
+    student: { findMany: jest.Mock; findFirst: jest.Mock };
+    staff: { findFirst: jest.Mock };
+    guardian: { findFirst: jest.Mock };
+    activityPost: {
+      create: jest.Mock;
+      update: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+    };
+    activityAttachment: {
+      findFirst: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
+    guardianConsent: { findMany: jest.Mock; findFirst: jest.Mock };
+    fileAsset: { update: jest.Mock };
+  };
+  let storageService: {
+    saveBase64Object: jest.Mock;
+    saveBufferObject: jest.Mock;
+    getObjectBuffer: jest.Mock;
+  };
+  let communicationsService: { recordDeliveryRecords: jest.Mock };
+  let auditService: { record: jest.Mock };
+  let eventEmitter: { emitAsync: jest.Mock; emit: jest.Mock };
+  let fileRegistry: {
+    registerFile: jest.Mock;
+    markUploaded: jest.Mock;
+    getSignedUrl: jest.Mock;
+    auditAccess: jest.Mock;
+    updateFileEntity: jest.Mock;
+    listFilesByEntity: jest.Mock;
+    registerGeneratedFile: jest.Mock;
+  };
+  let mediaQueue: { add: jest.Mock };
   let feedService: ActivityFeedService;
   let lifecycleService: ActivityPostLifecycleService;
-  let mediaProcessor: ActivityMediaProcessor;
 
   beforeEach(() => {
     prisma = {
@@ -120,13 +148,25 @@ describe('Activity Hardening Verification', () => {
     };
 
     feedService = new ActivityFeedService(
-      prisma,
-      storageService,
-      communicationsService,
-      auditService,
-      eventEmitter,
-      fileRegistry,
-      mediaQueue,
+      prisma as unknown as ConstructorParameters<typeof ActivityFeedService>[0],
+      storageService as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[1],
+      communicationsService as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[2],
+      auditService as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[3],
+      eventEmitter as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[4],
+      fileRegistry as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[5],
+      mediaQueue as unknown as ConstructorParameters<
+        typeof ActivityFeedService
+      >[6],
       {
         requireActorAccess: jest.fn().mockResolvedValue({}),
         requireActorAccessAnySectionOfClass: jest.fn().mockResolvedValue({}),
@@ -134,19 +174,33 @@ describe('Activity Hardening Verification', () => {
     );
 
     lifecycleService = new ActivityPostLifecycleService(
-      prisma,
-      auditService,
-      eventEmitter,
-      communicationsService,
+      prisma as unknown as ConstructorParameters<
+        typeof ActivityPostLifecycleService
+      >[0],
+      auditService as unknown as ConstructorParameters<
+        typeof ActivityPostLifecycleService
+      >[1],
+      eventEmitter as unknown as ConstructorParameters<
+        typeof ActivityPostLifecycleService
+      >[2],
+      communicationsService as unknown as ConstructorParameters<
+        typeof ActivityPostLifecycleService
+      >[3],
     );
 
-    mediaProcessor = new ActivityMediaProcessor(
-      prisma,
-      storageService,
+    new ActivityMediaProcessor(
+      prisma as unknown as ConstructorParameters<
+        typeof ActivityMediaProcessor
+      >[0],
+      storageService as unknown as ConstructorParameters<
+        typeof ActivityMediaProcessor
+      >[1],
       {
         shouldProcessTenantJob: jest.fn().mockResolvedValue(true),
       } as never,
-      fileRegistry,
+      fileRegistry as unknown as ConstructorParameters<
+        typeof ActivityMediaProcessor
+      >[3],
       createProcessorClsMock() as never,
     );
   });

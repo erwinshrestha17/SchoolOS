@@ -176,7 +176,7 @@ describe('backend hardening gate', () => {
     );
 
     const permanentPublicUrlPattern =
-      /(publicUrl|downloadUrl|previewUrl)\s*[:=]\s*[`'\"]https?:\/\//;
+      /(publicUrl|downloadUrl|previewUrl)\s*[:=]\s*[`'"]https?:\/\//;
 
     const violations = files.filter((file) =>
       permanentPublicUrlPattern.test(read(file)),
@@ -273,9 +273,10 @@ describe('backend hardening gate', () => {
 
   it('inventories TENANT_SCOPE_EXCLUDED_MODELS as platform/global reference data only', () => {
     const source = read(join(API_SRC_ROOT, 'prisma', 'prisma.service.ts'));
-    const match = source.match(
-      /export const TENANT_SCOPE_EXCLUDED_MODELS = \[([\s\S]*?)\];/,
-    );
+    const match =
+      /export const TENANT_SCOPE_EXCLUDED_MODELS = \[([\s\S]*?)\];/.exec(
+        source,
+      );
 
     expect(match).not.toBeNull();
 

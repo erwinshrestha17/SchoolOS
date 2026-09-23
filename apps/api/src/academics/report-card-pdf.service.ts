@@ -16,22 +16,6 @@ import { buildReportCardPdf } from '../common/pdf/simple-pdf';
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
 
-type ReportCardWithRelations = Prisma.ReportCardGetPayload<{
-  include: {
-    student: {
-      include: {
-        guardianLinks: {
-          include: { guardian: true };
-        };
-      };
-    };
-    class: true;
-    section: true;
-    examTerm: true;
-    academicYear: true;
-  };
-}>;
-
 type MarkWithRelations = Prisma.MarkEntryGetPayload<{
   include: {
     subject: true;
@@ -97,8 +81,8 @@ export class ReportCardPdfService {
       tenant,
       settings,
       marks,
-      attendanceSessions,
-      attendanceRecords,
+      _attendanceSessions,
+      _attendanceRecords,
       unpaid,
     ] = await Promise.all([
       this.prisma.tenant.findUnique({ where: { id: actor.tenantId } }),
@@ -168,8 +152,14 @@ export class ReportCardPdfService {
       throw new ConflictException('Report card is blocked by unpaid fees');
     }
 
-    const settingMap = new Map(settings.map((s) => [s.key, String(s.value)]));
-    const primaryGuardian = reportCard.student.guardianLinks[0]?.guardian;
+    const settingMap = new Map(
+      settings.map((s) => [
+        s.key,
+        typeof s.value === 'object' && s.value !== null
+          ? '[object Object]'
+          : String(s.value),
+      ]),
+    );
 
     const logo = await loadSchoolLogoForPdf(
       this.prisma,

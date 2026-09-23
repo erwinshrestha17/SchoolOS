@@ -97,7 +97,7 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
           controller,
         );
       expect(
-        classGuardMatch ||
+        classGuardMatch ??
           controller.includes(
             '@UseGuards(JwtAuthGuard, PlatformGuard)\nexport class PlatformController',
           ),
@@ -113,9 +113,14 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
 
       expect(httpMethods).not.toBeNull();
       expect(permissionDecorators).not.toBeNull();
+      if (!httpMethods || !permissionDecorators) {
+        throw new Error(
+          'Platform route or permission declarations were not found',
+        );
+      }
 
       // Every HTTP method should have a corresponding permission
-      expect(permissionDecorators!.length).toBe(httpMethods!.length);
+      expect(permissionDecorators.length).toBe(httpMethods.length);
     });
   });
 
@@ -151,8 +156,10 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
         permissions,
       );
       expect(supportMatch).not.toBeNull();
+      if (!supportMatch)
+        throw new Error('Platform support role declaration was not found');
 
-      const supportPermissions = supportMatch![1];
+      const supportPermissions = supportMatch[1];
       expect(supportPermissions).not.toContain('manage');
       expect(supportPermissions).not.toContain('retry');
       expect(supportPermissions).not.toContain('status');
@@ -165,8 +172,10 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
         permissions,
       );
       expect(billingMatch).not.toBeNull();
+      if (!billingMatch)
+        throw new Error('Platform billing role declaration was not found');
 
-      const billingPermissions = billingMatch![1];
+      const billingPermissions = billingMatch[1];
       expect(billingPermissions).toContain('platform:billing:manage');
       expect(billingPermissions).toContain('platform:subscriptions:manage');
       expect(billingPermissions).not.toContain('platform:providers:manage');

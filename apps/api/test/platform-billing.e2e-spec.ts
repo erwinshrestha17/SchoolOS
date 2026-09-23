@@ -7,7 +7,6 @@ import {
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { PlatformService } from '../src/platform/platform.service';
-import { PlatformController } from '../src/platform/platform.controller';
 import { PlansService } from '../src/plans/plans.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
@@ -16,7 +15,6 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaMock;
   let platformService: PlatformService;
-  let platformController: PlatformController;
   let plansService: PlansService;
 
   beforeAll(async () => {
@@ -46,7 +44,6 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
     await app.init();
 
     platformService = app.get<PlatformService>(PlatformService);
-    platformController = app.get<PlatformController>(PlatformController);
     plansService = app.get<PlansService>(PlansService);
   });
 
@@ -184,7 +181,7 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       const updatedSub = await prisma.tenantSubscription.findUnique({
         where: { id: sub.id },
       });
-      expect(updatedSub.status).toBe('GRACE');
+      expect(updatedSub).toMatchObject({ status: 'GRACE' });
 
       // Verify audit log for grace status
       const graceAudit = prisma.__state.auditLogs.find(
@@ -215,24 +212,24 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
       });
-      expect(tenant.isActive).toBe(false);
+      expect(tenant).toMatchObject({ isActive: false });
 
       // Verify subscription is suspended
       const updatedSub = await prisma.tenantSubscription.findUnique({
         where: { id: sub.id },
       });
-      expect(updatedSub.status).toBe('SUSPENDED');
+      expect(updatedSub).toMatchObject({ status: 'SUSPENDED' });
 
       // Verify audit logs
       const suspendAudit = prisma.__state.auditLogs.find(
         (log) => log.action === 'tenant_suspended_billing',
       );
       expect(suspendAudit).toBeDefined();
-      if (suspendAudit) {
-        expect((suspendAudit.after as any)?.reason).toBe(
-          'Unpaid balance for overdue invoice',
-        );
-      }
+      expect(suspendAudit?.after).toEqual(
+        expect.objectContaining({
+          reason: 'Unpaid balance for overdue invoice',
+        }),
+      );
     });
 
     it('payment -> reactivate tenant works', async () => {
@@ -261,24 +258,24 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
       });
-      expect(tenant.isActive).toBe(true);
+      expect(tenant).toMatchObject({ isActive: true });
 
       // Verify subscription is active
       const updatedSub = await prisma.tenantSubscription.findUnique({
         where: { id: sub.id },
       });
-      expect(updatedSub.status).toBe('ACTIVE');
+      expect(updatedSub).toMatchObject({ status: 'ACTIVE' });
 
       // Verify audit logs
       const reactivateAudit = prisma.__state.auditLogs.find(
         (log) => log.action === 'tenant_reactivated_billing',
       );
       expect(reactivateAudit).toBeDefined();
-      if (reactivateAudit) {
-        expect((reactivateAudit.after as any)?.reason).toBe(
-          'Payment received for past due invoice',
-        );
-      }
+      expect(reactivateAudit?.after).toEqual(
+        expect.objectContaining({
+          reason: 'Payment received for past due invoice',
+        }),
+      );
     });
 
     it('cancel invoice rejects cancellation of paid invoices and prevents payments on cancelled invoice', async () => {
@@ -511,6 +508,7 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
           tenantId,
           featureKey: 'module.library',
           enabled: true,
+          reason: 'E2E feature override',
         },
       });
 

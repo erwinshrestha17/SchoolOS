@@ -11,34 +11,32 @@ import {
 export class GcpStorageAdapter implements StorageAdapter {
   constructor(private readonly config: GcpStorageConfig) {}
 
-  async putObject(_input: PutObjectInput): Promise<StoredObjectResult> {
-    throw this.notImplemented();
+  putObject(_input: PutObjectInput): Promise<StoredObjectResult> {
+    return Promise.reject(this.notImplemented());
   }
 
-  async getObjectBuffer(_objectKey: string): Promise<Buffer> {
-    throw this.notImplemented();
+  getObjectBuffer(_objectKey: string): Promise<Buffer> {
+    return Promise.reject(this.notImplemented());
   }
 
-  async deleteObject(_objectKey: string): Promise<void> {
-    throw this.notImplemented();
+  deleteObject(_objectKey: string): Promise<void> {
+    return Promise.reject(this.notImplemented());
   }
 
-  async createSignedReadUrl(_input: SignedUrlInput): Promise<string> {
-    throw this.notImplemented();
+  createSignedReadUrl(_input: SignedUrlInput): Promise<string> {
+    return Promise.reject(this.notImplemented());
   }
 
-  async createSignedUploadUrl(
-    _input: SignedUrlInput,
-  ): Promise<SignedUploadResult> {
-    throw this.notImplemented();
+  createSignedUploadUrl(_input: SignedUrlInput): Promise<SignedUploadResult> {
+    return Promise.reject(this.notImplemented());
   }
 
-  async checkReadiness(): Promise<boolean> {
-    throw this.notImplemented();
+  checkReadiness(): Promise<boolean> {
+    return Promise.reject(this.notImplemented());
   }
 
-  async testConnection(): Promise<StorageReadinessResult> {
-    throw this.notImplemented();
+  testConnection(): Promise<StorageReadinessResult> {
+    return Promise.reject(this.notImplemented());
   }
 
   private notImplemented() {

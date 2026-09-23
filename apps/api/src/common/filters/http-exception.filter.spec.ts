@@ -1,5 +1,5 @@
 import { HttpExceptionFilter } from './http-exception.filter';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, type ArgumentsHost } from '@nestjs/common';
 
 describe('HttpExceptionFilter', () => {
   let filter: HttpExceptionFilter;
@@ -23,7 +23,7 @@ describe('HttpExceptionFilter', () => {
         getResponse: mockGetResponse,
         getRequest: mockGetRequest,
       }),
-    } as any;
+    } as unknown as ArgumentsHost;
 
     const exception = new HttpException('Forbidden', HttpStatus.FORBIDDEN);
 
@@ -61,7 +61,7 @@ describe('HttpExceptionFilter', () => {
         getResponse: mockGetResponse,
         getRequest: mockGetRequest,
       }),
-    } as any;
+    } as unknown as ArgumentsHost;
 
     const exception = new Error('Unexpected error');
 

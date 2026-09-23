@@ -1,13 +1,14 @@
 import { AuthMethod, SecurityDomain } from '@prisma/client';
-import { ForbiddenException } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RolesPermissionsGuard } from './roles-permissions.guard';
+import type { AuthContext } from '../auth.types';
 
 describe('RolesPermissionsGuard', () => {
   let guard: RolesPermissionsGuard;
   let reflector: Reflector;
-  let request: any;
-  let context: any;
+  let request: { auth: AuthContext };
+  let context: ExecutionContext;
 
   beforeEach(() => {
     reflector = {
@@ -33,7 +34,7 @@ describe('RolesPermissionsGuard', () => {
       switchToHttp: () => ({
         getRequest: () => request,
       }),
-    };
+    } as unknown as ExecutionContext;
   });
 
   it('grants access when role and permission requirements are satisfied', async () => {

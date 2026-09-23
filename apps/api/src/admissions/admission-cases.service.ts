@@ -336,7 +336,7 @@ export type AdmissionDocumentReminderCandidate =
         | 'NO_LONGER_MISSING';
     };
 
-type AdmissionDocumentRequestRow = {
+interface AdmissionDocumentRequestRow {
   admissionCaseId: string;
   admittedStudentId: string | null;
   applicantName: string;
@@ -358,7 +358,7 @@ type AdmissionDocumentRequestRow = {
   daysPending: number;
   createdAt: string;
   updatedAt: string;
-};
+}
 
 interface CapacityStatus {
   state: 'NOT_CONFIGURED' | 'AVAILABLE' | 'NEARLY_FULL' | 'FULL';
@@ -1226,7 +1226,8 @@ export class AdmissionCasesService implements OnModuleInit {
                 REVIEW_LOCKED_STATUSES.has(record.status)) &&
               record.policyVersionId,
           )
-          .map((record) => record.policyVersionId!),
+          .map((record) => record.policyVersionId)
+          .filter((id): id is string => id !== null),
       ),
     ];
     const [policies, classes, pinnedVersions] = await Promise.all([
@@ -1245,7 +1246,7 @@ export class AdmissionCasesService implements OnModuleInit {
             where: { tenantId: actor.tenantId, id: { in: pinnedVersionIds } },
             include: { documentRequirements: true, policy: true },
           })
-        : Promise.resolve([]),
+        : Promise.resolve<never[]>([]),
     ]);
     const versionsById = new Map<string, ResolvableVersion>();
     for (const policy of policies) {
@@ -1656,7 +1657,8 @@ export class AdmissionCasesService implements OnModuleInit {
     }
 
     const evaluation = await this.evaluate(current, actor);
-    const hasApprovalChain = evaluation.policy.approvalPolicyId != null;
+    const approvalPolicyId = evaluation.policy.approvalPolicyId;
+    const hasApprovalChain = approvalPolicyId !== null;
     if (dto.action === 'APPROVE') {
       if (
         !hasApprovalChain &&
@@ -1710,16 +1712,22 @@ export class AdmissionCasesService implements OnModuleInit {
     // by the time control returns here the case row may already have been
     // written by that executor — reusing the stale `current.status` as an
     // optimistic-concurrency guard in a second write would spuriously fail.
-    if (dto.action === 'APPROVE' && hasApprovalChain) {
+    if (dto.action === 'APPROVE' && approvalPolicyId !== null) {
+      const reason = dto.reason?.trim();
+      if (!reason) {
+        throw new BadRequestException(
+          'An admission approval reason is required.',
+        );
+      }
       const requestId =
         evaluation.approvalChain?.activeRequestId ??
         (
           await this.approvalWorkflowService.createRequest(
             {
               workflowType: 'ADMISSION_CASE',
-              policyId: evaluation.policy.approvalPolicyId!,
+              policyId: approvalPolicyId,
               title: `Admission approval: ${current.firstNameEn} ${current.lastNameEn}`,
-              reason: dto.reason!.trim(),
+              reason,
               targetModule: 'admissions',
               targetType: 'AdmissionApplication',
               targetId: current.id,
@@ -2700,7 +2708,7 @@ export class AdmissionCasesService implements OnModuleInit {
     },
     gradeBand: string | null,
     source: AdmissionSource,
-    transferStudent: boolean,
+    _transferStudent: boolean,
   ) {
     if (policy.isDefault) {
       return 'School default — no more specific policy matched.';

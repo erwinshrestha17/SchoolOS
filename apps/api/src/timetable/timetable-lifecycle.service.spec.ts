@@ -45,13 +45,13 @@ describe('TimetableLifecycleService', () => {
   });
 
   it('rejects publishing empty draft timetable versions', async () => {
-    const p = prisma as any;
+    const p = prisma;
     p.timetableVersion.findFirst.mockResolvedValue({
       id: 'version-1',
       tenantId: 'tenant-a',
       status: TimetableVersionStatus.DRAFT,
       slots: [],
-    });
+    } as never);
 
     const result = await service.validateVersionForPublish(actor, 'version-1');
 
@@ -67,13 +67,13 @@ describe('TimetableLifecycleService', () => {
   });
 
   it('rejects publishing non-draft timetable versions', async () => {
-    const p = prisma as any;
+    const p = prisma;
     p.timetableVersion.findFirst.mockResolvedValue({
       id: 'version-1',
       tenantId: 'tenant-a',
       status: TimetableVersionStatus.PUBLISHED,
       slots: [],
-    });
+    } as never);
 
     await expect(
       service.validateVersionForPublish(actor, 'version-1'),
@@ -81,7 +81,7 @@ describe('TimetableLifecycleService', () => {
   });
 
   it('detects blocking conflicts before publish', async () => {
-    const p = prisma as any;
+    const p = prisma;
     p.timetableVersion.findFirst.mockResolvedValue({
       id: 'version-1',
       tenantId: 'tenant-a',
@@ -116,7 +116,7 @@ describe('TimetableLifecycleService', () => {
           endsAt: '10:30',
         },
       ],
-    });
+    } as never);
 
     await expect(
       service.assertVersionPublishable(actor, 'version-1'),

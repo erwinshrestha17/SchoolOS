@@ -5,7 +5,7 @@ const actor = {
   tenantId: 'tenant-1',
   tenantSlug: 'tenant-one',
   userId: 'user-1',
-} as any;
+} as unknown as import('../auth/auth.types').AuthContext;
 
 function buildService() {
   const prisma = {
@@ -17,7 +17,12 @@ function buildService() {
   const sourceMappings = {
     getSourceMappingHealth: jest.fn(),
   };
-  const service = new AccountingM9Service(prisma as any, sourceMappings as any);
+  const service = new AccountingM9Service(
+    prisma as unknown as ConstructorParameters<typeof AccountingM9Service>[0],
+    sourceMappings as unknown as ConstructorParameters<
+      typeof AccountingM9Service
+    >[1],
+  );
   return { service, prisma, sourceMappings };
 }
 

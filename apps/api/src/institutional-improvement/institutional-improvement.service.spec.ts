@@ -271,7 +271,7 @@ function buildService() {
     timetableSlot: delegate(),
     user: delegate(),
     $transaction: jest.fn(),
-  } as any;
+  };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const fileRegistry = {
     getFileMetadata: jest.fn(),
@@ -281,7 +281,7 @@ function buildService() {
     countIemisReadyForClasses: jest.fn(),
   };
   const service = new InstitutionalImprovementService(
-    prisma as PrismaService,
+    prisma as unknown as PrismaService,
     audit as unknown as AuditService,
     fileRegistry as unknown as FileRegistryService,
     studentsService as unknown as StudentsService,
@@ -299,7 +299,7 @@ function staffRecord() {
   };
 }
 
-function observationRecord(overrides: Record<string, unknown> = {}): any {
+function observationRecord(overrides: Record<string, unknown> = {}) {
   return { ...observationRecordBase(), ...overrides };
 }
 
@@ -331,7 +331,7 @@ function observationRecordBase() {
   };
 }
 
-function goalRecord(overrides: Record<string, unknown> = {}): any {
+function goalRecord(overrides: Record<string, unknown> = {}) {
   const now = new Date('2026-07-26T10:00:00.000Z');
   return {
     id: 'goal-1',
@@ -375,7 +375,7 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function actionRecord(overrides: Record<string, unknown> = {}): any {
+function actionRecord(overrides: Record<string, unknown> = {}) {
   return { ...actionRecordBase(), ...overrides };
 }
 
@@ -398,7 +398,7 @@ function actionRecordBase() {
   };
 }
 
-function planRecord(overrides: Record<string, unknown> = {}): any {
+function planRecord(overrides: Record<string, unknown> = {}) {
   return { ...planRecordBase(), ...overrides };
 }
 

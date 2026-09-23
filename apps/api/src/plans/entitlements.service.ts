@@ -299,7 +299,7 @@ export class EntitlementsService {
     modulesSet.delete('communications');
     modulesSet.delete('messaging');
     modulesSet.delete('chat');
-    featuresSet.delete(FEATURE_KEYS.MOBILE_PARENT_TEACHER_CHAT);
+    featuresSet.delete('feature.mobile.parent_teacher_chat');
     for (const feature of Array.from(featuresSet)) {
       if (feature.startsWith('feature.chat.')) featuresSet.delete(feature);
     }

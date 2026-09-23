@@ -27,7 +27,7 @@ describe('ResultsService', () => {
     roles: ['teacher'],
     permissions: ['results:read', 'academics:read'],
   } as unknown as AuthContext;
-  let teacherAssignments: Array<Record<string, any>>;
+  let teacherAssignments: ReturnType<typeof teacherAssignmentFixture>[];
 
   beforeEach(async () => {
     teacherAssignments = [];

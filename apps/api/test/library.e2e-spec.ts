@@ -336,25 +336,31 @@ interface LibraryIssueQuery {
 }
 
 function patchLibraryIssueFindUniqueOrThrow(prisma: PrismaMock) {
-  prisma.libraryIssue.findUniqueOrThrow = jest.fn(
-    async (q: LibraryIssueQuery) => {
-      const result = await prisma.libraryIssue.findFirst(q);
+  const findFirst = prisma.libraryIssue.findFirst as unknown as (
+    query: LibraryIssueQuery,
+  ) => Promise<Record<string, unknown> | null>;
+  Object.assign(prisma.libraryIssue, {
+    findUniqueOrThrow: jest.fn(async (query: LibraryIssueQuery) => {
+      const result = await findFirst(query);
       if (!result) throw new Error('LibraryIssue not found');
       return result;
-    },
-  );
+    }),
+  });
 
   // The shared generic mock's create() defaults every model's `status` to
   // 'NEW' when the caller omits it -- correct for other dummy models, but
   // wrong here: issueCopy relies on Prisma's schema-level
   // `LibraryIssue.status @default(ISSUED)` and never sets it explicitly.
-  const genericCreate = prisma.libraryIssue.create;
-  prisma.libraryIssue.create = jest.fn(async (q: LibraryIssueQuery) => {
-    const created = await genericCreate({
-      ...q,
-      data: { status: LibraryIssueStatus.ISSUED, ...q.data },
-    });
-    return created;
+  const genericCreate = prisma.libraryIssue.create as unknown as (
+    query: LibraryIssueQuery,
+  ) => Promise<Record<string, unknown>>;
+  Object.assign(prisma.libraryIssue, {
+    create: jest.fn(async (query: LibraryIssueQuery) =>
+      genericCreate({
+        ...query,
+        data: { status: LibraryIssueStatus.ISSUED, ...query.data },
+      }),
+    ),
   });
 }
 

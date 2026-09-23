@@ -5,6 +5,15 @@ import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeacherReplacementService } from './teacher-replacement.service';
 
+interface ReplacementTransactionMock {
+  teacherAssignment: {
+    findFirst: jest.Mock;
+    update: jest.Mock;
+    create: jest.Mock;
+  };
+  teacherReplacement: { update: jest.Mock };
+}
+
 describe('TeacherReplacementService', () => {
   let service: TeacherReplacementService;
   let prisma: PrismaService;
@@ -76,10 +85,10 @@ describe('TeacherReplacementService', () => {
   it('schedules a replacement without rewriting authorship', async () => {
     jest
       .spyOn(prisma.teacherAssignment, 'findFirst')
-      .mockResolvedValue(sourceAssignment as any);
+      .mockResolvedValue(sourceAssignment as never);
     jest
       .spyOn(prisma.staff, 'findFirst')
-      .mockResolvedValue({ id: 'staff-new' } as any);
+      .mockResolvedValue({ id: 'staff-new' } as never);
     jest.spyOn(prisma.teacherReplacement, 'findFirst').mockResolvedValue(null);
     jest.spyOn(prisma.teacherReplacement, 'create').mockResolvedValue({
       id: 'repl-1',
@@ -87,7 +96,7 @@ describe('TeacherReplacementService', () => {
       formerStaffId: 'staff-old',
       replacementStaffId: 'staff-new',
       sourceAssignmentId: 'assign-1',
-    } as any);
+    } as never);
 
     const result = await service.schedule(
       {
@@ -103,7 +112,7 @@ describe('TeacherReplacementService', () => {
           },
         ],
       },
-      actor as any,
+      actor as unknown as Parameters<typeof service.schedule>[1],
     );
 
     expect(result.id).toBe('repl-1');
@@ -132,7 +141,7 @@ describe('TeacherReplacementService', () => {
       subjectId: 'subject-1',
       componentScope: null,
       pendingWork: [],
-    } as any);
+    } as never);
 
     const assignmentUpdate = jest.fn().mockResolvedValue({});
     const assignmentCreate = jest.fn().mockResolvedValue({ id: 'assign-new' });
@@ -143,7 +152,7 @@ describe('TeacherReplacementService', () => {
     });
 
     (prisma.$transaction as jest.Mock).mockImplementation(
-      async (fn: (tx: any) => unknown) =>
+      async (fn: (tx: ReplacementTransactionMock) => unknown) =>
         fn({
           teacherAssignment: {
             findFirst: jest.fn().mockResolvedValue(sourceAssignment),
@@ -156,7 +165,10 @@ describe('TeacherReplacementService', () => {
         }),
     );
 
-    const result = await service.activate('repl-1', actor as any);
+    const result = await service.activate(
+      'repl-1',
+      actor as unknown as Parameters<typeof service.activate>[1],
+    );
 
     expect(result.status).toBe('ACTIVE');
     expect(assignmentUpdate).toHaveBeenCalledWith(
@@ -188,11 +200,14 @@ describe('TeacherReplacementService', () => {
           disposition: null,
         },
       ],
-    } as any);
+    } as never);
 
-    await expect(service.complete('repl-1', actor as any)).rejects.toThrow(
-      /All pending work items must be disposed/,
-    );
+    await expect(
+      service.complete(
+        'repl-1',
+        actor as unknown as Parameters<typeof service.complete>[1],
+      ),
+    ).rejects.toThrow(/All pending work items must be disposed/);
   });
 
   it('records audited pending-work disposition', async () => {
@@ -201,7 +216,7 @@ describe('TeacherReplacementService', () => {
       tenantId: 'tenant-1',
       status: 'ACTIVE',
       pendingWork: [],
-    } as any);
+    } as never);
     jest
       .spyOn(prisma.teacherReplacementPendingWork, 'findFirst')
       .mockResolvedValue({
@@ -209,13 +224,13 @@ describe('TeacherReplacementService', () => {
         kind: 'MARK_SUBMISSION',
         resourceId: 'marks-1',
         disposition: null,
-      } as any);
+      } as never);
     jest
       .spyOn(prisma.teacherReplacementPendingWork, 'update')
       .mockResolvedValue({
         id: 'pw-1',
         disposition: 'TRANSFER',
-      } as any);
+      } as never);
 
     const result = await service.disposePendingWork(
       'repl-1',
@@ -224,7 +239,7 @@ describe('TeacherReplacementService', () => {
         disposition: 'TRANSFER',
         dispositionNote: 'Hand to incoming teacher',
       },
-      actor as any,
+      actor as unknown as Parameters<typeof service.disposePendingWork>[3],
     );
 
     expect(result.disposition).toBe('TRANSFER');
@@ -237,9 +252,9 @@ describe('TeacherReplacementService', () => {
       status: 'SCHEDULED',
       sourceAssignmentId: 'assign-missing',
       pendingWork: [],
-    } as any);
+    } as never);
     (prisma.$transaction as jest.Mock).mockImplementation(
-      async (fn: (tx: any) => unknown) =>
+      async (fn: (tx: ReplacementTransactionMock) => unknown) =>
         fn({
           teacherAssignment: {
             findFirst: jest.fn().mockResolvedValue(null),
@@ -250,15 +265,21 @@ describe('TeacherReplacementService', () => {
         }),
     );
 
-    await expect(service.activate('repl-1', actor as any)).rejects.toThrow(
-      ConflictException,
-    );
+    await expect(
+      service.activate(
+        'repl-1',
+        actor as unknown as Parameters<typeof service.activate>[1],
+      ),
+    ).rejects.toThrow(ConflictException);
   });
 
   it('returns not found for cross-tenant style missing replacement', async () => {
     jest.spyOn(prisma.teacherReplacement, 'findFirst').mockResolvedValue(null);
-    await expect(service.get('missing', actor as any)).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(
+      service.get(
+        'missing',
+        actor as unknown as Parameters<typeof service.get>[1],
+      ),
+    ).rejects.toThrow(NotFoundException);
   });
 });

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   NoticeLifecycleStatus,
+  type Prisma,
   type CommunicationTemplateCategory,
 } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
@@ -172,7 +173,18 @@ export class NoticeDetailService {
                 user: { select: { email: true } },
               },
             })
-          : Promise.resolve([]),
+          : Promise.resolve<
+              Array<
+                Prisma.AuditLogGetPayload<{
+                  select: {
+                    id: true;
+                    action: true;
+                    createdAt: true;
+                    user: { select: { email: true } };
+                  };
+                }>
+              >
+            >([]),
         canViewReports && notice.approvalRequestId
           ? this.prisma.approvalRequest.findFirst({
               where: {

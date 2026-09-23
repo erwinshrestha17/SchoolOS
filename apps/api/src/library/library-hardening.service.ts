@@ -693,7 +693,7 @@ export class LibraryHardeningService {
     actor: AuthContext,
   ) {
     const copy = await this.resolveCopyByScanCode(actor, dto.code);
-    return this.issueCopy({ ...dto, copyId: copy.id }, actor);
+    return this.issueCopy(Object.assign({}, dto, { copyId: copy.id }), actor);
   }
 
   async returnCopy(
@@ -1803,7 +1803,7 @@ function startOfDay(date: Date) {
   return result;
 }
 
-function csvEscape(value: unknown) {
+function csvEscape(value: string | number | boolean | Date | null | undefined) {
   const text = value === null || value === undefined ? '' : String(value);
   if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
   return text;

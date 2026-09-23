@@ -13,6 +13,9 @@ import {
   AudienceType,
   ConsentType,
   type DevelopmentalMilestone,
+  type Class,
+  type Section,
+  type Student,
   NotificationChannel,
   Prisma,
   ActivityAttachment,
@@ -1796,17 +1799,17 @@ export class ActivityFeedService {
         ? this.prisma.class.findMany({
             where: { tenantId, id: { in: classIds } },
           })
-        : Promise.resolve([]),
+        : Promise.resolve<Class[]>([]),
       sectionIds.length
         ? this.prisma.section.findMany({
             where: { tenantId, id: { in: sectionIds } },
           })
-        : Promise.resolve([]),
+        : Promise.resolve<Section[]>([]),
       studentIds.length
         ? this.prisma.student.findMany({
             where: { tenantId, id: { in: studentIds } },
           })
-        : Promise.resolve([]),
+        : Promise.resolve<Student[]>([]),
     ]);
 
     const classById = new Map(classes.map((row) => [row.id, row] as const));
@@ -1815,11 +1818,11 @@ export class ActivityFeedService {
 
     return milestones.map((milestone) => ({
       ...milestone,
-      class: classById.get(milestone.classId)!,
+      class: classById.get(milestone.classId),
       section: milestone.sectionId
         ? (sectionById.get(milestone.sectionId) ?? null)
         : null,
-      student: studentById.get(milestone.studentId)!,
+      student: studentById.get(milestone.studentId),
     }));
   }
 

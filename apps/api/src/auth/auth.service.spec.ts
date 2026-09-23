@@ -6,17 +6,59 @@ import {
 } from '@prisma/client';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { hashOtpCode } from './auth.utils';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prisma: any;
-  let jwtService: any;
-  let configService: any;
-  let auditService: any;
-  let notificationsService: any;
-  let response: any;
+  let prisma: {
+    $queryRaw: jest.Mock;
+    $transaction: jest.Mock;
+    runWithoutTenantScope: jest.Mock;
+    runWithTenantScope: jest.Mock;
+    tenant: { findUnique: jest.Mock };
+    user: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
+    refreshToken: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
+    mobilePushToken: { deleteMany: jest.Mock };
+    otpCode: {
+      create: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+      count: jest.Mock;
+    };
+  };
+  let jwtService: { signAsync: jest.Mock; verifyAsync: jest.Mock };
+  let configService: {
+    jwtSecret: string;
+    tokenHashPepper: string;
+    challengeSecret: string;
+    accessTokenTtl: string;
+    challengeTokenTtl: string;
+    refreshTokenTtlDays: number;
+    refreshCookieName: string;
+    accessCookieName: string;
+    cookieSameSite: string;
+    cookieDomain: undefined;
+    isProduction: boolean;
+    bcryptRounds: number;
+    otpTtlMinutes: number;
+    passwordResetTtlMinutes: number;
+    otpLength: number;
+    otpIssueLimit: number;
+    otpIssueWindowMinutes: number;
+    passwordResetAppUrl: string;
+  };
+  let auditService: { record: jest.Mock };
+  let notificationsService: { sendAuthCodeEmail: jest.Mock };
+  let response: Response & { cookie: jest.Mock; clearCookie: jest.Mock };
 
   const authUser = {
     id: 'user-1',
@@ -50,6 +92,7 @@ describe('AuthService', () => {
     authUser.passwordHash = await bcrypt.hash('password123', 4);
     prisma = {
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'resolved-auth-row' }]),
+      $transaction: jest.fn(),
       // Pass-throughs: the mock has no CLS/extension, so tenant-scope regions
       // just execute. Real enforcement is proven in tenant-isolation.int-spec.ts.
       runWithoutTenantScope: jest.fn(
@@ -84,14 +127,14 @@ describe('AuthService', () => {
         count: jest.fn().mockResolvedValue(0),
       },
     };
-    prisma.$transaction = jest.fn(
-      async (work: (tx: unknown) => Promise<unknown>) => work(prisma),
+    prisma.$transaction.mockImplementation(
+      (work: (tx: unknown) => Promise<unknown>) => work(prisma),
     );
     jwtService = {
       signAsync: jest
         .fn()
-        .mockImplementation(async (payload: any) =>
-          payload.purpose ? 'challenge-token' : 'access-token',
+        .mockImplementation((payload: { purpose?: OtpPurpose }) =>
+          Promise.resolve(payload.purpose ? 'challenge-token' : 'access-token'),
         ),
       verifyAsync: jest.fn().mockResolvedValue({
         sub: authUser.id,
@@ -129,14 +172,16 @@ describe('AuthService', () => {
     response = {
       cookie: jest.fn(),
       clearCookie: jest.fn(),
-    };
+    } as unknown as Response & { cookie: jest.Mock; clearCookie: jest.Mock };
 
     service = new AuthService(
-      prisma,
-      jwtService,
-      configService,
-      auditService,
-      notificationsService,
+      prisma as unknown as ConstructorParameters<typeof AuthService>[0],
+      jwtService as unknown as ConstructorParameters<typeof AuthService>[1],
+      configService as unknown as ConstructorParameters<typeof AuthService>[2],
+      auditService as unknown as ConstructorParameters<typeof AuthService>[3],
+      notificationsService as unknown as ConstructorParameters<
+        typeof AuthService
+      >[4],
     );
   });
 
@@ -912,11 +957,11 @@ describe('AuthService', () => {
         },
       });
 
-      const profile: any = await service.getProfile({
+      const profile = await service.getProfile({
         userId: 'user-1',
         tenantId: 'tenant-1',
         tenantSlug: 'default-school',
-      } as any);
+      } as unknown as Parameters<typeof service.getProfile>[0]);
 
       expect(profile.guardian).toEqual({
         id: 'guardian-1',
@@ -939,11 +984,11 @@ describe('AuthService', () => {
         guardian: null,
       });
 
-      const profile: any = await service.getProfile({
+      const profile = await service.getProfile({
         userId: 'user-1',
         tenantId: 'tenant-1',
         tenantSlug: 'default-school',
-      } as any);
+      } as unknown as Parameters<typeof service.getProfile>[0]);
 
       expect(profile.guardian).toBeNull();
       // profileType keeps its existing values; nothing switching on it moves.
@@ -968,7 +1013,7 @@ describe('AuthService', () => {
         userId: 'user-1',
         tenantId: 'tenant-1',
         tenantSlug: 'default-school',
-      } as any);
+      } as unknown as Parameters<typeof service.getProfile>[0]);
 
       const include = prisma.user.findFirst.mock.calls.at(-1)[0].include;
       expect(include.guardian).toEqual({
@@ -998,13 +1043,13 @@ describe('AuthService', () => {
         plan: 'STANDARD',
       });
 
-      const profile: any = await service.getProfile({
+      const profile = await service.getProfile({
         userId: 'user-1',
         tenantId: 'school-tenant-2',
         originalTenantId: 'platform-tenant',
         isSupportOverride: true,
         tenantSlug: 'pilot-rehearsal-1',
-      } as any);
+      } as unknown as Parameters<typeof service.getProfile>[0]);
 
       expect(profile.isSupportOverride).toBe(true);
       expect(profile.tenantId).toBe('school-tenant-2');
@@ -1018,23 +1063,15 @@ describe('AuthService', () => {
   });
 });
 
-function asSession(
-  result:
-    | { accessToken?: string; refreshToken?: string; user: any }
-    | { requiresMfa: boolean; challengeToken: string },
-) {
+function asSession(result: Awaited<ReturnType<AuthService['login']>>) {
   if (!('accessToken' in result) || !result.accessToken) {
     throw new Error('Expected a session response');
   }
 
-  return result as { accessToken: string; refreshToken?: string; user: any };
+  return result;
 }
 
-function asChallenge(
-  result:
-    | { accessToken?: string; refreshToken?: string; user: any }
-    | { requiresMfa: boolean; challengeToken: string },
-) {
+function asChallenge(result: Awaited<ReturnType<AuthService['login']>>) {
   if (!('challengeToken' in result)) {
     throw new Error('Expected an MFA challenge response');
   }

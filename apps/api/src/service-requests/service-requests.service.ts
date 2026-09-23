@@ -550,7 +550,7 @@ export class ServiceRequestsService {
     }
     await this.assertEligibleManager(dto.assignedToUserId, actor);
     const now = new Date();
-    const result = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       const updated = await tx.schoolServiceRequest.updateMany({
         where: {
           id: request.id,
@@ -984,7 +984,8 @@ export class ServiceRequestsService {
             request.status === SchoolServiceRequestStatus.CLOSED) &&
           Boolean(
             (request.closedAt ?? request.resolvedAt) &&
-            Date.now() - (request.closedAt ?? request.resolvedAt)!.getTime() <=
+            Date.now() -
+              ((request.closedAt ?? request.resolvedAt)?.getTime() ?? 0) <=
               REOPEN_WINDOW_MS,
           ),
         addEvidence:

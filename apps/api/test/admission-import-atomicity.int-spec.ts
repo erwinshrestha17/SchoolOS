@@ -109,7 +109,7 @@ if (databaseUrl) {
             type: 'STUDENT_ADMITTED',
             sourceModule: 'M1_ADMISSIONS',
             sourceEntityType: 'student',
-            sourceEntityId: `synthetic-source-${iteration}`,
+            sourceEntityId: `synthetic-source-${String(iteration)}`,
             idempotencyKey: randomUUID(),
             status: 'ACCEPTED',
           },
@@ -269,9 +269,11 @@ if (databaseUrl) {
         audienceType: 'ALL' as const,
         title: 'Synthetic batch',
         body: 'Original synthetic content',
-        channels: ['IN_APP', 'EMAIL', 'PUSH'] as Array<
-          'IN_APP' | 'EMAIL' | 'PUSH'
-        >,
+        channels: ['IN_APP', 'EMAIL', 'PUSH'] as (
+          | 'IN_APP'
+          | 'EMAIL'
+          | 'PUSH'
+        )[],
         directRecipients: recipients,
       };
       await expect(
@@ -384,9 +386,7 @@ if (databaseUrl) {
           retryCount: 0,
         },
       });
-      const releaseInAppNotification = jest.fn(
-        async (_input: { metadata: Record<string, string> }) => undefined,
-      );
+      const releaseInAppNotification = jest.fn().mockResolvedValue(undefined);
       const retries = new DeliveryRetryService(
         prisma,
         {

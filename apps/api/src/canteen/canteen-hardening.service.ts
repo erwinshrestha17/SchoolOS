@@ -9,8 +9,6 @@ import { Queue } from 'bullmq';
 import {
   CanteenEnrollmentStatus,
   CanteenMealServingStatus,
-  ConsentType,
-  NotificationChannel,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -356,7 +354,7 @@ export class CanteenHardeningService {
   }
 }
 
-function csvEscape(value: unknown) {
+function csvEscape(value: string | number | boolean | Date | null | undefined) {
   const text = String(value ?? '');
   if (/[",\n]/.test(text)) {
     return `"${text.replace(/"/g, '""')}"`;

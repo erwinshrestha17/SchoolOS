@@ -9,7 +9,6 @@ import {
 import { AccountingService } from '../src/accounting/accounting.service';
 import { AccountingPostingService } from '../src/accounting/accounting-posting.service';
 import { AppModule } from '../src/app.module';
-import { AuthContext } from '../src/auth/auth.types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import {
   createAuthContextMock,
@@ -27,32 +26,50 @@ describe('Accounting Module Hardening (E2E)', () => {
   const tenantB = 'tenant-b';
   const actorA = createAuthContextMock({ tenantId: tenantA });
   const actorB = createAuthContextMock({ tenantId: tenantB });
+  const postingPeriodStub = (id: string, fiscalYearId: string) =>
+    ({ id, fiscalYearId }) as Awaited<
+      ReturnType<AccountingPostingService['ensurePostingPeriodIsOpen']>
+    >;
 
   beforeEach(async () => {
-    prisma = createPrismaMock() as unknown as PrismaMock;
+    prisma = createPrismaMock();
 
-    // Ensure model mocks have all necessary functions
-    const ensureMock = (model: any) => {
-      if (!model.findMany) model.findMany = jest.fn();
-      if (!model.findFirst) model.findFirst = jest.fn();
-      if (!model.findUnique) model.findUnique = jest.fn();
-      if (!model.create) model.create = jest.fn();
-      if (!model.count) model.count = jest.fn();
-      if (!model.upsert) model.upsert = jest.fn();
+    // This fixture fills in Prisma delegate methods used by accounting tests.
+    type ModelName =
+      | 'chartAccount'
+      | 'fiscalPeriod'
+      | 'accountingPeriod'
+      | 'journalEntry'
+      | 'journalLine';
+    type MethodName =
+      | 'findMany'
+      | 'findFirst'
+      | 'findUnique'
+      | 'create'
+      | 'count'
+      | 'upsert';
+    type PartialDelegate = Partial<Record<MethodName, jest.Mock>>;
+    const ensureMock = (model: PartialDelegate) => {
+      model.findMany ??= jest.fn();
+      model.findFirst ??= jest.fn();
+      model.findUnique ??= jest.fn();
+      model.create ??= jest.fn();
+      model.count ??= jest.fn();
+      model.upsert ??= jest.fn();
     };
-
-    if (!(prisma as any).chartAccount) (prisma as any).chartAccount = {};
-    if (!(prisma as any).fiscalPeriod) (prisma as any).fiscalPeriod = {};
-    if (!(prisma as any).accountingPeriod)
-      (prisma as any).accountingPeriod = {};
-    if (!(prisma as any).journalEntry) (prisma as any).journalEntry = {};
-    if (!(prisma as any).journalLine) (prisma as any).journalLine = {};
-
-    ensureMock((prisma as any).chartAccount);
-    ensureMock((prisma as any).fiscalPeriod);
-    ensureMock((prisma as any).accountingPeriod);
-    ensureMock((prisma as any).journalEntry);
-    ensureMock((prisma as any).journalLine);
+    const models = prisma as unknown as Partial<
+      Record<ModelName, PartialDelegate>
+    >;
+    for (const name of [
+      'chartAccount',
+      'fiscalPeriod',
+      'accountingPeriod',
+      'journalEntry',
+      'journalLine',
+    ] as const) {
+      models[name] ??= {};
+      ensureMock(models[name]);
+    }
 
     moduleRef = await Test.createTestingModule({
       imports: [AppModule],
@@ -98,7 +115,7 @@ describe('Accounting Module Hardening (E2E)', () => {
 
   describe('Tenant Isolation', () => {
     it('should not allow tenant B to see tenant A accounts', async () => {
-      ((prisma as any).chartAccount.findMany as jest.Mock).mockResolvedValue([
+      (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
         {
           id: 'acc-b1',
           tenantId: tenantB,
@@ -122,7 +139,7 @@ describe('Accounting Module Hardening (E2E)', () => {
 
     it('should not allow cross-tenant posting via manual journal', async () => {
       // Mock findMany for chartAccount
-      ((prisma as any).chartAccount.findMany as jest.Mock).mockResolvedValue([
+      (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
         { id: 'acc-b1', tenantId: tenantB, code: '1000' },
       ]);
 
@@ -153,7 +170,7 @@ describe('Accounting Module Hardening (E2E)', () => {
   describe('Double-Entry Validation', () => {
     it('should reject imbalanced manual journals', async () => {
       // Mock findMany for chartAccount
-      ((prisma as any).chartAccount.findMany as jest.Mock).mockResolvedValue([
+      (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
         { id: 'acc-a1', tenantId: tenantA, code: '1000' },
         { id: 'acc-a2', tenantId: tenantA, code: '4000' },
       ]);
@@ -184,17 +201,14 @@ describe('Accounting Module Hardening (E2E)', () => {
     it('should accept balanced manual journals', async () => {
       // Mock period check to pass
       jest
-        .spyOn(postingService as any, 'ensurePostingPeriodIsOpen')
-        .mockResolvedValue({
-          id: 'period-1',
-          fiscalYearId: 'fy-1',
-        });
-      ((prisma as any).chartAccount.findMany as jest.Mock).mockResolvedValue([
+        .spyOn(postingService, 'ensurePostingPeriodIsOpen')
+        .mockResolvedValue(postingPeriodStub('period-1', 'fy-1'));
+      (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
         { id: 'acc-a1', tenantId: tenantA, code: '1000' },
         { id: 'acc-a2', tenantId: tenantA, code: '4000' },
       ]);
-      ((prisma as any).journalEntry.count as jest.Mock).mockResolvedValue(0);
-      ((prisma as any).journalEntry.create as jest.Mock).mockResolvedValue({
+      (prisma.journalEntry.count as jest.Mock).mockResolvedValue(0);
+      (prisma.journalEntry.create as jest.Mock).mockResolvedValue({
         id: 'je-1',
       });
 
@@ -224,10 +238,7 @@ describe('Accounting Module Hardening (E2E)', () => {
 
   describe('Period Boundaries', () => {
     it('should reject posting to a CLOSED fiscal period', async () => {
-      if (!(prisma as any).fiscalPeriod) {
-        (prisma as any).fiscalPeriod = { findFirst: jest.fn() };
-      }
-      ((prisma as any).fiscalPeriod.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.fiscalPeriod.findFirst as jest.Mock).mockResolvedValue({
         id: 'closed-period',
         status: AccountingPeriodStatus.CLOSED,
         label: 'Closed Month',
@@ -251,12 +262,7 @@ describe('Accounting Module Hardening (E2E)', () => {
     });
 
     it('should reject posting if no fiscal period exists for the date', async () => {
-      if (!(prisma as any).fiscalPeriod) {
-        (prisma as any).fiscalPeriod = { findFirst: jest.fn() };
-      }
-      ((prisma as any).fiscalPeriod.findFirst as jest.Mock).mockResolvedValue(
-        null,
-      );
+      (prisma.fiscalPeriod.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
         postingService.postManualJournal(
@@ -293,7 +299,7 @@ describe('Accounting Module Hardening (E2E)', () => {
     });
 
     it('should reject reversal of a reversed entry', async () => {
-      ((prisma as any).journalEntry.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue({
         id: 'je-1',
         tenantId: tenantA,
         status: 'REVERSED',
@@ -310,7 +316,7 @@ describe('Accounting Module Hardening (E2E)', () => {
     });
 
     it('should reject reversal of an entry in a CLOSED period', async () => {
-      ((prisma as any).journalEntry.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue({
         id: 'je-1',
         tenantId: tenantA,
         status: 'POSTED',
@@ -330,12 +336,12 @@ describe('Accounting Module Hardening (E2E)', () => {
   describe('Cross-Module Postings', () => {
     it('should post canteen top-up correctly', async () => {
       jest
-        .spyOn(postingService as any, 'ensurePostingPeriodIsOpen')
-        .mockResolvedValue({ id: 'p1', fiscalYearId: 'fy1' });
-      ((prisma as any).chartAccount.upsert as jest.Mock).mockResolvedValue({
+        .spyOn(postingService, 'ensurePostingPeriodIsOpen')
+        .mockResolvedValue(postingPeriodStub('p1', 'fy1'));
+      (prisma.chartAccount.upsert as jest.Mock).mockResolvedValue({
         id: 'acc-1',
       });
-      ((prisma as any).journalEntry.create as jest.Mock).mockResolvedValue({
+      (prisma.journalEntry.create as jest.Mock).mockResolvedValue({
         id: 'je-topup',
       });
 
@@ -351,7 +357,7 @@ describe('Accounting Module Hardening (E2E)', () => {
       );
 
       expect(entry).toBeDefined();
-      expect((prisma as any).journalEntry.create).toHaveBeenCalledWith(
+      expect(prisma.journalEntry.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             sourceModule: 'CANTEEN',
@@ -363,12 +369,12 @@ describe('Accounting Module Hardening (E2E)', () => {
 
     it('should post invoice correctly', async () => {
       jest
-        .spyOn(postingService as any, 'ensurePostingPeriodIsOpen')
-        .mockResolvedValue({ id: 'p1', fiscalYearId: 'fy1' });
-      ((prisma as any).chartAccount.upsert as jest.Mock).mockResolvedValue({
+        .spyOn(postingService, 'ensurePostingPeriodIsOpen')
+        .mockResolvedValue(postingPeriodStub('p1', 'fy1'));
+      (prisma.chartAccount.upsert as jest.Mock).mockResolvedValue({
         id: 'acc-1',
       });
-      ((prisma as any).journalEntry.create as jest.Mock).mockResolvedValue({
+      (prisma.journalEntry.create as jest.Mock).mockResolvedValue({
         id: 'je-invoice',
       });
 
@@ -391,7 +397,7 @@ describe('Accounting Module Hardening (E2E)', () => {
       );
 
       expect(entry).toBeDefined();
-      expect((prisma as any).journalEntry.create).toHaveBeenCalledWith(
+      expect(prisma.journalEntry.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             sourceType: 'INVOICE',

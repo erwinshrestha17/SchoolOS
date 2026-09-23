@@ -19,7 +19,7 @@ describe('Transport Hardening (E2E)', () => {
   let moduleRef: TestingModule;
   let prisma: PrismaMock;
   let transportController: TransportController;
-  let redis: any;
+  let redis: { getClient: jest.Mock };
 
   const tenantId = 'tenant-1';
   const adminActor: AuthContext = {

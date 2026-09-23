@@ -16,7 +16,18 @@ import {
 import { AssessmentRetakesService } from './assessment-retakes.service';
 
 describe('AssessmentRetakesService', () => {
-  let prisma: any;
+  let prisma: {
+    assessmentRetake: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
+    markEntry: { findFirst: jest.Mock; update: jest.Mock };
+    reportCardCorrectionRequest: { findFirst: jest.Mock };
+    $transaction: jest.Mock;
+  };
   let audit: { record: jest.Mock };
   let communications: { recordDeliveryRecords: jest.Mock };
   let teacherScope: {
@@ -127,7 +138,9 @@ describe('AssessmentRetakesService', () => {
       listActiveAssignmentsForCapability: jest.fn().mockResolvedValue([]),
     };
     service = new AssessmentRetakesService(
-      prisma,
+      prisma as unknown as ConstructorParameters<
+        typeof AssessmentRetakesService
+      >[0],
       audit as never,
       communications as never,
       teacherScope as never,

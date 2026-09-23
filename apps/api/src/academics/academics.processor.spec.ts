@@ -26,9 +26,15 @@ describe('AcademicsProcessor', () => {
     };
 
     processor = new AcademicsProcessor(
-      reportCardsService as any,
-      plansService as any,
-      createProcessorClsMock() as any,
+      reportCardsService as unknown as ConstructorParameters<
+        typeof AcademicsProcessor
+      >[0],
+      plansService as unknown as ConstructorParameters<
+        typeof AcademicsProcessor
+      >[1],
+      createProcessorClsMock() as unknown as ConstructorParameters<
+        typeof AcademicsProcessor
+      >[2],
     );
   });
 
@@ -46,7 +52,7 @@ describe('AcademicsProcessor', () => {
     await processor.process({
       name: 'batchGenerateReportCards',
       data: jobData,
-    } as any);
+    } as unknown as Parameters<typeof processor.process>[0]);
 
     expect(plansService.shouldProcessTenantJob).toHaveBeenCalledWith(
       'tenant-1',
@@ -90,7 +96,7 @@ describe('AcademicsProcessor', () => {
     await processor.process({
       name: 'batchGenerateReportCards',
       data: jobData,
-    } as any);
+    } as unknown as Parameters<typeof processor.process>[0]);
 
     expect(plansService.shouldProcessTenantJob).toHaveBeenCalledWith(
       'tenant-suspended',
@@ -115,7 +121,7 @@ describe('AcademicsProcessor', () => {
       processor.process({
         name: 'batchGenerateReportCards',
         data: jobData,
-      } as any),
+      } as unknown as Parameters<typeof processor.process>[0]),
     ).rejects.toThrow(
       'Report-card batch generation failed for 1 of 2 students',
     );
@@ -148,7 +154,7 @@ describe('AcademicsProcessor', () => {
     await processor.process({
       name: 'batchGenerateReportCards',
       data: jobData,
-    } as any);
+    } as unknown as Parameters<typeof processor.process>[0]);
 
     expect(reportCardsService.generateReportCard).toHaveBeenCalledTimes(2);
     expect(reportCardsService.generateReportCard).toHaveBeenNthCalledWith(

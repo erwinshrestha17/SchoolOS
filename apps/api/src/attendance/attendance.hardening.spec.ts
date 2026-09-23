@@ -1,10 +1,6 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import { AttendanceStatus, AuthMethod, Prisma } from '@prisma/client';
+import { AttendanceStatus, AuthMethod } from '@prisma/client';
 import { AttendanceService } from './attendance.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
@@ -49,6 +45,20 @@ function buildTestRosterVersion(input: {
     .digest('hex');
 }
 
+async function calendarDayForTest(
+  service: AttendanceService,
+  tenantId: string,
+  date: Date,
+): Promise<{ calendarDate: string; isWorkingDay: boolean }> {
+  const testedService = service as unknown as {
+    resolveCalendarDay: (
+      tenantId: string,
+      date: Date,
+    ) => Promise<{ calendarDate: string; isWorkingDay: boolean }>;
+  };
+  return testedService.resolveCalendarDay(tenantId, date);
+}
+
 describe('Attendance Hardening', () => {
   let service: AttendanceService;
   let prisma: PrismaService;
@@ -77,7 +87,7 @@ describe('Attendance Hardening', () => {
       'attendance:override_lock',
     ],
   };
-  let teacherAssignments: Array<Record<string, any>>;
+  let teacherAssignments: ReturnType<typeof teacherAssignmentFixture>[];
 
   beforeEach(async () => {
     // Default scope for this suite: these tests exercise lock, conflict and
@@ -364,11 +374,13 @@ describe('Attendance Hardening', () => {
           null,
         );
 
-        const saturday = await (service as any).resolveCalendarDay(
+        const saturday = await calendarDayForTest(
+          service,
           'tenant-1',
           new Date('2026-07-11'),
         );
-        const sunday = await (service as any).resolveCalendarDay(
+        const sunday = await calendarDayForTest(
+          service,
           'tenant-1',
           new Date('2026-07-12'),
         );
@@ -400,14 +412,16 @@ describe('Attendance Hardening', () => {
         );
 
         // Saturday
-        const satResult = await (service as any).resolveCalendarDay(
+        const satResult = await calendarDayForTest(
+          service,
           'tenant-1',
           new Date('2026-06-06'),
         ); // Saturday
         expect(satResult.isWorkingDay).toBe(false);
 
         // Sunday
-        const sunResult = await (service as any).resolveCalendarDay(
+        const sunResult = await calendarDayForTest(
+          service,
           'tenant-1',
           new Date('2026-06-07'),
         ); // Sunday
@@ -427,21 +441,24 @@ describe('Attendance Hardening', () => {
         );
 
         // Friday
-        const friResult = await (service as any).resolveCalendarDay(
+        const friResult = await calendarDayForTest(
+          service,
           'tenant-1',
           new Date('2026-06-05'),
         ); // Friday
         expect(friResult.isWorkingDay).toBe(false);
 
         // Saturday
-        const satResult = await (service as any).resolveCalendarDay(
+        const satResult = await calendarDayForTest(
+          service,
           'tenant-1',
           new Date('2026-06-06'),
         ); // Saturday
         expect(satResult.isWorkingDay).toBe(false);
 
         // Sunday
-        const sunResult = await (service as any).resolveCalendarDay(
+        const sunResult = await calendarDayForTest(
+          service,
           'tenant-1',
           new Date('2026-06-07'),
         ); // Sunday
@@ -544,7 +561,9 @@ describe('Attendance Hardening', () => {
             buildSyncDto({
               deviceTimestamp: '2026-06-05T09:00:00.000Z',
               expectedRosterVersion: 'f'.repeat(64),
-            }) as any,
+            }) as unknown as Parameters<
+              AttendanceService['submitAttendance']
+            >[0],
             mockActor,
           )
           .then(() => null)
@@ -566,7 +585,9 @@ describe('Attendance Hardening', () => {
             buildSyncDto({
               deviceTimestamp: '2026-06-05T11:00:00.000Z',
               expectedRosterVersion: 'f'.repeat(64),
-            }) as any,
+            }) as unknown as Parameters<
+              AttendanceService['submitAttendance']
+            >[0],
             mockActor,
           )
           .then(() => null)
@@ -587,7 +608,7 @@ describe('Attendance Hardening', () => {
           buildSyncDto({
             deviceTimestamp: '2026-06-05T09:00:00.000Z',
             expectedRosterVersion: currentRosterVersion,
-          }) as any,
+          }) as unknown as Parameters<typeof service.submitAttendance>[0],
           mockActor,
         );
 
@@ -603,7 +624,7 @@ describe('Attendance Hardening', () => {
           buildSyncDto({
             deviceTimestamp: '2026-06-05T11:00:00.000Z',
             expectedRosterVersion: currentRosterVersion,
-          }) as any,
+          }) as unknown as Parameters<typeof service.submitAttendance>[0],
           mockActor,
         );
 
@@ -649,8 +670,12 @@ describe('Attendance Hardening', () => {
             ],
           });
 
-        const p2002Error = new Error('Unique constraint failed') as any;
-        p2002Error.code = 'P2002';
+        const p2002Error = Object.assign(
+          new Error('Unique constraint failed'),
+          {
+            code: 'P2002',
+          },
+        );
         (prisma.$transaction as jest.Mock).mockRejectedValueOnce(p2002Error);
 
         (
@@ -674,7 +699,10 @@ describe('Attendance Hardening', () => {
           ],
         };
 
-        const result = await service.submitAttendance(dto as any, mockActor);
+        const result = await service.submitAttendance(
+          dto as unknown as Parameters<typeof service.submitAttendance>[0],
+          mockActor,
+        );
         expect(result.sessionId).toBe('concurrent-session-1');
         expect(prisma.attendanceConflict.create).toHaveBeenCalled();
         expect(prisma.attendanceSession.update).toHaveBeenCalledWith(
@@ -802,7 +830,7 @@ describe('Attendance Hardening', () => {
           },
         );
 
-        const result: any = await service.getAttendanceAnomalies(mockActor);
+        const result = await service.getAttendanceAnomalies(mockActor);
 
         // Verify streaks
         expect(result.absenceStreaks).toHaveLength(1);
@@ -815,14 +843,20 @@ describe('Attendance Hardening', () => {
         expect(result.repeatedLates[0].lateCount).toBe(3);
 
         // Verify late submissions
-        expect(result.anomalies.lateSubmissions).toHaveLength(1);
-        expect(result.anomalies.lateSubmissions[0].sessionId).toBe('session-1');
+        const anomalies = result.anomalies;
+        if (!anomalies || typeof anomalies !== 'object') {
+          throw new Error('Attendance anomalies fixture is missing');
+        }
+        const typedAnomalies = anomalies as {
+          lateSubmissions: { sessionId: string }[];
+          rosterDivergences: { sessionId: string }[];
+        };
+        expect(typedAnomalies.lateSubmissions).toHaveLength(1);
+        expect(typedAnomalies.lateSubmissions[0].sessionId).toBe('session-1');
 
         // Verify roster divergence
-        expect(result.anomalies.rosterDivergences).toHaveLength(1);
-        expect(result.anomalies.rosterDivergences[0].sessionId).toBe(
-          'session-1',
-        );
+        expect(typedAnomalies.rosterDivergences).toHaveLength(1);
+        expect(typedAnomalies.rosterDivergences[0].sessionId).toBe('session-1');
       });
     });
   });

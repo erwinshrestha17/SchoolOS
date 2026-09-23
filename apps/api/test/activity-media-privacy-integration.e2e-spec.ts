@@ -150,7 +150,7 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
     auditService = {
       record: jest.fn(async (entry: Record<string, unknown>) => {
         prisma.__state.auditLogs.push({
-          id: `audit-${prisma.__state.auditLogs.length + 1}`,
+          id: `audit-${String(prisma.__state.auditLogs.length + 1)}`,
           ...entry,
           createdAt: new Date(),
         });
@@ -779,9 +779,9 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
               | { create?: Record<string, unknown>[] }
               | undefined
           )?.create ?? []) as Record<string, unknown>[];
-          const postId = `post-${state.activityPosts.length + 1}`;
+          const postId = `post-${String(state.activityPosts.length + 1)}`;
           const attachments = attachmentsCreate.map((attachment, index) => ({
-            id: `attachment-${postId}-${index + 1}`,
+            id: `attachment-${postId}-${String(index + 1)}`,
             activityPostId: postId,
             ...attachment,
           })) as ActivityAttachmentRecord[];

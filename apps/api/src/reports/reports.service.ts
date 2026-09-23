@@ -9,22 +9,18 @@ import ExcelJS from 'exceljs';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
-import type {
-  ReportDefinition,
-  ReportExportRequest,
-  ReportExportResult,
-  ReportFormat,
-} from '@schoolos/core';
 import {
+  type ReportDefinition,
+  type ReportExportRequest,
+  type ReportExportResult,
+  type ReportFormat,
+  type FinancialReportClassification,
+  type FinancialReportDefinition,
+  type FinancialReportId,
   FINANCIAL_REPORT_DEFINITION_VERSION,
   P0_FINANCIAL_REPORT_CATALOG,
   findFinancialReportDefinition,
   resolveFinancialReportClassification,
-} from '@schoolos/core';
-import type {
-  FinancialReportClassification,
-  FinancialReportDefinition,
-  FinancialReportId,
 } from '@schoolos/core';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -183,12 +179,14 @@ export class ReportsService {
         const enrollments = await this.prisma.enrollment.findMany({
           where: {
             tenantId: actor.tenantId,
-            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            ...(filters.classId
+              ? { classId: reportFilterString(filters.classId) }
+              : {}),
             ...(filters.sectionId
-              ? { sectionId: String(filters.sectionId) }
+              ? { sectionId: reportFilterString(filters.sectionId) }
               : {}),
             ...(filters.academicYearId
-              ? { academicYearId: String(filters.academicYearId) }
+              ? { academicYearId: reportFilterString(filters.academicYearId) }
               : {}),
             ...(filters.status
               ? { status: filters.status as EnrollmentStatus }
@@ -263,11 +261,13 @@ export class ReportsService {
         const cards = await this.prisma.reportCard.findMany({
           where: {
             tenantId: actor.tenantId,
-            academicYearId: String(filters.academicYearId),
-            examTermId: String(filters.examTermId),
-            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            academicYearId: reportFilterString(filters.academicYearId),
+            examTermId: reportFilterString(filters.examTermId),
+            ...(filters.classId
+              ? { classId: reportFilterString(filters.classId) }
+              : {}),
             ...(filters.sectionId
-              ? { sectionId: String(filters.sectionId) }
+              ? { sectionId: reportFilterString(filters.sectionId) }
               : {}),
           },
           include: { student: true, class: true, section: true },
@@ -320,14 +320,16 @@ export class ReportsService {
         const marks = await this.prisma.markEntry.findMany({
           where: {
             tenantId: actor.tenantId,
-            examTermId: String(filters.examTermId),
+            examTermId: reportFilterString(filters.examTermId),
             ...(filters.subjectId
-              ? { subjectId: String(filters.subjectId) }
+              ? { subjectId: reportFilterString(filters.subjectId) }
               : {}),
             student: {
-              ...(filters.classId ? { classId: String(filters.classId) } : {}),
+              ...(filters.classId
+                ? { classId: reportFilterString(filters.classId) }
+                : {}),
               ...(filters.sectionId
-                ? { sectionId: String(filters.sectionId) }
+                ? { sectionId: reportFilterString(filters.sectionId) }
                 : {}),
             },
           },
@@ -390,11 +392,13 @@ export class ReportsService {
           by: ['grade'],
           where: {
             tenantId: actor.tenantId,
-            academicYearId: String(filters.academicYearId),
-            examTermId: String(filters.examTermId),
-            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            academicYearId: reportFilterString(filters.academicYearId),
+            examTermId: reportFilterString(filters.examTermId),
+            ...(filters.classId
+              ? { classId: reportFilterString(filters.classId) }
+              : {}),
             ...(filters.sectionId
-              ? { sectionId: String(filters.sectionId) }
+              ? { sectionId: reportFilterString(filters.sectionId) }
               : {}),
           },
           _count: { _all: true },
@@ -440,10 +444,10 @@ export class ReportsService {
           this.prisma.enrollment.findMany({
             where: {
               tenantId: actor.tenantId,
-              academicYearId: String(filters.academicYearId),
-              classId: String(filters.classId),
+              academicYearId: reportFilterString(filters.academicYearId),
+              classId: reportFilterString(filters.classId),
               ...(filters.sectionId
-                ? { sectionId: String(filters.sectionId) }
+                ? { sectionId: reportFilterString(filters.sectionId) }
                 : {}),
               status: 'ACTIVE',
             },
@@ -452,10 +456,12 @@ export class ReportsService {
           this.prisma.assessmentComponent.findMany({
             where: {
               tenantId: actor.tenantId,
-              examTermId: String(filters.examTermId),
+              examTermId: reportFilterString(filters.examTermId),
               subject: {
-                classId: String(filters.classId),
-                ...(filters.subjectId ? { id: String(filters.subjectId) } : {}),
+                classId: reportFilterString(filters.classId),
+                ...(filters.subjectId
+                  ? { id: reportFilterString(filters.subjectId) }
+                  : {}),
               },
             },
             include: { subject: true },
@@ -463,7 +469,7 @@ export class ReportsService {
           this.prisma.markEntry.findMany({
             where: {
               tenantId: actor.tenantId,
-              examTermId: String(filters.examTermId),
+              examTermId: reportFilterString(filters.examTermId),
             },
             select: {
               studentId: true,
@@ -555,11 +561,13 @@ export class ReportsService {
         const month = Number(filters.month);
         const year = Number(filters.year);
         const academicYearId = filters.academicYearId
-          ? String(filters.academicYearId)
+          ? reportFilterString(filters.academicYearId)
           : undefined;
-        const classId = filters.classId ? String(filters.classId) : undefined;
+        const classId = filters.classId
+          ? reportFilterString(filters.classId)
+          : undefined;
         const sectionId = filters.sectionId
-          ? String(filters.sectionId)
+          ? reportFilterString(filters.sectionId)
           : undefined;
 
         if (!month || !year || !academicYearId || !classId) {
@@ -594,7 +602,7 @@ export class ReportsService {
             classId,
             ...(sectionId ? { sectionId } : {}),
             ...(filters.studentId
-              ? { studentId: String(filters.studentId) }
+              ? { studentId: reportFilterString(filters.studentId) }
               : {}),
           },
           include: {
@@ -705,10 +713,12 @@ export class ReportsService {
         const records = await this.prisma.casRecord.findMany({
           where: {
             tenantId: actor.tenantId,
-            academicYearId: String(filters.academicYearId),
-            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            academicYearId: reportFilterString(filters.academicYearId),
+            ...(filters.classId
+              ? { classId: reportFilterString(filters.classId) }
+              : {}),
             ...(filters.sectionId
-              ? { sectionId: String(filters.sectionId) }
+              ? { sectionId: reportFilterString(filters.sectionId) }
               : {}),
           },
           include: {
@@ -758,8 +768,8 @@ export class ReportsService {
         const enrollments = await this.prisma.enrollment.findMany({
           where: {
             tenantId: actor.tenantId,
-            academicYearId: String(filters.academicYearId),
-            classId: String(filters.classId),
+            academicYearId: reportFilterString(filters.academicYearId),
+            classId: reportFilterString(filters.classId),
             status: 'ACTIVE',
           },
           include: {
@@ -808,8 +818,10 @@ export class ReportsService {
           this.prisma.enrollment.findMany({
             where: {
               tenantId: actor.tenantId,
-              academicYearId: String(filters.academicYearId),
-              ...(filters.classId ? { classId: String(filters.classId) } : {}),
+              academicYearId: reportFilterString(filters.academicYearId),
+              ...(filters.classId
+                ? { classId: reportFilterString(filters.classId) }
+                : {}),
               status: 'ACTIVE',
             },
             include: { student: true, class: true },
@@ -817,8 +829,10 @@ export class ReportsService {
           this.prisma.reportCard.findMany({
             where: {
               tenantId: actor.tenantId,
-              examTermId: String(filters.examTermId),
-              ...(filters.classId ? { classId: String(filters.classId) } : {}),
+              examTermId: reportFilterString(filters.examTermId),
+              ...(filters.classId
+                ? { classId: reportFilterString(filters.classId) }
+                : {}),
             },
             select: { studentId: true, status: true },
           }),
@@ -874,9 +888,11 @@ export class ReportsService {
         const reportCards = await this.prisma.reportCard.findMany({
           where: {
             tenantId: actor.tenantId,
-            academicYearId: String(filters.academicYearId),
-            examTermId: String(filters.examTermId),
-            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            academicYearId: reportFilterString(filters.academicYearId),
+            examTermId: reportFilterString(filters.examTermId),
+            ...(filters.classId
+              ? { classId: reportFilterString(filters.classId) }
+              : {}),
             percentage: { lt: threshold },
           },
           include: { student: true, class: true },
@@ -947,9 +963,12 @@ export class ReportsService {
         // windowTotals and the summary come from report-wide aggregates that
         // are identical on every page, so one minimal page is enough -- there
         // is no need to drain the ledger a second time.
+        const query = this.toStudentFeeLedgerQuery(filters);
+        query.page = 1;
+        query.limit = 1;
         const ledger = await this.financeService.getStudentFeeLedgerPage(
           this.requireStudentFeeLedgerId(filters),
-          { ...this.toStudentFeeLedgerQuery(filters), page: 1, limit: 1 },
+          query,
           actor,
         );
 
@@ -995,26 +1014,28 @@ export class ReportsService {
         const report = await this.financeService.getFeeCollectionReportRows(
           actor,
           {
-            fromDate: String(filters.fromDate),
-            toDate: String(filters.toDate),
+            fromDate: reportFilterString(filters.fromDate),
+            toDate: reportFilterString(filters.toDate),
             academicYearId: filters.academicYearId
-              ? String(filters.academicYearId)
+              ? reportFilterString(filters.academicYearId)
               : undefined,
-            classId: filters.classId ? String(filters.classId) : undefined,
+            classId: filters.classId
+              ? reportFilterString(filters.classId)
+              : undefined,
             sectionId: filters.sectionId
-              ? String(filters.sectionId)
+              ? reportFilterString(filters.sectionId)
               : undefined,
             studentId: filters.studentId
-              ? String(filters.studentId)
+              ? reportFilterString(filters.studentId)
               : undefined,
             collectorUserId: filters.collectorUserId
-              ? String(filters.collectorUserId)
+              ? reportFilterString(filters.collectorUserId)
               : undefined,
             paymentMethod: filters.paymentMethod
-              ? String(filters.paymentMethod)
+              ? reportFilterString(filters.paymentMethod)
               : undefined,
             feeHeadId: filters.feeHeadId
-              ? String(filters.feeHeadId)
+              ? reportFilterString(filters.feeHeadId)
               : undefined,
           },
         );
@@ -1136,25 +1157,27 @@ export class ReportsService {
         const report = await this.financeService.getDefaulterAgingReportRows(
           actor,
           {
-            asOfDate: String(filters.asOfDate),
+            asOfDate: reportFilterString(filters.asOfDate),
             academicYearId: filters.academicYearId
-              ? String(filters.academicYearId)
+              ? reportFilterString(filters.academicYearId)
               : undefined,
-            classId: filters.classId ? String(filters.classId) : undefined,
+            classId: filters.classId
+              ? reportFilterString(filters.classId)
+              : undefined,
             sectionId: filters.sectionId
-              ? String(filters.sectionId)
+              ? reportFilterString(filters.sectionId)
               : undefined,
             studentId: filters.studentId
-              ? String(filters.studentId)
+              ? reportFilterString(filters.studentId)
               : undefined,
             feeHeadId: filters.feeHeadId
-              ? String(filters.feeHeadId)
+              ? reportFilterString(filters.feeHeadId)
               : undefined,
             minOutstanding: filters.minOutstanding
               ? Number(filters.minOutstanding)
               : undefined,
             agingBucket: filters.agingBucket
-              ? String(filters.agingBucket)
+              ? reportFilterString(filters.agingBucket)
               : undefined,
           },
         );
@@ -1257,17 +1280,19 @@ export class ReportsService {
         const report = await this.financeService.getDuesTableReport(
           {
             academicYearId: filters.academicYearId
-              ? String(filters.academicYearId)
+              ? reportFilterString(filters.academicYearId)
               : undefined,
-            classId: filters.classId ? String(filters.classId) : undefined,
+            classId: filters.classId
+              ? reportFilterString(filters.classId)
+              : undefined,
             sectionId: filters.sectionId
-              ? String(filters.sectionId)
+              ? reportFilterString(filters.sectionId)
               : undefined,
             feeHeadId: filters.feeHeadId
-              ? String(filters.feeHeadId)
+              ? reportFilterString(filters.feeHeadId)
               : undefined,
             studentId: filters.studentId
-              ? String(filters.studentId)
+              ? reportFilterString(filters.studentId)
               : undefined,
           },
           actor,
@@ -1328,10 +1353,10 @@ export class ReportsService {
       execute: async (actor, filters) => {
         const result = await this.financeService.listCashierCloses(
           {
-            openedFrom: String(filters.fromDate),
-            closedTo: String(filters.toDate),
+            openedFrom: reportFilterString(filters.fromDate),
+            closedTo: reportFilterString(filters.toDate),
             collectorUserId: filters.collectorUserId
-              ? String(filters.collectorUserId)
+              ? reportFilterString(filters.collectorUserId)
               : undefined,
             page: 1,
             limit: 5000,
@@ -1491,20 +1516,26 @@ export class ReportsService {
           actor,
           {
             academicYearId: filters.academicYearId
-              ? String(filters.academicYearId)
+              ? reportFilterString(filters.academicYearId)
               : undefined,
-            classId: filters.classId ? String(filters.classId) : undefined,
+            classId: filters.classId
+              ? reportFilterString(filters.classId)
+              : undefined,
             sectionId: filters.sectionId
-              ? String(filters.sectionId)
+              ? reportFilterString(filters.sectionId)
               : undefined,
             studentId: filters.studentId
-              ? String(filters.studentId)
+              ? reportFilterString(filters.studentId)
               : undefined,
             feeHeadId: filters.feeHeadId
-              ? String(filters.feeHeadId)
+              ? reportFilterString(filters.feeHeadId)
               : undefined,
-            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            fromDate: filters.fromDate
+              ? reportFilterString(filters.fromDate)
+              : undefined,
+            toDate: filters.toDate
+              ? reportFilterString(filters.toDate)
+              : undefined,
           },
         );
 
@@ -1529,14 +1560,26 @@ export class ReportsService {
       executeTotals: async (actor, filters) => {
         const report = await this.financeService.getInvoiceRegisterRows(actor, {
           academicYearId: filters.academicYearId
-            ? String(filters.academicYearId)
+            ? reportFilterString(filters.academicYearId)
             : undefined,
-          classId: filters.classId ? String(filters.classId) : undefined,
-          sectionId: filters.sectionId ? String(filters.sectionId) : undefined,
-          studentId: filters.studentId ? String(filters.studentId) : undefined,
-          feeHeadId: filters.feeHeadId ? String(filters.feeHeadId) : undefined,
-          fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-          toDate: filters.toDate ? String(filters.toDate) : undefined,
+          classId: filters.classId
+            ? reportFilterString(filters.classId)
+            : undefined,
+          sectionId: filters.sectionId
+            ? reportFilterString(filters.sectionId)
+            : undefined,
+          studentId: filters.studentId
+            ? reportFilterString(filters.studentId)
+            : undefined,
+          feeHeadId: filters.feeHeadId
+            ? reportFilterString(filters.feeHeadId)
+            : undefined,
+          fromDate: filters.fromDate
+            ? reportFilterString(filters.fromDate)
+            : undefined,
+          toDate: filters.toDate
+            ? reportFilterString(filters.toDate)
+            : undefined,
           page: 1,
           limit: 1,
         });
@@ -1621,12 +1664,16 @@ export class ReportsService {
           actor,
           {
             studentId: filters.studentId
-              ? String(filters.studentId)
+              ? reportFilterString(filters.studentId)
               : undefined,
-            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            fromDate: filters.fromDate
+              ? reportFilterString(filters.fromDate)
+              : undefined,
+            toDate: filters.toDate
+              ? reportFilterString(filters.toDate)
+              : undefined,
             paymentMethod: filters.paymentMethod
-              ? String(filters.paymentMethod)
+              ? reportFilterString(filters.paymentMethod)
               : undefined,
           },
         );
@@ -1651,11 +1698,17 @@ export class ReportsService {
       },
       executeTotals: async (actor, filters) => {
         const report = await this.financeService.getReceiptRegisterRows(actor, {
-          studentId: filters.studentId ? String(filters.studentId) : undefined,
-          fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-          toDate: filters.toDate ? String(filters.toDate) : undefined,
+          studentId: filters.studentId
+            ? reportFilterString(filters.studentId)
+            : undefined,
+          fromDate: filters.fromDate
+            ? reportFilterString(filters.fromDate)
+            : undefined,
+          toDate: filters.toDate
+            ? reportFilterString(filters.toDate)
+            : undefined,
           paymentMethod: filters.paymentMethod
-            ? String(filters.paymentMethod)
+            ? reportFilterString(filters.paymentMethod)
             : undefined,
           page: 1,
           limit: 1,
@@ -1691,10 +1744,14 @@ export class ReportsService {
           actor,
           {
             fiscalYear: filters.fiscalYear
-              ? String(filters.fiscalYear)
+              ? reportFilterString(filters.fiscalYear)
               : undefined,
-            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            fromDate: filters.fromDate
+              ? reportFilterString(filters.fromDate)
+              : undefined,
+            toDate: filters.toDate
+              ? reportFilterString(filters.toDate)
+              : undefined,
             page: 1,
             limit: 5000,
           },
@@ -1742,10 +1799,16 @@ export class ReportsService {
       execute: async (actor, filters) => {
         const report =
           await this.financeService.getRefundReversalRegisterExport(actor, {
-            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            fromDate: filters.fromDate
+              ? reportFilterString(filters.fromDate)
+              : undefined,
+            toDate: filters.toDate
+              ? reportFilterString(filters.toDate)
+              : undefined,
             recordType: filters.recordType
-              ? (String(filters.recordType) as 'REFUND' | 'REVERSAL')
+              ? (reportFilterString(filters.recordType) as
+                  | 'REFUND'
+                  | 'REVERSAL')
               : undefined,
           });
 
@@ -1770,10 +1833,16 @@ export class ReportsService {
         const report = await this.financeService.getRefundReversalRegisterRows(
           actor,
           {
-            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            fromDate: filters.fromDate
+              ? reportFilterString(filters.fromDate)
+              : undefined,
+            toDate: filters.toDate
+              ? reportFilterString(filters.toDate)
+              : undefined,
             recordType: filters.recordType
-              ? (String(filters.recordType) as 'REFUND' | 'REVERSAL')
+              ? (reportFilterString(filters.recordType) as
+                  | 'REFUND'
+                  | 'REVERSAL')
               : undefined,
             page: 1,
             limit: 1,
@@ -1816,9 +1885,13 @@ export class ReportsService {
         const report = await this.accountingReportsService.getJournalRegister(
           actor.tenantId,
           {
-            fiscalYearId: String(filters.fiscalYearId),
-            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            fiscalYearId: reportFilterString(filters.fiscalYearId),
+            fromDate: filters.fromDate
+              ? reportFilterString(filters.fromDate)
+              : undefined,
+            toDate: filters.toDate
+              ? reportFilterString(filters.toDate)
+              : undefined,
             limit: 5000,
           },
         );
@@ -1927,10 +2000,18 @@ export class ReportsService {
       execute: async (actor, filters) => {
         const report = await this.auditService.queryFinancialAuditTrail({
           tenantId: actor.tenantId,
-          resource: filters.resource ? String(filters.resource) : undefined,
-          action: filters.action ? String(filters.action) : undefined,
-          fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-          toDate: filters.toDate ? String(filters.toDate) : undefined,
+          resource: filters.resource
+            ? reportFilterString(filters.resource)
+            : undefined,
+          action: filters.action
+            ? reportFilterString(filters.action)
+            : undefined,
+          fromDate: filters.fromDate
+            ? reportFilterString(filters.fromDate)
+            : undefined,
+          toDate: filters.toDate
+            ? reportFilterString(filters.toDate)
+            : undefined,
           limit: 1000,
         });
         return report.items.map((item) => ({
@@ -1974,9 +2055,13 @@ export class ReportsService {
         const report = await this.accountingReportsService.getCashFlowStatement(
           actor.tenantId,
           {
-            fiscalYearId: String(filters.fiscalYearId),
-            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            fiscalYearId: reportFilterString(filters.fiscalYearId),
+            fromDate: filters.fromDate
+              ? reportFilterString(filters.fromDate)
+              : undefined,
+            toDate: filters.toDate
+              ? reportFilterString(filters.toDate)
+              : undefined,
           },
         );
         return report.sections.flatMap((section) =>
@@ -2020,10 +2105,16 @@ export class ReportsService {
         const report = await this.accountingReportsService.getBudgetVsActual(
           actor.tenantId,
           {
-            fiscalYearId: String(filters.fiscalYearId),
-            budgetId: filters.budgetId ? String(filters.budgetId) : undefined,
-            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            fiscalYearId: reportFilterString(filters.fiscalYearId),
+            budgetId: filters.budgetId
+              ? reportFilterString(filters.budgetId)
+              : undefined,
+            fromDate: filters.fromDate
+              ? reportFilterString(filters.fromDate)
+              : undefined,
+            toDate: filters.toDate
+              ? reportFilterString(filters.toDate)
+              : undefined,
           },
         );
         return report.rows.map((row) => ({
@@ -2086,7 +2177,9 @@ export class ReportsService {
         const staff = await this.prisma.staff.findMany({
           where: {
             tenantId: actor.tenantId,
-            ...(filters.staffId ? { id: String(filters.staffId) } : {}),
+            ...(filters.staffId
+              ? { id: reportFilterString(filters.staffId) }
+              : {}),
           },
           include: {
             attendanceRecords: {
@@ -2146,7 +2239,9 @@ export class ReportsService {
         const staff = await this.prisma.staff.findMany({
           where: {
             tenantId: actor.tenantId,
-            ...(filters.staffId ? { id: String(filters.staffId) } : {}),
+            ...(filters.staffId
+              ? { id: reportFilterString(filters.staffId) }
+              : {}),
           },
           include: {
             leaveBalances: {
@@ -2402,13 +2497,13 @@ export class ReportsService {
         const records = await this.prisma.casRecord.findMany({
           where: {
             tenantId: actor.tenantId,
-            academicYearId: String(filters.academicYearId),
-            classId: String(filters.classId),
+            academicYearId: reportFilterString(filters.academicYearId),
+            classId: reportFilterString(filters.classId),
             ...(filters.sectionId
-              ? { sectionId: String(filters.sectionId) }
+              ? { sectionId: reportFilterString(filters.sectionId) }
               : {}),
             ...(filters.subjectId
-              ? { subjectId: String(filters.subjectId) }
+              ? { subjectId: reportFilterString(filters.subjectId) }
               : {}),
           },
           include: {
@@ -2471,11 +2566,13 @@ export class ReportsService {
         const cards = await this.prisma.reportCard.findMany({
           where: {
             tenantId: actor.tenantId,
-            academicYearId: String(filters.academicYearId),
-            examTermId: String(filters.examTermId),
-            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            academicYearId: reportFilterString(filters.academicYearId),
+            examTermId: reportFilterString(filters.examTermId),
+            ...(filters.classId
+              ? { classId: reportFilterString(filters.classId) }
+              : {}),
             ...(filters.sectionId
-              ? { sectionId: String(filters.sectionId) }
+              ? { sectionId: reportFilterString(filters.sectionId) }
               : {}),
             status: 'LOCKED',
           },
@@ -2545,9 +2642,11 @@ export class ReportsService {
         const cards = await this.prisma.reportCard.findMany({
           where: {
             tenantId: actor.tenantId,
-            academicYearId: String(filters.academicYearId),
-            examTermId: String(filters.examTermId),
-            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            academicYearId: reportFilterString(filters.academicYearId),
+            examTermId: reportFilterString(filters.examTermId),
+            ...(filters.classId
+              ? { classId: reportFilterString(filters.classId) }
+              : {}),
           },
           include: { student: true, class: true, section: true },
           orderBy: [{ percentage: 'asc' }, { student: { firstNameEn: 'asc' } }],
@@ -2836,7 +2935,7 @@ export class ReportsService {
         normalizedParameters:
           exportMetadata.normalizedParameters as Prisma.InputJsonObject,
         rowCount: artifact.rowCount,
-        displayedTotals: (displayedTotals ?? {}) as Prisma.InputJsonObject,
+        displayedTotals: displayedTotals ?? {},
         financialReportId: exportMetadata.financialReportId,
         definitionVersion: exportMetadata.definitionVersion,
         checksum: artifact.checksum,
@@ -3026,7 +3125,7 @@ export class ReportsService {
         .map((header) => {
           const val = obj[header];
           if (val === null || val === undefined) return '""';
-          const stringVal = String(val).replace(/"/g, '""');
+          const stringVal = reportCsvCellString(val).replace(/"/g, '""');
           return `"${stringVal}"`;
         })
         .join(','),
@@ -3036,7 +3135,9 @@ export class ReportsService {
   }
 
   private requireStudentFeeLedgerId(filters: Record<string, unknown>) {
-    const studentId = filters.studentId ? String(filters.studentId) : undefined;
+    const studentId = filters.studentId
+      ? reportFilterString(filters.studentId)
+      : undefined;
 
     if (!studentId) {
       throw new ForbiddenException('studentId filter is required');
@@ -3056,12 +3157,14 @@ export class ReportsService {
   ): StudentFeeLedgerQueryDto {
     return {
       academicYearId: filters.academicYearId
-        ? String(filters.academicYearId)
+        ? reportFilterString(filters.academicYearId)
         : undefined,
-      fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
-      toDate: filters.toDate ? String(filters.toDate) : undefined,
+      fromDate: filters.fromDate
+        ? reportFilterString(filters.fromDate)
+        : undefined,
+      toDate: filters.toDate ? reportFilterString(filters.toDate) : undefined,
       invoiceStatus: filters.status
-        ? (String(filters.status) as InvoiceStatus)
+        ? (reportFilterString(filters.status) as InvoiceStatus)
         : undefined,
       sortDirection: 'asc',
     };
@@ -3565,4 +3668,30 @@ function excelColumnName(columnNumber: number): string {
     cursor = Math.floor(cursor / 26);
   }
   return result;
+}
+
+/** Registry filters used as identifiers, enum values and dates must be scalars. */
+function reportFilterString(value: unknown): string {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    return String(value);
+  }
+  throw new BadRequestException('Report filter must be a scalar value');
+}
+
+/** Never expand an unexpected object into additional protected CSV fields. */
+function reportCsvCellString(value: unknown): string {
+  if (value instanceof Date || value instanceof Prisma.Decimal) {
+    return value.toString();
+  }
+  if (typeof value === 'object' && value !== null) {
+    return '[object Object]';
+  }
+  return reportFilterString(value);
 }

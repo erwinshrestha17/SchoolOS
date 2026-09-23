@@ -2144,7 +2144,7 @@ export class FinanceService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
     const offset = (page - 1) * limit;
-    type UnallocatedBalanceRow = {
+    interface UnallocatedBalanceRow {
       paymentId: string;
       paymentDate: Date;
       receiptNumber: string | null;
@@ -2158,11 +2158,11 @@ export class FinanceService {
       originalAmount: Prisma.Decimal;
       unallocatedBalance: Prisma.Decimal;
       isAdvance: boolean;
-    };
-    type UnallocatedBalanceSummary = {
+    }
+    interface UnallocatedBalanceSummary {
       total: bigint;
       totalBalance: Prisma.Decimal;
-    };
+    }
     const [balanceRows, summaryRows] = await Promise.all([
       this.prisma.$queryRaw<UnallocatedBalanceRow[]>(Prisma.sql`
         WITH balances AS (
@@ -2319,11 +2319,13 @@ export class FinanceService {
     actor: AuthContext,
     query: FinanceReportQueryDto = {},
   ) {
-    const first = await this.getUnallocatedPaymentReport(actor, {
-      ...query,
-      page: 1,
-      limit: UNALLOCATED_PAYMENT_EXPORT_PAGE_SIZE,
-    });
+    const first = await this.getUnallocatedPaymentReport(
+      actor,
+      Object.assign({}, query, {
+        page: 1,
+        limit: UNALLOCATED_PAYMENT_EXPORT_PAGE_SIZE,
+      }),
+    );
 
     if (first.pagination.total > UNALLOCATED_PAYMENT_EXPORT_MAX_ROWS) {
       throw new BadRequestException(
@@ -2337,11 +2339,13 @@ export class FinanceService {
     );
 
     for (let page = 2; page <= pageCount; page += 1) {
-      const next = await this.getUnallocatedPaymentReport(actor, {
-        ...query,
-        page,
-        limit: UNALLOCATED_PAYMENT_EXPORT_PAGE_SIZE,
-      });
+      const next = await this.getUnallocatedPaymentReport(
+        actor,
+        Object.assign({}, query, {
+          page,
+          limit: UNALLOCATED_PAYMENT_EXPORT_PAGE_SIZE,
+        }),
+      );
       rows.push(...next.rows);
     }
 
@@ -3249,14 +3253,17 @@ export class FinanceService {
     for (const [fiscalYear, fiscalReceipts] of grouped.entries()) {
       const parsed = fiscalReceipts
         .map((receipt) => {
-          const match = receipt.receiptNumber.match(/^REC-(.+)-(\d+)$/);
+          const match = /^REC-(.+)-(\d+)$/.exec(receipt.receiptNumber);
           return {
             receipt,
             sequence: match ? Number(match[2]) : null,
           };
         })
-        .filter((entry) => entry.sequence !== null)
-        .sort((a, b) => a.sequence! - b.sequence!);
+        .filter(
+          (entry): entry is typeof entry & { sequence: number } =>
+            entry.sequence !== null,
+        )
+        .sort((a, b) => a.sequence - b.sequence);
 
       const numberCounts = new Map<string, number>();
       for (const receipt of fiscalReceipts) {
@@ -3281,7 +3288,7 @@ export class FinanceService {
       }
 
       if (parsed.length > 0) {
-        const sequences = parsed.map((entry) => entry.sequence!);
+        const sequences = parsed.map((entry) => entry.sequence);
         const minSeq = sequences[0];
         const maxSeq = sequences[sequences.length - 1];
         const sequenceSet = new Set(sequences);
@@ -3306,7 +3313,7 @@ export class FinanceService {
           if (
             previousIssuedAt &&
             previousSequence !== null &&
-            entry.sequence! < previousSequence &&
+            entry.sequence < previousSequence &&
             entry.receipt.issuedAt < previousIssuedAt
           ) {
             rows.push({
@@ -4007,18 +4014,9 @@ export class FinanceService {
       throw new NotFoundException('Invoice not found in this tenant');
     }
 
-    const [waivers, journalEntries] = await Promise.all([
-      this.prisma.feeWaiver.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          invoiceId: invoice.id,
-        },
-        include: {
-          approvedBy: { select: { id: true, email: true } },
-          feeHead: true,
-        },
-        orderBy: [{ createdAt: 'asc' }],
-      }),
+    const journalEntriesPromise: Promise<
+      Array<{ sourceId: string | null; entryNumber: string | null }>
+    > =
       invoice.payments.length === 0 &&
       (invoice.paymentAllocations?.length ?? 0) === 0
         ? Promise.resolve([])
@@ -4037,8 +4035,22 @@ export class FinanceService {
                 ),
               },
             },
+            select: { sourceId: true, entryNumber: true },
             orderBy: [{ entryDate: 'asc' }, { createdAt: 'asc' }],
-          }),
+          });
+    const [waivers, journalEntries] = await Promise.all([
+      this.prisma.feeWaiver.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          invoiceId: invoice.id,
+        },
+        include: {
+          approvedBy: { select: { id: true, email: true } },
+          feeHead: true,
+        },
+        orderBy: [{ createdAt: 'asc' }],
+      }),
+      journalEntriesPromise,
     ]);
     const paymentEntryBySourceId = new Map<string, string>(
       journalEntries.flatMap((entry) =>
@@ -5260,7 +5272,7 @@ export class FinanceService {
       ? Prisma.sql`ORDER BY o."eventDate" ASC, o."typeOrder" ASC, o."eventId" ASC`
       : Prisma.sql`ORDER BY o."eventDate" DESC, o."typeOrder" DESC, o."eventId" DESC`;
 
-    type LedgerPageRow = {
+    interface LedgerPageRow {
       eventId: string;
       eventDate: Date;
       eventType: 'INVOICE' | 'PAYMENT' | 'WAIVER' | 'REFUND' | 'REVERSAL';
@@ -5275,19 +5287,19 @@ export class FinanceService {
       paymentId: string | null;
       receiptNumber: string | null;
       status: string | null;
-    };
-    type LedgerWindowSummary = {
+    }
+    interface LedgerWindowSummary {
       total: bigint;
       openingBalance: Prisma.Decimal | null;
       windowDebit: Prisma.Decimal | null;
       windowCredit: Prisma.Decimal | null;
-    };
-    type LedgerReportSummary = {
+    }
+    interface LedgerReportSummary {
       totalInvoiced: Prisma.Decimal | null;
       totalPaid: Prisma.Decimal | null;
       totalRefunded: Prisma.Decimal | null;
       totalWaived: Prisma.Decimal | null;
-    };
+    }
 
     const orderedCte = Prisma.sql`
       ordered AS (
@@ -5515,7 +5527,10 @@ export class FinanceService {
   ) {
     const first = await this.getStudentFeeLedgerPage(
       studentId,
-      { ...query, page: 1, limit: STUDENT_LEDGER_EXPORT_PAGE_SIZE },
+      Object.assign({}, query, {
+        page: 1,
+        limit: STUDENT_LEDGER_EXPORT_PAGE_SIZE,
+      }),
       actor,
     );
 
@@ -5531,7 +5546,10 @@ export class FinanceService {
     for (let page = 2; page <= pageCount; page += 1) {
       const next = await this.getStudentFeeLedgerPage(
         studentId,
-        { ...query, page, limit: STUDENT_LEDGER_EXPORT_PAGE_SIZE },
+        Object.assign({}, query, {
+          page,
+          limit: STUDENT_LEDGER_EXPORT_PAGE_SIZE,
+        }),
         actor,
       );
       rows.push(...next.rows);
@@ -6584,7 +6602,10 @@ export class FinanceService {
         'All payment allocations must belong to the same student.',
       );
     }
-    const studentId = studentIds.values().next().value as string;
+    const studentId = studentIds.values().next().value;
+    if (!studentId) {
+      throw new ConflictException('Payment student could not be resolved.');
+    }
     if (invoiceIds.length === 0) {
       const student = await this.prisma.student.findFirst({
         where: { id: studentId, tenantId: actor.tenantId },
@@ -6595,7 +6616,12 @@ export class FinanceService {
     }
 
     const allocationPlan = invoices.map((invoice) => {
-      const amount = invoiceAllocationAmounts.get(invoice.id)!;
+      const amount = invoiceAllocationAmounts.get(invoice.id);
+      if (!amount) {
+        throw new ConflictException(
+          `Payment allocation is missing for invoice ${invoice.invoiceNumber}.`,
+        );
+      }
       const paidSoFar = sumInvoiceAllocationAmount(
         invoice.paymentAllocations,
         invoice.payments,
@@ -6825,7 +6851,7 @@ export class FinanceService {
       });
     } catch (error) {
       if (isPrismaUniqueConstraintError(error)) {
-        const existingPayment = await this.prisma.payment.findUnique({
+        const concurrentPayment = await this.prisma.payment.findUnique({
           where: {
             tenantId_idempotencyKey: {
               tenantId: actor.tenantId,
@@ -6835,20 +6861,20 @@ export class FinanceService {
           include: { receipt: true, allocations: true },
         });
 
-        if (existingPayment) {
+        if (concurrentPayment) {
           await this.auditService.record({
             action: 'idempotent_replay',
             resource: 'payment',
             tenantId: actor.tenantId,
             userId: actor.userId,
-            resourceId: existingPayment.id,
+            resourceId: concurrentPayment.id,
             after: {
-              invoiceId: existingPayment.invoiceId,
+              invoiceId: concurrentPayment.invoiceId,
               idempotencyKey,
               concurrent: true,
             },
           });
-          return mapCollectedPaymentResult(existingPayment, 'REPLAYED');
+          return mapCollectedPaymentResult(concurrentPayment, 'REPLAYED');
         }
       }
 
@@ -7044,7 +7070,16 @@ export class FinanceService {
         'One or more target invoices were not found for this student.',
       );
     }
-    for (const invoice of invoices) {
+    const targetEntries = invoices.map((invoice) => {
+      const amount = targetAmounts.get(invoice.id);
+      if (!amount) {
+        throw new ConflictException(
+          `Reallocation target is missing for invoice ${invoice.invoiceNumber}.`,
+        );
+      }
+      return { invoice, amount };
+    });
+    for (const { invoice, amount } of targetEntries) {
       const existingPaid = sumInvoiceAllocationAmount(
         invoice.paymentAllocations,
         invoice.payments,
@@ -7053,7 +7088,7 @@ export class FinanceService {
         new Prisma.Decimal(0),
         invoice.totalAmount.sub(existingPaid),
       );
-      if (targetAmounts.get(invoice.id)!.gt(remaining)) {
+      if (amount.gt(remaining)) {
         throw new ConflictException(
           `Reallocation exceeds the remaining balance for invoice ${invoice.invoiceNumber}.`,
         );
@@ -7114,13 +7149,13 @@ export class FinanceService {
         include: { invoice: { select: { invoiceNumber: true } } },
       });
       const targets = await Promise.all(
-        invoices.map((invoice) =>
+        targetEntries.map(({ invoice, amount }) =>
           tx.paymentAllocation.create({
             data: {
               tenantId: actor.tenantId,
               paymentId,
               invoiceId: invoice.id,
-              amount: targetAmounts.get(invoice.id)!,
+              amount,
               allocationType: PaymentAllocationType.REALLOCATION,
               allocationGroupId: idempotencyKey,
               reason,
@@ -7301,7 +7336,13 @@ export class FinanceService {
       );
     }
 
-    let request;
+    let request: Prisma.FinanceApprovalRequestGetPayload<{
+      include: {
+        payment: true;
+        requestedBy: { select: { id: true; email: true } };
+        history: true;
+      };
+    }>;
     try {
       request = await this.prisma.financeApprovalRequest.create({
         data: {
@@ -7455,7 +7496,13 @@ export class FinanceService {
       );
     }
 
-    let request;
+    let request: Prisma.FinanceApprovalRequestGetPayload<{
+      include: {
+        payment: true;
+        requestedBy: { select: { id: true; email: true } };
+        history: true;
+      };
+    }>;
     try {
       request = await this.prisma.financeApprovalRequest.create({
         data: {
@@ -8065,7 +8112,13 @@ export class FinanceService {
       actor.tenantId,
     );
 
-    let result;
+    let result: {
+      refund: Prisma.PaymentRefundGetPayload<Record<string, never>>;
+      journalEntry: Awaited<
+        ReturnType<AccountingPostingService['postPaymentRefund']>
+      >;
+      updatedInvoices: Array<Prisma.InvoiceGetPayload<Record<string, never>>>;
+    };
     try {
       result = await this.prisma.$transaction(async (tx) => {
         await tx.$queryRaw(Prisma.sql`
@@ -8958,7 +9011,7 @@ export class FinanceService {
       );
     }
     const amount = close.actualCashAmount ?? close.expectedCashAmount;
-    if (!amount || !amount.gt(0)) {
+    if (!amount?.gt(0)) {
       throw new ConflictException(
         'This cashier session has no positive counted cash to deposit.',
       );
@@ -9403,9 +9456,9 @@ export class FinanceService {
     const actualCashAmount =
       dto.actualCashAmount === undefined || dto.actualCashAmount === null
         ? null
-        : new Prisma.Decimal(Number(dto.actualCashAmount).toFixed(2));
+        : new Prisma.Decimal(dto.actualCashAmount.toFixed(2));
     const expectedCashAmount = new Prisma.Decimal(
-      Number(summary.expectedCashAmount).toFixed(2),
+      summary.expectedCashAmount.toFixed(2),
     );
     const varianceAmount = actualCashAmount
       ? new Prisma.Decimal(
@@ -10016,14 +10069,13 @@ export class FinanceService {
     );
 
     return {
-      enabled: Boolean(
+      enabled:
         provider.enabled &&
         provider.validationStatus === 'VALID' &&
         webhookReady &&
         paymentIntentReady &&
         providerAdapterReady &&
         settlementTrackingReady,
-      ),
       status:
         provider.validationStatus === 'VALID'
           ? webhookReady && paymentIntentReady && settlementTrackingReady
@@ -10143,7 +10195,7 @@ export class FinanceService {
       providerConfig.secretKeys,
     );
 
-    let intent;
+    let intent: Prisma.OnlinePaymentIntentGetPayload<Record<string, never>>;
     try {
       intent = await this.prisma.onlinePaymentIntent.create({
         data: {
@@ -10394,9 +10446,17 @@ export class FinanceService {
       data.status ?? data.event,
     );
 
-    const reference = String(
-      data.intentId ?? data.providerReference ?? data.reference ?? '',
-    ).trim();
+    const rawReference: unknown =
+      data.intentId ?? data.providerReference ?? data.reference ?? '';
+    if (
+      typeof rawReference !== 'string' &&
+      (typeof rawReference !== 'number' || !Number.isFinite(rawReference))
+    ) {
+      throw new BadRequestException(
+        'Webhook reference must be a string or number.',
+      );
+    }
+    const reference = String(rawReference).trim();
     if (!reference) {
       throw new BadRequestException('Webhook reference is required.');
     }
@@ -11728,9 +11788,11 @@ export class FinanceService {
             orderBy: [{ entryDate: 'asc' }, { createdAt: 'asc' }],
           });
     const paymentEntryBySourceId = new Map(
-      paymentEntryRecords
-        .filter((e) => e.sourceId && e.entryNumber)
-        .map((entry) => [entry.sourceId!, entry.entryNumber!]),
+      paymentEntryRecords.flatMap((entry) =>
+        entry.sourceId && entry.entryNumber
+          ? ([[entry.sourceId, entry.entryNumber]] as const)
+          : [],
+      ),
     );
     const refundEntriesBySourceId = new Map<string, string[]>();
 
@@ -12209,10 +12271,6 @@ function buildDefaulterSegmentSummary(
   });
 }
 
-function roundMoney(value: number) {
-  return Math.round(value * 100) / 100;
-}
-
 function toMoneyString(value: number | Prisma.Decimal) {
   return new Prisma.Decimal(value).toFixed(2);
 }
@@ -12329,34 +12387,6 @@ function allocateJournalLinesForRefund(
   });
 }
 
-function allocatePaymentAcrossLines(
-  lines: Array<{
-    id: string;
-    totalAmount: Prisma.Decimal;
-    feeHeadCode: string;
-    description: string;
-  }>,
-  paymentAmount: Prisma.Decimal,
-  invoiceTotal: Prisma.Decimal,
-) {
-  let remaining = paymentAmount;
-
-  return lines.map((line, index) => {
-    if (index === lines.length - 1) {
-      return { ...line, totalAmount: remaining };
-    }
-
-    const proportional = line.totalAmount
-      .mul(paymentAmount)
-      .div(invoiceTotal)
-      .toDecimalPlaces(2);
-
-    remaining = remaining.sub(proportional);
-
-    return { ...line, totalAmount: proportional };
-  });
-}
-
 function resolveFiscalYear(date: Date) {
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth() + 1;
@@ -12366,73 +12396,6 @@ function resolveFiscalYear(date: Date) {
 
 function formatFiscalYearForNumber(fiscalYear: string) {
   return fiscalYear.replace(/[^0-9]+/g, '-');
-}
-
-function groupPaymentsByMonth(
-  payments: Array<{ paidAt: Date; amount: Prisma.Decimal }>,
-) {
-  const grouped = new Map<string, number>();
-
-  for (const payment of payments) {
-    const key = payment.paidAt.toISOString().slice(0, 7);
-    grouped.set(key, (grouped.get(key) ?? 0) + Number(payment.amount));
-  }
-
-  return Array.from(grouped.entries()).map(([month, amount]) => ({
-    month,
-    amount,
-  }));
-}
-
-function groupRefundsByMonth(
-  payments: Array<{
-    refunds: Array<{ refundDate: Date; amount: Prisma.Decimal }>;
-  }>,
-) {
-  const grouped = new Map<string, number>();
-
-  for (const payment of payments) {
-    for (const refund of payment.refunds) {
-      const key = refund.refundDate.toISOString().slice(0, 7);
-      grouped.set(key, (grouped.get(key) ?? 0) + Number(refund.amount));
-    }
-  }
-
-  return Array.from(grouped.entries()).map(([month, amount]) => ({
-    month,
-    amount,
-  }));
-}
-
-function groupNetCollectionsByMonth(
-  payments: Array<{
-    paidAt: Date;
-    amount: Prisma.Decimal;
-    refunds: Array<{ refundDate: Date; amount: Prisma.Decimal }>;
-  }>,
-) {
-  const grouped = new Map<string, number>();
-
-  for (const payment of payments) {
-    const paymentKey = payment.paidAt.toISOString().slice(0, 7);
-    grouped.set(
-      paymentKey,
-      (grouped.get(paymentKey) ?? 0) + Number(payment.amount),
-    );
-
-    for (const refund of payment.refunds) {
-      const refundKey = refund.refundDate.toISOString().slice(0, 7);
-      grouped.set(
-        refundKey,
-        (grouped.get(refundKey) ?? 0) - Number(refund.amount),
-      );
-    }
-  }
-
-  return Array.from(grouped.entries()).map(([month, amount]) => ({
-    month,
-    amount,
-  }));
 }
 
 function resolveWindow(openedAt: string, closedAt: string) {
@@ -12837,7 +12800,7 @@ function buildPaymentMethodReconciliation(
 }
 
 function normalizeOnlinePaymentWebhookStatus(value: unknown) {
-  const normalized = String(value ?? '')
+  const normalized = (typeof value === 'string' ? value : '')
     .trim()
     .toUpperCase();
 
@@ -12935,8 +12898,13 @@ function resolveFinanceSummaryPeriod(
     );
   }
 
-  const fromDate = query.date ?? query.fromDate!;
-  const toDate = query.date ?? query.toDate!;
+  const fromDate = query.date ?? query.fromDate;
+  const toDate = query.date ?? query.toDate;
+  if (!fromDate || !toDate) {
+    throw new BadRequestException(
+      'Both fromDate and toDate are required for a finance summary range.',
+    );
+  }
   const from = parseDateOnly(fromDate);
   const to = parseDateOnly(toDate);
   const nominalFrom = Date.UTC(from.year, from.month - 1, from.day);
@@ -13148,24 +13116,29 @@ export function resolveInvoiceStatusAfterAdjustment(
 }
 
 function toCsv(rows: Array<Record<string, unknown>>, headers: string[]) {
-  const escape = (val: unknown) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+  const escape = (val: unknown) => {
+    let text = '';
+    if (val !== null && val !== undefined) {
+      if (
+        typeof val === 'string' ||
+        typeof val === 'number' ||
+        typeof val === 'boolean' ||
+        typeof val === 'bigint' ||
+        val instanceof Date ||
+        val instanceof Prisma.Decimal
+      ) {
+        text = String(val);
+      } else {
+        // Export only supported scalar values. A nested object must not
+        // serialize additional fields into a CSV cell.
+        text = '[object Object]';
+      }
+    }
+    return `"${text.replace(/"/g, '""')}"`;
+  };
   const headerLine = headers.map(escape).join(',');
   const rowLines = rows.map((row) =>
     headers.map((h) => escape(row[h])).join(','),
   );
   return [headerLine, ...rowLines].join('\n');
-}
-
-function groupByAmount<T>(items: T[], getKey: (item: T) => string) {
-  const grouped = new Map<string, number>();
-
-  for (const item of items) {
-    const amount = Number(
-      (item as { totalAmount: Prisma.Decimal }).totalAmount,
-    );
-    const key = getKey(item);
-    grouped.set(key, (grouped.get(key) ?? 0) + amount);
-  }
-
-  return grouped;
 }

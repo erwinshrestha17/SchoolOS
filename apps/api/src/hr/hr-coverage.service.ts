@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { getNepalSchoolDay } from '@schoolos/core';
-import type { StaffCoverageSummary } from '@schoolos/core';
+import { getNepalSchoolDay, type StaffCoverageSummary } from '@schoolos/core';
 import {
   PayrollExceptionSeverity,
   PayrollExceptionStatus,

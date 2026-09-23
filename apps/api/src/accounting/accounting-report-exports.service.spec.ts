@@ -12,6 +12,46 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AuditService } from '../audit/audit.service';
 import sharp from 'sharp';
+import { createAuthContextMock } from '../../test/test-helpers';
+import type {
+  GeneralLedgerResponse,
+  GeneralLedgerRow,
+} from './types/accounting-reports.types';
+
+const defaultGeneralLedger = {
+  fiscalYearId: 'fy-1',
+  openingBalance: new Prisma.Decimal(0),
+  openingBalanceSide: JournalLineSide.DEBIT,
+  closingBalance: new Prisma.Decimal(0),
+  closingBalanceSide: JournalLineSide.DEBIT,
+  totals: { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(0) },
+  rows: [],
+  pagination: { page: 1, limit: 1000, total: 0, totalPages: 0 },
+  generatedAt: new Date('2026-01-01T00:00:00.000Z'),
+} satisfies GeneralLedgerResponse;
+
+const ledgerRowContext = {
+  journalEntryId: 'entry-1',
+  journalLineId: 'line-1',
+  postedAt: new Date('2024-01-01'),
+  accountId: 'acc-1',
+  sourceId: null,
+  createdById: null,
+  postedById: null,
+  reversalOfId: null,
+  correctionOfId: null,
+} satisfies Pick<
+  GeneralLedgerRow,
+  | 'journalEntryId'
+  | 'journalLineId'
+  | 'postedAt'
+  | 'accountId'
+  | 'sourceId'
+  | 'createdById'
+  | 'postedById'
+  | 'reversalOfId'
+  | 'correctionOfId'
+>;
 
 describe('AccountingReportExportsService', () => {
   let service: AccountingReportExportsService;
@@ -118,7 +158,7 @@ describe('AccountingReportExportsService', () => {
         },
       ],
       generatedAt: new Date(),
-    } as any);
+    });
 
     const csv = await service.exportTrialBalanceCsv('tenant-1', {
       fiscalYearId: 'fy-1',
@@ -136,6 +176,7 @@ describe('AccountingReportExportsService', () => {
 
   it('exports General Ledger CSV with spec columns', async () => {
     reportsService.getGeneralLedger.mockResolvedValue({
+      ...defaultGeneralLedger,
       openingBalance: new Prisma.Decimal('1000'),
       openingBalanceSide: JournalLineSide.DEBIT,
       closingBalance: new Prisma.Decimal('1500'),
@@ -146,6 +187,7 @@ describe('AccountingReportExportsService', () => {
       },
       rows: [
         {
+          ...ledgerRowContext,
           entryDate: new Date('2024-01-01'),
           entryNumber: 'JE001',
           accountCode: '1001',
@@ -160,7 +202,7 @@ describe('AccountingReportExportsService', () => {
         },
       ],
       pagination: { page: 1, limit: 1000, total: 1, totalPages: 1 },
-    } as any);
+    });
 
     const csv = await service.exportGeneralLedgerCsv('tenant-1', {
       fiscalYearId: 'fy-1',
@@ -178,6 +220,8 @@ describe('AccountingReportExportsService', () => {
 
   it('exports Cash Book CSV with Counterparty Account column', async () => {
     reportsService.getCashBook.mockResolvedValue({
+      fiscalYearId: 'fy-1',
+      generatedAt: new Date('2026-01-01T00:00:00.000Z'),
       openingBalance: new Prisma.Decimal('1000'),
       openingBalanceSide: JournalLineSide.DEBIT,
       totalReceipts: new Prisma.Decimal('700'),
@@ -187,6 +231,12 @@ describe('AccountingReportExportsService', () => {
       account: { id: 'acc-1', code: '1001', name: 'Cash' },
       rows: [
         {
+          journalEntryId: 'entry-1',
+          journalLineId: 'line-1',
+          postedAt: new Date('2024-01-01'),
+          accountId: 'acc-1',
+          sourceId: null,
+          postedById: null,
           entryDate: new Date('2024-01-01'),
           entryNumber: 'JE001',
           accountCode: '4001',
@@ -201,7 +251,7 @@ describe('AccountingReportExportsService', () => {
         },
       ],
       pagination: { page: 1, limit: 1000, total: 1, totalPages: 1 },
-    } as any);
+    });
 
     const csv = await service.exportCashBookCsv('tenant-1', {
       fiscalYearId: 'fy-1',
@@ -217,6 +267,7 @@ describe('AccountingReportExportsService', () => {
 
   it('blocks large synchronous General Ledger exports before generating rows', async () => {
     reportsService.getGeneralLedger.mockResolvedValue({
+      ...defaultGeneralLedger,
       openingBalance: new Prisma.Decimal('0'),
       openingBalanceSide: JournalLineSide.DEBIT,
       closingBalance: new Prisma.Decimal('0'),
@@ -227,7 +278,7 @@ describe('AccountingReportExportsService', () => {
       },
       rows: [],
       pagination: { page: 1, limit: 1000, total: 1001, totalPages: 2 },
-    } as any);
+    });
 
     await expect(
       service.exportGeneralLedgerCsv('tenant-1', {
@@ -239,20 +290,21 @@ describe('AccountingReportExportsService', () => {
 
   it('queues large General Ledger exports with a deterministic accounting report job', async () => {
     reportsService.getGeneralLedger.mockResolvedValue({
+      ...defaultGeneralLedger,
       rows: [],
       pagination: { page: 1, limit: 1, total: 1001, totalPages: 1001 },
-    } as any);
+    });
     prisma.reportExport.create.mockResolvedValue({ id: 'export-1' });
 
     const result = await service.queueLargeReportExport({
       reportKey: 'accounting.general-ledger',
       format: 'csv',
       filters: { fiscalYearId: 'fy-1', accountCode: '1001' },
-      actor: {
+      actor: createAuthContextMock({
         tenantId: 'tenant-1',
         tenantSlug: 'test',
         userId: 'user-1',
-      } as any,
+      }),
     });
 
     expect(result).toEqual(
@@ -294,9 +346,10 @@ describe('AccountingReportExportsService', () => {
 
   it('reuses an existing queued accounting export instead of adding a duplicate job', async () => {
     reportsService.getGeneralLedger.mockResolvedValue({
+      ...defaultGeneralLedger,
       rows: [],
       pagination: { page: 1, limit: 1, total: 1500, totalPages: 1500 },
-    } as any);
+    });
     prisma.reportExport.findFirst.mockResolvedValue({
       id: 'export-existing',
       status: 'QUEUED',
@@ -307,11 +360,11 @@ describe('AccountingReportExportsService', () => {
       reportKey: 'accounting.general-ledger',
       format: 'csv',
       filters: { fiscalYearId: 'fy-1', accountCode: '1001' },
-      actor: {
+      actor: createAuthContextMock({
         tenantId: 'tenant-1',
         tenantSlug: 'test',
         userId: 'user-1',
-      } as any,
+      }),
     });
 
     expect(result).toEqual(
@@ -339,6 +392,7 @@ describe('AccountingReportExportsService', () => {
       })
       .mockResolvedValueOnce(null);
     reportsService.getGeneralLedger.mockResolvedValue({
+      ...defaultGeneralLedger,
       openingBalance: new Prisma.Decimal('0'),
       openingBalanceSide: JournalLineSide.DEBIT,
       closingBalance: new Prisma.Decimal('700'),
@@ -349,6 +403,7 @@ describe('AccountingReportExportsService', () => {
       },
       rows: [
         {
+          ...ledgerRowContext,
           entryDate: new Date('2024-01-01'),
           entryNumber: 'JE001',
           accountCode: '1001',
@@ -363,18 +418,18 @@ describe('AccountingReportExportsService', () => {
         },
       ],
       pagination: { page: 1, limit: 50000, total: 1001, totalPages: 1 },
-    } as any);
+    });
 
     await service.completeQueuedReportExport({
       exportId: 'export-1',
       reportKey: 'accounting.general-ledger',
       format: 'csv',
       filters: { fiscalYearId: 'fy-1', accountCode: '1001' },
-      actor: {
+      actor: createAuthContextMock({
         tenantId: 'tenant-1',
         tenantSlug: 'test',
         userId: 'user-1',
-      } as any,
+      }),
     });
 
     expect(fileRegistryService.registerGeneratedFile).toHaveBeenCalledWith(
@@ -422,11 +477,11 @@ describe('AccountingReportExportsService', () => {
       reportKey: 'accounting.cash-book',
       format: 'pdf',
       filters: { fiscalYearId: 'fy-1' },
-      actor: {
+      actor: createAuthContextMock({
         tenantId: 'tenant-1',
         tenantSlug: 'test',
         userId: 'user-1',
-      } as any,
+      }),
     });
 
     expect(fileRegistryService.registerGeneratedFile).not.toHaveBeenCalled();
@@ -454,6 +509,8 @@ describe('AccountingReportExportsService', () => {
 
   it('exports Income Statement CSV with Section/Account Code/Account Name/Amount', async () => {
     reportsService.getIncomeStatement.mockResolvedValue({
+      fiscalYearId: 'fy-1',
+      generatedAt: new Date('2026-01-01T00:00:00.000Z'),
       sections: [
         {
           section: 'INCOME',
@@ -484,7 +541,7 @@ describe('AccountingReportExportsService', () => {
       totalExpense: new Prisma.Decimal('3000'),
       netSurplusOrDeficit: new Prisma.Decimal('2000'),
       resultType: 'SURPLUS',
-    } as any);
+    });
 
     const csv = await service.exportIncomeStatementCsv('tenant-1', {
       fiscalYearId: 'fy-1',
@@ -500,6 +557,9 @@ describe('AccountingReportExportsService', () => {
 
   it('exports Balance Sheet CSV with Section/Account columns and summary', async () => {
     reportsService.getBalanceSheet.mockResolvedValue({
+      fiscalYearId: 'fy-1',
+      asOfDate: new Date('2026-01-01T00:00:00.000Z'),
+      generatedAt: new Date('2026-01-01T00:00:00.000Z'),
       sections: [
         {
           section: 'ASSETS',
@@ -541,7 +601,7 @@ describe('AccountingReportExportsService', () => {
       totalLiabilitiesAndEquity: new Prisma.Decimal('10000'),
       isBalanced: true,
       imbalanceAmount: new Prisma.Decimal('0'),
-    } as any);
+    });
 
     const csv = await service.exportBalanceSheetCsv('tenant-1', {
       fiscalYearId: 'fy-1',
@@ -563,6 +623,8 @@ describe('AccountingReportExportsService', () => {
 
   it('exports Tax Summary CSV with Section/Metric/Amount/Status columns', async () => {
     reportsService.getTaxSummary.mockResolvedValue({
+      fiscalYearId: 'fy-1',
+      generatedAt: new Date('2026-01-01T00:00:00.000Z'),
       vat: {
         outputVat: new Prisma.Decimal('130'),
         inputVat: new Prisma.Decimal('50'),
@@ -581,7 +643,7 @@ describe('AccountingReportExportsService', () => {
         netPayable: new Prisma.Decimal('200'),
       },
       setupWarnings: ['Missing PF Mapping'],
-    } as any);
+    });
 
     const csv = await service.exportTaxSummaryCsv('tenant-1', {
       fiscalYearId: 'fy-1',
@@ -598,6 +660,7 @@ describe('AccountingReportExportsService', () => {
 
   it('calls report service methods with tenantId from auth', async () => {
     reportsService.getTrialBalance.mockResolvedValue({
+      fiscalYearId: 'fy-1',
       rows: [],
       totalOpeningDebit: new Prisma.Decimal(0),
       totalOpeningCredit: new Prisma.Decimal(0),
@@ -608,7 +671,7 @@ describe('AccountingReportExportsService', () => {
       isBalanced: true,
       imbalanceAmount: new Prisma.Decimal(0),
       generatedAt: new Date(),
-    } as any);
+    });
 
     await service.exportTrialBalanceCsv('tenant-1', { fiscalYearId: 'fy-1' });
     expect(reportsService.getTrialBalance).toHaveBeenCalledWith('tenant-1', {
@@ -671,6 +734,7 @@ describe('AccountingReportExportsService', () => {
       content: logoBytes,
     });
     reportsService.getTrialBalance.mockResolvedValue({
+      fiscalYearId: 'fy-1',
       rows: [],
       totalOpeningDebit: new Prisma.Decimal(0),
       totalOpeningCredit: new Prisma.Decimal(0),
@@ -681,7 +745,7 @@ describe('AccountingReportExportsService', () => {
       isBalanced: true,
       imbalanceAmount: new Prisma.Decimal(0),
       generatedAt: new Date(),
-    } as any);
+    });
 
     const pdf = await service.exportTrialBalancePdf(
       'tenant-1',
@@ -690,7 +754,7 @@ describe('AccountingReportExportsService', () => {
         tenantId: 'tenant-1',
         tenantSlug: 'test',
         userId: 'user-1',
-      } as any,
+      } as unknown as Parameters<typeof service.exportTrialBalancePdf>[2],
     );
 
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
@@ -708,6 +772,7 @@ describe('AccountingReportExportsService', () => {
       fileAssetId: 'file-existing',
     });
     reportsService.getTrialBalance.mockResolvedValue({
+      fiscalYearId: 'fy-1',
       rows: [],
       totalOpeningDebit: new Prisma.Decimal(0),
       totalOpeningCredit: new Prisma.Decimal(0),
@@ -718,7 +783,7 @@ describe('AccountingReportExportsService', () => {
       isBalanced: true,
       imbalanceAmount: new Prisma.Decimal(0),
       generatedAt: new Date(),
-    } as any);
+    });
 
     const pdf = await service.exportTrialBalancePdf(
       'tenant-1',
@@ -727,7 +792,7 @@ describe('AccountingReportExportsService', () => {
         tenantId: 'tenant-1',
         tenantSlug: 'test',
         userId: 'user-1',
-      } as any,
+      } as unknown as Parameters<typeof service.exportTrialBalancePdf>[2],
     );
 
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
@@ -757,6 +822,9 @@ describe('AccountingReportExportsService', () => {
 
   it('exports a styled Balance Sheet PDF with accounting control totals', async () => {
     reportsService.getBalanceSheet.mockResolvedValue({
+      fiscalYearId: 'fy-1',
+      asOfDate: new Date('2026-01-01T00:00:00.000Z'),
+      generatedAt: new Date('2026-01-01T00:00:00.000Z'),
       sections: [
         {
           section: 'ASSETS',
@@ -798,7 +866,7 @@ describe('AccountingReportExportsService', () => {
       totalLiabilitiesAndEquity: new Prisma.Decimal('10000'),
       isBalanced: true,
       imbalanceAmount: new Prisma.Decimal('0'),
-    } as any);
+    });
 
     const pdf = await service.exportBalanceSheetPdf(
       'tenant-1',
@@ -807,7 +875,7 @@ describe('AccountingReportExportsService', () => {
         tenantId: 'tenant-1',
         tenantSlug: 'test',
         userId: 'user-1',
-      } as any,
+      } as unknown as Parameters<typeof service.exportBalanceSheetPdf>[2],
     );
 
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
@@ -822,12 +890,14 @@ describe('AccountingReportExportsService', () => {
 
   it('returns empty CSV for reports with no data rows', async () => {
     reportsService.getIncomeStatement.mockResolvedValue({
+      fiscalYearId: 'fy-1',
+      generatedAt: new Date('2026-01-01T00:00:00.000Z'),
       sections: [],
       totalIncome: new Prisma.Decimal(0),
       totalExpense: new Prisma.Decimal(0),
       netSurplusOrDeficit: new Prisma.Decimal(0),
       resultType: 'BREAK_EVEN',
-    } as any);
+    });
 
     const csv = await service.exportIncomeStatementCsv('tenant-1', {
       fiscalYearId: 'fy-1',

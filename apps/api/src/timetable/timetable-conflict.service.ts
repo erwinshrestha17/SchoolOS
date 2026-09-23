@@ -767,7 +767,13 @@ function sectionsOverlap(
   first?: string | null,
   second?: string | null,
 ): boolean {
-  return first === second || first == null || second == null;
+  return (
+    first === second ||
+    first === null ||
+    first === undefined ||
+    second === null ||
+    second === undefined
+  );
 }
 
 function dedupeIssues(

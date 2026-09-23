@@ -777,7 +777,9 @@ export class M10HardeningService {
 
   async getCommunicationPreference(actor: AuthContext) {
     const guardian = await this.getGuardianForActor(actor);
-    const rows = await this.prisma.$queryRaw(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<
+      Array<Record<string, unknown>>
+    >(Prisma.sql`
       SELECT * FROM "CommunicationPreference"
       WHERE "tenantId" = ${actor.tenantId}
         AND "guardianId" = ${guardian.id}

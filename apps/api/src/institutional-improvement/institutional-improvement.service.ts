@@ -810,7 +810,10 @@ export class InstitutionalImprovementService {
     const result = await this.prisma.schoolImprovementAction.findFirst({
       where: { id: actionId, tenantId: actor.tenantId },
     });
-    return mapAction(result!);
+    if (!result) {
+      throw new NotFoundException('Improvement action not found');
+    }
+    return mapAction(result);
   }
 
   async addSchoolImprovementReview(

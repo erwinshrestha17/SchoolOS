@@ -13,6 +13,7 @@ import {
   InvoiceStatus,
   PaymentStatus,
   JournalSourceType,
+  FinanceRequestStatus,
 } from '@prisma/client';
 import {
   BadRequestException,
@@ -196,7 +197,7 @@ describe('FinanceService - Hardening', () => {
             verifyLimit: jest.fn().mockResolvedValue(undefined),
             checkLimit: jest.fn().mockResolvedValue(undefined),
             incrementUsage: jest.fn().mockResolvedValue(undefined),
-          } as any,
+          },
         },
         {
           provide: FileRegistryService,
@@ -247,7 +248,7 @@ describe('FinanceService - Hardening', () => {
             reason: 'Overpaid',
             idempotencyKey: 'refund-overpaid',
           },
-          actor as any,
+          actor as unknown as Parameters<typeof service.refundPayment>[2],
         ),
       ).rejects.toThrow('Refund exceeds the remaining refundable amount');
     });
@@ -280,7 +281,7 @@ describe('FinanceService - Hardening', () => {
           reason: 'Correction',
           idempotencyKey: 'refund-replay',
         },
-        actor as any,
+        actor as unknown as Parameters<typeof service.refundPayment>[2],
       );
 
       expect(result.disposition).toBe('REPLAYED');
@@ -302,7 +303,9 @@ describe('FinanceService - Hardening', () => {
             openedAt: '2026-05-01T08:00:00Z',
             closedAt: '2026-05-01T17:00:00Z',
           },
-          actor as any,
+          actor as unknown as Parameters<
+            typeof service.finalizeCashierClose
+          >[1],
         ),
       ).rejects.toThrow('This cashier window is already closed for today.');
     });
@@ -320,7 +323,7 @@ describe('FinanceService - Hardening', () => {
           {
             ...actor,
             permissions: [],
-          } as any,
+          } as unknown as Parameters<typeof service.reversePayment>[2],
         ),
       ).rejects.toThrow(ForbiddenException);
 
@@ -332,7 +335,7 @@ describe('FinanceService - Hardening', () => {
         service.reversePayment(
           'p1',
           { reason: '   ', idempotencyKey: 'reverse-blank' },
-          actor as any,
+          actor as unknown as Parameters<typeof service.reversePayment>[2],
         ),
       ).rejects.toThrow(BadRequestException);
 
@@ -360,7 +363,7 @@ describe('FinanceService - Hardening', () => {
         service.reversePayment(
           'p1',
           { reason: 'Error', idempotencyKey: 'reverse-refunded' },
-          actor as any,
+          actor as unknown as Parameters<typeof service.reversePayment>[2],
         ),
       ).rejects.toThrow(ConflictException);
     });
@@ -385,7 +388,7 @@ describe('FinanceService - Hardening', () => {
             reason: 'Incorrect collection',
             idempotencyKey: 'reverse-already',
           },
-          actor as any,
+          actor as unknown as Parameters<typeof service.reversePayment>[2],
         ),
       ).rejects.toThrow('This payment is already reversed.');
     });
@@ -422,7 +425,7 @@ describe('FinanceService - Hardening', () => {
             reason: 'Incorrect collection',
             idempotencyKey: 'reverse-closed',
           },
-          actor as any,
+          actor as unknown as Parameters<typeof service.reversePayment>[2],
         ),
       ).rejects.toThrow(
         'This cashier day is already closed. Please contact an administrator.',
@@ -459,13 +462,13 @@ describe('FinanceService - Hardening', () => {
         status: InvoiceStatus.ISSUED,
       });
 
-      const result = await service.reversePayment(
+      await service.reversePayment(
         'p1',
         {
           reason: 'Incorrect charge',
           idempotencyKey: 'reverse-valid',
         },
-        actor as any,
+        actor as unknown as Parameters<typeof service.reversePayment>[2],
       );
 
       expect(prisma.payment.updateMany).toHaveBeenCalledWith(
@@ -505,7 +508,7 @@ describe('FinanceService - Hardening', () => {
           reason: 'Incorrect charge',
           idempotencyKey: 'reverse-replay',
         },
-        actor as any,
+        actor as unknown as Parameters<typeof service.reversePayment>[2],
       );
 
       expect(result.disposition).toBe('REPLAYED');
@@ -560,7 +563,7 @@ describe('FinanceService - Hardening', () => {
           actualCashAmount: '390.00',
           varianceReason: 'Cash drawer short after recount',
         },
-        actor as any,
+        actor as unknown as Parameters<typeof service.countCashierClose>[2],
       );
 
       expect(result).toEqual(
@@ -606,7 +609,7 @@ describe('FinanceService - Hardening', () => {
         service.approveCashierClose(
           'close-1',
           { reason: 'Count reviewed' },
-          actor as any,
+          actor as unknown as Parameters<typeof service.approveCashierClose>[2],
         ),
       ).rejects.toThrow(
         'The person who submitted this cashier count cannot approve it.',
@@ -645,7 +648,7 @@ describe('FinanceService - Hardening', () => {
       const result = await service.closeCashierClose(
         'close-1',
         { reason: 'Approved count completed' },
-        actor as any,
+        actor as unknown as Parameters<typeof service.closeCashierClose>[2],
       );
 
       expect(result).toEqual(
@@ -684,7 +687,7 @@ describe('FinanceService - Hardening', () => {
         service.reopenCashierClose(
           'close-1',
           { reason: 'Counted cash was entered incorrectly' },
-          actor as any,
+          actor as unknown as Parameters<typeof service.reopenCashierClose>[2],
         ),
       ).rejects.toThrow('Deposited cashier sessions are immutable');
       expect(auditService.record).toHaveBeenCalledWith(
@@ -717,7 +720,16 @@ describe('FinanceService - Hardening', () => {
         configEncrypted: { webhookSecret: 'secret' },
       });
       jest
-        .spyOn(service as any, 'verifyWebhookSignature')
+        .spyOn(
+          service as unknown as {
+            verifyWebhookSignature: (
+              payload: Record<string, unknown>,
+              signature: string,
+              signingSecret: string | null,
+            ) => boolean;
+          },
+          'verifyWebhookSignature',
+        )
         .mockReturnValue(true);
       (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
         id: 'intent-1',
@@ -781,7 +793,16 @@ describe('FinanceService - Hardening', () => {
         configEncrypted: { webhookSecret: 'secret' },
       });
       jest
-        .spyOn(service as any, 'verifyWebhookSignature')
+        .spyOn(
+          service as unknown as {
+            verifyWebhookSignature: (
+              payload: Record<string, unknown>,
+              signature: string,
+              signingSecret: string | null,
+            ) => boolean;
+          },
+          'verifyWebhookSignature',
+        )
         .mockReturnValue(true);
       (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
         id: 'intent-2',
@@ -823,7 +844,16 @@ describe('FinanceService - Hardening', () => {
         configEncrypted: { webhookSecret: 'secret' },
       });
       jest
-        .spyOn(service as any, 'verifyWebhookSignature')
+        .spyOn(
+          service as unknown as {
+            verifyWebhookSignature: (
+              payload: Record<string, unknown>,
+              signature: string,
+              signingSecret: string | null,
+            ) => boolean;
+          },
+          'verifyWebhookSignature',
+        )
         .mockReturnValue(true);
       (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
         id: 'intent-3',
@@ -864,7 +894,16 @@ describe('FinanceService - Hardening', () => {
         configEncrypted: { webhookSecret: 'secret' },
       });
       jest
-        .spyOn(service as any, 'verifyWebhookSignature')
+        .spyOn(
+          service as unknown as {
+            verifyWebhookSignature: (
+              payload: Record<string, unknown>,
+              signature: string,
+              signingSecret: string | null,
+            ) => boolean;
+          },
+          'verifyWebhookSignature',
+        )
         .mockReturnValue(true);
       (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
         id: 'intent-5',
@@ -899,7 +938,16 @@ describe('FinanceService - Hardening', () => {
         configEncrypted: { webhookSecret: 'secret' },
       });
       jest
-        .spyOn(service as any, 'verifyWebhookSignature')
+        .spyOn(
+          service as unknown as {
+            verifyWebhookSignature: (
+              payload: Record<string, unknown>,
+              signature: string,
+              signingSecret: string | null,
+            ) => boolean;
+          },
+          'verifyWebhookSignature',
+        )
         .mockReturnValue(true);
       (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
         id: 'intent-zero',
@@ -935,7 +983,16 @@ describe('FinanceService - Hardening', () => {
         configEncrypted: { webhookSecret: 'secret' },
       });
       jest
-        .spyOn(service as any, 'verifyWebhookSignature')
+        .spyOn(
+          service as unknown as {
+            verifyWebhookSignature: (
+              payload: Record<string, unknown>,
+              signature: string,
+              signingSecret: string | null,
+            ) => boolean;
+          },
+          'verifyWebhookSignature',
+        )
         .mockReturnValue(true);
       (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
         id: 'intent-suspended',
@@ -986,7 +1043,16 @@ describe('FinanceService - Hardening', () => {
         configEncrypted: { webhookSecret: 'secret' },
       });
       jest
-        .spyOn(service as any, 'verifyWebhookSignature')
+        .spyOn(
+          service as unknown as {
+            verifyWebhookSignature: (
+              payload: Record<string, unknown>,
+              signature: string,
+              signingSecret: string | null,
+            ) => boolean;
+          },
+          'verifyWebhookSignature',
+        )
         .mockReturnValue(true);
       (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
         id: 'intent-succeeded',
@@ -1045,7 +1111,7 @@ describe('FinanceService - Hardening', () => {
           reason: 'Accidental charge',
           idempotencyKey: 'request-refund-1',
         },
-        actor as any,
+        actor as unknown as Parameters<typeof service.requestRefund>[2],
       );
 
       expect(prisma.financeApprovalRequest.create).toHaveBeenCalledWith(
@@ -1083,7 +1149,7 @@ describe('FinanceService - Hardening', () => {
           reason: 'Wrong student billed',
           idempotencyKey: 'request-reversal-1',
         },
-        actor as any,
+        actor as unknown as Parameters<typeof service.requestReversal>[2],
       );
 
       expect(prisma.financeApprovalRequest.create).toHaveBeenCalledWith(
@@ -1169,10 +1235,10 @@ describe('FinanceService - Hardening', () => {
       const result = await service.reviewApprovalRequest(
         'req-1',
         {
-          status: 'APPROVED' as any,
+          status: FinanceRequestStatus.APPROVED,
           reviewNote: 'Approved by principal',
         },
-        actor as any,
+        actor as unknown as Parameters<typeof service.reviewApprovalRequest>[2],
       );
 
       expect(result.status).toBe('EXECUTED');
@@ -1224,7 +1290,9 @@ describe('FinanceService - Hardening', () => {
           direction: InvoiceAdjustmentDirection.INCREASE,
           reason: 'Correction',
         },
-        actor as any,
+        actor as unknown as Parameters<
+          typeof service.createInvoiceAdjustment
+        >[2],
       );
 
       expect(
@@ -1258,7 +1326,16 @@ describe('FinanceService - Hardening', () => {
         configEncrypted: { webhookSecret: 'secret' },
       });
       jest
-        .spyOn(service as any, 'verifyWebhookSignature')
+        .spyOn(
+          service as unknown as {
+            verifyWebhookSignature: (
+              payload: Record<string, unknown>,
+              signature: string,
+              signingSecret: string | null,
+            ) => boolean;
+          },
+          'verifyWebhookSignature',
+        )
         .mockReturnValue(true);
       (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
         id: 'intent-concurrent',
@@ -1326,8 +1403,14 @@ describe('FinanceService - Hardening', () => {
       };
 
       const [first, second] = await Promise.all([
-        service.collectPayment(dto, actor as any),
-        service.collectPayment(dto, actor as any),
+        service.collectPayment(
+          dto,
+          actor as unknown as Parameters<typeof service.collectPayment>[1],
+        ),
+        service.collectPayment(
+          dto,
+          actor as unknown as Parameters<typeof service.collectPayment>[1],
+        ),
       ]);
 
       expect(first.paymentId).toBe('payment-existing');
@@ -1357,12 +1440,12 @@ describe('FinanceService - Hardening', () => {
         service.reversePayment(
           'p-reversed',
           { reason: 'Incorrect charge', idempotencyKey: 'reverse-concurrent' },
-          actor as any,
+          actor as unknown as Parameters<typeof service.reversePayment>[2],
         ),
         service.reversePayment(
           'p-reversed',
           { reason: 'Incorrect charge', idempotencyKey: 'reverse-concurrent' },
-          actor as any,
+          actor as unknown as Parameters<typeof service.reversePayment>[2],
         ),
       ]);
 
@@ -1433,7 +1516,7 @@ describe('FinanceService - Hardening', () => {
           referenceNumber: 'BANK-SLIP-1',
           idempotencyKey: 'deposit-key-1',
         },
-        actor as any,
+        actor as unknown as Parameters<typeof service.prepareCashDeposit>[1],
       );
 
       expect(result.amount).toBe('1195.00');
@@ -1523,7 +1606,7 @@ describe('FinanceService - Hardening', () => {
       const result = await service.completeCashDeposit(
         submittedDeposit.id,
         { reason: 'Confirmed against bank deposit slip' },
-        actor as any,
+        actor as unknown as Parameters<typeof service.completeCashDeposit>[2],
       );
 
       expect(result.status).toBe('DEPOSITED');

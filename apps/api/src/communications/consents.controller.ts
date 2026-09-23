@@ -51,11 +51,7 @@ export class ConsentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.communicationsService.captureConsent(
-      {
-        ...dto,
-        guardianId,
-        granted: true,
-      },
+      Object.assign({}, dto, { guardianId, granted: true }),
       auth,
     );
   }
@@ -68,11 +64,7 @@ export class ConsentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.communicationsService.captureConsent(
-      {
-        ...dto,
-        guardianId,
-        granted: false,
-      },
+      Object.assign({}, dto, { guardianId, granted: false }),
       auth,
     );
   }

@@ -14,17 +14,17 @@ import {
 } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { PlatformService } from '../platform/platform.service';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantActiveGuard } from '../auth/guards/tenant-active.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
-import type { AuthenticatedRequest } from '../auth/auth-request.interface';
-import type {
-  TenantSettingSummary,
-  UpdateTenantSettingPayload,
+import { AuthenticatedRequest } from '../auth/auth-request.interface';
+import {
+  isPrincipalRestrictedFromInstitutionalSettings,
+  type TenantSettingSummary,
+  type UpdateTenantSettingPayload,
 } from '@schoolos/core';
-import { isPrincipalRestrictedFromInstitutionalSettings } from '@schoolos/core';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { UploadTenantLogoDto } from './dto/upload-tenant-logo.dto';

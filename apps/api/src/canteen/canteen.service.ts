@@ -49,7 +49,6 @@ import {
   CreateCanteenSupplierDto,
   CreateCanteenWastageDto,
   ManualStockAdjustmentDto,
-  OverrideAllergyDto,
 } from './dto/canteen-hardened.dto';
 
 type Tx = Prisma.TransactionClient;
@@ -1945,7 +1944,12 @@ export class CanteenService {
     const supplier = await this.prisma.canteenSupplier.create({
       data: {
         tenantId: actor.tenantId,
-        ...dto,
+        name: dto.name,
+        contactName: dto.contactName,
+        phone: dto.phone,
+        email: dto.email,
+        address: dto.address,
+        panNumber: dto.panNumber,
       },
     });
     await this.audit(

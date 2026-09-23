@@ -2,6 +2,38 @@ import { NotificationStatus } from '@prisma/client';
 import { createProcessorClsMock } from '../plans/processor-cls.mock';
 import { NotificationsProcessor } from './notifications.processor';
 
+function emailBoundary(processor: NotificationsProcessor) {
+  return processor as unknown as {
+    handleSendEmail(input: {
+      to: string;
+      subject: string;
+      text?: string;
+      html?: string;
+      metadata?: Record<string, unknown>;
+    }): Promise<{
+      status: NotificationStatus;
+      errorMessage?: string;
+      providerMessageId?: string;
+    }>;
+  };
+}
+
+function providerBoundary(processor: NotificationsProcessor) {
+  return processor as unknown as {
+    logger: { log(message: string): void };
+    deliverWithProvider(
+      provider: {
+        mode: 'dev-log';
+        channel: 'email' | 'sms' | 'push';
+        providerName: null;
+        webhookUrl: null;
+        headers: Record<string, string>;
+      },
+      payload: Record<string, unknown>,
+    ): Promise<unknown>;
+  };
+}
+
 describe('NotificationsProcessor', () => {
   const originalEmailMode = process.env.EMAIL_DELIVERY_MODE;
   const originalEmailWebhookUrl = process.env.EMAIL_WEBHOOK_URL;
@@ -82,10 +114,11 @@ describe('NotificationsProcessor', () => {
       createProcessorClsMock() as never,
     );
     const log = jest.fn();
-    (processor as any).logger.log = log;
+    const internals = providerBoundary(processor);
+    internals.logger.log = log;
     const deliveryId = 'delivery-safe-log';
 
-    await (processor as any).deliverWithProvider(
+    await internals.deliverWithProvider(
       {
         mode: 'dev-log',
         channel: 'email',
@@ -101,7 +134,7 @@ describe('NotificationsProcessor', () => {
         metadata: { notificationDeliveryId: deliveryId },
       },
     );
-    await (processor as any).deliverWithProvider(
+    await internals.deliverWithProvider(
       {
         mode: 'dev-log',
         channel: 'sms',
@@ -115,7 +148,7 @@ describe('NotificationsProcessor', () => {
         metadata: { notificationDeliveryId: deliveryId },
       },
     );
-    await (processor as any).deliverWithProvider(
+    await internals.deliverWithProvider(
       {
         mode: 'dev-log',
         channel: 'push',
@@ -923,7 +956,7 @@ describe('NotificationsProcessor', () => {
         rejectProvider = reject;
       });
       jest
-        .spyOn(processor as any, 'handleSendEmail')
+        .spyOn(emailBoundary(processor), 'handleSendEmail')
         .mockImplementation(async () => {
           enteredProvider();
           return providerResult;
@@ -1144,7 +1177,7 @@ describe('NotificationsProcessor', () => {
       policy as never,
     );
     const sendEmail = jest
-      .spyOn(processor as any, 'handleSendEmail')
+      .spyOn(emailBoundary(processor), 'handleSendEmail')
       .mockResolvedValue({
         status: NotificationStatus.SENT,
       });

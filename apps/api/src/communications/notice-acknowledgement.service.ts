@@ -244,7 +244,9 @@ export class NoticeAcknowledgementService {
       .map((item) => item.recipientUserId)
       .filter(
         (userId): userId is string =>
-          Boolean(userId) && !acknowledgedIds.has(userId as string),
+          typeof userId === 'string' &&
+          userId.length > 0 &&
+          !acknowledgedIds.has(userId),
       );
     if (recipientUserIds.length === 0) {
       throw new ConflictException(
@@ -261,7 +263,9 @@ export class NoticeAcknowledgementService {
       idempotencyKey: sourceId,
       metadata: { recipientCount: recipientUserIds.length },
     });
-    let result;
+    let result: Awaited<
+      ReturnType<CommunicationsService['recordDeliveryRecords']>
+    >;
     try {
       result = await this.communicationsService.recordDeliveryRecords({
         actor,

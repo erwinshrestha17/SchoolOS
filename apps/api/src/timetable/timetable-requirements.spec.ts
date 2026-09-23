@@ -16,6 +16,15 @@ import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { TimetableConflictService } from './timetable-conflict.service';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
+interface RequirementPrismaMock {
+  staff: { findFirst: jest.Mock };
+  teacherAvailability: { findFirst: jest.Mock; create: jest.Mock };
+  academicYear: { findFirst: jest.Mock };
+  class: { findFirst: jest.Mock };
+  subject: { findFirst: jest.Mock };
+  subjectWeeklyRequirement: { findFirst: jest.Mock; create: jest.Mock };
+}
+
 describe('Timetable Requirements and Availability', () => {
   let service: TimetableService;
   let prisma: PrismaMock;
@@ -62,7 +71,7 @@ describe('Timetable Requirements and Availability', () => {
 
   describe('Teacher Availability', () => {
     it('should create teacher availability', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as RequirementPrismaMock;
       p.staff.findFirst.mockResolvedValue({
         id: 'staff-1',
         tenantId: 'tenant-a',
@@ -89,7 +98,7 @@ describe('Timetable Requirements and Availability', () => {
     });
 
     it('should reject invalid time range', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as RequirementPrismaMock;
       p.staff.findFirst.mockResolvedValue({
         id: 'staff-1',
         tenantId: 'tenant-a',
@@ -111,7 +120,7 @@ describe('Timetable Requirements and Availability', () => {
 
   describe('Subject Weekly Requirements', () => {
     it('should create subject weekly requirement', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as RequirementPrismaMock;
       p.academicYear.findFirst.mockResolvedValue({
         id: 'year-1',
         tenantId: 'tenant-a',
@@ -151,7 +160,7 @@ describe('Timetable Requirements and Availability', () => {
     });
 
     it('should reject negative required periods', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as RequirementPrismaMock;
       p.academicYear.findFirst.mockResolvedValue({
         id: 'year-1',
         tenantId: 'tenant-a',

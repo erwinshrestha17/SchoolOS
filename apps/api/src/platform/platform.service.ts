@@ -472,7 +472,7 @@ export class PlatformService {
     let total = 0;
     for (const queue of this.queues.values()) {
       const counts = await queue.getJobCounts('failed');
-      total += Number(counts.failed ?? 0);
+      total += counts.failed ?? 0;
     }
     return total;
   }
@@ -1232,7 +1232,16 @@ export class PlatformService {
     const profile = await delegate.upsert({
       where: { tenantId },
       update: dto,
-      create: { tenantId, ...dto },
+      create: {
+        tenantId,
+        billingContactName: dto.billingContactName,
+        billingEmail: dto.billingEmail,
+        billingPhone: dto.billingPhone,
+        billingAddress: dto.billingAddress,
+        panVatNumber: dto.panVatNumber,
+        preferredBillingCycle: dto.preferredBillingCycle,
+        notes: dto.notes,
+      },
     });
     await this.platformAudit(
       actorUserId,
@@ -2167,8 +2176,10 @@ export class PlatformService {
       return baseReadiness;
     }
 
-    const environment = String(provider.environment ?? '').toUpperCase();
-    const providerName = String(provider.name ?? '');
+    const environment = platformScalarString(
+      provider.environment ?? '',
+    ).toUpperCase();
+    const providerName = platformScalarString(provider.name ?? '');
 
     if (environment !== 'PRODUCTION') {
       return {
@@ -2588,7 +2599,7 @@ export class PlatformService {
             data: { isActive: false },
           });
 
-          const override = await tx.supportOverride.create({
+          const createdOverride = await tx.supportOverride.create({
             data: {
               platformUserId,
               tenantId,
@@ -2608,7 +2619,7 @@ export class PlatformService {
               tenantId: 'platform',
               userId: platformUserId,
               after: {
-                overrideId: override.id,
+                overrideId: createdOverride.id,
                 reason: normalizedReason,
                 permissionScopes,
                 readOnly: true,
@@ -2618,7 +2629,7 @@ export class PlatformService {
             tx,
           );
 
-          return override;
+          return createdOverride;
         }),
     );
 
@@ -2851,7 +2862,7 @@ export class PlatformService {
       this.count('teacherAssignment', { tenantId }),
       this.delegate('tenantOnboardingChecklistOverride')?.findMany({
         where: { tenantId },
-      }) ?? Promise.resolve([]),
+      }) ?? Promise.resolve<never[]>([]),
     ]);
     const settingKeys = new Set(settings.map((setting) => setting.key));
     const computed: Record<string, boolean> = {
@@ -3079,7 +3090,7 @@ export class PlatformService {
       name: String(plan.name),
       description: nullableString(plan.description),
       status: String(plan.status),
-      priceNpr: plan.priceNpr?.toString?.() ?? String(plan.priceNpr ?? '0'),
+      priceNpr: platformScalarString(plan.priceNpr ?? '0'),
       billingCycle: String(plan.billingCycle),
       features: asRecords(plan.features).map((feature) => ({
         featureKey: String(feature.featureKey),
@@ -3118,7 +3129,9 @@ export class PlatformService {
       tenantId: String(subscription.tenantId),
       planId: String(subscription.planId),
       planKey: String(asRecord(subscription.plan).key ?? subscription.planId),
-      planName: String(asRecord(subscription.plan).name ?? 'Unknown plan'),
+      planName: platformScalarString(
+        asRecord(subscription.plan).name ?? 'Unknown plan',
+      ),
       status: String(
         subscription.status,
       ) as PlatformTenantSubscriptionSummary['status'],
@@ -3614,7 +3627,7 @@ function nullableString(value: unknown): string | null {
     return null;
   }
 
-  return String(value);
+  return platformScalarString(value);
 }
 
 function toDate(value: unknown): Date {
@@ -3650,7 +3663,7 @@ function preserveMaskedProviderSecrets(
 }
 
 function decimalValue(value: unknown): Prisma.Decimal {
-  return new Prisma.Decimal(String(value ?? 0));
+  return new Prisma.Decimal(platformScalarString(value ?? 0));
 }
 
 function safeErrorMessage(error: unknown) {
@@ -3805,4 +3818,21 @@ function asNullableUser(value: unknown) {
     email: nullableString(user.email),
     phone: nullableString(user.phone),
   };
+}
+
+function platformScalarString(value: unknown): string {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    return String(value);
+  }
+  if (value instanceof Prisma.Decimal || value instanceof Date) {
+    return value.toString();
+  }
+  throw new TypeError('Platform data expected a scalar value');
 }

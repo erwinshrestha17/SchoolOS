@@ -22,8 +22,8 @@ describe('ResponseEnvelopeInterceptor', () => {
         ({
           getRequest: () => mockRequest,
           getResponse: () => mockResponse,
-        }) as any,
-      getHandler: () => ({ name: 'testHandler' }) as any,
+        }) as ReturnType<ExecutionContext['switchToHttp']>,
+      getHandler: () => () => undefined,
     };
 
     interceptor
@@ -53,8 +53,8 @@ describe('ResponseEnvelopeInterceptor', () => {
         ({
           getRequest: () => mockRequest,
           getResponse: () => mockResponse,
-        }) as any,
-      getHandler: () => ({ name: 'testHandler' }) as any,
+        }) as ReturnType<ExecutionContext['switchToHttp']>,
+      getHandler: () => () => undefined,
     };
 
     interceptor
@@ -83,8 +83,8 @@ describe('ResponseEnvelopeInterceptor', () => {
         ({
           getRequest: () => mockRequest,
           getResponse: () => mockResponse,
-        }) as any,
-      getHandler: () => ({ name: 'testHandler' }) as any,
+        }) as ReturnType<ExecutionContext['switchToHttp']>,
+      getHandler: () => () => undefined,
     };
 
     interceptor

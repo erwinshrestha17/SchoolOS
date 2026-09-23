@@ -254,7 +254,7 @@ describe('OperationalSummaryService', () => {
       (query: {
         select: {
           studentLinks: {
-            where: { AND: Array<Record<string, unknown>> };
+            where: { AND: Record<string, unknown>[] };
           };
         };
       }) => {

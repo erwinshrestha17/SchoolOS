@@ -71,7 +71,7 @@ export class ListInvoicesQueryDto extends BaseFinanceListQueryDto {
   dueTo?: string;
 
   @IsOptional()
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     value === 'true' ? true : value === 'false' ? false : value,
   )
   @IsBoolean()
@@ -166,7 +166,7 @@ export class ListBillingRunsQueryDto extends BaseFinanceListQueryDto {
 
 export class ListDiscountRulesQueryDto extends BaseFinanceListQueryDto {
   @IsOptional()
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     value === 'true' ? true : value === 'false' ? false : value,
   )
   @IsBoolean()

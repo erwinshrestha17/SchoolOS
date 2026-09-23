@@ -9,7 +9,6 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { AccountingPeriodStatus } from '@prisma/client';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -21,7 +20,6 @@ import { FinanceService } from '../finance/finance.service';
 import { AccountingService } from './accounting.service';
 import { AccountingBankImportJobsService } from './accounting-bank-import-jobs.service';
 import { AccountingSourceMappingService } from './accounting-source-mapping.service';
-import { AccountingActionDto } from './dto/accounting-action.dto';
 import { CreateAccountingPeriodDto } from './dto/create-accounting-period.dto';
 import { CreateChartAccountDto } from './dto/create-chart-account.dto';
 import { CreateExpenseDto } from './dto/create-expense.dto';

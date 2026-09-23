@@ -922,7 +922,9 @@ export class PayrollService {
       throw new NotFoundException('No active staff contracts found to process');
     }
 
-    let run;
+    let run: Prisma.PayrollRunGetPayload<{
+      include: { lines: { include: { staff: true } } };
+    }>;
     try {
       run = await this.prisma.payrollRun.create({
         data: {
@@ -1544,13 +1546,14 @@ export class PayrollService {
       );
     }
 
-    if (!run.journalEntryId) {
+    const journalEntryId = run.journalEntryId;
+    if (!journalEntryId) {
       throw new ConflictException('No journal entry found to reverse');
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
       const originalEntry = await tx.journalEntry.findUnique({
-        where: { id: run.journalEntryId! },
+        where: { id: journalEntryId },
         include: { lines: true },
       });
 
@@ -1742,7 +1745,8 @@ export class PayrollService {
     dto: PayrollActionDto,
     actor: AuthContext,
   ) {
-    if (!dto.reason) {
+    const reason = dto.reason;
+    if (!reason) {
       throw new ConflictException('Reversal reason is required');
     }
 
@@ -1775,7 +1779,7 @@ export class PayrollService {
             originalEntryId: originalEntry.id,
             reversalDate: new Date(),
             narration: `Reversal of Payroll Disbursement for ${run.periodMonth}/${run.periodYear}`,
-            reason: dto.reason!,
+            reason,
             lines: originalEntry.lines.map((l) => ({
               chartAccountId: l.chartAccountId,
               side:
@@ -1808,7 +1812,7 @@ export class PayrollService {
             originalEntryId: originalEntry.id,
             reversalDate: new Date(),
             narration: `Reversal of Payroll Accrual for ${run.periodMonth}/${run.periodYear}`,
-            reason: dto.reason!,
+            reason,
             lines: originalEntry.lines.map((l) => ({
               chartAccountId: l.chartAccountId,
               side:

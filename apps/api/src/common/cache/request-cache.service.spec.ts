@@ -31,7 +31,7 @@ describe('RequestCacheService', () => {
 
   it('deduplicates concurrent callers rather than racing the loader', async () => {
     const cache = new RequestCacheService(makeCls(true));
-    let resolveLoader: (value: string) => void = () => {};
+    let resolveLoader: (value: string) => void = jest.fn();
     const loader = jest.fn(
       () =>
         new Promise<string>((resolve) => {

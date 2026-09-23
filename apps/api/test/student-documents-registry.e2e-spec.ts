@@ -6,7 +6,6 @@ import { FileRegistryService } from '../src/file-registry/file-registry.service'
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StorageService } from '../src/storage/storage.service';
 import { StudentRecordsService } from '../src/student-records/student-records.service';
-import { UsageService } from '../src/usage/usage.service';
 import {
   PrismaMock,
   createAuthContextMock,
@@ -25,7 +24,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
     auditService = {
       record: jest.fn(async (entry: Record<string, unknown>) => {
         prisma.__state.auditLogs.push({
-          id: `audit-${prisma.__state.auditLogs.length + 1}`,
+          id: `audit-${String(prisma.__state.auditLogs.length + 1)}`,
           ...entry,
           createdAt: new Date(),
         });
@@ -51,10 +50,10 @@ describe('Student Documents Registry Integration (E2E)', () => {
         verifyLimit: jest.fn().mockResolvedValue(undefined),
         checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
-      } as any,
+      } as unknown as ConstructorParameters<typeof FileRegistryService>[4],
       {
         assertTenantActive: jest.fn().mockResolvedValue(undefined),
-      } as any,
+      } as unknown as ConstructorParameters<typeof FileRegistryService>[5],
       {
         requireActorAccess: jest.fn().mockResolvedValue({
           source: 'ASSIGNMENT',
@@ -64,7 +63,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
           source: 'ASSIGNMENT',
           assignmentId: 'assignment-1',
         }),
-      } as any,
+      } as unknown as ConstructorParameters<typeof FileRegistryService>[6],
     );
     studentRecordsService = new StudentRecordsService(
       prisma as unknown as PrismaService,

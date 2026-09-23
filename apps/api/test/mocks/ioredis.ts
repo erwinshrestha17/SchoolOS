@@ -1,6 +1,5 @@
 export default class Redis {
   status = 'ready';
-  constructor() {}
   connect = jest.fn().mockResolvedValue(undefined);
   ping = jest.fn().mockResolvedValue('PONG');
   quit = jest.fn().mockResolvedValue(undefined);

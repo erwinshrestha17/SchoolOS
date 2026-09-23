@@ -10,7 +10,6 @@ import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
 import { StudentPhotoService } from './student-photo.service';
 import {
-  EnrollmentStatus,
   StudentDuplicateReviewStatus,
   StudentLifecycleStatus,
 } from '@prisma/client';

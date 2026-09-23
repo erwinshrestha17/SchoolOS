@@ -127,7 +127,7 @@ export class AccountingBankImportJobsService {
       metadata: { accountId, fingerprint, rowCount: lines.length },
     });
 
-    let job;
+    let job: Prisma.BankStatementImportJobGetPayload<Record<string, never>>;
     try {
       job = await this.prisma.bankStatementImportJob.create({
         data: {

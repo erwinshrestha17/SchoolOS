@@ -13,7 +13,29 @@ import { getQueueToken } from '@nestjs/bullmq';
 
 describe('ReportCardsService', () => {
   let service: ReportCardsService;
-  let prisma: any;
+  let prisma: {
+    academicYear: { findFirst: jest.Mock };
+    examTerm: { findFirst: jest.Mock };
+    student: { findFirst: jest.Mock };
+    tenantSetting: { findFirst: jest.Mock };
+    assessmentComponent: { findMany: jest.Mock };
+    assessmentRetake: { findFirst: jest.Mock };
+    markEntry: { findMany: jest.Mock; updateMany: jest.Mock };
+    reportCard: {
+      findUnique: jest.Mock;
+      findFirst: jest.Mock;
+      upsert: jest.Mock;
+      update: jest.Mock;
+    };
+    reportCardCorrectionRequest: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+    };
+    reportCardHistory: { create: jest.Mock; findMany: jest.Mock };
+    $transaction: jest.Mock;
+  };
   let auditService: { record: jest.Mock };
   let financeService: { getStudentFeeLedger: jest.Mock };
   let academicsQueue: { add: jest.Mock };
@@ -87,7 +109,7 @@ describe('ReportCardsService', () => {
             verifyLimit: jest.fn().mockResolvedValue(undefined),
             checkLimit: jest.fn().mockResolvedValue(undefined),
             incrementUsage: jest.fn().mockResolvedValue(undefined),
-          } as any,
+          },
         },
         {
           provide: getQueueToken('academics'),
@@ -321,7 +343,10 @@ describe('ReportCardsService', () => {
 
   it('queues batch generation job when studentIds count is greater than 20', async () => {
     mockValidBase();
-    const studentIds = Array.from({ length: 21 }, (_, i) => `student-${i}`);
+    const studentIds = Array.from(
+      { length: 21 },
+      (_, i) => `student-${String(i)}`,
+    );
     const result = await service.batchGenerateReportCards(
       {
         academicYearId: 'year-1',

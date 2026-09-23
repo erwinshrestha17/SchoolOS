@@ -12,16 +12,79 @@ import { JournalLineSide } from '@prisma/client';
 
 describe('AccountingService - Slices 2-5', () => {
   let service: AccountingService;
-  let prisma: any;
-  let auditService: any;
-  let postingService: any;
+  let prisma: {
+    fiscalYear: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
+      create: jest.Mock;
+    };
+    fiscalPeriod: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
+    };
+    chartAccount: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      upsert: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
+    journalEntry: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+      count: jest.Mock;
+      groupBy: jest.Mock;
+    };
+    payrollRun: { count: jest.Mock };
+    journalLine: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      groupBy: jest.Mock;
+      aggregate: jest.Mock;
+    };
+    accountingPeriod: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
+      create: jest.Mock;
+    };
+    accountingReportAccountMapping: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+    };
+    bankStatement: {
+      create: jest.Mock;
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+      aggregate: jest.Mock;
+    };
+    bankStatementImportBatch: { findFirst: jest.Mock; create: jest.Mock };
+    $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
+  };
+  let auditService: { record: jest.Mock };
+  let postingService: {
+    createDraftJournal: jest.Mock;
+    postManualJournal: jest.Mock;
+    ensurePostingPeriodIsOpen: jest.Mock;
+    generateJournalEntryNumber: jest.Mock;
+    updateJournalStatus: jest.Mock;
+  };
 
   const actor = {
     userId: 'user-1',
     tenantId: 'tenant-1',
     role: 'ADMIN',
     permissions: [],
-  } as any;
+  } as unknown as import('../auth/auth.types').AuthContext;
 
   beforeEach(async () => {
     prisma = {
@@ -92,7 +155,9 @@ describe('AccountingService - Slices 2-5', () => {
       $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
     };
     prisma.$transaction.mockImplementation(async (input: unknown) =>
-      typeof input === 'function' ? input(prisma) : Promise.all(input as any),
+      typeof input === 'function'
+        ? input(prisma)
+        : Promise.all(input as unknown as Parameters<typeof Promise.all>[0]),
     );
 
     auditService = {
@@ -777,12 +842,10 @@ describe('AccountingService - Slices 2-5', () => {
 
       prisma.bankStatement.updateMany.mockResolvedValue({ count: 1 });
 
-      const result = (await service.reconcileStatement(
-        'bs-1',
-        'jl-1',
-        actor,
-      )) as any;
+      const result = await service.reconcileStatement('bs-1', 'jl-1', actor);
 
+      expect(result).not.toBeNull();
+      if (!result) throw new Error('Expected a reconciled bank statement');
       expect(result.isReconciled).toBe(true);
       expect(result.journalLineId).toBe('jl-1');
       expect(auditService.record).toHaveBeenCalledWith(

@@ -4,6 +4,7 @@ import {
   ConflictException,
   ExecutionContext,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { RequestLoggingInterceptor } from './request-logging.interceptor';
@@ -15,12 +16,8 @@ describe('RequestLoggingInterceptor', () => {
 
   beforeEach(() => {
     interceptor = new RequestLoggingInterceptor();
-    logSpy = jest
-      .spyOn((interceptor as any).logger, 'log')
-      .mockImplementation();
-    warnSpy = jest
-      .spyOn((interceptor as any).logger, 'warn')
-      .mockImplementation();
+    logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
   });
 
   afterEach(() => {

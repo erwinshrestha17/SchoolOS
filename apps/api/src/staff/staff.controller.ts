@@ -126,7 +126,7 @@ export class StaffController {
   ) {
     return this.staffService.transitionStaffStatus(
       id,
-      { ...dto, status: StaffStatus.INACTIVE },
+      { reason: dto.reason, status: StaffStatus.INACTIVE },
       auth,
     );
   }
@@ -140,7 +140,7 @@ export class StaffController {
   ) {
     return this.staffService.transitionStaffStatus(
       id,
-      { ...dto, status: StaffStatus.TERMINATED },
+      { reason: dto.reason, status: StaffStatus.TERMINATED },
       auth,
     );
   }

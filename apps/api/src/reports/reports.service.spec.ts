@@ -774,9 +774,10 @@ describe('ReportsService', () => {
     // Asserted through the real registry entry, not a synthetic definition, so
     // the link itself is covered rather than just the resolution helper.
     const tdsExecutor = service.registry.get('statutory-tds-summary');
+    if (!tdsExecutor) throw new Error('TDS report fixture is missing');
     expect(tdsExecutor?.definition.financialReportId).toBe('TAX-01');
 
-    expect(buildExportMetadata(tdsExecutor!.definition, {}, actor)).toEqual(
+    expect(buildExportMetadata(tdsExecutor.definition, {}, actor)).toEqual(
       expect.objectContaining({
         financialReportId: 'TAX-01',
         classification: 'STATUTORY_DRAFT',
@@ -786,7 +787,7 @@ describe('ReportsService', () => {
     // Statutory output must be watermarked as a draft, so a generated artifact
     // is never presented as final before Nepal-qualified review exists.
     expect(
-      buildExportMetadata(tdsExecutor!.definition, {}, actor).watermark,
+      buildExportMetadata(tdsExecutor.definition, {}, actor).watermark,
     ).toContain('STATUTORY DRAFT');
 
     // An unlinked, non-financial export stays confidential with no catalog id.
@@ -961,7 +962,10 @@ describe('ReportsService', () => {
     const metadata = new Map<string, unknown>();
     workbook.getWorksheet('Report Metadata')?.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
-      metadata.set(String(row.getCell(1).value), row.getCell(2).value);
+      metadata.set(
+        requireMetadataKey(row.getCell(1).value),
+        row.getCell(2).value,
+      );
     });
     expect(String(metadata.get('Classification'))).toContain('CONFIDENTIAL');
     expect(metadata.get('totalAmount')).toBe('1000.00');
@@ -992,7 +996,10 @@ describe('ReportsService', () => {
     const metadata = new Map<string, unknown>();
     workbook.getWorksheet('Report Metadata')?.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
-      metadata.set(String(row.getCell(1).value), row.getCell(2).value);
+      metadata.set(
+        requireMetadataKey(row.getCell(1).value),
+        row.getCell(2).value,
+      );
     });
     expect(String(metadata.get('Classification'))).toContain('CONFIDENTIAL');
     expect(metadata.get('totalAmount')).toBe('500.00');
@@ -1011,7 +1018,8 @@ describe('ReportsService', () => {
     ).buildExportMetadata.bind(service);
 
     const receiptExecutor = service.registry.get('receipt-register');
-    expect(buildExportMetadata(receiptExecutor!.definition, {}, actor)).toEqual(
+    if (!receiptExecutor) throw new Error('Receipt report fixture is missing');
+    expect(buildExportMetadata(receiptExecutor.definition, {}, actor)).toEqual(
       expect.objectContaining({
         financialReportId: 'FEE-17',
         classification: 'CONFIDENTIAL',
@@ -1020,7 +1028,7 @@ describe('ReportsService', () => {
 
     expect(
       buildExportMetadata(
-        { ...receiptExecutor!.definition, financialReportId: undefined },
+        { ...receiptExecutor.definition, financialReportId: undefined },
         {},
         actor,
       ),
@@ -1131,7 +1139,10 @@ describe('ReportsService', () => {
     const metadata = new Map<string, unknown>();
     workbook.getWorksheet('Report Metadata')?.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
-      metadata.set(String(row.getCell(1).value), row.getCell(2).value);
+      metadata.set(
+        requireMetadataKey(row.getCell(1).value),
+        row.getCell(2).value,
+      );
     });
     expect(String(metadata.get('Classification'))).toContain('CONFIDENTIAL');
     expect(metadata.get('totalNetAmount')).toBe('3500.00');
@@ -1166,7 +1177,10 @@ describe('ReportsService', () => {
     const metadata = new Map<string, unknown>();
     workbook.getWorksheet('Report Metadata')?.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
-      metadata.set(String(row.getCell(1).value), row.getCell(2).value);
+      metadata.set(
+        requireMetadataKey(row.getCell(1).value),
+        row.getCell(2).value,
+      );
     });
     expect(String(metadata.get('Classification'))).toContain('CONFIDENTIAL');
     expect(metadata.get('totalUnallocatedAmount')).toBe('500.00');
@@ -1216,7 +1230,10 @@ describe('ReportsService', () => {
     const metadata = new Map<string, unknown>();
     metaSheet?.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
-      metadata.set(String(row.getCell(1).value), row.getCell(2).value);
+      metadata.set(
+        requireMetadataKey(row.getCell(1).value),
+        row.getCell(2).value,
+      );
     });
 
     expect(String(metadata.get('Classification'))).toContain('CONFIDENTIAL');
@@ -1566,4 +1583,11 @@ function createTestLogoJpeg() {
   })
     .jpeg({ quality: 90 })
     .toBuffer();
+}
+
+function requireMetadataKey(value: unknown): string {
+  if (typeof value !== 'string') {
+    throw new Error('Report metadata key must be a string');
+  }
+  return value;
 }

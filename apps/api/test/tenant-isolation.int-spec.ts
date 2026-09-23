@@ -48,7 +48,7 @@ class FakeCls {
   }
 }
 
-const SUFFIX = `p0-01-int-${Date.now()}`;
+const SUFFIX = `p0-01-int-${String(Date.now())}`;
 const TENANT_A_SLUG = `tenant-a-${SUFFIX}`;
 const TENANT_B_SLUG = `tenant-b-${SUFFIX}`;
 
@@ -108,7 +108,9 @@ describe('P0-01 tenant isolation (real database)', () => {
   });
 
   describe('with tenant A in CLS', () => {
-    beforeEach(() => cls.setTenant(tenantAId));
+    beforeEach(() => {
+      cls.setTenant(tenantAId);
+    });
 
     it('findMany returns only tenant A rows', async () => {
       const rows = await prisma.class.findMany({
@@ -264,7 +266,9 @@ describe('P0-01 tenant isolation (real database)', () => {
   });
 
   describe('with tenant B in CLS', () => {
-    beforeEach(() => cls.setTenant(tenantBId));
+    beforeEach(() => {
+      cls.setTenant(tenantBId);
+    });
 
     it('sees only its own class, confirming the fixture is genuinely split', async () => {
       const rows = await prisma.class.findMany({
@@ -276,7 +280,9 @@ describe('P0-01 tenant isolation (real database)', () => {
   });
 
   describe('with NO tenant in CLS (fail-closed)', () => {
-    beforeEach(() => cls.setTenant(undefined));
+    beforeEach(() => {
+      cls.setTenant(undefined);
+    });
 
     it('refuses to read a tenant-scoped model', async () => {
       await expect(
@@ -312,7 +318,9 @@ describe('P0-01 tenant isolation (real database)', () => {
   });
 
   describe('runWithoutTenantScope (explicit cross-tenant escape hatch)', () => {
-    beforeEach(() => cls.setTenant(undefined));
+    beforeEach(() => {
+      cls.setTenant(undefined);
+    });
 
     it('permits a deliberate cross-tenant sweep and sees every tenant', async () => {
       const rows = await prisma.runWithoutTenantScope(
@@ -326,7 +334,7 @@ describe('P0-01 tenant isolation (real database)', () => {
     it('permits reviewed global raw SQL only inside the explicit bypass', async () => {
       const rows = await prisma.runWithoutTenantScope(
         'test: global database probe',
-        () => prisma.$queryRaw<Array<{ value: number }>>`SELECT 1 AS value`,
+        () => prisma.$queryRaw<{ value: number }[]>`SELECT 1 AS value`,
       );
 
       expect(rows).toEqual([{ value: 1 }]);

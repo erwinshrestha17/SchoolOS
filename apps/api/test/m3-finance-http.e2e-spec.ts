@@ -74,7 +74,7 @@ describe('M3 Fees HTTP isolation hardening (E2E)', () => {
       .overrideProvider(FileRegistryService)
       .useValue({
         registerGeneratedFile: jest.fn(async (input) => ({
-          id: `asset-${input.entityId ?? 'cashier-close'}`,
+          id: `asset-${String(input.entityId ?? 'cashier-close')}`,
           originalFilename: input.originalFilename,
           mimeType: input.mimeType,
           sizeBytes: input.content.length,
@@ -361,7 +361,7 @@ function seedFinanceData(prisma: PrismaMock) {
 
 function buildInvoice(overrides: Record<string, unknown>) {
   return {
-    invoiceNumber: `INV-${overrides.id}`,
+    invoiceNumber: `INV-${String(overrides.id)}`,
     academicYearId: 'ay-1',
     dueDate: new Date('2026-05-10T00:00:00.000Z'),
     subtotal: new Prisma.Decimal(1000),
@@ -376,90 +376,132 @@ function buildInvoice(overrides: Record<string, unknown>) {
   };
 }
 
+interface InvoiceLookupQuery {
+  where?: { tenantId?: string; id?: string };
+}
+
+interface InvoiceLineLookupQuery {
+  where?: { tenantId?: string; invoiceId?: string; feeHeadId?: string };
+  data: Record<string, unknown>;
+}
+
+interface PaymentLookupQuery {
+  where?: {
+    tenantId?: string;
+    method?: PaymentMethod;
+    collectedById?: string;
+    paidAt?: { gte?: Date | string; lte?: Date | string };
+  };
+}
+
+interface CashierCloseLookupQuery {
+  where?: {
+    closeWindowKey?: string;
+    tenantId?: string;
+    id?: string;
+    collectorUserId?: string;
+    openedAt?: { lt: Date | string };
+    closedAt?: { gt: Date | string };
+    AND?: { OR?: { paymentMethod?: PaymentMethod }[] }[];
+  };
+}
+
 function overrideFinanceQuerySemantics(prisma: PrismaMock) {
-  prisma.invoice.findFirst = jest.fn((q) =>
-    Promise.resolve(
-      prisma.__state.invoices.find(
-        (invoice) =>
-          (!q.where?.tenantId || invoice.tenantId === q.where.tenantId) &&
-          (!q.where?.id || invoice.id === q.where.id),
-      ) ?? null,
-    ),
-  );
-  prisma.invoiceLine = {
-    findFirst: jest.fn((q) =>
+  Object.assign(prisma.invoice, {
+    findFirst: jest.fn((q: InvoiceLookupQuery) =>
       Promise.resolve(
-        q.where?.tenantId === tenantAId &&
-          q.where?.invoiceId === 'invoice-a-issued' &&
-          q.where?.feeHeadId === 'fee-head-a'
-          ? { id: 'line-a' }
-          : null,
+        prisma.__state.invoices.find(
+          (invoice) =>
+            (!q.where?.tenantId || invoice.tenantId === q.where.tenantId) &&
+            (!q.where?.id || invoice.id === q.where.id),
+        ) ?? null,
       ),
     ),
-    create: jest.fn(async (q) => q.data),
-  };
-  prisma.payment.findMany = jest.fn((q) => {
-    const where = q.where ?? {};
-    const paidAt = where.paidAt ?? {};
-    const opened = paidAt.gte ? new Date(paidAt.gte).getTime() : -Infinity;
-    const closed = paidAt.lte ? new Date(paidAt.lte).getTime() : Infinity;
-
-    return Promise.resolve(
-      prisma.__state.payments.filter((payment) => {
-        const paidAtTime = new Date(payment.paidAt as Date).getTime();
-        return (
-          (!where.tenantId || payment.tenantId === where.tenantId) &&
-          (!where.method || payment.method === where.method) &&
-          (!where.collectedById ||
-            payment.collectedById === where.collectedById) &&
-          paidAtTime >= opened &&
-          paidAtTime <= closed &&
-          payment.status !== PaymentStatus.REVERSED
-        );
-      }),
-    );
   });
-  prisma.paymentRefund.findMany = jest.fn(() => Promise.resolve([]));
-  prisma.cashierClose.findFirst = jest.fn((q) => {
-    const where = q.where ?? {};
-    const existing = prisma.__state.cashierCloses.find((close) => {
-      if (where.closeWindowKey) {
+  Object.assign(prisma, {
+    invoiceLine: {
+      findFirst: jest.fn((q: InvoiceLineLookupQuery) =>
+        Promise.resolve(
+          q.where?.tenantId === tenantAId &&
+            q.where?.invoiceId === 'invoice-a-issued' &&
+            q.where?.feeHeadId === 'fee-head-a'
+            ? { id: 'line-a' }
+            : null,
+        ),
+      ),
+      create: jest.fn(async (q: InvoiceLineLookupQuery) => q.data),
+    },
+  });
+  Object.assign(prisma.payment, {
+    findMany: jest.fn((q: PaymentLookupQuery) => {
+      const where = q.where ?? {};
+      const paidAt = where.paidAt ?? {};
+      const opened = paidAt.gte ? new Date(paidAt.gte).getTime() : -Infinity;
+      const closed = paidAt.lte ? new Date(paidAt.lte).getTime() : Infinity;
+
+      return Promise.resolve(
+        prisma.__state.payments.filter((payment) => {
+          const paidAtTime = new Date(payment.paidAt as Date).getTime();
+          return (
+            (!where.tenantId || payment.tenantId === where.tenantId) &&
+            (!where.method || payment.method === where.method) &&
+            (!where.collectedById ||
+              payment.collectedById === where.collectedById) &&
+            paidAtTime >= opened &&
+            paidAtTime <= closed &&
+            payment.status !== PaymentStatus.REVERSED
+          );
+        }),
+      );
+    }),
+  });
+  Object.assign(prisma.paymentRefund, {
+    findMany: jest.fn(() => Promise.resolve([])),
+  });
+  Object.assign(prisma.cashierClose, {
+    findFirst: jest.fn((q: CashierCloseLookupQuery) => {
+      const where = q.where ?? {};
+      const existing = prisma.__state.cashierCloses.find((close) => {
+        if (where.closeWindowKey) {
+          return (
+            close.tenantId === where.tenantId &&
+            close.closeWindowKey === where.closeWindowKey
+          );
+        }
+        if (!where.openedAt || !where.closedAt) {
+          return (
+            (!where.tenantId || close.tenantId === where.tenantId) &&
+            (!where.id || close.id === where.id)
+          );
+        }
+
+        const closeOpened = new Date(close.openedAt as Date).getTime();
+        const closeClosed = new Date(close.closedAt as Date).getTime();
+        const openedLt = new Date(where.openedAt.lt).getTime();
+        const closedGt = new Date(where.closedAt.gt).getTime();
+        const requestedMethod = where.AND?.[0]?.OR?.find(
+          (item: Record<string, unknown>) => item.paymentMethod,
+        )?.paymentMethod;
+
         return (
           close.tenantId === where.tenantId &&
-          close.closeWindowKey === where.closeWindowKey
+          (where.collectorUserId === undefined ||
+            close.collectorUserId === where.collectorUserId) &&
+          closeOpened < openedLt &&
+          closeClosed > closedGt &&
+          (!requestedMethod ||
+            close.paymentMethod === null ||
+            close.paymentMethod === requestedMethod)
         );
-      }
-      if (!where.openedAt || !where.closedAt) {
-        return (
-          (!where.tenantId || close.tenantId === where.tenantId) &&
-          (!where.id || close.id === where.id)
-        );
-      }
+      });
 
-      const closeOpened = new Date(close.openedAt as Date).getTime();
-      const closeClosed = new Date(close.closedAt as Date).getTime();
-      const openedLt = new Date(where.openedAt.lt).getTime();
-      const closedGt = new Date(where.closedAt.gt).getTime();
-      const requestedMethod = where.AND?.[0]?.OR?.find(
-        (item: Record<string, unknown>) => item.paymentMethod,
-      )?.paymentMethod;
-
-      return (
-        close.tenantId === where.tenantId &&
-        (where.collectorUserId === undefined ||
-          close.collectorUserId === where.collectorUserId) &&
-        closeOpened < openedLt &&
-        closeClosed > closedGt &&
-        (!requestedMethod ||
-          close.paymentMethod === null ||
-          close.paymentMethod === requestedMethod)
-      );
-    });
-
-    return Promise.resolve(existing ?? null);
+      return Promise.resolve(existing ?? null);
+    }),
   });
 }
 
 function findInvoice(prisma: PrismaMock, invoiceId: string) {
-  return prisma.__state.invoices.find((invoice) => invoice.id === invoiceId)!;
+  const invoice = prisma.__state.invoices.find((item) => item.id === invoiceId);
+  if (!invoice) throw new Error(`Missing test invoice ${invoiceId}`);
+  return invoice;
 }

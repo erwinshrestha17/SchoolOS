@@ -10,24 +10,106 @@ import {
   NotificationStatus,
   NoticeLifecycleStatus,
   NoticePriority,
+  type Notice,
   ProviderType,
   StudentLifecycleStatus,
 } from '@prisma/client';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from './communications.service';
-import { UsageService } from '../usage/usage.service';
+
+interface SavedDeliveryRow {
+  id: string;
+  tenantId: string;
+  idempotencyKey?: string;
+  [key: string]: unknown;
+}
+
+interface CommunicationsTestInternals {
+  createDeliveryRows: (
+    input: unknown,
+    recipients: unknown,
+    status: NotificationStatus,
+    transaction: unknown,
+  ) => Promise<
+    (SavedDeliveryRow & {
+      status: NotificationStatus;
+      title: string;
+      body: string;
+    })[]
+  >;
+  dispatchDelivery: (delivery: unknown) => Promise<unknown>;
+  notificationPreferencePolicy?: { evaluateDelivery: jest.Mock };
+}
+
+function testInternals(
+  service: CommunicationsService,
+): CommunicationsTestInternals {
+  return service as unknown as CommunicationsTestInternals;
+}
 
 describe('CommunicationsService', () => {
-  let prisma: any;
-  let notificationsService: any;
-  let auditService: any;
-  let fileRegistryService: any;
-  let redisService: any;
-  let teacherScopeService: any;
+  let prisma: {
+    class: { findFirst: jest.Mock };
+    section: { findFirst: jest.Mock; findMany: jest.Mock };
+    staff: { findFirst: jest.Mock; findMany: jest.Mock };
+    subjectTeacherAssignment: { findMany: jest.Mock };
+    event: { create: jest.Mock; findMany: jest.Mock };
+    notice: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+      count: jest.Mock;
+    };
+    student: { findMany: jest.Mock };
+    user: { findMany: jest.Mock };
+    notificationDelivery: {
+      createMany: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+      upsert: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      groupBy: jest.Mock;
+      count: jest.Mock;
+    };
+    parentTeacherThread: { count: jest.Mock };
+    providerConfig: { findFirst: jest.Mock };
+    communicationTemplate: {
+      findMany: jest.Mock;
+      count: jest.Mock;
+      aggregate: jest.Mock;
+      create: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+    };
+    guardian: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
+    guardianConsent: { create: jest.Mock; findMany: jest.Mock };
+    communicationPreference: { findMany: jest.Mock };
+    $queryRaw: jest.Mock;
+    $transaction: jest.Mock;
+  };
+  let notificationsService: {
+    sendPushNotification: jest.Mock;
+    releaseInAppNotification: jest.Mock;
+    sendSms: jest.Mock;
+    sendEmail: jest.Mock;
+    getProviderReadiness: jest.Mock;
+  };
+  let auditService: { record: jest.Mock };
+  let fileRegistryService: {
+    getFileMetadata: jest.Mock;
+    getSignedUrl: jest.Mock;
+    linkToEntity: jest.Mock;
+  };
+  let redisService: { getClient: jest.Mock };
+  let teacherScopeService: { resolveReadableScope: jest.Mock };
   let service: CommunicationsService;
   let actor: AuthContext;
-  let savedDeliveryRows: Array<Record<string, any>>;
+  let savedDeliveryRows: SavedDeliveryRow[];
   let batchDeliveryFindMany: jest.Mock;
   let notificationPreferencePolicy: { evaluateDelivery: jest.Mock };
 
@@ -38,6 +120,7 @@ describe('CommunicationsService', () => {
         .filter(
           (row) =>
             row.tenantId === where.tenantId &&
+            typeof row.idempotencyKey === 'string' &&
             where.idempotencyKey.in.includes(row.idempotencyKey),
         )
         .slice(0, take)
@@ -90,7 +173,7 @@ describe('CommunicationsService', () => {
             )
               continue;
             savedDeliveryRows.push({
-              id: `delivery-${savedDeliveryRows.length + 1}`,
+              id: `delivery-${String(savedDeliveryRows.length + 1)}`,
               createdAt: new Date('2026-04-27T00:00:00.000Z'),
               retryCount: 0,
               ...row,
@@ -101,7 +184,7 @@ describe('CommunicationsService', () => {
         }),
         create: jest.fn((args) =>
           Promise.resolve({
-            id: `delivery-${prisma.notificationDelivery.create.mock.calls.length}`,
+            id: `delivery-${String(prisma.notificationDelivery.create.mock.calls.length)}`,
             createdAt: new Date('2026-04-27T00:00:00.000Z'),
             sentAt: null,
             errorMessage: null,
@@ -118,7 +201,7 @@ describe('CommunicationsService', () => {
         }),
         upsert: jest.fn((args) =>
           Promise.resolve({
-            id: `delivery-${prisma.notificationDelivery.upsert.mock.calls.length}`,
+            id: `delivery-${String(prisma.notificationDelivery.upsert.mock.calls.length)}`,
             createdAt: new Date('2026-04-27T00:00:00.000Z'),
             sentAt: null,
             errorMessage: null,
@@ -230,20 +313,32 @@ describe('CommunicationsService', () => {
     };
 
     service = new CommunicationsService(
-      prisma,
-      notificationsService,
-      auditService,
+      prisma as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[0],
+      notificationsService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[1],
+      auditService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[2],
       {
         verifyLimit: jest.fn().mockResolvedValue(undefined),
         checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
-      } as any,
-      redisService,
-      fileRegistryService,
+      } as unknown as ConstructorParameters<typeof CommunicationsService>[3],
+      redisService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[4],
+      fileRegistryService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[5],
       undefined,
       undefined,
       notificationPreferencePolicy as never,
-      teacherScopeService,
+      teacherScopeService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[9],
     );
   });
 
@@ -254,16 +349,26 @@ describe('CommunicationsService', () => {
       markFailed: jest.fn().mockResolvedValue(undefined),
     };
     const reminderService = new CommunicationsService(
-      prisma,
-      notificationsService,
-      auditService,
+      prisma as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[0],
+      notificationsService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[1],
+      auditService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[2],
       {
         verifyLimit: jest.fn(),
         checkLimit: jest.fn(),
         incrementUsage: jest.fn(),
       } as never,
-      redisService,
-      fileRegistryService,
+      redisService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[4],
+      fileRegistryService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[5],
       undefined,
       notificationEventService as never,
       notificationPreferencePolicy as never,
@@ -331,12 +436,22 @@ describe('CommunicationsService', () => {
       markFailed: jest.fn().mockResolvedValue(undefined),
     };
     const reminderService = new CommunicationsService(
-      prisma,
-      notificationsService,
-      auditService,
+      prisma as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[0],
+      notificationsService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[1],
+      auditService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[2],
       {} as never,
-      redisService,
-      fileRegistryService,
+      redisService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[4],
+      fileRegistryService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[5],
       undefined,
       notificationEventService as never,
       notificationPreferencePolicy as never,
@@ -372,12 +487,22 @@ describe('CommunicationsService', () => {
       markFailed: jest.fn(),
     };
     const replayService = new CommunicationsService(
-      prisma,
-      notificationsService,
-      auditService,
+      prisma as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[0],
+      notificationsService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[1],
+      auditService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[2],
       {} as never,
-      redisService,
-      fileRegistryService,
+      redisService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[4],
+      fileRegistryService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[5],
       undefined,
       notificationEventService as never,
       notificationPreferencePolicy as never,
@@ -404,12 +529,22 @@ describe('CommunicationsService', () => {
       markFailed: jest.fn(),
     };
     const replayService = new CommunicationsService(
-      prisma,
-      notificationsService,
-      auditService,
+      prisma as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[0],
+      notificationsService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[1],
+      auditService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[2],
       {} as never,
-      redisService,
-      fileRegistryService,
+      redisService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[4],
+      fileRegistryService as unknown as ConstructorParameters<
+        typeof CommunicationsService
+      >[5],
       undefined,
       events as never,
       notificationPreferencePolicy as never,
@@ -507,9 +642,9 @@ describe('CommunicationsService', () => {
     const recipients = Array.from({ length: 501 }, (_, index) => ({
       studentId: '',
       guardianId: null,
-      userId: `recipient-${index}`,
-      email: `recipient-${index}@school.test`,
-      phone: `synthetic-phone-${index}`,
+      userId: `recipient-${String(index)}`,
+      email: `recipient-${String(index)}@school.test`,
+      phone: `synthetic-phone-${String(index)}`,
     }));
     const channels = [
       NotificationChannel.PUSH,
@@ -586,7 +721,7 @@ describe('CommunicationsService', () => {
         findMany: batchDeliveryFindMany,
       },
     };
-    const createRows = (service as any).createDeliveryRows.bind(service);
+    const createRows = testInternals(service).createDeliveryRows.bind(service);
     const original = await createRows(
       input,
       recipients,
@@ -1392,7 +1527,15 @@ describe('CommunicationsService', () => {
       allowedRecipientCount: 1,
     } as never);
     const emit = jest
-      .spyOn(service as any, 'emitNoticePublished')
+      .spyOn(
+        service as unknown as {
+          emitNoticePublished: (
+            notice: Notice,
+            actor: AuthContext,
+          ) => Promise<{ count: number }>;
+        },
+        'emitNoticePublished',
+      )
       .mockImplementation(async (...args: unknown[]) => {
         const sourceNotice = args[0] as { lifecycleStatus: string };
         expect(sourceNotice.lifecycleStatus).toBe(
@@ -1432,7 +1575,15 @@ describe('CommunicationsService', () => {
     jest.spyOn(service, 'previewNoticeRecipients').mockResolvedValue({
       allowedRecipientCount: 0,
     } as never);
-    const emit = jest.spyOn(service as any, 'emitNoticePublished');
+    const emit = jest.spyOn(
+      service as unknown as {
+        emitNoticePublished: (
+          notice: Notice,
+          actor: AuthContext,
+        ) => Promise<{ count: number }>;
+      },
+      'emitNoticePublished',
+    );
 
     await expect(
       service.publishPreparedNotice('notice-1', actor),
@@ -1775,7 +1926,7 @@ describe('CommunicationsService', () => {
           },
         );
 
-        await (service as any).dispatchDelivery(snapshot);
+        await testInternals(service).dispatchDelivery(snapshot);
 
         expect(
           notificationsService.sendPushNotification,
@@ -1807,7 +1958,7 @@ describe('CommunicationsService', () => {
           },
         );
 
-        await (service as any).dispatchDelivery({ ...row });
+        await testInternals(service).dispatchDelivery({ ...row });
 
         expect(row).toMatchObject({
           ...advanced,
@@ -1850,7 +2001,7 @@ describe('CommunicationsService', () => {
           };
         },
       );
-      await (service as any).dispatchDelivery({ ...row });
+      await testInternals(service).dispatchDelivery({ ...row });
       expect(row).toMatchObject({
         status: NotificationStatus.RETRY_PENDING,
         retryCount: 1,
@@ -1880,7 +2031,7 @@ describe('CommunicationsService', () => {
         const row = seedInitialDelivery();
         row.channel = channel as NotificationChannel;
         if (channel === NotificationChannel.IN_APP) {
-          (service as any).notificationPreferencePolicy = {
+          testInternals(service).notificationPreferencePolicy = {
             evaluateDelivery: jest
               .fn()
               .mockResolvedValue({ action: 'IMMEDIATE' }),
@@ -1892,7 +2043,7 @@ describe('CommunicationsService', () => {
             new Error('redis://private-internal password=private-token'),
           );
 
-        await (service as any).dispatchDelivery({ ...row });
+        await testInternals(service).dispatchDelivery({ ...row });
 
         expect(notificationsService[method]).toHaveBeenCalledTimes(1);
         expect(notificationsService[method]).toHaveBeenCalledWith(
@@ -1912,7 +2063,7 @@ describe('CommunicationsService', () => {
         });
         expect(JSON.stringify(row)).not.toContain('private-token');
         // Re-entering the initial path cannot enqueue another copy of this attempt.
-        await (service as any).dispatchDelivery({ ...row });
+        await testInternals(service).dispatchDelivery({ ...row });
         expect(notificationsService[method]).toHaveBeenCalledTimes(1);
       },
     );
@@ -1921,7 +2072,7 @@ describe('CommunicationsService', () => {
       const row = seedInitialDelivery();
       row.destination = '';
 
-      await (service as any).dispatchDelivery({ ...row });
+      await testInternals(service).dispatchDelivery({ ...row });
 
       expect(row).toMatchObject({
         status: NotificationStatus.FAILED,
@@ -1934,13 +2085,13 @@ describe('CommunicationsService', () => {
 
     it('preserves cancellation while the initial policy decides to skip', async () => {
       const row = seedInitialDelivery();
-      (service as any).notificationPreferencePolicy = {
+      testInternals(service).notificationPreferencePolicy = {
         evaluateDelivery: jest.fn(async () => {
           Object.assign(row, { status: NotificationStatus.CANCELLED });
           return { action: 'SKIP', reason: 'No longer linked' };
         }),
       };
-      await (service as any).dispatchDelivery({ ...row });
+      await testInternals(service).dispatchDelivery({ ...row });
       expect(row).toMatchObject({
         status: NotificationStatus.CANCELLED,
         errorMessage: null,
@@ -1962,7 +2113,7 @@ describe('CommunicationsService', () => {
       const row = seedInitialDelivery();
       row.channel = NotificationChannel.IN_APP;
       Object.assign(row, { destination: null });
-      await (service as any).dispatchDelivery({ ...row });
+      await testInternals(service).dispatchDelivery({ ...row });
       expect(row.status).toBe(NotificationStatus.QUEUED);
       expect(
         notificationPreferencePolicy.evaluateDelivery,
@@ -1986,9 +2137,9 @@ describe('CommunicationsService', () => {
         const row = seedInitialDelivery();
         row.channel = channel;
         Object.assign(row, { destination: null });
-        (service as any).notificationPreferencePolicy = undefined;
+        testInternals(service).notificationPreferencePolicy = undefined;
 
-        await (service as any).dispatchDelivery({ ...row });
+        await testInternals(service).dispatchDelivery({ ...row });
 
         expect(row).toMatchObject({
           status: NotificationStatus.FAILED,
@@ -2659,7 +2810,7 @@ describe('CommunicationsService', () => {
       });
 
       const call = (prisma.notice.findMany as jest.Mock).mock.calls[0][0];
-      const andClauses = call.where.AND as Array<Record<string, unknown>>;
+      const andClauses = call.where.AND as Record<string, unknown>[];
       expect(
         andClauses.some(
           (clause) => clause.lifecycleStatus === NoticeLifecycleStatus.DRAFT,
@@ -2825,7 +2976,7 @@ describe('CommunicationsService', () => {
       await service.listNotices(teacherActor, { page: 1, limit: 25 });
 
       const call = (prisma.notice.findMany as jest.Mock).mock.calls[0][0];
-      const andClauses = call.where.AND as Array<Record<string, unknown>>;
+      const andClauses = call.where.AND as Record<string, unknown>[];
       const orClause = andClauses.find((clause) => Array.isArray(clause.OR)) as
         | { OR: unknown[] }
         | undefined;

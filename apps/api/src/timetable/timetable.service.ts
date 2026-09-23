@@ -26,18 +26,14 @@ import { AttendanceService } from '../attendance/attendance.service';
 import { toTimetableDayOfWeek } from './timetable-calendar';
 import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import {
-  AssignSubstitutionDto,
   CreateRoomDto,
-  CreateSubstitutionDto,
   CreateTimetablePeriodDto,
   CreateTimetableVersionDto,
   CreateVersionSlotDto,
-  SubstitutionQueryDto,
   TeacherAvailabilityDto,
   TimetableQueryDto,
   TimetableVersionQueryDto,
   UpdateRoomDto,
-  UpdateSubstitutionDto,
   UpdateTimetablePeriodDto,
   UpdateTimetableVersionDto,
   RestoreTimetableVersionDto,
@@ -266,7 +262,7 @@ export class TimetableService {
   }
 
   async deletePeriod(id: string, actor: AuthContext) {
-    const period = await this.findPeriodOrThrow(id, actor);
+    await this.findPeriodOrThrow(id, actor);
     await this.ensurePeriodNotLocked(id, actor);
     await this.prisma.timetablePeriod.delete({ where: { id } });
     await this.audit('delete', 'timetable_period', id, actor, { id });
@@ -310,7 +306,7 @@ export class TimetableService {
   }
 
   async deleteRoom(id: string, actor: AuthContext) {
-    const room = await this.findRoomOrThrow(id, actor);
+    await this.findRoomOrThrow(id, actor);
     await this.ensureRoomNotLocked(id, actor);
     await this.prisma.room.delete({ where: { id } });
     await this.audit('delete', 'room', id, actor, { id });
@@ -1538,7 +1534,13 @@ export class TimetableService {
             where: { tenantId: actor.tenantId, id: { in: missingSlotIds } },
             select: teacherMobileSlotSelect(),
           })
-        : Promise.resolve([]),
+        : Promise.resolve<
+            Array<
+              Prisma.TimetableSlotGetPayload<{
+                select: ReturnType<typeof teacherMobileSlotSelect>;
+              }>
+            >
+          >([]),
       substitutionTeacherIds.length
         ? this.prisma.staff.findMany({
             where: {
@@ -1548,7 +1550,9 @@ export class TimetableService {
             // Display name only — never the full Staff row.
             select: { id: true, firstName: true, lastName: true },
           })
-        : Promise.resolve([]),
+        : Promise.resolve<
+            Array<{ id: string; firstName: string; lastName: string }>
+          >([]),
     ]);
 
     for (const slot of missingSlots) {

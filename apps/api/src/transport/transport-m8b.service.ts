@@ -348,7 +348,7 @@ export class TransportM8bService {
   }
 
   async getVehicleDocumentExpiryReport(actor: AuthContext, days = 30) {
-    const normalizedDays = Math.min(Math.max(Number(days) || 30, 1), 365);
+    const normalizedDays = Math.min(Math.max(days || 30, 1), 365);
     const now = new Date();
     const until = addDays(now, normalizedDays);
     const vehicles = await this.prisma.transportVehicle.findMany({

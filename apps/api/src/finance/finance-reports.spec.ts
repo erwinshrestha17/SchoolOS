@@ -12,7 +12,7 @@ const actor: AuthContext = {
   authMethod: 'PASSWORD' as AuthContext['authMethod'],
 };
 
-function createService(receipts: Array<Record<string, unknown>>) {
+function createService(receipts: Record<string, unknown>[]) {
   const prisma = {
     receipt: {
       findMany: jest.fn().mockResolvedValue(receipts),

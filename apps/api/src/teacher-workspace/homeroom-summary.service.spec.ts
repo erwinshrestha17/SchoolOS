@@ -30,7 +30,7 @@ const actor: AuthContext = {
 };
 
 function buildService(
-  assignments: Array<Record<string, any>>,
+  assignments: Record<string, unknown>[],
   enabledModules: string[] = [
     'students',
     'attendance',

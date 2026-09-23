@@ -508,7 +508,7 @@ export class AccountingService implements OnModuleInit {
         where: { id: batch.sourceBatchId, tenantId: actor.tenantId },
         include: { invoice: true, receipt: true },
       });
-      if (!payment || !payment.receipt) {
+      if (!payment?.receipt) {
         throw new NotFoundException('Fee payment source record not found');
       }
       await this.postingService.postFeePayment(
@@ -638,8 +638,10 @@ export class AccountingService implements OnModuleInit {
   async createPeriod(dto: CreateAccountingPeriodDto, actor: AuthContext) {
     void dto;
     void actor;
-    throw new BadRequestException(
-      'Legacy accounting periods are read-only. Create a fiscal year and use its fiscal periods.',
+    return Promise.reject(
+      new BadRequestException(
+        'Legacy accounting periods are read-only. Create a fiscal year and use its fiscal periods.',
+      ),
     );
   }
 
@@ -1405,8 +1407,10 @@ export class AccountingService implements OnModuleInit {
   async closePeriod(id: string, actor: AuthContext) {
     void id;
     void actor;
-    throw new BadRequestException(
-      'Legacy accounting periods are read-only. Close the linked fiscal period through Fiscal Periods.',
+    return Promise.reject(
+      new BadRequestException(
+        'Legacy accounting periods are read-only. Close the linked fiscal period through Fiscal Periods.',
+      ),
     );
   }
 
@@ -2929,7 +2933,7 @@ export class AccountingService implements OnModuleInit {
               },
             }),
           ),
-        ) as Promise<UnsafeBankStatement[]>;
+        );
       });
     } catch (error) {
       if (
@@ -3169,7 +3173,7 @@ export class AccountingService implements OnModuleInit {
           1
       ) {
         for (const candidate of candidates.filter(
-          (candidate) => candidate.score === topScore,
+          (item) => item.score === topScore,
         )) {
           candidate.warningFlags.push('DUPLICATE_CANDIDATE');
           candidate.suggestedAction = 'MANUAL_REVIEW';
@@ -3481,7 +3485,7 @@ function readRequiredReason(payload: unknown) {
   if (!payload || typeof payload !== 'object') {
     throw new BadRequestException('Fiscal-period reopen reason is required');
   }
-  const reason = Reflect.get(payload, 'reason');
+  const reason: unknown = Reflect.get(payload, 'reason');
   if (typeof reason !== 'string' || !reason.trim()) {
     throw new BadRequestException('Fiscal-period reopen reason is required');
   }
@@ -3548,7 +3552,7 @@ function daysBetween(a: Date, b: Date) {
 }
 
 function normalizeMatchText(value: string | null | undefined) {
-  return String(value ?? '')
+  return (value ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
@@ -3673,7 +3677,7 @@ function toCsv(rows: Array<Record<string, unknown>>) {
 
     if (typeof value === 'object') {
       if (
-        value.constructor.name === 'Decimal' &&
+        value instanceof Prisma.Decimal &&
         'toString' in value &&
         typeof value.toString === 'function'
       ) {

@@ -248,7 +248,7 @@ export class NotificationCenterService {
       DO UPDATE SET "readAt" = EXCLUDED."readAt"
     `);
 
-    return { success: true, markedCount: Number(result) };
+    return { success: true, markedCount: result };
   }
 
   private async insertReadReceipt(actor: AuthContext, notificationId: string) {

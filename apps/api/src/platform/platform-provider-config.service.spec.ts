@@ -1,9 +1,32 @@
 import { BadRequestException } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 
+function providerInternals(service: PlatformService) {
+  return service as unknown as {
+    validateProvider(dto: unknown): void;
+    detectSecretKeys(config: Record<string, unknown>): string[];
+    encryptProviderConfig(
+      config: Record<string, unknown>,
+      secretKeys: string[],
+    ): Record<string, unknown>;
+    toProviderSummary(
+      provider: Record<string, unknown>,
+    ): Record<string, unknown>;
+  };
+}
+
 describe('PlatformService provider config hardening', () => {
   let service: PlatformService;
-  let prisma: any;
+  let prisma: {
+    providerConfig: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      upsert: jest.Mock;
+      update: jest.Mock;
+    };
+    auditLog: { findMany: jest.Mock };
+  };
   let auditService: { record: jest.Mock };
   let configService: {
     storageConfig: {
@@ -63,47 +86,85 @@ describe('PlatformService provider config hardening', () => {
     };
 
     service = new PlatformService(
-      prisma,
-      auditService as any,
-      {} as any,
-      configService as any,
-      {} as any,
-      {} as any,
+      prisma as unknown as ConstructorParameters<typeof PlatformService>[0],
+      auditService as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[1],
+      {} as unknown as ConstructorParameters<typeof PlatformService>[2],
+      configService as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[3],
+      {} as unknown as ConstructorParameters<typeof PlatformService>[4],
+      {} as unknown as ConstructorParameters<typeof PlatformService>[5],
       {
         invalidateTenantEntitlements: jest.fn(async () => undefined),
         invalidateAllTenantEntitlements: jest.fn(async () => undefined),
-      } as any,
-      storageService as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
+      } as unknown as ConstructorParameters<typeof PlatformService>[6],
+      storageService as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[7],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[8],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[9],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[10],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[11],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[12],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[13],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[14],
     );
   });
 
   it('returns an empty provider list when ProviderConfig delegate is unavailable', async () => {
     service = new PlatformService(
-      {} as any,
-      auditService as any,
-      {} as any,
-      configService as any,
-      {} as any,
-      {} as any,
+      {} as unknown as ConstructorParameters<typeof PlatformService>[0],
+      auditService as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[1],
+      {} as unknown as ConstructorParameters<typeof PlatformService>[2],
+      configService as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[3],
+      {} as unknown as ConstructorParameters<typeof PlatformService>[4],
+      {} as unknown as ConstructorParameters<typeof PlatformService>[5],
       {
         invalidateTenantEntitlements: jest.fn(async () => undefined),
         invalidateAllTenantEntitlements: jest.fn(async () => undefined),
-      } as any,
-      {} as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
+      } as unknown as ConstructorParameters<typeof PlatformService>[6],
+      {} as unknown as ConstructorParameters<typeof PlatformService>[7],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[8],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[9],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[10],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[11],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[12],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[13],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[14],
     );
 
     await expect(service.listProviders()).resolves.toEqual([]);
@@ -125,18 +186,20 @@ describe('PlatformService provider config hardening', () => {
       updatedAt: new Date('2026-05-01T00:00:00.000Z'),
     };
     prisma.providerConfig.findMany.mockResolvedValue([provider]);
-    jest.spyOn(service as any, 'toProviderSummary').mockReturnValue({
-      id: 'provider-1',
-      type: 'SMS',
-      name: 'sparrow',
-      enabled: true,
-      environment: 'TEST',
-      config: {
-        apiKey: '********',
-        senderId: 'SchoolOS',
-      },
-      secretKeys: ['apiKey'],
-    });
+    jest
+      .spyOn(providerInternals(service), 'toProviderSummary')
+      .mockReturnValue({
+        id: 'provider-1',
+        type: 'SMS',
+        name: 'sparrow',
+        enabled: true,
+        environment: 'TEST',
+        config: {
+          apiKey: '********',
+          senderId: 'SchoolOS',
+        },
+        secretKeys: ['apiKey'],
+      });
 
     await expect(service.listProviders()).resolves.toEqual([
       {
@@ -156,7 +219,9 @@ describe('PlatformService provider config hardening', () => {
     expect(prisma.providerConfig.findMany).toHaveBeenCalledWith({
       orderBy: [{ type: 'asc' }, { name: 'asc' }],
     });
-    expect((service as any).toProviderSummary).toHaveBeenCalledWith(provider);
+    expect(providerInternals(service).toProviderSummary).toHaveBeenCalledWith(
+      provider,
+    );
   });
 
   it('encrypts configured secret keys before persistence and audits masked summaries only', async () => {
@@ -187,24 +252,28 @@ describe('PlatformService provider config hardening', () => {
     prisma.providerConfig.findUnique.mockResolvedValue(null);
     prisma.providerConfig.upsert.mockResolvedValue(persisted);
     jest
-      .spyOn(service as any, 'validateProvider')
+      .spyOn(providerInternals(service), 'validateProvider')
       .mockImplementation(() => undefined);
-    jest.spyOn(service as any, 'encryptProviderConfig').mockReturnValue({
-      apiKey: 'encrypted-secret-value',
-      senderId: 'SchoolOS',
-    });
-    jest.spyOn(service as any, 'toProviderSummary').mockReturnValue({
-      id: 'provider-1',
-      type: 'SMS',
-      name: 'sparrow',
-      enabled: true,
-      environment: 'TEST',
-      config: {
-        apiKey: '********',
+    jest
+      .spyOn(providerInternals(service), 'encryptProviderConfig')
+      .mockReturnValue({
+        apiKey: 'encrypted-secret-value',
         senderId: 'SchoolOS',
-      },
-      secretKeys: ['apiKey'],
-    });
+      });
+    jest
+      .spyOn(providerInternals(service), 'toProviderSummary')
+      .mockReturnValue({
+        id: 'provider-1',
+        type: 'SMS',
+        name: 'sparrow',
+        enabled: true,
+        environment: 'TEST',
+        config: {
+          apiKey: '********',
+          senderId: 'SchoolOS',
+        },
+        secretKeys: ['apiKey'],
+      });
 
     await expect(
       service.upsertProvider(dto, 'platform-user-1'),
@@ -215,10 +284,9 @@ describe('PlatformService provider config hardening', () => {
       }),
     );
 
-    expect((service as any).encryptProviderConfig).toHaveBeenCalledWith(
-      dto.config,
-      ['apiKey'],
-    );
+    expect(
+      providerInternals(service).encryptProviderConfig,
+    ).toHaveBeenCalledWith(dto.config, ['apiKey']);
     expect(prisma.providerConfig.upsert).toHaveBeenCalledWith({
       where: {
         type_name_environment: {
@@ -294,35 +362,40 @@ describe('PlatformService provider config hardening', () => {
     prisma.providerConfig.findUnique.mockResolvedValue(null);
     prisma.providerConfig.upsert.mockResolvedValue(persisted);
     jest
-      .spyOn(service as any, 'validateProvider')
+      .spyOn(providerInternals(service), 'validateProvider')
       .mockImplementation(() => undefined);
     jest
-      .spyOn(service as any, 'detectSecretKeys')
+      .spyOn(providerInternals(service), 'detectSecretKeys')
       .mockReturnValue(['password']);
-    jest.spyOn(service as any, 'encryptProviderConfig').mockReturnValue({
-      password: 'encrypted-password',
-      host: 'smtp.local',
-    });
-    jest.spyOn(service as any, 'toProviderSummary').mockReturnValue({
-      id: 'provider-2',
-      type: 'EMAIL',
-      name: 'smtp',
-      enabled: true,
-      environment: 'TEST',
-      config: {
-        password: '********',
+    jest
+      .spyOn(providerInternals(service), 'encryptProviderConfig')
+      .mockReturnValue({
+        password: 'encrypted-password',
         host: 'smtp.local',
-      },
-      secretKeys: ['password'],
-    });
+      });
+    jest
+      .spyOn(providerInternals(service), 'toProviderSummary')
+      .mockReturnValue({
+        id: 'provider-2',
+        type: 'EMAIL',
+        name: 'smtp',
+        enabled: true,
+        environment: 'TEST',
+        config: {
+          password: '********',
+          host: 'smtp.local',
+        },
+        secretKeys: ['password'],
+      });
 
     await service.upsertProvider(dto, 'platform-user-1');
 
-    expect((service as any).detectSecretKeys).toHaveBeenCalledWith(dto.config);
-    expect((service as any).encryptProviderConfig).toHaveBeenCalledWith(
+    expect(providerInternals(service).detectSecretKeys).toHaveBeenCalledWith(
       dto.config,
-      ['password'],
     );
+    expect(
+      providerInternals(service).encryptProviderConfig,
+    ).toHaveBeenCalledWith(dto.config, ['password']);
     expect(prisma.providerConfig.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({ secretKeys: ['password'] }),
@@ -355,17 +428,21 @@ describe('PlatformService provider config hardening', () => {
     prisma.providerConfig.findUnique.mockResolvedValue(before);
     prisma.providerConfig.upsert.mockResolvedValue(persisted);
     jest
-      .spyOn(service as any, 'validateProvider')
+      .spyOn(providerInternals(service), 'validateProvider')
       .mockImplementation(() => undefined);
-    jest.spyOn(service as any, 'encryptProviderConfig').mockReturnValue({
-      apiKey: 'encrypted-masked-value',
-      senderId: 'SchoolOS Nepal',
-    });
-    jest.spyOn(service as any, 'toProviderSummary').mockReturnValue({
-      id: 'provider-1',
-      config: { apiKey: '********', senderId: 'SchoolOS Nepal' },
-      secretKeys: ['apiKey'],
-    });
+    jest
+      .spyOn(providerInternals(service), 'encryptProviderConfig')
+      .mockReturnValue({
+        apiKey: 'encrypted-masked-value',
+        senderId: 'SchoolOS Nepal',
+      });
+    jest
+      .spyOn(providerInternals(service), 'toProviderSummary')
+      .mockReturnValue({
+        id: 'provider-1',
+        config: { apiKey: '********', senderId: 'SchoolOS Nepal' },
+        secretKeys: ['apiKey'],
+      });
 
     await service.upsertProvider(
       {
@@ -407,8 +484,8 @@ describe('PlatformService provider config hardening', () => {
       enabled: false,
     });
     jest
-      .spyOn(service as any, 'toProviderSummary')
-      .mockImplementation((provider: any) => ({
+      .spyOn(providerInternals(service), 'toProviderSummary')
+      .mockImplementation((provider: Record<string, unknown>) => ({
         id: provider.id,
         enabled: provider.enabled,
         config: { apiKey: '********' },
@@ -440,9 +517,11 @@ describe('PlatformService provider config hardening', () => {
   });
 
   it('rejects unsafe provider configurations before persistence', async () => {
-    jest.spyOn(service as any, 'validateProvider').mockImplementation(() => {
-      throw new BadRequestException('Provider config is invalid');
-    });
+    jest
+      .spyOn(providerInternals(service), 'validateProvider')
+      .mockImplementation(() => {
+        throw new BadRequestException('Provider config is invalid');
+      });
 
     await expect(
       service.upsertProvider(

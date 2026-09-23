@@ -255,6 +255,11 @@ describe('production data integrity contracts', () => {
     expect(reportsService).toContain(
       "requiredPermissions: ['reports:export', 'ledger:read']",
     );
-    expect(reportsService).toContain('asOfDate: String(filters.asOfDate)');
+    expect(reportsService).toContain(
+      'asOfDate: reportFilterString(filters.asOfDate)',
+    );
+    expect(reportsService).toContain(
+      "throw new BadRequestException('Report filter must be a scalar value')",
+    );
   });
 });

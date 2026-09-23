@@ -7,17 +7,29 @@ import {
 import { AddressService } from './address.service';
 import { PrismaService } from '../prisma/prisma.service';
 
+interface AddressRow {
+  id: string;
+  isHistorical: boolean;
+  tenantId?: string;
+  ownerType?: AddressOwnerType;
+  ownerId?: string;
+  addressType?: AddressType;
+  wardNumber?: string;
+  [key: string]: unknown;
+}
+
 function makeDb(overrides: Partial<Record<string, unknown>> = {}) {
-  const addresses: any[] = [];
+  const addresses: AddressRow[] = [];
   return {
     nepalLocalLevel: {
-      findUnique: jest.fn(async ({ where: { id } }: any) =>
-        id === 500 ? { id: 500, nameEn: 'Tilottama' } : null,
+      findUnique: jest.fn(
+        async ({ where: { id } }: { where: { id: number } }) =>
+          id === 500 ? { id: 500, nameEn: 'Tilottama' } : null,
       ),
     },
     address: {
       findFirst: jest.fn(
-        async ({ where }: any) =>
+        async ({ where }: { where: Partial<AddressRow> }) =>
           addresses.find(
             (a) =>
               a.tenantId === where.tenantId &&
@@ -27,20 +39,31 @@ function makeDb(overrides: Partial<Record<string, unknown>> = {}) {
               a.isHistorical === where.isHistorical,
           ) ?? null,
       ),
-      create: jest.fn(async ({ data }: any) => {
+      create: jest.fn(async ({ data }: { data: Partial<AddressRow> }) => {
         const row = {
-          id: `addr-${addresses.length + 1}`,
+          id: `addr-${String(addresses.length + 1)}`,
           isHistorical: false,
           ...data,
         };
         addresses.push(row);
         return row;
       }),
-      update: jest.fn(async ({ where, data }: any) => {
-        const row = addresses.find((a) => a.id === where.id);
-        Object.assign(row, data);
-        return row;
-      }),
+      update: jest.fn(
+        async ({
+          where,
+          data,
+        }: {
+          where: { id: string };
+          data: Partial<AddressRow>;
+        }) => {
+          const row = addresses.find((a) => a.id === where.id);
+          if (!row) {
+            throw new Error(`Address fixture ${where.id} was not created`);
+          }
+          Object.assign(row, data);
+          return row;
+        },
+      ),
     },
     _addresses: addresses,
     ...overrides,
@@ -121,8 +144,8 @@ describe('AddressService', () => {
       },
     });
 
-    expect((db as any)._addresses).toHaveLength(1);
-    expect((db as any)._addresses[0].wardNumber).toBe('7');
+    expect(db._addresses).toHaveLength(1);
+    expect(db._addresses[0].wardNumber).toBe('7');
   });
 
   it('keeps PERMANENT and CURRENT addresses as separate rows for the same owner', async () => {
@@ -142,6 +165,6 @@ describe('AddressService', () => {
       input: { localLevelId: 500, addressType: AddressType.CURRENT },
     });
 
-    expect((db as any)._addresses).toHaveLength(2);
+    expect(db._addresses).toHaveLength(2);
   });
 });

@@ -37,25 +37,38 @@ describe('DeliveryRetryService failure dashboard', () => {
         notificationDelivery: {
           findFirst: jest.fn(async () => ({ ...delivery })),
           findMany: jest.fn(async () => [{ ...delivery }]),
-          updateMany: jest.fn(async ({ where, data }) => {
-            if (
-              where.id !== delivery.id ||
-              where.tenantId !== delivery.tenantId ||
-              where.retryCount !== delivery.retryCount ||
-              (typeof where.status === 'string'
-                ? where.status !== delivery.status
-                : !where.status.in.includes(delivery.status))
-            ) {
-              return { count: 0 };
-            }
-            Object.assign(delivery, {
-              ...data,
-              retryCount: data.retryCount
-                ? delivery.retryCount + data.retryCount.increment
-                : delivery.retryCount,
-            });
-            return { count: 1 };
-          }),
+          updateMany: jest.fn(
+            async ({
+              where,
+              data,
+            }: {
+              where: {
+                id: string;
+                tenantId: string;
+                retryCount: number;
+                status: string | { in: string[] };
+              };
+              data: { retryCount?: { increment: number } };
+            }) => {
+              if (
+                where.id !== delivery.id ||
+                where.tenantId !== delivery.tenantId ||
+                where.retryCount !== delivery.retryCount ||
+                (typeof where.status === 'string'
+                  ? where.status !== delivery.status
+                  : !where.status.in.includes(delivery.status))
+              ) {
+                return { count: 0 };
+              }
+              Object.assign(delivery, {
+                ...data,
+                retryCount: data.retryCount
+                  ? delivery.retryCount + data.retryCount.increment
+                  : delivery.retryCount,
+              });
+              return { count: 1 };
+            },
+          ),
         },
       };
       const notifications = {
@@ -560,15 +573,21 @@ describe('DeliveryRetryService failure dashboard', () => {
     const prisma = {
       notificationDelivery: {
         findFirst: jest.fn(async () => ({ ...delivery })),
-        updateMany: jest.fn(async ({ data }) => {
-          Object.assign(delivery, {
-            ...data,
-            retryCount: data.retryCount
-              ? delivery.retryCount + data.retryCount.increment
-              : delivery.retryCount,
-          });
-          return { count: 1 };
-        }),
+        updateMany: jest.fn(
+          async ({
+            data,
+          }: {
+            data: { retryCount?: { increment: number } };
+          }) => {
+            Object.assign(delivery, {
+              ...data,
+              retryCount: data.retryCount
+                ? delivery.retryCount + data.retryCount.increment
+                : delivery.retryCount,
+            });
+            return { count: 1 };
+          },
+        ),
       },
     };
     const notifications = {

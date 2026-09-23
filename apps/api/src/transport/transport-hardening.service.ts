@@ -372,8 +372,8 @@ export class TransportHardeningService {
   }
 }
 
-function csvEscape(value: unknown) {
-  const text = value == null ? '' : String(value);
+function csvEscape(value: string | number | boolean | Date | null | undefined) {
+  const text = value === null || value === undefined ? '' : String(value);
   if (/[",\n]/.test(text)) {
     return `"${text.replace(/"/g, '""')}"`;
   }

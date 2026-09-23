@@ -159,7 +159,11 @@ export const EDITABLE_STATUSES: readonly TeacherRecordStatus[] = [
 export function isEditableStatus(
   status: TeacherRecordStatus | null | undefined,
 ) {
-  return status == null || EDITABLE_STATUSES.includes(status);
+  return (
+    status === null ||
+    status === undefined ||
+    EDITABLE_STATUSES.includes(status)
+  );
 }
 
 const SUBJECT_TEACHING_TYPES = [

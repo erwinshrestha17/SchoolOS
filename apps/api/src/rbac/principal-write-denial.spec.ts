@@ -1,5 +1,5 @@
 import { AuthMethod } from '@prisma/client';
-import { ForbiddenException } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { systemRolePermissions } from '@schoolos/core';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
@@ -18,7 +18,7 @@ describe('Principal write-route denial (PPR-P0-03 seed)', () => {
       permissions: string[];
     };
   };
-  let context: any;
+  let context: ExecutionContext;
 
   const principalPermissions = systemRolePermissions.principal;
 
@@ -44,7 +44,7 @@ describe('Principal write-route denial (PPR-P0-03 seed)', () => {
       switchToHttp: () => ({
         getRequest: () => request,
       }),
-    };
+    } as unknown as ExecutionContext;
   });
 
   async function expectDenied(requiredPermissions: string[]) {

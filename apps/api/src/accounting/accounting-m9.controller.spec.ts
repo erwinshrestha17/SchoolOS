@@ -5,7 +5,7 @@ const actor = {
   tenantId: 'tenant-1',
   tenantSlug: 'tenant-one',
   userId: 'user-1',
-} as any;
+} as unknown as import('../auth/auth.types').AuthContext;
 
 describe('AccountingM9Controller', () => {
   it('previews the Nepal school chart template with account rows', () => {
@@ -105,9 +105,13 @@ function buildController() {
   };
   return {
     controller: new AccountingM9Controller(
-      m9 as any,
-      sources as any,
-      templates as any,
+      m9 as unknown as ConstructorParameters<typeof AccountingM9Controller>[0],
+      sources as unknown as ConstructorParameters<
+        typeof AccountingM9Controller
+      >[1],
+      templates as unknown as ConstructorParameters<
+        typeof AccountingM9Controller
+      >[2],
     ),
     m9,
     sources,

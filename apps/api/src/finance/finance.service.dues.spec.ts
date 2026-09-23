@@ -61,7 +61,7 @@ describe('FinanceService - Dues & Reprints', () => {
             verifyLimit: jest.fn().mockResolvedValue(undefined),
             checkLimit: jest.fn().mockResolvedValue(undefined),
             incrementUsage: jest.fn().mockResolvedValue(undefined),
-          } as any,
+          },
         },
       ],
     }).compile();
@@ -78,7 +78,7 @@ describe('FinanceService - Dues & Reprints', () => {
         service.reprintReceipt(
           'r1',
           { reason: 'Lost', idempotencyKey: 'reprint-not-found' },
-          actor as any,
+          actor as unknown as Parameters<typeof service.reprintReceipt>[2],
         ),
       ).rejects.toThrow(NotFoundException);
     });
@@ -129,7 +129,7 @@ describe('FinanceService - Dues & Reprints', () => {
       const result = await service.reprintReceipt(
         'r1',
         { reason: 'Lost', idempotencyKey: 'reprint-valid' },
-        actor as any,
+        actor as unknown as Parameters<typeof service.reprintReceipt>[2],
       );
 
       expect(prisma.receiptReprintHistory.create).toHaveBeenCalled();
@@ -168,7 +168,10 @@ describe('FinanceService - Dues & Reprints', () => {
       );
       (prisma.feeWaiver.findMany as jest.Mock).mockResolvedValue([]);
 
-      const result = await service.getDuesTableReport({}, actor as any);
+      const result = await service.getDuesTableReport(
+        {},
+        actor as unknown as Parameters<typeof service.getDuesTableReport>[1],
+      );
 
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].outstanding).toBe('5000.00');

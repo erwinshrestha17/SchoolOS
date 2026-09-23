@@ -13,10 +13,24 @@ describe('NoticeAcknowledgementService', () => {
     permissions: ['notices:read'],
     authMethod: AuthMethod.PASSWORD,
   };
-  let prisma: any;
-  let auditService: any;
-  let eventService: any;
-  let communicationsService: any;
+  let prisma: {
+    notificationDelivery: { findFirst: jest.Mock; findMany: jest.Mock };
+    studentGuardian: { findFirst: jest.Mock };
+    noticeAcknowledgement: {
+      findUnique: jest.Mock;
+      findMany: jest.Mock;
+      upsert: jest.Mock;
+    };
+    notice: { findFirst: jest.Mock };
+    $queryRaw: jest.Mock;
+  };
+  let auditService: { record: jest.Mock };
+  let eventService: {
+    accept: jest.Mock;
+    markDispatched: jest.Mock;
+    markFailed: jest.Mock;
+  };
+  let communicationsService: { recordDeliveryRecords: jest.Mock };
   let service: NoticeAcknowledgementService;
 
   beforeEach(() => {
@@ -61,10 +75,18 @@ describe('NoticeAcknowledgementService', () => {
         .mockResolvedValue({ count: 2, queuedCount: 1, skippedCount: 1 }),
     };
     service = new NoticeAcknowledgementService(
-      prisma,
-      auditService,
-      eventService,
-      communicationsService,
+      prisma as unknown as ConstructorParameters<
+        typeof NoticeAcknowledgementService
+      >[0],
+      auditService as unknown as ConstructorParameters<
+        typeof NoticeAcknowledgementService
+      >[1],
+      eventService as unknown as ConstructorParameters<
+        typeof NoticeAcknowledgementService
+      >[2],
+      communicationsService as unknown as ConstructorParameters<
+        typeof NoticeAcknowledgementService
+      >[3],
     );
   });
 

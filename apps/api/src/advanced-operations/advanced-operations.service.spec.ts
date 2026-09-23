@@ -68,7 +68,14 @@ describe('advanced operations services', () => {
         }),
       },
     };
-    const service = new ApprovalWorkflowService(prisma as any, audit as any);
+    const service = new ApprovalWorkflowService(
+      prisma as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[0],
+      audit as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[1],
+    );
 
     await expect(
       service.decide(
@@ -118,7 +125,14 @@ describe('advanced operations services', () => {
         (callback: (client: typeof tx) => Promise<unknown>) => callback(tx),
       ),
     };
-    const service = new ApprovalWorkflowService(prisma as any, audit as any);
+    const service = new ApprovalWorkflowService(
+      prisma as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[0],
+      audit as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[1],
+    );
 
     await service.decide(
       'approval-1',
@@ -161,7 +175,14 @@ describe('advanced operations services', () => {
       },
       $transaction: jest.fn(),
     };
-    const service = new ApprovalWorkflowService(prisma as any, audit as any);
+    const service = new ApprovalWorkflowService(
+      prisma as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[0],
+      audit as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[1],
+    );
 
     await expect(
       service.decide(
@@ -195,7 +216,14 @@ describe('advanced operations services', () => {
         update: jest.fn(),
       },
     };
-    const service = new ApprovalWorkflowService(prisma as any, audit as any);
+    const service = new ApprovalWorkflowService(
+      prisma as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[0],
+      audit as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[1],
+    );
 
     await expect(
       service.applyFinalAction('approval-1', actor),
@@ -240,7 +268,14 @@ describe('advanced operations services', () => {
         }),
       },
     };
-    const service = new ApprovalWorkflowService(prisma as any, audit as any);
+    const service = new ApprovalWorkflowService(
+      prisma as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[0],
+      audit as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[1],
+    );
     service.registerFinalAction('academics.marks.correct', executor);
 
     await service.applyFinalAction('approval-1', actor);
@@ -288,7 +323,14 @@ describe('advanced operations services', () => {
         }),
       },
     };
-    const service = new ApprovalWorkflowService(prisma as any, audit as any);
+    const service = new ApprovalWorkflowService(
+      prisma as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[0],
+      audit as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[1],
+    );
 
     await service.delegate(
       'approval-1',
@@ -350,7 +392,14 @@ describe('advanced operations services', () => {
       },
       $transaction: jest.fn(),
     };
-    const service = new ApprovalWorkflowService(prisma as any, audit as any);
+    const service = new ApprovalWorkflowService(
+      prisma as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[0],
+      audit as unknown as ConstructorParameters<
+        typeof ApprovalWorkflowService
+      >[1],
+    );
 
     await expect(
       service.decide(
@@ -398,7 +447,14 @@ describe('advanced operations services', () => {
         }),
       },
     };
-    const service = new AutomationEngineService(prisma as any, audit as any);
+    const service = new AutomationEngineService(
+      prisma as unknown as ConstructorParameters<
+        typeof AutomationEngineService
+      >[0],
+      audit as unknown as ConstructorParameters<
+        typeof AutomationEngineService
+      >[1],
+    );
 
     const result = await service.executeTrigger(
       {
@@ -442,8 +498,12 @@ describe('advanced operations services', () => {
       },
     };
     const service = new DescriptiveAnalyticsService(
-      prisma as any,
-      audit as any,
+      prisma as unknown as ConstructorParameters<
+        typeof DescriptiveAnalyticsService
+      >[0],
+      audit as unknown as ConstructorParameters<
+        typeof DescriptiveAnalyticsService
+      >[1],
     );
 
     await service.refresh(
@@ -471,9 +531,11 @@ describe('advanced operations services', () => {
 
   it('rejects document templates that use undeclared merge fields', async () => {
     const service = new DocumentTemplateService(
-      {} as any,
-      audit as any,
-      {} as any,
+      {} as unknown as ConstructorParameters<typeof DocumentTemplateService>[0],
+      audit as unknown as ConstructorParameters<
+        typeof DocumentTemplateService
+      >[1],
+      {} as unknown as ConstructorParameters<typeof DocumentTemplateService>[2],
     );
 
     await expect(
@@ -521,9 +583,15 @@ describe('advanced operations services', () => {
       registerGeneratedFile: jest.fn().mockResolvedValue({ id: 'file-1' }),
     };
     const service = new DocumentTemplateService(
-      prisma as any,
-      audit as any,
-      fileRegistry as any,
+      prisma as unknown as ConstructorParameters<
+        typeof DocumentTemplateService
+      >[0],
+      audit as unknown as ConstructorParameters<
+        typeof DocumentTemplateService
+      >[1],
+      fileRegistry as unknown as ConstructorParameters<
+        typeof DocumentTemplateService
+      >[2],
     );
 
     await service.generateDocument(
@@ -569,10 +637,18 @@ describe('advanced operations services', () => {
       },
     };
     const service = new DataExportCenterService(
-      prisma as any,
-      audit as any,
-      { registerGeneratedFile: jest.fn() } as any,
-      queue as any,
+      prisma as unknown as ConstructorParameters<
+        typeof DataExportCenterService
+      >[0],
+      audit as unknown as ConstructorParameters<
+        typeof DataExportCenterService
+      >[1],
+      { registerGeneratedFile: jest.fn() } as unknown as ConstructorParameters<
+        typeof DataExportCenterService
+      >[2],
+      queue as unknown as ConstructorParameters<
+        typeof DataExportCenterService
+      >[3],
     );
 
     await service.createJob(
@@ -599,10 +675,16 @@ describe('advanced operations services', () => {
       },
     };
     const service = new DataExportCenterService(
-      prisma as any,
-      audit as any,
-      {} as any,
-      { add: jest.fn() } as any,
+      prisma as unknown as ConstructorParameters<
+        typeof DataExportCenterService
+      >[0],
+      audit as unknown as ConstructorParameters<
+        typeof DataExportCenterService
+      >[1],
+      {} as unknown as ConstructorParameters<typeof DataExportCenterService>[2],
+      { add: jest.fn() } as unknown as ConstructorParameters<
+        typeof DataExportCenterService
+      >[3],
     );
 
     await expect(service.retryJob('job-1', actor)).rejects.toThrow(

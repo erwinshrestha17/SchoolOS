@@ -17,9 +17,7 @@ import { ParentScopeContextService } from './parent-scope-context.service';
 import {
   buildActiveGuardianRelationshipWhere,
   createGuardianCapabilityDeniedException,
-  getParentStudentIds,
   isParentOnly,
-  requireGuardianCapability,
 } from '../common/security/parent-scope';
 import {
   assertConfirmStudentId,
@@ -3180,13 +3178,25 @@ export class MobileService {
             where: { tenantId, id: { in: routeIds } },
             select: { id: true, name: true, code: true },
           })
-        : Promise.resolve([]),
+        : Promise.resolve<
+            Array<
+              Prisma.TransportRouteGetPayload<{
+                select: { id: true; name: true; code: true };
+              }>
+            >
+          >([]),
       stopIds.length
         ? this.prisma.transportStop.findMany({
             where: { tenantId, id: { in: stopIds } },
             select: { id: true, name: true, sequence: true },
           })
-        : Promise.resolve([]),
+        : Promise.resolve<
+            Array<
+              Prisma.TransportStopGetPayload<{
+                select: { id: true; name: true; sequence: true };
+              }>
+            >
+          >([]),
       trip
         ? this.prisma.transportVehicle.findFirst({
             where: { tenantId, id: trip.vehicleId },

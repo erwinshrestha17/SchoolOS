@@ -160,7 +160,7 @@ export class S3CompatibleStorageAdapter implements StorageAdapter {
 
   async checkReadiness() {
     this.assertConfig();
-    return true;
+    return Promise.resolve(true);
   }
 
   async testConnection(): Promise<StorageReadinessResult> {
@@ -283,13 +283,29 @@ async function streamBodyToBuffer(body: unknown): Promise<Buffer> {
     'transformToByteArray' in body &&
     typeof body.transformToByteArray === 'function'
   ) {
-    return Buffer.from(await body.transformToByteArray());
+    const transform = body.transformToByteArray as () => Promise<unknown>;
+    const bytes: unknown = await transform.call(body);
+    if (!(bytes instanceof Uint8Array)) {
+      throw new StorageOperationError(
+        'Object storage download returned invalid bytes',
+      );
+    }
+    return Buffer.from(bytes);
   }
 
   if (body instanceof Readable) {
     const chunks: Buffer[] = [];
-    for await (const chunk of body) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    for await (const value of body) {
+      const chunk: unknown = value;
+      if (Buffer.isBuffer(chunk)) {
+        chunks.push(chunk);
+      } else if (typeof chunk === 'string' || chunk instanceof Uint8Array) {
+        chunks.push(Buffer.from(chunk));
+      } else {
+        throw new StorageOperationError(
+          'Object storage download returned an invalid chunk',
+        );
+      }
     }
     return Buffer.concat(chunks);
   }

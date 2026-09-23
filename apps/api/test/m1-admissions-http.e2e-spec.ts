@@ -1084,6 +1084,32 @@ function seedM1Data(prisma: PrismaMock) {
   ];
 }
 
+interface FixtureQuery {
+  where?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+  take?: number;
+  skip?: number;
+}
+
+function queryMock(
+  method: unknown,
+): jest.Mock<Promise<unknown>, [FixtureQuery]> {
+  return method as jest.Mock<Promise<unknown>, [FixtureQuery]>;
+}
+
+function installFixtureDelegate(
+  prisma: PrismaMock,
+  name:
+    | 'admissionApplication'
+    | 'admissionImportBatch'
+    | 'admissionImportRow'
+    | 'feePlan'
+    | 'studentFeeAssignment',
+  delegate: Record<string, unknown>,
+): void {
+  (prisma as unknown as Record<string, unknown>)[name] = delegate;
+}
+
 function overrideGeneratedDocumentReads(prisma: PrismaMock) {
   const findDocuments = (where?: Record<string, unknown>) =>
     prisma.__state.generatedStudentDocuments.filter(
@@ -1095,8 +1121,8 @@ function overrideGeneratedDocumentReads(prisma: PrismaMock) {
         (!where?.revokedAt || document.revokedAt === where.revokedAt),
     );
 
-  prisma.generatedStudentDocument.findFirst.mockImplementation(
-    (query: { where?: Record<string, unknown> }) =>
+  queryMock(prisma.generatedStudentDocument.findFirst).mockImplementation(
+    (query) =>
       Promise.resolve(
         findDocuments(query.where).sort(
           (left, right) =>
@@ -1108,12 +1134,11 @@ function overrideGeneratedDocumentReads(prisma: PrismaMock) {
         )[0] ?? null,
       ),
   );
-  prisma.generatedStudentDocument.findMany.mockImplementation(
-    (query: { where?: Record<string, unknown> }) =>
-      Promise.resolve(findDocuments(query.where)),
+  queryMock(prisma.generatedStudentDocument.findMany).mockImplementation(
+    (query) => Promise.resolve(findDocuments(query.where)),
   );
-  prisma.generatedStudentDocument.create.mockImplementation(
-    (query: { data?: Record<string, unknown> }) => {
+  queryMock(prisma.generatedStudentDocument.create).mockImplementation(
+    (query) => {
       const now = new Date('2026-04-06T00:10:00.000Z');
       const document = {
         id: `generated-${String(
@@ -1128,107 +1153,100 @@ function overrideGeneratedDocumentReads(prisma: PrismaMock) {
       return Promise.resolve(document);
     },
   );
-  prisma.generatedStudentDocument.count = jest.fn();
-  prisma.generatedStudentDocument.count.mockImplementation(
-    (query: { where?: Record<string, unknown> }) =>
+  Object.assign(prisma.generatedStudentDocument, {
+    count: jest.fn((query: FixtureQuery) =>
       Promise.resolve(findDocuments(query.where).length),
-  );
+    ),
+  });
 }
 
 function overrideStudentGuardianReads(prisma: PrismaMock) {
-  prisma.studentGuardian.create.mockImplementation(
-    (query: { data?: Record<string, unknown> }) => {
-      const data = query.data ?? {};
-      const link = {
-        id: `link-${String(prisma.__state.studentGuardians.length + 1)}`,
-        ...data,
-        guardian: prisma.__state.guardians.find(
-          (guardian) => guardian.id === data.guardianId,
-        ),
-      };
-      prisma.__state.studentGuardians.push(link);
-      return Promise.resolve(link);
-    },
-  );
-  prisma.studentGuardian.findMany.mockImplementation(
-    (query: { where?: Record<string, unknown> }) =>
-      Promise.resolve(
-        prisma.__state.studentGuardians
-          .filter(
-            (link) =>
-              (!query.where?.tenantId ||
-                link.tenantId === query.where.tenantId) &&
-              (!query.where?.studentId ||
-                link.studentId === query.where.studentId) &&
-              (!query.where?.guardianId ||
-                link.guardianId === query.where.guardianId) &&
-              (!query.where?.status || link.status === query.where.status) &&
-              (!query.where?.verificationStatus ||
-                link.verificationStatus === query.where.verificationStatus) &&
-              (!query.where?.approvalStatus ||
-                link.approvalStatus === query.where.approvalStatus),
-          )
-          .map((link) => ({
-            ...link,
-            guardian: prisma.__state.guardians.find(
-              (guardian) => guardian.id === link.guardianId,
-            ),
-          })),
+  queryMock(prisma.studentGuardian.create).mockImplementation((query) => {
+    const data = query.data ?? {};
+    const link = {
+      id: `link-${String(prisma.__state.studentGuardians.length + 1)}`,
+      ...data,
+      guardian: prisma.__state.guardians.find(
+        (guardian) => guardian.id === data.guardianId,
       ),
-  );
-  prisma.studentGuardian.findFirst.mockImplementation(
-    (query: { where?: Record<string, unknown> }) =>
-      Promise.resolve(
-        prisma.__state.studentGuardians
-          .filter(
-            (link) =>
-              (!query.where?.tenantId ||
-                link.tenantId === query.where.tenantId) &&
-              (!query.where?.studentId ||
-                link.studentId === query.where.studentId) &&
-              (!query.where?.guardianId ||
-                link.guardianId === query.where.guardianId) &&
-              (!query.where?.status || link.status === query.where.status) &&
-              (!query.where?.verificationStatus ||
-                link.verificationStatus === query.where.verificationStatus) &&
-              (!query.where?.approvalStatus ||
-                link.approvalStatus === query.where.approvalStatus),
-          )
-          .map((link) => ({
-            ...link,
-            guardian: prisma.__state.guardians.find(
-              (guardian) => guardian.id === link.guardianId,
-            ),
-            student: prisma.__state.students.find(
-              (student) => student.id === link.studentId,
-            ),
-          }))[0] ?? null,
-      ),
-  );
-  prisma.studentGuardian.deleteMany.mockImplementation(
-    (query: { where?: Record<string, unknown> }) => {
-      const before = prisma.__state.studentGuardians.length;
-      prisma.__state.studentGuardians = prisma.__state.studentGuardians.filter(
-        (link) =>
-          !(
-            (!query.where?.id || link.id === query.where.id) &&
+    };
+    prisma.__state.studentGuardians.push(link);
+    return Promise.resolve(link);
+  });
+  queryMock(prisma.studentGuardian.findMany).mockImplementation((query) =>
+    Promise.resolve(
+      prisma.__state.studentGuardians
+        .filter(
+          (link) =>
             (!query.where?.tenantId ||
               link.tenantId === query.where.tenantId) &&
             (!query.where?.studentId ||
               link.studentId === query.where.studentId) &&
             (!query.where?.guardianId ||
-              link.guardianId === query.where.guardianId)
+              link.guardianId === query.where.guardianId) &&
+            (!query.where?.status || link.status === query.where.status) &&
+            (!query.where?.verificationStatus ||
+              link.verificationStatus === query.where.verificationStatus) &&
+            (!query.where?.approvalStatus ||
+              link.approvalStatus === query.where.approvalStatus),
+        )
+        .map((link) => ({
+          ...link,
+          guardian: prisma.__state.guardians.find(
+            (guardian) => guardian.id === link.guardianId,
           ),
-      );
-      return Promise.resolve({
-        count: before - prisma.__state.studentGuardians.length,
-      });
-    },
+        })),
+    ),
   );
+  queryMock(prisma.studentGuardian.findFirst).mockImplementation((query) =>
+    Promise.resolve(
+      prisma.__state.studentGuardians
+        .filter(
+          (link) =>
+            (!query.where?.tenantId ||
+              link.tenantId === query.where.tenantId) &&
+            (!query.where?.studentId ||
+              link.studentId === query.where.studentId) &&
+            (!query.where?.guardianId ||
+              link.guardianId === query.where.guardianId) &&
+            (!query.where?.status || link.status === query.where.status) &&
+            (!query.where?.verificationStatus ||
+              link.verificationStatus === query.where.verificationStatus) &&
+            (!query.where?.approvalStatus ||
+              link.approvalStatus === query.where.approvalStatus),
+        )
+        .map((link) => ({
+          ...link,
+          guardian: prisma.__state.guardians.find(
+            (guardian) => guardian.id === link.guardianId,
+          ),
+          student: prisma.__state.students.find(
+            (student) => student.id === link.studentId,
+          ),
+        }))[0] ?? null,
+    ),
+  );
+  queryMock(prisma.studentGuardian.deleteMany).mockImplementation((query) => {
+    const before = prisma.__state.studentGuardians.length;
+    prisma.__state.studentGuardians = prisma.__state.studentGuardians.filter(
+      (link) =>
+        !(
+          (!query.where?.id || link.id === query.where.id) &&
+          (!query.where?.tenantId || link.tenantId === query.where.tenantId) &&
+          (!query.where?.studentId ||
+            link.studentId === query.where.studentId) &&
+          (!query.where?.guardianId ||
+            link.guardianId === query.where.guardianId)
+        ),
+    );
+    return Promise.resolve({
+      count: before - prisma.__state.studentGuardians.length,
+    });
+  });
 }
 
 function overrideAdmissionDraftReads(prisma: PrismaMock) {
-  prisma.admissionApplication = {
+  installFixtureDelegate(prisma, 'admissionApplication', {
     findFirst: jest.fn((query: { where?: Record<string, unknown> }) =>
       Promise.resolve(
         prisma.__state.admissionApplications.find((application) =>
@@ -1295,11 +1313,11 @@ function overrideAdmissionDraftReads(prisma: PrismaMock) {
         return Promise.resolve(application);
       },
     ),
-  };
+  });
 }
 
 function overrideImportReviewReads(prisma: PrismaMock) {
-  prisma.admissionImportBatch = {
+  installFixtureDelegate(prisma, 'admissionImportBatch', {
     count: jest.fn((query: { where?: Record<string, unknown> }) =>
       Promise.resolve(
         prisma.__state.admissionImportBatches.filter((batch) =>
@@ -1335,9 +1353,9 @@ function overrideImportReviewReads(prisma: PrismaMock) {
           ),
       });
     }),
-  };
+  });
 
-  prisma.admissionImportRow = {
+  installFixtureDelegate(prisma, 'admissionImportRow', {
     count: jest.fn((query: { where?: Record<string, unknown> }) =>
       Promise.resolve(
         prisma.__state.admissionImportRows.filter((row) =>
@@ -1363,12 +1381,12 @@ function overrideImportReviewReads(prisma: PrismaMock) {
             })),
         ),
     ),
-  };
+  });
 }
 
 function overrideFileAssetCount(prisma: PrismaMock) {
-  prisma.fileAsset.count = jest.fn(
-    (query: { where?: Record<string, unknown> }) =>
+  Object.assign(prisma.fileAsset, {
+    count: jest.fn((query: { where?: Record<string, unknown> }) =>
       Promise.resolve(
         prisma.__state.fileAssets.filter(
           (asset) =>
@@ -1381,20 +1399,23 @@ function overrideFileAssetCount(prisma: PrismaMock) {
               asset.deletedAt === query.where.deletedAt),
         ).length,
       ),
-  );
+    ),
+  });
 }
 
 function overrideAdmissionConversionWrites(prisma: PrismaMock) {
-  prisma.invoice.findUnique = jest.fn(() => Promise.resolve(null));
-  prisma.feePlan = {
+  Object.assign(prisma.invoice, {
+    findUnique: jest.fn(() => Promise.resolve(null)),
+  });
+  installFixtureDelegate(prisma, 'feePlan', {
     findMany: jest.fn(() => Promise.resolve([])),
-  };
-  prisma.studentFeeAssignment = {
+  });
+  installFixtureDelegate(prisma, 'studentFeeAssignment', {
     findMany: jest.fn(() => Promise.resolve([])),
     upsert: jest.fn(),
-  };
-  prisma.enrollment.create = jest.fn(
-    (query: { data?: Record<string, unknown> }) => {
+  });
+  Object.assign(prisma.enrollment, {
+    create: jest.fn((query: { data?: Record<string, unknown> }) => {
       const data = query.data ?? {};
       const enrollment = {
         id: `enrollment-${String(prisma.__state.enrollments.length + 1)}`,
@@ -1413,8 +1434,8 @@ function overrideAdmissionConversionWrites(prisma: PrismaMock) {
       };
       prisma.__state.enrollments.push(enrollment);
       return Promise.resolve(enrollment);
-    },
-  );
+    }),
+  });
 }
 
 function matchesRecordWhere(

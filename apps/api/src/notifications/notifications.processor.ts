@@ -125,7 +125,8 @@ export class NotificationsProcessor extends WorkerHost {
         tenantId,
         'module.notifications',
       );
-      if (entitlement?.allowed !== true) {
+      const allowed: unknown = entitlement?.allowed;
+      if (allowed !== true) {
         await this.markDelivery(
           job.data,
           NotificationStatus.SKIPPED,

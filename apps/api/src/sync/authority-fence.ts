@@ -5,15 +5,15 @@ export const AUTHORITY_FENCED_CODE = 'AUTHORITY_FENCED';
 export const DEFAULT_AUTHORITY_NODE_ID = 'cloud';
 export const DEFAULT_AUTHORITY_EPOCH = 1;
 
-export type ClientAuthorityFence = {
+export interface ClientAuthorityFence {
   authorityNodeId?: string;
   authorityEpoch?: number;
-};
+}
 
-export type SchoolAuthorityFence = {
+export interface SchoolAuthorityFence {
   authorityNodeId: string;
   authorityEpoch: number;
-};
+}
 
 export async function getOrCreateTenantAuthorityFence(
   prisma: PrismaService,
@@ -67,11 +67,14 @@ export async function assertClientAuthorityFence(
   const providedNode = client?.authorityNodeId?.trim();
   const providedEpoch = client?.authorityEpoch;
 
-  if (!providedNode && providedEpoch == null) {
+  if (
+    !providedNode &&
+    (providedEpoch === null || providedEpoch === undefined)
+  ) {
     return fence;
   }
 
-  if (!providedNode || providedEpoch == null) {
+  if (!providedNode || providedEpoch === null || providedEpoch === undefined) {
     throw createAuthorityFencedException();
   }
 

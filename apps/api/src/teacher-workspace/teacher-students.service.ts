@@ -88,8 +88,8 @@ export class TeacherStudentsService {
             const stats = attendance.get(student.id);
             const marked = stats?.marked ?? 0;
             const attendancePercent =
-              marked > 0
-                ? Math.round(((stats!.present + stats!.late) / marked) * 1000) /
+              stats && marked > 0
+                ? Math.round(((stats.present + stats.late) / marked) * 1000) /
                   10
                 : null;
             return {
@@ -109,7 +109,7 @@ export class TeacherStudentsService {
       }),
     );
 
-    return groups.filter((group) => group !== null) as MyStudentsClassGroup[];
+    return groups.filter((group) => group !== null);
   }
 
   /**

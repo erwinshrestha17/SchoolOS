@@ -4,7 +4,29 @@ import { PlatformService } from './platform.service';
 
 describe('PlatformService SaaS billing lifecycle hardening', () => {
   let service: PlatformService;
-  let prisma: any;
+  let prisma: {
+    tenant: { findUnique: jest.Mock };
+    saaSInvoice: {
+      count: jest.Mock;
+      create: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+    };
+    saaSPayment: { create: jest.Mock; findFirst: jest.Mock };
+    tenantSubscription: {
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
+    platformWebhookEndpoint: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+    };
+    platformWebhookDelivery: { create: jest.Mock; findMany: jest.Mock };
+  };
   let auditService: { record: jest.Mock };
 
   const makeQueue = () => ({
@@ -54,24 +76,40 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
     auditService = { record: jest.fn().mockResolvedValue({}) };
 
     service = new PlatformService(
-      prisma,
-      auditService as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
+      prisma as unknown as ConstructorParameters<typeof PlatformService>[0],
+      auditService as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[1],
+      {} as unknown as ConstructorParameters<typeof PlatformService>[2],
+      {} as unknown as ConstructorParameters<typeof PlatformService>[3],
+      {} as unknown as ConstructorParameters<typeof PlatformService>[4],
+      {} as unknown as ConstructorParameters<typeof PlatformService>[5],
       {
         invalidateTenantEntitlements: jest.fn(async () => undefined),
         invalidateAllTenantEntitlements: jest.fn(async () => undefined),
-      } as any,
-      {} as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
-      makeQueue() as any,
+      } as unknown as ConstructorParameters<typeof PlatformService>[6],
+      {} as unknown as ConstructorParameters<typeof PlatformService>[7],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[8],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[9],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[10],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[11],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[12],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[13],
+      makeQueue() as unknown as ConstructorParameters<
+        typeof PlatformService
+      >[14],
     );
   });
 
@@ -91,15 +129,31 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
 
     prisma.saaSInvoice.create.mockResolvedValue(invoice);
     jest
-      .spyOn(service as any, 'nextInvoiceNumber')
+      .spyOn(
+        service as unknown as {
+          nextInvoiceNumber: () => Promise<string>;
+          toInvoiceSummary: () => Record<string, unknown>;
+          toSubscriptionSummary: () => Record<string, unknown>;
+        },
+        'nextInvoiceNumber',
+      )
       .mockResolvedValue('SaaS-000001');
-    jest.spyOn(service as any, 'toInvoiceSummary').mockReturnValue({
-      id: invoice.id,
-      tenantId: invoice.tenantId,
-      invoiceNumber: invoice.invoiceNumber,
-      status: invoice.status,
-      amount: '2500',
-    });
+    jest
+      .spyOn(
+        service as unknown as {
+          nextInvoiceNumber: () => Promise<string>;
+          toInvoiceSummary: () => Record<string, unknown>;
+          toSubscriptionSummary: () => Record<string, unknown>;
+        },
+        'toInvoiceSummary',
+      )
+      .mockReturnValue({
+        id: invoice.id,
+        tenantId: invoice.tenantId,
+        invoiceNumber: invoice.invoiceNumber,
+        status: invoice.status,
+        amount: '2500',
+      });
 
     const result = await service.createSaaSInvoice(
       'tenant-1',
@@ -177,11 +231,20 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
     prisma.saaSInvoice.findFirst.mockResolvedValue(invoice);
     prisma.saaSPayment.create.mockResolvedValue({ id: 'saas-payment-1' });
     prisma.saaSInvoice.update.mockResolvedValue(updatedInvoice);
-    jest.spyOn(service as any, 'toInvoiceSummary').mockReturnValue({
-      id: 'saas-invoice-1',
-      status: 'PARTIAL',
-      paidAmount: '1500',
-    });
+    jest
+      .spyOn(
+        service as unknown as {
+          nextInvoiceNumber: () => Promise<string>;
+          toInvoiceSummary: () => Record<string, unknown>;
+          toSubscriptionSummary: () => Record<string, unknown>;
+        },
+        'toInvoiceSummary',
+      )
+      .mockReturnValue({
+        id: 'saas-invoice-1',
+        status: 'PARTIAL',
+        paidAmount: '1500',
+      });
 
     await service.recordSaaSPayment(
       'tenant-1',
@@ -211,9 +274,15 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
         data: { status: 'PARTIAL' },
       }),
     );
-    expect((prisma as any).payment).toBeUndefined();
-    expect((prisma as any).invoice).toBeUndefined();
-    expect((prisma as any).journalEntry).toBeUndefined();
+    expect(
+      (prisma as unknown as Record<string, unknown>).payment,
+    ).toBeUndefined();
+    expect(
+      (prisma as unknown as Record<string, unknown>).invoice,
+    ).toBeUndefined();
+    expect(
+      (prisma as unknown as Record<string, unknown>).journalEntry,
+    ).toBeUndefined();
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'saas_payment_recorded',
@@ -305,10 +374,19 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
 
     prisma.saaSInvoice.findFirst.mockResolvedValue(invoice);
     prisma.saaSInvoice.update.mockResolvedValue(cancelled);
-    jest.spyOn(service as any, 'toInvoiceSummary').mockReturnValue({
-      id: 'saas-invoice-1',
-      status: 'CANCELLED',
-    });
+    jest
+      .spyOn(
+        service as unknown as {
+          nextInvoiceNumber: () => Promise<string>;
+          toInvoiceSummary: () => Record<string, unknown>;
+          toSubscriptionSummary: () => Record<string, unknown>;
+        },
+        'toInvoiceSummary',
+      )
+      .mockReturnValue({
+        id: 'saas-invoice-1',
+        status: 'CANCELLED',
+      });
 
     await expect(
       service.cancelSaaSInvoice(
@@ -377,11 +455,20 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
         trialEndsAt: null,
         plan: { key: 'standard', name: 'Standard' },
       });
-      jest.spyOn(service as any, 'toSubscriptionSummary').mockReturnValueOnce({
-        id: `sub-${status}`,
-        tenantId: 'tenant-1',
-        status,
-      });
+      jest
+        .spyOn(
+          service as unknown as {
+            nextInvoiceNumber: () => Promise<string>;
+            toInvoiceSummary: () => Record<string, unknown>;
+            toSubscriptionSummary: () => Record<string, unknown>;
+          },
+          'toSubscriptionSummary',
+        )
+        .mockReturnValueOnce({
+          id: `sub-${status}`,
+          tenantId: 'tenant-1',
+          status,
+        });
 
       await expect(
         service.updateSubscriptionStatus(
@@ -577,12 +664,21 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
       endsAt: new Date('2026-05-15'),
     });
     prisma.tenantSubscription.create.mockResolvedValue(created);
-    jest.spyOn(service as any, 'toSubscriptionSummary').mockReturnValue({
-      id: 'sub-new',
-      tenantId: 'tenant-1',
-      planId: 'plan-premium',
-      status: 'ACTIVE',
-    });
+    jest
+      .spyOn(
+        service as unknown as {
+          nextInvoiceNumber: () => Promise<string>;
+          toInvoiceSummary: () => Record<string, unknown>;
+          toSubscriptionSummary: () => Record<string, unknown>;
+        },
+        'toSubscriptionSummary',
+      )
+      .mockReturnValue({
+        id: 'sub-new',
+        tenantId: 'tenant-1',
+        planId: 'plan-premium',
+        status: 'ACTIVE',
+      });
 
     await service.assignSubscription(
       'tenant-1',
@@ -622,9 +718,15 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
         }),
       }),
     );
-    expect((prisma as any).invoice).toBeUndefined();
-    expect((prisma as any).payment).toBeUndefined();
-    expect((prisma as any).journalEntry).toBeUndefined();
+    expect(
+      (prisma as unknown as Record<string, unknown>).invoice,
+    ).toBeUndefined();
+    expect(
+      (prisma as unknown as Record<string, unknown>).payment,
+    ).toBeUndefined();
+    expect(
+      (prisma as unknown as Record<string, unknown>).journalEntry,
+    ).toBeUndefined();
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'tenant_subscription_assigned',

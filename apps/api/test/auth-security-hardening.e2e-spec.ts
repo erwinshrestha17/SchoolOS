@@ -45,10 +45,12 @@ describe('Auth Security Hardening (Regression)', () => {
 
   beforeEach(async () => {
     prisma = createPrismaMock();
-    prisma.refreshToken.findFirst.mockResolvedValue({ id: 'platform-session' });
+    (prisma.refreshToken.findFirst as jest.Mock).mockResolvedValue({
+      id: 'platform-session',
+    });
     jwtService = {
       verifyAsync: jest.fn(),
-    } as any;
+    } as unknown as JwtService;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -89,7 +91,7 @@ describe('Auth Security Hardening (Regression)', () => {
     };
     (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);
 
-    prisma.user.findUnique.mockResolvedValue({
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
       id: 'user-1',
       tenantId: 'tenant-A', // Mismatch!
       status: 'ACTIVE',
@@ -98,11 +100,11 @@ describe('Auth Security Hardening (Regression)', () => {
 
     const request = {
       headers: { authorization: 'Bearer valid-token' },
-    } as any;
+    } as unknown as AuthenticatedRequest;
 
     const context = {
       switchToHttp: () => ({ getRequest: () => request }),
-    } as any;
+    } as unknown as ExecutionContext;
 
     await expect(guard.canActivate(context)).rejects.toThrow(
       ForbiddenException,
@@ -114,17 +116,19 @@ describe('Auth Security Hardening (Regression)', () => {
     const payload = { sub: 'user-1', tenantId: 'tenant-A' };
     (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);
 
-    prisma.user.findUnique.mockResolvedValue({
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
       id: 'user-1',
       tenantId: 'tenant-A',
       status: 'SUSPENDED', // Inactive user
       tenant: { isActive: true },
     });
 
-    const request = { headers: { authorization: 'Bearer valid-token' } } as any;
+    const request = {
+      headers: { authorization: 'Bearer valid-token' },
+    } as unknown as AuthenticatedRequest;
     const context = {
       switchToHttp: () => ({ getRequest: () => request }),
-    } as any;
+    } as unknown as ExecutionContext;
 
     await expect(guard.canActivate(context)).rejects.toThrow(
       UnauthorizedException,
@@ -142,17 +146,17 @@ describe('Auth Security Hardening (Regression)', () => {
       roles: ['platform_super_admin'],
     };
     // AuthzCacheService resolves roles from these two reads.
-    prisma.userRole.findMany.mockResolvedValue([
+    (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
       {
         scopeId: 'global',
         expiresAt: null,
         role: { name: 'platform_super_admin', rolePermissions: [] },
       },
     ]);
-    prisma.rolePermission.findMany.mockResolvedValue([]);
+    (prisma.rolePermission.findMany as jest.Mock).mockResolvedValue([]);
     (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);
 
-    prisma.user.findUnique.mockResolvedValue({
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
       id: 'platform-user',
       tenantId: 'platform-tenant',
       status: 'ACTIVE',
@@ -167,7 +171,7 @@ describe('Auth Security Hardening (Regression)', () => {
     });
 
     // No active override in DB
-    prisma.supportOverride.findFirst.mockResolvedValue(null);
+    (prisma.supportOverride.findFirst as jest.Mock).mockResolvedValue(null);
 
     const request = {
       headers: {
@@ -177,11 +181,11 @@ describe('Auth Security Hardening (Regression)', () => {
         'x-schoolos-support-override-id': 'override-1',
       },
       method: 'GET',
-    } as any;
+    } as unknown as AuthenticatedRequest;
 
     const context = {
       switchToHttp: () => ({ getRequest: () => request }),
-    } as any;
+    } as unknown as ExecutionContext;
 
     await expect(guard.canActivate(context)).rejects.toThrow(
       ForbiddenException,
@@ -198,17 +202,17 @@ describe('Auth Security Hardening (Regression)', () => {
       tenantId: 'platform-tenant',
     };
     // AuthzCacheService resolves roles from these two reads.
-    prisma.userRole.findMany.mockResolvedValue([
+    (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
       {
         scopeId: 'global',
         expiresAt: null,
         role: { name: 'platform_super_admin', rolePermissions: [] },
       },
     ]);
-    prisma.rolePermission.findMany.mockResolvedValue([]);
+    (prisma.rolePermission.findMany as jest.Mock).mockResolvedValue([]);
     (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);
 
-    prisma.user.findUnique.mockResolvedValue({
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
       id: 'platform-user',
       tenantId: 'platform-tenant',
       status: 'ACTIVE',
@@ -222,13 +226,13 @@ describe('Auth Security Hardening (Regression)', () => {
       },
     });
 
-    prisma.tenant.findUnique.mockResolvedValue({
+    (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
       id: 'school-tenant-1',
       slug: 'school-one',
       isActive: true,
       securityDomain: SecurityDomain.SCHOOL,
     });
-    prisma.supportOverride.findFirst.mockResolvedValue({
+    (prisma.supportOverride.findFirst as jest.Mock).mockResolvedValue({
       id: 'override-1',
       reason: 'Support ticket #123',
       permissionScopes: ['ATTENDANCE'],
@@ -245,11 +249,11 @@ describe('Auth Security Hardening (Regression)', () => {
         'x-schoolos-support-override-id': 'override-1',
       },
       method: 'GET',
-    } as any;
+    } as unknown as AuthenticatedRequest;
 
     const context = {
       switchToHttp: () => ({ getRequest: () => request }),
-    } as any;
+    } as unknown as ExecutionContext;
 
     await expect(guard.canActivate(context)).rejects.toThrow(
       ForbiddenException,
@@ -266,17 +270,17 @@ describe('Auth Security Hardening (Regression)', () => {
       tenantId: 'platform-tenant',
     };
     // AuthzCacheService resolves roles from these two reads.
-    prisma.userRole.findMany.mockResolvedValue([
+    (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
       {
         scopeId: 'global',
         expiresAt: null,
         role: { name: 'platform_super_admin', rolePermissions: [] },
       },
     ]);
-    prisma.rolePermission.findMany.mockResolvedValue([]);
+    (prisma.rolePermission.findMany as jest.Mock).mockResolvedValue([]);
     (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);
 
-    prisma.user.findUnique.mockResolvedValue({
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
       id: 'platform-user',
       tenantId: 'platform-tenant',
       status: 'ACTIVE',
@@ -290,13 +294,13 @@ describe('Auth Security Hardening (Regression)', () => {
       },
     });
 
-    prisma.tenant.findUnique.mockResolvedValue({
+    (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
       id: 'school-tenant-1',
       slug: 'school-one',
       isActive: true,
       securityDomain: SecurityDomain.SCHOOL,
     });
-    prisma.supportOverride.findFirst.mockResolvedValue({
+    (prisma.supportOverride.findFirst as jest.Mock).mockResolvedValue({
       id: 'override-1',
       reason: 'Support ticket #123',
       permissionScopes: ['ATTENDANCE'],
@@ -313,16 +317,18 @@ describe('Auth Security Hardening (Regression)', () => {
         'x-schoolos-support-override-id': 'override-1',
       },
       method: 'GET',
-    } as any;
+    } as unknown as AuthenticatedRequest;
 
     const context = {
       switchToHttp: () => ({ getRequest: () => request }),
       getHandler: () => AttendanceController.prototype.getAnalytics,
       getClass: () => AttendanceController,
-    } as any;
+    } as unknown as ExecutionContext;
 
     const result = await guard.canActivate(context);
     expect(result).toBe(true);
+    if (!request.auth)
+      throw new Error('Authenticated request fixture is missing');
     expect(request.auth.tenantId).toBe('school-tenant-1');
     expect(request.auth.roles).toEqual([]);
     expect(request.auth.permissions).toEqual([
@@ -354,10 +360,10 @@ describe('Auth Security Hardening (Regression)', () => {
 
     const request = {
       headers: { authorization: 'Bearer expired-token' },
-    } as any;
+    } as unknown as AuthenticatedRequest;
     const context = {
       switchToHttp: () => ({ getRequest: () => request }),
-    } as any;
+    } as unknown as ExecutionContext;
 
     await expect(guard.canActivate(context)).rejects.toThrow(
       UnauthorizedException,

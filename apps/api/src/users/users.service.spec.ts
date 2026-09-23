@@ -9,9 +9,25 @@ import { AuthContext } from '../auth/auth.types';
 
 describe('UsersService', () => {
   let service: UsersService;
-  let prisma: any;
-  let configService: any;
-  let auditService: any;
+  let prisma: {
+    user: {
+      findUnique: jest.Mock;
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
+    refreshToken: { updateMany: jest.Mock; findFirst: jest.Mock };
+    role: { findMany: jest.Mock };
+    tenant: { findUnique: jest.Mock };
+    userRole: { findMany: jest.Mock };
+    otpCode: { updateMany: jest.Mock };
+    mobilePushToken: { deleteMany: jest.Mock };
+    runWithTenantScope: jest.Mock;
+    $queryRaw: jest.Mock;
+    $transaction: jest.Mock;
+  };
+  let configService: { bcryptRounds: number };
+  let auditService: { record: jest.Mock };
   let actor: AuthContext;
 
   beforeEach(async () => {
@@ -58,9 +74,10 @@ describe('UsersService', () => {
       $queryRaw: jest.fn(async (_sql: TemplateStringsArray, id: string) => [
         { id },
       ]),
+      $transaction: jest.fn(),
     };
-    prisma.$transaction = jest.fn(
-      async (work: (tx: unknown) => Promise<unknown>) => work(prisma),
+    prisma.$transaction.mockImplementation(
+      (work: (tx: unknown) => Promise<unknown>) => work(prisma),
     );
     configService = { bcryptRounds: 4 };
     auditService = { record: jest.fn() };
@@ -75,7 +92,11 @@ describe('UsersService', () => {
       permissions: ['users:create'],
     };
 
-    service = new UsersService(prisma, configService, auditService);
+    service = new UsersService(
+      prisma as unknown as ConstructorParameters<typeof UsersService>[0],
+      configService as unknown as ConstructorParameters<typeof UsersService>[1],
+      auditService as unknown as ConstructorParameters<typeof UsersService>[2],
+    );
   });
 
   it('creates a tenant-scoped user with hashed password and roles', async () => {
@@ -84,16 +105,26 @@ describe('UsersService', () => {
       { id: 'role-1', name: 'teacher' },
       { id: 'role-2', name: 'librarian' },
     ]);
-    prisma.user.create.mockImplementation(async ({ data }: any) => ({
-      id: 'user-2',
-      email: data.email,
-      phone: data.phone,
-      status: 'ACTIVE',
-      userRoles: [
-        { role: { id: 'role-1', name: 'teacher' } },
-        { role: { id: 'role-2', name: 'librarian' } },
-      ],
-    }));
+    prisma.user.create.mockImplementation(
+      ({
+        data,
+      }: {
+        data: {
+          email: string | null;
+          phone: string | null;
+        };
+      }) =>
+        Promise.resolve({
+          id: 'user-2',
+          email: data.email,
+          phone: data.phone,
+          status: 'ACTIVE',
+          userRoles: [
+            { role: { id: 'role-1', name: 'teacher' } },
+            { role: { id: 'role-2', name: 'librarian' } },
+          ],
+        }),
+    );
 
     const result = await service.createUser(
       {
@@ -182,13 +213,24 @@ describe('UsersService', () => {
     const transaction = {
       user: {
         findUnique: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockImplementation(async ({ data }: any) => ({
-          id: 'guardian-user-1',
-          email: data.email,
-          phone: data.phone,
-          status: data.status ?? 'ACTIVE',
-          userRoles: [{ role: { id: 'parent-role-1', name: 'parent' } }],
-        })),
+        create: jest.fn().mockImplementation(
+          ({
+            data,
+          }: {
+            data: {
+              email: string | null;
+              phone: string | null;
+              status?: string;
+            };
+          }) =>
+            Promise.resolve({
+              id: 'guardian-user-1',
+              email: data.email,
+              phone: data.phone,
+              status: data.status ?? 'ACTIVE',
+              userRoles: [{ role: { id: 'parent-role-1', name: 'parent' } }],
+            }),
+        ),
       },
       role: {
         findMany: jest

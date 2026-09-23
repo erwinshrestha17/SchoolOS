@@ -152,8 +152,8 @@ function buildService(
     activeTeaching?: number;
     staffWithActiveContract?: number;
     staffWithActiveSalaryStructure?: number;
-    absentStaff?: Array<{ staffId: string }>;
-    onLeaveStaff?: Array<{ staffId: string }>;
+    absentStaff?: { staffId: string }[];
+    onLeaveStaff?: { staffId: string }[];
     pendingLeaveApprovals?: number;
     contractsExpiring?: number;
     latestActiveRun?: {
@@ -162,8 +162,8 @@ function buildService(
       periodYear: number;
     } | null;
     blockingExceptions?: number;
-    todaySlots?: Array<{ id: string; staffId: string }>;
-    coveredSubstitutions?: Array<{ timetableSlotId: string }>;
+    todaySlots?: { id: string; staffId: string }[];
+    coveredSubstitutions?: { timetableSlotId: string }[];
   } = {},
 ) {
   const staffCountQueue = [

@@ -20,6 +20,17 @@ import {
   TeacherScopeService,
 } from '../teacher-scope/teacher-scope.service';
 
+type TimetablePrismaMock = Record<
+  | 'academicYear'
+  | 'class'
+  | 'room'
+  | 'staff'
+  | 'subject'
+  | 'timetableSlot'
+  | 'timetableVersion',
+  Record<string, jest.Mock>
+>;
+
 describe('Timetable Hardening', () => {
   let timetableService: TimetableService;
   let prisma: PrismaMock;
@@ -68,7 +79,7 @@ describe('Timetable Hardening', () => {
 
   describe('Tenant Isolation', () => {
     it('should reject creating a slot with a room from another tenant', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as TimetablePrismaMock;
       p.timetableVersion.findFirst.mockResolvedValue({
         id: 'version-1',
         tenantId: 'tenant-a',
@@ -95,11 +106,13 @@ describe('Timetable Hardening', () => {
       });
 
       // Room from another tenant
-      p.room.findFirst.mockImplementation((q: any) => {
-        if (q.where.id === 'room-b' && q.where.tenantId === 'tenant-a')
+      p.room.findFirst.mockImplementation(
+        (q: { where: { id: string; tenantId: string } }) => {
+          if (q.where.id === 'room-b' && q.where.tenantId === 'tenant-a')
+            return Promise.resolve(null);
           return Promise.resolve(null);
-        return Promise.resolve(null);
-      });
+        },
+      );
 
       await expect(
         timetableService.createVersionSlot(
@@ -119,7 +132,7 @@ describe('Timetable Hardening', () => {
     });
 
     it('should reject modifying a timetable version from another tenant', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as TimetablePrismaMock;
       p.timetableVersion.findFirst.mockResolvedValue(null); // Not found because of tenant mismatch
 
       await expect(
@@ -130,7 +143,7 @@ describe('Timetable Hardening', () => {
 
   describe('Conflict Detection', () => {
     it('should reject teacher double-booking in the same time range', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as TimetablePrismaMock;
       const version = {
         id: 'version-1',
         tenantId: 'tenant-a',
@@ -189,7 +202,7 @@ describe('Timetable Hardening', () => {
     });
 
     it('should reject room double-booking in the same time range', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as TimetablePrismaMock;
       const version = {
         id: 'version-1',
         tenantId: 'tenant-a',
@@ -256,7 +269,7 @@ describe('Timetable Hardening', () => {
 
   describe('Versioning and Publishing', () => {
     it('should prevent editing a published timetable', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as TimetablePrismaMock;
       p.timetableSlot.findFirst.mockResolvedValue({
         id: 'slot-1',
         tenantId: 'tenant-a',
@@ -269,7 +282,7 @@ describe('Timetable Hardening', () => {
     });
 
     it('should prevent publishing if conflicts exist', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as TimetablePrismaMock;
       const version = {
         id: 'version-1',
         tenantId: 'tenant-a',
@@ -315,7 +328,7 @@ describe('Timetable Hardening', () => {
       permissions: ['timetable:read'],
     };
 
-    function mockPublishedVersion(p: any) {
+    function mockPublishedVersion(p: TimetablePrismaMock) {
       p.timetableVersion.findFirst.mockResolvedValue({
         id: 'version-1',
         tenantId: 'tenant-a',
@@ -325,7 +338,7 @@ describe('Timetable Hardening', () => {
     }
 
     it('blocks a teacher when the canonical scope gate denies the class/section', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as TimetablePrismaMock;
       teacherScopeService.requireActorAccess.mockRejectedValue(
         createTeacherScopeDeniedException(),
       );
@@ -349,7 +362,7 @@ describe('Timetable Hardening', () => {
     });
 
     it('allows a Subject Teacher when the canonical scope gate grants access', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as TimetablePrismaMock;
       mockPublishedVersion(p);
 
       await expect(
@@ -371,7 +384,7 @@ describe('Timetable Hardening', () => {
     });
 
     it('allows a Class Teacher when the canonical scope gate grants access', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as TimetablePrismaMock;
       mockPublishedVersion(p);
 
       await expect(
@@ -385,7 +398,7 @@ describe('Timetable Hardening', () => {
     });
 
     it('denies a teacher when canonical scope resolution has no active staff profile', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as TimetablePrismaMock;
       teacherScopeService.requireActorAccess.mockRejectedValue(
         createTeacherScopeDeniedException(),
       );
@@ -406,7 +419,7 @@ describe('Timetable Hardening', () => {
     });
 
     it('lets admins bypass the assignment check entirely', async () => {
-      const p = prisma as any;
+      const p = prisma as unknown as TimetablePrismaMock;
       mockPublishedVersion(p);
 
       await expect(

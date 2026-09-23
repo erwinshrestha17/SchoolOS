@@ -181,7 +181,7 @@ function makePrisma() {
     rows: [string, AttendanceStatus][],
   ) {
     return {
-      id: `session-${attendanceDate.getDate()}`,
+      id: `session-${String(attendanceDate.getDate())}`,
       tenantId,
       academicYearId,
       classId,
@@ -189,9 +189,9 @@ function makePrisma() {
       attendanceDate,
       submittedAt: new Date(attendanceDate.getTime() + 8 * 60 * 60 * 1000),
       records: rows.map(([studentId, status], index) => ({
-        id: `record-${attendanceDate.getDate()}-${index}`,
+        id: `record-${String(attendanceDate.getDate())}-${String(index)}`,
         tenantId,
-        attendanceSessionId: `session-${attendanceDate.getDate()}`,
+        attendanceSessionId: `session-${String(attendanceDate.getDate())}`,
         studentId,
         status,
         remark: null,

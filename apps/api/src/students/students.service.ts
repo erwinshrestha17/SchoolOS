@@ -2462,7 +2462,22 @@ export class StudentsService {
             orderBy: [{ lastUsedAt: 'desc' }, { createdAt: 'desc' }],
             take: 20,
           })
-        : Promise.resolve([]),
+        : Promise.resolve<
+            Array<
+              Prisma.RefreshTokenGetPayload<{
+                select: {
+                  id: true;
+                  deviceId: true;
+                  expiresAt: true;
+                  revokedAt: true;
+                  createdAt: true;
+                  revokedReason: true;
+                  userAgent: true;
+                  lastUsedAt: true;
+                };
+              }>
+            >
+          >([]),
       this.prisma.guardianIdentityVerification.findMany({
         where: { tenantId: actor.tenantId, guardianId },
         select: {
@@ -7848,7 +7863,7 @@ type GuardianRelationshipWriteInput = Pick<
   | 'restrictionReasonRef'
 >;
 
-type CurrentGuardianRelationship = {
+interface CurrentGuardianRelationship {
   capabilities: GuardianRelationshipWriteInput['capabilities'];
   verificationStatus: NonNullable<
     GuardianRelationshipWriteInput['verificationStatus']
@@ -7859,7 +7874,7 @@ type CurrentGuardianRelationship = {
   emergencyContactPriority: number | null;
   approvalStatus: GuardianRelationshipApprovalStatus;
   restrictionReasonRef: string | null;
-};
+}
 
 function buildGuardianRelationshipCreate(
   input: GuardianRelationshipWriteInput,

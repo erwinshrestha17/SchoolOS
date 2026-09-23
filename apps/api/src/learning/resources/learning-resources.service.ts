@@ -120,7 +120,16 @@ export class LearningResourcesService {
     activityId: string,
     dto: CreateLearningResourceDto,
   ) {
-    return this.createResource(actor, { ...dto, activityId });
+    return this.createResource(actor, {
+      subjectId: dto.subjectId,
+      topicId: dto.topicId,
+      fileAssetId: dto.fileAssetId,
+      type: dto.type,
+      title: dto.title,
+      url: dto.url,
+      metadata: dto.metadata,
+      activityId,
+    });
   }
 
   async getResource(actor: AuthContext, resourceId: string) {

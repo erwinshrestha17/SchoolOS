@@ -1,15 +1,19 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  UnauthorizedException,
+  type ExecutionContext,
+} from '@nestjs/common';
 import { SecurityDomain } from '@prisma/client';
 import { PlatformGuard } from './platform.guard';
 
-const makeExecutionContext = (auth: any) =>
+const makeExecutionContext = (auth: unknown): ExecutionContext =>
   ({
     switchToHttp: () => ({
       getRequest: () => ({ auth }),
     }),
     getHandler: () => 'handler',
     getClass: () => 'controller',
-  }) as any;
+  }) as unknown as ExecutionContext;
 
 describe('PlatformGuard', () => {
   const reflector = {
@@ -20,7 +24,9 @@ describe('PlatformGuard', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    guard = new PlatformGuard(reflector as any);
+    guard = new PlatformGuard(
+      reflector as unknown as ConstructorParameters<typeof PlatformGuard>[0],
+    );
   });
 
   it('rejects unauthenticated requests to platform routes', () => {

@@ -108,7 +108,11 @@ export class TimetableLifecycleService {
       new Set(version.slots.map((s) => s.subjectId)),
     );
     const roomIds = Array.from(
-      new Set(version.slots.filter((s) => s.roomId).map((s) => s.roomId!)),
+      new Set(
+        version.slots
+          .map((s) => s.roomId)
+          .filter((roomId): roomId is string => Boolean(roomId)),
+      ),
     );
     const classIds = Array.from(new Set(version.slots.map((s) => s.classId)));
 
@@ -144,7 +148,7 @@ export class TimetableLifecycleService {
         where: {
           tenantId: actor.tenantId,
           academicYearId: version.academicYearId,
-          classId: version.classId! ?? undefined,
+          classId: version.classId ?? undefined,
           sectionId: version.sectionId ?? undefined,
           subjectId: { in: subjectIds },
         },

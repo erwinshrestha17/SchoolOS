@@ -224,7 +224,7 @@ export class AccountingPostingService {
   async updateJournalStatus(
     id: string,
     tenantId: string,
-    status: JournalEntryStatus | string,
+    status: string,
     actor: AuthContext,
     extraData: Prisma.JournalEntryUpdateInput = {},
     tx: Prisma.TransactionClient = this.prisma,

@@ -690,8 +690,12 @@ function createContext(
   includeAuthorization = true,
   method = 'GET',
 ) {
-  function handler() {}
-  class ControllerClass {}
+  function handler() {
+    return undefined;
+  }
+  function ControllerClass() {
+    return undefined;
+  }
   const request: {
     headers: Record<string, string>;
     method: string;

@@ -31,6 +31,7 @@ import {
 } from './admissions.service';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 import { CreateDirectAdmissionDto } from './dto/create-direct-admission.dto';
+import { UploadStudentDocumentDto } from '../student-records/dto/upload-student-document.dto';
 
 const actor = {
   tenantId: 'tenant-1',
@@ -720,12 +721,11 @@ describe('AdmissionsService production hardening', () => {
     prisma.$transaction.mockImplementation(async (callback) => callback(tx));
     const { service } = buildService(prisma);
     const dto = buildAdmissionDto();
-    dto.guardians[0] = {
-      ...dto.guardians[0],
+    dto.guardians[0] = Object.assign(dto.guardians[0], {
       email: 'replacement@example.test',
       homeAddress: 'Replacement address',
       receivesAlerts: false,
-    };
+    });
 
     await service.createAdmission(dto, actor);
 
@@ -753,7 +753,9 @@ describe('AdmissionsService production hardening', () => {
     prisma.$transaction.mockImplementation(async (callback) => callback(tx));
     const { service } = buildService(prisma);
     const dto = buildAdmissionDto();
-    dto.guardians[0] = { ...dto.guardians[0], isPrimary: undefined };
+    dto.guardians[0] = Object.assign(dto.guardians[0], {
+      isPrimary: undefined,
+    });
 
     await service.createAdmission(dto, actor);
 
@@ -1061,7 +1063,7 @@ describe('AdmissionsService production hardening', () => {
 
     const rows = Array.from(
       { length: 501 },
-      (_, index) => `Student${index},Family${index}`,
+      (_, index) => `Student${String(index)},Family${String(index)}`,
     );
     await expect(
       service.bulkImport(
@@ -1697,13 +1699,12 @@ describe('AdmissionsService production hardening', () => {
     });
     const changedDocument = Object.assign(new CreateAdmissionDto(), second, {
       documents: [
-        {
-          ...second.documents?.[0],
+        Object.assign(new UploadStudentDocumentDto(), second.documents?.[0], {
           kind: StudentDocumentKind.BIRTH_CERTIFICATE,
           fileName: 'birth.pdf',
           contentType: 'application/pdf',
           base64Content: 'Y2hhbmdlZA==',
-        },
+        }),
       ],
     });
 

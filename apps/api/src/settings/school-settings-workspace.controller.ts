@@ -9,8 +9,10 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import type { SchoolSettingsOverview } from '@schoolos/core';
-import { isPrincipalRestrictedFromInstitutionalSettings } from '@schoolos/core';
+import {
+  isPrincipalRestrictedFromInstitutionalSettings,
+  type SchoolSettingsOverview,
+} from '@schoolos/core';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { AllowSupportOverrideRead } from '../auth/decorators/allow-support-override-read.decorator';
 import type { AuthContext } from '../auth/auth.types';

@@ -147,10 +147,11 @@ describe('teacher capability matrix', () => {
         );
         expect(restriction).not.toBeNull();
         expect(restriction?.redirectTo).toMatch(/^\/dashboard/);
+        if (!restriction) throw new Error('Expected teacher route restriction');
         // The redirect must not bounce back into a restricted route.
         const { capabilities } = personaFor(['teacher'], TEACHER_PERMISSIONS);
         expect(
-          resolveTeacherRouteRestriction(restriction!.redirectTo, capabilities),
+          resolveTeacherRouteRestriction(restriction.redirectTo, capabilities),
         ).toBeNull();
       },
     );

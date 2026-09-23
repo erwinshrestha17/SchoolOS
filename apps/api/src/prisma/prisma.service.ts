@@ -145,7 +145,10 @@ export function applyTenantScopeToArgs<TArgs>(
   }
 
   if (isUpdate) {
-    scopedArgs.data = { ...(scopedArgs.data ?? {}), tenantId };
+    scopedArgs.data = {
+      ...(scopedArgs.data as Record<string, unknown> | undefined),
+      tenantId,
+    };
   }
 
   if (isUpsert) {
@@ -182,11 +185,15 @@ export class PrismaService
           prop === 'runWithoutTenantScope' ||
           prop === 'runWithTenantScope'
         ) {
-          const val = Reflect.get(target, prop, receiver);
-          return typeof val === 'function' ? val.bind(target) : val;
+          const val: unknown = Reflect.get(target, prop, receiver);
+          return typeof val === 'function'
+            ? (val.bind(target) as unknown)
+            : val;
         }
-        const val = Reflect.get(target._client, prop);
-        return typeof val === 'function' ? val.bind(target._client) : val;
+        const val: unknown = Reflect.get(target._client, prop);
+        return typeof val === 'function'
+          ? (val.bind(target._client) as unknown)
+          : val;
       },
     });
   }
@@ -195,42 +202,44 @@ export class PrismaService
     const cls = this.cls;
     return this.$extends({
       query: {
-        async $queryRaw({ operation, args, query }) {
+        async $queryRaw({ operation, args, query }): Promise<unknown> {
           assertRawTenantScope(
             operation,
-            cls?.get(TENANT_ID_KEY),
-            Boolean(cls?.get(TENANT_SCOPE_BYPASS_KEY)),
+            cls?.get<string | undefined>(TENANT_ID_KEY),
+            Boolean(cls?.get<boolean | undefined>(TENANT_SCOPE_BYPASS_KEY)),
           );
           return query(args);
         },
-        async $executeRaw({ operation, args, query }) {
+        async $executeRaw({ operation, args, query }): Promise<unknown> {
           assertRawTenantScope(
             operation,
-            cls?.get(TENANT_ID_KEY),
-            Boolean(cls?.get(TENANT_SCOPE_BYPASS_KEY)),
+            cls?.get<string | undefined>(TENANT_ID_KEY),
+            Boolean(cls?.get<boolean | undefined>(TENANT_SCOPE_BYPASS_KEY)),
           );
           return query(args);
         },
-        async $queryRawUnsafe({ operation, args, query }) {
+        async $queryRawUnsafe({ operation, args, query }): Promise<unknown> {
           assertRawTenantScope(
             operation,
-            cls?.get(TENANT_ID_KEY),
-            Boolean(cls?.get(TENANT_SCOPE_BYPASS_KEY)),
+            cls?.get<string | undefined>(TENANT_ID_KEY),
+            Boolean(cls?.get<boolean | undefined>(TENANT_SCOPE_BYPASS_KEY)),
           );
           return query(args);
         },
-        async $executeRawUnsafe({ operation, args, query }) {
+        async $executeRawUnsafe({ operation, args, query }): Promise<unknown> {
           assertRawTenantScope(
             operation,
-            cls?.get(TENANT_ID_KEY),
-            Boolean(cls?.get(TENANT_SCOPE_BYPASS_KEY)),
+            cls?.get<string | undefined>(TENANT_ID_KEY),
+            Boolean(cls?.get<boolean | undefined>(TENANT_SCOPE_BYPASS_KEY)),
           );
           return query(args);
         },
         $allModels: {
           async $allOperations({ model, operation, args, query }) {
-            const tenantId = cls?.get(TENANT_ID_KEY);
-            const bypass = Boolean(cls?.get(TENANT_SCOPE_BYPASS_KEY));
+            const tenantId = cls?.get<string | undefined>(TENANT_ID_KEY);
+            const bypass = Boolean(
+              cls?.get<boolean | undefined>(TENANT_SCOPE_BYPASS_KEY),
+            );
             return query(
               applyTenantScopeToArgs(model, operation, args, tenantId, bypass),
             );
@@ -292,7 +301,7 @@ export class PrismaService
       });
     }
 
-    const previous = cls.get(TENANT_SCOPE_BYPASS_KEY);
+    const previous = cls.get<boolean | undefined>(TENANT_SCOPE_BYPASS_KEY);
     cls.set(TENANT_SCOPE_BYPASS_KEY, true);
     try {
       return await fn();

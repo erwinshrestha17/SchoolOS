@@ -16,24 +16,26 @@ export class UsageInterceptor implements NestInterceptor {
   constructor(private readonly usageService: UsageService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<{
+      auth?: { tenantId?: string };
+      user?: { tenantId?: string };
+    }>();
     const tenantId = request.auth?.tenantId || request.user?.tenantId;
 
     return next.handle().pipe(
-      tap(async () => {
+      tap(() => {
         // Only track for non-platform tenants
         if (tenantId && tenantId !== 'platform') {
-          try {
-            // We don't verifyLimit here to avoid blocking requests,
-            // just increment for tracking. Gating is done at feature level.
-            await this.usageService.incrementUsage(tenantId, 'api.requests', 1);
-          } catch (error) {
-            this.logger.error(
-              `Failed to increment API usage for tenant ${tenantId}: ${
-                error instanceof Error ? error.message : String(error)
-              }`,
-            );
-          }
+          // Usage is observational: errors are recorded without changing the response.
+          void this.usageService
+            .incrementUsage(tenantId, 'api.requests', 1)
+            .catch((error: unknown) => {
+              this.logger.error(
+                `Failed to increment API usage for tenant ${tenantId}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            });
         }
       }),
     );

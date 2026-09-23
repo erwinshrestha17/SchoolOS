@@ -34,9 +34,8 @@ export class RequestCacheService {
       typeof this.cls.isActive === 'function' ? this.cls.isActive() : false;
     if (!isActive) return null;
 
-    let store = this.cls.get(REQUEST_CACHE_KEY) as
-      | Map<string, Promise<unknown>>
-      | undefined;
+    let store: Map<string, Promise<unknown>> | undefined =
+      this.cls.get(REQUEST_CACHE_KEY);
 
     if (!store) {
       store = new Map<string, Promise<unknown>>();
@@ -65,7 +64,7 @@ export class RequestCacheService {
     });
 
     store.set(key, pending);
-    return pending as Promise<T>;
+    return pending;
   }
 
   /**
@@ -77,7 +76,7 @@ export class RequestCacheService {
    * memo. Existing entries are not overwritten, so the first read of a key in a
    * request always wins.
    */
-  seed<T>(key: string, value: T) {
+  seed(key: string, value: unknown) {
     const store = this.store();
     if (!store || store.has(key)) return;
     store.set(key, Promise.resolve(value));

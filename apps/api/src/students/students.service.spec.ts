@@ -2188,9 +2188,10 @@ describe('students lifecycle hardening', () => {
     expect(result.totalRecords).toBe(2);
     expect(result.validRecords).toBe(1);
     expect(result.invalidRecords).toBe(1);
-    const csv = (
-      storageService.saveBufferObject.mock.calls[0][0].content as Buffer
-    ).toString('utf8');
+    const content = storageService.saveBufferObject.mock.calls[0][0].content;
+    expect(content).toBeDefined();
+    if (!content) throw new Error('Expected saved CSV content');
+    const csv = content.toString('utf8');
     expect(csv).toContain('studentSystemId');
     expect(csv).toContain('SCH-2026-0001');
     expect(csv).not.toContain('SCH-2026-0002');
@@ -2374,7 +2375,7 @@ describe('students lifecycle hardening', () => {
           admissionDate: new Date('2026-04-01T00:00:00.000Z'),
           mediumOfInstruction: 'English',
           updatedAt: new Date('2026-08-28T00:00:00.000Z'),
-        } as any,
+        },
       ],
     });
     const updatedProfileStudent = buildStudent({
@@ -2492,7 +2493,7 @@ describe('students lifecycle hardening', () => {
           admissionNumber: 'ADM-1',
           mediumOfInstruction: 'English',
           updatedAt: new Date('2026-08-28T00:00:00.000Z'),
-        } as any,
+        },
       ],
     });
     const updatedProfileStudent = buildStudent({
@@ -2500,7 +2501,7 @@ describe('students lifecycle hardening', () => {
       classId: 'class-2',
       disabilityFlag: 'No known disability',
       section: 'B',
-    } as any);
+    } as unknown as Parameters<typeof buildStudent>[0]);
     const prisma = buildPrisma({
       studentFindFirstQueue: [student, updatedProfileStudent],
       classFindFirstResult: { id: 'class-2', tenantId: actor.tenantId },

@@ -3119,10 +3119,10 @@ function buildService(options: {
             (
               options.payment as
                 | {
-                    allocations?: Array<{
+                    allocations?: {
                       invoiceId: string | null;
                       amount: Prisma.Decimal;
-                    }>;
+                    }[];
                   }
                 | undefined
             )?.allocations ?? [];

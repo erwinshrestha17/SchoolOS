@@ -5,7 +5,6 @@ import {
   NotificationEventStatus,
   NotificationEventType,
   NotificationPreferenceCategory,
-  NotificationStatus,
   UserStatus,
 } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
@@ -120,8 +119,7 @@ export class NotificationPreferencePolicy {
 
     if (
       delivery.notificationEventId &&
-      (!delivery.notificationEvent ||
-        delivery.notificationEvent.tenantId !== tenantId ||
+      (delivery.notificationEvent?.tenantId !== tenantId ||
         delivery.notificationEvent.status === NotificationEventStatus.CANCELLED)
     ) {
       return inactiveDecision('Notification event is no longer deliverable');

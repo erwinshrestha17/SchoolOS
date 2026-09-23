@@ -1,7 +1,9 @@
 import { PlatformReportExportsService } from './platform-report-exports.service';
 
 describe('PlatformReportExportsService', () => {
-  let prisma: any;
+  let prisma: {
+    reportExport: { findMany: jest.Mock; count: jest.Mock; create: jest.Mock };
+  };
   let service: PlatformReportExportsService;
 
   beforeEach(() => {
@@ -12,11 +14,19 @@ describe('PlatformReportExportsService', () => {
         create: jest.fn(),
       },
     };
-    service = new PlatformReportExportsService(prisma);
+    service = new PlatformReportExportsService(
+      prisma as unknown as ConstructorParameters<
+        typeof PlatformReportExportsService
+      >[0],
+    );
   });
 
   it('returns empty pagination result when ReportExport delegate is unavailable', async () => {
-    service = new PlatformReportExportsService({} as any);
+    service = new PlatformReportExportsService(
+      {} as unknown as ConstructorParameters<
+        typeof PlatformReportExportsService
+      >[0],
+    );
 
     await expect(
       service.listReportExportsPage({

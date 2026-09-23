@@ -143,10 +143,10 @@ export interface AdmissionDocumentReminderDeliveryInput {
   missingDocumentLabels: string[];
 }
 
-export type AdmissionDocumentReminderDeliveryOutcome = {
+export interface AdmissionDocumentReminderDeliveryOutcome {
   state: 'QUEUED' | 'ALREADY_QUEUED' | 'SKIPPED';
   reason: 'DELIVERY_UNAVAILABLE' | null;
-};
+}
 
 @Injectable()
 export class CommunicationsService {
@@ -1931,7 +1931,10 @@ export class CommunicationsService {
       const result = await this.publishPreparedNotice(notice.id, actor);
       results.push({
         noticeId: notice.id,
-        deliveryCount: result.delivery.count,
+        deliveryCount:
+          'count' in result.delivery
+            ? result.delivery.count
+            : result.delivery.total,
       });
     }
 
@@ -2644,6 +2647,7 @@ export class CommunicationsService {
       ) {
         throw new Error(`No destination resolved for ${delivery.channel}`);
       }
+      const destination = delivery.destination ?? '';
 
       const metadata = {
         tenantId: delivery.tenantId,
@@ -2697,7 +2701,7 @@ export class CommunicationsService {
       if (delivery.channel === NotificationChannel.EMAIL) {
         handoffStarted = true;
         await this.notificationsService.sendEmail({
-          to: delivery.destination!,
+          to: destination,
           subject: delivery.title,
           text: delivery.body,
           metadata,
@@ -2708,7 +2712,7 @@ export class CommunicationsService {
       if (delivery.channel === NotificationChannel.SMS) {
         handoffStarted = true;
         await this.notificationsService.sendSms({
-          to: delivery.destination!,
+          to: destination,
           message: delivery.body,
           metadata,
         });
@@ -2727,7 +2731,7 @@ export class CommunicationsService {
       await this.notificationsService.sendPushNotification({
         title: delivery.title,
         body: delivery.body,
-        audience: delivery.destination!,
+        audience: destination,
         metadata,
       });
     } catch (error) {
@@ -3056,10 +3060,12 @@ export class CommunicationsService {
       return this.handleNoticePublished(event);
     }
 
-    const results = await this.eventEmitter.emitAsync(
+    const results = (await this.eventEmitter.emitAsync(
       'notice.published',
       event,
-    );
+    )) as Array<
+      Awaited<ReturnType<CommunicationsService['handleNoticePublished']>>
+    >;
     return results[0] ?? { count: 0 };
   }
 

@@ -267,11 +267,14 @@ describe('School OS Auth + RBAC integration', () => {
       createRequestMock() as unknown as AuthenticatedRequest,
     );
     expect(teacherVerifiedLogin.accessToken).toBeTruthy();
+    if (!teacherVerifiedLogin.accessToken) {
+      throw new Error('Expected teacher access token after OTP verification');
+    }
 
     const teacherRequest = await authenticateRequest(
       jwtAuthGuard,
       rolesGuard,
-      teacherVerifiedLogin.accessToken!,
+      teacherVerifiedLogin.accessToken,
       ClassesController.prototype.listClasses as unknown as (
         ...args: unknown[]
       ) => unknown,

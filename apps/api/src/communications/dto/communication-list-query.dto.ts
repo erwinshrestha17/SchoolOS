@@ -3,6 +3,7 @@ import {
   IsEnum,
   IsInt,
   IsOptional,
+  IsIn,
   IsString,
   Max,
   MaxLength,
@@ -16,7 +17,6 @@ import {
   NoticePriority,
   NotificationPreferenceCategory,
 } from '@prisma/client';
-import { IsIn } from 'class-validator';
 
 export class CommunicationPageQueryDto {
   @IsOptional()

@@ -39,7 +39,7 @@ class FakeCls {
   }
 }
 
-const SUFFIX = `p0-01-ta-${Date.now()}`;
+const SUFFIX = `p0-01-ta-${String(Date.now())}`;
 const DAY = 24 * 60 * 60 * 1000;
 
 describe('P0-01 teacher assignment scoping (real database)', () => {

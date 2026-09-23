@@ -260,7 +260,9 @@ describe('PayrollController M7 contracts', () => {
         const chunks: Buffer[] = [];
         const stream = result.getStream();
         stream.on('data', (chunk: Buffer) => chunks.push(chunk));
-        stream.on('end', () => resolve(Buffer.concat(chunks)));
+        stream.on('end', () => {
+          resolve(Buffer.concat(chunks));
+        });
         stream.on('error', reject);
       });
       expect(streamed).toEqual(pdf);

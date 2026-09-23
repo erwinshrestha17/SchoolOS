@@ -303,7 +303,7 @@ export class MobilePrincipalService implements OnModuleInit {
       const { start, end } = dayBounds(new Date());
       items = items.filter((item) => {
         const date = item.timestamp ? new Date(item.timestamp) : null;
-        return date != null && date >= start && date < end;
+        return date !== null && date >= start && date < end;
       });
     } else if (normalizedFilter === 'assigned') {
       items = items.filter((item) => item.owner === 'Principal');
@@ -331,7 +331,14 @@ export class MobilePrincipalService implements OnModuleInit {
   ) {
     this.assertPrincipal(actor);
     return this.serviceRequestsService.listManagerRequests(
-      { ...query, limit: query.limit ?? 50 },
+      {
+        status: query.status,
+        type: query.type,
+        priority: query.priority,
+        assignedToId: query.assignedToId,
+        page: query.page,
+        limit: query.limit ?? 50,
+      },
       actor,
     );
   }
@@ -469,7 +476,7 @@ export class MobilePrincipalService implements OnModuleInit {
             orderBy: { createdAt: 'desc' },
             take: 10,
           })
-        : Promise.resolve([]);
+        : Promise.resolve<never[]>([]);
 
     const [
       leaveRequests,
@@ -541,80 +548,89 @@ export class MobilePrincipalService implements OnModuleInit {
       approvalBackedNotices.map((request) => request.targetId),
     );
     const items: PrincipalItem[] = [
-      ...leaveRequests.map((request) => ({
-        id: request.id,
-        type: 'leave',
-        title: 'Leave Request',
-        subtitle: staffName(request.staff),
-        detail: `${decimalToNumber(request.days)} days leave`,
-        status: request.status,
-        severity: 'high' as Severity,
-        timestamp: toIso(request.createdAt),
-        owner: 'Principal',
-        nextAction: 'Review leave request',
-      })),
-      ...attendanceCorrections.map((request) => ({
-        id: request.id,
-        type: 'attendance_correction',
-        title: 'Attendance Correction',
-        subtitle: classLabel(
-          request.student.class?.name,
-          request.student.sectionRef?.name,
-        ),
-        detail: request.reason,
-        status: request.status,
-        severity: 'medium' as Severity,
-        timestamp: toIso(request.requestedAt),
-        owner: 'Principal',
-        nextAction: 'Review correction',
-      })),
-      ...reportCardCorrections.map((request) => ({
-        id: request.id,
-        type: 'report_card',
-        title: 'Report-card Correction',
-        subtitle: classLabel(
-          request.reportCard.class?.name,
-          request.reportCard.section?.name,
-        ),
-        detail: request.reason,
-        status: request.status,
-        severity: 'high' as Severity,
-        timestamp: toIso(request.createdAt),
-        owner: 'Principal',
-        nextAction: 'Review publish blocker',
-      })),
-      ...workflowApprovals.map((request) => ({
-        id: request.id,
-        type: request.targetModule,
-        title: request.title,
-        subtitle: request.targetType,
-        detail: request.reason,
-        status: request.status,
-        severity: (request.workflowType === 'EMERGENCY_HIGH_IMPACT_NOTICE'
-          ? 'critical'
-          : 'medium') as Severity,
-        timestamp: toIso(request.createdAt),
-        owner: 'Principal',
-        nextAction: 'Review request',
-        route: `/principal/approvals/${request.id}`,
-      })),
+      ...leaveRequests.map(
+        (request): PrincipalItem => ({
+          id: request.id,
+          type: 'leave',
+          title: 'Leave Request',
+          subtitle: staffName(request.staff),
+          detail: `${decimalToNumber(request.days)} days leave`,
+          status: request.status,
+          severity: 'high',
+          timestamp: toIso(request.createdAt),
+          owner: 'Principal',
+          nextAction: 'Review leave request',
+        }),
+      ),
+      ...attendanceCorrections.map(
+        (request): PrincipalItem => ({
+          id: request.id,
+          type: 'attendance_correction',
+          title: 'Attendance Correction',
+          subtitle: classLabel(
+            request.student.class?.name,
+            request.student.sectionRef?.name,
+          ),
+          detail: request.reason,
+          status: request.status,
+          severity: 'medium',
+          timestamp: toIso(request.requestedAt),
+          owner: 'Principal',
+          nextAction: 'Review correction',
+        }),
+      ),
+      ...reportCardCorrections.map(
+        (request): PrincipalItem => ({
+          id: request.id,
+          type: 'report_card',
+          title: 'Report-card Correction',
+          subtitle: classLabel(
+            request.reportCard.class?.name,
+            request.reportCard.section?.name,
+          ),
+          detail: request.reason,
+          status: request.status,
+          severity: 'high',
+          timestamp: toIso(request.createdAt),
+          owner: 'Principal',
+          nextAction: 'Review publish blocker',
+        }),
+      ),
+      ...workflowApprovals.map(
+        (request): PrincipalItem => ({
+          id: request.id,
+          type: request.targetModule,
+          title: request.title,
+          subtitle: request.targetType,
+          detail: request.reason,
+          status: request.status,
+          severity:
+            request.workflowType === 'EMERGENCY_HIGH_IMPACT_NOTICE'
+              ? 'critical'
+              : 'medium',
+          timestamp: toIso(request.createdAt),
+          owner: 'Principal',
+          nextAction: 'Review request',
+          route: `/principal/approvals/${request.id}`,
+        }),
+      ),
       ...noticeDrafts
         .filter((notice) => !approvalBackedNoticeIds.has(notice.id))
-        .map((notice) => ({
-          id: notice.id,
-          type: 'notice',
-          title: 'High-impact Notice Approval',
-          subtitle: notice.title,
-          detail: audienceLabel(notice.audienceType),
-          status: 'PENDING',
-          severity: (notice.priority === 'EMERGENCY'
-            ? 'critical'
-            : 'medium') as Severity,
-          timestamp: toIso(notice.createdAt),
-          owner: 'Principal',
-          nextAction: 'Review notice',
-          route: '/principal/notices',
-        })),
+        .map(
+          (notice): PrincipalItem => ({
+            id: notice.id,
+            type: 'notice',
+            title: 'High-impact Notice Approval',
+            subtitle: notice.title,
+            detail: audienceLabel(notice.audienceType),
+            status: 'PENDING',
+            severity: notice.priority === 'EMERGENCY' ? 'critical' : 'medium',
+            timestamp: toIso(notice.createdAt),
+            owner: 'Principal',
+            nextAction: 'Review notice',
+            route: '/principal/notices',
+          }),
+        ),
     ].sort(compareAttention);
 
     return {
@@ -778,9 +794,9 @@ export class MobilePrincipalService implements OnModuleInit {
       deadline: {
         at: toIso(request.deadlineAt),
         overdue:
-          Boolean(request.deadlineAt) &&
+          request.deadlineAt instanceof Date &&
           request.status === ApprovalRequestStatus.PENDING &&
-          request.deadlineAt!.getTime() < Date.now(),
+          request.deadlineAt.getTime() < Date.now(),
       },
       delegation: request.delegatedTo
         ? {
@@ -1239,7 +1255,7 @@ export class MobilePrincipalService implements OnModuleInit {
           title: row.label,
           subtitle: 'Attendance not submitted',
           detail: 'No attendance recorded today',
-          severity: 'critical' as Severity,
+          severity: 'critical',
         })),
       ],
       studentFollowUps,
@@ -1300,27 +1316,31 @@ export class MobilePrincipalService implements OnModuleInit {
     ]);
 
     const absenceItems: PrincipalItem[] = [
-      ...attendance.map((row) => ({
-        id: row.id,
-        type: 'staff_absence',
-        title: staffName(row.staff),
-        subtitle: row.note ?? row.leaveType ?? 'Staff attendance',
-        status: row.status,
-        severity: (row.status === 'ABSENT' ? 'high' : 'medium') as Severity,
-        timestamp: toIso(row.createdAt),
-        nextAction: 'Review staff coverage',
-      })),
-      ...leaveRequests.map((row) => ({
-        id: row.id,
-        type: 'staff_leave',
-        title: staffName(row.staff),
-        subtitle: `${row.leaveType} leave`,
-        detail: `${decimalToNumber(row.days)} days`,
-        status: row.status,
-        severity: (row.status === 'PENDING' ? 'high' : 'medium') as Severity,
-        timestamp: toIso(row.createdAt),
-        nextAction: 'Review leave coverage',
-      })),
+      ...attendance.map(
+        (row): PrincipalItem => ({
+          id: row.id,
+          type: 'staff_absence',
+          title: staffName(row.staff),
+          subtitle: row.note ?? row.leaveType ?? 'Staff attendance',
+          status: row.status,
+          severity: row.status === 'ABSENT' ? 'high' : 'medium',
+          timestamp: toIso(row.createdAt),
+          nextAction: 'Review staff coverage',
+        }),
+      ),
+      ...leaveRequests.map(
+        (row): PrincipalItem => ({
+          id: row.id,
+          type: 'staff_leave',
+          title: staffName(row.staff),
+          subtitle: `${row.leaveType} leave`,
+          detail: `${decimalToNumber(row.days)} days`,
+          status: row.status,
+          severity: row.status === 'PENDING' ? 'high' : 'medium',
+          timestamp: toIso(row.createdAt),
+          nextAction: 'Review leave coverage',
+        }),
+      ),
     ];
     const uncovered = substitutions.filter(
       (row) => row.status !== 'ASSIGNED' && row.status !== 'COMPLETED',
@@ -1449,7 +1469,7 @@ export class MobilePrincipalService implements OnModuleInit {
           title: `${row.student.class?.name ?? 'Class'} overdue collection`,
           detail: formatNpr(decimalToNumber(row.totalAmount)),
           status: 'High',
-          severity: 'high' as Severity,
+          severity: 'high',
         })),
         ...financeApprovals.slice(0, 3).map((row) => ({
           id: row.id,
@@ -1457,7 +1477,7 @@ export class MobilePrincipalService implements OnModuleInit {
           title: `${financeApprovalTitle(row.type)} - ${studentName(row.payment.student)}`,
           detail: formatNpr(decimalToNumber(row.amount ?? row.payment.amount)),
           status: 'Pending',
-          severity: 'medium' as Severity,
+          severity: 'medium',
         })),
         ...(cashierClose?.varianceAmount
           ? [
@@ -1772,9 +1792,7 @@ export class MobilePrincipalService implements OnModuleInit {
       subtitle: 'Escalation context is restricted on mobile',
       detail: row.reason,
       status: row.status,
-      severity: (row.status === ChatEscalationStatus.RESOLVED
-        ? 'low'
-        : 'high') as Severity,
+      severity: row.status === ChatEscalationStatus.RESOLVED ? 'low' : 'high',
       timestamp: toIso(row.createdAt),
       owner:
         row.escalatedToUserId === actor.userId
@@ -3168,16 +3186,18 @@ export class MobilePrincipalService implements OnModuleInit {
   ): Promise<PrincipalItem[]> {
     const summary = await this.getAttendanceSummary(actor);
     return [
-      ...summary.classRisk.slice(0, 5).map((item) => ({
-        id: item.id,
-        type: 'attendance',
-        title: `${item.title} attendance`,
-        subtitle: item.detail,
-        severity: item.severity,
-        nextAction: 'Open attendance risk',
-        timestamp: nowIso(),
-        route: '/principal/attendance-risk',
-      })),
+      ...summary.classRisk.slice(0, 5).map(
+        (item): PrincipalItem => ({
+          id: item.id,
+          type: 'attendance',
+          title: `${item.title} attendance`,
+          subtitle: item.detail,
+          severity: item.severity as Severity,
+          nextAction: 'Open attendance risk',
+          timestamp: nowIso(),
+          route: '/principal/attendance-risk',
+        }),
+      ),
       ...(summary.metrics.lateFollowUp > 0
         ? [
             {
@@ -3217,27 +3237,29 @@ export class MobilePrincipalService implements OnModuleInit {
           activeStatuses.includes(request.status) &&
           (request.priority === 'HIGH' || request.isOverdue),
       )
-      .map((request) => ({
-        id: request.id,
-        type: 'service_request',
-        title:
-          request.type === 'PAYMENT_DISPUTE'
-            ? 'Parent Payment Dispute'
-            : 'Parent School Request',
-        subtitle: `${request.student.name} • ${request.student.classSection}`,
-        detail: request.subject,
-        severity: 'high' as Severity,
-        status: request.status,
-        owner:
-          request.assignedTo?.id === actor.userId
-            ? 'Principal'
-            : (request.assignedTo?.name ?? 'Unassigned'),
-        nextAction: request.isOverdue
-          ? 'Respond to overdue request'
-          : 'Review parent request',
-        timestamp: request.createdAt,
-        route: `/principal/service-requests/${request.id}`,
-      }));
+      .map(
+        (request): PrincipalItem => ({
+          id: request.id,
+          type: 'service_request',
+          title:
+            request.type === 'PAYMENT_DISPUTE'
+              ? 'Parent Payment Dispute'
+              : 'Parent School Request',
+          subtitle: `${request.student.name} • ${request.student.classSection}`,
+          detail: request.subject,
+          severity: 'high',
+          status: request.status,
+          owner:
+            request.assignedTo?.id === actor.userId
+              ? 'Principal'
+              : (request.assignedTo?.name ?? 'Unassigned'),
+          nextAction: request.isOverdue
+            ? 'Respond to overdue request'
+            : 'Review parent request',
+          timestamp: request.createdAt,
+          route: `/principal/service-requests/${request.id}`,
+        }),
+      );
   }
 
   private async staffAttention(actor: AuthContext): Promise<PrincipalItem[]> {
@@ -3260,21 +3282,23 @@ export class MobilePrincipalService implements OnModuleInit {
               nextAction: 'Review leave requests',
               timestamp: nowIso(),
               route: '/principal/approvals',
-            },
+            } satisfies PrincipalItem,
           ]
         : []),
       ...staff.coverageItems
         .filter((item) => item.severity === 'high')
-        .map((item) => ({
-          id: item.id,
-          type: 'staff_coverage',
-          title: item.title,
-          subtitle: item.detail,
-          severity: 'high' as Severity,
-          nextAction: 'Review staff coverage',
-          timestamp: nowIso(),
-          route: '/principal/staff-absence',
-        })),
+        .map(
+          (item): PrincipalItem => ({
+            id: item.id,
+            type: 'staff_coverage',
+            title: item.title,
+            subtitle: item.detail,
+            severity: 'high',
+            nextAction: 'Review staff coverage',
+            timestamp: nowIso(),
+            route: '/principal/staff-absence',
+          }),
+        ),
     ];
   }
 
@@ -3284,16 +3308,18 @@ export class MobilePrincipalService implements OnModuleInit {
     const transport = await this.getTransportAlerts(actor);
     return transport.routes
       .filter((route) => route.severity === 'high')
-      .map((route) => ({
-        id: route.id,
-        type: 'transport',
-        title: route.title,
-        subtitle: route.status,
-        severity: 'high',
-        nextAction: 'Review transport status',
-        timestamp: nowIso(),
-        route: '/principal/transport-alerts',
-      }));
+      .map(
+        (route): PrincipalItem => ({
+          id: route.id,
+          type: 'transport',
+          title: route.title,
+          subtitle: route.status,
+          severity: 'high',
+          nextAction: 'Review transport status',
+          timestamp: nowIso(),
+          route: '/principal/transport-alerts',
+        }),
+      );
   }
 
   private async noticeAttention(actor: AuthContext): Promise<PrincipalItem[]> {
@@ -3309,23 +3335,25 @@ export class MobilePrincipalService implements OnModuleInit {
             nextAction: 'Review emergency notice',
             timestamp: nowIso(),
             route: '/principal/notices',
-          },
+          } satisfies PrincipalItem,
         ]
       : [];
   }
 
   private async feeAttention(actor: AuthContext): Promise<PrincipalItem[]> {
     const fees = await this.getFeesSummary(actor);
-    return fees.watchlist.map((item) => ({
-      id: item.id,
-      type: item.type,
-      title: item.title,
-      subtitle: item.detail,
-      severity: item.severity,
-      nextAction: 'Review fees snapshot',
-      timestamp: nowIso(),
-      route: '/principal/fees-snapshot',
-    }));
+    return fees.watchlist.map(
+      (item): PrincipalItem => ({
+        id: item.id,
+        type: item.type,
+        title: item.title,
+        subtitle: item.detail,
+        severity: item.severity as Severity,
+        nextAction: 'Review fees snapshot',
+        timestamp: nowIso(),
+        route: '/principal/fees-snapshot',
+      }),
+    );
   }
 
   private async activityAttention(
@@ -3547,7 +3575,7 @@ function minutesAgo(minutes: number) {
 }
 
 function decimalToNumber(value: unknown) {
-  if (value == null) return 0;
+  if (value === null || value === undefined) return 0;
   if (typeof value === 'number') return value;
   if (typeof value === 'string') return Number(value) || 0;
   if (typeof value === 'object' && 'toNumber' in value) {
@@ -3612,7 +3640,7 @@ function isMobileApprovalTarget(
 }
 
 function sanitizeMobileContext(value: unknown, depth = 0): unknown {
-  if (value == null || depth > 3) return null;
+  if (value === null || value === undefined || depth > 3) return null;
   if (typeof value === 'number' || typeof value === 'boolean') {
     return value;
   }
@@ -3676,7 +3704,7 @@ function countToday(items: Array<{ timestamp?: string | null }>) {
   const { start, end } = dayBounds(new Date());
   return items.filter((item) => {
     const date = item.timestamp ? new Date(item.timestamp) : null;
-    return date != null && date >= start && date < end;
+    return date !== null && date >= start && date < end;
   }).length;
 }
 

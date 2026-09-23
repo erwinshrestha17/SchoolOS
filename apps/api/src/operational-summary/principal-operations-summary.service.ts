@@ -7,10 +7,10 @@ import { PrismaService } from '../prisma/prisma.service';
 type MetricValue = number | string | null;
 type ModuleStatus = 'ready' | 'empty' | 'partial' | 'locked';
 
-type PrincipalOperationsModuleSummary = {
+interface PrincipalOperationsModuleSummary {
   status: ModuleStatus;
   metrics: Record<string, MetricValue>;
-};
+}
 
 @Injectable()
 export class PrincipalOperationsSummaryService {

@@ -1601,7 +1601,7 @@ function mapStaffDetail(
     department?: string | null;
     designation?: string | null;
     employmentType?: string | null;
-    status?: StaffStatus | string;
+    status?: string;
     contractStatus?: string | null;
     emergencyContactName?: string | null;
     emergencyContactPhone?: string | null;

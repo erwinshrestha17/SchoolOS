@@ -85,7 +85,9 @@ export class AccountingReportsService {
     private readonly auditService: AuditService,
   ) {}
 
-  private toDecimal(value: unknown): Prisma.Decimal {
+  private toDecimal(
+    value: Prisma.Decimal | string | number | null | undefined,
+  ): Prisma.Decimal {
     const val = value === null || value === undefined ? 0 : value;
     return new Prisma.Decimal(val.toString());
   }
@@ -530,12 +532,11 @@ export class AccountingReportsService {
       }
     }
 
-    const existingMappings =
-      await this.prisma.accountingReportAccountMapping.findMany({
-        where: { tenantId },
-      });
+    await this.prisma.accountingReportAccountMapping.findMany({
+      where: { tenantId },
+    });
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       await tx.accountingReportAccountMapping.deleteMany({
         where: { tenantId },
       });
@@ -766,7 +767,7 @@ export class AccountingReportsService {
 
       const rowAccount = targetAccounts.find(
         (a) => a.id === line.chartAccountId,
-      )!;
+      );
 
       const otherAccount = line.journalEntry.lines.find(
         (l) => l.chartAccountId !== line.chartAccountId,
@@ -1312,10 +1313,10 @@ export class AccountingReportsService {
       );
     }
 
-    return this.getCashBook(tenantId, {
-      ...query,
-      accountKind: CashBookAccountKind.BANK,
-    });
+    return this.getCashBook(
+      tenantId,
+      Object.assign({}, query, { accountKind: CashBookAccountKind.BANK }),
+    );
   }
 
   async getJournalRegister(

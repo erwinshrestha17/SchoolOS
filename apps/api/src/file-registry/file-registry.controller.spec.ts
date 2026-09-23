@@ -1,23 +1,39 @@
 import { BadRequestException } from '@nestjs/common';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { FileRegistryController } from './file-registry.controller';
 
 describe('FileRegistryController upload safety', () => {
   it('requires TenantActiveGuard on the controller shell', () => {
-    const source = require('fs').readFileSync(
-      require('path').join(__dirname, 'file-registry.controller.ts'),
+    const source = readFileSync(
+      join(__dirname, 'file-registry.controller.ts'),
       'utf8',
     );
     expect(source).toContain('TenantActiveGuard');
   });
   let controller: FileRegistryController;
-  let fileRegistryService: any;
-  let storageService: any;
+  let fileRegistryService: {
+    registerFile: jest.Mock;
+    getSignedUrl: jest.Mock;
+    getFileMetadata: jest.Mock;
+    assertFileAccessForAuth: jest.Mock;
+    auditAccess: jest.Mock;
+    markUploaded: jest.Mock;
+    createSignedUpload: jest.Mock;
+    completeSignedUpload: jest.Mock;
+    createSignedPreviewUrl: jest.Mock;
+    createSignedDownloadUrl: jest.Mock;
+  };
+  let storageService: {
+    saveBase64Object: jest.Mock;
+    getObjectBuffer: jest.Mock;
+  };
 
   const auth = {
     tenantId: 'tenant-1',
     userId: 'user-1',
     permissions: ['homework:create', 'homework:submit'],
-  } as any;
+  } as unknown as import('../auth/auth.types').AuthContext;
 
   const ext = (...codes: number[]) => String.fromCharCode(...codes);
 
@@ -39,8 +55,12 @@ describe('FileRegistryController upload safety', () => {
       getObjectBuffer: jest.fn(),
     };
     controller = new FileRegistryController(
-      fileRegistryService,
-      storageService,
+      fileRegistryService as unknown as ConstructorParameters<
+        typeof FileRegistryController
+      >[0],
+      storageService as unknown as ConstructorParameters<
+        typeof FileRegistryController
+      >[1],
     );
   });
 
@@ -185,7 +205,7 @@ describe('FileRegistryController upload safety', () => {
         {
           ...auth,
           permissions: ['notices:create', 'notices:read', 'messaging:create'],
-        } as any,
+        } as unknown as Parameters<typeof controller.uploadFile>[0],
         {
           fileName: 'notice.pdf',
           contentType: 'application/pdf',
@@ -212,7 +232,10 @@ describe('FileRegistryController upload safety', () => {
   it('blocks new chat attachments while preserving historical download policy', async () => {
     await expect(
       controller.uploadFile(
-        { ...auth, permissions: ['messaging:create', 'messaging:read'] } as any,
+        {
+          ...auth,
+          permissions: ['messaging:create', 'messaging:read'],
+        } as unknown as Parameters<typeof controller.uploadFile>[0],
         {
           fileName: 'historical-chat.pdf',
           contentType: 'application/pdf',
@@ -244,7 +267,9 @@ describe('FileRegistryController upload safety', () => {
   it('requires a permission that matches the requested upload module', async () => {
     await expect(
       controller.uploadFile(
-        { ...auth, permissions: ['homework:submit'] } as any,
+        { ...auth, permissions: ['homework:submit'] } as unknown as Parameters<
+          typeof controller.uploadFile
+        >[0],
         {
           fileName: 'worksheet.pdf',
           contentType: 'application/pdf',

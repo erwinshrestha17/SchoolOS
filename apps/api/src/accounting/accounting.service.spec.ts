@@ -30,7 +30,7 @@ describe('accounting reversals', () => {
         { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
       ],
     };
-    const { service, prisma, postingService, auditService } = buildService({
+    const { service, postingService } = buildService({
       original,
       existingReversal: null,
       closedPeriod: null,
@@ -96,8 +96,10 @@ describe('accounting reversals', () => {
   });
 
   it('blocks reversals if original journal entry belongs to a locked period', async () => {
-    const original = buildOriginalJournal();
-    (original as any).fiscalPeriod = { status: 'LOCKED', label: '2026-04' };
+    const original = {
+      ...buildOriginalJournal(),
+      fiscalPeriod: { status: 'LOCKED', label: '2026-04' },
+    };
     const { service } = buildService({
       original,
       existingReversal: null,
@@ -337,7 +339,7 @@ describe('Manual Journal Approval Workflow', () => {
         { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
       ],
     };
-    const { service, prisma, postingService } = buildService({
+    const { service, postingService } = buildService({
       original: journal,
     });
 
@@ -368,7 +370,7 @@ describe('Manual Journal Approval Workflow', () => {
         { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(90) },
       ],
     };
-    const { service, postingService } = buildService({ original: journal });
+    const { service } = buildService({ original: journal });
 
     await expect(
       service.submitManualJournal('journal-1', {}, actor),
@@ -385,7 +387,7 @@ describe('Manual Journal Approval Workflow', () => {
         { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
       ],
     };
-    const { service, postingService } = buildService({ original: journal });
+    const { service } = buildService({ original: journal });
 
     await expect(
       service.submitManualJournal('journal-1', {}, actor),
@@ -403,7 +405,7 @@ describe('Manual Journal Approval Workflow', () => {
         { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
       ],
     };
-    const { service, prisma, postingService } = buildService({
+    const { service, postingService } = buildService({
       original: journal,
     });
 
@@ -436,7 +438,7 @@ describe('Manual Journal Approval Workflow', () => {
         { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
       ],
     };
-    const { service, postingService } = buildService({ original: journal });
+    const { service } = buildService({ original: journal });
 
     await expect(
       service.approveManualJournal('journal-1', {}, actor),
@@ -453,7 +455,7 @@ describe('Manual Journal Approval Workflow', () => {
         { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
       ],
     };
-    const { service, prisma, postingService } = buildService({
+    const { service, postingService } = buildService({
       original: journal,
     });
 
@@ -485,7 +487,7 @@ describe('Manual Journal Approval Workflow', () => {
         { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
       ],
     };
-    const { service, prisma, postingService } = buildService({
+    const { service, postingService } = buildService({
       original: journal,
     });
 
@@ -518,7 +520,7 @@ describe('Manual Journal Approval Workflow', () => {
         { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
       ],
     };
-    const { service, prisma, postingService } = buildService({
+    const { service, postingService } = buildService({
       original: journal,
     });
 
@@ -577,7 +579,8 @@ function buildService(options: {
     journalEntry: {
       findFirst: jest.fn().mockImplementation(({ where }) => {
         if (
-          where.id === (options.original as any)?.id ||
+          where.id ===
+            (options.original as { id?: unknown } | null | undefined)?.id ||
           where.id === 'journal-original'
         ) {
           return Promise.resolve(options.original);

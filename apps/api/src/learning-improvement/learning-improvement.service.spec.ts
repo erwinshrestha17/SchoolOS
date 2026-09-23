@@ -366,13 +366,13 @@ function buildService() {
     subject: delegate(),
     subjectTeacherAssignment: delegate(),
     $transaction: jest.fn(),
-  } as any;
+  };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const entitlements = {
     checkModuleEnabled: jest.fn(),
   };
   const service = new LearningImprovementService(
-    prisma as PrismaService,
+    prisma as unknown as PrismaService,
     audit as unknown as AuditService,
     entitlements as unknown as EntitlementsService,
   );

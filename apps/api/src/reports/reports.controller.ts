@@ -28,7 +28,7 @@ export class ReportsController {
   @Get()
   @Permissions('reports:read')
   async listReports(@CurrentAuth() actor: AuthContext) {
-    return this.reportsService.listReports(actor);
+    return Promise.resolve(this.reportsService.listReports(actor));
   }
 
   @Get('financial-catalog')

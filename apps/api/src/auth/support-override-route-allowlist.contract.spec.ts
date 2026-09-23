@@ -52,13 +52,11 @@ const CONTROLLERS = [
   DeliveriesController,
 ] as const;
 
-const APPROVED: Array<
-  [
-    controller: (typeof CONTROLLERS)[number],
-    handler: string,
-    scopes: SupportOverrideScope[],
-  ]
-> = [
+const APPROVED: [
+  controller: (typeof CONTROLLERS)[number],
+  handler: string,
+  scopes: SupportOverrideScope[],
+][] = [
   [AuthController, 'me', ALL_SCOPES],
   [MeController, 'getMyEntitlements', ALL_SCOPES],
   [AcademicYearsController, 'listAcademicYears', ACADEMIC_CONTEXT_SCOPES],
@@ -97,7 +95,7 @@ const APPROVED: Array<
 
 describe('support override route allowlist contract', () => {
   it('pins the complete method-level allowlist and exact purpose scopes', () => {
-    const actual: Array<[string, string, SupportOverrideScope[]]> = [];
+    const actual: [string, string, SupportOverrideScope[]][] = [];
 
     for (const Controller of CONTROLLERS) {
       expect(

@@ -11,14 +11,17 @@ import type { Request, Response } from 'express';
 
 @Injectable()
 export class ResponseEnvelopeInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(
+    context: ExecutionContext,
+    next: CallHandler<unknown>,
+  ): Observable<unknown> {
     const http = context.switchToHttp();
     const request = http.getRequest<Request & { requestId?: string }>();
     const response = http.getResponse<Response>();
 
     // Skip Server-Sent Events (SSE)
     // NestJS marked SSE handlers often return an Observable directly, but we can also check metadata
-    const isSse = Reflect.getMetadata('__sse__', context.getHandler());
+    const isSse: unknown = Reflect.getMetadata('__sse__', context.getHandler());
     if (isSse) {
       return next.handle();
     }

@@ -5,7 +5,7 @@ const actor = {
   tenantId: 'tenant-1',
   tenantSlug: 'tenant-one',
   userId: 'user-1',
-} as any;
+} as unknown as import('../auth/auth.types').AuthContext;
 
 function buildService() {
   const prisma = {

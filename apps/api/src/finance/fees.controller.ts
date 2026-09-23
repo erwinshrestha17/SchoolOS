@@ -304,7 +304,7 @@ export class FeesController {
     return this.financeService.getRefundReversalRegisterRows(auth, {
       fromDate: query.fromDate,
       toDate: query.toDate,
-      recordType: query.recordType as 'REFUND' | 'REVERSAL' | undefined,
+      recordType: query.recordType,
       page: query.page,
       limit: query.limit,
     });

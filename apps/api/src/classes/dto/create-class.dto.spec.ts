@@ -8,7 +8,7 @@ describe('CreateClassDto Grade 1-12 boundary', () => {
     'accepts supported class level %s',
     async (level) => {
       const dto = plainToInstance(CreateClassDto, {
-        name: `Grade ${level}`,
+        name: `Grade ${String(level)}`,
         level,
       });
 
@@ -20,7 +20,7 @@ describe('CreateClassDto Grade 1-12 boundary', () => {
     'rejects out-of-scope class level %s',
     async (level) => {
       const dto = plainToInstance(CreateClassDto, {
-        name: `Grade ${level}`,
+        name: `Grade ${String(level)}`,
         level,
       });
 

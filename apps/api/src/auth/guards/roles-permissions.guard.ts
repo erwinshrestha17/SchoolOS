@@ -55,7 +55,7 @@ export class RolesPermissionsGuard implements CanActivate {
             : 'Platform identities require an active support override on school routes',
         );
       }
-      return true;
+      return Promise.resolve(true);
     }
 
     if (!auth) {
@@ -104,6 +104,6 @@ export class RolesPermissionsGuard implements CanActivate {
       throw new ForbiddenException('Insufficient permissions');
     }
 
-    return true;
+    return Promise.resolve(true);
   }
 }

@@ -37,8 +37,8 @@ describe('TeacherTodayService', () => {
   function makeService(
     overrides: {
       periods?: ReturnType<typeof makePeriod>[];
-      subjectAssignments?: Array<{ subjectId: string }>;
-      examTerms?: Array<{ id: string; name: string; endsOn: Date }>;
+      subjectAssignments?: { subjectId: string }[];
+      examTerms?: { id: string; name: string; endsOn: Date }[];
       enabledModules?: string[];
     } = {},
   ) {
@@ -81,7 +81,7 @@ describe('TeacherTodayService', () => {
       listActiveAssignments: jest.fn().mockResolvedValue(
         (overrides.subjectAssignments ?? [{ subjectId: 'subject-1' }]).map(
           (assignment, index) => ({
-            assignmentId: `assignment-${index + 1}`,
+            assignmentId: `assignment-${String(index + 1)}`,
             academicYearId: 'year-1',
             classId: 'class-1',
             sectionId: 'section-1',
