@@ -564,6 +564,9 @@ Today: present / absent / leave / unconfirmed
 NEEDS ATTENTION
 Pending leave
 Expiring contracts
+Qualification/licence verification or expiry
+Teacher eligibility blockers
+Uncovered teacher absence/substitution
 Missing staff documents
 Missing salary structures
 Payroll readiness issues
@@ -691,6 +694,45 @@ Data & audit
 Use permission matrix/table with role/persona selector.
 
 Avoid checkbox walls without grouping. Group permissions by business capability.
+
+### M0-F Nepal Education & HR Compliance Policies
+
+This is a governance/configuration workspace, not a generic settings form.
+
+Use two primary sections:
+
+```text
+Education
+  School recognition / jurisdiction
+  Curriculum versions
+  Grading / assessment / promotion policies
+  Academic-calendar versions
+  NEB configuration/evidence
+  IEMIS mappings / export schemas
+
+HR / Employment
+  Employment/post classifications
+  Contract/service-condition policies
+  Qualification / teaching-licence requirements
+  Working-time / leave policies
+  Compensation/statutory/tax policy inputs
+  Payroll policy versions
+```
+
+Every policy detail should show:
+
+- status: draft/reviewed/approved/active/superseded;
+- jurisdiction and school-type applicability;
+- effective from/to;
+- source/evidence reference;
+- current reviewer/approver;
+- supersedes/superseded-by relationship;
+- affected workflows;
+- change history.
+
+Do not expose mutable statutory rules as unlabelled toggles. A school-level override must clearly show whether it is permitted and must never present a below-minimum/invalid value as valid.
+
+Government integration states must be truthful. `Ready for export` is not `Submitted`; `Submitted` is not `Acknowledged`.
 
 ---
 
@@ -1362,7 +1404,7 @@ Period | Class | Subject | Absent teacher | Substitute | Status | Acknowledged
 
 ## M7 — HR & Payroll
 
-**Primary job:** maintain trustworthy staff lifecycle data and prepare payroll without omissions or hidden exceptions.
+**Primary job:** maintain trustworthy staff identity, employment, professional eligibility, leave/coverage and compensation data, then prepare payroll from verified inputs without omissions, hidden exceptions or a parallel accounting ledger.
 
 ### M7-A HR Home
 
@@ -1375,6 +1417,9 @@ Present 51 | Absent 3 | Leave 4 | Unconfirmed 2
 NEEDS ATTENTION
 7 leave requests
 3 contracts expiring
+2 teaching licences expiring / unverified
+3 teacher eligibility blockers
+1 uncovered teaching period
 2 staff missing salary structure
 5 document issues
 
@@ -1389,37 +1434,125 @@ RECENT STAFF CHANGES
 Columns:
 
 ```text
-Staff | Staff ID | Department | Designation | Employment | Attendance today | Status
+Staff | Staff ID | Department | Designation | Employment | Professional status | Attendance today | Status
 ```
 
 Inspector:
 
 - identity/contact;
-- department/designation;
+- active employment and position;
 - current contract;
+- teacher/professional status when relevant;
 - attendance/leave today;
-- document issues;
+- document/compliance issues;
 - payroll access only when permitted.
+
+Do not reduce staff identity to one role label.
 
 ### M7-C Staff 360
 
-Identity header + tabs:
+Identity header + authorization-aware tabs:
 
 ```text
-Overview | Employment | Contracts | Attendance | Leave | Payroll | Documents | History
+Overview | Employment | Contracts | Qualifications | Teaching Licence | Eligibility |
+Assignments | Attendance | Leave | Compensation | Payroll | Documents | History
 ```
 
-Payroll tab hidden entirely when not authorized.
+Rules:
 
-### M7-D Contracts
+- teacher-only tabs appear only where relevant;
+- compensation/payroll/bank/tax/medical/disciplinary/safeguarding data require server-authorized projections;
+- hidden tabs must mean the data was not returned, not merely hidden after full payload download;
+- SchoolOS role/permission is not displayed as proof of professional eligibility.
 
-Table with expiry emphasis:
+### M7-D Employment & Contracts
+
+Use effective-dated employment/service records.
 
 ```text
-Staff | Contract type | Start | End | Days remaining | Status
+Staff | Employment type | Post/designation | Start | End | Contract | Status
 ```
 
-### M7-E Leave
+Full detail should distinguish:
+
+- employment status;
+- organizational position/responsibility;
+- contract/service terms;
+- probation/effective dates;
+- evidence;
+- lifecycle/history.
+
+Historical records should remain readable after later policy or contract changes.
+
+### M7-E Qualifications
+
+Evidence workspace:
+
+```text
+Staff | Qualification | Institution/Issuer | Level/Subject | Verified | Effective/Expiry | Issue
+```
+
+Inspector shows evidence document, verification state, verifier, date, source/reference and history.
+
+An uploaded certificate must never render as `Verified` unless verification actually occurred.
+
+### M7-F Teaching Licence
+
+Teacher-specific workspace:
+
+```text
+Teacher | Licence/reference | Level/subject context | Verified | Valid through | Status
+```
+
+Use clear states such as:
+
+```text
+Unverified | Verified | Expiring | Expired | Revoked | Review required
+```
+
+Do not imply TSC/government verification unless SchoolOS has actual authorized evidence of that verification.
+
+### M7-G Teacher Eligibility
+
+Use an operational validation workspace rather than a generic HR profile.
+
+```text
+Teacher | Employment | Required evidence | Policy version | Eligibility | Current assignments | Blocking issue
+```
+
+Inspector:
+
+- active employment;
+- applicable jurisdiction/school/post context;
+- qualifications;
+- teaching licence;
+- active policy/evidence;
+- level/subject requirements where applicable;
+- eligibility decision and reason codes;
+- affected current/future assignments;
+- history.
+
+Elevated overrides, if the active policy permits them, require visible reason/approval/audit context.
+
+### M7-H Assignments & Professional Impact
+
+Staff 360 should link professional eligibility to academic assignments without collapsing the concepts.
+
+Show:
+
+```text
+Assignment | Academic year | Class/section | Subject | Effective dates | Eligibility state | Status
+```
+
+An assignment warning must identify the authoritative blocker rather than simply showing "No access".
+
+### M7-I Staff Attendance
+
+Dense daily/monthly attendance workspace with corrections and payroll-impact projection where enabled.
+
+Do not treat payroll consumption of attendance as permission for Payroll users to see unrelated sensitive HR records.
+
+### M7-J Leave & Academic Impact
 
 Desktop split:
 
@@ -1427,35 +1560,71 @@ Desktop split:
 Calendar / team availability      Request queue
 ```
 
-Request inspector contains balance, overlap, reason, attachment, approval history.
+Request inspector contains:
 
-### M7-F Payroll Readiness
+- entitlement/balance;
+- overlap;
+- reason/evidence;
+- effective dates or partial day;
+- approval history;
+- affected timetable periods for teaching staff;
+- substitution/coverage status;
+- unresolved academic impact.
+
+For teacher leave, approval is not presented as the end of the operational workflow when classes remain uncovered.
+
+### M7-K Substitution Coverage
+
+Today/period-oriented workspace:
+
+```text
+Period | Class | Subject | Absent teacher | Eligible substitutes | Assigned substitute | Coverage | Acknowledged
+```
+
+Candidate presentation should combine availability and server-provided eligibility/assignment authority. UI ranking never bypasses backend authorization.
+
+### M7-L Compensation & Statutory Profile
+
+Restricted workspace for effective-dated salary, allowances, deductions, payment/bank data, statutory membership and policy references.
+
+Use a clear historical timeline. Do not silently overwrite prior compensation or statutory configuration after it has affected payroll.
+
+### M7-M Payroll Readiness
 
 Checklist matrix:
 
 ```text
-Staff | Salary structure | Attendance | Leave | Deductions | Bank info | Ready
+Staff | Employment | Compensation | Attendance | Leave | Statutory/Tax | Bank | Policy | Ready
 ```
 
-### M7-G Payroll Run
+Blockers must be explicit. `Ready` means the configured prerequisites passed; it is not a statutory-compliance certification.
+
+### M7-N Payroll Run
 
 Lifecycle screen:
 
 ```text
-Prepare → Validate → Review → Approve → Finalize → Post
+Prepare → Validate → Review → Approve → Finalize → Accounting Post
 ```
 
 At each stage show:
 
 - employee count;
 - gross/net totals;
+- statutory/deduction summaries;
 - blockers;
 - changes since prior stage;
-- authorized actions.
+- policy/configuration version;
+- authorized actions;
+- accounting-post state.
 
-### M7-H Payslips
+M7 calculates and approves payroll obligations. Final approved liabilities/expenses post to M11 through controlled idempotent events. Do not create a second payroll ledger that competes with M11.
+
+### M7-O Payslips
 
 Batch table + individual detail/download. Avoid card-per-employee.
+
+Payslip visibility remains self/scoped/authorized and must not expose other employees' compensation.
 
 ---
 
