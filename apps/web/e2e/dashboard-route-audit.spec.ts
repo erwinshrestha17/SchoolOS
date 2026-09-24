@@ -1,5 +1,5 @@
 import { paceCredentialAttempt } from './fixtures/credential-pacing';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Response } from '@playwright/test';
 
 const schoolCredentials = {
   tenantSlug: process.env.SCHOOLOS_E2E_TENANT_SLUG,
@@ -203,7 +203,7 @@ test.describe('Browser-level platform and school route denial', () => {
     for (const route of platformRoutes) {
       await expectRouteDenied(page, route, platformApiPathsByRoute[route]);
       await expect(
-        page.getByRole('heading', { name: /Platform Dashboard/i }),
+        page.getByRole('heading', { name: /Operator Attention Dashboard/i }),
       ).toHaveCount(0);
     }
   });
@@ -258,39 +258,58 @@ async function expectRouteDenied(
   apiPattern: RegExp,
 ) {
   const denialPattern =
-    /Access restricted|Insufficient platform permissions|Access denied|Forbidden|not authorized|Authentication required|Request failed with status 401|Request failed with status 403/i;
+    /Access restricted|Platform Restricted|Insufficient platform permissions|Access denied|Forbidden|not authorized|Authentication required|Request failed with status 401|Request failed with status 403/i;
   const denialMessage = page.getByText(denialPattern).first();
-  const deniedResponsePromise = page
-    .waitForResponse(
-      (response) =>
-        apiPattern.test(response.url()) &&
-        [401, 403].includes(response.status()),
-      { timeout: 5_000 },
-    )
-    .catch(() => null);
+  let deniedApiResponse = false;
+  let successfulPlatformApiResponse = false;
+  const observeResponse = (response: Response) => {
+    const pathname = new URL(response.url()).pathname;
+    if (!pathname.startsWith('/api/v1/') || !apiPattern.test(pathname)) {
+      return;
+    }
+    deniedApiResponse ||= [401, 403].includes(response.status());
+    if (route.startsWith('/platform') && response.ok()) {
+      successfulPlatformApiResponse = true;
+    }
+  };
 
-  await page.goto(route, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(300);
+  page.on('response', observeResponse);
+  try {
+    await page.goto(route, { waitUntil: 'domcontentloaded' });
+    await expect
+      .poll(
+        async () => {
+          if (successfulPlatformApiResponse) {
+            return 'protected platform API succeeded';
+          }
 
-  const currentPath = new URL(page.url()).pathname;
-  if (route.startsWith('/platform') && !currentPath.startsWith('/platform')) {
-    expect(currentPath).toMatch(/^\/(?:dashboard|login)$/);
-    return;
+          const currentPath = new URL(page.url()).pathname;
+          if (
+            route.startsWith('/platform') &&
+            !currentPath.startsWith('/platform')
+          ) {
+            return /^\/(?:dashboard|login)$/.test(currentPath)
+              ? 'denied'
+              : `unexpected redirect to ${currentPath}`;
+          }
+
+          if (
+            (await denialMessage.isVisible().catch(() => false)) ||
+            deniedApiResponse
+          ) {
+            return 'denied';
+          }
+
+          return 'pending';
+        },
+        {
+          message: `${route} must redirect to an allowed route or show an explicit authorization denial`,
+          timeout: 10_000,
+        },
+      )
+      .toBe('denied');
+    expect(successfulPlatformApiResponse).toBe(false);
+  } finally {
+    page.off('response', observeResponse);
   }
-
-  if (await denialMessage.isVisible().catch(() => false)) {
-    return;
-  }
-
-  const deniedResponse = await deniedResponsePromise;
-
-  if (deniedResponse) {
-    expect([401, 403]).toContain(deniedResponse.status());
-    return;
-  }
-
-  await expect(
-    denialMessage,
-    `${route} should render an authorization denial when no denied API response is observable`,
-  ).toBeVisible({ timeout: 5_000 });
 }
