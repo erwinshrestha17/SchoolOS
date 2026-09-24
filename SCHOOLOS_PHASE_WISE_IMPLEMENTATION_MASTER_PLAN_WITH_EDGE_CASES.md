@@ -101,6 +101,24 @@ Every phase MUST preserve:
 - Nepal education/compliance boundaries;
 - no international expansion unless explicitly authorized.
 
+### 2.3.1 Versioned Nepal education and HR policy
+
+Mutable Nepal education, employment, payroll, social-security, tax, local-government and fiscal rules MUST be implemented as effective-dated policy/configuration with evidence rather than scattered constants.
+
+Policy resolution must be able to represent:
+
+```text
+National baseline
+→ province/local-government profile where applicable
+→ school type
+→ academic or employment/post context
+→ record-specific effective-dated terms
+```
+
+Historical academic, employment and financial records must remain interpretable under the policy version that applied when the authoritative event occurred.
+
+NEB, IEMIS/CEHRD, TSC and other government systems remain external authorities for their legally assigned functions. SchoolOS may validate, map, export, reconcile and preserve evidence, but must not claim live government integration or statutory approval without authorized current proof.
+
 ## 2.4 Deferred modules
 Unless explicitly reactivated:
 - M8 Library
@@ -191,7 +209,7 @@ Phase 1   Authorization Foundation
 Phase 2   Domain Authorization Policies
 Phase 3   Shared Contracts & Web Design System v2
 Phase 4   App Shells & Persona Homes
-Phase 5   People, Admissions & Student 360
+Phase 5   People, Admissions, Student 360 & Teacher Identity Foundation
 Phase 6   Attendance, Homework, Academics & Timetable
 Phase 7   Fees, HR, Payroll & Accounting
 Phase 8   Access Control Administration & Sensitive Data Maturity
@@ -732,6 +750,85 @@ Audit:
 
 ---
 
+# P0 CROSS-PHASE GATE — Nepal Policy & Teacher Professional Eligibility Foundation
+
+This bounded foundation must be completed before SchoolOS treats teacher assignment, timetable/marks authority, or statutory payroll as production-trustworthy. It does **not** require a complete payroll engine before Phase 6.
+
+## P0-N1 — Nepal Education Policy Foundation
+
+Establish versioned/effective-dated structures for:
+
+- jurisdiction/local-level profile;
+- school type/recognition context;
+- curriculum version;
+- grading/assessment policy version;
+- promotion/report-card policy;
+- academic calendar policy;
+- government-reporting schema/mapping;
+- source/evidence, review status, effective dates and supersession.
+
+## P0-N2 — Nepal HR Legal Policy Foundation
+
+Establish versioned/effective-dated structures for:
+
+- employment/post classification;
+- contract/service-condition policy;
+- working-time/leave policy;
+- compensation/minimum-remuneration policy inputs;
+- statutory scheme/tax policy inputs;
+- teacher qualification/licence requirements where applicable;
+- jurisdiction, school type, source/evidence, review status and effective dates.
+
+No school setting may silently override a mandatory minimum represented by the active approved policy.
+
+## P0-N3 — Teacher Identity and Professional Eligibility Foundation
+
+Keep these distinct:
+
+```text
+Person
+→ Employee
+→ Employment
+→ Teacher Profile
+→ Qualification
+→ Teaching Licence
+→ Eligibility
+→ Academic Assignment
+→ Timetable
+→ Authorization
+```
+
+The minimum pre-Phase-6 contract must support active employment, qualification/licence evidence, verification state, effective dates, applicable policy reference, eligibility outcome/reason, and assignment preflight.
+
+A `Teacher` role/persona is never evidence of professional eligibility.
+
+## P0-N4 — External Authority Boundary
+
+- NEB/IEMIS/TSC records or identifiers must retain their external-authority meaning.
+- Initial integrations should support validated export/import/reconciliation and immutable submission snapshots where no supported direct API is established.
+- UI states must distinguish `READY`, `EXPORTED`, `SUBMITTED`, `ACKNOWLEDGED`, `REJECTED/CORRECTION_REQUIRED` as applicable instead of implying success.
+- Direct government synchronization, licensing verification or statutory certification remains disabled until an authorized interface/evidence exists.
+
+## Cross-Phase Gate Verification
+
+- historical policy-version test;
+- future policy change does not rewrite prior academic/employment records;
+- teacher role without active employment/required eligibility cannot create an authoritative assignment/write;
+- assignment removal or eligibility loss revokes affected current authority;
+- government export readiness does not imply submission;
+- unsupported government integration cannot be shown as connected.
+
+## Cross-Phase Exit Gate
+
+Before authoritative Phase 6 teacher workflows or Phase 7 statutory payroll can be enabled:
+
+- education-policy versioning exists for the rules those workflows consume;
+- minimum employment/teacher-profile/qualification/licence/eligibility contracts exist;
+- assignment creation/preflight can consume current eligibility when policy requires it;
+- external-authority states are truthful and auditable.
+
+---
+
 # PHASE 3 — Shared Contracts & Web Design System v2
 
 ## Phase 3 Edge Cases & Early-Resolution Checks
@@ -905,7 +1002,7 @@ Every major persona has a purpose-built authorized home.
 
 ---
 
-# PHASE 5 — People, Admissions & Student 360
+# PHASE 5 — People, Admissions, Student 360 & Teacher Identity Foundation
 
 ## Phase 5 Edge Cases & Early-Resolution Checks
 
@@ -948,11 +1045,26 @@ Every major persona has a purpose-built authorized home.
 - readiness falsely implies submission;
 - export generated from stale student data.
 
+### Teacher identity / professional evidence
+- employee exists without an active employment record;
+- duplicate overlapping employment records;
+- teacher role exists without Teacher Profile;
+- qualification document is present but unverified;
+- teaching licence expires or is revoked mid-academic-year;
+- licence requirement differs by school/post/policy context;
+- eligibility changes after assignment is created;
+- historical assignment must retain the policy/evidence context used when created;
+- substitute teacher is available but not eligible for the required level/subject;
+- staff identity is incorrectly treated as SchoolOS authorization.
+
 ### Required tests
 - direct Student 360 URL cannot bypass projection;
 - protected fields absent from JSON;
 - cross-tenant duplicate matching never exposes identity;
-- child-switch race cannot mix two children's data.
+- child-switch race cannot mix two children's data;
+- teacher role alone does not satisfy professional-eligibility preflight;
+- expired/revoked employment or required licence blocks new authoritative assignment/write;
+- historical eligibility decision retains its policy-version reference.
 
 ### 5A Admissions Home
 Stage summary, review queue, missing docs, duplicates, capacity/waitlist where real, new application.
@@ -985,14 +1097,36 @@ Secure switching, relationship-aware fetch, cache invalidation, removal of unaut
 ### 5I IEMIS Readiness
 Completeness, blockers, affected records, validation detail, truthful export/submission state.
 
+### 5J Employee / Employment Foundation
+Canonical staff identity plus effective-dated employment/service records. Prevent overlapping authoritative employment where policy/domain rules forbid it.
+
+### 5K Teacher Professional Profile
+Teacher-specific profile remains separate from role/persona and organizational position.
+
+### 5L Qualification & Teaching-Licence Evidence
+Store qualification/licence evidence, issuer/reference, verification state, effective/expiry dates, protected documents and history. Do not treat uploaded evidence as verified by default.
+
+### 5M Professional Eligibility Projection & Assignment Preflight
+Resolve the currently applicable policy, active employment, verified evidence and required level/subject constraints into an auditable eligibility outcome/reason code. Academic-assignment creation consumes this projection where policy requires it.
+
 ## Phase 5 Exit Gate
-Admissions, Student Directory, Student 360, Guardian scope and IEMIS readiness work safely end-to-end.
+Admissions, Student Directory, Student 360, Guardian scope and IEMIS readiness work safely end-to-end, and the minimum teacher identity/employment/professional-evidence foundation required by Phase 6 exists.
 
 ---
 
 # PHASE 6 — Attendance, Homework, Academics & Timetable
 
 ## Phase 6 Edge Cases & Early-Resolution Checks
+
+### Teacher eligibility / assignment
+- assignment is created for inactive/terminated employment;
+- required qualification/licence expires while assignment is active;
+- eligibility changes while a teacher has an offline attendance/marks draft;
+- policy version changes during the academic year;
+- historical marks/attendance must retain the original authoritative event/policy context;
+- substitute assignment bypasses level/subject eligibility;
+- timetable contains a teacher whose assignment is no longer authoritative;
+- teacher role/capability exists but current professional preconditions fail.
 
 ### Attendance
 - roster changes after draft created;
@@ -1032,12 +1166,20 @@ Admissions, Student Directory, Student 360, Guardian scope and IEMIS readiness w
 - timetable edit races with attendance/session generation.
 
 ### Required tests
+- teacher assignment preflight checks active employment and required eligibility;
+- role/permission without current professional preconditions does not bypass assignment policy;
+- eligibility/assignment loss invalidates affected offline sync;
+- substitute eligibility is enforced where applicable;
+- policy-version changes do not rewrite historical authoritative records;
 - idempotent attendance submit;
 - stale offline attendance rejected safely;
 - concurrent correction handling;
 - mark lifecycle enforcement;
 - unpublished parent visibility denial;
 - timetable conflict constraints.
+
+### Phase 6 Teacher Professional Eligibility Gate
+Before any authoritative attendance/marks/timetable operation, the server must evaluate the current assignment plus active employment and applicable professional eligibility where required by the active policy. Existing assignments must not become a bypass around expired/revoked preconditions.
 
 ### 6A Teacher Attendance Web
 Fast register with class/period context, roster, mark-all-present, exceptions, draft/submitted/locked and submit.
@@ -1077,7 +1219,7 @@ Unscheduled items, grid, conflicts, teacher load, room context, version state.
 Today-first queue.
 
 ## Phase 6 Exit Gate
-Daily teacher work functions safely on Web/Mobile with correct assignment scope and lifecycle.
+Daily teacher work functions safely on Web/Mobile with correct employment/eligibility preconditions where applicable, assignment scope, substitution rules and lifecycle.
 
 ---
 
@@ -1107,23 +1249,41 @@ Daily teacher work functions safely on Web/Mobile with correct assignment scope 
 - provider refund succeeds but ledger posting fails;
 - ledger reversal succeeds but provider refund fails.
 
-### HR
-- employee has duplicate active contract;
-- leave overlaps termination/start dates;
-- employee has multiple departments;
-- bank account changes during payroll cycle;
-- restricted disciplinary document exposed in Staff 360;
-- staff becomes inactive while approval flow open.
+### HR / employment / professional eligibility
+- employee has duplicate or overlapping authoritative employment/contract records;
+- employee has multiple departments/positions with ambiguous primary responsibility;
+- employment starts/terminates mid-period;
+- qualification or licence evidence is missing/unverified/expired/revoked;
+- policy applicability differs by school type, local jurisdiction or employment/post type;
+- teacher eligibility changes while academic assignments remain active;
+- approved teacher leave creates uncovered timetable periods;
+- substitute is available but not eligible for the affected subject/level;
+- bank/compensation/statutory membership changes during payroll cycle;
+- restricted medical/disciplinary/safeguarding document is exposed in Staff 360;
+- staff becomes inactive while approval flow is open;
+- historical employment/eligibility record is destructively rewritten after policy changes.
+
+### Leave / academic impact
+- leave overlaps employment start/end dates;
+- leave balance changes after request but before approval;
+- partial-day leave affects only some timetable periods;
+- two approved absences compete for the same substitute;
+- timetable changes after leave approval;
+- substitute assignment expires or is revoked;
+- leave is approved but required coverage remains unresolved.
 
 ### Payroll
+- payroll is attempted before employment/compensation/policy prerequisites are complete;
 - employee added/removed mid-cycle;
 - retroactive adjustment;
 - unpaid leave after payroll preparation;
 - rounding differences between employee totals and batch totals;
 - duplicate finalize/post retry;
-- tax/config changes effective mid-period;
+- tax/statutory configuration changes effective mid-period;
 - payroll reopened after accounting posting;
-- bank export generated before final approval.
+- bank export generated before final approval;
+- one employee has blocking data while the remainder of the batch is valid;
+- payroll calculator and M11 posting disagree on liability totals.
 
 ### Accounting
 - journal unbalanced by rounding;
@@ -1141,20 +1301,29 @@ Daily teacher work functions safely on Web/Mobile with correct assignment scope 
 - provider succeeds while DB transaction fails;
 - DB commits while queue publish fails;
 - queue retry duplicates accounting event;
-- immutable record accidentally updated rather than reversed.
+- immutable record accidentally updated rather than reversed;
+- payroll obligation is finalized but M11 posting fails;
+- current policy evidence disappears after a later version activates.
 
 ### Required tests
 - payment idempotency;
 - callback replay;
 - transaction atomicity;
 - refund/reversal lineage;
+- employment/contract effective-date constraints;
+- qualification/licence verification-state tests;
+- teacher eligibility policy-version tests;
+- leave-to-timetable impact and substitute authorization tests;
+- payroll prerequisite/readiness validation;
 - payroll replay safety;
+- payroll-to-M11 posting idempotency and reconciliation;
 - balanced-journal invariant;
 - reconciliation concurrency;
-- report-to-ledger reconciliation.
+- report-to-ledger reconciliation;
+- unauthorized salary/bank/medical/disciplinary/safeguarding projection denial.
 
 ## Goal
-Complete the highest-risk business domains after SoD is enforced.
+Complete the highest-risk fee, workforce, payroll and accounting domains after SoD and the Nepal policy/teacher-eligibility foundations are enforced.
 
 ### 7A Fees Home
 Collections, outstanding, overdue, reconciliation, posting failures, cashier status, exceptions.
@@ -1176,55 +1345,81 @@ Source transaction, mandatory reason, amount validation, approval, immutable lin
 Expected, actual, difference, unresolved, approval.
 
 ### 7G Staff Directory
-Dense workspace + inspector.
+Dense workspace + inspector. Separate person identity, employment, organizational position and SchoolOS access.
 
 ### 7H Staff 360 Sensitive Projection
-Server-filter basic, employment, contracts, attendance, leave, payroll, documents, history.
+Server-filtered categories for basic identity, employment, contracts, qualifications, teaching licence, eligibility, attendance, leave, compensation, payroll, bank/tax, documents, disciplinary/safeguarding and history. A generic staff-read permission never implies every category.
 
-### 7I HR Leave
-Queue + team calendar.
+### 7I Employment & Contracts
+Effective-dated employment/service records, post/designation, department/responsibility, probation/contract dates, status transitions, evidence and history.
 
-### 7J Payroll Readiness
-Salary structure, attendance, leave, deductions, bank info, ready state.
+### 7J Qualifications & Professional Evidence
+Qualifications/training evidence with issuer/reference, verification, expiry where applicable and protected documents.
 
-### 7K Payroll Run
-Prepare → Validate → Review → Approve → Finalize → Post.
+### 7K Teaching Licence & Verification
+Separate teacher-licence record with level/subject context where applicable, issuer/reference, verification state, effective/expiry dates and audit history. SchoolOS must not claim external verification unless it actually occurred.
 
-### 7L Accounting Home
+### 7L Teacher Eligibility Workspace
+Policy-driven result showing active employment, required evidence, policy version, eligible/ineligible/review state, reason codes, current assignments and blocking changes. Overrides, if allowed, are elevated, reason-bound and audited.
+
+### 7M Staff Attendance
+Authoritative staff attendance with correction history and payroll-impact projection where enabled.
+
+### 7N Leave, Entitlements & Academic Impact
+Leave queue + team calendar + entitlement/balance + overlap validation. For teaching staff, show affected timetable periods, coverage status and unresolved academic impact before/after approval.
+
+### 7O Substitution Coordination
+Resolve affected classes/periods to eligible, available substitutes. Temporary assignment must be effective-dated, assignment-scoped and independently authorized.
+
+### 7P Compensation & Statutory Membership
+Effective-dated salary/allowance/deduction structures plus applicable statutory-scheme/tax membership/configuration references. Restrict sensitive categories through server projections.
+
+### 7Q Payroll Readiness
+Validate employment dates, compensation, attendance, leave, statutory/tax configuration, bank/payment data, approvals and policy-version evidence. Missing/blocking state must remain explicit.
+
+### 7R Payroll Run
+Prepare → Validate → Review → Approve → Finalize → Accounting Post.
+
+M7 calculates/approves payroll obligations; it does not maintain a second accounting ledger. Final approved liabilities/expenses post idempotently to M11.
+
+### 7S Accounting Home
 Period, attention, cash/bank, recent journals.
 
-### 7M Chart of Accounts
+### 7T Chart of Accounts
 Hierarchy/tree.
 
-### 7N Journal Register
+### 7U Journal Register
 Dense table + inspector.
 
-### 7O Journal Entry
+### 7V Journal Entry
 Balanced line editor; post only when balanced and authorized.
 
-### 7P Reconciliation
+### 7W Reconciliation
 Split-pane matching.
 
-### 7Q Receivables / Payables
+### 7X Receivables / Payables
 Aging-first.
 
-### 7R Fiscal Periods
+### 7Y Fiscal Periods
 Close/reopen lifecycle with consequence preview.
 
-### 7S Financial Reports
+### 7Z Financial Reports
 Statement → line → account → ledger → journal → source → approval/document.
 
 ## Phase 7 Required Security Tests
 - cashier self-refund approval deny;
 - journal self-approval deny;
 - payroll self-approval deny;
+- HR access does not imply payroll/accounting access;
+- accounting access does not imply unrestricted HR document/salary/bank access;
+- teacher eligibility override without elevated permission/reason deny;
 - closed period mutation deny;
-- cross-tenant finance deny;
-- unauthorized salary/bank read deny;
+- cross-tenant finance/HR deny;
+- unauthorized salary/bank/medical/disciplinary/safeguarding read deny;
 - unauthorized posting deny.
 
 ## Phase 7 Exit Gate
-Financial and payroll workflows are correct, auditable, SoD-safe and end-to-end tested.
+HR employment/professional-eligibility records are effective-dated and auditable; leave/substitution integration is operationally safe; payroll prerequisites are versioned and validated; and financial/payroll workflows are correct, M11-posted, auditable, SoD-safe and end-to-end tested.
 
 ---
 
