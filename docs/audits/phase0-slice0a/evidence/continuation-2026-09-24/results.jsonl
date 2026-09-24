@@ -1,0 +1,15 @@
+{"gate": "install", "command": "pnpm install --frozen-lockfile", "exit": 0, "seconds": 0.65, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "environment", "command": "pnpm verify:env:deploy", "exit": 0, "seconds": 0.14, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "generate", "command": "pnpm db:generate", "exit": 0, "seconds": 11.26, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "validate", "command": "pnpm db:validate", "exit": 0, "seconds": 1.15, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "tracked", "command": "pnpm verify:tracked-artifacts", "exit": 0, "seconds": 0.16, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "openapi", "command": "pnpm verify:openapi", "exit": 0, "seconds": 28.01, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "format", "command": "pnpm format:check", "exit": 0, "seconds": 10.66, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "core-lint", "command": "pnpm --filter @schoolos/core lint", "exit": 0, "seconds": 0.4, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "lint", "command": "pnpm lint", "exit": 0, "seconds": 56.92, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "typecheck", "command": "pnpm typecheck", "exit": 0, "seconds": 29.29, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "unit", "command": "pnpm test", "exit": 0, "seconds": 22.1, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "api-e2e", "command": "pnpm test:e2e", "exit": 0, "seconds": 39.09, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "integration", "command": "pnpm test:integration", "exit": 0, "seconds": 21.78, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "drift", "command": "pnpm db:verify:drift", "exit": 0, "seconds": 0.91, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "build", "command": "pnpm build", "exit": 0, "seconds": 74.33, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}

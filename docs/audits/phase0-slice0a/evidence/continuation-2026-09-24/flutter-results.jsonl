@@ -1,0 +1,6 @@
+{"gate": "flutter-version", "command": ["flutter", "--version"], "exit": 0, "seconds": 0.29, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "dart-version", "command": ["dart", "--version"], "exit": 0, "seconds": 0.08, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "flutter-dependencies", "command": ["flutter", "pub", "get"], "exit": 0, "seconds": 1.49, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "flutter-format", "command": ["dart", "format", "--output=none", "--set-exit-if-changed", "lib", "test"], "exit": 0, "seconds": 1.43, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "flutter-analyze", "command": ["flutter", "analyze"], "exit": 0, "seconds": 4.31, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "flutter-test", "command": ["flutter", "test"], "exit": 0, "seconds": 23.78, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}

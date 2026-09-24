@@ -1,0 +1,1645 @@
+{
+  "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe",
+  "source_db": "schoolos_slice0a_05f53d8d_clean",
+  "target_db": "schoolos_slice0a_05f53d8d_restore",
+  "tables": [
+    {
+      "table": "AcademicYear",
+      "source": "1|9a4ea5ad6b1214cd7c1814d800350431",
+      "restored": "1|9a4ea5ad6b1214cd7c1814d800350431",
+      "match": true
+    },
+    {
+      "table": "AccountingPeriod",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AccountingPostingBatch",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AccountingPostingItem",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AccountingReportAccountMapping",
+      "source": "9|06eac319df535f4c298a51460e5ac245",
+      "restored": "9|06eac319df535f4c298a51460e5ac245",
+      "match": true
+    },
+    {
+      "table": "AccountingSourceMapping",
+      "source": "1|bde8d64b481a0223897beb40df9d0383",
+      "restored": "1|bde8d64b481a0223897beb40df9d0383",
+      "match": true
+    },
+    {
+      "table": "ActivityAttachment",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ActivityPost",
+      "source": "1|a7f05f748499e137677e7eba923aec79",
+      "restored": "1|a7f05f748499e137677e7eba923aec79",
+      "match": true
+    },
+    {
+      "table": "ActivityPostStudent",
+      "source": "1|5261148805fdd4fc41948a9598274022",
+      "restored": "1|5261148805fdd4fc41948a9598274022",
+      "match": true
+    },
+    {
+      "table": "ActivityReaction",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Address",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AdmissionApplication",
+      "source": "5|a23dceb5af68deb7bc2ca1b3bc1ecfa3",
+      "restored": "5|a23dceb5af68deb7bc2ca1b3bc1ecfa3",
+      "match": true
+    },
+    {
+      "table": "AdmissionAssessmentSession",
+      "source": "2|76ba142b3e4bde57d9b79a1578f153e1",
+      "restored": "2|76ba142b3e4bde57d9b79a1578f153e1",
+      "match": true
+    },
+    {
+      "table": "AdmissionImportBatch",
+      "source": "2|f57879cb7ee75f2015b0450c955c8665",
+      "restored": "2|f57879cb7ee75f2015b0450c955c8665",
+      "match": true
+    },
+    {
+      "table": "AdmissionImportRow",
+      "source": "2|deb0dd3b655f49e62b8dc4d0f09e5685",
+      "restored": "2|deb0dd3b655f49e62b8dc4d0f09e5685",
+      "match": true
+    },
+    {
+      "table": "AdmissionPolicy",
+      "source": "3|d8084a83a38df9e32103459ab62c625d",
+      "restored": "3|d8084a83a38df9e32103459ab62c625d",
+      "match": true
+    },
+    {
+      "table": "AdmissionPolicyDocumentRequirement",
+      "source": "1|b82eb6b1a573a6bbf27b0a26d61e76ed",
+      "restored": "1|b82eb6b1a573a6bbf27b0a26d61e76ed",
+      "match": true
+    },
+    {
+      "table": "AdmissionPolicyVersion",
+      "source": "3|d72e329706aa90b837ee9c78dcd62aa4",
+      "restored": "3|d72e329706aa90b837ee9c78dcd62aa4",
+      "match": true
+    },
+    {
+      "table": "AnalyticsRefreshJob",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AnalyticsSummary",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ApprovalAttachment",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ApprovalComment",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ApprovalDecision",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ApprovalPolicy",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ApprovalRequest",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ApprovalStep",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AssessmentComponent",
+      "source": "1|3749d84f0ad9b76ca5b3eaea1173c189",
+      "restored": "1|3749d84f0ad9b76ca5b3eaea1173c189",
+      "match": true
+    },
+    {
+      "table": "AssessmentRetake",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AttendanceConflict",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AttendanceCorrectionRequest",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AttendanceDraft",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AttendanceRecord",
+      "source": "6890|aa90c37e480e3fbfe1a06427606e3ae9",
+      "restored": "6890|aa90c37e480e3fbfe1a06427606e3ae9",
+      "match": true
+    },
+    {
+      "table": "AttendanceSession",
+      "source": "240|31fb4be1340c252b1566593cda088b5f",
+      "restored": "240|31fb4be1340c252b1566593cda088b5f",
+      "match": true
+    },
+    {
+      "table": "AttendanceSyncSubmission",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AuditLog",
+      "source": "70|1af457de3f3311c3b4bacdf54d02cf5d",
+      "restored": "70|1af457de3f3311c3b4bacdf54d02cf5d",
+      "match": true
+    },
+    {
+      "table": "AutomationAction",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AutomationCondition",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AutomationExecutionLog",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AutomationFailure",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AutomationRule",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "AutomationTrigger",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "BankReconciliationHistory",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "BankReconciliationMatch",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "BankReconciliationSession",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "BankStatement",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "BankStatementImportBatch",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "BankStatementImportJob",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenInventoryItem",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenMealPlan",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenMealServing",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenMenuItem",
+      "source": "1|ec9c0d2ade8263255c61ec50bcc94722",
+      "restored": "1|ec9c0d2ade8263255c61ec50bcc94722",
+      "match": true
+    },
+    {
+      "table": "CanteenPosSale",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenPosSaleItem",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenPurchaseBill",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenPurchaseBillItem",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenSpendingControl",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenStockMovement",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenStudentEnrollment",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenSupplier",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenWallet",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenWalletTransaction",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CanteenWastage",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CasRecord",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CashDeposit",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CashierClose",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ChartAccount",
+      "source": "34|56ceeb5f21696f25e371407a09b84f3e",
+      "restored": "34|56ceeb5f21696f25e371407a09b84f3e",
+      "match": true
+    },
+    {
+      "table": "ChatAbuseReport",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ChatAvailabilityRule",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ChatEscalation",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Class",
+      "source": "12|ab6f65b38e4d5ca252ff22e3ef062786",
+      "restored": "12|ab6f65b38e4d5ca252ff22e3ef062786",
+      "match": true
+    },
+    {
+      "table": "CommunicationPreference",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CommunicationTemplate",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ConsentTemplate",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Conversation",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ConversationParticipant",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "CurriculumProgressItem",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "DataExportFailure",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "DataExportJob",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "DemoRequest",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "DevelopmentalMilestone",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "DiscountRule",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "DocumentAccessLog",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "DocumentPrintHistory",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "DocumentTemplate",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "DocumentTemplateVersion",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "DocumentVerificationToken",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Enrollment",
+      "source": "690|7f34c0cf13ccb735137199bbf9f9bd5f",
+      "restored": "690|7f34c0cf13ccb735137199bbf9f9bd5f",
+      "match": true
+    },
+    {
+      "table": "Event",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ExamTerm",
+      "source": "1|d1119fc80d6be96dd72c6a5b789ab916",
+      "restored": "1|d1119fc80d6be96dd72c6a5b789ab916",
+      "match": true
+    },
+    {
+      "table": "ExamTimetableSlot",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FeeBillingRun",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FeeDueSchedule",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FeeHead",
+      "source": "6|d7cc570926c2fab995dc0a3d3f5e2031",
+      "restored": "6|d7cc570926c2fab995dc0a3d3f5e2031",
+      "match": true
+    },
+    {
+      "table": "FeePlan",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FeePlanItem",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FeeWaiver",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FileAsset",
+      "source": "4|1c0bc0a4eb157f092e0c9ee842ab1ead",
+      "restored": "4|1c0bc0a4eb157f092e0c9ee842ab1ead",
+      "match": true
+    },
+    {
+      "table": "FinanceApprovalRequest",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FinanceApprovalRequestHistory",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FinanceExpense",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FinancePayable",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FinancePayableSettlement",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FinanceVendor",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FiscalBudget",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FiscalBudgetLine",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "FiscalPeriod",
+      "source": "12|87901d12f3645a7a2c804da6400b7552",
+      "restored": "12|87901d12f3645a7a2c804da6400b7552",
+      "match": true
+    },
+    {
+      "table": "FiscalYear",
+      "source": "1|0de8d13c82b16d0d2973f1955b6511bc",
+      "restored": "1|0de8d13c82b16d0d2973f1955b6511bc",
+      "match": true
+    },
+    {
+      "table": "FormativeAssessmentEvidence",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "GeneratedDocument",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "GeneratedStudentDocument",
+      "source": "1|514221399090836c5401a5ab245dc17d",
+      "restored": "1|514221399090836c5401a5ab245dc17d",
+      "match": true
+    },
+    {
+      "table": "Guardian",
+      "source": "678|b3a04b98b9464e947ff0834c6b2398aa",
+      "restored": "678|b3a04b98b9464e947ff0834c6b2398aa",
+      "match": true
+    },
+    {
+      "table": "GuardianConsent",
+      "source": "677|16d0e203d8a8d05686011a0315a751a3",
+      "restored": "677|16d0e203d8a8d05686011a0315a751a3",
+      "match": true
+    },
+    {
+      "table": "GuardianIdentityVerification",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "HomeworkAssignment",
+      "source": "73|d4d2d559da927c1c059e3aa8a26541b4",
+      "restored": "73|d4d2d559da927c1c059e3aa8a26541b4",
+      "match": true
+    },
+    {
+      "table": "HomeworkAttachment",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "HomeworkReminderBatch",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "HomeworkSubmission",
+      "source": "120|fb93098f98b426cab66a3fe08e27161f",
+      "restored": "120|fb93098f98b426cab66a3fe08e27161f",
+      "match": true
+    },
+    {
+      "table": "Invoice",
+      "source": "24|668da710662eaf56e869d9f1cd34c5b3",
+      "restored": "24|668da710662eaf56e869d9f1cd34c5b3",
+      "match": true
+    },
+    {
+      "table": "InvoiceLine",
+      "source": "24|fde473a7f0f7385f190984c52d26d713",
+      "restored": "24|fde473a7f0f7385f190984c52d26d713",
+      "match": true
+    },
+    {
+      "table": "JournalEntry",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "JournalEntrySequence",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "JournalLine",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LearningActivity",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LearningAnswer",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LearningAttempt",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LearningOutcome",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LearningParticipant",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LearningProgress",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LearningQuestion",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LearningResource",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LearningSession",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LibraryBook",
+      "source": "1|90509312a11f213f26f9f3eaae1be3f4",
+      "restored": "1|90509312a11f213f26f9f3eaae1be3f4",
+      "match": true
+    },
+    {
+      "table": "LibraryCopy",
+      "source": "1|f1f08cd1d15684d3a8aa91c86a4af2c2",
+      "restored": "1|f1f08cd1d15684d3a8aa91c86a4af2c2",
+      "match": true
+    },
+    {
+      "table": "LibraryCopyHistory",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LibraryFine",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LibraryIssue",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LibraryReservation",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "LibrarySetting",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "MarkEntry",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "MarkLockRequest",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Message",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "MessageReadReceipt",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "MobilePushToken",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "MoodLog",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "NepalDistrict",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "NepalLocalLevel",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "NepalLocalLevelType",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "NepalProvince",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Notice",
+      "source": "5|880304f2061748b4d9b8b1a867e1b61c",
+      "restored": "5|880304f2061748b4d9b8b1a867e1b61c",
+      "match": true
+    },
+    {
+      "table": "NoticeAcknowledgement",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "NoticeReadReceipt",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "NotificationDelivery",
+      "source": "1413|5e3c38a52a9208091a7bb8a3299725be",
+      "restored": "1413|5e3c38a52a9208091a7bb8a3299725be",
+      "match": true
+    },
+    {
+      "table": "NotificationEvent",
+      "source": "3|c3a27e67766eae8440aa94f81a75fa22",
+      "restored": "3|c3a27e67766eae8440aa94f81a75fa22",
+      "match": true
+    },
+    {
+      "table": "NotificationPreference",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "NotificationReadReceipt",
+      "source": "3|e4710ce914aab6f87e4dfb61cecd905b",
+      "restored": "3|e4710ce914aab6f87e4dfb61cecd905b",
+      "match": true
+    },
+    {
+      "table": "OnlinePaymentIntent",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "OtpCode",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ParentLearningGuidance",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ParentTeacherMessage",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ParentTeacherThread",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Payment",
+      "source": "16|0fb34dbf4ff73ca499fca1ccb63dc133",
+      "restored": "16|0fb34dbf4ff73ca499fca1ccb63dc133",
+      "match": true
+    },
+    {
+      "table": "PaymentAllocation",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "PaymentRefund",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "PayrollAccountingSnapshot",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "PayrollException",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "PayrollLine",
+      "source": "1|e875c2917e67f15946b58f64499309ae",
+      "restored": "1|e875c2917e67f15946b58f64499309ae",
+      "match": true
+    },
+    {
+      "table": "PayrollRun",
+      "source": "1|c70f8efebe981c3a6416df66403a903f",
+      "restored": "1|c70f8efebe981c3a6416df66403a903f",
+      "match": true
+    },
+    {
+      "table": "Payslip",
+      "source": "1|dd4ee6a6d37623b5702a57bbfdbd8f60",
+      "restored": "1|dd4ee6a6d37623b5702a57bbfdbd8f60",
+      "match": true
+    },
+    {
+      "table": "Permission",
+      "source": "326|fa685d72de5c09e8a3090f58bdd0bbb9",
+      "restored": "326|fa685d72de5c09e8a3090f58bdd0bbb9",
+      "match": true
+    },
+    {
+      "table": "PlatformApiKey",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "PlatformPlan",
+      "source": "4|8a96277fc475daf278289b1f96d5f74c",
+      "restored": "4|8a96277fc475daf278289b1f96d5f74c",
+      "match": true
+    },
+    {
+      "table": "PlatformPlanFeature",
+      "source": "32|52f17eb326f8b648116516c7ccdca811",
+      "restored": "32|52f17eb326f8b648116516c7ccdca811",
+      "match": true
+    },
+    {
+      "table": "PlatformWebhookDelivery",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "PlatformWebhookEndpoint",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "PromotionRecord",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ProviderConfig",
+      "source": "3|83ad947800480351a6411887c004365e",
+      "restored": "3|83ad947800480351a6411887c004365e",
+      "match": true
+    },
+    {
+      "table": "Receipt",
+      "source": "16|f0f71233f3b984978cd8bd308d9ff27f",
+      "restored": "16|f0f71233f3b984978cd8bd308d9ff27f",
+      "match": true
+    },
+    {
+      "table": "ReceiptReprintHistory",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ReceiptSequence",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ReferenceDatasetVersion",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "RefreshToken",
+      "source": "25|88bca197114156cbd0ab3d4a7fd2f9ea",
+      "restored": "25|88bca197114156cbd0ab3d4a7fd2f9ea",
+      "match": true
+    },
+    {
+      "table": "RemedialGroup",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "RemedialGroupMember",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ReportCard",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ReportCardCorrectionRequest",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ReportCardHistory",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ReportCardSubjectResult",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ReportExport",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "ReportSavedView",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Role",
+      "source": "16|5f6918bf2d4fe1c27f5f6fd01d5ed9d8",
+      "restored": "16|5f6918bf2d4fe1c27f5f6fd01d5ed9d8",
+      "match": true
+    },
+    {
+      "table": "RolePermission",
+      "source": "614|34caf1813df02fc386f4f9a1e309088e",
+      "restored": "614|34caf1813df02fc386f4f9a1e309088e",
+      "match": true
+    },
+    {
+      "table": "Room",
+      "source": "24|7048230c5578f2b3fa468d71b6d54b74",
+      "restored": "24|7048230c5578f2b3fa468d71b6d54b74",
+      "match": true
+    },
+    {
+      "table": "SaaSInvoice",
+      "source": "2|e1acfe81a15c5ba5315b74d241ab12ac",
+      "restored": "2|e1acfe81a15c5ba5315b74d241ab12ac",
+      "match": true
+    },
+    {
+      "table": "SaaSInvoiceLine",
+      "source": "2|4b0540063de4d3801905ea230244a1f6",
+      "restored": "2|4b0540063de4d3801905ea230244a1f6",
+      "match": true
+    },
+    {
+      "table": "SaaSPayment",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "SalaryComponent",
+      "source": "4|8d6e8165f11b0a1e4f9555be58fbff6e",
+      "restored": "4|8d6e8165f11b0a1e4f9555be58fbff6e",
+      "match": true
+    },
+    {
+      "table": "SalaryStructure",
+      "source": "1|b35219aec6b1acfbc36f20faee088611",
+      "restored": "1|b35219aec6b1acfbc36f20faee088611",
+      "match": true
+    },
+    {
+      "table": "SchoolCalendarDay",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "SchoolImprovementAction",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "SchoolImprovementKpi",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "SchoolImprovementPlan",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "SchoolImprovementReview",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "SchoolServiceRequest",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "SchoolServiceRequestAttachment",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "SchoolServiceRequestNote",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Section",
+      "source": "25|20af51d9343adadd3c7bd92d83f202e9",
+      "restored": "25|20af51d9343adadd3c7bd92d83f202e9",
+      "match": true
+    },
+    {
+      "table": "SiblingGroup",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "SiblingGroupMember",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Staff",
+      "source": "114|e97e496618a17703373667cb616c7076",
+      "restored": "114|e97e496618a17703373667cb616c7076",
+      "match": true
+    },
+    {
+      "table": "StaffAttendance",
+      "source": "10|ca860e7130e1ae63c2054b6ca6748780",
+      "restored": "10|ca860e7130e1ae63c2054b6ca6748780",
+      "match": true
+    },
+    {
+      "table": "StaffContract",
+      "source": "1|ece3924a1d05e0609f79a27f05499e96",
+      "restored": "1|ece3924a1d05e0609f79a27f05499e96",
+      "match": true
+    },
+    {
+      "table": "StaffDocument",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StaffExperienceRecord",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StaffLeaveBalance",
+      "source": "2|94791edc88d134efd6906d6c23ace41e",
+      "restored": "2|94791edc88d134efd6906d6c23ace41e",
+      "match": true
+    },
+    {
+      "table": "StaffLeaveRequest",
+      "source": "2|9b7d9cb4d0d4be2b61110a3d841bab60",
+      "restored": "2|9b7d9cb4d0d4be2b61110a3d841bab60",
+      "match": true
+    },
+    {
+      "table": "StaffLifecycleEvent",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StaffQualification",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Stream",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Student",
+      "source": "690|1618e02b3e1d2f09af601f482a48db3b",
+      "restored": "690|1618e02b3e1d2f09af601f482a48db3b",
+      "match": true
+    },
+    {
+      "table": "StudentDocument",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StudentDocumentExpiryTemplate",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StudentDocumentHistory",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StudentDuplicateReview",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StudentFeeAssignment",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StudentGuardian",
+      "source": "690|663086ef41c2fe0f87fa5cd430ba9d5d",
+      "restored": "690|663086ef41c2fe0f87fa5cd430ba9d5d",
+      "match": true
+    },
+    {
+      "table": "StudentIdentity",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StudentInterventionCase",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StudentInterventionEntry",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StudentLeaveRequest",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StudentLifecycleTransition",
+      "source": "1|5aeaf01cd0d412f0fdf66f01068c30fb",
+      "restored": "1|5aeaf01cd0d412f0fdf66f01068c30fb",
+      "match": true
+    },
+    {
+      "table": "StudentMergeHistory",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "StudentQrCredential",
+      "source": "3|54f26f7ad79331c579b3bd8e8c2b914e",
+      "restored": "3|54f26f7ad79331c579b3bd8e8c2b914e",
+      "match": true
+    },
+    {
+      "table": "Subject",
+      "source": "96|7448c65c4233918edcdd5c8ead056b63",
+      "restored": "96|7448c65c4233918edcdd5c8ead056b63",
+      "match": true
+    },
+    {
+      "table": "SubjectTeacherAssignment",
+      "source": "192|eebeb33bdad6b110b56a491fa4a580d5",
+      "restored": "192|eebeb33bdad6b110b56a491fa4a580d5",
+      "match": true
+    },
+    {
+      "table": "SubjectWeeklyRequirement",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "SupportOverride",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "SyllabusTopic",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TeacherAssignment",
+      "source": "216|d3839900f604cdfc70424b84d33f146a",
+      "restored": "216|d3839900f604cdfc70424b84d33f146a",
+      "match": true
+    },
+    {
+      "table": "TeacherAvailability",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TeacherClassroomObservation",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TeacherDelegation",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TeacherDevelopmentGoal",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TeacherHandoverNote",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TeacherReplacement",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TeacherReplacementPendingWork",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TeacherTrainingRecord",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TeacherWorkloadLimit",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "Tenant",
+      "source": "2|17df1ef3d3c033e673cfdbf384134894",
+      "restored": "2|17df1ef3d3c033e673cfdbf384134894",
+      "match": true
+    },
+    {
+      "table": "TenantAuthorityFence",
+      "source": "1|3e13e071e67aead0d10445418e7f6204",
+      "restored": "1|3e13e071e67aead0d10445418e7f6204",
+      "match": true
+    },
+    {
+      "table": "TenantBillingProfile",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TenantFeatureOverride",
+      "source": "23|54711c4f7c9735b51f00b63eb6086f7e",
+      "restored": "23|54711c4f7c9735b51f00b63eb6086f7e",
+      "match": true
+    },
+    {
+      "table": "TenantOnboardingChecklistOverride",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TenantSetting",
+      "source": "17|ea52697493ee9b430d7c63b5be008674",
+      "restored": "17|ea52697493ee9b430d7c63b5be008674",
+      "match": true
+    },
+    {
+      "table": "TenantSubscription",
+      "source": "1|fc3b664c66ad6fd6cec8fec36a7c0f7e",
+      "restored": "1|fc3b664c66ad6fd6cec8fec36a7c0f7e",
+      "match": true
+    },
+    {
+      "table": "TimetablePeriod",
+      "source": "8|8150a9ae6f098e6d64de6db938fec1aa",
+      "restored": "8|8150a9ae6f098e6d64de6db938fec1aa",
+      "match": true
+    },
+    {
+      "table": "TimetableSlot",
+      "source": "960|6e92ea6f8b77c410de82fe1d73c6ecf2",
+      "restored": "960|6e92ea6f8b77c410de82fe1d73c6ecf2",
+      "match": true
+    },
+    {
+      "table": "TimetableSubstitution",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TimetableVersion",
+      "source": "24|344fef47627eafabd239d1c7bca28bcc",
+      "restored": "24|344fef47627eafabd239d1c7bca28bcc",
+      "match": true
+    },
+    {
+      "table": "TransportDriverAssignment",
+      "source": "2|151b3fbe2b94287835c22f528c6f77fd",
+      "restored": "2|151b3fbe2b94287835c22f528c6f77fd",
+      "match": true
+    },
+    {
+      "table": "TransportEnrollment",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TransportLocationPing",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TransportLog",
+      "source": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "restored": "0|d41d8cd98f00b204e9800998ecf8427e",
+      "match": true
+    },
+    {
+      "table": "TransportRoute",
+      "source": "3|0f64cb3d2435c6dd73dcf7d4829057a9",
+      "restored": "3|0f64cb3d2435c6dd73dcf7d4829057a9",
+      "match": true
+    },
+    {
+      "table": "TransportStop",
+      "source": "8|cb4df517370ee54f49dcb39d20650122",
+      "restored": "8|cb4df517370ee54f49dcb39d20650122",
+      "match": true
+    },
+    {
+      "table": "TransportStudentAssignment",
+      "source": "72|cb0c940db373dfd12c483325ac1c87da",
+      "restored": "72|cb0c940db373dfd12c483325ac1c87da",
+      "match": true
+    },
+    {
+      "table": "TransportTrip",
+      "source": "2|8f33ebb9107871f3b3246353f84183ee",
+      "restored": "2|8f33ebb9107871f3b3246353f84183ee",
+      "match": true
+    },
+    {
+      "table": "TransportTripStudentStatus",
+      "source": "64|9adea8a106de4649f106878e3111bc63",
+      "restored": "64|9adea8a106de4649f106878e3111bc63",
+      "match": true
+    },
+    {
+      "table": "TransportVehicle",
+      "source": "2|596646db85e7455530c143c8ebf5ed0f",
+      "restored": "2|596646db85e7455530c143c8ebf5ed0f",
+      "match": true
+    },
+    {
+      "table": "UsageCounter",
+      "source": "4|e32570ffb1f7f9c9f365e3b56aaacd11",
+      "restored": "4|e32570ffb1f7f9c9f365e3b56aaacd11",
+      "match": true
+    },
+    {
+      "table": "UsageLimit",
+      "source": "8|fe595d43786ef2e62319b608d389b89f",
+      "restored": "8|fe595d43786ef2e62319b608d389b89f",
+      "match": true
+    },
+    {
+      "table": "User",
+      "source": "799|ad5de6211e935babd0ebc38ea9b036ec",
+      "restored": "799|ad5de6211e935babd0ebc38ea9b036ec",
+      "match": true
+    },
+    {
+      "table": "UserRole",
+      "source": "799|4bb2fc657e764937a4fc501b2dca6d2c",
+      "restored": "799|4bb2fc657e764937a4fc501b2dca6d2c",
+      "match": true
+    },
+    {
+      "table": "_prisma_migrations",
+      "source": "112|a3338b5bce8d9ff729dc06aee4c85093",
+      "restored": "112|a3338b5bce8d9ff729dc06aee4c85093",
+      "match": true
+    }
+  ]
+}

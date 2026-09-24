@@ -1,0 +1,9 @@
+{
+  "command": "pnpm rehearse:backup-restore:local --skip-docker-check",
+  "exit": 0,
+  "seconds": 2.45,
+  "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe",
+  "source_db": "schoolos_slice0a_05f53d8d_clean",
+  "target_db": "schoolos_slice0a_05f53d8d_restore",
+  "clean_after": true
+}

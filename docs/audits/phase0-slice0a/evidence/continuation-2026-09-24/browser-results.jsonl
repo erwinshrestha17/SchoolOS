@@ -1,0 +1,7 @@
+{"gate": "seed-platform", "command": ["pnpm", "db:seed:platform"], "exit": 0, "seconds": 1.7, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "seed-m0-account-security", "command": ["pnpm", "db:seed:e2e:m0-account-security"], "exit": 0, "seconds": 1.09, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "seed-m1-reminders", "command": ["pnpm", "db:seed:e2e:m1-reminders"], "exit": 0, "seconds": 0.77, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "seed-m1-waitlist", "command": ["pnpm", "db:seed:e2e:m1-waitlist"], "exit": 0, "seconds": 0.79, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "seed-m1-assessment", "command": ["pnpm", "db:seed:e2e:m1-assessment"], "exit": 0, "seconds": 0.76, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "web-build-audit-api", "command": ["pnpm", "--filter", "@schoolos/web", "build"], "exit": 0, "seconds": 35.25, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}
+{"gate": "web-playwright", "command": ["pnpm", "test:web:e2e"], "exit": 0, "seconds": 331.08, "sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe", "clean_after": true}

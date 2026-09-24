@@ -1,28 +1,28 @@
 # SchoolOS Phase 0 Baseline Certification
 
-Date: 2026-09-21. Scope: **Phase 0 / Slice 0A only**. This is a point-in-time audit and verification record, not another repository-wide source of truth. `AGENTS.md` and its recognized execution documents retain their authority. No Phase 1 authorization migration or product redesign was performed.
+Updated: 2026-09-24 (initial audit 2026-09-21). Scope: **Phase 0 / Slice 0A only**. This is an evolving audit and verification record, not another repository-wide source of truth. `AGENTS.md` and its recognized execution documents retain their authority. No Phase 1 authorization migration or product redesign is authorized by this report.
 
 ## Repository Baseline
 
 - Repository: `https://github.com/erwinshrestha17/SchoolOS`, local `/Users/erwin/Projects/SchoolOS`.
 - Branch: `main`; no feature branch. The master plan explicitly permits main with coherent commit boundaries.
 - Starting SHA: `6240ed7fc62c65a7d10f3fb851a775db8ebefe2a`. Initial tree clean. `git fetch origin` and `git merge --ff-only origin/main` reported already up to date.
-- Final implementation SHA / audit target: `3aa8d07cf5a2945bab7f353f0e3ac0620cc2d09c` (includes repair commit `a77aac8436a575c9b0279a97e4ce2d01bb20c694`). The subsequent evidence-only commit contains this report; its hash is reported in the delivery response. This distinction avoids pretending a report can contain its own Git commit hash.
-- No push, hosted rerun, merge, deployment, real provider transaction, or physical-device certification is claimed.
-- Raw execution evidence was captured under `/tmp/schoolos-slice0a-evidence`; selected full logs, checksums, and reproduction instructions are preserved alongside this report. Preliminary runs on a dirty tree are explicitly distinguished from final-target reruns in the JSONL manifests.
+- Final **implementation and local-verification target SHA**: `05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe`. Every packaged local gate ran on this exact clean commit; the manifests also record a clean tracked tree after each command. The report/evidence-only commit will have a later SHA without changing implementation; record that delivery SHA separately rather than claiming this report contains its own commit hash.
+- `origin/main` was pushed to the implementation SHA. [Full manual-dispatch CI run 35941980611](https://github.com/erwinshrestha17/SchoolOS/actions/runs/35941980611) completed successfully on that exact SHA: `verify` and `mobile` both passed with no skipped steps; hosted Web E2E passed 33/33. The previous [full run 35868752421](https://github.com/erwinshrestha17/SchoolOS/actions/runs/35868752421) on `38ebaa67` failed one Web notice smoke assertion after its earlier gates and Mobile passed; this is recorded as a repaired baseline defect.
+- The initial audit's locked logs and checksums remain in [evidence/](evidence/README.md). The complete same-SHA continuation package, command/exit manifests and SHA-256 checksums are in [evidence/continuation-2026-09-24/](evidence/continuation-2026-09-24/README.md). Earlier checkpoint logs are historical only.
 
 | Tool | Observed version / boundary |
 | --- | --- |
 | Host Node | 24.15.0 initially |
 | Verification Node | 22.23.2, selected explicitly to match CI major 22 |
-| pnpm | 10.12.1; packageManager and lockfile unchanged |
+| pnpm | 10.12.1; packageManager unchanged; the later lockfile pins Prettier 3.8.3 for reproducible formatting |
 | Prisma client / CLI | 7.8.0 |
 | PostgreSQL | 16.13, cached `postgres:16-alpine`, isolated loopback port 55433; hosted starting run used 16.15 |
 | Redis | 7.4.8, isolated loopback port 56379; hosted starting run used 7.4.11 |
-| Flutter | 3.44.0, framework 559ffa3f75, macOS arm64; matches CI Flutter version |
+| Flutter | 3.44.0, framework 559ffa3f75, macOS 27.0 (26A428) arm64; matches CI Flutter version |
 | Dart | 3.12.0 |
 
-The audit used new disposable PostgreSQL/Redis containers, not the development school database. Additional explicitly opted-in databases were `schoolos_auth_recovery_test` and `schoolos_admission_atomic_test`. A second empty database, `schoolos_baseline_final`, replayed the final target's canonical migration and seed commands. During that replay the audit containers had stopped with exit 0 (not OOM); the initial connection failures were preserved and the commands rerun after restarting only those audit containers.
+The audit used disposable PostgreSQL/Redis containers, not the development school database. Additional explicitly opted-in databases were `schoolos_auth_recovery_test` and `schoolos_admission_atomic_test`. At `05f53d8d`, new empty database `schoolos_slice0a_05f53d8d_clean` replayed all 112 migrations and the canonical seed with no manual repair and no schema drift. A separate target `schoolos_slice0a_05f53d8d_restore` was used for recovery proof.
 
 ### Canonical commands and configuration
 
@@ -31,9 +31,8 @@ These were read from root/workspace package scripts, Prisma config, Playwright c
 | Concern | Canonical command / important distinction |
 | --- | --- |
 | Install | `pnpm install --frozen-lockfile`; mobile `flutter pub get` |
-| API format | `pnpm --filter @schoolos/api format:check`; CI historically writes then checks Git diff |
-| Core/Web format | No canonical format script; supplementary Prettier checks recorded below, without bulk reformatting |
-| Root lint | `pnpm lint`: artifact/import checks, API **formatting**, Web ESLint; does **not** run API ESLint |
+| Format | `pnpm format:check` now checks Core, API and Web using pinned Prettier; workspace `format:check` scripts are also available. CI still has its historical API write/diff step. |
+| Root lint | `pnpm lint`: artifact/import checks, all three format checks, API ESLint and Web ESLint. `f312e6b9` closed the former coverage gap. |
 | API lint | `pnpm --filter @schoolos/api lint:check`; do not use mutating `lint` for certification |
 | Core lint | `pnpm --filter @schoolos/core lint` (TypeScript no-emit) |
 | Typecheck | `pnpm typecheck`, ordered core build → API → Web |
@@ -42,7 +41,7 @@ These were read from root/workspace package scripts, Prisma config, Playwright c
 | Unit/component | `pnpm test`: API Jest + Web Node test runner. Core `test` is an explicit no-tests placeholder |
 | API E2E | `pnpm test:e2e`; Nest HTTP tests include mocked persistence/providers; not a substitute for PostgreSQL integration |
 | Integration | `pnpm test:integration`; auth/admission concurrency suites additionally require explicit guarded test-database URLs |
-| Migration | `pnpm db:migrate` adds QR preflight before `prisma migrate deploy`; CI uses direct deploy |
+| Migration / drift | `pnpm db:migrate` adds QR preflight before `prisma migrate deploy`; CI uses direct deploy and now runs `pnpm db:verify:drift` |
 | Seed | `pnpm db:seed`; Prisma 7 `apps/api/prisma.config.ts` specifies `tsx prisma/seed.ts` |
 | Build | `pnpm build`; API/core compile, then Web production build |
 | Web E2E | `pnpm test:web:e2e`; six essential spec files; wrapper runs fixture cleanup; Playwright standalone server on 3101 |
@@ -64,53 +63,57 @@ Bounded repairs:
 5. Let the Web documentation-contract test accept the current equivalent phrase “If this file conflicts…” while retaining the AGENTS-wins assertion.
 6. Explicitly select production mode for Next build and the standalone E2E server. A development-mode build failed prerendering with null `useState`; production mode passed on the same source.
 7. Declare isolated-database scope for integration-test PostgreSQL lock diagnostics and a temporary-table migration probe. Production fail-closed Prisma rules remain unchanged.
-8. Add manual full workflow dispatch to bypass path skipping and provision the two guarded concurrency databases in CI. Hosted execution of these changes remains unverified.
+8. Add manual full workflow dispatch to bypass path skipping and provision the two guarded concurrency databases in CI. The first full dispatch on `38ebaa67` exposed the notice smoke timing defect; the repeat full dispatch passed on `05f53d8d`.
+9. At `cef2d658`, match Prisma metadata to existing migration/index names and two existing `updatedAt` defaults; add `pnpm db:verify:drift` to scripts and CI. Migration files, SQL-only partial indexes, and `NULLS NOT DISTINCT` constraints were preserved. The 112 migration hashes were unchanged.
+10. Keep exact JWT-protected `GET /api/v1/auth/me` on the ordinary API rate budget while credential/refresh/recovery operations retain the strict budget. Six guard regressions and paced browser sign-in fixtures cover this distinction.
+11. Bootstrap separate synthetic Platform and account-security/admissions fixtures in CI; enable previously optional admission browser checks. Repair a Platform-denial hydration race, CSV phone fixture, timetable summary request, and server-response label assertion at their test or request source.
+12. Update ten macOS Flutter goldens only after original source commit `8f8692675b7ed45a8bea2723834126b732f57df7` and the current checkout rendered byte-identical images on this host. The pixel threshold and assertions were unchanged. The comparison and archived source-file checks are in the locked `golden-provenance.json`.
+13. Apply the existing restore-target safety guard before backup rehearsal can connect, back up, or recreate its target. A subprocess regression rejects source-as-target against an unreachable synthetic endpoint. Local PostgreSQL and synthetic-file restoration then passed separately.
+14. At clean checkpoint `f312e6b9`, pin Prettier 3.8.3, add canonical Core/Web format scripts and root checks, format tracked source, and make generated Core artifacts formatting-stable. A 565-file comparison against the prior checkpoint found one non-format-only movement: an ESLint comment repositioned to keep the Web zero-warning lint gate effective. No authorization or design-system migration was intended.
+15. At `38ebaa67`, repair API ESLint and TypeScript diagnostics in production/test code without disabling rules or deleting tests; root `pnpm lint` now completes with zero API errors (3,660 existing warnings). A bounded report CSV scalar-serialization regression and scheduled-notice count contract were corrected with tests. Full API unit, HTTP E2E and integration suites passed after these changes.
+16. At `05f53d8d`, repair the hosted notice smoke's premature assertion: await the exact successful publish POST response before requiring the Published badge. The prior hosted API call returned HTTP 201 after about 11.6 seconds, while the original badge wait expired at 10 seconds; a disposable local runtime proved the repaired flow with a single 18.8-second publish and 6/6 notice cases. The full 33-case local browser suite then passed on the clean committed SHA.
 
-No role presets, permissions, domain authorization, lifecycle rules, financial logic, schema, migrations, application layout, snapshots, or quality thresholds were changed.
+The repairs did not migrate role presets, permission grants, typed scopes, or the authorization architecture. No migration SQL changed. The final diff and same-SHA suites are the basis for the bounded implementation claim; they are not Phase 1 completion evidence.
 
 ## Verification Results
 
-Results refer to final implementation source unless explicitly marked preliminary. Logs and command/exit manifests are in [evidence/](evidence/README.md); `.log` names below are stored as `.log.gz`. A zero exit with skipped tests is not a full pass.
+Every local PASS below is from the exact clean implementation SHA `05f53d8d`, recorded in [the checked evidence package](evidence/continuation-2026-09-24/README.md). JSONL manifests give command, exit code, SHA and post-command tree state; compressed logs preserve test counts and diagnostics. `SHA256SUMS` verified the package bytes. A zero exit with skipped tests is not a full pass; the local test totals below had no skipped tests in their reported suites.
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
-| Frozen install, Node 22 | PASS | `final-install22.log` |
-| Compile generated artifacts / tracked artifacts | PASS | `final-generate.log`, `final-tracked.log`; no tracked generated drift |
-| Prisma generate / validate | PASS | `final-generate.log`, `final-validate.log`, Prisma 7.8.0 |
-| Core lint / typecheck / build / import boundaries / dist | PASS | `final-core-lint.log`, `final-typecheck.log`, `final-lint.log`, `final-openapi.log` |
+| Frozen install, Node 22 | PASS | `results.jsonl`, `install.log.gz`; pinned pnpm/Prettier lockfile used |
+| Staging/production deploy environment preflight | NOT APPLICABLE | `environment.log.gz`: `pnpm verify:env:deploy` exited zero because `DEPLOY_ENV`/`NODE_ENV` was development and explicitly **skipped** the staging/production checks; no deploy-environment readiness is claimed |
+| Compile generated/shared contracts, tracked artifacts | PASS | `generate.log.gz`, `tracked.log.gz`, `lint.log.gz`, `typecheck.log.gz`; no tracked artifact drift |
+| Prisma generate / validate | PASS | `generate.log.gz`, `validate.log.gz`; Prisma 7.8.0 |
+| Core lint / typecheck / build / import boundaries / dist | PASS | `core-lint.log.gz`, `lint.log.gz`, `typecheck.log.gz`, `build.log.gz` |
 | Core standalone tests | NOT APPLICABLE | Package script explicitly contains no tests; shared behavior exercised by API/Web tests, not claimed as a core suite |
-| Core supplementary formatting | FAIL | `core-format.log`: 38 files; no canonical core format script |
-| OpenAPI gate | PASS | 1,152 paths, 1,334 operations, 475 schemas; `final-openapi.log` |
-| API formatting | PASS | Root lint includes API format check; `final-lint.log` |
-| API ESLint | FAIL | `final-api-eslint.log`: 1,750 errors, 8,614 warnings; not covered by root lint |
-| API typecheck | PASS | `final-typecheck.log` after fixture repairs |
-| API unit tests | PASS | `final-unit.log`: 272 suites, 3,110 tests |
-| API HTTP E2E | PASS | `final-api-e2e.log`: 43 suites, 294 tests |
-| PostgreSQL integration, all opt-ins enabled | PASS | `final-integration.log`: 12 suites, 202 tests; earlier 112 skips and four fixture failures separately retained |
-| Empty supported DB migration | PASS | 112 migrations, `final-empty-migration-retry.log`; initial stopped-container attempt recorded separately |
-| Canonical seed on empty migrated DB | PASS | `final-seed-retry.log`; no migration resolve/manual SQL repair required |
-| Migration history status | PASS | `final-migration-status.log`; migration source hashes in `migrations.json` |
-| Migrated DB ↔ schema drift | FAIL | `migration-diff.log`: nonempty default/index-name drift; do not apply generated SQL blindly |
-| API production artifact build | PASS | `final-build.log`; compiled API also started and returned health `status: ok` on isolated port 4400 |
-| Web lint / typecheck | PASS | `final-lint.log`, `final-typecheck.log` |
-| Web supplementary formatting | FAIL | `web-format.log`: 682 files; no canonical Web format script |
-| Web unit/component contracts | PASS | `final-unit.log`: 665 tests after documentation assertion repair; many are source-contract tests, not rendered component tests |
-| Web production build | PASS | `final-build.log`; 262 static pages; Node 22, explicit production build mode |
-| Chromium install | PASS | `chromium.log` |
-| Essential Playwright smoke | FAIL | `web-e2e.log`: 8 passed, 14 failed, 5 skipped, 6 did not run; no browser-green claim |
-| Flutter dependency resolution / format / analyze | PASS | `flutter-pub.log`, `flutter-format.log`, `flutter-analyze-repair.log` |
-| Flutter tests including goldens | FAIL | `flutter-full-repair.log`: 798 passed, 10 golden failures. Non-golden fixture defects repaired |
-| Physical Android/iOS, provider delivery, backup restoration | BLOCKED | Not established by local source/unit/browser evidence; required external/device/recovery evidence remains absent |
-| Hosted CI on final implementation SHA | BLOCKED | Only starting SHA has a fetched hosted run. Repairs and full-dispatch configuration are local commits |
-| One clean, fully green, final-SHA certification | BLOCKED | Failing gates above; evidence-only commit distinct from implementation SHA; no PASS asserted |
+| Core/API/Web formatting | PASS | `format.log.gz`; canonical `pnpm format:check` checked all three workspaces |
+| OpenAPI gate | PASS | `openapi.log.gz`: 1,152 paths, 1,334 operations, 475 schemas |
+| API ESLint / root lint | PASS | `lint.log.gz`: **0 errors**, 3,660 API warnings; Web ESLint ran with `--max-warnings=0`. Existing warning policy was not relaxed |
+| API and Web typecheck | PASS | `typecheck.log.gz`; ordered Core build, API, Web |
+| API unit tests | PASS | `unit.log.gz`: 273 suites, 3,119 tests |
+| API HTTP E2E | PASS | `api-e2e.log.gz`: 43 suites, 294 tests |
+| PostgreSQL integration, all opt-ins enabled | PASS | `integration.log.gz`: 12 suites, 202 tests with guarded auth/admissions databases |
+| Empty supported DB migration / canonical seed | PASS | `database-results.jsonl`, `empty-migration.log.gz`, `canonical-seed.log.gz`: 112 migrations from empty PostgreSQL 16, then canonical seed |
+| Migration history status and schema drift | PASS | `migration-history.json`: 112 SQL migration hashes unchanged from starting SHA; `migration-status.log.gz` up to date; `migration-drift.log.gz` reports no difference |
+| API production build and runtime health | PASS | `build.log.gz`, `api-runtime.log.gz`; compiled API served `GET /api/v1/health` with HTTP 200 during browser run |
+| Web lint / typecheck / production build | PASS | `lint.log.gz`, `typecheck.log.gz`, `build.log.gz`; `web-build-audit-api.log.gz` rebuilt with the audit API base URL |
+| Web unit/component contracts | PASS | `unit.log.gz`: 666 tests, zero skipped; many are source contracts rather than rendered-component tests |
+| Essential Chromium Playwright smoke | PASS | `browser-results.jsonl`, `web-playwright.log.gz`: 33 authenticated browser cases passed, no skips |
+| Browser audit-infrastructure isolation | PASS | `browser-results.jsonl`, `web-playwright.log.gz`, `api-runtime.log.gz`: a new `05f53d8d` database and empty disposable Redis on port 56382 passed all 33 cases; zero usage-counter foreign-key errors |
+| Flutter dependency / format / analyze / widget-golden tests | PASS | `flutter-results.jsonl`, `flutter-*.log.gz`: 808 tests including ten same-host goldens; provenance locked separately |
+| Local PostgreSQL and synthetic-file backup/restore | PASS | `backup-restore-result.json`: exit 0; all 273 public-table row digests and the synthetic storage-file SHA-256 match source to restore |
+| Physical Android/iOS, live providers, cloud/staging recovery | NOT APPLICABLE | Outside Slice 0A's device-independent/local baseline; no readiness claim and later controlled verification remains |
+| Hosted full CI on implementation SHA | PASS | [Manual full run 35941980611](https://github.com/erwinshrestha17/SchoolOS/actions/runs/35941980611) on `05f53d8d`: `verify` and `mobile` succeeded with no skipped steps; hosted Web E2E 33/33; `hosted-ci.json`, `hosted-verify-job.log.gz` |
+| Clean implementation-SHA certification | PASS | Every packaged local gate and the hosted full workflow passed on clean `05f53d8d`; the later report/evidence-only delivery commit is verified separately against its own exact SHA before the delivery response |
 
-### Remaining baseline failures explained
+### Evidence limits
 
-- **API ESLint:** repository-wide pre-existing diagnostics, chiefly unsafe TypeScript usage and related lint rules. Root `lint` does not execute this gate. A broad automatic fix or rule disable would violate this task's bounded repair policy.
-- **Core/Web formatting:** supplementary checks use the installed formatter; there is no agreed package script/configuration enforcing the entire surfaces. These findings are not silently reclassified as PASS or bulk rewritten.
-- **Schema drift:** replay succeeds, but Prisma diff proposes dropping defaults on `ReceiptSequence.updatedAt` and `StudentGuardian.updatedAt` and renaming indexes whose migration names differ from schema-generated names. SQL-only partial/NULLS-NOT-DISTINCT constraints must be preserved. This is model/migration representation drift, not a failed migration or proof that data were corrupted.
-- **Flutter:** all remaining failures are existing golden comparisons (Parent dashboard variants, children, homework filter, timetable), with differences of 0.12–0.33%. The filter-sheet master/test/masked images were visually inspected: layout matches with text-raster differences. That observation does not establish the cause of every failing image or justify regenerating the baselines. No golden was updated, threshold widened, or test excluded.
-- **Browser:** the full run reached real SchoolOS public/login/dashboard pages. Failures include Users & access heading, removed-chat heading, authenticated navigation, and Platform login. API logs show 429 on `/auth/me` with the default five-per-minute auth policy; ordinary school seed also does not bootstrap an explicit Platform operator. These are fixture/rate-policy/presentation verification issues, not proof that Platform isolation is broken. Retained error contexts distinguish assertions from login timeouts. The admin-reset scenario and several later tests did not execute, so they remain unverified.
+- **Hosted CI:** Both previous `38ebaa67` runs failed at the Web notice smoke after prior verify gates passed; the full dispatch also passed Mobile. The defect was a premature 10-second UI assertion while publish took about 11.6 seconds and returned HTTP 201. The committed repair awaits the response and still requires the Published badge. The full dispatch on `05f53d8d` then passed both jobs and all 33 browser cases.
+- **API warnings:** The formerly failing API ESLint gate now exits zero with zero errors. Its 3,660 warnings are recorded rather than silently described as a zero-diagnostic result. No rule/threshold was weakened to obtain the pass.
+- **Golden provenance:** The ten regenerated images match original-source renders byte for byte on this same host. This isolates them from intervening app-source changes; the original creation host is unknown, so no precise OS/engine cause is asserted and no threshold was widened.
+- **Browser fixture history:** Earlier runs failed because of the `/auth/me` rate policy, absent synthetic Platform bootstrap, fixture validity, and an asynchronous redirect assertion. The bounded repairs were verified by the 33/33 browser run on `05f53d8d`, built with its API base URL at build time.
+- **Audit Redis contamination:** An earlier browser run reused `usage:pending` values for tenant `481276f8…` from the earlier `schoolos_baseline` database, which was absent from that run's database. The exact `05f53d8d` browser run used a new seeded database and empty disposable Redis, passed 33/33, and logged zero usage-counter foreign-key errors. This confirms evidence-run isolation, not cross-tenant request access. UsageService's indefinite retry of a permanently deleted tenant's delta remains a bounded operational follow-up.
 
 ## Implementation Classification
 
@@ -118,7 +121,7 @@ Results refer to final implementation source unless explicitly marked preliminar
 
 | Capability | Status | Evidence | Next Action |
 | --- | --- | --- | --- |
-| Nest API/domain organization | correctly implemented | Controllers/services/modules in `apps/api`; successful compile + 3,110 unit/294 HTTP tests | Preserve architecture |
+| Nest API/domain organization | correctly implemented | Controllers/services/modules in `apps/api`; `05f53d8d` compiled and passed 3,119 unit/294 HTTP tests | Preserve architecture; continue bounded security review |
 | Prisma top-level tenant enforcement | correctly implemented | `prisma.service.ts` rejects missing context, overwrites client tenant predicates, rejects unsupported operations; tenant-isolation integration | Preserve; audit nested writes/raw SQL separately |
 | Authentication revocation/rotation | correctly implemented | Live JwtAuthGuard session-family/user checks; authVersion transactions; auth concurrency integration | Preserve; device/offline boundary testing |
 | Teacher scope engine | correctly implemented | `teacher-scope.service.ts`, capability rules, Attendance/Marks callers, scope unit/E2E/integration suites | Adapt behind later kernel; do not replace |
@@ -130,23 +133,24 @@ Results refer to final implementation source unless explicitly marked preliminar
 | Central decision kernel | documentation-only | Blueprint target; current guards/domain services already implement substantial enforcement | Phase 1B after baseline; wrap existing mechanisms |
 | Student protected-data projection | unsafe | General profile returns medical/restriction/identity and financial sections; only support is explicitly redacted | H03 / Phase 3B, 5F |
 | Staff protected-data projection | partially implemented | Staff serializer drops raw User; masks bank/identity/salary without HR/payroll grant | Review broad hr:manage semantics in Phase 2D/3B/7H |
-| Finance and payroll SoD | partially implemented | Manual journal creator cannot approve; Accountant combines many capabilities; HR prepares/reviews | Phase 2C/2D; retain current checks |
+| Finance and payroll SoD | partially implemented | Manual journal creator cannot approve; Accountant combines many capabilities; HR prepares/reviews. Direct privileged refund/reversal routes do not require a reviewed FinanceApprovalRequest (H07) | Phase 2C/2D; retain current checks |
+| School role grant governance | unsafe | School Configuration Owner can create tenant roles, grant any non-Platform permission and assign the role to self; no grant ceiling or self-escalation check in the reviewed service path (H08) | Phase 8A–8E with Phase 1 authorization-policy prerequisites |
 | Receipt/payment/ledger integrity | partially implemented | Decimal storage, sequences, unique provider/idempotency keys, reversal lineage, finance tests | Full concurrent recovery/restore evidence still required |
 | Reports/queued exports | unsafe | Teacher scope exists; queued generic export uses stale actor snapshot | H04 / Phase 9F with Phase 1/2 policy dependencies |
 | Protected files | partially implemented | Tenant, upload status, owner/module checks, signed TTL and support prohibition | H05; audit generic notice audience/lifecycle |
 | M12 notification delivery | partially implemented | Persisted events/deliveries, retries, current recipient/source checks, stale-attempt tests | Provider/failure/recovery verification; preserve M15/M12 split |
 | Redis authorization behavior | correctly implemented | Role and entitlement resolution now read live; request memo only; compatibility cache invalidation remains | Correct stale comments, retain live authority |
-| Web shell/state/primitives | partially implemented | Shared session provider, query cache teardown, shell/navigation and UI primitives; source tests pass | Browser baseline before redesign; retain existing primitive families |
-| Mobile shell/auth/cache/drafts | partially implemented | Riverpod/GoRouter/Dio/secure storage, scoped private cache, biometrics and sync envelope | Golden/device/offline revocation verification |
+| Web shell/state/primitives | partially implemented | Shared session provider, query cache teardown, shell/navigation and UI primitives; 33/33 browser smoke passed at `05f53d8d` | Retain existing primitive families; broaden visual/accessibility proof in later work |
+| Mobile shell/auth/cache/drafts | partially implemented | Riverpod/GoRouter/Dio/secure storage, scoped private cache, biometrics and sync envelope; 808 widget/golden tests passed at `05f53d8d` | Device/offline revocation verification |
 | Learning/deferred services | partially implemented | Existing code/tests remain despite active scope freeze | Keep isolated; do not activate or delete merely for audit |
 | Broad future kernel/JIT/typed grant roadmap | documentation-only | Execution blueprints describe future state | Do not claim implemented |
-| Cloud storage, real delivery, backup recovery, device biometrics | external dependency | Adapters/scripts exist; no live provider/physical-device/recovery run in this audit | Separate controlled evidence |
+| Cloud storage, real delivery, device biometrics | external dependency | Adapters/scripts exist; local PostgreSQL/file restore passed, but no live provider/physical-device/staging recovery run | Separate controlled evidence |
 
 ### Architecture and design primitive inventory
 
 - `packages/core`: permission catalog/aliases/presets, API contracts, entitlements, date/localization; build consumed by API and Web. Core standalone test script has no suite.
 - `apps/api/prisma/schema/*.prisma`: canonical split inputs; `schema.prisma` is compiled. 112 immutable migration files inventoried with SHA-256. Prisma 7 adapter uses PostgreSQL.
-- `apps/web`: Next App Router, React Query, session provider; shared shell and persona navigation, components under `components/ui`, module workspaces, dashboard primitives. Existing `card`, `section-card`, `summary-card`, `operational-summary`, `data-table`, `workspace-states`, drawer/dialog/form components coexist. This is an inventory, not evidence that a third design system is needed. Browser failure blocks visual certification.
+- `apps/web`: Next App Router, React Query, session provider; shared shell and persona navigation, components under `components/ui`, module workspaces, dashboard primitives. Existing `card`, `section-card`, `summary-card`, `operational-summary`, `data-table`, `workspace-states`, drawer/dialog/form components coexist. This is an inventory, not evidence that a third design system is needed. The 33-test browser smoke is bounded functional evidence, not comprehensive visual/accessibility certification.
 - `apps/schoolos_mobile`: `lib/app`, `core`, `features`, `shared`; Riverpod state, GoRouter persona routing, Dio auth, OS biometrics, secure storage, private cache, draft stores, sync adapter, push/deep links. Noncanonical/deferred persona code remains but does not change active product scope.
 - Redis/BullMQ: notifications, finance, payroll, reports, accounting reports/imports, homework, academics, activity media, advanced operations; `runTenantScopedJob` checks tenant liveness and enters CLS. This does not by itself refresh the actor's current permission graph.
 - Storage: local, S3-compatible, and GCP adapters; FileRegistry owns asset metadata and protected access; provider configured success is not provider execution proof.
@@ -179,8 +183,8 @@ No literal `*` grant was found in these presets. No Platform permission key is d
 
 ## Endpoint → Authorization Matrix
 
-- [endpoint-declarations.csv](endpoint-declarations.csv): AST-derived inventory of **1,336 method declarations across 111 controller files**, including inherited/method permissions, guards, entitlement markers, support scopes and service calls. This is not a claim of 1,336 deployed operations: OpenAPI reports 1,334 operations; declaration inventory includes routes outside its exposed contract.
-- [endpoint-authorization-reviewed.csv](endpoint-authorization-reviewed.csv): **35 selected sensitive operations** with route/controller, permission, entitlement, tenant/resource/relationship scope, lifecycle, SoD, downstream evidence and known gap.
+- [endpoint-declarations.csv](endpoint-declarations.csv): AST-derived inventory of **1,336 method declarations across 110 controller files**, including inherited/method permissions, guards, entitlement markers, support scopes and service calls. This is not a claim of 1,336 deployed operations: OpenAPI reports 1,334 operations; declaration inventory includes routes outside its exposed contract.
+- [endpoint-authorization-reviewed.csv](endpoint-authorization-reviewed.csv): **67 selected sensitive operations** with route/controller, permission, entitlement, tenant/resource/relationship scope, lifecycle, SoD, downstream evidence and known gap. The expanded sample includes role grants, direct and reviewed finance actions, marks/results, guardian administration, notices, and Platform support override.
 - Downstream families inspected include authentication, students, Parent child scope, Teacher attendance/marks, roles, payroll/manual journal, reports/exports, files, queues and Platform support. Unreviewed declaration rows are explicitly labeled inventory-only. This is not exhaustive service-path security certification; do not promote it to one.
 
 Cross-cutting facts: JwtAuthGuard derives effective tenant from verified identity; Prisma enforces top-level tenant operations; school routes with RolesPermissionsGuard use required permission **AND** semantics with aliases. `RolesPermissionsGuard` returns true for SCHOOL requests with no role/permission metadata; some such routes implement self-service or module checks inside services. It is therefore not a universal “missing permission metadata always denies” kernel. EntitlementGuard fails missing entitlement declarations closed where installed. PlatformGuard has a separate domain/role/permission path. Guard presence alone does not prove row or field scope.
@@ -248,11 +252,11 @@ No cross-tenant access was confirmed by the exercised tests or inspected paths. 
 | Tenant switching | No general same-session multi-school switching API established; login changes context, Platform support is distinct and bounded |
 | Biometrics after server revocation | OS local auth calls loadSession; online server rejection logs out. Offline cached-session fallback can only know the last observed state; physical-device behavior not certified |
 | Clock/expiry | Server Date/time and JWT expiry authoritative; tests cover expired grants/tokens; no actual clock-skew chaos/device-clock test conducted |
-| Rate policy | AppThrottlerGuard applies auth limit to `/auth/me` as well as login. Rapid browser navigation produced 429; do not disable security controls to obtain green tests |
+| Rate policy | `cef2d658` repair places exact JWT-protected GET `/auth/me` on the ordinary API budget; credential, refresh and recovery routes retain the strict budget. Six focused guard regressions and the final-SHA auth suites passed |
 
 ## Prisma/Data Integrity Findings
 
-- All 112 migration files replayed from empty PostgreSQL 16, with no `migrate resolve`, history rewriting or data repair. The canonical seed ran. A nonempty schema diff is retained as a separate FAIL, not confused with replay success.
+- All 112 migration files replayed from empty PostgreSQL 16 at `05f53d8d`, with no `migrate resolve`, history rewriting or data repair. The canonical seed ran. Schema metadata matches existing database names/defaults; migration status is current and the schema diff is empty. The migration-history manifest confirms all 112 SQL file hashes are unchanged from the starting SHA.
 - User email/phone and role names are tenant-unique. UserRole contains tenantId, generic scopeId, assigned/revoked metadata and expiresAt; it has user/role FKs and a composite grant key. It has no typed scope model. Nullable grant keys and missing composite tenant FKs deserve evidence-led Phase 1C/1D review, not speculative constraints now.
 - StudentGuardian has unique student/guardian pairs, active/verification/approval/effective-date/capability columns and indexes. SQL migration adds a partial unique active-primary guardian index and capability/window checks. This is more than a bare join table.
 - TeacherAssignment exact scope uniqueness is recreated with `NULLS NOT DISTINCT` by the latest migration; migrations preflight duplicates. Indexed tenant/staff/year/status and class/section lookups exist. Exact tuple uniqueness is not a general exclusion constraint for all overlapping delegation/effective-date combinations.
@@ -279,16 +283,16 @@ No cross-tenant access was confirmed by the exercised tests or inspected paths. 
 | --- | --- | --- |
 | LOW | Web source/component contracts, Flutter widgets | Source-string tests do not prove rendering |
 | MEDIUM | Unit + persistence integration for selected workflows | Failure/recovery coverage varies by subsystem |
-| HIGH | Teacher/guardian/Platform negatives, protected files, route denial, tenant integration | Only 35 endpoint operations have explicit downstream matrix review; remaining sensitive paths need review; typed scopes and field projections incomplete |
+| HIGH | Teacher/guardian/Platform negatives, protected files, route denial, tenant integration | Only 67 selected endpoint operations have explicit downstream matrix review; remaining sensitive paths need review; typed scopes and field projections incomplete |
 | CRITICAL | Auth recovery/admin concurrency, attendance correction concurrency, admission atomicity, finance replay/reversal tests | Not a full database-concurrency/failure-injection/restore program for every financial transition |
 | Cross-tenant / negative auth | Dedicated API integration/E2E suites passed | Nested relations, mixed bulk IDs and every export/worker subtype not exhaustively tested |
 | Idempotency/replay | Refresh, attendance, finance and notification stale-attempt coverage | Real provider duplicates, DB commit/queue outage and dead-letter recovery across all families |
-| Migration | 112-file empty replay, guarded migration probe, schema diff | Supported production upgrade/dirty-data preflights and drift reconciliation |
+| Migration | 112-file empty replay, guarded migration probe, empty schema diff at `05f53d8d` | Production upgrade/dirty-data preflights remain distinct from a clean replay |
 | Financial reversal | Journal/payment/payroll lineage tests present | Live PostgreSQL competing-actor rollback/reversal and end-to-end recovery evidence |
 | Offline/sync | Scope/version/conflict/cache tests | Actual device offline revocation, year change, app resume, prolonged disconnection |
-| Backup/restore | Scripts exist | No backup restored and reconciled in this slice |
-| Web accessibility/visual | Playwright + source checks exist | Failing authenticated smoke; no complete keyboard/screen-reader/responsive visual certification |
-| Flutter accessibility/device | Semantic action test repaired; widget/text-scale tests pass | 10 goldens fail; real Android/iOS biometrics, secure storage and background behavior unverified |
+| Backup/restore | `05f53d8d` local PostgreSQL restore and synthetic file recovery passed; all 273 table digests matched | Cloud/staging recovery, production volumes and RTO/RPO unverified |
+| Web accessibility/visual | 33 essential Chromium checks passed at `05f53d8d`; source contracts exist | No complete keyboard/screen-reader/responsive visual certification |
+| Flutter accessibility/device | Semantic action test repaired; `05f53d8d` ran 808 tests including ten same-host goldens | Real Android/iOS biometrics, secure storage and background behavior unverified |
 
 ## HIGH / CRITICAL Findings
 
@@ -349,12 +353,45 @@ No CRITICAL cross-tenant exploit was confirmed. Findings below distinguish sourc
 - **Owning implementation slice:** Phase 9H Notices / 9F protected delivery, coordinated with Phase 5F file projection.
 - **Blocking Phase 0? NO:** Source/control-flow proof recorded; feature hardening deferred as instructed.
 
+### H06 — Backup rehearsal could recreate its source database (fixed)
+
+- **Problem:** The rehearsal previously called `ensureRestoreDatabase` without the source-versus-target safety guard used by the normal restore entry point.
+- **Evidence:** Previous source at `c3e6280:scripts/rehearse-backup-restore-local.mjs`; repaired entry point at `cef2d658`; `apps/web/test/backup-restore-safety.test.mjs`; final-SHA `backup-restore-result.json`, `restore-all-table-digests.json`, and `restore-file-digest.json` in the locked continuation package.
+- **Failure scenario / proof:** Setting `RESTORE_DATABASE_URL` equal to `DATABASE_URL` could let target recreation drop the source. This is source/control-flow proof, not a destructive run on real data. The regression uses an unreachable localhost endpoint and requires immediate explicit refusal.
+- **Severity:** HIGH (recovery/data loss).
+- **Current behavior:** Existing `assertSafeRestoreTarget` now runs before connection, backup, or target recreation; local rehearsal restored all 273 public-table row digests and a synthetic storage-file SHA-256.
+- **Required future behavior:** Preserve the precondition and certify staging/provider recovery separately.
+- **Owning implementation slice:** Phase 0 / Slice 0A bounded baseline repair; staging/provider recovery is a later production-hardening gate.
+- **Blocking Phase 0? NO:** Fixed and regression-tested at `05f53d8d` in the 666-test Web suite; final-SHA restore digest proof is locked.
+
+### H07 — Direct refund and reversal do not require the reviewed request
+
+- **Problem:** A separate finance request/review workflow enforces a different reviewer, but privileged direct refund and reversal routes execute without requiring an approved `FinanceApprovalRequest`.
+- **Evidence:** `PaymentsController.refundPayment` / `reversePayment` expose `POST /payments/:id/refund` and `POST /payments/:id/reverse` under `payments:refund` / `payments:reverse`; `FinanceService.refundPayment` and `reversePayment` validate permission, tenant, amount/state, reason and idempotency but do not resolve an approved request. `FinanceService.reviewApprovalRequest` separately rejects the requester as reviewer. The endpoint matrix records both direct and request/review paths.
+- **Failure scenario / proof:** An actor with a direct refund or reversal capability invokes the direct endpoint without submitting a request to a different approver. The service proceeds through its existing tenant and financial-integrity checks without a two-person request prerequisite. This is source-path proof, not a live unauthorized payment execution.
+- **Severity:** HIGH (financial separation of duties).
+- **Current behavior:** Tenant isolation, idempotency and reversal lineage remain; the two-person review applies to the request workflow but is not universal across direct execution.
+- **Required future behavior:** Define and enforce a role/amount/lifecycle-aware approval policy at every refund/reversal execution entry point, preserving legitimate emergency exceptions only with explicit auditable authority.
+- **Owning implementation slice:** Phase 2C Finance Approval and SoD, coordinated with Phase 7 finance recovery.
+- **Blocking Phase 0? NO:** The distinct direct path and approval gap are documented for the authorized later slice; no refund/SoD migration begins in 0A.
+
+### H08 — School role administrator can grant beyond their own authority
+
+- **Problem:** `school_config_owner` can create school roles, grant any non-Platform permission and assign a role to their own user. The reviewed path has no grant ceiling or self-escalation check.
+- **Evidence:** `packages/core/src/permissions/roles.ts` gives School Configuration Owner `roles:create`, `roles:manage_permissions`, and `roles:assign`. `RolesService.createRoleInTransaction`, `assignPermissionsInTransaction` and `assignRolesInTransaction` check school domain, tenant identity and Platform exclusions, but do not compare requested school grants with the actor's effective grants or reject `dto.userId === actor.userId`. `withSchoolAuthorizationTransaction` reloads the actor's current governance permission and session but does not apply a grant ceiling.
+- **Failure scenario / proof:** A configuration owner creates a tenant role, grants it `payments:refund` or another finance capability, then assigns that role to their own tenant user. Each reviewed service path accepts the respective operation subject to the ordinary tenant/session checks. This is source-path proof; no production role was modified to test it.
+- **Severity:** HIGH (within-tenant privilege escalation and finance boundary).
+- **Current behavior:** Platform role names and Platform permission keys are blocked, tenant and live session checks are retained, and changes are audited; non-Platform grant breadth and self-assignment remain open.
+- **Required future behavior:** Enforce a server-side grant ceiling, non-delegable permission policy, protected role-template rules and self-escalation/SoD checks, with transactional negative tests.
+- **Owning implementation slice:** Phase 8A–8E Access Control governance, depending on Phase 1 authorization-policy primitives.
+- **Blocking Phase 0? NO:** The path is proven and assigned; Phase 0 records it without starting access-control migration.
+
 ## Documentation / Repository Conflicts
 
 1. “Explicit allowlists only” target conflicts with Admin and Principal catalog filters (H01). Blueprint target is not current implementation proof.
 2. “Default deny” is not yet uniform permission-metadata behavior: school requests without metadata are allowed by RolesPermissionsGuard and may rely on service checks. Do not remove working self/relationship policies or claim a universal kernel exists.
 3. Authz/Redis and entitlement comments describe cross-request authority caching or a removed `apps/api/AGENTS.md`; current implementation reads authority live. Root AGENTS is the single authority.
-4. Root `lint` naming hides the absence of API ESLint; core/Web have no canonical formatting script. Full baseline must state these differences.
+4. Before `f312e6b9`, root `lint` omitted API ESLint and Core/Web had no canonical formatting script. The new scripts and pinned formatter close that gate-coverage conflict; they pass at `05f53d8d`. API ESLint comments claiming warning-only test rules do not override actual strict diagnostics.
 5. Prisma package seed metadata differs from effective Prisma 7 configuration. Configured school seed is not explicit Platform bootstrap.
 6. Master plan section 0.2 says “four root docs,” while its coordinated set now includes five. This report uses all five and the root AGENTS partitioned authority; it does not create another master document.
 7. Design playbooks describe targets, not proof that current pages meet them. No aesthetic changes were made to make documentation appear implemented.
@@ -362,8 +399,8 @@ No CRITICAL cross-tenant exploit was confirmed. Findings below distinguish sourc
 
 ## Phase 0 Exit Decision
 
-**PHASE 0: BLOCKED**
+**PHASE 0: PASS**
 
-Migration replay, generated contracts, unit/HTTP/integration checks and production build provide useful evidence, but they do not override API ESLint failures, supplementary format failures, schema representation drift, ten golden failures and a failing/skipping authenticated browser suite. Hosted CI has not run the final implementation SHA. Endpoint declaration coverage is broad, while downstream service review remains explicitly bounded. No fully green final-SHA certificate is issued.
+All local gates, the empty-database migration and seed, generated contracts, full API/Web/Flutter suites, authenticated browser smoke, production build and local database/file recovery passed on one clean implementation SHA, `05f53d8d`; the evidence package records commands and checksums. The full hosted workflow on that SHA passed `verify` and `mobile` without path-based skips, including 33/33 browser cases. A fresh database/Redis browser rerun resolved the earlier audit-environment contamination. Endpoint declaration coverage is broad while downstream service review remains explicitly bounded. The documentation/evidence-only delivery commit is a distinct SHA, recorded and verified in the delivery response because a Git commit cannot embed its own hash.
 
-The evidence package identifies future authorization defects without implementing them. **Exact next slice: continue Phase 0 / Slice 0A — close the remaining baseline gate and evidence gaps.** Once that slice passes, the master plan's next implementation slice is **Phase 1A — Canonical Permission Catalog, including 1A.1 built-in allowlists and 1A.2 role template baseline**. Do not start it from this BLOCKED state.
+The evidence package identifies future authorization defects without implementing them. **Exact recommended next slice: Phase 1A — Canonical Permission Catalog, including 1A.1 built-in allowlists and 1A.2 role template baseline.** Phase 1 was not begun in Slice 0A.

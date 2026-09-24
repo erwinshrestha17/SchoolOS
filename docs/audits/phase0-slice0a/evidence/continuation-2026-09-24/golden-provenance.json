@@ -1,0 +1,73 @@
+{
+  "original_source_commit": "8f869267",
+  "host": "macOS 27.0 (26A428) arm64",
+  "flutter": "3.44.0",
+  "dart": "3.12.0",
+  "comparison": [
+    {
+      "golden": "parent_children_standard_phone.png",
+      "original_commit_render": "3ae2577fea8a4acb50e2bf07e7725504f8286e22dfb569498ed1dd6196a581c4",
+      "current_golden": "3ae2577fea8a4acb50e2bf07e7725504f8286e22dfb569498ed1dd6196a581c4",
+      "identical": true
+    },
+    {
+      "golden": "parent_dashboard_dark_phone.png",
+      "original_commit_render": "034607a26b613a9a34b3fec8a31282c7c460d4b5d6d6bc0e97e977f4bf544aab",
+      "current_golden": "034607a26b613a9a34b3fec8a31282c7c460d4b5d6d6bc0e97e977f4bf544aab",
+      "identical": true
+    },
+    {
+      "golden": "parent_dashboard_empty.png",
+      "original_commit_render": "5c02b95bf23488fb5b6b65279b020b2d15cb98cdec73d1d9c4ab953158424e36",
+      "current_golden": "5c02b95bf23488fb5b6b65279b020b2d15cb98cdec73d1d9c4ab953158424e36",
+      "identical": true
+    },
+    {
+      "golden": "parent_dashboard_error.png",
+      "original_commit_render": "458a967eedd847316c8fa00180235e86dfe895c5ce41bb2254a42065a3ddf7a9",
+      "current_golden": "458a967eedd847316c8fa00180235e86dfe895c5ce41bb2254a42065a3ddf7a9",
+      "identical": true
+    },
+    {
+      "golden": "parent_dashboard_large_text.png",
+      "original_commit_render": "c1b321579df5f3f7a1986c2e34fde1aa39e3c571728eca54f2da9a2cff60863f",
+      "current_golden": "c1b321579df5f3f7a1986c2e34fde1aa39e3c571728eca54f2da9a2cff60863f",
+      "identical": true
+    },
+    {
+      "golden": "parent_dashboard_offline.png",
+      "original_commit_render": "fa94de03df19d77fcd5c35dd3356188348b26dbe297d0d1665d63d26f54c8089",
+      "current_golden": "fa94de03df19d77fcd5c35dd3356188348b26dbe297d0d1665d63d26f54c8089",
+      "identical": true
+    },
+    {
+      "golden": "parent_dashboard_small_phone.png",
+      "original_commit_render": "0445b61d6b93d34d299009b384dbacb13a400864e2808d81658fc98bcbd2864e",
+      "current_golden": "0445b61d6b93d34d299009b384dbacb13a400864e2808d81658fc98bcbd2864e",
+      "identical": true
+    },
+    {
+      "golden": "parent_dashboard_standard_phone.png",
+      "original_commit_render": "9983205fcf8f6115168bdcd5fd83add3a86330e46d262c4283eb4991af0da85a",
+      "current_golden": "9983205fcf8f6115168bdcd5fd83add3a86330e46d262c4283eb4991af0da85a",
+      "identical": true
+    },
+    {
+      "golden": "parent_homework_filter_sheet.png",
+      "original_commit_render": "9941db0d6b72f7ec80b712991b28bf661c82a3dd7e99235374b2e3b9a94a1171",
+      "current_golden": "9941db0d6b72f7ec80b712991b28bf661c82a3dd7e99235374b2e3b9a94a1171",
+      "identical": true
+    },
+    {
+      "golden": "parent_timetable_screen.png",
+      "original_commit_render": "623da63c788841a95877dbd058791d1ef8cfde91921da59304e17bea8654f0bb",
+      "current_golden": "623da63c788841a95877dbd058791d1ef8cfde91921da59304e17bea8654f0bb",
+      "identical": true
+    }
+  ],
+  "original_source_full_sha": "8f8692675b7ed45a8bea2723834126b732f57df7",
+  "archived_source_verification": {
+    "files_checked": 210,
+    "mismatches": []
+  }
+}

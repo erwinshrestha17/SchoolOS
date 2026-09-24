@@ -1,0 +1,10 @@
+{
+  "implementation_sha": "05f53d8ddd7495b72cc4e09ca2f6528541fd8ebe",
+  "branch": "main",
+  "node": "v22.23.2",
+  "pnpm": "10.12.1",
+  "postgresql": "psql (PostgreSQL) 16.13",
+  "redis": "Redis server v=7.4.8 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=ccfd955b9fce8f87",
+  "flutter": "3.44.0",
+  "dart": "Dart SDK version: 3.12.0 (stable) (Fri May 8 01:51:14 2026 -0700) on \"macos_arm64\""
+}
