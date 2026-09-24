@@ -115,7 +115,8 @@ Rules:
 | --- | --- |
 | Student 360 sensitive sections | teacher/guardian policies + server-authorized data projection |
 | Staff 360 payroll/bank/documents | HR/payroll separation + sensitive staff projection |
-| Teacher attendance / marks | assignment-aware scoped policy |
+| Teacher attendance / marks | active employment + applicable professional-eligibility precondition + assignment-aware scoped policy |
+| Teacher assignment / substitution | policy-backed professional eligibility + effective-dated assignment scope |
 | Parent linked-child screens | authoritative guardian relationship policy |
 | Principal approval UX | explicit approval capability + lifecycle/SoD policy |
 | Fee refunds / reversals / accounting approvals | finance SoD + explicit approval permissions |
@@ -372,6 +373,25 @@ accounting:period:reopen
 hr:staff:read
 hr:staff:update
 hr:documents:read
+hr:employment:read
+hr:employment:manage
+hr:qualification:read
+hr:qualification:manage
+hr:qualification:verify
+hr:teaching_license:read
+hr:teaching_license:manage
+hr:teaching_license:verify
+hr:teacher_eligibility:read
+hr:teacher_eligibility:evaluate
+hr:teacher_eligibility:override
+hr:leave:read
+hr:leave:request
+hr:leave:review
+hr:leave:approve
+hr:compensation:read
+hr:compensation:manage
+hr:statutory_membership:read
+hr:statutory_membership:manage
 
 payroll:run:prepare
 payroll:run:review
@@ -683,11 +703,15 @@ authenticated
 tenant match
 attendance entitlement
 permission present
+active employment
+professional eligibility satisfied where required by the applicable policy
 teacher assignment active
 section match
 subject/period match when required
 attendance lifecycle allows marking
 ```
+
+Professional eligibility is a domain precondition, not a role grant. A `Teacher` role or permission MUST NOT manufacture employment, qualification, licence or eligibility. The authorization layer consumes authoritative HR/eligibility state and the applicable effective-dated policy; it does not hard-code one universal Nepal teacher rule.
 
 Only then:
 
@@ -708,6 +732,53 @@ permitted guardian-contact projection
 ```
 
 Role membership alone must never bypass assignment scope.
+
+---
+
+## 11.1 Teacher Professional Eligibility Policy
+
+Keep professional status separate from access-control vocabulary:
+
+```text
+Person
+→ Employee
+→ Employment
+→ Teacher Profile
+→ Qualification
+→ Teaching Licence
+→ Professional Eligibility
+→ Academic Assignment
+→ Authorization Decision
+```
+
+Rules:
+
+- employment/qualification/licence/eligibility data are authoritative domain facts, not permissions;
+- teacher role membership does not satisfy these facts;
+- where the active policy requires qualification/licensing, assignment creation and authoritative teaching writes must require current professional eligibility;
+- professional eligibility must resolve against effective-dated policy, school type, jurisdiction, post/employment type, level/subject context and evidence as applicable;
+- an assignment created earlier must not bypass later employment termination, licence expiry/revocation or eligibility loss for future writes;
+- historical attendance/marks/results must not be rewritten merely because current eligibility later changes;
+- substitution/temporary assignment is subject to the same applicable eligibility preconditions;
+- any eligibility override must be explicit, elevated, reason-bound, time/effect scoped where applicable and audited.
+
+Recommended decision reasons include:
+
+```text
+EMPLOYMENT_INACTIVE
+EMPLOYMENT_OUTSIDE_EFFECTIVE_PERIOD
+TEACHER_PROFILE_MISSING
+QUALIFICATION_REQUIRED
+QUALIFICATION_UNVERIFIED
+TEACHING_LICENCE_REQUIRED
+TEACHING_LICENCE_UNVERIFIED
+TEACHING_LICENCE_EXPIRED
+TEACHER_ELIGIBILITY_PENDING
+TEACHER_ELIGIBILITY_FAILED
+TEACHER_ELIGIBILITY_OVERRIDE_REQUIRED
+```
+
+`hr:teacher_eligibility:override` SHOULD be HIGH/CRITICAL, non-delegable by default, require a reason, and require elevated approval/step-up when the active policy permits such an override at all.
 
 ---
 
@@ -845,11 +916,17 @@ Staff data categories may include:
 ```text
 STAFF_BASIC
 STAFF_EMPLOYMENT
+STAFF_CONTRACT
+STAFF_QUALIFICATION
+STAFF_TEACHING_LICENSE
+STAFF_ELIGIBILITY
 STAFF_DOCUMENTS
 STAFF_COMPENSATION
 STAFF_BANK
 STAFF_TAX
+STAFF_MEDICAL
 STAFF_DISCIPLINARY
+STAFF_SAFEGUARDING
 ```
 
 A generic `hr:staff:read` permission must not automatically expose all categories.
@@ -1849,9 +1926,11 @@ Server re-authorizes mutation
 Commit or reject/conflict
 ```
 
-If assignment was revoked while offline, sync may be rejected.
+If employment, required professional eligibility, assignment or relationship authority was revoked/expired while offline, sync may be rejected.
 
-Mobile UI must surface that conflict clearly.
+For teacher-originated authoritative mutations, synchronization MUST re-check current active employment, applicable eligibility and assignment scope before commit. Cached licence/eligibility/assignment state is never final authority.
+
+Mobile UI must surface that conflict clearly and remove/invalidate now-unauthorized cached projections.
 
 ---
 
@@ -2149,9 +2228,11 @@ timetable
 guardian-contact projection
 ```
 
+Integrate authoritative active-employment and professional-eligibility preconditions where the effective-dated policy requires them. Preserve the distinction between HR/legal eligibility facts and RBAC permissions.
+
 ### Exit
 
-Teacher role alone can never bypass authoritative assignment rules.
+Teacher role alone can never bypass active-employment, applicable professional-eligibility or authoritative assignment rules.
 
 ---
 
