@@ -39,7 +39,18 @@ test.describe.serial('M12 and M15 authenticated notice workflows', () => {
     await page.getByRole('button', { name: 'Publish now' }).click();
     const publishDialog = page.getByRole('dialog');
     await expect(publishDialog).toContainText('eligible recipients');
-    await publishDialog.getByRole('button', { name: 'Publish now' }).click();
+    const [publishResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          /^\/api\/v1\/notices\/[^/]+\/publish$/.test(
+            new URL(response.url()).pathname,
+          ),
+        { timeout: 30_000 },
+      ),
+      publishDialog.getByRole('button', { name: 'Publish now' }).click(),
+    ]);
+    expect(publishResponse.status()).toBe(201);
     await expect(page.getByTestId('notice-lifecycle-badge')).toHaveText(
       'Published',
     );
