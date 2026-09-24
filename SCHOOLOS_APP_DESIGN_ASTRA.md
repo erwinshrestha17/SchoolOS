@@ -231,10 +231,11 @@ Prioritize:
 - quick marks/CAS where safely enabled;
 - activity capture;
 - substitutions;
+- leave/self-service with affected-class context where available;
+- read-only professional/employment/eligibility status where useful;
 - notices;
 - notifications;
 - offline/sync state;
-- leave/self-service;
 - profile/security.
 
 ### Navigation target
@@ -275,7 +276,8 @@ Prioritize:
 - approvals;
 - attendance exceptions;
 - academic readiness;
-- staff absence impact;
+- staff absence and substitution coverage;
+- teacher professional-eligibility/assignment blockers when they affect current operations;
 - critical finance exceptions;
 - communication failures;
 - safety/operational alerts;
@@ -653,6 +655,51 @@ Do not optimize approvals into blind swipe actions when context matters.
 
 ---
 
+# 22.1 Teacher Professional Status, Leave and Substitution UX
+
+Mobile remains an operational companion, not the HR/legal administration surface.
+
+Teacher mobile MAY expose a concise read-only professional status when it materially affects daily work:
+
+```text
+Employment        Active
+Teaching status   Eligible / Review required / Ineligible
+Licence/evidence  Verified / Expiring / Unverified where applicable
+Assignments       Current authorized classes/subjects
+```
+
+Rules:
+
+- do not use the `Teacher` role/persona as proof of professional eligibility;
+- do not let Mobile verify qualifications/licences, alter eligibility policy, edit compensation/statutory configuration, or perform payroll governance;
+- do not claim external/TSC verification unless the server has authorized evidence of that state;
+- sensitive qualification/licence documents remain protected and are not downloaded merely to show status.
+
+For teacher leave:
+
+```text
+Request leave
+→ show dates/partial-day scope
+→ show affected classes/periods when available
+→ submit request
+→ school resolves substitution/coverage
+```
+
+If classes remain uncovered after approval, show that as an operational state rather than implying the workflow is complete.
+
+Principal mobile may surface:
+
+```text
+Teacher absent
+3 periods affected
+2 covered
+1 uncovered
+```
+
+with direct navigation to the authorized review/attention surface. Assignment/substitution decisions remain server-authoritative and policy-scoped.
+
+---
+
 # 23. Authentication and Biometrics
 
 Mobile auth UX must respect `AGENTS.md`.
@@ -705,7 +752,9 @@ Principles:
 - explain conflicts in user language;
 - provide retry when safe;
 - show stale-data state when material;
-- after role/assignment/guardian/session changes, now-unauthorized cached data must disappear/become inaccessible.
+- after role/assignment/guardian/session changes, now-unauthorized cached data must disappear/become inaccessible;
+- teacher-originated authoritative sync must also handle employment, required professional-eligibility/licence, and assignment changes as authority changes;
+- when current employment/eligibility/assignment no longer permits the queued action, surface a clear rejection such as "Assignment or teaching authority is no longer active" instead of a generic network failure.
 
 High-risk offline mutations prohibited by `AGENTS.md` remain prohibited regardless of design convenience.
 
