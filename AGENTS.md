@@ -218,6 +218,12 @@ Architecture rules:
 | Feature entitlement | server entitlement resolution |
 | API contract | backend/OpenAPI/shared contracts |
 | Compliance policy | versioned/effective-dated authoritative configuration/evidence |
+| Education policy/curriculum/grading | versioned/effective-dated Nepal education-policy configuration + evidence |
+| Employment terms | effective-dated employment/contract records |
+| Teacher professional eligibility | active employment + verified qualification/licence evidence + applicable policy decision |
+| HR statutory policy | versioned/effective-dated Nepal HR/legal policy configuration + evidence |
+| Payroll statutory inputs | approved effective-dated payroll/HR policy configuration |
+| External government authority state | relevant external authority (for example NEB/IEMIS/TSC); SchoolOS stores mappings, submissions, reconciliation and evidence rather than replacing that authority |
 | School timezone/day semantics | school configuration; Nepal defaults when appropriate |
 | UI composition | client presentation state only |
 | Offline cached authorization | never authoritative; re-check on sync |
@@ -340,9 +346,28 @@ Every tenant-owned read, write, file, export, report, cache, queue job, notifica
 
 Teacher authority MUST match active assignments across relevant dimensions such as tenant, academic year, class, section, subject, period, assessment, or assessment component.
 
+Teacher identity and authority MUST remain separated across these concepts:
+
+```text
+Person
+→ Employee
+→ Employment
+→ Teacher Profile
+→ Qualification
+→ Teaching Licence
+→ Professional Eligibility
+→ Academic Assignment
+→ SchoolOS Permission
+```
+
+- A `Teacher` persona/role does not prove employment, qualification, licence, eligibility, assignment, or permission.
+- Employment position, organizational responsibility, academic assignment, and SchoolOS authorization are independent concepts.
+- Where the applicable effective-dated policy requires qualification/licensing, authoritative teaching writes MUST require active employment, current professional eligibility, and the matching academic assignment.
+- An existing assignment MUST NOT override an expired/revoked employment or eligibility condition.
+- Professional-eligibility requirements MUST be resolved from the applicable jurisdiction, school type, post/employment type, and policy version rather than one universal hard-coded Nepal rule.
 - Homeroom authority does not grant every subject write.
 - Subject teaching does not grant homeroom attendance automatically.
-- Assignment removal MUST remove authority immediately and invalidate affected cached/offline scope.
+- Assignment or eligibility removal MUST remove affected authority immediately and invalidate affected cached/offline scope.
 
 ### Guardian scope
 
@@ -403,6 +428,19 @@ Canonical concepts:
 - Parents MUST NOT see unpublished marks/results.
 - Corrected published results preserve prior versions.
 
+## M7 HR / Teacher Professional Eligibility / Payroll
+
+M7 MUST maintain a trustworthy staff/employment foundation before payroll becomes authoritative.
+
+- Person/staff identity, employment, organizational position, contract, professional qualification, teaching licence, eligibility, academic assignment, attendance, leave, compensation, statutory membership, and authorization are separate concepts.
+- Employment, contract, compensation, leave-policy and statutory-membership records that affect authoritative outcomes MUST be effective-dated and historically reproducible.
+- Qualifications and teaching licences are professional evidence, not permission grants.
+- Teacher eligibility decisions MUST reference the applicable policy version/evidence and MUST NOT be inferred from the `Teacher` role alone.
+- For teaching staff, approved leave MUST surface academic/timetable impact and substitution requirements; leave approval is not the end of the school-operational workflow.
+- Payroll readiness depends on trustworthy employment dates, effective compensation, attendance/leave outcomes, statutory/tax configuration, approval state, and immutable audit history.
+- M7 may calculate and approve payroll obligations, but M11 remains the authoritative accounting/ledger layer. Payroll MUST post approved liabilities/expenses into M11 through controlled idempotent accounting events rather than maintain a second ledger.
+- Fully validated statutory payroll MUST NOT be enabled merely because a calculation screen exists; applicable policy/rate evidence must be current and approved.
+
 ---
 
 # 14. Offline and Synchronization
@@ -435,6 +473,8 @@ Offline rules:
 - sensitive cached data uses secure storage appropriate to platform;
 - offline writes use durable operation identity/idempotency;
 - sync re-checks current server authority;
+- teaching mutations re-check active employment, applicable professional eligibility, and academic assignment when those conditions govern the action;
+- employment/licence/eligibility/assignment revocation invalidates affected offline authority and cached sensitive projections;
 - conflicts are explicit and resolvable;
 - no silent last-write-wins for authoritative sensitive records;
 - never serve one user/child/tenant's cached data as fallback for another.
@@ -445,7 +485,7 @@ The App design playbook controls how offline/sync state is communicated, but it 
 
 # 15. Financial Integrity
 
-M11 is the authoritative accounting layer. M3 Fees/Receipts and M7 Payroll hand off controlled, idempotent accounting events into M11.
+M11 is the authoritative accounting layer. M3 Fees/Receipts and M7 Payroll hand off controlled, idempotent accounting events into M11. M7 MUST NOT become a parallel accounting ledger.
 
 Non-negotiable:
 
@@ -465,9 +505,28 @@ Do not claim IRD, tax, payroll, CBMS, or statutory compliance merely because cal
 
 ---
 
-# 16. Nepal Compliance and Localization
+# 16. Nepal Education, HR Policy and Localization
 
-Treat mutable Nepal education/fiscal policy as versioned/effective-dated configuration and evidence, not scattered constants.
+Treat mutable Nepal education, employment, payroll, social-security, tax, local-government and fiscal policy as versioned/effective-dated configuration backed by authoritative evidence, not scattered constants.
+
+Canonical policy resolution MUST support the hierarchy:
+
+```text
+National legal/policy baseline
+→ Province/local-government profile where applicable
+→ School type
+→ Academic or employment/post context
+→ Employee/student/record-specific effective-dated terms
+```
+
+Rules:
+
+- Historical records MUST continue to be interpreted under the policy/curriculum/grading/employment version that applied when the authoritative event occurred.
+- A school-level setting MUST NOT silently override a statutory minimum or mandatory national/local requirement.
+- Curriculum versions, grading rules, assessment structures, promotion rules, academic calendars, government-reporting mappings, employment policies, leave rules, statutory schemes and payroll rules MUST be modeled so effective dates and evidence can change without rewriting history.
+- Nepal school employment MUST NOT be represented as one universal employee policy; applicability may vary by school type, approved/community post status, institutional/private employment, local jurisdiction and employment/post type.
+- NEB, IEMIS/CEHRD, TSC and other government bodies remain external authorities for the functions legally assigned to them. SchoolOS may validate, map, export, reconcile and retain submission evidence, but MUST NOT claim to replace those authorities.
+- Do not claim live government/API integration, approval, IRD/CBMS status, teacher licensing verification or statutory payroll compliance without authorized current evidence.
 
 Support correctly where applicable:
 
@@ -479,7 +538,7 @@ Support correctly where applicable:
 - province/district/local level/ward;
 - BS and AD date presentation with unambiguous canonical storage.
 
-Do not claim government/API integration without authorized evidence.
+Policy configuration and historical evidence are business records and MUST be auditable, effective-dated and protected from silent destructive overwrite.
 
 ---
 
