@@ -1,4 +1,4 @@
-import { permissionCatalog, systemRolePermissions } from '@schoolos/core';
+import { systemRolePermissions } from '@schoolos/core';
 
 describe('Accounting RBAC Hardening', () => {
   const accountingOperationalKeys = [
@@ -18,19 +18,13 @@ describe('Accounting RBAC Hardening', () => {
     'accounting:exports:create',
   ];
 
-  const accountingReadKeys = permissionCatalog
-    .filter(
-      ({ resource, action }) =>
-        (resource.startsWith('accounting') || resource === 'accounting') &&
-        (action === 'read' || resource === 'accounting:reports'),
-    )
-    .map(({ resource, action }) => `${resource}:${action}`);
-
-  it('has a non-empty read/reports surface to assert against', () => {
-    // Guards this spec itself against silently testing nothing if the
-    // catalog is ever restructured.
-    expect(accountingReadKeys.length).toBeGreaterThan(5);
-  });
+  const principalAccountingReadKeys = [
+    'accounting:read',
+    'accounting:accounts:read',
+    'accounting:journals:read',
+    'accounting:reports:read',
+    'accounting:reports:trial-balance',
+  ];
 
   it('PRD 11.12: principal keeps read-only accounting visibility, not operations', () => {
     for (const key of accountingOperationalKeys) {
@@ -38,8 +32,8 @@ describe('Accounting RBAC Hardening', () => {
     }
   });
 
-  it('principal retains every accounting read/reports permission', () => {
-    for (const key of accountingReadKeys) {
+  it('principal retains the reviewed accounting visibility needed by oversight', () => {
+    for (const key of principalAccountingReadKeys) {
       expect(systemRolePermissions.principal).toContain(key);
     }
   });

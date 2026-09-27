@@ -1,5 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  PLATFORM_SYSTEM_ROLE_DEFINITIONS,
+  PLATFORM_SYSTEM_ROLE_PERMISSIONS,
+  SCHOOL_SYSTEM_ROLE_DEFINITIONS,
+  SCHOOL_SYSTEM_ROLE_PERMISSIONS,
+  isPlatformPermissionKey,
+} from '@schoolos/core';
 
 /**
  * M0 Platform Boundary Hardening – Route-Denial Contracts
@@ -40,40 +47,23 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
     });
 
     it('school-level role definitions do not contain platform permission keys', () => {
-      const permissions = read('../../packages/core/src/permissions.ts');
-      const schoolRoles = [
-        'admin',
-        'teacher',
-        'principal',
-        'accountant',
-        'librarian',
-        'driver',
-        'student',
-        'parent',
-      ];
-
-      for (const role of schoolRoles) {
-        const roleRegex = new RegExp(`${role}:\\s*\\[([\\s\\S]*?)\\]`, 'm');
-        const match = permissions.match(roleRegex);
-        if (match) {
-          const rolePermissions = match[1];
-          expect(rolePermissions).not.toContain('platform:manage');
-          expect(rolePermissions).not.toContain('platform:tenants:status');
-          expect(rolePermissions).not.toContain('platform:billing:manage');
-          expect(rolePermissions).not.toContain('platform:providers:manage');
-          expect(rolePermissions).not.toContain('platform:api-keys:manage');
-          expect(rolePermissions).not.toContain('platform:queues:retry');
+      for (const { name } of SCHOOL_SYSTEM_ROLE_DEFINITIONS) {
+        const grants = SCHOOL_SYSTEM_ROLE_PERMISSIONS[name];
+        expect(grants).toBeDefined();
+        for (const key of grants) {
+          expect(isPlatformPermissionKey(key)).toBe(false);
         }
       }
     });
 
-    it('TENANT_PERMISSION_KEYS do not include platform permissions', () => {
-      const permissions = read('../../packages/core/src/permissions.ts');
-
-      expect(permissions).toContain('TENANT_PERMISSION_KEYS');
-      expect(permissions).toContain('!isPlatformPermissionKey(key)');
-      expect(permissions).toContain('SCHOOL_SYSTEM_ROLE_PERMISSIONS');
-      expect(permissions).toContain('PLATFORM_SYSTEM_ROLE_PERMISSIONS');
+    it('Platform presets contain only Platform-domain grants', () => {
+      for (const { name } of PLATFORM_SYSTEM_ROLE_DEFINITIONS) {
+        const grants = PLATFORM_SYSTEM_ROLE_PERMISSIONS[name];
+        expect(grants?.length).toBeGreaterThan(0);
+        for (const key of grants) {
+          expect(isPlatformPermissionKey(key)).toBe(true);
+        }
+      }
     });
 
     it('reserves the whole platform role namespace outside school roles', () => {

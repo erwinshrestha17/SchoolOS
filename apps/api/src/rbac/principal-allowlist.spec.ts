@@ -116,13 +116,31 @@ describe('Principal explicit permission allowlist (PPR-P0-01)', () => {
   });
 
   it('retains every accounting read/reports permission and no operational accounting writes', () => {
-    const accountingReadKeys = permissionCatalog
-      .filter(
-        ({ resource, action }) =>
-          (resource.startsWith('accounting') || resource === 'accounting') &&
-          (action === 'read' || resource === 'accounting:reports'),
-      )
-      .map(({ resource, action }) => buildPermissionKey(resource, action));
+    // Reviewed Phase 1A snapshot. New catalog reads do not enter Principal
+    // automatically; their template grant needs an explicit review.
+    const accountingReadKeys = [
+      'accounting:read',
+      'accounting:accounts:read',
+      'accounting:journals:read',
+      'accounting:reports:read',
+      'accounting:audit:read',
+      'accounting:reports:trial-balance',
+      'accounting:reports:general-ledger',
+      'accounting:reports:cash-book',
+      'accounting:reports:income-statement',
+      'accounting:reports:balance-sheet',
+      'accounting:reports:tax-summary',
+      'accounting:settings:read',
+      'accounting:posting-batches:read',
+      'accounting:payroll-handoff:read',
+      'accounting:expenses:read',
+      'accounting:vendors:read',
+      'accounting:payables:read',
+      'accounting:reconciliation:read',
+      'accounting:budgets:read',
+      'accounting:reports:budget-vs-actual',
+      'accounting:reports:cash-flow-statement',
+    ];
 
     const accountingOperationalKeys = [
       'accounting:close',

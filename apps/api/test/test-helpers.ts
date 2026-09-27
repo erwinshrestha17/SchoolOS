@@ -833,11 +833,13 @@ export function createPrismaMock() {
       }),
       findMany: jest.fn((q: PrismaQuery) => {
         const idIn = (q.where?.id as { in?: string[] } | undefined)?.in;
+        const isSystem = q.where?.isSystem as boolean | undefined;
         return Promise.resolve(
           state.roles.filter(
             (role) =>
               role.tenantId === q.where?.tenantId &&
-              (!idIn || idIn.includes(role.id as string)),
+              (!idIn || idIn.includes(role.id as string)) &&
+              (isSystem === undefined || Boolean(role.isSystem) === isSystem),
           ),
         );
       }),

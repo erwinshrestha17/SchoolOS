@@ -1,0 +1,131 @@
+{
+  "accountant": [
+    "advanced:analytics:read",
+    "advanced:automation:read",
+    "advanced:documents:read",
+    "advanced:exports:create",
+    "advanced:exports:read",
+    "hr:leave:request",
+    "hr:staff:read",
+    "payroll:payslip:read"
+  ],
+  "admin": [
+    "accounting:exports:create",
+    "payroll:payslip:read",
+    "settings:accounting:manage",
+    "settings:finance:manage"
+  ],
+  "admissions_officer": [],
+  "cashier": [],
+  "driver": [
+    "transport:assignments:read",
+    "transport:location:read",
+    "transport:location:update",
+    "transport:reports:read",
+    "transport:routes:read",
+    "transport:tracking:parent",
+    "transport:trips:create",
+    "transport:trips:read",
+    "transport:trips:update",
+    "transport:vehicles:read"
+  ],
+  "finance_approver": [],
+  "financial_auditor": [
+    "advanced:analytics:read",
+    "advanced:automation:read",
+    "advanced:documents:read",
+    "advanced:exports:create",
+    "advanced:exports:read"
+  ],
+  "hr_manager": [
+    "advanced:analytics:read",
+    "advanced:automation:read",
+    "advanced:documents:read",
+    "advanced:exports:read",
+    "notifications:manage_preferences",
+    "notifications:view_own"
+  ],
+  "librarian": [
+    "library:books:create",
+    "library:books:read",
+    "library:books:update",
+    "library:copies:create",
+    "library:copies:read",
+    "library:copies:update",
+    "library:fines:create",
+    "library:fines:post",
+    "library:fines:update",
+    "library:issues:create",
+    "library:issues:read",
+    "library:issues:return",
+    "library:reports:read"
+  ],
+  "parent": [
+    "homework:read_published",
+    "notifications:manage_preferences",
+    "notifications:view_own",
+    "timetable:read_published"
+  ],
+  "payroll_approver": [],
+  "payroll_preparer": [],
+  "payroll_reviewer": [],
+  "platform_billing_admin": [],
+  "platform_super_admin": [],
+  "platform_support": [],
+  "principal": [
+    "advanced:analytics:read",
+    "advanced:automation:read",
+    "advanced:documents:read",
+    "advanced:exports:read",
+    "hr:attendance:correct",
+    "hr:leave:request",
+    "notifications:manage_preferences",
+    "notifications:view_delivery_diagnostics",
+    "payroll:payslip:read"
+  ],
+  "school_config_owner": [
+    "advanced:analytics:read",
+    "advanced:analytics:refresh",
+    "advanced:automation:execute",
+    "advanced:automation:manage",
+    "advanced:automation:read",
+    "advanced:documents:manage",
+    "advanced:documents:read",
+    "advanced:exports:read"
+  ],
+  "student": [
+    "homework:read_published",
+    "notifications:manage_preferences",
+    "notifications:view_own",
+    "timetable:read_published"
+  ],
+  "subject_teacher": [
+    "advanced:analytics:read",
+    "advanced:documents:read",
+    "advanced:exports:read",
+    "homework:read_published",
+    "hr:attendance:read",
+    "notifications:manage_preferences",
+    "notifications:view_own",
+    "timetable:read_published"
+  ],
+  "support_staff": [
+    "hr:leave:request",
+    "hr:staff:read",
+    "notifications:manage_preferences",
+    "notifications:view_own",
+    "payroll:payslip:read"
+  ],
+  "teacher": [
+    "advanced:analytics:read",
+    "advanced:automation:read",
+    "advanced:documents:read",
+    "advanced:exports:read",
+    "homework:read_published",
+    "hr:attendance:read",
+    "hr:attendance:write",
+    "notifications:manage_preferences",
+    "notifications:view_own",
+    "timetable:read_published"
+  ]
+}

@@ -18,9 +18,7 @@ describe('TenantsService.register (platform-operator provisioning)', () => {
       runWithoutTenantScope: jest.fn(
         async (_reason: string, callback: () => unknown) => callback(),
       ),
-      $transaction: jest.fn(async (callback: (tx: unknown) => unknown) =>
-        callback(prisma),
-      ),
+      $transaction: jest.fn(),
       user: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
@@ -34,18 +32,47 @@ describe('TenantsService.register (platform-operator provisioning)', () => {
         }),
       },
       role: {
-        upsert: jest.fn().mockResolvedValue(undefined),
+        upsert: jest
+          .fn<
+            Promise<void>,
+            [
+              {
+                update: Record<string, unknown>;
+                create: { name: string; isSystem: boolean };
+              },
+            ]
+          >()
+          .mockResolvedValue(undefined),
+        findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(
-          ({ where }: { where: { tenantId_name: { name: string } } }) =>
+          ({
+            where,
+          }: {
+            where: { tenantId_name: { name: string } };
+          }): Promise<{
+            id: string;
+            name: string;
+            isSystem: boolean;
+          } | null> =>
             Promise.resolve({
               id: `role-${where.tenantId_name.name}`,
               name: where.tenantId_name.name,
+              isSystem: true,
             }),
         ),
       },
       permission: {
         upsert: jest.fn().mockResolvedValue(undefined),
-        findUnique: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn(
+          ({
+            where,
+          }: {
+            where: { resource_action: { resource: string; action: string } };
+          }): Promise<{ id: string } | null> =>
+            Promise.resolve({
+              id: `permission-${where.resource_action.resource}:${where.resource_action.action}`,
+            }),
+        ),
       },
       rolePermission: {
         deleteMany: jest.fn().mockResolvedValue(undefined),
@@ -72,6 +99,9 @@ describe('TenantsService.register (platform-operator provisioning)', () => {
         create: jest.fn().mockResolvedValue(undefined),
       },
     };
+    prisma.$transaction.mockImplementation(
+      (callback: (tx: unknown) => unknown) => callback(prisma),
+    );
 
     const usersService = {
       createManagedUser: jest.fn().mockResolvedValue({
@@ -157,6 +187,51 @@ describe('TenantsService.register (platform-operator provisioning)', () => {
         name.trim().toLowerCase().startsWith('platform_'),
       ),
     ).toBe(false);
+  });
+
+  it('fails tenant provisioning when a configured system role permission is missing', async () => {
+    const { service, prisma, usersService, auditService } = createMocks();
+    prisma.permission.findUnique.mockResolvedValueOnce(null);
+
+    await expect(service.register(dto, platformActor)).rejects.toThrow(
+      /System role permission .+ is missing from the catalog/,
+    );
+    expect(usersService.createManagedUser).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('fails tenant provisioning when a configured system role is missing', async () => {
+    const { service, prisma, usersService } = createMocks();
+    prisma.role.findUnique.mockResolvedValue(null);
+
+    await expect(service.register(dto, platformActor)).rejects.toThrow(
+      /System role .+ was not provisioned/,
+    );
+    expect(usersService.createManagedUser).not.toHaveBeenCalled();
+  });
+
+  it('does not promote a colliding custom role into a system template', async () => {
+    const { service, prisma, usersService } = createMocks();
+    prisma.role.findMany.mockResolvedValue([{ name: ' CASHIER ' }]);
+
+    await expect(service.register(dto, platformActor)).rejects.toThrow(
+      'Custom role CASHIER conflicts with a SchoolOS system template',
+    );
+    expect(prisma.permission.upsert).not.toHaveBeenCalled();
+    expect(prisma.role.upsert).not.toHaveBeenCalled();
+    expect(prisma.rolePermission.deleteMany).not.toHaveBeenCalled();
+    expect(usersService.createManagedUser).not.toHaveBeenCalled();
+  });
+
+  it('never changes a preexisting role into a system role during upsert', async () => {
+    const { service, prisma } = createMocks();
+
+    await service.register(dto, platformActor);
+
+    for (const [call] of prisma.role.upsert.mock.calls) {
+      expect(call.update).not.toHaveProperty('isSystem');
+      expect(call.create.isSystem).toBe(true);
+    }
   });
 
   it('audits provisioning against the acting platform operator', async () => {

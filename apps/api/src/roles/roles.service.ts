@@ -9,6 +9,7 @@ import {
   isPlatformPermissionKey,
   isPlatformRoleName,
   SCHOOL_CONFIG_OWNER_ROLE,
+  SCHOOL_SYSTEM_ROLE_DEFINITIONS,
   systemRolePermissions,
 } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
@@ -95,6 +96,11 @@ export class RolesService {
       throw new ForbiddenException(
         'Platform role names cannot be created in a school tenant',
       );
+    if (isSchoolSystemRoleName(dto.name)) {
+      throw new ForbiddenException(
+        'System role names cannot be created as custom roles',
+      );
+    }
     return withSchoolAuthorizationTransaction(
       this.prisma,
       actor,
@@ -114,6 +120,11 @@ export class RolesService {
     if (isPlatformRoleName(dto.name)) {
       throw new ForbiddenException(
         'Platform role names cannot be created in a school tenant',
+      );
+    }
+    if (isSchoolSystemRoleName(dto.name)) {
+      throw new ForbiddenException(
+        'System role names cannot be created as custom roles',
       );
     }
 
@@ -192,6 +203,11 @@ export class RolesService {
     if (isPlatformRoleName(role.name)) {
       throw new ForbiddenException(
         'Platform role permissions cannot be managed from a school tenant',
+      );
+    }
+    if (role.isSystem || isSchoolSystemRoleName(role.name)) {
+      throw new ForbiddenException(
+        'System role permissions are defined by SchoolOS templates',
       );
     }
 
@@ -516,6 +532,13 @@ export class RolesService {
         name: { in: [...FINANCE_RECONCILIATION_ROLE_PRESETS] },
       },
     });
+    if (
+      roles.some((role) => !role.isSystem || !isSchoolSystemRoleName(role.name))
+    ) {
+      throw new ForbiddenException(
+        'Finance reconciliation requires canonical system roles',
+      );
+    }
     const permissions = await tx.permission.findMany();
     const permissionByKey = new Map(
       permissions.map((permission) => [
@@ -637,6 +660,14 @@ const FINANCE_RECONCILIATION_ROLE_PRESETS = [
   'financial_auditor',
   'hr_manager',
 ] as const;
+
+const SCHOOL_SYSTEM_ROLE_NAMES = new Set(
+  SCHOOL_SYSTEM_ROLE_DEFINITIONS.map(({ name }) => name.toLowerCase()),
+);
+
+function isSchoolSystemRoleName(name: string): boolean {
+  return SCHOOL_SYSTEM_ROLE_NAMES.has(name.trim().toLowerCase());
+}
 
 function isFinancePermissionKey(key: string): boolean {
   const root = key.split(':')[0];

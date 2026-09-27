@@ -192,6 +192,24 @@ export class TenantsService {
     tenantId: string,
     tx: Prisma.TransactionClient = this.prisma,
   ) {
+    // A newly introduced template name must not promote an existing custom
+    // role and replace its tenant-authored grants during provisioning.
+    const templateNames = new Set(
+      SCHOOL_ROLE_DEFINITIONS.map(({ name }) => name.toLowerCase()),
+    );
+    const customRoles = await tx.role.findMany({
+      where: { tenantId, isSystem: false },
+      select: { name: true },
+    });
+    const collision = customRoles.find(({ name }) =>
+      templateNames.has(name.trim().toLowerCase()),
+    );
+    if (collision) {
+      throw new ConflictException(
+        `Custom role ${collision.name.trim()} conflicts with a SchoolOS system template`,
+      );
+    }
+
     for (const permission of PERMISSION_CATALOG) {
       await tx.permission.upsert({
         where: {
@@ -217,7 +235,6 @@ export class TenantsService {
         },
         update: {
           description: role.description,
-          isSystem: true,
         },
         create: {
           tenantId,
@@ -240,8 +257,10 @@ export class TenantsService {
         },
       });
 
-      if (!role) {
-        continue;
+      if (!role?.isSystem) {
+        throw new Error(
+          `System role ${roleName} was not provisioned or conflicts with a custom role`,
+        );
       }
 
       await tx.rolePermission.deleteMany({
@@ -267,7 +286,9 @@ export class TenantsService {
         });
 
         if (!permission) {
-          continue;
+          throw new Error(
+            `System role permission ${permissionKey} is missing from the catalog`,
+          );
         }
 
         await tx.rolePermission.create({

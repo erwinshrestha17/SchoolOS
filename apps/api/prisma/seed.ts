@@ -553,11 +553,35 @@ async function seedAcademicYear(tenantId: string) {
   });
 }
 
-async function seedRoles(tenantId: string) {
+export async function seedRoles(tenantId: string, roleDelegate = prisma.role) {
   console.log('Seeding system roles...');
 
+  // A role created by a school before a new built-in template was introduced
+  // must not silently become that template (and receive its permissions) on
+  // reseed. Check every name before changing any role in this batch.
+  const templateNames = new Set(
+    SCHOOL_ROLE_DEFINITIONS.map(({ name }) => name.toLowerCase()),
+  );
+  const customRoles = await roleDelegate.findMany({
+    where: {
+      tenantId,
+      isSystem: false,
+    },
+    select: { name: true },
+  });
+  const customNameCollisions = customRoles.filter(({ name }) =>
+    templateNames.has(name.trim().toLowerCase()),
+  );
+  if (customNameCollisions.length > 0) {
+    throw new Error(
+      `Cannot seed system roles: existing custom role names collide with built-in templates: ${customNameCollisions
+        .map(({ name }) => name.trim())
+        .join(', ')}`,
+    );
+  }
+
   for (const role of SCHOOL_ROLE_DEFINITIONS) {
-    await prisma.role.upsert({
+    await roleDelegate.upsert({
       where: {
         tenantId_name: {
           tenantId,
@@ -566,7 +590,6 @@ async function seedRoles(tenantId: string) {
       },
       update: {
         description: role.description,
-        isSystem: true,
       },
       create: {
         tenantId,
@@ -597,13 +620,12 @@ async function seedPermissions() {
   }
 }
 
-async function seedRolePermissions(tenantId: string) {
+export async function seedRolePermissions(tenantId: string, database = prisma) {
   console.log('Seeding role permissions...');
 
-  for (const [roleName, permissionKeys] of Object.entries(
-    SCHOOL_ROLE_PERMISSIONS,
-  )) {
-    const role = await prisma.role.findUnique({
+  const roleIds = new Map<string, string>();
+  for (const roleName of Object.keys(SCHOOL_ROLE_PERMISSIONS)) {
+    const role = await database.role.findUnique({
       where: {
         tenantId_name: {
           tenantId,
@@ -612,42 +634,57 @@ async function seedRolePermissions(tenantId: string) {
       },
     });
 
-    if (!role) {
-      throw new Error(`Role ${roleName} was not created successfully.`);
+    if (!role?.isSystem) {
+      throw new Error(
+        `System role ${roleName} is missing or conflicts with a custom role; refusing to replace its grants.`,
+      );
+    }
+    roleIds.set(roleName, role.id);
+  }
+
+  const permissionIds = new Map<string, string>();
+  const requiredPermissionKeys = new Set(
+    Object.values(SCHOOL_ROLE_PERMISSIONS).flat(),
+  );
+  for (const permissionKey of requiredPermissionKeys) {
+    const parts = permissionKey.split(':');
+    const action = parts.pop();
+    const resource = parts.join(':');
+    if (!resource || !action) {
+      throw new Error(`Invalid permission key: ${permissionKey}`);
+    }
+    const permission = await database.permission.findUnique({
+      where: { resource_action: { resource, action } },
+    });
+    if (!permission) {
+      throw new Error(`Permission ${permissionKey} was not created.`);
+    }
+    permissionIds.set(permissionKey, permission.id);
+  }
+
+  for (const [roleName, permissionKeys] of Object.entries(
+    SCHOOL_ROLE_PERMISSIONS,
+  )) {
+    const roleId = roleIds.get(roleName);
+    if (!roleId) {
+      throw new Error(`System role ${roleName} was not verified for seeding.`);
     }
 
-    await prisma.rolePermission.deleteMany({
+    await database.rolePermission.deleteMany({
       where: {
-        roleId: role.id,
+        roleId,
       },
     });
 
     for (const permissionKey of Array.from(new Set(permissionKeys))) {
-      const parts = permissionKey.split(':');
-      const action = parts.pop();
-      const resource = parts.join(':');
-
-      if (!resource || !action) {
-        throw new Error(`Invalid permission key: ${permissionKey}`);
+      const permissionId = permissionIds.get(permissionKey);
+      if (!permissionId) {
+        throw new Error(`Permission ${permissionKey} was not verified.`);
       }
-
-      const permission = await prisma.permission.findUnique({
-        where: {
-          resource_action: {
-            resource,
-            action,
-          },
-        },
-      });
-
-      if (!permission) {
-        throw new Error(`Permission ${permissionKey} was not created.`);
-      }
-
-      await prisma.rolePermission.create({
+      await database.rolePermission.create({
         data: {
-          roleId: role.id,
-          permissionId: permission.id,
+          roleId,
+          permissionId,
         },
       });
     }
@@ -5246,11 +5283,13 @@ async function seedPlatformInfrastructure() {
   }
 }
 
-main()
-  .catch((error) => {
-    console.error('❌ Seed failed:', error);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (require.main === module) {
+  main()
+    .catch((error) => {
+      console.error('❌ Seed failed:', error);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

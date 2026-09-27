@@ -304,6 +304,7 @@ describeDatabase(
             data: {
               tenantId,
               name: 'admin',
+              isSystem: true,
               rolePermissions: { create: { permissionId: permission.id } },
             },
           }),
@@ -994,9 +995,34 @@ describeDatabase(
         ).toBe(1);
       });
       it('permission replacement rolls back when its audit fails', async () => {
+        const customRole = await roles.createRole(
+          { name: 'synthetic-permission-rollback' },
+          actor,
+        );
+        const readPermission = await scoped(() =>
+          prisma.permission.findUnique({
+            where: {
+              resource_action: {
+                resource: 'users',
+                action: 'reset_password',
+              },
+            },
+          }),
+        );
+        if (!readPermission) {
+          throw new Error('Expected users:reset_password permission fixture');
+        }
+        await scoped(() =>
+          prisma.rolePermission.create({
+            data: {
+              roleId: customRole.id,
+              permissionId: readPermission.id,
+            },
+          }),
+        );
         const before = await scoped(() =>
           prisma.rolePermission.findMany({
-            where: { roleId: adminRoleId },
+            where: { roleId: customRole.id },
             orderBy: { permissionId: 'asc' },
           }),
         );
@@ -1004,8 +1030,29 @@ describeDatabase(
           .spyOn(audit, 'record')
           .mockRejectedValueOnce(new Error('Synthetic audit failure'));
         await expect(
-          roles.assignPermissions(adminRoleId, { permissionIds: [] }, actor),
+          roles.assignPermissions(customRole.id, { permissionIds: [] }, actor),
         ).rejects.toThrow('Synthetic audit failure');
+        expect(
+          await scoped(() =>
+            prisma.rolePermission.findMany({
+              where: { roleId: customRole.id },
+              orderBy: { permissionId: 'asc' },
+            }),
+          ),
+        ).toEqual(before);
+      });
+      it('rejects direct system-template permission replacement without changing grants', async () => {
+        const before = await scoped(() =>
+          prisma.rolePermission.findMany({
+            where: { roleId: adminRoleId },
+            orderBy: { permissionId: 'asc' },
+          }),
+        );
+
+        await expect(
+          roles.assignPermissions(adminRoleId, { permissionIds: [] }, actor),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
         expect(
           await scoped(() =>
             prisma.rolePermission.findMany({
@@ -1161,9 +1208,10 @@ describeDatabase(
       });
 
       it('a suspended Accountant assignment cannot make finance authority appear available', async () => {
-        const accountant = await roles.createRole(
-          { name: 'accountant' },
-          actor,
+        const accountant = await scoped(() =>
+          prisma.role.create({
+            data: { tenantId, name: 'accountant', isSystem: true },
+          }),
         );
         await roles.assignRoles(
           { userId: targetId, roleIds: [accountant.id] },

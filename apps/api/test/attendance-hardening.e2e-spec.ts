@@ -269,6 +269,18 @@ describe('Attendance Hardening (E2E)', () => {
     await moduleRef?.close();
   });
 
+  it('denies a teacher bulk staff-attendance submission even with attendance:mark', async () => {
+    await expect(
+      attendanceController.submitStaffAttendance(
+        {
+          attendanceDate: '2026-04-28',
+          records: [{ staffId: 'staff-1', status: AttendanceStatus.PRESENT }],
+        },
+        teacherActor,
+      ),
+    ).rejects.toThrow('Bulk staff attendance is limited to HR administrators');
+  });
+
   describe('Attendance Monthly Register Export Scoping & Metadata', () => {
     it('allows admin to export attendance register and verifies retained file registry metadata', async () => {
       const result = await attendanceController.exportMonthlyRegister(

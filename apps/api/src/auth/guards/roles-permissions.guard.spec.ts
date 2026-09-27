@@ -107,13 +107,15 @@ describe('RolesPermissionsGuard', () => {
     );
   });
 
-  it('retains permission alias semantics for ordinary school sessions', async () => {
+  it('does not infer cross-module approval read from ordinary school settings read', async () => {
     (reflector.getAllAndOverride as jest.Mock)
       .mockReturnValueOnce([])
       .mockReturnValueOnce(['advanced:approvals:read']);
     request.auth.permissions = ['settings:read'];
 
-    await expect(guard.canActivate(context)).resolves.toBe(true);
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 
   it('does not let a support override satisfy a role-gated school route', async () => {

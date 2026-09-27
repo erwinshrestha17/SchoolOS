@@ -9,7 +9,7 @@
     "build": "pnpm compile:artifacts && pnpm check:core-imports && pnpm --filter @schoolos/core build && pnpm check:core-dist && pnpm --filter @schoolos/api build && pnpm --filter @schoolos/web build",
     "lint": "pnpm compile:artifacts && pnpm check:core-imports && pnpm format:check && pnpm --filter @schoolos/api lint:check && pnpm --filter @schoolos/web lint",
     "typecheck": "pnpm compile:artifacts && pnpm check:core-imports && pnpm --filter @schoolos/core typecheck && pnpm --filter @schoolos/core build && pnpm check:core-dist && pnpm --filter @schoolos/api typecheck && pnpm --filter @schoolos/web typecheck",
-    "test": "pnpm compile:artifacts && pnpm check:core-imports && pnpm --filter @schoolos/api test && pnpm --filter @schoolos/web test",
+    "test": "pnpm compile:artifacts && pnpm check:core-imports && pnpm --filter @schoolos/core build && pnpm --filter @schoolos/core test && pnpm --filter @schoolos/api test && pnpm --filter @schoolos/web test",
     "test:e2e": "pnpm --filter @schoolos/api test:e2e",
     "test:integration": "pnpm --filter @schoolos/api test:integration",
     "check:core-imports": "node scripts/check-core-imports.mjs",

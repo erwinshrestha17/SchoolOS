@@ -1719,6 +1719,10 @@ export const systemRoleDefinitions = [
   },
   { name: "admin", description: "System preset role for admin" },
   {
+    name: "admissions_officer",
+    description: "School admissions intake and enrollment creation",
+  },
+  {
     name: "school_config_owner",
     description:
       "School Configuration Owner with full authority over this school's settings, delegation, and configuration audit",
@@ -1737,6 +1741,14 @@ export const systemRoleDefinitions = [
   { name: "parent", description: "System preset role for parent" },
   { name: "accountant", description: "System preset role for accountant" },
   {
+    name: "cashier",
+    description: "School fee collection and receipt lookup",
+  },
+  {
+    name: "finance_approver",
+    description: "Finance approval authority for finance-scoped workflows",
+  },
+  {
     name: "financial_auditor",
     description:
       "Time-bounded read-only financial evidence and protected export access",
@@ -1745,9 +1757,28 @@ export const systemRoleDefinitions = [
     name: "hr_manager",
     description: "System preset role for HR/staff administration",
   },
+  {
+    name: "payroll_preparer",
+    description: "Prepare payroll runs without review or approval authority",
+  },
+  {
+    name: "payroll_reviewer",
+    description:
+      "Review payroll runs without preparation or approval authority",
+  },
+  {
+    name: "payroll_approver",
+    description:
+      "Approve payroll runs without preparation or posting authority",
+  },
   { name: "librarian", description: "System preset role for librarian" },
   { name: "driver", description: "System preset role for driver" },
 ] as const;
+
+for (const definition of systemRoleDefinitions) Object.freeze(definition);
+Object.freeze(systemRoleDefinitions);
+
+export type SystemRoleName = (typeof systemRoleDefinitions)[number]["name"];
 
 /**
  * Platform identities are a separate security domain from school identities.
@@ -1767,16 +1798,12 @@ export function isPlatformRoleName(value: string): boolean {
   return value.trim().toLowerCase().startsWith("platform_");
 }
 
-export const SCHOOL_SYSTEM_ROLE_DEFINITIONS = systemRoleDefinitions.filter(
-  ({ name }) => !isPlatformRoleName(name),
+export const SCHOOL_SYSTEM_ROLE_DEFINITIONS = Object.freeze(
+  systemRoleDefinitions.filter(({ name }) => !isPlatformRoleName(name)),
 );
 
-export const PLATFORM_SYSTEM_ROLE_DEFINITIONS = systemRoleDefinitions.filter(
-  ({ name }) => isPlatformRoleName(name),
-);
-
-const ALL_PERMISSION_KEYS = permissionCatalog.map(({ resource, action }) =>
-  buildPermissionKey(resource, action),
+export const PLATFORM_SYSTEM_ROLE_DEFINITIONS = Object.freeze(
+  systemRoleDefinitions.filter(({ name }) => isPlatformRoleName(name)),
 );
 
 export const PLATFORM_PERMISSION_KEYS = [
@@ -1814,17 +1841,6 @@ export function isPlatformPermissionKey(value: string): boolean {
   return value === "tenants:manage" || value.startsWith("platform:");
 }
 
-const REMOVED_CHAT_WRITE_PERMISSION_KEYS = [
-  "messaging:create",
-  "messaging:manage",
-];
-
-const TENANT_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
-  (key) =>
-    !isPlatformPermissionKey(key) &&
-    !REMOVED_CHAT_WRITE_PERMISSION_KEYS.includes(key),
-);
-
 /**
  * Canonical name of the tenant-scoped School Configuration Owner role.
  * At least one active user per tenant must keep this role; role assignment
@@ -1832,7 +1848,7 @@ const TENANT_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
  */
 export const SCHOOL_CONFIG_OWNER_ROLE = "school_config_owner";
 
-const SETTINGS_DOMAIN_MANAGE_KEYS = [
+const SETTINGS_DOMAIN_MANAGE_KEYS: PermissionKey[] = [
   "settings:identity:manage",
   "settings:academic:manage",
   "settings:attendance:manage",
@@ -1847,15 +1863,29 @@ const SETTINGS_DOMAIN_MANAGE_KEYS = [
  * PRD 11.12 / PPR-P0-01: Principal preset uses an explicit allowlist.
  * New tenant permissions must not silently flow into this role.
  */
-const PRINCIPAL_ACCOUNTING_READ_KEYS = permissionCatalog
-  .filter(
-    ({ resource, action }) =>
-      (resource.startsWith("accounting") || resource === "accounting") &&
-      (action === "read" || resource === "accounting:reports"),
-  )
-  .map(({ resource, action }) =>
-    buildPermissionKey(resource, action),
-  ) as PermissionKey[];
+const PRINCIPAL_ACCOUNTING_READ_KEYS: PermissionKey[] = [
+  "accounting:read",
+  "accounting:accounts:read",
+  "accounting:journals:read",
+  "accounting:reports:read",
+  "accounting:audit:read",
+  "accounting:reports:trial-balance",
+  "accounting:reports:general-ledger",
+  "accounting:reports:cash-book",
+  "accounting:reports:income-statement",
+  "accounting:reports:balance-sheet",
+  "accounting:reports:tax-summary",
+  "accounting:settings:read",
+  "accounting:posting-batches:read",
+  "accounting:payroll-handoff:read",
+  "accounting:expenses:read",
+  "accounting:vendors:read",
+  "accounting:payables:read",
+  "accounting:reconciliation:read",
+  "accounting:budgets:read",
+  "accounting:reports:budget-vs-actual",
+  "accounting:reports:cash-flow-statement",
+];
 
 const PRINCIPAL_OVERSIGHT_READ_KEYS: PermissionKey[] = [
   // identity and inbox
@@ -1923,24 +1953,233 @@ export const PRINCIPAL_PERMISSION_KEYS: PermissionKey[] = [
   ]),
 ];
 
-const ADMIN_EXCLUDED_FINANCE_KEYS = TENANT_PERMISSION_KEYS.filter((key) => {
-  const [root] = key.split(":");
-  return (
-    [
-      "accounting",
-      "fees",
-      "payments",
-      "receipts",
-      "ledger",
-      "payroll",
-      "finance",
-    ].includes(root) ||
-    key === "settings:finance:manage" ||
-    key === "settings:accounting:manage"
-  );
-});
+/** Reviewed Phase 1A allowlist: new catalog keys grant no Admin authority by default. */
+const ADMIN_PERMISSION_KEYS: PermissionKey[] = [
+  "classes:create",
+  "classes:read",
+  "streams:create",
+  "streams:read",
+  "academic_years:create",
+  "academic_years:read",
+  "sections:create",
+  "sections:read",
+  "academics:manage",
+  "academics:read",
+  "academics:enter_marks",
+  "academics:manage_report_cards",
+  "academics:create",
+  "academics:update",
+  "academics:delete",
+  "exam-terms:read",
+  "exam-terms:manage",
+  "exam-terms:unlock",
+  "assessment-components:read",
+  "assessment-components:manage",
+  "marks:read",
+  "marks:manage",
+  "marks:review_lock",
+  "academics:cas:manage",
+  "cas-records:read",
+  "cas-records:manage",
+  "results:read",
+  "results:publish",
+  "results:unpublish",
+  "academics:report_cards:review",
+  "timetable:manage",
+  "timetable:read_published",
+  "timetable:read",
+  "timetable:create",
+  "timetable:update",
+  "timetable:delete",
+  "timetable:publish",
+  "timetable:substitute",
+  "homework:create",
+  "homework:read_published",
+  "homework:read",
+  "homework:review",
+  "homework:update",
+  "homework:delete",
+  "homework:notify",
+  "homework:submit",
+  "activity_feed:create",
+  "activity_feed:read",
+  "activity_feed:moderate",
+  "advanced:approvals:read",
+  "advanced:approvals:manage",
+  "advanced:approvals:decide",
+  "advanced:automation:read",
+  "advanced:automation:manage",
+  "advanced:automation:execute",
+  "advanced:analytics:read",
+  "advanced:analytics:refresh",
+  "advanced:documents:read",
+  "advanced:documents:manage",
+  "advanced:exports:read",
+  "advanced:exports:create",
+  "attendance:mark",
+  "attendance:read",
+  "attendance:review_conflicts",
+  "attendance:manage_all",
+  "attendance:override_lock",
+  "attendance:staff:update",
+  "users:create",
+  "users:read",
+  "users:update_status",
+  "users:reset_password",
+  "roles:read",
+  "roles:create",
+  "roles:assign",
+  "roles:manage_permissions",
+  "canteen:menu:create",
+  "canteen:menu:read",
+  "canteen:menu:update",
+  "canteen:plans:create",
+  "canteen:plans:read",
+  "canteen:plans:update",
+  "canteen:enrollments:create",
+  "canteen:enrollments:read",
+  "canteen:enrollments:update",
+  "canteen:serving:create",
+  "canteen:serving:read",
+  "canteen:serving:update",
+  "canteen:wallets:create",
+  "canteen:wallets:read",
+  "canteen:wallets:update",
+  "canteen:pos:create",
+  "canteen:pos:read",
+  "canteen:pos:update",
+  "canteen:inventory:read",
+  "canteen:inventory:update",
+  "canteen:controls:create",
+  "canteen:controls:read",
+  "canteen:controls:update",
+  "canteen:reports:read",
+  "canteen:parent:read",
+  "notifications:view_own",
+  "notifications:manage_templates",
+  "notifications:manage_preferences",
+  "notifications:view_delivery_diagnostics",
+  "notifications:retry_deliveries",
+  "notices:create",
+  "notices:edit",
+  "notices:publish",
+  "notices:schedule",
+  "notices:cancel",
+  "notices:archive",
+  "notices:read",
+  "notices:approve",
+  "notices:send_emergency",
+  "notices:read_reports",
+  "events:create",
+  "events:read",
+  "communications:read_deliveries",
+  "communications:retry_deliveries",
+  "communications:manage_templates",
+  "communications:manage_consent",
+  "consents:manage",
+  "service_requests:create",
+  "service_requests:read",
+  "service_requests:manage",
+  "hr:manage",
+  "hr:read",
+  "hr:staff:read",
+  "hr:staff:create",
+  "hr:staff:update",
+  "hr:staff:lifecycle",
+  "hr:staff:terminate",
+  "hr:staff:archive",
+  "hr:attendance:read",
+  "hr:attendance:write",
+  "hr:attendance:correct",
+  "hr:leave:read",
+  "hr:leave:request",
+  "hr:leave:approve",
+  "hr:leave:adjust",
+  "learning:read",
+  "learning:manage",
+  "learning:create",
+  "learning:update",
+  "learning:delete",
+  "learning:launch",
+  "learning:attempt",
+  "learning:progress",
+  "library:read",
+  "library:manage",
+  "library:books:create",
+  "library:books:read",
+  "library:books:update",
+  "library:copies:create",
+  "library:copies:read",
+  "library:copies:update",
+  "library:issues:create",
+  "library:issues:read",
+  "library:issues:return",
+  "library:fines:create",
+  "library:fines:update",
+  "library:fines:post",
+  "library:reports:read",
+  "library:reports:export",
+  "messaging:read",
+  "tenants:read",
+  "settings:read_public",
+  "settings:read",
+  "settings:manage",
+  "settings:delegate",
+  "settings:audit:read",
+  "settings:identity:manage",
+  "settings:academic:manage",
+  "settings:attendance:manage",
+  "settings:hr:manage",
+  "settings:communication:manage",
+  "settings:security:manage",
+  "reports:read",
+  "reports:export",
+  "staff:create",
+  "staff:read",
+  "staff:update",
+  "students:create",
+  "students:read",
+  "students:update",
+  "students:delete",
+  "students:manage_lifecycle",
+  "admission_policy:read",
+  "admission_policy:manage",
+  "students:qr:generate",
+  "students:qr:read",
+  "students:qr:rotate",
+  "students:qr:revoke",
+  "students:qr:resolve",
+  "students:qr:resolve_all",
+  "guardians:create",
+  "guardians:read",
+  "guardians:update",
+  "guardians:verify",
+  "student_documents:manage",
+  "siblings:manage",
+  "enrollments:create",
+  "enrollments:read",
+  "transport:read",
+  "transport:manage",
+  "transport:operate",
+  "transport:routes:create",
+  "transport:routes:read",
+  "transport:routes:update",
+  "transport:vehicles:create",
+  "transport:vehicles:read",
+  "transport:vehicles:update",
+  "transport:assignments:create",
+  "transport:assignments:read",
+  "transport:assignments:update",
+  "transport:trips:create",
+  "transport:trips:read",
+  "transport:trips:update",
+  "transport:location:read",
+  "transport:location:update",
+  "transport:tracking:parent",
+  "transport:reports:read",
+];
 
-const SCHOOL_CONFIG_OWNER_PERMISSION_KEYS = [
+const SCHOOL_CONFIG_OWNER_PERMISSION_KEYS: PermissionKey[] = [
   "settings:read_public",
   "settings:read",
   "settings:manage",
@@ -1968,10 +2207,20 @@ const SCHOOL_CONFIG_OWNER_PERMISSION_KEYS = [
   "reports:read",
 ];
 
-export const systemRolePermissions: Record<string, string[]> = {
-  admin: TENANT_PERMISSION_KEYS.filter(
-    (key) => !ADMIN_EXCLUDED_FINANCE_KEYS.includes(key),
-  ),
+const reviewedSystemRolePermissions: Record<SystemRoleName, PermissionKey[]> = {
+  admin: [...ADMIN_PERMISSION_KEYS],
+  admissions_officer: [
+    "settings:read_public",
+    "admission_policy:read",
+    "classes:read",
+    "sections:read",
+    "streams:read",
+    "academic_years:read",
+    "students:create",
+    "guardians:create",
+    "enrollments:create",
+    "enrollments:read",
+  ],
   school_config_owner: [...SCHOOL_CONFIG_OWNER_PERMISSION_KEYS],
   principal: [...PRINCIPAL_PERMISSION_KEYS],
   teacher: [
@@ -2169,6 +2418,12 @@ export const systemRolePermissions: Record<string, string[]> = {
     "service_requests:read",
     "service_requests:manage",
   ],
+  cashier: ["settings:read_public", "payments:collect", "receipts:read"],
+  finance_approver: [
+    "settings:read_public",
+    "finance:approvals:read",
+    "finance:approvals:decide",
+  ],
   financial_auditor: [
     "settings:read_public",
     "settings:read",
@@ -2234,6 +2489,30 @@ export const systemRolePermissions: Record<string, string[]> = {
     "settings:hr:manage",
     "reports:read",
   ],
+  payroll_preparer: [
+    "settings:read_public",
+    "hr:staff:read",
+    "hr:attendance:read",
+    "hr:leave:read",
+    "payroll:salary:read",
+    "payroll:run:create",
+    "payroll:run:read",
+  ],
+  payroll_reviewer: [
+    "settings:read_public",
+    "hr:staff:read",
+    "hr:attendance:read",
+    "hr:leave:read",
+    "payroll:salary:read",
+    "payroll:run:read",
+    "payroll:run:review",
+  ],
+  payroll_approver: [
+    "settings:read_public",
+    "payroll:salary:read",
+    "payroll:run:read",
+    "payroll:run:approve",
+  ],
   librarian: [
     "roles:read",
     "classes:read",
@@ -2275,16 +2554,88 @@ export const systemRolePermissions: Record<string, string[]> = {
   ],
 };
 
-export const SCHOOL_SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> =
+/**
+ * Existing consumers use mutable-array types. Preserve that TypeScript surface
+ * during Phase 1A, while freezing every definition at runtime so a consumer
+ * cannot alter a canonical template before provisioning or reconciliation.
+ */
+export const systemRolePermissions: Record<string, string[]> = Object.freeze(
   Object.fromEntries(
-    Object.entries(systemRolePermissions).filter(
-      ([roleName]) => !isPlatformRoleName(roleName),
+    Object.entries(reviewedSystemRolePermissions).map(([name, grants]) => [
+      name,
+      Object.freeze([...grants]),
+    ]),
+  ),
+) as unknown as Record<string, string[]>;
+
+/**
+ * Versioned SchoolOS-owned templates. Existing role names remain stable for
+ * persisted grants; display names identify the Phase 1A baseline templates.
+ * A later template-grant change must deliberately advance that template's
+ * version and review its tenant migration separately.
+ */
+const SYSTEM_ROLE_TEMPLATE_IDENTITIES: Record<
+  SystemRoleName,
+  { displayName: string; version: number }
+> = {
+  platform_super_admin: { displayName: "Platform Super Admin", version: 1 },
+  platform_support: { displayName: "Platform Support", version: 1 },
+  platform_billing_admin: { displayName: "Platform Billing Admin", version: 1 },
+  school_config_owner: { displayName: "School Access Owner", version: 1 },
+  admin: { displayName: "School Admin", version: 1 },
+  principal: { displayName: "Principal", version: 1 },
+  admissions_officer: { displayName: "Admissions Officer", version: 1 },
+  teacher: { displayName: "Teacher", version: 1 },
+  subject_teacher: { displayName: "Subject Teacher", version: 1 },
+  support_staff: { displayName: "Support Staff", version: 1 },
+  hr_manager: { displayName: "HR Manager", version: 1 },
+  payroll_preparer: { displayName: "Payroll Preparer", version: 1 },
+  payroll_reviewer: { displayName: "Payroll Reviewer", version: 1 },
+  payroll_approver: { displayName: "Payroll Approver", version: 1 },
+  cashier: { displayName: "Cashier", version: 1 },
+  accountant: { displayName: "Accountant", version: 1 },
+  finance_approver: { displayName: "Finance Approver", version: 1 },
+  financial_auditor: { displayName: "Auditor", version: 1 },
+  parent: { displayName: "Parent/Guardian", version: 1 },
+  student: { displayName: "Student", version: 1 },
+  librarian: { displayName: "Librarian", version: 1 },
+  driver: { displayName: "Driver", version: 1 },
+};
+
+export interface SystemRoleTemplate {
+  readonly key: SystemRoleName;
+  readonly displayName: string;
+  readonly version: number;
+  readonly securityDomain: "SCHOOL" | "PLATFORM";
+  readonly permissions: readonly PermissionKey[];
+}
+
+export const systemRoleTemplates: readonly SystemRoleTemplate[] = Object.freeze(
+  systemRoleDefinitions.map(({ name }) =>
+    Object.freeze({
+      key: name,
+      displayName: SYSTEM_ROLE_TEMPLATE_IDENTITIES[name].displayName,
+      version: SYSTEM_ROLE_TEMPLATE_IDENTITIES[name].version,
+      securityDomain: isPlatformRoleName(name) ? "PLATFORM" : "SCHOOL",
+      permissions: Object.freeze([...reviewedSystemRolePermissions[name]]),
+    }),
+  ),
+);
+
+export const SCHOOL_SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> =
+  Object.freeze(
+    Object.fromEntries(
+      Object.entries(systemRolePermissions).filter(
+        ([roleName]) => !isPlatformRoleName(roleName),
+      ),
     ),
   );
 
 export const PLATFORM_SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> =
-  Object.fromEntries(
-    Object.entries(systemRolePermissions).filter(([roleName]) =>
-      isPlatformRoleName(roleName),
+  Object.freeze(
+    Object.fromEntries(
+      Object.entries(systemRolePermissions).filter(([roleName]) =>
+        isPlatformRoleName(roleName),
+      ),
     ),
   );

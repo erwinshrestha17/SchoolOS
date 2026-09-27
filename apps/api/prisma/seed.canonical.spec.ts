@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { SCHOOL_ROLE_DEFINITIONS } from '../src/rbac/rbac.defaults';
+import { seedRolePermissions, seedRoles } from './seed';
 
 describe('canonical development seed', () => {
   const source = readFileSync(join(__dirname, 'seed.ts'), 'utf8');
@@ -136,9 +138,108 @@ describe('canonical development seed', () => {
     }
   });
 
+  it('refuses a custom-role/template name collision before changing any role', async () => {
+    expect(SCHOOL_ROLE_DEFINITIONS.map(({ name }) => name)).toContain(
+      'cashier',
+    );
+    const roleDelegate = {
+      findMany: jest.fn().mockResolvedValue([{ name: ' CASHIER ' }]),
+      upsert: jest.fn(),
+    };
+
+    await expect(seedRoles('school-1', roleDelegate as never)).rejects.toThrow(
+      /existing custom role names collide with built-in templates: cashier/i,
+    );
+
+    expect(roleDelegate.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'school-1',
+        isSystem: false,
+      },
+      select: { name: true },
+    });
+    expect(roleDelegate.upsert).not.toHaveBeenCalled();
+  });
+
+  it('does not promote an existing custom role during a system-role upsert', async () => {
+    const roleDelegate = {
+      findMany: jest.fn().mockResolvedValue([]),
+      upsert: jest.fn().mockResolvedValue({ id: 'system-role-1' }),
+    };
+
+    await seedRoles('school-1', roleDelegate as never);
+
+    expect(roleDelegate.upsert).toHaveBeenCalledTimes(
+      SCHOOL_ROLE_DEFINITIONS.length,
+    );
+    for (const callArgs of roleDelegate.upsert.mock.calls) {
+      const call = callArgs[0] as {
+        update: Record<string, unknown>;
+        create: { isSystem: boolean };
+      };
+      expect(call.update).not.toHaveProperty('isSystem');
+      expect(call.create.isSystem).toBe(true);
+    }
+  });
+
+  it('refuses to replace grants if a colliding custom role appears after preflight', async () => {
+    const database = {
+      role: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce({ id: 'system-role', isSystem: true })
+          .mockResolvedValueOnce({
+            id: 'legacy-custom-role',
+            isSystem: false,
+          }),
+      },
+      rolePermission: {
+        deleteMany: jest.fn(),
+        create: jest.fn(),
+      },
+      permission: { findUnique: jest.fn() },
+    };
+
+    await expect(
+      seedRolePermissions('school-1', database as never),
+    ).rejects.toThrow(/conflicts with a custom role/);
+
+    expect(database.role.findUnique).toHaveBeenCalledTimes(2);
+    expect(database.rolePermission.deleteMany).not.toHaveBeenCalled();
+    expect(database.rolePermission.create).not.toHaveBeenCalled();
+    expect(database.permission.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('checks all configured permissions before deleting any system-role grant', async () => {
+    const database = {
+      role: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 'system-role', isSystem: true }),
+      },
+      rolePermission: {
+        deleteMany: jest.fn(),
+        create: jest.fn(),
+      },
+      permission: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
+
+    await expect(
+      seedRolePermissions('school-1', database as never),
+    ).rejects.toThrow(/Permission .+ was not created/);
+
+    expect(database.role.findUnique).toHaveBeenCalledTimes(
+      SCHOOL_ROLE_DEFINITIONS.length,
+    );
+    expect(database.rolePermission.deleteMany).not.toHaveBeenCalled();
+    expect(database.rolePermission.create).not.toHaveBeenCalled();
+  });
+
   it('keeps controlled-pilot rehearsal fixtures out of production and logs', () => {
     for (const rehearsalSource of [pilotRehearsalSource, pilotPersonaSource]) {
-      expect(rehearsalSource).toContain("process.env.NODE_ENV === 'production'");
+      expect(rehearsalSource).toContain(
+        "process.env.NODE_ENV === 'production'",
+      );
       expect(rehearsalSource).toContain(
         "process.env.SCHOOLOS_PILOT_REHEARSAL_FIXTURES !== 'true'",
       );

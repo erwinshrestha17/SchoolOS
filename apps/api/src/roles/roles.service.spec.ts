@@ -1,4 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
+import { permissionCatalog, systemRolePermissions } from '@schoolos/core';
 import { RolesService } from './roles.service';
 import { installSchoolGovernanceDouble } from '../../test/helpers/school-governance-double';
 
@@ -162,6 +163,32 @@ describe('RolesService role inspection', () => {
       expect(prisma.role.create).not.toHaveBeenCalled();
     },
   );
+
+  it.each(['admin', ' PRINCIPAL ', 'school_config_owner'])(
+    'rejects reserved system role name %p before creating a custom role',
+    async (name) => {
+      const prisma = {
+        role: {
+          findUnique: jest.fn(),
+          create: jest.fn(),
+        },
+      };
+      const service = new RolesService(
+        prisma as never,
+        auditService as never,
+        authzCacheDouble(),
+      );
+
+      await expect(
+        service.createRole(
+          { name, description: 'Impersonated template' } as never,
+          { tenantId: 'tenant-1', userId: 'admin-1' } as never,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.role.findUnique).not.toHaveBeenCalled();
+      expect(prisma.role.create).not.toHaveBeenCalled();
+    },
+  );
 });
 
 /**
@@ -180,14 +207,14 @@ describe('RolesService authorization cache invalidation', () => {
       role: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'role-1',
-          name: 'teacher',
+          name: 'custom_teacher',
           isSystem: false,
         }),
         findUnique: jest.fn().mockResolvedValue({ id: 'role-1' }),
         create: jest.fn().mockResolvedValue({ id: 'role-1' }),
         findMany: jest
           .fn()
-          .mockResolvedValue([{ id: 'role-1', name: 'teacher' }]),
+          .mockResolvedValue([{ id: 'role-1', name: 'custom_teacher' }]),
       },
       permission: {
         findMany: jest.fn().mockResolvedValue([
@@ -210,11 +237,12 @@ describe('RolesService authorization cache invalidation', () => {
         findFirst: jest.fn().mockResolvedValue({ id: 'user-9' }),
         findUnique: jest.fn().mockResolvedValue({ id: 'user-9' }),
       },
-      $transaction: jest.fn(async (work: (tx: unknown) => Promise<unknown>) =>
-        work(prisma),
-      ),
+      $transaction: jest.fn(),
       ...overrides,
     };
+    prisma.$transaction.mockImplementation(
+      (work: (tx: unknown) => Promise<unknown>) => work(prisma),
+    );
     installSchoolGovernanceDouble(prisma, [
       'roles:assign',
       'roles:manage_permissions',
@@ -241,7 +269,7 @@ describe('RolesService authorization cache invalidation', () => {
   } as never;
 
   it('drops the whole tenant when a role permission set changes', async () => {
-    const { service, authzCache } = buildService();
+    const { service, authzCache, prisma } = buildService();
 
     await service.assignPermissions(
       'role-1',
@@ -252,7 +280,33 @@ describe('RolesService authorization cache invalidation', () => {
     // Every holder of the role is affected, not just the caller.
     expect(authzCache.invalidateTenant).toHaveBeenCalledWith('tenant-1');
     expect(authzCache.invalidateUser).not.toHaveBeenCalled();
+    expect(prisma.rolePermission.deleteMany).toHaveBeenCalled();
+    expect(prisma.rolePermission.createMany).toHaveBeenCalled();
   });
+
+  it.each([
+    { name: 'teacher', isSystem: true },
+    { name: 'principal', isSystem: false },
+  ])(
+    'rejects direct permission mutation of protected role $name',
+    async (role) => {
+      const { service, prisma, authzCache } = buildService();
+      prisma.role.findFirst.mockResolvedValue({ id: 'role-1', ...role });
+
+      await expect(
+        service.assignPermissions(
+          'role-1',
+          { permissionIds: ['perm-1'] } as never,
+          actor,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(prisma.permission.findMany).not.toHaveBeenCalled();
+      expect(prisma.rolePermission.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.rolePermission.createMany).not.toHaveBeenCalled();
+      expect(authzCache.invalidateTenant).not.toHaveBeenCalled();
+    },
+  );
 
   it('drops only the affected user when role membership changes', async () => {
     const { service, authzCache } = buildService();
@@ -397,5 +451,114 @@ describe('RolesService authorization cache invalidation', () => {
       }),
       prisma,
     );
+  });
+
+  it('allows canonical reconciliation of a true system role from the reviewed template only', async () => {
+    const permissionRows = permissionCatalog.map(({ resource, action }) => ({
+      id: `${resource}:${action}`,
+      resource,
+      action,
+    }));
+    const prisma = {
+      role: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'role-accountant',
+            name: 'accountant',
+            isSystem: true,
+            rolePermissions: [],
+          },
+        ]),
+      },
+      user: {},
+      userRole: {
+        count: jest.fn().mockResolvedValue(1),
+        findMany: jest.fn(),
+      },
+      permission: { findMany: jest.fn().mockResolvedValue(permissionRows) },
+      rolePermission: {
+        deleteMany: jest.fn(),
+        createMany: jest
+          .fn<
+            Promise<{ count: number }>,
+            [{ data: { roleId: string; permissionId: string }[] }]
+          >()
+          .mockResolvedValue({ count: 0 }),
+      },
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      (work: (tx: unknown) => Promise<unknown>) => work(prisma),
+    );
+    installSchoolGovernanceDouble(prisma, ['roles:manage_permissions']);
+    const service = new RolesService(
+      prisma as never,
+      { record: jest.fn() } as never,
+      authzCacheDouble(),
+    );
+
+    await service.reconcileFinancePermissions('Approved review', actor);
+
+    const created = prisma.rolePermission.createMany.mock.calls.flatMap(
+      ([call]) => call.data,
+    );
+    expect(created.length).toBeGreaterThan(0);
+    expect(created.every((grant) => grant.roleId === 'role-accountant')).toBe(
+      true,
+    );
+    expect(
+      created.every((grant) =>
+        systemRolePermissions.accountant.includes(grant.permissionId),
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects finance reconciliation against a non-system role impersonating a preset', async () => {
+    const prisma = {
+      role: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'role-accountant',
+            name: 'accountant',
+            isSystem: false,
+            rolePermissions: [],
+          },
+        ]),
+      },
+      user: {},
+      userRole: {
+        count: jest.fn().mockResolvedValue(1),
+        findMany: jest.fn(),
+      },
+      permission: { findMany: jest.fn() },
+      rolePermission: {
+        deleteMany: jest.fn(),
+        createMany: jest.fn(),
+      },
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation(
+      (work: (tx: unknown) => Promise<unknown>) => work(prisma),
+    );
+    installSchoolGovernanceDouble(prisma, ['roles:manage_permissions']);
+    const audit = { record: jest.fn() };
+    const authzCache = {
+      invalidateTenant: jest.fn(),
+      invalidateUser: jest.fn(),
+    };
+    const service = new RolesService(
+      prisma as never,
+      audit as never,
+      authzCache as never,
+    );
+
+    await expect(
+      service.reconcileFinancePermissions('Approved review', actor),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.permission.findMany).not.toHaveBeenCalled();
+    expect(prisma.rolePermission.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.rolePermission.createMany).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+    expect(authzCache.invalidateTenant).not.toHaveBeenCalled();
   });
 });

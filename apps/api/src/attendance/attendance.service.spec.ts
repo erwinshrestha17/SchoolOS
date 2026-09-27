@@ -3896,9 +3896,28 @@ describe('attendance production hardening', () => {
             },
           ],
         },
-        adminActor,
+        hrActor,
       ),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(
+      'Staff attendance can only be submitted for working days',
+    );
+  });
+
+  it('rejects a teacher bulk staff-attendance write despite attendance:mark', async () => {
+    const { service, prisma } = buildService({});
+
+    await expect(
+      service.submitStaffAttendance(
+        {
+          attendanceDate: '2026-04-28',
+          records: [{ staffId: 'staff-1', status: AttendanceStatus.PRESENT }],
+        },
+        teacherActor,
+      ),
+    ).rejects.toThrow('Bulk staff attendance is limited to HR administrators');
+
+    expect(prisma.staff.count).not.toHaveBeenCalled();
+    expect(prisma.staffAttendance.upsert).not.toHaveBeenCalled();
   });
 
   it('prevents leave approval from creating a negative balance', async () => {

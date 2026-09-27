@@ -1,0 +1,47 @@
+{
+  "scope": "Phase 1A, 1A.1 and 1A.2 only",
+  "starting_sha": "f764c313ee0f0f6e8a61ef0e90a36e118f2a558d",
+  "boundary": "Local logs are from the reviewed pre-commit change; exact final SHA and full hosted CI are recorded in the delivery response.",
+  "toolchain": {
+    "node": "22.23.2",
+    "pnpm": "10.12.1",
+    "prisma": "7.8.0",
+    "postgresql": "16.13",
+    "redis": "7.4.8"
+  },
+  "test_totals": {
+    "core": 12,
+    "api_unit": 3134,
+    "api_unit_suites": 273,
+    "web_unit": 666,
+    "api_http_e2e": 295,
+    "api_http_e2e_suites": 43,
+    "postgresql_integration": 203,
+    "postgresql_integration_suites": 12,
+    "final_targeted_api": 171
+  },
+  "migration_count": 112,
+  "api_lint": {
+    "errors": 0,
+    "warnings": 3628
+  },
+  "log_files": [
+    "install.log.gz",
+    "validate.log.gz",
+    "openapi.log.gz",
+    "typecheck.log.gz",
+    "lint.log.gz",
+    "core.log.gz",
+    "focused.log.gz",
+    "unit.log.gz",
+    "api-e2e.log.gz",
+    "migration.log.gz",
+    "auth-migration.log.gz",
+    "admission-migration.log.gz",
+    "preflight.log.gz",
+    "seed.log.gz",
+    "drift.log.gz",
+    "integration.log.gz",
+    "build.log.gz"
+  ]
+}

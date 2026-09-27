@@ -3600,6 +3600,19 @@ export class AttendanceService {
     dto: SubmitStaffAttendanceDto,
     actor: AuthContext,
   ) {
+    // Legacy staff routes accept student-attendance grants, directly or via
+    // aliases. Bulk staff writes still require a direct HR grant; the
+    // self-attendance service remains scoped to the caller.
+    const permissions = actor.permissions;
+    if (
+      !permissions.includes('hr:attendance:write') &&
+      !permissions.includes('hr:manage')
+    ) {
+      throw new ForbiddenException(
+        'Bulk staff attendance is limited to HR administrators',
+      );
+    }
+
     const attendanceDate = stripTime(new Date(dto.attendanceDate));
     const calendarDay = await this.resolveCalendarDay(
       actor.tenantId,
