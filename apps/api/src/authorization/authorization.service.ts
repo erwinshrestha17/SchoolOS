@@ -1,3 +1,4 @@
+import { grantAllows, scopesMatch } from './scopes/scope-resolver';
 import { Injectable, Logger } from '@nestjs/common';
 import { SecurityDomain } from '@prisma/client';
 import {
@@ -47,6 +48,32 @@ export class AuthorizationService {
       const actor = input.actor
         ? Object.freeze({
             ...input.actor,
+            accessGrants: input.actor.accessGrants
+              ? Object.freeze(
+                  input.actor.accessGrants.map((grant) =>
+                    Object.freeze({
+                      ...grant,
+                      permissions: Object.freeze([...grant.permissions]),
+                      scopes: Object.freeze(
+                        grant.scopes.map((scope) =>
+                          Object.freeze({
+                            ...scope,
+                            effectiveFrom: new Date(
+                              scope.effectiveFrom,
+                            ).toISOString(),
+                            expiresAt: scope.expiresAt
+                              ? new Date(scope.expiresAt).toISOString()
+                              : null,
+                            revokedAt: scope.revokedAt
+                              ? new Date(scope.revokedAt).toISOString()
+                              : null,
+                          }),
+                        ),
+                      ),
+                    }),
+                  ),
+                )
+              : undefined,
             roles: Object.freeze([...input.actor.roles]) as unknown as string[],
             supportOverrideScopes: input.actor.supportOverrideScopes
               ? (Object.freeze([
@@ -61,9 +88,12 @@ export class AuthorizationService {
           })
         : undefined;
       const definitions = input.requestedPermissions.map(resolvePermission);
-      const context: AuthorizationContext = Object.freeze({
+      let context: AuthorizationContext = Object.freeze({
         ...input,
         actor,
+        resourceScope: input.resourceScope
+          ? Object.freeze({ ...input.resourceScope })
+          : undefined,
         identity: input.identity
           ? Object.freeze({ ...input.identity })
           : undefined,
@@ -114,6 +144,19 @@ export class AuthorizationService {
 
       for (stage of AUTHORIZATION_STAGES) {
         policyId = `builtin.${stage}`;
+        if (stage === 'RESOURCE_TENANT' && context.resourceLookup) {
+          const owned = await context.resourceLookup();
+          if (!owned)
+            return this.finish(
+              context,
+              this.decision('RESOURCE_NOT_FOUND', stage, policyId, definitions),
+            );
+          context = Object.freeze({
+            ...context,
+            resource: Object.freeze({ id: owned.id, tenantId: owned.tenantId }),
+            resourceScope: Object.freeze({ ...owned.scope }),
+          });
+        }
         const result = await this.evaluateBuiltin(stage, context, definitions);
         if (result.outcome === 'DENY') {
           return this.finish(
@@ -285,9 +328,10 @@ export class AuthorizationService {
         )
           return deny('ROLE_MISSING');
         const grants =
-          actor?.permissions.map(
-            (key) => resolvePermission(key)?.legacyKey ?? key,
-          ) ?? [];
+          (actor?.accessGrants && !actor.isSupportOverride
+            ? actor.accessGrants.flatMap((g) => [...g.permissions])
+            : actor?.permissions
+          )?.map((key) => resolvePermission(key)?.legacyKey ?? key) ?? [];
         for (const definition of definitions) {
           if (!definition) return deny('UNKNOWN_PERMISSION');
           const exact =
@@ -302,8 +346,39 @@ export class AuthorizationService {
         }
         return NA;
       }
+      case 'SCOPE':
+        if (
+          !actor?.accessGrants ||
+          actor.isSupportOverride ||
+          context.securityDomain === SecurityDomain.PLATFORM
+        )
+          return NA;
+        if (
+          context.requiredRoles?.length &&
+          !actor.accessGrants.some(
+            (grant) =>
+              context.requiredRoles?.includes(grant.role) &&
+              grant.scopes.length === 1 &&
+              grant.scopes[0].scopeType === 'TENANT' &&
+              grant.tenantId === context.trustedTenantId &&
+              scopesMatch(grant.scopes, context.trustedTenantId ?? ''),
+          )
+        )
+          return deny('SCOPE_MISMATCH');
+        return context.requestedPermissions.every((permission) =>
+          actor.accessGrants?.some((grant) =>
+            grantAllows(
+              grant,
+              permission,
+              context.trustedTenantId ?? '',
+              context.resourceScope,
+            ),
+          ),
+        )
+          ? NA
+          : deny('SCOPE_MISMATCH');
       default:
-        // Scope/relationship/lifecycle/SoD/step-up/projection are extension
+        // Relationship/lifecycle/SoD/step-up/projection are extension
         // points. Existing domain services still enforce their own policies.
         return NA;
     }

@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { FileRegistryService } from '../src/file-registry/file-registry.service';
@@ -86,7 +86,7 @@ describe('SchoolOS File Registry (E2E)', () => {
     // 3. Tenant B CANNOT fetch metadata (Tenant Isolation)
     await expect(
       fileRegistryService.getFileMetadata(tenantBId, assetA.id),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).rejects.toBeInstanceOf(NotFoundException);
 
     // 4. List files by entity
     const files = await fileRegistryService.listFilesByEntity(

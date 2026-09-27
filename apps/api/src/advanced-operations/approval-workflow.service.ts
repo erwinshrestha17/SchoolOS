@@ -1,3 +1,4 @@
+import { unrestrictedRoleAssignmentsWhere } from '../authorization/scopes/unrestricted-role-where';
 import {
   BadRequestException,
   ConflictException,
@@ -451,7 +452,7 @@ export class ApprovalWorkflowService {
       select: {
         id: true,
         userRoles: {
-          where: { tenantId: actor.tenantId },
+          where: unrestrictedRoleAssignmentsWhere(actor.tenantId),
           select: {
             role: {
               select: {

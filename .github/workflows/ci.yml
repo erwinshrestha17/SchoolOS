@@ -178,6 +178,14 @@ jobs:
           DATABASE_URL="$SCHOOLOS_AUTH_TEST_DATABASE_URL" pnpm --filter @schoolos/api exec prisma migrate deploy
           DATABASE_URL="$SCHOOLOS_ADMISSION_TEST_DATABASE_URL" pnpm --filter @schoolos/api exec prisma migrate deploy
 
+      - name: Replay typed scope migration with legacy and corrupt fixtures
+        env:
+          PGPASSWORD: password123
+          DATABASE_URL: postgresql://schoolos:password123@localhost:5433/schoolos_scope_migration_test?schema=public
+        run: |
+          createdb -h localhost -p 5433 -U schoolos schoolos_scope_migration_test
+          pnpm --filter @schoolos/api exec tsx prisma/scope-migration-replay/verify.ts
+
       - name: API integration tests
         run: pnpm test:integration
 

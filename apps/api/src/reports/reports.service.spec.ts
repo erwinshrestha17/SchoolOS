@@ -141,6 +141,8 @@ describe('ReportsService', () => {
                 },
               ]),
             },
+            user: { findFirst: jest.fn() },
+            refreshToken: { findFirst: jest.fn() },
             reportExport: {
               create: jest.fn(),
               update: jest.fn(),
@@ -1310,13 +1312,99 @@ describe('ReportsService', () => {
     );
   });
 
+  function configureLiveExport() {
+    const live = {
+      id: actor.userId,
+      tenantId: actor.tenantId,
+      email: actor.email,
+      authMethod: actor.authMethod,
+      tenant: { slug: actor.tenantSlug },
+      mustChangePassword: false,
+      lockedUntil: null,
+      userRoles: [
+        {
+          role: {
+            name: 'admin',
+            rolePermissions: actor.permissions.map((key) => {
+              const index = key.lastIndexOf(':');
+              return {
+                permission: {
+                  resource: key.slice(0, index),
+                  action: key.slice(index + 1),
+                },
+              };
+            }),
+          },
+        },
+      ],
+    };
+    (prisma.reportExport.findFirst as jest.Mock).mockResolvedValue({
+      id: 'export-1',
+    });
+    (prisma.user.findFirst as jest.Mock).mockResolvedValue(live);
+    (prisma.refreshToken.findFirst as jest.Mock).mockResolvedValue({
+      id: 'refresh-1',
+    });
+    return live;
+  }
+
+  it('denies queued export after live role revocation', async () => {
+    const live = configureLiveExport();
+    live.userRoles = [];
+    await expect(
+      service.completeQueuedExport({
+        exportId: 'export-1',
+        reportKey: 'student-roster',
+        filters: {},
+        format: 'csv',
+        actor: { ...actor, sessionFamilyId: 'session-1' },
+      }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.student.findMany).not.toHaveBeenCalled();
+    expect(fileRegistry.registerGeneratedFile).not.toHaveBeenCalled();
+  });
+
+  it('denies queued export when the session is revoked', async () => {
+    configureLiveExport();
+    (prisma.refreshToken.findFirst as jest.Mock).mockResolvedValue(null);
+    await expect(
+      service.completeQueuedExport({
+        exportId: 'export-1',
+        reportKey: 'student-roster',
+        filters: {},
+        format: 'csv',
+        actor: { ...actor, sessionFamilyId: 'session-1' },
+      }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(fileRegistry.registerGeneratedFile).not.toHaveBeenCalled();
+  });
+
+  it('denies file registration if authority changes while building the export', async () => {
+    const live = configureLiveExport();
+    (prisma.user.findFirst as jest.Mock)
+      .mockResolvedValueOnce(live)
+      .mockResolvedValueOnce({ ...live, userRoles: [] });
+    await expect(
+      service.completeQueuedExport({
+        exportId: 'export-1',
+        reportKey: 'student-roster',
+        filters: {},
+        format: 'csv',
+        actor: { ...actor, sessionFamilyId: 'session-1' },
+      }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.student.findMany).toHaveBeenCalled();
+    expect(fileRegistry.registerGeneratedFile).not.toHaveBeenCalled();
+  });
+
   it('completes queued exports with a protected File Registry snapshot', async () => {
+    configureLiveExport();
     await service.completeQueuedExport({
       exportId: 'export-1',
       reportKey: 'student-roster',
       filters: { status: 'ACTIVE' },
       format: 'csv',
-      actor,
+      actor: { ...actor, sessionFamilyId: 'session-1' },
     });
 
     expect(fileRegistry.registerGeneratedFile).toHaveBeenCalledWith(

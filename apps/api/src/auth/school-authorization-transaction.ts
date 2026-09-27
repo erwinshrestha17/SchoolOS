@@ -1,3 +1,4 @@
+import { grantAllows } from '../authorization/scopes/scope-resolver';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { SecurityDomain, UserStatus, type Prisma } from '@prisma/client';
 import { hasEffectivePermission, isPlatformRoleName } from '@schoolos/core';
@@ -83,10 +84,15 @@ export async function withSchoolAuthorizationTransaction<T>(
             tenantId: actor.tenantId,
             userId: actor.userId,
             revokedAt: null,
+            assignedAt: { lte: new Date() },
             OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
             role: { tenantId: actor.tenantId },
           },
           select: {
+            id: true,
+            scopeGrants: {
+              where: { tenantId: actor.tenantId, supersededAt: null },
+            },
             role: {
               select: {
                 name: true,
@@ -106,7 +112,22 @@ export async function withSchoolAuthorizationTransaction<T>(
         );
         if (
           grants.some(({ role }) => isPlatformRoleName(role.name)) ||
-          !hasEffectivePermission(permissions, permission)
+          !hasEffectivePermission(permissions, permission) ||
+          !grants.some((g) =>
+            grantAllows(
+              {
+                assignmentId: g.id,
+                tenantId: actor.tenantId,
+                role: g.role.name,
+                permissions: g.role.rolePermissions.map(
+                  ({ permission: p }) => `${p.resource}:${p.action}`,
+                ),
+                scopes: g.scopeGrants,
+              },
+              permission,
+              actor.tenantId,
+            ),
+          )
         )
           throw new ForbiddenException('Insufficient permissions');
         return work(tx, locked);

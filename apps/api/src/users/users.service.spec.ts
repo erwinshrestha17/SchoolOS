@@ -55,6 +55,16 @@ describe('UsersService', () => {
       userRole: {
         findMany: jest.fn().mockResolvedValue([
           {
+            id: 'assignment',
+            scopeGrants: [
+              {
+                scopeType: 'TENANT',
+                scopeId: 'tenant-1',
+                effectiveFrom: new Date(0),
+                expiresAt: null,
+                revokedAt: null,
+              },
+            ],
             role: {
               name: 'admin',
               rolePermissions: [

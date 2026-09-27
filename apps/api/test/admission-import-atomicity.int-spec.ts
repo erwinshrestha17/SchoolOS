@@ -215,7 +215,7 @@ if (databaseUrl) {
           channels: ['IN_APP'],
           directRecipients: [allowed, invalid],
         }),
-      ).rejects.toMatchObject({ code: 'P2003' });
+      ).rejects.toThrow('Tenant-owned reference is not available');
       expect(
         await prisma.notificationDelivery.count({
           where: { tenantId: actor.tenantId, sourceId },

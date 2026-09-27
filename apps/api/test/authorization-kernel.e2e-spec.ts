@@ -6,6 +6,7 @@ import {
   Get,
   Injectable,
   Logger,
+  Param,
   UseGuards,
   type INestApplication,
 } from '@nestjs/common';
@@ -14,6 +15,10 @@ import { Test } from '@nestjs/testing';
 import { AuthMethod, SecurityDomain } from '@prisma/client';
 import type { Server } from 'node:http';
 import request from 'supertest';
+import {
+  AuthorizeResource,
+  ResourceOwnershipService,
+} from '../src/authorization/resource-ownership';
 import { AuthorizationModule } from '../src/authorization/authorization.module';
 import { ServiceAuthorization } from '../src/authorization/service-authorization.decorator';
 import { AuthorizationService } from '../src/authorization/authorization.service';
@@ -63,6 +68,27 @@ class FixtureAuthenticationGuard implements CanActivate {
               ? ['notices:read']
               : ['students:read', 'settings:manage'],
     };
+    if (fixture === 'scoped' || fixture === 'scope-revoked') {
+      req.auth.roles = ['admin'];
+      req.auth.permissions = [];
+      req.auth.accessGrants = [
+        {
+          assignmentId: 'scoped-assignment',
+          tenantId: req.auth.tenantId,
+          role: 'admin',
+          permissions: ['students:read'],
+          scopes: [
+            {
+              scopeType: 'CLASS',
+              scopeId: 'assigned-class',
+              effectiveFrom: new Date(0),
+              expiresAt: null,
+              revokedAt: fixture === 'scope-revoked' ? new Date() : null,
+            },
+          ],
+        },
+      ];
+    }
     if (fixture === 'support')
       Object.assign(req.auth, {
         originalTenantId: 'original-platform',
@@ -81,6 +107,12 @@ class KernelController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return { tenantId: auth.tenantId };
+  }
+  @Get('student/:id')
+  @Permissions('students:read')
+  @AuthorizeResource('STUDENT', 'id')
+  scopedStudent(@Param('id') id: string) {
+    return { id };
   }
   @Get('canonical') @Permissions('students:profile:read') canonical() {
     return { allowed: true };
@@ -146,6 +178,24 @@ describe('Central authorization HTTP enforcement (synthetic authentication, real
         { provide: EntitlementGuard, useValue: entitlement },
       ],
     })
+      .overrideProvider(ResourceOwnershipService)
+      .useValue({
+        lookup: jest.fn((tenantId: string, _type: string, id: string) =>
+          Promise.resolve(
+            id === 'foreign' || id === 'missing'
+              ? null
+              : {
+                  id,
+                  tenantId,
+                  scope: {
+                    TENANT: tenantId,
+                    STUDENT: id,
+                    CLASS: id === 'assigned' ? 'assigned-class' : 'other-class',
+                  },
+                },
+          ),
+        ),
+      })
       .overrideGuard(EntitlementGuard)
       .useValue(entitlement)
       .compile();
@@ -170,6 +220,35 @@ describe('Central authorization HTTP enforcement (synthetic authentication, real
         .expect(200);
     },
   );
+  it('uses server-owned resource scope and denies unscoped lists', async () => {
+    await request(server)
+      .get('/kernel/student/assigned?tenantId=other&classId=other-class')
+      .set('x-fixture', 'scoped')
+      .expect(200);
+    await request(server)
+      .get('/kernel/valid')
+      .set('x-fixture', 'scoped')
+      .expect(403);
+    await request(server)
+      .get('/kernel/student/unassigned?classId=assigned-class')
+      .set('x-fixture', 'scoped')
+      .expect(403);
+    await request(server)
+      .get('/kernel/student/assigned')
+      .set('x-fixture', 'scope-revoked')
+      .expect(403);
+  });
+  it('returns the same safe HTTP result for foreign and absent objects', async () => {
+    const foreign = await request(server)
+      .get('/kernel/student/foreign')
+      .set('x-fixture', 'scoped')
+      .expect(404);
+    const missing = await request(server)
+      .get('/kernel/student/missing')
+      .set('x-fixture', 'scoped')
+      .expect(404);
+    expect(foreign.body.message).toEqual(missing.body.message);
+  });
   it('allows canonical required permissions identically', async () => {
     await request(server)
       .get('/kernel/canonical')

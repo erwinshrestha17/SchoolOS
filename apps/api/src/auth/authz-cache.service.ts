@@ -1,15 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { isPlatformRoleName } from '@schoolos/core';
 import type { SecurityDomain } from '@prisma/client';
+import { grantAllows } from '../authorization/scopes/scope-resolver';
+import { scopeTargetExists } from '../authorization/scopes/scope-target';
+import type {
+  RoleAccessGrant,
+  ScopeGrant,
+} from '../authorization/scopes/scope.types';
 import { RedisCacheService } from '../common/cache/redis-cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface ResolvedAuthz {
   roles: string[];
   permissions: string[];
+  accessGrants?: readonly RoleAccessGrant[];
 }
 
 interface CachedRoleGrant {
+  assignmentId: string;
+  assignedAt: string;
+  scopes: ScopeGrant[];
   role: string;
   scopeId: string | null;
   expiresAt: string | null;
@@ -76,18 +86,41 @@ export class AuthzCacheService {
     // the Redis entry remains warm.
     const now = Date.now();
     const active = cached.grants.filter(
-      ({ role, scopeId, expiresAt }) =>
+      ({ role, scopeId, expiresAt, assignedAt }) =>
         (securityDomain === 'PLATFORM'
           ? isPlatformRoleName(role) && scopeId === 'global'
           : !isPlatformRoleName(role)) &&
-        (expiresAt === null || Date.parse(expiresAt) > now),
+        (expiresAt === null || Date.parse(expiresAt) > now) &&
+        Date.parse(assignedAt) <= now,
     );
 
+    const accessGrants: RoleAccessGrant[] = active.map((g) => ({
+      assignmentId: g.assignmentId,
+      tenantId,
+      role: g.role,
+      permissions: g.permissions,
+      scopes: g.scopes,
+    }));
     return {
-      roles: [...new Set(active.map(({ role }) => role))],
-      permissions: [
-        ...new Set(active.flatMap(({ permissions }) => permissions)),
+      roles: [
+        ...new Set(
+          active
+            .filter((g) => securityDomain === 'PLATFORM' || g.scopes.length > 0)
+            .map(({ role }) => role),
+        ),
       ],
+      permissions: [
+        ...new Set(
+          accessGrants.flatMap((g) =>
+            g.permissions.filter(
+              (permission) =>
+                securityDomain === 'PLATFORM' ||
+                grantAllows(g, permission, tenantId),
+            ),
+          ),
+        ),
+      ],
+      ...(securityDomain === 'SCHOOL' ? { accessGrants } : {}),
     };
   }
 
@@ -109,6 +142,18 @@ export class AuthzCacheService {
             role: { tenantId },
           },
           select: {
+            id: true,
+            assignedAt: true,
+            scopeGrants: {
+              where: { tenantId, supersededAt: null },
+              select: {
+                scopeType: true,
+                scopeId: true,
+                effectiveFrom: true,
+                expiresAt: true,
+                revokedAt: true,
+              },
+            },
             scopeId: true,
             expiresAt: true,
             role: {
@@ -126,16 +171,34 @@ export class AuthzCacheService {
           },
         });
 
-        return {
-          grants: assignments.map(({ role, scopeId, expiresAt }) => ({
-            role: role.name,
-            scopeId,
-            expiresAt: expiresAt?.toISOString() ?? null,
-            permissions: role.rolePermissions.map(
+        const grants: CachedRoleGrant[] = [];
+        for (const assignment of assignments) {
+          const scopes = assignment.scopeGrants ?? [];
+          // Deleted, inactive and foreign targets invalidate the entire assignment.
+          // Do not drop a restrictive dimension and retain a broader one.
+          const valid = await Promise.all(
+            scopes.map((scope) =>
+              scopeTargetExists(
+                this.prisma,
+                tenantId,
+                scope.scopeType,
+                scope.scopeId,
+              ),
+            ),
+          );
+          grants.push({
+            assignmentId: assignment.id,
+            assignedAt: assignment.assignedAt.toISOString(),
+            role: assignment.role.name,
+            scopeId: assignment.scopeId,
+            expiresAt: assignment.expiresAt?.toISOString() ?? null,
+            scopes: valid.every(Boolean) ? scopes : [],
+            permissions: assignment.role.rolePermissions.map(
               ({ permission }) => `${permission.resource}:${permission.action}`,
             ),
-          })),
-        };
+          });
+        }
+        return { grants };
       },
     );
   }

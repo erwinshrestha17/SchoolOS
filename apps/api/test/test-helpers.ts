@@ -588,6 +588,30 @@ export function createPrismaMock() {
     });
   }
 
+  // Emulate the explicit TENANT grant initialized atomically by the DB trigger.
+  function typedAssignment(item: Record<string, unknown>) {
+    const role = state.roles.find((row) => row.id === item.roleId);
+    const platform = String(role?.name).startsWith('platform_');
+    return {
+      ...item,
+      assignedAt: item.assignedAt ?? new Date(0),
+      scopeGrants:
+        item.scopeGrants ??
+        (platform || item.scopeId
+          ? []
+          : [
+              {
+                tenantId: item.tenantId,
+                scopeType: 'TENANT',
+                scopeId: item.tenantId,
+                effectiveFrom: new Date(0),
+                expiresAt: null,
+                revokedAt: null,
+              },
+            ]),
+    };
+  }
+
   function attachUserRoles(
     stateRef: MockState,
     user: Record<string, unknown> | undefined,
@@ -604,7 +628,7 @@ export function createPrismaMock() {
       userRoles: stateRef.userRoles
         .filter((item) => item.userId === user.id)
         .map((item) => ({
-          ...item,
+          ...typedAssignment(item),
           role: attachRolePermissions(
             stateRef,
             stateRef.roles.find((role) => role.id === item.roleId),
@@ -978,7 +1002,7 @@ export function createPrismaMock() {
                 item.tenantId === q.where?.tenantId,
             )
             .map((item) => ({
-              ...item,
+              ...typedAssignment(item),
               role: attachRolePermissions(
                 state,
                 state.roles.find((role) => role.id === item.roleId),

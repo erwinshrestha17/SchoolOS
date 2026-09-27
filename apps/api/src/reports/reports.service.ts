@@ -1,3 +1,4 @@
+import { resolveLiveSchoolActor } from '../authorization/scopes/live-school-actor';
 import {
   BadRequestException,
   Injectable,
@@ -2861,14 +2862,28 @@ export class ReportsService {
     actor: AuthContext;
   }) {
     await this.plansService.assertTenantActive(input.actor.tenantId);
+    const persisted = await this.prisma.reportExport.findFirst({
+      where: {
+        id: input.exportId,
+        tenantId: input.actor.tenantId,
+        requestedBy: input.actor.userId,
+        reportKey: input.reportKey,
+        format: input.format,
+      },
+    });
+    if (!persisted) throw new NotFoundException('Report export not found');
+    input = {
+      ...input,
+      actor: await resolveLiveSchoolActor(this.prisma, input.actor),
+    };
     const executor = this.registry.get(input.reportKey);
     if (!executor) {
       throw new NotFoundException('Report not found');
     }
 
     if (
-      !executor.definition.requiredPermissions.every((permission) =>
-        input.actor.permissions.includes(permission),
+      !['reports:export', ...executor.definition.requiredPermissions].every(
+        (permission) => input.actor.permissions.includes(permission),
       )
     ) {
       throw new ForbiddenException(
@@ -2911,6 +2926,18 @@ export class ReportsService {
       watermark: exportMetadata.watermark,
       displayedTotals,
     });
+    const current = await resolveLiveSchoolActor(this.prisma, input.actor);
+    if (
+      !['reports:export', ...executor.definition.requiredPermissions].every(
+        (permission) => current.permissions.includes(permission),
+      )
+    )
+      throw new ForbiddenException('Current export authorization is required');
+    await this.assertTeacherReportScope(
+      executor.definition,
+      input.filters,
+      current,
+    );
     const fileAssetId = await this.registerReportExportFile({
       tenantId: input.actor.tenantId,
       requestedBy: input.actor.userId,

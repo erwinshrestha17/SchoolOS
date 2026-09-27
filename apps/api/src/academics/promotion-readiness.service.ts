@@ -1,3 +1,4 @@
+import { assertCompleteTenantBatch } from '../authorization/resource-ownership';
 import {
   ConflictException,
   ForbiddenException,
@@ -310,12 +311,29 @@ export class PromotionReadinessService {
 
     const results: unknown[] = [];
 
+    // Authorize the entire request before executing any student transition.
     for (const mapping of dto.classMappings) {
+      await this.ensureClass(actor, mapping.fromClassId);
       await this.ensureClass(actor, mapping.toClassId);
       if (mapping.toSectionId) {
         await this.ensureSection(actor, mapping.toSectionId, mapping.toClassId);
       }
 
+      const ids = mapping.studentIds ?? [];
+      const students = await this.prisma.student.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          classId: mapping.fromClassId,
+          id: { in: ids },
+        },
+        select: { id: true, tenantId: true },
+      });
+      if (!assertCompleteTenantBatch(actor.tenantId, ids, students))
+        throw new NotFoundException(
+          'One or more promotion targets are not available',
+        );
+    }
+    for (const mapping of dto.classMappings) {
       for (const studentId of mapping.studentIds ?? []) {
         results.push(
           await this.promoteStudent(

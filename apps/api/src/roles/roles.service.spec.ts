@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { permissionCatalog, systemRolePermissions } from '@schoolos/core';
 import { RolesService } from './roles.service';
 import { installSchoolGovernanceDouble } from '../../test/helpers/school-governance-double';
@@ -226,6 +226,8 @@ describe('RolesService authorization cache invalidation', () => {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
         createMany: jest.fn().mockResolvedValue({ count: 2 }),
       },
+      class: { findFirst: jest.fn().mockResolvedValue({ id: 'class-1' }) },
+      roleScopeGrant: { updateMany: jest.fn(), createMany: jest.fn() },
       userRole: {
         update: jest.fn().mockResolvedValue({}),
         create: jest.fn().mockResolvedValue({ id: 'assignment-1' }),
@@ -321,6 +323,94 @@ describe('RolesService authorization cache invalidation', () => {
       'user-9',
     );
     expect(authzCache.invalidateTenant).not.toHaveBeenCalled();
+  });
+
+  it('replaces scope history transactionally without changing role permissions', async () => {
+    const { service, prisma, authzCache } = buildService();
+    await service.assignRoles(
+      {
+        userId: 'user-9',
+        reason: 'Assign the reviewed class scope',
+        roleIds: ['role-1'],
+        scopesByRole: {
+          'role-1': [{ scopeType: 'CLASS', scopeId: 'class-1' }],
+        },
+      },
+      actor,
+    );
+    expect(prisma.roleScopeGrant.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: 'tenant-1',
+          userRoleAssignmentId: 'assignment-1',
+          supersededAt: null,
+        },
+        data: expect.objectContaining({
+          supersededAt: expect.any(Date),
+          revokedAt: expect.any(Date),
+        }),
+      }),
+    );
+    expect(prisma.roleScopeGrant.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          tenantId: 'tenant-1',
+          userRoleAssignmentId: 'assignment-1',
+          scopeType: 'CLASS',
+          scopeId: 'class-1',
+          createdById: 'admin-1',
+        }),
+      ],
+    });
+    expect(prisma.rolePermission.createMany).not.toHaveBeenCalled();
+    expect(authzCache.invalidateUser).toHaveBeenCalledWith(
+      'tenant-1',
+      'user-9',
+    );
+  });
+
+  it('requires an audit reason for an explicit scope change before mutation', async () => {
+    const { service, prisma } = buildService();
+    await expect(
+      service.assignRoles(
+        {
+          userId: 'user-9',
+          roleIds: ['role-1'],
+          scopesByRole: {
+            'role-1': [{ scopeType: 'CLASS', scopeId: 'class-1' }],
+          },
+        },
+        actor,
+      ),
+    ).rejects.toThrow('A reason is required');
+    expect(prisma.userRole.create).not.toHaveBeenCalled();
+    expect(prisma.roleScopeGrant.createMany).not.toHaveBeenCalled();
+  });
+
+  it('preserves restrictions when scope input is omitted', async () => {
+    const { service, prisma } = buildService();
+    await service.assignRoles({ userId: 'user-9', roleIds: ['role-1'] }, actor);
+    expect(prisma.roleScopeGrant.updateMany).not.toHaveBeenCalled();
+    expect(prisma.roleScopeGrant.createMany).not.toHaveBeenCalled();
+  });
+
+  it('denies foreign scope targets before any assignment mutation', async () => {
+    const { service, prisma } = buildService();
+    prisma.class.findFirst.mockResolvedValue(null);
+    await expect(
+      service.assignRoles(
+        {
+          userId: 'user-9',
+          roleIds: ['role-1'],
+          scopesByRole: {
+            'role-1': [{ scopeType: 'CLASS', scopeId: 'foreign-class' }],
+          },
+        },
+        actor,
+      ),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.userRole.create).not.toHaveBeenCalled();
+    expect(prisma.roleScopeGrant.createMany).not.toHaveBeenCalled();
   });
 
   it('rejects a legacy school-local Platform role assignment before mutation', async () => {

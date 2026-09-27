@@ -1,3 +1,4 @@
+import { unrestrictedRoleAssignmentsWhere } from '../authorization/scopes/unrestricted-role-where';
 import {
   BadRequestException,
   ConflictException,
@@ -179,8 +180,7 @@ export class ServiceRequestsService {
           },
         });
         if (
-          raced &&
-          raced.requestedById === actor.userId &&
+          raced?.requestedById === actor.userId &&
           raced.studentId === studentId &&
           raced.type === dto.type
         ) {
@@ -871,7 +871,7 @@ export class ServiceRequestsService {
         status: 'ACTIVE',
         userRoles: {
           some: {
-            tenantId: actor.tenantId,
+            ...unrestrictedRoleAssignmentsWhere(actor.tenantId),
             role: {
               rolePermissions: {
                 some: {

@@ -245,7 +245,7 @@ describe('FileRegistryService tenant scoping', () => {
     ).resolves.toEqual(asset);
 
     expect(prisma.fileAsset.findUnique).toHaveBeenCalledWith({
-      where: { id: 'file-1' },
+      where: { id: 'file-1', tenantId: 'tenant-1' },
     });
   });
 
@@ -253,8 +253,29 @@ describe('FileRegistryService tenant scoping', () => {
     prisma.fileAsset.findUnique.mockResolvedValue(asset);
 
     await expect(service.getFileMetadata('tenant-2', 'file-1')).rejects.toThrow(
-      ForbiddenException,
+      NotFoundException,
     );
+  });
+
+  it.each([
+    'foreign/students/file.png',
+    'tenant-1/../foreign/file.png',
+    'tenant-1/%2e%2e/file.png',
+    'tenant-1//file.png',
+  ])('refuses a foreign or noncanonical storage key: %s', async (objectKey) => {
+    prisma.fileAsset.findUnique.mockResolvedValue({ ...asset, objectKey });
+    await expect(
+      service.createSignedPreviewUrl(
+        {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          roles: ['admin'],
+          permissions: ['students:read'],
+        } as never,
+        'file-1',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(storageService.createSignedReadUrl).not.toHaveBeenCalled();
   });
 
   it('treats missing and soft-deleted files as not found', async () => {

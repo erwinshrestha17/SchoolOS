@@ -1,3 +1,7 @@
+import { scopeIsActive } from '../authorization/scopes/scope-resolver';
+import { unrestrictedRoleAssignmentsWhere } from '../authorization/scopes/unrestricted-role-where';
+import type { ScopeGrant } from '../authorization/scopes/scope.types';
+import { validateScopeWrites } from '../authorization/scopes/scope-write';
 import {
   BadRequestException,
   ConflictException,
@@ -314,6 +318,30 @@ export class RolesService {
       );
     }
 
+    const scopesByRole = await validateScopeWrites(
+      tx,
+      actor.tenantId,
+      roleIds,
+      dto.scopesByRole,
+    );
+    if (scopesByRole.size && !dto.reason?.trim())
+      throw new BadRequestException(
+        'A reason is required when changing typed role scopes',
+      );
+    for (const role of roles) {
+      const scopes = scopesByRole.get(role.id);
+      if (
+        role.name === SCHOOL_CONFIG_OWNER_ROLE &&
+        scopes &&
+        (scopes.length !== 1 ||
+          scopes[0].scopeType !== 'TENANT' ||
+          scopes[0].expiresAt !== null ||
+          !scopeIsActive(scopes[0]))
+      )
+        throw new BadRequestException(
+          'Configuration ownership must remain active until a controlled role revocation',
+        );
+    }
     const expiresAtByRole = resolveRoleAssignmentExpiries(
       roles,
       dto.expiresAtByRole,
@@ -332,7 +360,7 @@ export class RolesService {
         revokedAt: null,
         OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
       },
-      include: { role: true },
+      include: { role: true, scopeGrants: true },
     });
     const removedAssignments = activeAssignments.filter(
       ({ roleId }) => !roleIds.includes(roleId),
@@ -375,13 +403,27 @@ export class RolesService {
       const existing = activeByRoleId.get(roleId);
       const expiresAt = expiresAtByRole.get(roleId) ?? null;
       if (existing) {
-        await tx.userRole.update({
-          where: { id: existing.id, tenantId: actor.tenantId },
-          data: { expiresAt },
-        });
+        const matching = activeAssignments.filter((a) => a.roleId === roleId);
+        if (scopesByRole.has(roleId) && matching.length !== 1)
+          throw new BadRequestException(
+            'Duplicate legacy assignments require review before changing scopes',
+          );
+        for (const assignment of matching) {
+          await tx.userRole.update({
+            where: { id: assignment.id, tenantId: actor.tenantId },
+            data: { expiresAt },
+          });
+        }
+        if (scopesByRole.has(roleId))
+          await this.replaceScopes(
+            tx,
+            actor,
+            existing.id,
+            scopesByRole.get(roleId) ?? [],
+          );
         continue;
       }
-      await tx.userRole.create({
+      const assignment = await tx.userRole.create({
         data: {
           userId: dto.userId,
           roleId,
@@ -390,6 +432,13 @@ export class RolesService {
           expiresAt,
         },
       });
+      if (scopesByRole.has(roleId))
+        await this.replaceScopes(
+          tx,
+          actor,
+          assignment.id,
+          scopesByRole.get(roleId) ?? [],
+        );
     }
     await this.auditService.record(
       {
@@ -406,6 +455,8 @@ export class RolesService {
               value?.toISOString() ?? null,
             ]),
           ),
+          scopesByRole: Object.fromEntries(scopesByRole),
+          reason: dto.reason?.trim() ?? null,
           revokedRoleIds: removedAssignments.map(({ roleId }) => roleId),
           ...(removesOwnerRole
             ? {
@@ -425,7 +476,7 @@ export class RolesService {
         revokedAt: null,
         OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
       },
-      include: { role: true },
+      include: { role: true, scopeGrants: true },
     });
   }
 
@@ -608,6 +659,37 @@ export class RolesService {
     }
   }
 
+  private async replaceScopes(
+    tx: Prisma.TransactionClient,
+    actor: AuthContext,
+    assignmentId: string,
+    scopes: ScopeGrant[],
+  ) {
+    await tx.roleScopeGrant.updateMany({
+      where: {
+        tenantId: actor.tenantId,
+        userRoleAssignmentId: assignmentId,
+        supersededAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+        supersededAt: new Date(),
+        revokedById: actor.userId,
+      },
+    });
+    await tx.roleScopeGrant.createMany({
+      data: scopes.map((scope) => ({
+        tenantId: actor.tenantId,
+        userRoleAssignmentId: assignmentId,
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
+        effectiveFrom: new Date(scope.effectiveFrom),
+        expiresAt: scope.expiresAt ? new Date(scope.expiresAt) : null,
+        createdById: actor.userId,
+      })),
+    });
+  }
+
   private async wouldRemoveConfigOwnerRole(
     tenantId: string,
     userId: string,
@@ -616,10 +698,8 @@ export class RolesService {
   ): Promise<boolean> {
     const currentOwnerAssignment = await tx.userRole.findFirst({
       where: {
-        tenantId,
+        ...unrestrictedRoleAssignmentsWhere(tenantId),
         userId,
-        revokedAt: null,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
         role: { tenantId, name: SCHOOL_CONFIG_OWNER_ROLE },
       },
       select: { roleId: true },
@@ -637,10 +717,8 @@ export class RolesService {
   ): Promise<void> {
     const otherActiveOwners = await tx.userRole.count({
       where: {
-        tenantId,
+        ...unrestrictedRoleAssignmentsWhere(tenantId),
         userId: { not: excludedUserId },
-        revokedAt: null,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
         role: { tenantId, name: SCHOOL_CONFIG_OWNER_ROLE },
         user: { status: 'ACTIVE' },
       },

@@ -382,7 +382,7 @@ export class CommunicationsService {
   }
 
   async createNotice(dto: CreateNoticeDto, actor: AuthContext) {
-    await this.ensureAudienceRefs(actor, dto.classId, dto.sectionId);
+    await this.ensureAudienceRefs(actor, dto.classId, dto.sectionId, dto);
     const priority = dto.priority ?? NoticePriority.NORMAL;
     if (priority !== NoticePriority.NORMAL) {
       throw new ConflictException(
@@ -458,7 +458,7 @@ export class CommunicationsService {
   }
 
   async createNoticeDraft(input: NoticeDraftInput, actor: AuthContext) {
-    await this.ensureAudienceRefs(actor, input.classId, input.sectionId);
+    await this.ensureAudienceRefs(actor, input.classId, input.sectionId, input);
     await this.assertNoticeAttachmentFile(input.attachmentFileId, actor);
 
     const existing = await this.prisma.notice.findFirst({
@@ -558,7 +558,12 @@ export class CommunicationsService {
 
     const classId = dto.classId ?? notice.classId ?? undefined;
     const sectionId = dto.sectionId ?? notice.sectionId ?? undefined;
-    await this.ensureAudienceRefs(actor, classId, sectionId);
+    await this.ensureAudienceRefs(actor, classId, sectionId, {
+      studentIds: dto.studentIds ?? notice.studentIds,
+      staffIds: dto.staffIds ?? notice.staffIds,
+      guardianIds: dto.guardianIds ?? notice.guardianIds,
+      recipientUserIds: dto.recipientUserIds ?? notice.recipientUserIds,
+    });
     await this.assertNoticeAttachmentFile(dto.attachmentFileId, actor);
 
     const scheduledFor = dto.scheduledFor
@@ -1044,7 +1049,7 @@ export class CommunicationsService {
   }
 
   async previewNoticeRecipients(dto: CreateNoticeDto, actor: AuthContext) {
-    await this.ensureAudienceRefs(actor, dto.classId, dto.sectionId);
+    await this.ensureAudienceRefs(actor, dto.classId, dto.sectionId, dto);
 
     const priority = dto.priority ?? NoticePriority.NORMAL;
     const channels = noticeChannels(priority);
@@ -2823,7 +2828,42 @@ export class CommunicationsService {
     actor: AuthContext,
     classId?: string,
     sectionId?: string,
+    targets: {
+      studentIds?: string[];
+      staffIds?: string[];
+      guardianIds?: string[];
+      recipientUserIds?: string[];
+    } = {},
   ) {
+    const validate = async (
+      ids: string[] | undefined,
+      count: (where: {
+        tenantId: string;
+        id: { in: string[] };
+      }) => Promise<number>,
+    ) => {
+      if (!ids?.length) return;
+      const unique = [...new Set(ids)];
+      if (
+        (await count({ tenantId: actor.tenantId, id: { in: unique } })) !==
+        unique.length
+      )
+        throw new NotFoundException(
+          'One or more audience targets are not available',
+        );
+    };
+    await validate(targets.studentIds, (where) =>
+      this.prisma.student.count({ where }),
+    );
+    await validate(targets.staffIds, (where) =>
+      this.prisma.staff.count({ where }),
+    );
+    await validate(targets.guardianIds, (where) =>
+      this.prisma.guardian.count({ where }),
+    );
+    await validate(targets.recipientUserIds, (where) =>
+      this.prisma.user.count({ where }),
+    );
     if (classId) {
       const classroom = await this.prisma.class.findFirst({
         where: { id: classId, tenantId: actor.tenantId },

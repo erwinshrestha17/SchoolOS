@@ -74,6 +74,17 @@ describe('JwtAuthGuard', () => {
   // userRole.findMany select instead of a flat rolePermission query.
   const mockUserRoles = [
     {
+      id: 'assignment',
+      assignedAt: new Date(0),
+      scopeGrants: [
+        {
+          scopeType: 'TENANT',
+          scopeId: 'tenant-1',
+          effectiveFrom: new Date(0),
+          expiresAt: null,
+          revokedAt: null,
+        },
+      ],
       scopeId: null,
       expiresAt: null,
       role: {
@@ -89,6 +100,9 @@ describe('JwtAuthGuard', () => {
     prisma.user.findUnique.mockResolvedValue(mockPlatformUser);
     prisma.userRole.findMany.mockResolvedValue([
       {
+        id: 'platform-assignment',
+        assignedAt: new Date(0),
+        scopeGrants: [],
         scopeId: 'global',
         expiresAt: null,
         role: {
@@ -183,6 +197,23 @@ describe('JwtAuthGuard', () => {
       mustChangePassword: false,
       roles: ['admin'],
       permissions: ['students:read'],
+      accessGrants: [
+        {
+          assignmentId: 'assignment',
+          tenantId: 'tenant-1',
+          role: 'admin',
+          permissions: ['students:read'],
+          scopes: [
+            {
+              scopeType: 'TENANT',
+              scopeId: 'tenant-1',
+              effectiveFrom: new Date(0),
+              expiresAt: null,
+              revokedAt: null,
+            },
+          ],
+        },
+      ],
     });
     expect(prisma.user.findUnique).toHaveBeenCalled();
     expect(cls.set).toHaveBeenCalledWith(TENANT_ID_KEY, 'tenant-1');
@@ -264,11 +295,25 @@ describe('JwtAuthGuard', () => {
   it('rejects tenant override attempts from tenant users including principals', async () => {
     prisma.userRole.findMany.mockResolvedValueOnce([
       {
+        id: 'assignment',
+        assignedAt: new Date(0),
+        scopeGrants: [
+          {
+            scopeType: 'TENANT',
+            scopeId: 'tenant-1',
+            effectiveFrom: new Date(0),
+            expiresAt: null,
+            revokedAt: null,
+          },
+        ],
         scopeId: null,
         expiresAt: null,
         role: { name: 'principal', rolePermissions: [] },
       },
       {
+        id: 'platform-assignment',
+        assignedAt: new Date(0),
+        scopeGrants: [],
         scopeId: 'global',
         expiresAt: null,
         role: { name: 'platform_super_admin', rolePermissions: [] },
@@ -293,6 +338,9 @@ describe('JwtAuthGuard', () => {
     prisma.user.findUnique.mockResolvedValueOnce(mockPlatformUser);
     prisma.userRole.findMany.mockResolvedValueOnce([
       {
+        id: 'platform-assignment',
+        assignedAt: new Date(0),
+        scopeGrants: [],
         scopeId: 'tenant-2',
         expiresAt: null,
         role: { name: 'platform_super_admin', rolePermissions: [] },

@@ -1,3 +1,4 @@
+import type { RoleAccessGrant } from '../authorization/scopes/scope.types';
 import {
   type AuthMethod,
   type OtpPurpose,
@@ -21,6 +22,8 @@ export interface AuthContext {
   mustChangePassword?: boolean;
   roles: string[];
   permissions: string[];
+  /** Live persisted grants; flat permissions contain only unrestricted grants. */
+  accessGrants?: readonly RoleAccessGrant[];
 }
 
 export interface JwtAccessPayload {

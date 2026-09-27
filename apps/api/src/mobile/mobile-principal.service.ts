@@ -1,3 +1,4 @@
+import { unrestrictedRoleAssignmentsWhere } from '../authorization/scopes/unrestricted-role-where';
 import {
   BadRequestException,
   ConflictException,
@@ -887,7 +888,7 @@ export class MobilePrincipalService implements OnModuleInit {
         },
       },
     });
-    if (!request || !request.steps[0]) {
+    if (!request?.steps[0]) {
       throw new NotFoundException(
         'Pending approval request not found or is not available on mobile.',
       );
@@ -914,7 +915,7 @@ export class MobilePrincipalService implements OnModuleInit {
         id: true,
         staff: { select: safeStaffSelect },
         userRoles: {
-          where: { tenantId: actor.tenantId },
+          where: unrestrictedRoleAssignmentsWhere(actor.tenantId),
           select: {
             role: {
               select: {
@@ -3052,7 +3053,7 @@ export class MobilePrincipalService implements OnModuleInit {
         id: true,
         staff: { select: { id: true } },
         userRoles: {
-          where: { tenantId },
+          where: unrestrictedRoleAssignmentsWhere(tenantId),
           select: {
             role: {
               select: {

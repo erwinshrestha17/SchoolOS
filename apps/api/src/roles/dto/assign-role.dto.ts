@@ -14,6 +14,19 @@ export class AssignRoleDto {
   @IsString({ each: true })
   roleIds!: string[];
 
+  /** Typed dimensions, keyed by role id. Omission preserves existing restrictions. */
+  @IsOptional()
+  @IsObject()
+  scopesByRole?: Record<
+    string,
+    Array<{
+      scopeType: string;
+      scopeId: string;
+      effectiveFrom?: string;
+      expiresAt?: string;
+    }>
+  >;
+
   /** Optional ISO expiry keyed by role id. */
   @IsOptional()
   @IsObject()

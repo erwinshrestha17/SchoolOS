@@ -72,6 +72,15 @@ describe('AuthService', () => {
     userRoles: [
       {
         tenantId: 'tenant-1',
+        scopeGrants: [
+          {
+            scopeType: 'TENANT',
+            scopeId: 'tenant-1',
+            effectiveFrom: new Date(0),
+            expiresAt: null,
+            revokedAt: null,
+          },
+        ],
         scopeId: null,
         expiresAt: null,
         revokedAt: null,

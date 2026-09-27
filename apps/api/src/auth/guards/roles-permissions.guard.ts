@@ -1,4 +1,9 @@
 import {
+  ResourceOwnershipService,
+  RESOURCE_OWNERSHIP_KEY,
+  type OwnershipResourceType,
+} from '../../authorization/resource-ownership';
+import {
   AuthorizationForbiddenException,
   AuthorizationUnauthorizedException,
 } from '../../authorization/authorization-denied.exception';
@@ -7,6 +12,8 @@ import {
   ExecutionContext,
   HttpException,
   Injectable,
+  Optional,
+  NotFoundException,
 } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
@@ -29,6 +36,7 @@ export class RolesPermissionsGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly authorization: AuthorizationService,
     private readonly entitlementGuard: EntitlementGuard,
+    @Optional() private readonly ownership?: ResourceOwnershipService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -78,7 +86,23 @@ export class RolesPermissionsGuard implements CanActivate {
           },
         }
       : undefined;
+    const resource = this.reflector.get<{
+      type: OwnershipResourceType;
+      param: string;
+    }>(RESOURCE_OWNERSHIP_KEY, context.getHandler());
+    const resourceId = resource
+      ? (request.params[resource.param] as string)
+      : '';
+    const trustedTenantId = auth?.tenantId ?? '';
     const decision = await this.authorization.evaluate({
+      resourceLookup: resource
+        ? () =>
+            this.ownership?.lookup(
+              trustedTenantId,
+              resource.type,
+              resourceId,
+            ) ?? Promise.resolve(null)
+        : undefined,
       actor: auth,
       identity: readVerifiedAuthorizationIdentity(request, auth),
       securityDomain: SecurityDomain.SCHOOL,
@@ -92,6 +116,11 @@ export class RolesPermissionsGuard implements CanActivate {
       requestId: request.requestId,
     });
     if (decision.outcome === 'ALLOW') return true;
+    if (
+      decision.reasonCode === 'RESOURCE_NOT_FOUND' ||
+      decision.reasonCode === 'RESOURCE_TENANT_MISMATCH'
+    )
+      throw new NotFoundException('Resource not found');
     if (expectedEntitlementFailure) throw expectedEntitlementFailure;
     if (decision.reasonCode === 'AUTHENTICATION_REQUIRED')
       throw new AuthorizationUnauthorizedException(

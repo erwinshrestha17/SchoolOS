@@ -26,7 +26,11 @@ export class SyncAuthorityController {
     description: 'Current authorityNodeId and authorityEpoch',
   })
   getAuthority(@CurrentAuth() auth: AuthContext) {
-    if (!auth.tenantId || auth.tenantId === 'platform') {
+    if (
+      !auth.tenantId ||
+      auth.securityDomain !== 'SCHOOL' ||
+      auth.isSupportOverride
+    ) {
       throw new ForbiddenException(
         'School authority discovery is tenant-scoped',
       );

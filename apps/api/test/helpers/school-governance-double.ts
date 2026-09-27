@@ -14,23 +14,35 @@ export function installSchoolGovernanceDouble(
   });
   prisma.userRole.findMany = jest
     .fn()
-    .mockImplementation((args: { select?: unknown }) => {
-      if (args.select)
-        return Promise.resolve([
-          {
-            role: {
-              name: 'admin',
-              rolePermissions: permissions.map((key) => {
-                const [resource, action] = key.split(':');
-                return { permission: { resource, action } };
-              }),
+    .mockImplementation(
+      (args: { select?: unknown; where?: { tenantId?: string } }) => {
+        if (args.select)
+          return Promise.resolve([
+            {
+              id: 'governance-assignment',
+              scopeGrants: [
+                {
+                  scopeType: 'TENANT',
+                  scopeId: args.where?.tenantId,
+                  effectiveFrom: new Date(0),
+                  expiresAt: null,
+                  revokedAt: null,
+                },
+              ],
+              role: {
+                name: 'admin',
+                rolePermissions: permissions.map((key) => {
+                  const [resource, action] = key.split(':');
+                  return { permission: { resource, action } };
+                }),
+              },
             },
-          },
-        ]);
-      return assignments
-        ? (assignments(args) as Promise<unknown>)
-        : Promise.resolve([]);
-    });
+          ]);
+        return assignments
+          ? (assignments(args) as Promise<unknown>)
+          : Promise.resolve([]);
+      },
+    );
   Object.assign(prisma, {
     tenant: {
       findUnique: jest.fn().mockResolvedValue({ securityDomain: 'SCHOOL' }),
