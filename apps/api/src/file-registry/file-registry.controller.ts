@@ -1,3 +1,4 @@
+import { ServiceAuthorization } from '../authorization/service-authorization.decorator';
 import {
   BadRequestException,
   Body,
@@ -110,6 +111,7 @@ export class FileRegistryController {
 
   @Post('upload')
   @Permissions()
+  @ServiceAuthorization('FILE_MODULE_UPLOAD')
   async uploadFile(
     @CurrentAuth() auth: AuthContext,
     @Body() dto: UploadFileDto,
@@ -157,6 +159,7 @@ export class FileRegistryController {
 
   @Post('signed-upload')
   @Permissions()
+  @ServiceAuthorization('FILE_MODULE_UPLOAD')
   async createSignedUpload(
     @CurrentAuth() auth: AuthContext,
     @Body() dto: CreateSignedUploadDto,
@@ -176,6 +179,7 @@ export class FileRegistryController {
 
   @Post(':id/complete-upload')
   @Permissions()
+  @ServiceAuthorization('FILE_UPLOAD_OWNER')
   async completeSignedUpload(
     @CurrentAuth() auth: AuthContext,
     @Param('id') id: string,
@@ -184,6 +188,7 @@ export class FileRegistryController {
   }
 
   @Get(':id/view')
+  @ServiceAuthorization('FILE_RESOURCE_ACCESS')
   async getFileView(@CurrentAuth() auth: AuthContext, @Param('id') id: string) {
     const asset = await this.fileRegistryService.getFileMetadata(
       auth.tenantId,
@@ -202,6 +207,7 @@ export class FileRegistryController {
   }
 
   @Get(':id/signed-preview')
+  @ServiceAuthorization('FILE_RESOURCE_ACCESS')
   async getSignedPreview(
     @CurrentAuth() auth: AuthContext,
     @Param('id') id: string,
@@ -210,6 +216,7 @@ export class FileRegistryController {
   }
 
   @Get(':id/signed-download')
+  @ServiceAuthorization('FILE_RESOURCE_ACCESS')
   async getSignedDownload(
     @CurrentAuth() auth: AuthContext,
     @Param('id') id: string,
@@ -218,6 +225,7 @@ export class FileRegistryController {
   }
 
   @Get(':id/preview')
+  @ServiceAuthorization('FILE_RESOURCE_ACCESS')
   async previewFile(
     @CurrentAuth() auth: AuthContext,
     @Param('id') id: string,
@@ -245,6 +253,7 @@ export class FileRegistryController {
   }
 
   @Get(':id/download')
+  @ServiceAuthorization('FILE_RESOURCE_ACCESS')
   async downloadFile(
     @CurrentAuth() auth: AuthContext,
     @Param('id') id: string,

@@ -1,3 +1,4 @@
+import { SecurityDomain } from '@prisma/client';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { createHash, createHmac } from 'node:crypto';
 import type { AuditService } from '../audit/audit.service';
@@ -35,7 +36,11 @@ interface ApiKeyRecordFixture {
   createdBy: string | null;
   createdAt: Date;
   updatedAt: Date;
-  tenant?: { id: string; isActive: boolean } | null;
+  tenant?: {
+    id: string;
+    isActive: boolean;
+    securityDomain?: SecurityDomain;
+  } | null;
 }
 
 describe('PlatformApiKeysService', () => {
@@ -234,13 +239,18 @@ describe('PlatformApiKeysService', () => {
     prisma.platformApiKey.findFirst.mockResolvedValue(
       apiKeyRecord({
         keyHash: hmacSecret(secret, tokenHashPepper),
-        tenant: { id: 'tenant-1', isActive: true },
+        tenant: {
+          id: 'tenant-1',
+          isActive: true,
+          securityDomain: SecurityDomain.SCHOOL,
+        },
       }),
     );
 
     const result = await service.validateApiKey(secret);
 
     expect(result).toEqual({
+      securityDomain: SecurityDomain.SCHOOL,
       id: 'api-key-1',
       tenantId: 'tenant-1',
       scopes: ['students:read'],
@@ -268,7 +278,11 @@ describe('PlatformApiKeysService', () => {
     prisma.platformApiKey.findFirst.mockResolvedValue(
       apiKeyRecord({
         keyHash: shaSecret(secret),
-        tenant: { id: 'tenant-1', isActive: true },
+        tenant: {
+          id: 'tenant-1',
+          isActive: true,
+          securityDomain: SecurityDomain.SCHOOL,
+        },
       }),
     );
 

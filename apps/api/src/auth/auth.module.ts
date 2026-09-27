@@ -1,3 +1,4 @@
+import { AuthorizationModule } from '../authorization/authorization.module';
 import { Global, Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { AuditModule } from '../audit/audit.module';
@@ -18,6 +19,7 @@ import { PlatformModule } from '../platform/platform.module';
 @Global()
 @Module({
   imports: [
+    AuthorizationModule,
     JwtModule.register({}),
     ConfigModule,
     AuditModule,

@@ -1,3 +1,4 @@
+import { recordVerifiedAuthorizationIdentity } from '../../authorization/authorization-request-identity';
 import {
   CanActivate,
   ExecutionContext,
@@ -28,7 +29,7 @@ export class ApiKeyAuthGuard implements CanActivate {
     }
 
     const validated = await this.apiKeysService.validateApiKey(apiKey);
-    if (!validated) {
+    if (!validated || validated.securityDomain !== SecurityDomain.SCHOOL) {
       throw new UnauthorizedException('Invalid API key');
     }
 
@@ -38,7 +39,7 @@ export class ApiKeyAuthGuard implements CanActivate {
       tenantId: validated.tenantId,
       originalTenantId: validated.tenantId,
       isSupportOverride: false,
-      securityDomain: SecurityDomain.SCHOOL,
+      securityDomain: validated.securityDomain,
       tenantSlug: '',
       email: null,
       authMethod: AuthMethod.PASSWORD,
@@ -57,6 +58,12 @@ export class ApiKeyAuthGuard implements CanActivate {
       this.cls.set(TENANT_ID_KEY, validated.tenantId);
     }
 
+    recordVerifiedAuthorizationIdentity(request, request.auth, {
+      securityDomain: validated.securityDomain,
+      tenantId: validated.tenantId,
+      userSessionActive: true,
+      tenantActive: true,
+    });
     return true;
   }
 

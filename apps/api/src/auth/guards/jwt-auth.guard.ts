@@ -1,3 +1,4 @@
+import { recordVerifiedAuthorizationIdentity } from '../../authorization/authorization-request-identity';
 import {
   CanActivate,
   ExecutionContext,
@@ -334,6 +335,13 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     this.mustChangePasswordGuard.canActivate(context);
+    recordVerifiedAuthorizationIdentity(request, request.auth, {
+      securityDomain: user.tenant.securityDomain,
+      tenantId: effectiveTenantId,
+      userSessionActive: true,
+      tenantActive: true,
+      supportOverrideApproved: request.auth.isSupportOverride === true,
+    });
 
     return true;
   }

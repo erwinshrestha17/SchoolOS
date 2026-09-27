@@ -133,7 +133,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     } as unknown as ExecutionContext;
 
     await jwtAuthGuard.canActivate(mockContext);
-    expect(() => platformGuard.canActivate(mockContext)).toThrow(
+    await expect(platformGuard.canActivate(mockContext)).rejects.toThrow(
       ForbiddenException,
     );
 
@@ -187,7 +187,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
 
     // 6. Access platform API - should succeed
     await jwtAuthGuard.canActivate(mockContext);
-    expect(platformGuard.canActivate(mockContext)).toBe(true);
+    await expect(platformGuard.canActivate(mockContext)).resolves.toBe(true);
 
     const tenants = await platformController.listTenants();
     expect(tenants).toHaveLength(3); // school-1, platform, and default-school
@@ -256,7 +256,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
 
     // 10. Support can read tenants
     await jwtAuthGuard.canActivate(sMockContext);
-    expect(platformGuard.canActivate(sMockContext)).toBe(true);
+    await expect(platformGuard.canActivate(sMockContext)).resolves.toBe(true);
     const tenantsList = await platformController.listTenants();
     expect(tenantsList).toBeDefined();
 
@@ -267,7 +267,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       getClass: () => PlatformController,
     } as unknown as ExecutionContext;
     await jwtAuthGuard.canActivate(sUpdateContext);
-    expect(() => platformGuard.canActivate(sUpdateContext)).toThrow(
+    await expect(platformGuard.canActivate(sUpdateContext)).rejects.toThrow(
       ForbiddenException,
     );
 
@@ -315,7 +315,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
 
     // 13. Billing can read usage
     await jwtAuthGuard.canActivate(bMockContext);
-    expect(platformGuard.canActivate(bMockContext)).toBe(true);
+    await expect(platformGuard.canActivate(bMockContext)).resolves.toBe(true);
     const usage = await platformController.getTenantUsage(tenantId);
     expect(usage).toBeDefined();
 
@@ -326,7 +326,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       getClass: () => PlatformController,
     } as unknown as ExecutionContext;
     await jwtAuthGuard.canActivate(bUpdateContext);
-    expect(() => platformGuard.canActivate(bUpdateContext)).toThrow(
+    await expect(platformGuard.canActivate(bUpdateContext)).rejects.toThrow(
       ForbiddenException,
     );
   });

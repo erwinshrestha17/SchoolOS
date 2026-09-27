@@ -1,3 +1,4 @@
+import { SecurityDomain } from '@prisma/client';
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { ApiKeyAuthGuard } from './api-key-auth.guard';
 
@@ -49,6 +50,26 @@ describe('ApiKeyAuthGuard', () => {
     await expect(guard.canActivate(context)).rejects.toThrow('Invalid API key');
   });
 
+  it('rejects Platform or missing live domain before populating SCHOOL authority', async () => {
+    for (const securityDomain of [SecurityDomain.PLATFORM, undefined]) {
+      const req = {
+        headers: { 'x-api-key': 'sk_schoolos_platform' },
+        auth: null,
+      };
+      platformApiKeysService.validateApiKey.mockResolvedValue({
+        id: 'key',
+        tenantId: 'platform',
+        scopes: ['students:read'],
+        securityDomain,
+      });
+      await expect(
+        guard.canActivate(mockExecutionContext(req)),
+      ).rejects.toThrow('Invalid API key');
+      expect(req.auth).toBeNull();
+      expect(cls.set).not.toHaveBeenCalled();
+    }
+  });
+
   it('successfully authorizes request and populates request.auth with scopes', async () => {
     const request = {
       headers: {
@@ -61,6 +82,7 @@ describe('ApiKeyAuthGuard', () => {
       id: 'key-1',
       tenantId: 'tenant-1',
       scopes: ['students:read'],
+      securityDomain: SecurityDomain.SCHOOL,
     });
 
     const result = await guard.canActivate(context);
@@ -84,6 +106,7 @@ describe('ApiKeyAuthGuard', () => {
       id: 'key-1',
       tenantId: 'tenant-1',
       scopes: ['students:read'],
+      securityDomain: SecurityDomain.SCHOOL,
     });
 
     await guard.canActivate(mockExecutionContext(request));
@@ -104,6 +127,7 @@ describe('ApiKeyAuthGuard', () => {
       id: 'key-1',
       tenantId: 'tenant-1',
       scopes: ['students:read'],
+      securityDomain: SecurityDomain.SCHOOL,
     });
 
     await expect(

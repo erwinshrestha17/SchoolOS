@@ -1,3 +1,6 @@
+import { AuthorizationService } from '../authorization/authorization.service';
+import { recordTestAuthorizationIdentity } from '../../test/helpers/authorization-test-helpers';
+import type { AuthContext } from '../auth/auth.types';
 import {
   ExecutionContext,
   ForbiddenException,
@@ -11,14 +14,24 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PlatformGuard } from '../auth/guards/platform.guard';
 import { TenantsController } from './tenants.controller';
 
-const makeExecutionContext = (auth: unknown) =>
-  ({
+const makeExecutionContext = (auth: unknown) => {
+  const req = {
+    auth: auth
+      ? {
+          ...(auth as AuthContext),
+          tenantId: (auth as AuthContext).tenantId ?? 'platform-tenant',
+        }
+      : undefined,
+  };
+  recordTestAuthorizationIdentity(req);
+  return {
     switchToHttp: () => ({
-      getRequest: () => ({ auth }),
+      getRequest: () => req,
     }),
     getHandler: () => TenantsController.prototype.register,
     getClass: () => TenantsController,
-  }) as unknown as ExecutionContext;
+  } as unknown as ExecutionContext;
+};
 
 describe('TenantsController tenant provisioning authorization (DEF-01)', () => {
   it('guards POST /tenants/register with JwtAuthGuard and PlatformGuard', () => {
@@ -41,16 +54,19 @@ describe('TenantsController tenant provisioning authorization (DEF-01)', () => {
   });
 
   describe('PlatformGuard evaluated against the real register metadata', () => {
-    const guard = new PlatformGuard(new Reflector());
+    const guard = new PlatformGuard(
+      new Reflector(),
+      new AuthorizationService(),
+    );
 
-    it('rejects unauthenticated requests', () => {
-      expect(() => guard.canActivate(makeExecutionContext(undefined))).toThrow(
-        UnauthorizedException,
-      );
+    it('rejects unauthenticated requests', async () => {
+      await expect(
+        guard.canActivate(makeExecutionContext(undefined)),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('rejects school tenant admins even with broad tenant permissions', () => {
-      expect(() =>
+    it('rejects school tenant admins even with broad tenant permissions', async () => {
+      await expect(
         guard.canActivate(
           makeExecutionContext({
             userId: 'school-admin-1',
@@ -60,11 +76,11 @@ describe('TenantsController tenant provisioning authorization (DEF-01)', () => {
             permissions: ['users:create', 'settings:manage'],
           }),
         ),
-      ).toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenException);
     });
 
-    it('rejects platform support users, who lack tenants:manage', () => {
-      expect(() =>
+    it('rejects platform support users, who lack tenants:manage', async () => {
+      await expect(
         guard.canActivate(
           makeExecutionContext({
             userId: 'platform-support-1',
@@ -74,11 +90,11 @@ describe('TenantsController tenant provisioning authorization (DEF-01)', () => {
             permissions: ['platform:tenants:read'],
           }),
         ),
-      ).toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenException);
     });
 
-    it('allows platform super admins to provision tenants', () => {
-      expect(
+    it('allows platform super admins to provision tenants', async () => {
+      await expect(
         guard.canActivate(
           makeExecutionContext({
             userId: 'platform-super-admin-1',
@@ -88,7 +104,7 @@ describe('TenantsController tenant provisioning authorization (DEF-01)', () => {
             permissions: ['tenants:manage'],
           }),
         ),
-      ).toBe(true);
+      ).resolves.toBe(true);
     });
   });
 });

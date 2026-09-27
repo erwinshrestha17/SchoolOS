@@ -243,7 +243,7 @@ describe('Demo Requests (E2E)', () => {
       require('../src/auth/guards/platform.guard').PlatformGuard,
     );
 
-    expect(() => platformGuard.canActivate(context)).toThrow(
+    await expect(platformGuard.canActivate(context)).rejects.toThrow(
       ForbiddenException,
     );
   });

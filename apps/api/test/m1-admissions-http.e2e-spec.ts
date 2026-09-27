@@ -1,3 +1,4 @@
+import { recordTestAuthorizationIdentity } from './helpers/authorization-test-helpers';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -121,6 +122,7 @@ describe('M1 Admissions HTTP ownership hardening (E2E)', () => {
                   ),
                 }
               : actor;
+          recordTestAuthorizationIdentity(req);
           return true;
         },
       })

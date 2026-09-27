@@ -1,3 +1,4 @@
+import { isAuthorizationDenial } from '../../authorization/authorization-denied.exception';
 import {
   ArgumentsHost,
   Catch,
@@ -48,6 +49,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
           'error' in exceptionResponse
             ? (exceptionResponse as { error: string }).error
             : HttpStatus[status] || 'Error',
+        ...(isAuthorizationDenial(exception)
+          ? { reasonCode: exception.decision.reasonCode }
+          : {}),
         path: request.url,
         method: request.method,
       },
@@ -56,10 +60,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
     };
 
     this.logger.error(
-      JSON.stringify({
-        ...payload,
-        stack: exception instanceof Error ? exception.stack : undefined,
-      }),
+      JSON.stringify(
+        isAuthorizationDenial(exception)
+          ? {
+              outcome: exception.decision.outcome,
+              reasonCode: exception.decision.reasonCode,
+              stage: exception.decision.stage,
+              policyId: exception.decision.policyId,
+              statusCode: status,
+            }
+          : {
+              ...payload,
+              stack: exception instanceof Error ? exception.stack : undefined,
+            },
+      ),
     );
 
     response.status(status).json(payload);

@@ -1,3 +1,4 @@
+import { recordTestAuthorizationIdentity } from './helpers/authorization-test-helpers';
 import { INestApplication } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -114,6 +115,7 @@ describe('M8 Library HTTP circulation lifecycle (E2E)', () => {
                 : actorKey === 'other-tenant'
                   ? otherTenantActor
                   : librarianActor;
+          recordTestAuthorizationIdentity(req);
           return true;
         },
       });

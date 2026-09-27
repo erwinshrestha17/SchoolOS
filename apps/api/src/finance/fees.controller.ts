@@ -1,3 +1,4 @@
+import { ServiceAuthorization } from '../authorization/service-authorization.decorator';
 import {
   Body,
   Controller,
@@ -45,6 +46,7 @@ export class FeesController {
   constructor(private readonly financeService: FinanceService) {}
 
   @Get('dashboard-summary')
+  @ServiceAuthorization('FINANCE_DASHBOARD')
   getDashboardSummary(
     @Query() query: FinanceDashboardSummaryQueryDto,
     @CurrentAuth() auth: AuthContext,

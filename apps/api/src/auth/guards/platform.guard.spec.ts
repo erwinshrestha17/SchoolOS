@@ -1,3 +1,6 @@
+import { AuthorizationService } from '../../authorization/authorization.service';
+import { recordTestAuthorizationIdentity } from '../../../test/helpers/authorization-test-helpers';
+import type { AuthContext } from '../auth.types';
 import {
   ForbiddenException,
   UnauthorizedException,
@@ -6,14 +9,24 @@ import {
 import { SecurityDomain } from '@prisma/client';
 import { PlatformGuard } from './platform.guard';
 
-const makeExecutionContext = (auth: unknown): ExecutionContext =>
-  ({
+const makeExecutionContext = (auth: unknown): ExecutionContext => {
+  const req = {
+    auth: auth
+      ? {
+          ...(auth as AuthContext),
+          tenantId: (auth as AuthContext).tenantId ?? 'platform-tenant',
+        }
+      : undefined,
+  };
+  recordTestAuthorizationIdentity(req);
+  return {
     switchToHttp: () => ({
-      getRequest: () => ({ auth }),
+      getRequest: () => req,
     }),
     getHandler: () => 'handler',
     getClass: () => 'controller',
-  }) as unknown as ExecutionContext;
+  } as unknown as ExecutionContext;
+};
 
 describe('PlatformGuard', () => {
   const reflector = {
@@ -26,21 +39,22 @@ describe('PlatformGuard', () => {
     jest.clearAllMocks();
     guard = new PlatformGuard(
       reflector as unknown as ConstructorParameters<typeof PlatformGuard>[0],
+      new AuthorizationService(),
     );
   });
 
-  it('rejects unauthenticated requests to platform routes', () => {
+  it('rejects unauthenticated requests to platform routes', async () => {
     reflector.getAllAndOverride.mockReturnValue([]);
 
-    expect(() => guard.canActivate(makeExecutionContext(undefined))).toThrow(
-      UnauthorizedException,
-    );
+    await expect(
+      guard.canActivate(makeExecutionContext(undefined)),
+    ).rejects.toThrow(UnauthorizedException);
   });
 
-  it('rejects school users from platform routes even if they have tenant permissions', () => {
+  it('rejects school users from platform routes even if they have tenant permissions', async () => {
     reflector.getAllAndOverride.mockReturnValue(['platform:dashboard:read']);
 
-    expect(() =>
+    await expect(
       guard.canActivate(
         makeExecutionContext({
           userId: 'school-user-1',
@@ -51,13 +65,13 @@ describe('PlatformGuard', () => {
           permissions: ['platform:dashboard:read', 'students:read'],
         }),
       ),
-    ).toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenException);
   });
 
-  it('does not give platform super admins a permission bypass', () => {
+  it('does not give platform super admins a permission bypass', async () => {
     reflector.getAllAndOverride.mockReturnValue(['platform:billing:manage']);
 
-    expect(() =>
+    await expect(
       guard.canActivate(
         makeExecutionContext({
           userId: 'platform-super-admin-1',
@@ -67,13 +81,13 @@ describe('PlatformGuard', () => {
           permissions: [],
         }),
       ),
-    ).toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenException);
   });
 
-  it('allows platform super admins only with the explicit route permission', () => {
+  it('allows platform super admins only with the explicit route permission', async () => {
     reflector.getAllAndOverride.mockReturnValue(['platform:billing:manage']);
 
-    expect(
+    await expect(
       guard.canActivate(
         makeExecutionContext({
           userId: 'platform-super-admin-1',
@@ -83,13 +97,13 @@ describe('PlatformGuard', () => {
           permissions: ['platform:billing:manage'],
         }),
       ),
-    ).toBe(true);
+    ).resolves.toBe(true);
   });
 
-  it('allows platform support users only when required platform permissions are present', () => {
+  it('allows platform support users only when required platform permissions are present', async () => {
     reflector.getAllAndOverride.mockReturnValue(['platform:queues:read']);
 
-    expect(
+    await expect(
       guard.canActivate(
         makeExecutionContext({
           userId: 'platform-support-1',
@@ -99,13 +113,13 @@ describe('PlatformGuard', () => {
           permissions: ['platform:queues:read'],
         }),
       ),
-    ).toBe(true);
+    ).resolves.toBe(true);
   });
 
-  it('rejects platform support users missing required permissions', () => {
+  it('rejects platform support users missing required permissions', async () => {
     reflector.getAllAndOverride.mockReturnValue(['platform:queues:retry']);
 
-    expect(() =>
+    await expect(
       guard.canActivate(
         makeExecutionContext({
           userId: 'platform-support-1',
@@ -115,13 +129,13 @@ describe('PlatformGuard', () => {
           permissions: ['platform:queues:read'],
         }),
       ),
-    ).toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenException);
   });
 
-  it('allows platform billing admins only through platform role plus matching permission', () => {
+  it('allows platform billing admins only through platform role plus matching permission', async () => {
     reflector.getAllAndOverride.mockReturnValue(['platform:billing:manage']);
 
-    expect(
+    await expect(
       guard.canActivate(
         makeExecutionContext({
           userId: 'platform-billing-1',
@@ -131,13 +145,13 @@ describe('PlatformGuard', () => {
           permissions: ['platform:billing:manage'],
         }),
       ),
-    ).toBe(true);
+    ).resolves.toBe(true);
   });
 
-  it('rejects a support override from returning to platform routes', () => {
+  it('rejects a support override from returning to platform routes', async () => {
     reflector.getAllAndOverride.mockReturnValue(['platform:dashboard:read']);
 
-    expect(() =>
+    await expect(
       guard.canActivate(
         makeExecutionContext({
           userId: 'platform-super-admin-1',
@@ -147,6 +161,6 @@ describe('PlatformGuard', () => {
           permissions: ['platform:dashboard:read'],
         }),
       ),
-    ).toThrow(ForbiddenException);
+    ).rejects.toThrow(ForbiddenException);
   });
 });

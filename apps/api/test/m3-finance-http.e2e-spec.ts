@@ -1,3 +1,4 @@
+import { recordTestAuthorizationIdentity } from './helpers/authorization-test-helpers';
 import { INestApplication } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -93,6 +94,7 @@ describe('M3 Fees HTTP isolation hardening (E2E)', () => {
           const req = context.switchToHttp().getRequest();
           req.auth =
             req.headers['x-test-tenant'] === tenantBId ? actorB : actorA;
+          recordTestAuthorizationIdentity(req);
           return true;
         },
       })

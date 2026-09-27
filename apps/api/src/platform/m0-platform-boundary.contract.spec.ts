@@ -30,10 +30,11 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
     it('PlatformGuard rejects non-platform roles with ForbiddenException', () => {
       const guard = read('src/auth/guards/platform.guard.ts');
 
-      // Guard must check platform role membership
-      expect(guard).toContain('platform_super_admin');
-      expect(guard).toContain('platform_support');
-      expect(guard).toContain('platform_billing_admin');
+      // Guard delegates the authoritative domain/role boundary to the kernel.
+      const kernel = read('src/authorization/authorization.service.ts');
+      expect(guard).toContain('this.authorization.evaluate');
+      expect(kernel).toContain('PLATFORM_ROLE_NAMES.some');
+      expect(kernel).toContain('SecurityDomain.PLATFORM');
       expect(guard).toContain('ForbiddenException');
       expect(guard).toContain(
         'Access restricted to platform administrators only',
@@ -120,21 +121,27 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
     it('requires the live Platform security domain and rejects active support overrides', () => {
       const guard = read('src/auth/guards/platform.guard.ts');
       expect(guard).toContain('SecurityDomain.PLATFORM');
-      expect(guard).toContain('auth.isSupportOverride');
+      const kernel = read('src/authorization/authorization.service.ts');
+      expect(guard).toContain('readVerifiedAuthorizationIdentity');
+      expect(kernel).toContain('actor?.isSupportOverride');
       expect(guard).toContain('Platform security domain');
     });
 
     it('does not give platform_super_admin a route-permission bypass', () => {
       const guard = read('src/auth/guards/platform.guard.ts');
-      expect(guard).toContain('isPlatformAdmin');
-      expect(guard).toContain('hasAllPermissions');
+      const kernel = read('src/authorization/authorization.service.ts');
+      expect(guard).toContain('this.authorization.evaluate');
+      expect(kernel).toContain('grants.includes(definition.legacyKey)');
       expect(guard).not.toMatch(/if\s*\(isPlatformAdmin\)\s*\{?\s*return true/);
     });
 
     it('platform_support and platform_billing_admin require matching permissions', () => {
       const guard = read('src/auth/guards/platform.guard.ts');
       expect(guard).toContain('requiredPermissions');
-      expect(guard).toContain('hasAllPermissions');
+      expect(guard).toContain('this.authorization.evaluate');
+      const kernel = read('src/authorization/authorization.service.ts');
+      expect(kernel).toContain('for (const definition of definitions)');
+      expect(kernel).toContain('PERMISSION_MISSING');
       expect(guard).toContain('Insufficient platform permissions');
     });
 

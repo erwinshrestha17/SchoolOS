@@ -1,3 +1,5 @@
+import { AuthorizationService } from '../authorization/authorization.service';
+import { recordTestAuthorizationIdentity } from '../../test/helpers/authorization-test-helpers';
 import { AuthMethod } from '@prisma/client';
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -25,8 +27,13 @@ describe('Principal write-route denial (PPR-P0-03 seed)', () => {
   beforeEach(() => {
     reflector = {
       getAllAndOverride: jest.fn(),
+      get: jest.fn(),
     } as unknown as Reflector;
-    guard = new RolesPermissionsGuard(reflector);
+    guard = new RolesPermissionsGuard(
+      reflector,
+      new AuthorizationService(),
+      {} as never,
+    );
     request = {
       auth: {
         userId: 'principal-1',
@@ -39,8 +46,11 @@ describe('Principal write-route denial (PPR-P0-03 seed)', () => {
       },
     };
     context = {
-      getHandler: jest.fn(),
-      getClass: jest.fn(),
+      getHandler: () =>
+        function testHandler() {
+          return undefined;
+        },
+      getClass: () => RolesPermissionsGuard,
       switchToHttp: () => ({
         getRequest: () => request,
       }),
@@ -51,6 +61,7 @@ describe('Principal write-route denial (PPR-P0-03 seed)', () => {
     (reflector.getAllAndOverride as jest.Mock)
       .mockReturnValueOnce([])
       .mockReturnValueOnce(requiredPermissions);
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -60,6 +71,7 @@ describe('Principal write-route denial (PPR-P0-03 seed)', () => {
     (reflector.getAllAndOverride as jest.Mock)
       .mockReturnValueOnce([])
       .mockReturnValueOnce(requiredPermissions);
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).resolves.toBe(true);
   }
 

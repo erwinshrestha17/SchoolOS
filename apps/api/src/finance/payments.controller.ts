@@ -1,3 +1,4 @@
+import { ServiceAuthorization } from '../authorization/service-authorization.decorator';
 import {
   Body,
   Controller,
@@ -59,6 +60,7 @@ export class PaymentsController {
   }
 
   @Get(':id/allocations')
+  @ServiceAuthorization('PAYMENT_ALLOCATIONS')
   listPaymentAllocations(
     @Param('id') paymentId: string,
     @Query() query: ListPaymentAllocationsQueryDto,
@@ -280,6 +282,7 @@ export class PaymentsController {
   }
 
   @Get('requests')
+  @ServiceAuthorization('FINANCE_REQUEST_REVIEW')
   listApprovalRequests(
     @Query() query: ListFinanceApprovalRequestsQueryDto,
     @CurrentAuth() auth: AuthContext,
@@ -294,6 +297,7 @@ export class PaymentsController {
   }
 
   @Post('requests/:id/review')
+  @ServiceAuthorization('FINANCE_REQUEST_REVIEW')
   reviewApprovalRequest(
     @Param('id') requestId: string,
     @Body() dto: ReviewFinanceRequestDto,

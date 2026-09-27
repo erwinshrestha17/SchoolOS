@@ -1,3 +1,4 @@
+import { ServiceAuthorization } from '../authorization/service-authorization.decorator';
 import {
   Controller,
   Get,
@@ -129,6 +130,7 @@ export class SettingsController {
   }
 
   @Patch(':key')
+  @ServiceAuthorization('SETTING_KEY_WRITE')
   async updateSetting(
     @Param('key') key: string,
     @Body() payload: UpdateTenantSettingPayload,

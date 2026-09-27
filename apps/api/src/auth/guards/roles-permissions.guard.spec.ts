@@ -1,3 +1,5 @@
+import { AuthorizationService } from '../../authorization/authorization.service';
+import { recordTestAuthorizationIdentity } from '../../../test/helpers/authorization-test-helpers';
 import { AuthMethod, SecurityDomain } from '@prisma/client';
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -7,15 +9,21 @@ import type { AuthContext } from '../auth.types';
 describe('RolesPermissionsGuard', () => {
   let guard: RolesPermissionsGuard;
   let reflector: Reflector;
-  let request: { auth: AuthContext };
+  let request: { auth: AuthContext; method: string };
   let context: ExecutionContext;
 
   beforeEach(() => {
     reflector = {
       getAllAndOverride: jest.fn(),
+      get: jest.fn(),
     } as unknown as Reflector;
-    guard = new RolesPermissionsGuard(reflector);
+    guard = new RolesPermissionsGuard(
+      reflector,
+      new AuthorizationService(),
+      {} as never,
+    );
     request = {
+      method: 'GET',
       auth: {
         userId: 'user-1',
         tenantId: 'tenant-1',
@@ -29,8 +37,11 @@ describe('RolesPermissionsGuard', () => {
       },
     };
     context = {
-      getHandler: jest.fn(),
-      getClass: jest.fn(),
+      getHandler: () =>
+        function testHandler() {
+          return undefined;
+        },
+      getClass: () => RolesPermissionsGuard,
       switchToHttp: () => ({
         getRequest: () => request,
       }),
@@ -44,6 +55,7 @@ describe('RolesPermissionsGuard', () => {
     request.auth.roles = ['admin'];
     request.auth.permissions = ['users:create'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(request.auth.roles).toEqual(['admin']);
     expect(request.auth.permissions).toEqual(['users:create']);
@@ -56,6 +68,7 @@ describe('RolesPermissionsGuard', () => {
     request.auth.roles = ['teacher'];
     request.auth.permissions = ['roles:read'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -70,6 +83,7 @@ describe('RolesPermissionsGuard', () => {
     request.auth.roles = ['platform_super_admin'];
     request.auth.permissions = ['students:read'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toThrow(
       new ForbiddenException(
         'Platform identities require an active support override on school routes',
@@ -83,11 +97,13 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce(['students:read']);
     request.auth.securityDomain = SecurityDomain.PLATFORM;
     request.auth.isSupportOverride = true;
+    request.auth.originalTenantId = 'platform-tenant';
     request.auth.supportOverrideReadOnly = true;
     request.auth.supportOverrideScopes = ['STUDENT_RECORDS'];
     request.auth.roles = [];
     request.auth.permissions = ['students:read'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).resolves.toBe(true);
   });
 
@@ -97,11 +113,13 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce(['advanced:approvals:read']);
     request.auth.securityDomain = SecurityDomain.PLATFORM;
     request.auth.isSupportOverride = true;
+    request.auth.originalTenantId = 'platform-tenant';
     request.auth.supportOverrideReadOnly = true;
     request.auth.supportOverrideScopes = ['SCHOOL_PROFILE'];
     request.auth.roles = [];
     request.auth.permissions = ['settings:read'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -113,6 +131,7 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce(['advanced:approvals:read']);
     request.auth.permissions = ['settings:read'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -124,10 +143,12 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce([]);
     request.auth.securityDomain = SecurityDomain.PLATFORM;
     request.auth.isSupportOverride = true;
+    request.auth.originalTenantId = 'platform-tenant';
     request.auth.supportOverrideReadOnly = true;
     request.auth.supportOverrideScopes = ['SCHOOL_PROFILE'];
     request.auth.roles = ['admin'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toThrow(
       new ForbiddenException(
         'Support override requires an explicitly permissioned read route',
@@ -141,11 +162,13 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce([]);
     request.auth.securityDomain = SecurityDomain.PLATFORM;
     request.auth.isSupportOverride = true;
+    request.auth.originalTenantId = 'platform-tenant';
     request.auth.supportOverrideReadOnly = true;
     request.auth.supportOverrideScopes = ['SCHOOL_PROFILE'];
     request.auth.roles = [];
     request.auth.permissions = ['settings:read'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toThrow(
       new ForbiddenException(
         'Support override requires an explicitly permissioned read route',
@@ -160,6 +183,7 @@ describe('RolesPermissionsGuard', () => {
     request.auth.roles = ['platform_super_admin'];
     request.auth.permissions = [];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -171,6 +195,7 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce(['payroll:payslip:generate']);
     request.auth.permissions = ['payroll:manage'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).resolves.toBe(true);
   });
 
@@ -180,6 +205,7 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce(['accounting:accounts:write']);
     request.auth.permissions = ['accounting:close'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -191,6 +217,7 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce(['accounting:fiscal:manage']);
     request.auth.permissions = ['accounting:close'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -202,6 +229,7 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce(['accounting:exports:create']);
     request.auth.permissions = ['accounting:close'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -213,6 +241,7 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce(['accounting:exports:create']);
     request.auth.permissions = ['reports:export'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).resolves.toBe(true);
   });
 
@@ -222,6 +251,7 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce(['notifications:manage_preferences']);
     request.auth.permissions = ['notices:read'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).resolves.toBe(true);
   });
 
@@ -231,6 +261,7 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce(['consents:manage']);
     request.auth.permissions = ['notices:read'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -242,6 +273,7 @@ describe('RolesPermissionsGuard', () => {
       .mockReturnValueOnce(['communications:manage_consent']);
     request.auth.permissions = ['notices:read'];
 
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -253,6 +285,7 @@ describe('RolesPermissionsGuard', () => {
     (reflector.getAllAndOverride as jest.Mock)
       .mockReturnValueOnce([])
       .mockReturnValueOnce(['notices:approve']);
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -260,6 +293,7 @@ describe('RolesPermissionsGuard', () => {
     (reflector.getAllAndOverride as jest.Mock)
       .mockReturnValueOnce([])
       .mockReturnValueOnce(['notices:send_emergency']);
+    recordTestAuthorizationIdentity(request);
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );

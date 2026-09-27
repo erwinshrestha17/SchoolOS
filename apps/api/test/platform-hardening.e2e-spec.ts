@@ -1,3 +1,4 @@
+import { recordSyntheticContextIdentity } from './helpers/authorization-test-helpers';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   INestApplication,
@@ -438,7 +439,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       } as unknown as ExecutionContext;
     }
 
-    it('platform endpoints require platform auth and granular platform permissions', () => {
+    it('platform endpoints require platform auth and granular platform permissions', async () => {
       // platform_support has read permissions, should fail on status update
       const handlerCtx = {
         switchToHttp: () => ({
@@ -455,7 +456,9 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         getClass: () => PlatformController,
       } as unknown as ExecutionContext;
 
-      expect(() => platformGuard.canActivate(handlerCtx)).toThrow(
+      recordSyntheticContextIdentity(handlerCtx);
+
+      await expect(platformGuard.canActivate(handlerCtx)).rejects.toThrow(
         ForbiddenException,
       );
 
@@ -475,16 +478,19 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         getClass: () => PlatformController,
       } as unknown as ExecutionContext;
 
-      expect(platformGuard.canActivate(adminCtx)).toBe(true);
+      recordSyntheticContextIdentity(adminCtx);
+
+      await expect(platformGuard.canActivate(adminCtx)).resolves.toBe(true);
     });
 
-    it('school users cannot access platform endpoints', () => {
+    it('school users cannot access platform endpoints', async () => {
       const schoolUserCtx = makeAuthContext(
         'some-school-id',
         ['admin'],
         ['platform:tenants:read'],
       );
-      expect(() => platformGuard.canActivate(schoolUserCtx)).toThrow(
+      recordSyntheticContextIdentity(schoolUserCtx);
+      await expect(platformGuard.canActivate(schoolUserCtx)).rejects.toThrow(
         ForbiddenException,
       );
     });
@@ -841,10 +847,11 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       } as unknown as ExecutionContext;
 
       jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key) => {
-        if (key === 'permissions') return ['students.admission.create'];
+        if (key === 'permissions') return ['students:create'];
         return [];
       });
 
+      recordSyntheticContextIdentity(unprivilegedContext);
       await expect(rolesGuard.canActivate(unprivilegedContext)).rejects.toThrow(
         ForbiddenException,
       );
@@ -1815,7 +1822,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       expect(registerLog?.userId).toBe(platformActor.userId);
     });
 
-    it('school admin is denied by PlatformGuard on register', () => {
+    it('school admin is denied by PlatformGuard on register', async () => {
       const schoolUserCtx = {
         switchToHttp: () => ({
           getRequest: () => ({
@@ -1831,7 +1838,9 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         getClass: () => TenantsController,
       } as unknown as ExecutionContext;
 
-      expect(() => platformGuard.canActivate(schoolUserCtx)).toThrow(
+      recordSyntheticContextIdentity(schoolUserCtx);
+
+      await expect(platformGuard.canActivate(schoolUserCtx)).rejects.toThrow(
         ForbiddenException,
       );
     });

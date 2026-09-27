@@ -1,3 +1,4 @@
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import {
   ForbiddenException,
   NotFoundException,
@@ -124,6 +125,28 @@ describe('School OS Auth + RBAC integration', () => {
     );
 
     expect(registration.tenant.slug).toBe('green-valley');
+
+    // The real Classes guard chain requires an active students entitlement.
+    // Onboarding alone does not grant a subscription or a module.
+    const planId = 'green-valley-test-plan';
+    prisma.__state.platformPlans.push({
+      id: planId,
+      key: 'green-valley-test',
+      name: 'Green Valley test plan',
+    });
+    prisma.__state.platformPlanFeatures.push({
+      id: 'green-valley-students-feature',
+      planId,
+      featureKey: 'module.students',
+      enabled: true,
+    });
+    prisma.__state.tenantSubscriptions.push({
+      id: 'green-valley-test-subscription',
+      tenantId: registration.tenant.id,
+      planId,
+      status: 'ACTIVE',
+      createdAt: new Date(),
+    });
 
     const adminResponse = createResponseMock();
     const adminLogin = asSession(
@@ -682,7 +705,13 @@ async function authenticateRequest(
 
   return cls.run(async () => {
     await jwtAuthGuard.canActivate(context);
-    await rolesGuard.canActivate(context);
+    const configuredGuards = [handler, controllerClass].flatMap(
+      (target) =>
+        (Reflect.getMetadata(GUARDS_METADATA, target) ?? []) as unknown[],
+    );
+    if (configuredGuards.includes(RolesPermissionsGuard)) {
+      await rolesGuard.canActivate(context);
+    }
 
     return request;
   });

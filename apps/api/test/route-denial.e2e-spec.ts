@@ -1,3 +1,4 @@
+import { recordSyntheticContextIdentity } from './helpers/authorization-test-helpers';
 import { ForbiddenException, ExecutionContext } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -664,7 +665,8 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
     } as unknown as ExecutionContext;
 
     const platformGuard = moduleRef.get(PlatformGuard);
-    expect(() => platformGuard.canActivate(context)).toThrow(
+    recordSyntheticContextIdentity(context);
+    await expect(platformGuard.canActivate(context)).rejects.toThrow(
       /Access restricted to platform administrators only/,
     );
   });

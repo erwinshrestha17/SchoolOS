@@ -1,67 +1,58 @@
 import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+  AuthorizationForbiddenException,
+  AuthorizationUnauthorizedException,
+} from '../../authorization/authorization-denied.exception';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { SecurityDomain } from '@prisma/client';
+import { AuthorizationService } from '../../authorization/authorization.service';
+import { readVerifiedAuthorizationIdentity } from '../../authorization/authorization-request-identity';
 import { AuthenticatedRequest } from '../auth-request.interface';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
-import { SecurityDomain } from '@prisma/client';
 
 @Injectable()
 export class PlatformGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly authorization: AuthorizationService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const auth = request.auth;
-
-    if (!auth) {
-      throw new UnauthorizedException('Authentication required');
-    }
-
-    const roles = auth.roles;
-    if (
-      auth.securityDomain !== SecurityDomain.PLATFORM ||
-      auth.isSupportOverride
-    ) {
-      throw new ForbiddenException(
-        'Access restricted to platform administrators only: account is outside the Platform security domain',
-      );
-    }
-
-    const isPlatformAdmin = roles.includes('platform_super_admin');
-    const isPlatformSupport = roles.includes('platform_support');
-    const isPlatformBilling = roles.includes('platform_billing_admin');
-
-    if (!isPlatformAdmin && !isPlatformSupport && !isPlatformBilling) {
-      throw new ForbiddenException(
-        'Access restricted to platform administrators only',
-      );
-    }
-
     const requiredPermissions =
       this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
         context.getHandler(),
         context.getClass(),
       ]) ?? [];
-
-    if (requiredPermissions.length === 0) {
-      return true;
-    }
-
-    const hasAllPermissions = requiredPermissions.every((permission) =>
-      auth.permissions.includes(permission),
-    );
-
-    if (!hasAllPermissions) {
-      throw new ForbiddenException(
-        'Insufficient platform permissions for this action',
+    const decision = await this.authorization.evaluate({
+      actor: auth,
+      identity: readVerifiedAuthorizationIdentity(request, auth),
+      securityDomain: SecurityDomain.PLATFORM,
+      trustedTenantId: auth?.tenantId,
+      requestedPermissions: requiredPermissions,
+      method: request.method,
+      requestId: request.requestId,
+    });
+    if (decision.outcome === 'ALLOW') return true;
+    if (decision.reasonCode === 'AUTHENTICATION_REQUIRED')
+      throw new AuthorizationUnauthorizedException(
+        decision,
+        'Authentication required',
       );
-    }
-
-    return true;
+    if (decision.reasonCode === 'USER_OR_SESSION_INACTIVE')
+      throw new AuthorizationUnauthorizedException(
+        decision,
+        'User or session is inactive',
+      );
+    if (decision.reasonCode === 'SECURITY_DOMAIN_MISMATCH')
+      throw new AuthorizationForbiddenException(
+        decision,
+        'Access restricted to platform administrators only: account is outside the Platform security domain',
+      );
+    throw new AuthorizationForbiddenException(
+      decision,
+      'Insufficient platform permissions for this action',
+    );
   }
 }

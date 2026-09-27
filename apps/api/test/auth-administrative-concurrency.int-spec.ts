@@ -1,3 +1,4 @@
+import { AuthorizationService } from '../src/authorization/authorization.service';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -203,7 +204,11 @@ describeDatabase(
           { provide: JwtAuthGuard, useValue: guard },
           {
             provide: RolesPermissionsGuard,
-            useValue: new RolesPermissionsGuard(new Reflector()),
+            useValue: new RolesPermissionsGuard(
+              new Reflector(),
+              new AuthorizationService(),
+              {} as never,
+            ),
           },
           {
             provide: TenantActiveGuard,
@@ -220,7 +225,13 @@ describeDatabase(
         .overrideGuard(JwtAuthGuard)
         .useValue(guard)
         .overrideGuard(RolesPermissionsGuard)
-        .useValue(new RolesPermissionsGuard(new Reflector()))
+        .useValue(
+          new RolesPermissionsGuard(
+            new Reflector(),
+            new AuthorizationService(),
+            {} as never,
+          ),
+        )
         .overrideGuard(TenantActiveGuard)
         .useValue(
           new TenantActiveGuard(

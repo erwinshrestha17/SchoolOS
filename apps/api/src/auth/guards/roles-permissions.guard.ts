@@ -1,109 +1,126 @@
 import {
+  AuthorizationForbiddenException,
+  AuthorizationUnauthorizedException,
+} from '../../authorization/authorization-denied.exception';
+import {
   CanActivate,
   ExecutionContext,
-  ForbiddenException,
+  HttpException,
   Injectable,
-  Logger,
-  UnauthorizedException,
 } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
+import { SecurityDomain } from '@prisma/client';
+import { AuthorizationService } from '../../authorization/authorization.service';
+import { readVerifiedAuthorizationIdentity } from '../../authorization/authorization-request-identity';
+import { SERVICE_AUTHORIZATION_KEY } from '../../authorization/service-authorization.decorator';
+import type { AuthorizationContext } from '../../authorization/authorization.types';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { ROLES_KEY } from '../decorators/roles.decorator';
+import { ENTITLEMENT_KEY } from '../decorators/entitlement.decorator';
+import { REQUIRED_MODULE_KEY } from '../decorators/required-module.decorator';
+import { REQUIRED_FEATURE_KEY } from '../decorators/required-feature.decorator';
 import { AuthenticatedRequest } from '../auth-request.interface';
-import { hasEffectivePermission } from '@schoolos/core';
-import { SecurityDomain } from '@prisma/client';
-
-/**
- * The alias table now lives in `@schoolos/core` (PERMISSION_ALIASES) so the
- * web can evaluate the exact rule this guard enforces instead of maintaining
- * a second, drifting copy. This guard remains the authorization authority.
- */
-function hasRequiredPermission(
-  actualPermissions: string[] | undefined,
-  requiredPermission: string,
-) {
-  return hasEffectivePermission(actualPermissions ?? [], requiredPermission);
-}
+import { EntitlementGuard } from './entitlement.guard';
 
 @Injectable()
 export class RolesPermissionsGuard implements CanActivate {
-  private readonly logger = new Logger(RolesPermissionsGuard.name);
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly authorization: AuthorizationService,
+    private readonly entitlementGuard: EntitlementGuard,
+  ) {}
 
-  constructor(private readonly reflector: Reflector) {}
-
-  async canActivate(context: ExecutionContext) {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const targets = [context.getHandler(), context.getClass()];
     const requiredRoles =
-      this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
-        context.getHandler(),
-        context.getClass(),
-      ]) ?? [];
-
+      this.reflector.getAllAndOverride<string[]>(ROLES_KEY, targets) ?? [];
     const requiredPermissions =
-      this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
-        context.getHandler(),
-        context.getClass(),
-      ]) ?? [];
-
+      this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, targets) ??
+      [];
+    // Method-only compatibility. No class-wide metadata-less bypass.
+    const serviceAuthorizationPolicy = this.reflector.get<string>(
+      SERVICE_AUTHORIZATION_KEY,
+      context.getHandler(),
+    );
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const auth = request.auth;
-
-    if (requiredRoles.length === 0 && requiredPermissions.length === 0) {
-      if (auth?.securityDomain === SecurityDomain.PLATFORM) {
-        throw new ForbiddenException(
-          auth.isSupportOverride
-            ? 'Support override requires an explicitly permissioned read route'
-            : 'Platform identities require an active support override on school routes',
-        );
-      }
-      return Promise.resolve(true);
-    }
-
-    if (!auth) {
-      throw new UnauthorizedException('Authentication required');
-    }
-
-    if (auth.securityDomain === SecurityDomain.PLATFORM) {
-      if (!auth.isSupportOverride) {
-        throw new ForbiddenException(
-          'Platform identities require an active support override on school routes',
-        );
-      }
-
-      if (requiredRoles.length > 0 || requiredPermissions.length === 0) {
-        throw new ForbiddenException(
-          'Support override requires an explicitly permissioned read route',
-        );
-      }
-    }
-
-    const hasRole =
-      requiredRoles.length === 0 ||
-      requiredRoles.some((role) => auth.roles.includes(role));
-    const hasPermission =
-      requiredPermissions.length === 0 ||
-      requiredPermissions.every((permission) =>
-        auth.isSupportOverride
-          ? auth.permissions.includes(permission)
-          : hasRequiredPermission(auth.permissions, permission),
+    const guards = targets.flatMap((target) => {
+      if (typeof target !== 'function') return [];
+      const value: unknown = Reflect.getMetadata(GUARDS_METADATA, target);
+      return Array.isArray(value) ? (value as unknown[]) : [];
+    });
+    let expectedEntitlementFailure: HttpException | undefined;
+    const entitlement: AuthorizationContext['entitlement'] = guards.includes(
+      EntitlementGuard,
+    )
+      ? {
+          keys: [REQUIRED_MODULE_KEY, REQUIRED_FEATURE_KEY, ENTITLEMENT_KEY]
+            .map((key) =>
+              this.reflector.getAllAndOverride<string>(key, targets),
+            )
+            .filter((key): key is string => typeof key === 'string'),
+          evaluate: async () => {
+            try {
+              return await this.entitlementGuard.canActivate(context);
+            } catch (error) {
+              // Preserve established, controlled entitlement denials. Unexpected
+              // failures reach the kernel and are logged without exception data.
+              if (
+                error instanceof HttpException &&
+                [401, 403, 404].includes(error.getStatus())
+              ) {
+                expectedEntitlementFailure = error;
+                return false;
+              }
+              throw error;
+            }
+          },
+        }
+      : undefined;
+    const decision = await this.authorization.evaluate({
+      actor: auth,
+      identity: readVerifiedAuthorizationIdentity(request, auth),
+      securityDomain: SecurityDomain.SCHOOL,
+      trustedTenantId: auth?.tenantId,
+      requestedPermissions: requiredPermissions,
+      requiredRoles,
+      serviceAuthorizationPolicy,
+      entitlement,
+      routeAction: `${context.getClass().name}.${context.getHandler().name}`,
+      method: request.method,
+      requestId: request.requestId,
+    });
+    if (decision.outcome === 'ALLOW') return true;
+    if (expectedEntitlementFailure) throw expectedEntitlementFailure;
+    if (decision.reasonCode === 'AUTHENTICATION_REQUIRED')
+      throw new AuthorizationUnauthorizedException(
+        decision,
+        'Authentication required',
       );
-
-    if (!hasRole || !hasPermission) {
-      this.logger.warn(
-        JSON.stringify({
-          requestId: request.requestId,
-          path: request.originalUrl ?? request.url,
-          method: request.method,
-          userId: auth.userId,
-          tenantId: auth.tenantId,
-          requiredRoles,
-          requiredPermissions,
-          roleMatched: hasRole,
-          permissionMatched: hasPermission,
-        }),
+    if (decision.reasonCode === 'USER_OR_SESSION_INACTIVE')
+      throw new AuthorizationUnauthorizedException(
+        decision,
+        'User or session is inactive',
       );
-      throw new ForbiddenException('Insufficient permissions');
+    if (
+      auth?.securityDomain === SecurityDomain.PLATFORM &&
+      !auth.isSupportOverride
+    ) {
+      throw new AuthorizationForbiddenException(
+        decision,
+        'Platform identities require an active support override on school routes',
+      );
     }
-
-    return Promise.resolve(true);
+    if (auth?.isSupportOverride && decision.reasonCode === 'POLICY_DENIED') {
+      throw new AuthorizationForbiddenException(
+        decision,
+        'Support override requires an explicitly permissioned read route',
+      );
+    }
+    throw new AuthorizationForbiddenException(
+      decision,
+      'Insufficient permissions',
+    );
   }
 }

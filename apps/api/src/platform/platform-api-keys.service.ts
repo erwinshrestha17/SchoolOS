@@ -9,7 +9,7 @@ import {
   randomBytes,
   timingSafeEqual,
 } from 'node:crypto';
-import { Prisma } from '@prisma/client';
+import { Prisma, SecurityDomain } from '@prisma/client';
 import type {
   PlatformApiKeyCreated,
   PlatformApiKeySummary,
@@ -51,6 +51,7 @@ interface ApiKeyValidationRecord {
   tenant: {
     id: string;
     isActive: boolean;
+    securityDomain: SecurityDomain;
   } | null;
 }
 
@@ -189,6 +190,7 @@ export class PlatformApiKeysService {
           select: {
             id: true,
             isActive: true,
+            securityDomain: true,
           },
         },
       },
@@ -262,6 +264,7 @@ export class PlatformApiKeysService {
       id: key.id,
       tenantId: key.tenantId,
       scopes: key.scopes,
+      securityDomain: key.tenant.securityDomain,
     };
   }
 

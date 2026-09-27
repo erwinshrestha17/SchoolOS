@@ -1,0 +1,743 @@
+[
+  {
+    "controller": "AppController",
+    "handler": "getHealth",
+    "method": "GET",
+    "prefix": "",
+    "path": "health",
+    "guards": []
+  },
+  {
+    "controller": "AppController",
+    "handler": "getInfo",
+    "method": "GET",
+    "prefix": "",
+    "path": "",
+    "guards": []
+  },
+  {
+    "controller": "AppController",
+    "handler": "getReadiness",
+    "method": "GET",
+    "prefix": "",
+    "path": "ready",
+    "guards": []
+  },
+  {
+    "controller": "AuthController",
+    "handler": "changePassword",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "change-password",
+    "guards": ["JwtAuthGuard"]
+  },
+  {
+    "controller": "AuthController",
+    "handler": "confirmMfaSetup",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "mfa/setup/confirm",
+    "guards": ["JwtAuthGuard"]
+  },
+  {
+    "controller": "AuthController",
+    "handler": "confirmPasswordRecovery",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "password-recovery/confirm",
+    "guards": []
+  },
+  {
+    "controller": "AuthController",
+    "handler": "forgotPassword",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "forgot-password",
+    "guards": []
+  },
+  {
+    "controller": "AuthController",
+    "handler": "listSessions",
+    "method": "GET",
+    "prefix": "auth",
+    "path": "sessions",
+    "guards": ["JwtAuthGuard"]
+  },
+  {
+    "controller": "AuthController",
+    "handler": "login",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "login",
+    "guards": []
+  },
+  {
+    "controller": "AuthController",
+    "handler": "logout",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "logout",
+    "guards": []
+  },
+  {
+    "controller": "AuthController",
+    "handler": "me",
+    "method": "GET",
+    "prefix": "auth",
+    "path": "me",
+    "guards": ["JwtAuthGuard"]
+  },
+  {
+    "controller": "AuthController",
+    "handler": "refresh",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "refresh",
+    "guards": []
+  },
+  {
+    "controller": "AuthController",
+    "handler": "requestMfaSetup",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "mfa/setup/request",
+    "guards": ["JwtAuthGuard"]
+  },
+  {
+    "controller": "AuthController",
+    "handler": "requestOtpLogin",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "otp/request-login",
+    "guards": []
+  },
+  {
+    "controller": "AuthController",
+    "handler": "requestPasswordRecovery",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "password-recovery/request",
+    "guards": []
+  },
+  {
+    "controller": "AuthController",
+    "handler": "resetPassword",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "reset-password",
+    "guards": []
+  },
+  {
+    "controller": "AuthController",
+    "handler": "revokeOtherSessions",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "sessions/revoke-others",
+    "guards": ["JwtAuthGuard"]
+  },
+  {
+    "controller": "AuthController",
+    "handler": "revokeSession",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "sessions/:sessionId/revoke",
+    "guards": ["JwtAuthGuard"]
+  },
+  {
+    "controller": "AuthController",
+    "handler": "verifyOtpLogin",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "otp/verify",
+    "guards": []
+  },
+  {
+    "controller": "AuthController",
+    "handler": "verifyPassword",
+    "method": "POST",
+    "prefix": "auth",
+    "path": "verify-password",
+    "guards": ["JwtAuthGuard"]
+  },
+  {
+    "controller": "DemoRequestsController",
+    "handler": "create",
+    "method": "POST",
+    "prefix": "demo-requests",
+    "path": "",
+    "guards": []
+  },
+  {
+    "controller": "FeesController",
+    "handler": "getDashboardSummary",
+    "method": "GET",
+    "prefix": "fees",
+    "path": "dashboard-summary",
+    "guards": ["JwtAuthGuard", "RolesPermissionsGuard", "EntitlementGuard"],
+    "servicePolicy": "FINANCE_DASHBOARD"
+  },
+  {
+    "controller": "FileRegistryController",
+    "handler": "completeSignedUpload",
+    "method": "POST",
+    "prefix": "files",
+    "path": ":id/complete-upload",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "servicePolicy": "FILE_UPLOAD_OWNER"
+  },
+  {
+    "controller": "FileRegistryController",
+    "handler": "createSignedUpload",
+    "method": "POST",
+    "prefix": "files",
+    "path": "signed-upload",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "servicePolicy": "FILE_MODULE_UPLOAD"
+  },
+  {
+    "controller": "FileRegistryController",
+    "handler": "downloadFile",
+    "method": "GET",
+    "prefix": "files",
+    "path": ":id/download",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "servicePolicy": "FILE_RESOURCE_ACCESS"
+  },
+  {
+    "controller": "FileRegistryController",
+    "handler": "getFileView",
+    "method": "GET",
+    "prefix": "files",
+    "path": ":id/view",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "servicePolicy": "FILE_RESOURCE_ACCESS"
+  },
+  {
+    "controller": "FileRegistryController",
+    "handler": "getSignedDownload",
+    "method": "GET",
+    "prefix": "files",
+    "path": ":id/signed-download",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "servicePolicy": "FILE_RESOURCE_ACCESS"
+  },
+  {
+    "controller": "FileRegistryController",
+    "handler": "getSignedPreview",
+    "method": "GET",
+    "prefix": "files",
+    "path": ":id/signed-preview",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "servicePolicy": "FILE_RESOURCE_ACCESS"
+  },
+  {
+    "controller": "FileRegistryController",
+    "handler": "previewFile",
+    "method": "GET",
+    "prefix": "files",
+    "path": ":id/preview",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "servicePolicy": "FILE_RESOURCE_ACCESS"
+  },
+  {
+    "controller": "FileRegistryController",
+    "handler": "uploadFile",
+    "method": "POST",
+    "prefix": "files",
+    "path": "upload",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "servicePolicy": "FILE_MODULE_UPLOAD"
+  },
+  {
+    "controller": "GeographyController",
+    "handler": "getLocalLevel",
+    "method": "GET",
+    "prefix": "reference/nepal",
+    "path": "local-levels/:id",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+  },
+  {
+    "controller": "GeographyController",
+    "handler": "getVersion",
+    "method": "GET",
+    "prefix": "reference/nepal",
+    "path": "version",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+  },
+  {
+    "controller": "GeographyController",
+    "handler": "listDistricts",
+    "method": "GET",
+    "prefix": "reference/nepal",
+    "path": "districts",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+  },
+  {
+    "controller": "GeographyController",
+    "handler": "listLocalLevels",
+    "method": "GET",
+    "prefix": "reference/nepal",
+    "path": "local-levels",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+  },
+  {
+    "controller": "GeographyController",
+    "handler": "listLocalLevelTypes",
+    "method": "GET",
+    "prefix": "reference/nepal",
+    "path": "local-level-types",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+  },
+  {
+    "controller": "GeographyController",
+    "handler": "listProvinces",
+    "method": "GET",
+    "prefix": "reference/nepal",
+    "path": "provinces",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+  },
+  {
+    "controller": "GeographyController",
+    "handler": "search",
+    "method": "GET",
+    "prefix": "reference/nepal",
+    "path": "search",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "cancelStudentAttendanceCorrection",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "students/:id/attendance-corrections/:requestId/cancel",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "cancelStudentServiceRequest",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "service-requests/:requestId/cancel",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "collectStudentSandboxFeePayment",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "students/:id/sandbox-payments/fees",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "confirmStudentServiceRequestResolution",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "service-requests/:requestId/confirm-resolution",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "createStudentAttendanceCorrection",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "students/:id/attendance-corrections",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "createStudentLeaveRequest",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "students/:id/leave-requests",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "createStudentServiceRequest",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "students/:id/service-requests",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "decideMyConsent",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "me/consents/decision",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "downloadStudentServiceRequestAttachment",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "service-requests/:requestId/attachments/:attachmentId",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getDashboard",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "me/dashboard",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getMyConsentStatus",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "me/consents",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getNotificationAttachment",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "me/notifications/:id/attachment",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getNotificationDetail",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "me/notifications/:id",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getNotificationUnreadCount",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "me/notifications/unread-count",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getParentActionCentre",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "me/action-centre",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentActivityFeed",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/activity-feed",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentAttendanceSummary",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/attendance-summary",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentCanteen",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/canteen",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentDocumentDownloadUrl",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/documents/:documentId/download-url",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentExamSchedule",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/exam-schedule",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentFeesSummary",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/fees-summary",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentHomework",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/homework",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentHomeworkAttachmentDownloadUrl",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/homework/:homeworkId/attachments/:attachmentId/download-url",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentHomeworkAttachments",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/homework/:homeworkId/attachments",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentLearningSummary",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/learning-summary",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentLibrary",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/library",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentPaymentGatewayReadiness",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/payment-gateway-readiness",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentProfile",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/profile",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentReceiptPdf",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/receipts/:receiptNumber.pdf",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentReportCardPdf",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/report-cards/:reportCardId.pdf",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentReportCards",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/report-cards",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentServiceRequest",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "service-requests/:requestId",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentTimetable",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/timetable",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentTransport",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/transport",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "getStudentWeeklyProgress",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/weekly-progress",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "initiateStudentPayment",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "students/:id/payment-intents",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "listMyStudents",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "me/students",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "listNotifications",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "me/notifications",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "listStudentAttendanceCorrections",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/attendance-corrections",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "listStudentLeaveRequests",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/leave-requests",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "listStudentServiceRequests",
+    "method": "GET",
+    "prefix": "mobile",
+    "path": "students/:id/service-requests",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "markAllNotificationsRead",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "me/notifications/mark-all-read",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "markNotificationRead",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "me/notifications/:id/read",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "reopenStudentServiceRequest",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "service-requests/:requestId/reopen",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "topUpStudentCanteenSandbox",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "students/:id/sandbox-payments/canteen-top-up",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobileController",
+    "handler": "uploadStudentServiceRequestAttachment",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "service-requests/:requestId/attachments",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobilePushTokensController",
+    "handler": "register",
+    "method": "POST",
+    "prefix": "mobile/push-tokens",
+    "path": "",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "MobilePushTokensController",
+    "handler": "revoke",
+    "method": "DELETE",
+    "prefix": "mobile/push-tokens",
+    "path": ":installationId",
+    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+  },
+  {
+    "controller": "PaymentsController",
+    "handler": "listApprovalRequests",
+    "method": "GET",
+    "prefix": "payments",
+    "path": "requests",
+    "guards": ["JwtAuthGuard", "RolesPermissionsGuard", "EntitlementGuard"],
+    "servicePolicy": "FINANCE_REQUEST_REVIEW"
+  },
+  {
+    "controller": "PaymentsController",
+    "handler": "listPaymentAllocations",
+    "method": "GET",
+    "prefix": "payments",
+    "path": ":id/allocations",
+    "guards": ["JwtAuthGuard", "RolesPermissionsGuard", "EntitlementGuard"],
+    "servicePolicy": "PAYMENT_ALLOCATIONS"
+  },
+  {
+    "controller": "PaymentsController",
+    "handler": "reviewApprovalRequest",
+    "method": "POST",
+    "prefix": "payments",
+    "path": "requests/:id/review",
+    "guards": ["JwtAuthGuard", "RolesPermissionsGuard", "EntitlementGuard"],
+    "servicePolicy": "FINANCE_REQUEST_REVIEW"
+  },
+  {
+    "controller": "PaymentsWebhookController",
+    "handler": "handleWebhook",
+    "method": "POST",
+    "prefix": "payments/online/webhook",
+    "path": ":provider",
+    "guards": []
+  },
+  {
+    "controller": "SettingsController",
+    "handler": "updateSetting",
+    "method": "PATCH",
+    "prefix": "settings",
+    "path": ":key",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "servicePolicy": "SETTING_KEY_WRITE"
+  },
+  {
+    "controller": "SyncAuthorityController",
+    "handler": "getAuthority",
+    "method": "GET",
+    "prefix": "sync",
+    "path": "authority",
+    "guards": ["JwtAuthGuard", "TenantActiveGuard", "EntitlementGuard"]
+  }
+]
