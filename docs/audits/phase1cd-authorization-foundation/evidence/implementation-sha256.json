@@ -7,6 +7,7 @@
   "apps/api/prisma/schema.prisma": "0ae9ceb69c7c88e9a2682e90caea8c7640e61baf70b9ace634efa7fdcdd9aa14",
   "apps/api/prisma/schema/auth.prisma": "5ae3c8a459da691795b60b1c02a89f5bf72419a948893364cab6fc825037d931",
   "apps/api/prisma/scope-migration-replay/verify.ts": "28453fd8e45a881c73904eddea2d27d99390e622d42ade1234cc0333ec8223ca",
+  "apps/api/prisma/seed-m0-account-security-e2e.ts": "0b5079c1b66d9327eca1bc5efc77d689f9d3d9cd5b6966cd841762e110780ae3",
   "apps/api/src/academics/promotion-readiness.service.ts": "ffa619b990b3c8da9561b761a90bffc0078990bae0c6cdde5c3d6131a44ab1c4",
   "apps/api/src/admissions/admission-cases.service.ts": "5907eab47570b58a3cb051b88c89d238ae0376a03ba020c4f9f5c28ff9b41347",
   "apps/api/src/advanced-operations/approval-workflow.service.ts": "5d379f2dadf1219df5ab272e75b8eba10999fd57e637ee010937c9039a9f6fc5",
@@ -61,5 +62,5 @@
   "apps/api/test/platform-hardening.e2e-spec.ts": "627b49fa9e199c8dd1f18c852975ec1a93b1d7828309d1c380081ab1572397bf",
   "apps/api/test/protected-file-scope.int-spec.ts": "9bbc84ea529a5fff570c9c4557f532fcb434f3d2534a58e7db760beec5386006",
   "apps/api/test/test-helpers.ts": "e04fd66f6bdfddfd19a76620f6f4adcf0c8204a0ee148792d34d12ec14651f83",
-  "docs/audits/phase1cd-authorization-foundation/IMPLEMENTATION_VERIFICATION.md": "88f3261e7c266cd83f1f6a94838099734e26429283016b7f8108ca6312a21644"
+  "docs/audits/phase1cd-authorization-foundation/IMPLEMENTATION_VERIFICATION.md": "424f05ef53e4ffc0e0b8c5b860461ea858924bbd3439d51f47e161d8b748354e"
 }

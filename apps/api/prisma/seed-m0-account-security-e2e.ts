@@ -82,22 +82,25 @@ async function upsertManagedUser(input: {
     },
   });
 
-  await prisma.userRole.upsert({
+  const existingRole = await prisma.userRole.findFirst({
     where: {
-      userId_roleId_scopeId: {
-        userId: user.id,
-        roleId: input.roleId,
-        scopeId: 'global',
-      },
-    },
-    update: {},
-    create: {
       userId: user.id,
       roleId: input.roleId,
       tenantId: input.tenantId,
-      scopeId: 'global',
+      scopeId: null,
     },
+    select: { id: true },
   });
+  if (!existingRole) {
+    await prisma.userRole.create({
+      data: {
+        userId: user.id,
+        roleId: input.roleId,
+        tenantId: input.tenantId,
+        scopeId: null,
+      },
+    });
+  }
 
   await prisma.refreshToken.deleteMany({
     where: { userId: user.id },
@@ -145,7 +148,7 @@ async function main() {
 }
 
 main()
-  .catch((error) => {
+  .catch((error: unknown) => {
     console.error(error);
     process.exitCode = 1;
   })

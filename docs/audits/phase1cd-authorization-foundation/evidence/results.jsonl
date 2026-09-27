@@ -67,3 +67,16 @@
 {"name": "ownership-style", "command": ["pnpm", "--filter", "@schoolos/api", "exec", "eslint", "src/users/users.service.ts", "test/auth-administrative-concurrency.int-spec.ts"], "exitCode": 0, "seconds": 5.12, "evidence": "local working patch"}
 {"name": "ownership-typecheck", "command": ["pnpm", "--filter", "@schoolos/api", "exec", "tsc", "--noEmit", "--project", "tsconfig.json"], "exitCode": 0, "seconds": 6.78, "evidence": "local working patch"}
 {"name": "ownership-full-integration", "command": ["pnpm", "test:integration"], "exitCode": 0, "seconds": 20.83, "evidence": "local working patch"}
+{"name": "e2e-seed-main", "command": ["pnpm", "db:seed"], "exitCode": 0, "seconds": 12.37, "evidence": "local working patch"}
+{"name": "e2e-seed-platform", "command": ["pnpm", "db:seed:platform"], "exitCode": 0, "seconds": 1.06, "evidence": "local working patch"}
+{"name": "e2e-seed-security", "command": ["pnpm", "db:seed:e2e:m0-account-security"], "exitCode": 0, "seconds": 1.08, "evidence": "local working patch"}
+{"name": "e2e-seed-security-repeat", "command": ["pnpm", "db:seed:e2e:m0-account-security"], "exitCode": 0, "seconds": 1.03, "evidence": "local working patch"}
+{"name": "e2e-seed-typecheck", "command": ["pnpm", "--filter", "@schoolos/api", "exec", "tsc", "--noEmit", "-p", "tsconfig.json"], "exitCode": 0, "seconds": 3.26, "evidence": "local working patch"}
+{"name": "e2e-seed-reminders", "command": ["pnpm", "db:seed:e2e:m1-reminders"], "exitCode": 0, "seconds": 0.78, "evidence": "local working patch"}
+{"name": "e2e-seed-waitlist", "command": ["pnpm", "db:seed:e2e:m1-waitlist"], "exitCode": 0, "seconds": 0.75, "evidence": "local working patch"}
+{"name": "e2e-seed-assessment", "command": ["pnpm", "db:seed:e2e:m1-assessment"], "exitCode": 0, "seconds": 0.77, "evidence": "local working patch"}
+{"name": "e2e-seed-lint", "command": ["pnpm", "--filter", "@schoolos/api", "exec", "eslint", "prisma/seed-m0-account-security-e2e.ts"], "exitCode": 1, "seconds": 4.13, "evidence": "local working patch"}
+{"name": "e2e-seed-lint-final", "command": ["pnpm", "--filter", "@schoolos/api", "exec", "eslint", "prisma/seed-m0-account-security-e2e.ts"], "exitCode": 0, "seconds": 3.72, "evidence": "local working patch"}
+{"name": "e2e-seed-format", "command": ["pnpm", "--filter", "@schoolos/api", "exec", "prettier", "--check", "prisma/seed-m0-account-security-e2e.ts"], "exitCode": 0, "seconds": 0.21, "evidence": "local working patch"}
+{"name": "e2e-seed-persistence", "command": ["zsh", "-c", "docker exec -i schoolos_phase1cd_postgres psql -v ON_ERROR_STOP=1 -U schoolos -d schoolos_phase1cd < /tmp/schoolos-phase1-security-seed-verify.sql"], "exitCode": 3, "seconds": 0.04, "evidence": "local working patch"}
+{"name": "e2e-seed-persistence-final", "command": ["zsh", "-c", "docker exec -i schoolos_phase1cd_postgres psql -v ON_ERROR_STOP=1 -U schoolos -d schoolos_phase1cd < docs/audits/phase1cd-authorization-foundation/evidence/security-seed-verification.sql"], "exitCode": 0, "seconds": 0.05, "evidence": "local working patch"}

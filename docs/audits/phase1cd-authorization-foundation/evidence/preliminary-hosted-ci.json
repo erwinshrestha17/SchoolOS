@@ -14,5 +14,21 @@
     "status": "completed",
     "url": "https://github.com/erwinshrestha17/SchoolOS/actions/runs/36302420592",
     "reason": "Cancelled to include effective-configuration-owner correction before final certification"
+  },
+  {
+    "conclusion": "failure",
+    "event": "workflow_dispatch",
+    "headSha": "a8ed78aefebea4a9ab32cf25237a33bccef9b16c",
+    "status": "completed",
+    "url": "https://github.com/erwinshrestha17/SchoolOS/actions/runs/36302783542",
+    "reason": "Account-security E2E fixture retained prohibited legacy global school scope; corrected fixture, no enforcement bypass"
+  },
+  {
+    "conclusion": "failure",
+    "event": "pull_request",
+    "headSha": "a8ed78aefebea4a9ab32cf25237a33bccef9b16c",
+    "status": "completed",
+    "url": "https://github.com/erwinshrestha17/SchoolOS/actions/runs/36302778582",
+    "reason": "Account-security E2E fixture retained prohibited legacy global school scope; corrected fixture, no enforcement bypass"
   }
 ]

@@ -13,6 +13,7 @@ Starting SHA: `7c828a39c4548e273a7e3a46c1392768eead1094`. Local commands ran aga
 | History / drift | 112 old SQL files unchanged; no schema difference |
 | OpenAPI | 1,152 paths / 1,334 operations / 475 schemas |
 | Build / compiled runtime | API + Web production build passes; compiled API health returns 200 on port 4207 |
+| Hosted E2E fixture preparation | Six seed commands pass locally; repeated security seed retains one typed same-tenant assignment per fixture user; fixture typecheck/lint/format pass |
 | Tracked artifacts / diff | PASS |
 
 `results.jsonl` preserves command, status and timing, including preliminary failures. Each compressed log retains the named attempt. Diagnostic interpretation appears in the parent report. `baseline-migrations.json` records unchanged old migration bytes. `prerequisite-full-ci.json` captures the starting SHA's live full CI result. `implementation-sha256.json` identifies the verified implementation bytes. `SHA256SUMS` locks this evidence package; verify from this directory with `shasum -a 256 -c SHA256SUMS`.
