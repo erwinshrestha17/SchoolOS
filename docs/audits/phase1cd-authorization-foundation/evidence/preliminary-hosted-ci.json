@@ -1,0 +1,18 @@
+[
+  {
+    "conclusion": "cancelled",
+    "event": "workflow_dispatch",
+    "headSha": "854f99ea0f0424ddfaa43b639abf0a7f454293e5",
+    "status": "completed",
+    "url": "https://github.com/erwinshrestha17/SchoolOS/actions/runs/36302449263",
+    "reason": "Cancelled to include effective-configuration-owner correction before final certification"
+  },
+  {
+    "conclusion": "cancelled",
+    "event": "pull_request",
+    "headSha": "854f99ea0f0424ddfaa43b639abf0a7f454293e5",
+    "status": "completed",
+    "url": "https://github.com/erwinshrestha17/SchoolOS/actions/runs/36302420592",
+    "reason": "Cancelled to include effective-configuration-owner correction before final certification"
+  }
+]

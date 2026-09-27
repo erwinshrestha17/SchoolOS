@@ -1,3 +1,4 @@
+import { unrestrictedRoleAssignmentsWhere } from '../authorization/scopes/unrestricted-role-where';
 import {
   BadRequestException,
   ConflictException,
@@ -165,10 +166,8 @@ export class UsersService {
           }
           const otherActiveOwners = await tx.userRole.count({
             where: {
-              tenantId: actor.tenantId,
+              ...unrestrictedRoleAssignmentsWhere(actor.tenantId),
               userId: { not: user.id },
-              revokedAt: null,
-              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
               role: {
                 tenantId: actor.tenantId,
                 name: SCHOOL_CONFIG_OWNER_ROLE,

@@ -61,3 +61,9 @@
 {"name": "gate-units", "command": ["pnpm", "test"], "exitCode": 0, "seconds": 16.09, "evidence": "local working patch"}
 {"name": "gate-http", "command": ["pnpm", "test:e2e"], "exitCode": 0, "seconds": 32.04, "evidence": "local working patch"}
 {"name": "gate-integration", "command": ["pnpm", "test:integration"], "exitCode": 0, "seconds": 18.91, "evidence": "local working patch"}
+{"name": "ownership-format", "command": ["pnpm", "exec", "prettier", "--write", "apps/api/src/users/users.service.ts", "apps/api/test/auth-administrative-concurrency.int-spec.ts"], "exitCode": 0, "seconds": 0.28, "evidence": "local working patch"}
+{"name": "ownership-integration", "command": ["pnpm", "--filter", "@schoolos/api", "exec", "jest", "--config", "./test/jest-integration.json", "--runInBand", "auth-administrative-concurrency"], "exitCode": 0, "seconds": 4.8, "evidence": "local working patch"}
+{"name": "ownership-unit", "command": ["pnpm", "--filter", "@schoolos/api", "exec", "jest", "--runInBand", "src/users/users.service.spec.ts"], "exitCode": 0, "seconds": 0.85, "evidence": "local working patch"}
+{"name": "ownership-style", "command": ["pnpm", "--filter", "@schoolos/api", "exec", "eslint", "src/users/users.service.ts", "test/auth-administrative-concurrency.int-spec.ts"], "exitCode": 0, "seconds": 5.12, "evidence": "local working patch"}
+{"name": "ownership-typecheck", "command": ["pnpm", "--filter", "@schoolos/api", "exec", "tsc", "--noEmit", "--project", "tsconfig.json"], "exitCode": 0, "seconds": 6.78, "evidence": "local working patch"}
+{"name": "ownership-full-integration", "command": ["pnpm", "test:integration"], "exitCode": 0, "seconds": 20.83, "evidence": "local working patch"}

@@ -49,7 +49,9 @@
   "apps/api/src/students/students.service.ts": "97e1de1c28d7d018e67bc7e07f7865a6ec9f8c4e5f6331e156e1fd1ad59ca27a",
   "apps/api/src/sync/sync-authority.controller.ts": "0d01d724b96c49c3a3e084af06fe444fc683fc8475fe26b9a608851d288c094b",
   "apps/api/src/users/users.service.spec.ts": "8484a4577005ef76eb9cf7a548a1361a8dc42ceaa3c59cdef23b5bc9b8fec6d3",
+  "apps/api/src/users/users.service.ts": "d07c26494cbf5666f128f78ed4a2867dc636a0443ca8bf84c09f6ca3dd9aa02a",
   "apps/api/test/admission-import-atomicity.int-spec.ts": "1d362403659fdcaf3439200e145413b5f5765fb2f2f0b5c0160272ebcfab5607",
+  "apps/api/test/auth-administrative-concurrency.int-spec.ts": "a44ad9f7f4bb9fdadbdadd30601337a703d308e6281d41164834bba4860033a7",
   "apps/api/test/auth-security-hardening.e2e-spec.ts": "db5e121e3d7916cd91be8dddfeb01395b1efc43ab04eb92254a19cef2eb1c0c3",
   "apps/api/test/authorization-kernel.e2e-spec.ts": "263a2ccf306717a80606b1c0fd5a3174c8f474d893601af72bbf2fcfefc52620",
   "apps/api/test/file-registry.e2e-spec.ts": "24e65a1f89c2809d0c5e39cc4ae9918f5bf8e3d8a6e31e3e707baafa91387373",
@@ -59,5 +61,5 @@
   "apps/api/test/platform-hardening.e2e-spec.ts": "627b49fa9e199c8dd1f18c852975ec1a93b1d7828309d1c380081ab1572397bf",
   "apps/api/test/protected-file-scope.int-spec.ts": "9bbc84ea529a5fff570c9c4557f532fcb434f3d2534a58e7db760beec5386006",
   "apps/api/test/test-helpers.ts": "e04fd66f6bdfddfd19a76620f6f4adcf0c8204a0ee148792d34d12ec14651f83",
-  "docs/audits/phase1cd-authorization-foundation/IMPLEMENTATION_VERIFICATION.md": "8053fce2fe4847a4c7514e323784b6584fbbbfc2d18625d23444d13e4d6711b2"
+  "docs/audits/phase1cd-authorization-foundation/IMPLEMENTATION_VERIFICATION.md": "88f3261e7c266cd83f1f6a94838099734e26429283016b7f8108ca6312a21644"
 }

@@ -7,7 +7,7 @@ Starting SHA: `7c828a39c4548e273a7e3a46c1392768eead1094`. Local commands ran aga
 | Root lint / typecheck | PASS; existing API warnings retained; no rule changes |
 | Root unit/component tests | Core 12; API 277 suites / 3,219 tests; Web 666; no reported skips |
 | Full API HTTP | 45 suites / 318 tests |
-| Full opted-in PostgreSQL integration | 13 suites / 219 tests; both guarded URLs supplied; no skipped suites |
+| Full opted-in PostgreSQL integration | 13 suites / 222 tests; both guarded URLs supplied; no skipped suites |
 | Migration / generation | All 115 migrations deployed to three disposable databases; Prisma generation passes |
 | Legacy replay | 112 baseline + 3 new migrations; nine mappings, three retained/audited unresolved grants; corruption rollback and foreign-write rejection |
 | History / drift | 112 old SQL files unchanged; no schema difference |
