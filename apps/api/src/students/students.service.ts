@@ -1,3 +1,5 @@
+import { grantAllows } from '../authorization/scopes/scope-resolver';
+import { studentResourceScope } from '../authorization/scopes/student-resource-scope';
 import {
   BadRequestException,
   ConflictException,
@@ -1087,6 +1089,19 @@ export class StudentsService {
     if (!student) {
       throw new NotFoundException('Student not found in this tenant');
     }
+
+    if (
+      actor.accessGrants &&
+      !actor.accessGrants.some((grant) =>
+        grantAllows(
+          grant,
+          'students:read',
+          actor.tenantId,
+          studentResourceScope(student),
+        ),
+      )
+    )
+      throw new NotFoundException('Student not found in this tenant');
 
     if (isTeacherOnly(actor)) {
       const activeEnrollment = student.enrollments.find(

@@ -1,3 +1,4 @@
+import { AuthorizeResource } from '../authorization/resource-ownership';
 import {
   Body,
   Controller,
@@ -148,6 +149,7 @@ export class StudentsController {
   }
 
   @Get(':id')
+  @AuthorizeResource('STUDENT', 'id')
   @Permissions('students:read')
   @AllowSupportOverrideRead('STUDENT_RECORDS')
   async getStudentProfile(

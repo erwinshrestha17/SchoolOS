@@ -1371,7 +1371,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
 
       await expect(
         fileRegistryService.getFileMetadata('tenant-intruder', asset.id),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('dangerous extension upload is rejected', async () => {

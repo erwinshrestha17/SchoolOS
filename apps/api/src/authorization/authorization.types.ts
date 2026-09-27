@@ -1,3 +1,5 @@
+import type { OwnedResource } from './resource-ownership';
+import type { ResourceScope } from './scopes/scope.types';
 import type { SecurityDomain } from '@prisma/client';
 import type {
   CanonicalPermissionCode,
@@ -36,7 +38,9 @@ export const AUTHORIZATION_REASON_CODES = Object.freeze([
   'ROLE_MISSING',
   'UNKNOWN_PERMISSION',
   'RESOURCE_TENANT_MISMATCH',
+  'RESOURCE_NOT_FOUND',
   'POLICY_DENIED',
+  'SCOPE_MISMATCH',
   'AUTHORIZATION_EVALUATION_ERROR',
 ] as const);
 export type AuthorizationReasonCode =
@@ -67,6 +71,8 @@ export interface AuthorizationContext {
   readonly method?: string;
   readonly requestId?: string;
   readonly resource?: Readonly<{ id?: string; tenantId?: string }>;
+  readonly resourceScope?: ResourceScope;
+  readonly resourceLookup?: () => Promise<OwnedResource | null>;
   readonly serviceAuthorizationPolicy?: string;
   readonly entitlement?: Readonly<{
     keys: readonly string[];

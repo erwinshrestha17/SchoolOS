@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService, TENANT_ID_KEY } from '../src/prisma/prisma.service';
 import { FileRegistryService } from '../src/file-registry/file-registry.service';
@@ -59,7 +59,7 @@ describe('P0-01 protected file scoping (real database)', () => {
       data: {
         tenantId,
         originalFilename: `${label}-${SUFFIX}.pdf`,
-        objectKey: `${label}/${SUFFIX}`,
+        objectKey: `${tenantId}/${label}/${SUFFIX}`,
         mimeType: 'application/pdf',
         sizeBytes: BigInt(1024),
         visibility: 'PRIVATE',
@@ -147,10 +147,10 @@ describe('P0-01 protected file scoping (real database)', () => {
 
   it('denies a caller whose claimed tenant does not own the asset', async () => {
     // CLS still on tenant A (as a real request would be), but the caller passes
-    // tenant B: the explicit `asset.tenantId !== tenantId` check must fire.
+    // tenant B: the explicit tenant predicate must return the same safe absence.
     await expect(
       service.getFileMetadata(tenantBId, ownAssetId),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(NotFoundException);
   });
 
   it('denies a soft-deleted asset', async () => {

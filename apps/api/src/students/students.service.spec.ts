@@ -6451,6 +6451,36 @@ describe('attendance history', () => {
 });
 
 describe('Cross-Tenant Access Hardening', () => {
+  it('rejects a profile whose class moved outside the scope already checked by the guard', async () => {
+    const student = buildStudent({ classId: 'new-class', enrollments: [] });
+    const prisma = buildPrisma({ studentFindFirstQueue: [student] });
+    const { service } = buildService(prisma);
+    await expect(
+      service.getStudentProfile(student.id, {
+        ...actor,
+        permissions: [],
+        accessGrants: [
+          {
+            assignmentId: 'restricted-role',
+            tenantId: actor.tenantId,
+            role: 'admin',
+            permissions: ['students:read'],
+            scopes: [
+              {
+                scopeType: 'CLASS',
+                scopeId: 'original-class',
+                effectiveFrom: new Date(0),
+                expiresAt: null,
+                revokedAt: null,
+              },
+            ],
+          },
+        ],
+      }),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.activityPost.findMany).not.toHaveBeenCalled();
+  });
+
   it('rejects getStudentProfile for a student outside the actor tenant', async () => {
     const prisma = buildPrisma({ studentFindFirstQueue: [null] });
     const { service } = buildService(prisma);

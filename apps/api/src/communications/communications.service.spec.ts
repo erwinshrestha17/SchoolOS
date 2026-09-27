@@ -14,7 +14,11 @@ import {
   ProviderType,
   StudentLifecycleStatus,
 } from '@prisma/client';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from './communications.service';
 
@@ -52,7 +56,7 @@ describe('CommunicationsService', () => {
   let prisma: {
     class: { findFirst: jest.Mock };
     section: { findFirst: jest.Mock; findMany: jest.Mock };
-    staff: { findFirst: jest.Mock; findMany: jest.Mock };
+    staff: { findFirst: jest.Mock; findMany: jest.Mock; count: jest.Mock };
     subjectTeacherAssignment: { findMany: jest.Mock };
     event: { create: jest.Mock; findMany: jest.Mock };
     notice: {
@@ -63,8 +67,8 @@ describe('CommunicationsService', () => {
       updateMany: jest.Mock;
       count: jest.Mock;
     };
-    student: { findMany: jest.Mock };
-    user: { findMany: jest.Mock };
+    student: { findMany: jest.Mock; count: jest.Mock };
+    user: { findMany: jest.Mock; count: jest.Mock };
     notificationDelivery: {
       createMany: jest.Mock;
       create: jest.Mock;
@@ -86,7 +90,12 @@ describe('CommunicationsService', () => {
       findFirst: jest.Mock;
       update: jest.Mock;
     };
-    guardian: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
+    guardian: {
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
+      count: jest.Mock;
+    };
     guardianConsent: { create: jest.Mock; findMany: jest.Mock };
     communicationPreference: { findMany: jest.Mock };
     $queryRaw: jest.Mock;
@@ -135,6 +144,10 @@ describe('CommunicationsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       staff: {
+        count: jest.fn(
+          async (args: { where: { id: { in: string[] } } }) =>
+            args.where.id.in.length,
+        ),
         findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
       },
@@ -154,9 +167,17 @@ describe('CommunicationsService', () => {
         count: jest.fn().mockResolvedValue(0),
       },
       student: {
+        count: jest.fn(
+          async (args: { where: { id: { in: string[] } } }) =>
+            args.where.id.in.length,
+        ),
         findMany: jest.fn(),
       },
       user: {
+        count: jest.fn(
+          async (args: { where: { id: { in: string[] } } }) =>
+            args.where.id.in.length,
+        ),
         findMany: jest.fn(),
       },
       notificationDelivery: {
@@ -233,6 +254,10 @@ describe('CommunicationsService', () => {
         update: jest.fn(),
       },
       guardian: {
+        count: jest.fn(
+          async (args: { where: { id: { in: string[] } } }) =>
+            args.where.id.in.length,
+        ),
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
@@ -340,6 +365,21 @@ describe('CommunicationsService', () => {
         typeof CommunicationsService
       >[9],
     );
+  });
+
+  it('rejects a mixed-tenant notice target list before creating a notice or delivery', async () => {
+    prisma.staff.count.mockResolvedValue(1);
+    await expect(
+      service.createNotice(
+        { title: 'Synthetic', body: 'Synthetic', staffIds: ['own', 'foreign'] },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.notice.create).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.createMany).not.toHaveBeenCalled();
+    expect(prisma.staff.count).toHaveBeenCalledWith({
+      where: { tenantId: actor.tenantId, id: { in: ['own', 'foreign'] } },
+    });
   });
 
   it('queues an admission document reminder through canonical M12 intake with daily idempotency', async () => {

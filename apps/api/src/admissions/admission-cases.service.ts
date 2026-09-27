@@ -1,3 +1,4 @@
+import { unrestrictedRoleAssignmentsWhere } from '../authorization/scopes/unrestricted-role-where';
 import {
   BadRequestException,
   ConflictException,
@@ -1632,7 +1633,7 @@ export class AdmissionCasesService implements OnModuleInit {
           status: 'ACTIVE',
           userRoles: {
             some: {
-              tenantId: actor.tenantId,
+              ...unrestrictedRoleAssignmentsWhere(actor.tenantId),
               role: {
                 tenantId: actor.tenantId,
                 rolePermissions: {

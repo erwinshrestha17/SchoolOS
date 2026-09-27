@@ -1,4 +1,9 @@
 import {
+  grantAllows,
+  scopeIsActive,
+} from '../authorization/scopes/scope-resolver';
+import type { ScopeGrant } from '../authorization/scopes/scope.types';
+import {
   AuthMethod,
   OtpPurpose,
   UserStatus,
@@ -865,6 +870,7 @@ export class AuthService {
                 ? { tenantId: homeTenantId }
                 : undefined,
               include: {
+                scopeGrants: { where: { supersededAt: null } },
                 role: {
                   include: {
                     rolePermissions: {
@@ -880,7 +886,7 @@ export class AuthService {
         }),
     );
 
-    if (!user || user.tenantId !== homeTenantId) {
+    if (user?.tenantId !== homeTenantId) {
       throw new NotFoundException('Authenticated user was not found');
     }
 
@@ -1324,8 +1330,7 @@ export class AuthService {
     });
 
     if (
-      !otpCode ||
-      otpCode.codeHash !== hashOtpCode(code) ||
+      otpCode?.codeHash !== hashOtpCode(code) ||
       otpCode.expiresAt <= new Date()
     ) {
       throw new UnauthorizedException(invalidMessage);
@@ -1508,6 +1513,7 @@ export class AuthService {
       guardian: { select: { fullName: true } },
       userRoles: {
         include: {
+          scopeGrants: { where: { supersededAt: null } },
           role: {
             include: {
               rolePermissions: {
@@ -1532,6 +1538,7 @@ export class AuthService {
       userRoles: Array<{
         tenantId: string;
         scopeId: string | null;
+        scopeGrants?: ScopeGrant[];
         expiresAt: Date | null;
         revokedAt: Date | null;
         role: {
@@ -1565,11 +1572,41 @@ export class AuthService {
     );
     const permissions = Array.from(
       new Set(
-        eligibleAssignments.flatMap(({ role }) =>
-          role.rolePermissions.map(
-            ({ permission }) => `${permission.resource}:${permission.action}`,
+        eligibleAssignments
+          .filter(
+            (a) =>
+              securityDomain === 'PLATFORM' ||
+              a.scopeGrants?.some(
+                (g) =>
+                  g.scopeType === 'TENANT' &&
+                  g.scopeId === user.tenantId &&
+                  scopeIsActive(g),
+              ),
+          )
+          .flatMap(({ role, scopeGrants }) =>
+            role.rolePermissions
+              .filter(
+                ({ permission }) =>
+                  securityDomain === 'PLATFORM' ||
+                  grantAllows(
+                    {
+                      assignmentId: 'session',
+                      tenantId: user.tenantId,
+                      role: role.name,
+                      permissions: [
+                        `${permission.resource}:${permission.action}`,
+                      ],
+                      scopes: scopeGrants ?? [],
+                    },
+                    `${permission.resource}:${permission.action}`,
+                    user.tenantId,
+                  ),
+              )
+              .map(
+                ({ permission }) =>
+                  `${permission.resource}:${permission.action}`,
+              ),
           ),
-        ),
       ),
     );
 

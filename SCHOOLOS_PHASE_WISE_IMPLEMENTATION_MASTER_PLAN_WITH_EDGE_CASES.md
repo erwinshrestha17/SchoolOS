@@ -606,6 +606,12 @@ Prioritize:
 - attachment/export/batch endpoint tenant tests.
 
 ## Phase 1 Exit Gate
+
+Implementation and verification of Phase 1C/1D are recorded in
+[the scoped Phase 1 authorization foundation evidence](docs/audits/phase1cd-authorization-foundation/IMPLEMENTATION_VERIFICATION.md).
+The final delivery commit and its full hosted CI result are recorded in the PR and delivery response.
+This gate does not certify Phase 2 domain policies or remaining P0 release gates.
+
 - canonical catalog;
 - explicit role allowlists;
 - central authorization kernel;

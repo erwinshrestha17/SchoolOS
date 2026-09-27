@@ -59,6 +59,17 @@ describe('AuthzCacheService', () => {
       userRole: {
         findMany: jest.fn().mockResolvedValue([
           {
+            id: 'assignment',
+            assignedAt: new Date(0),
+            scopeGrants: [
+              {
+                scopeType: 'TENANT',
+                scopeId: 'tenant-1',
+                effectiveFrom: new Date(0),
+                expiresAt: null,
+                revokedAt: null,
+              },
+            ],
             scopeId: null,
             expiresAt: null,
             role: {
@@ -77,7 +88,7 @@ describe('AuthzCacheService', () => {
   });
 
   it('resolves roles and resource:action permission keys', async () => {
-    await expect(service.resolve('tenant-1', 'user-1')).resolves.toEqual({
+    await expect(service.resolve('tenant-1', 'user-1')).resolves.toMatchObject({
       roles: ['teacher'],
       permissions: ['students:read', 'attendance:mark'],
     });
@@ -94,6 +105,18 @@ describe('AuthzCacheService', () => {
         role: { tenantId: 'tenant-1' },
       },
       select: {
+        id: true,
+        assignedAt: true,
+        scopeGrants: {
+          where: { tenantId: 'tenant-1', supersededAt: null },
+          select: {
+            scopeType: true,
+            scopeId: true,
+            effectiveFrom: true,
+            expiresAt: true,
+            revokedAt: true,
+          },
+        },
         scopeId: true,
         expiresAt: true,
         role: {
@@ -146,7 +169,20 @@ describe('AuthzCacheService', () => {
   it('never serves one tenant the permissions cached for another', async () => {
     prisma.userRole.findMany
       .mockResolvedValueOnce([roleGrant('admin')])
-      .mockResolvedValueOnce([roleGrant('teacher')]);
+      .mockResolvedValueOnce([
+        {
+          ...roleGrant('teacher'),
+          scopeGrants: [
+            {
+              scopeType: 'TENANT',
+              scopeId: 'tenant-2',
+              effectiveFrom: new Date(0),
+              expiresAt: null,
+              revokedAt: null,
+            },
+          ],
+        },
+      ]);
 
     // Same user id in two tenants must not share an entry.
     const a = await service.resolve('tenant-1', 'user-1');
@@ -216,7 +252,7 @@ describe('AuthzCacheService', () => {
       roleGrant('teacher', 'students', 'read'),
     ]);
 
-    await expect(service.resolve('tenant-1', 'user-1')).resolves.toEqual({
+    await expect(service.resolve('tenant-1', 'user-1')).resolves.toMatchObject({
       roles: ['teacher'],
       permissions: ['students:read'],
     });
@@ -225,7 +261,7 @@ describe('AuthzCacheService', () => {
   it('returns empty sets for a user with no roles', async () => {
     prisma.userRole.findMany.mockResolvedValue([]);
 
-    await expect(service.resolve('tenant-1', 'user-1')).resolves.toEqual({
+    await expect(service.resolve('tenant-1', 'user-1')).resolves.toMatchObject({
       roles: [],
       permissions: [],
     });
@@ -245,7 +281,7 @@ describe('AuthzCacheService', () => {
 
     await expect(
       service.resolve('tenant-1', 'user-1', SecurityDomain.SCHOOL),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       roles: ['admin'],
       permissions: ['students:read'],
     });
@@ -265,7 +301,7 @@ describe('AuthzCacheService', () => {
 
     await expect(
       service.resolve('tenant-1', 'user-1', SecurityDomain.PLATFORM),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       roles: [],
       permissions: [],
     });
@@ -279,7 +315,7 @@ describe('AuthzCacheService', () => {
 
     await expect(
       service.resolve('tenant-1', 'user-1', SecurityDomain.PLATFORM),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       roles: ['platform_support'],
       permissions: ['platform:queues:read'],
     });
@@ -300,14 +336,14 @@ describe('AuthzCacheService', () => {
 
     await expect(
       service.resolve('platform-tenant', 'operator-1', SecurityDomain.PLATFORM),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       roles: ['platform_super_admin'],
       permissions: ['platform:support_override:manage'],
     });
 
     await expect(
       service.resolve('platform-tenant', 'operator-1', SecurityDomain.PLATFORM),
-    ).resolves.toEqual({ roles: [], permissions: [] });
+    ).resolves.toMatchObject({ roles: [], permissions: [] });
 
     expect(prisma.userRole.findMany).toHaveBeenCalledTimes(2);
     expect(store.size).toBe(0);
@@ -319,13 +355,13 @@ describe('AuthzCacheService', () => {
       roleGrant('financial_auditor', 'reports', 'export', expiresAt),
     ]);
 
-    await expect(service.resolve('tenant-1', 'user-1')).resolves.toEqual({
+    await expect(service.resolve('tenant-1', 'user-1')).resolves.toMatchObject({
       roles: ['financial_auditor'],
       permissions: ['reports:export'],
     });
 
     jest.spyOn(Date, 'now').mockReturnValue(expiresAt.getTime());
-    await expect(service.resolve('tenant-1', 'user-1')).resolves.toEqual({
+    await expect(service.resolve('tenant-1', 'user-1')).resolves.toMatchObject({
       roles: [],
       permissions: [],
     });
@@ -340,6 +376,20 @@ function roleGrant(
   scopeId: string | null = null,
 ) {
   return {
+    id: 'assignment',
+    assignedAt: new Date(0),
+    scopeGrants:
+      scopeId === null
+        ? [
+            {
+              scopeType: 'TENANT',
+              scopeId: 'tenant-1',
+              effectiveFrom: new Date(0),
+              expiresAt: null,
+              revokedAt: null,
+            },
+          ]
+        : [],
     scopeId,
     expiresAt,
     role: {

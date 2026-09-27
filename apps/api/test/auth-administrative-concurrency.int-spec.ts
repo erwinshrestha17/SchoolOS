@@ -906,25 +906,47 @@ describeDatabase(
         const second = await ownerPair();
         await assertOneWinner([removeRoles(targetId), suspend(second)]);
       });
-      it.each(['expired', 'revoked'] as const)(
-        'does not count an %s alternate owner',
-        async (state) => {
-          const second = await ownerPair();
-          await scoped(() =>
-            prisma.userRole.updateMany({
+      it.each([
+        'expired',
+        'revoked',
+        'not-started',
+        'scope-expired',
+        'scope-revoked',
+      ] as const)('does not count an %s alternate owner', async (state) => {
+        const second = await ownerPair();
+        await scoped(async () => {
+          if (state === 'scope-expired' || state === 'scope-revoked') {
+            await prisma.roleScopeGrant.updateMany({
+              where: {
+                tenantId,
+                userRoleAssignment: { userId: second },
+                supersededAt: null,
+              },
+              data:
+                state === 'scope-expired'
+                  ? {
+                      effectiveFrom: new Date('2020-01-01'),
+                      expiresAt: new Date(Date.now() - 1000),
+                    }
+                  : { revokedAt: new Date() },
+            });
+          } else {
+            await prisma.userRole.updateMany({
               where: { userId: second, tenantId },
               data:
                 state === 'expired'
                   ? { expiresAt: new Date(Date.now() - 1000) }
-                  : { revokedAt: new Date() },
-            }),
-          );
-          await expect(suspend()).rejects.toBeInstanceOf(ForbiddenException);
-          await expect(removeRoles(targetId)).rejects.toBeInstanceOf(
-            ForbiddenException,
-          );
-        },
-      );
+                  : state === 'not-started'
+                    ? { assignedAt: new Date(Date.now() + 60_000) }
+                    : { revokedAt: new Date() },
+            });
+          }
+        });
+        await expect(suspend()).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(removeRoles(targetId)).rejects.toBeInstanceOf(
+          ForbiddenException,
+        );
+      });
       it('suspension races refresh without leaving usable credentials, and reactivation cannot revive them', async () => {
         const session = await login();
         const otp = await pendingCode();

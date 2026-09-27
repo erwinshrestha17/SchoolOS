@@ -149,6 +149,8 @@ describe('Auth Security Hardening (Regression)', () => {
     (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
       {
         scopeId: 'global',
+        assignedAt: new Date(0),
+        scopeGrants: [],
         expiresAt: null,
         role: { name: 'platform_super_admin', rolePermissions: [] },
       },
@@ -205,6 +207,8 @@ describe('Auth Security Hardening (Regression)', () => {
     (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
       {
         scopeId: 'global',
+        assignedAt: new Date(0),
+        scopeGrants: [],
         expiresAt: null,
         role: { name: 'platform_super_admin', rolePermissions: [] },
       },
@@ -273,6 +277,8 @@ describe('Auth Security Hardening (Regression)', () => {
     (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
       {
         scopeId: 'global',
+        assignedAt: new Date(0),
+        scopeGrants: [],
         expiresAt: null,
         role: { name: 'platform_super_admin', rolePermissions: [] },
       },

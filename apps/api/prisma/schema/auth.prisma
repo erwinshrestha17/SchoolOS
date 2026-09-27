@@ -133,6 +133,7 @@ model User {
   disposedReplacementPendingWork TeacherReplacementPendingWork[]  @relation("DisposedReplacementPendingWork")
   createdHandoverNotes           TeacherHandoverNote[]            @relation("CreatedHandoverNotes")
 
+  @@unique([id, tenantId])
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
 }
@@ -148,6 +149,7 @@ model Role {
   userRoles       UserRole[]
   rolePermissions RolePermission[]
 
+  @@unique([id, tenantId])
   @@unique([tenantId, name])
 }
 
@@ -175,8 +177,11 @@ model UserRole {
   revokedById  String?
   revokeReason String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  role Role @relation(fields: [roleId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  scopeGrants RoleScopeGrant[]
+
+  @@unique([id, tenantId])
 
   @@unique([userId, roleId, scopeId])
   @@index([tenantId, userId, revokedAt, expiresAt])
@@ -251,4 +256,37 @@ model AuditLog {
   @@index([resource, resourceId])
   @@index([createdAt])
   @@index([requestId])
+}
+
+// GLOBAL belongs to Platform; school scopes are deliberately a separate enum.
+enum RoleScopeType {
+  TENANT
+  BRANCH
+  ACADEMIC_YEAR
+  CLASS
+  SECTION
+  SUBJECT
+  DEPARTMENT
+  STUDENT
+  STAFF
+  FINANCE_ACCOUNT
+}
+
+model RoleScopeGrant {
+  id                   String @id @default(uuid())
+  tenantId             String
+  userRoleAssignmentId String
+  scopeType            RoleScopeType
+  scopeId              String
+  effectiveFrom        DateTime @default(now())
+  expiresAt            DateTime?
+  createdById          String?
+  createdAt            DateTime @default(now())
+  supersededAt         DateTime?
+  revokedAt            DateTime?
+  revokedById          String?
+  userRoleAssignment   UserRole @relation(fields: [userRoleAssignmentId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@index([tenantId, userRoleAssignmentId, revokedAt, expiresAt])
+  @@index([tenantId, scopeType, scopeId])
 }

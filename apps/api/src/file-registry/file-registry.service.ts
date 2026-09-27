@@ -27,7 +27,7 @@ import {
 } from '../common/security/parent-scope';
 import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
 import { MAX_SIGNED_URL_TTL_SECONDS } from '../storage/storage.types';
-import { buildObjectKey } from '../storage/storage.utils';
+import { buildObjectKey, isTenantObjectKey } from '../storage/storage.utils';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import {
   createTeacherScopeDeniedException,
@@ -402,15 +402,18 @@ export class FileRegistryService {
 
   async getFileMetadata(tenantId: string, assetId: string) {
     const asset = await this.prisma.fileAsset.findUnique({
-      where: { id: assetId },
+      where: { id: assetId, tenantId },
     });
 
     if (!asset || asset.softDeletedAt || asset.deletedAt) {
       throw new NotFoundException('File not found');
     }
 
-    if (asset.tenantId !== tenantId) {
-      throw new ForbiddenException('Access denied');
+    if (
+      asset.tenantId !== tenantId ||
+      !isTenantObjectKey(tenantId, asset.objectKey)
+    ) {
+      throw new NotFoundException('File not found');
     }
 
     return asset;

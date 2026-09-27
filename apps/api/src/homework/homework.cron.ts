@@ -1,3 +1,4 @@
+import { unrestrictedRoleAssignmentsWhere } from '../authorization/scopes/unrestricted-role-where';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -101,7 +102,7 @@ export class HomeworkCron {
       include: {
         tenant: { select: { slug: true } },
         userRoles: {
-          where: { tenantId: homework.tenantId },
+          where: unrestrictedRoleAssignmentsWhere(homework.tenantId),
           include: {
             role: {
               include: {

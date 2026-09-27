@@ -84,3 +84,15 @@ export class StorageOperationError extends Error {
     this.name = 'StorageOperationError';
   }
 }
+
+/** Metadata and object storage must share one exact tenant namespace. */
+export function isTenantObjectKey(tenantId: string, key: string): boolean {
+  return (
+    !!tenantId &&
+    typeof key === 'string' &&
+    key.startsWith(`${sanitizeSegment(tenantId)}/`) &&
+    !key.includes('\\') &&
+    !key.includes('%') &&
+    key.split('/').every((s) => !!s && s !== '.' && s !== '..')
+  );
+}

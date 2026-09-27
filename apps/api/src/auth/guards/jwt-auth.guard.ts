@@ -132,11 +132,13 @@ export class JwtAuthGuard implements CanActivate {
     // Roles and permissions are derived, slow-changing data with an explicit
     // invalidation contract (see AuthzCacheService). Resolving them here
     // replaces four nested-include round-trips on every authenticated request.
-    let { roles, permissions: permissionKeys } = await this.authzCache.resolve(
+    const resolvedAuthz = await this.authzCache.resolve(
       payload.tenantId,
       user.id,
       user.tenant.securityDomain,
     );
+    let { roles, permissions: permissionKeys } = resolvedAuthz;
+    const { accessGrants } = resolvedAuthz;
 
     if (
       user.tenant.securityDomain === SecurityDomain.SCHOOL &&
@@ -311,6 +313,8 @@ export class JwtAuthGuard implements CanActivate {
       mustChangePassword: user.mustChangePassword,
       roles: Array.from(new Set(roles)),
       permissions: Array.from(new Set(permissionKeys)),
+      accessGrants:
+        effectiveTenantId === payload.tenantId ? accessGrants : undefined,
     };
     const hasActiveCls =
       typeof this.cls.isActive === 'function' ? this.cls.isActive() : true;
