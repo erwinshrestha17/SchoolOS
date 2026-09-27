@@ -26,9 +26,14 @@ evidence, not a separate product or implementation authority.
   same SHA, with both jobs successful, no skipped steps, and 33/33 hosted
   Chromium cases. The canonical live run is
   https://github.com/erwinshrestha17/SchoolOS/actions/runs/35941980611.
+- `hosted-ci-91d1a848.json`: full manual-dispatch run 35967665115 after the
+  Platform route-denial browser assertion repair. It certifies exact source
+  SHA `91d1a848956afa0b1592923310702f5b6af1c59e`; both `verify` and `mobile`
+  succeeded with no skipped or failed steps. The live run is
+  https://github.com/erwinshrestha17/SchoolOS/actions/runs/35967665115.
 
 Read a log with `gzip -dc NAME.log.gz`. Verify all preserved evidence bytes
-with `shasum -a 256 -c SHA256SUMS` from this folder. `hosted-ci.json` and
-`hosted-dispatch-watch.log.gz` record the full manual-dispatch CI result for
-this implementation SHA. The local and hosted evidence do not imply
+with `shasum -a 256 -c SHA256SUMS` from this folder. The hosted JSON snapshots
+and `hosted-dispatch-watch.log.gz` record the full manual-dispatch CI results
+for their stated SHAs. The local and hosted evidence do not imply
 real-provider, physical-device, staging or production readiness.
