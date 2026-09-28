@@ -10,6 +10,7 @@ import '../../../core/storage/private_read_cache.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../../../core/auth/auth_provider.dart';
 import '../data/parent_repository.dart';
+import '../data/parent_protected_download_store.dart';
 import '../data/parent_dashboard_snapshot_store.dart';
 import '../domain/parent_action_centre_models.dart';
 import '../domain/parent_models.dart';
@@ -18,9 +19,11 @@ import '../domain/parent_weekly_progress_models.dart';
 import '../../learning_support/domain/learning_support_models.dart';
 
 final parentRepositoryProvider = Provider<ParentRepository>((ref) {
+  final cache = ref.watch(privateReadCacheProvider);
   return ParentRepository(
     ref.watch(apiClientProvider),
-    cache: ref.watch(privateReadCacheProvider),
+    cache: cache,
+    protectedDownloads: ParentProtectedDownloadStore(scope: cache.scope),
   );
 });
 

@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/core/network/api_path_resolver.dart';
+import 'package:schoolos_mobile/core/storage/private_read_cache.dart';
+import 'package:schoolos_mobile/features/parent/data/parent_protected_download_store.dart';
 import 'package:schoolos_mobile/features/parent/data/parent_repository.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_action_centre_models.dart';
 import 'package:schoolos_mobile/features/parent/domain/parent_models.dart';
@@ -58,7 +60,16 @@ void main() {
               invocation.namedArguments[#unavailableMessage] as String,
         ),
       );
-      repository = ParentRepository(apiClient);
+      repository = ParentRepository(
+        apiClient,
+        protectedDownloads: ParentProtectedDownloadStore(
+          scope: PrivateReadCacheScope(
+            tenantId: 'tenant-1',
+            userId: 'guardian-1',
+            role: 'parent',
+          ),
+        ),
+      );
       tempDir = Directory.systemTemp.createTempSync('schoolos_parent_test_');
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
