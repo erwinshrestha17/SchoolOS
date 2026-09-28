@@ -22,14 +22,14 @@ const permissions = {
 } as const;
 export const reconciliationPermission = (duty: ReconciliationDuty) =>
   permissions[duty];
-type Evidence = {
+interface Evidence {
   status: string;
   createdById: string;
   submittedById?: string | null;
   reviewedById?: string | null;
   sourceFingerprint?: string | null;
   matches: Array<{ matchedById: string; unmatchedById?: string | null }>;
-};
+}
 export function requireReconciliationDuty(
   actor: AuthContext,
   session: Evidence,

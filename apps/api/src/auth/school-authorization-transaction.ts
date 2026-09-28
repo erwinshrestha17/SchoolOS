@@ -19,7 +19,10 @@ export async function withSchoolAuthorizationTransaction<T>(
   targetUserIds: string[],
   work: (tx: Prisma.TransactionClient, locked: Set<string>) => Promise<T>,
   exclusive = false,
-  options: { isolationLevel?: Prisma.TransactionIsolationLevel } = {},
+  options: {
+    isolationLevel?: Prisma.TransactionIsolationLevel;
+    timeoutMs?: number;
+  } = {},
 ): Promise<T> {
   if (
     actor.securityDomain === SecurityDomain.PLATFORM ||
@@ -139,7 +142,10 @@ export async function withSchoolAuthorizationTransaction<T>(
           throw new ForbiddenException('Insufficient permissions');
         return work(tx, locked);
       },
-      { ...options, timeout: 10000 },
+      {
+        isolationLevel: options.isolationLevel,
+        timeout: options.timeoutMs ?? 10000,
+      },
     ),
   );
 }

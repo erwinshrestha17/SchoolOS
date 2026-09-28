@@ -118,6 +118,7 @@ export function FiscalManagementView() {
                       <FiscalPeriodActions
                         periodId={period.id}
                         status={period.status}
+                        fiscalYearStatus={year.status}
                         label={period.label}
                       />
                     </div>

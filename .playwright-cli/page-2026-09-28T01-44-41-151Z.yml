@@ -1,7 +1,0 @@
-- generic [active] [ref=e1]:
-  - generic [ref=e2]:
-    - generic [ref=e4]:
-      - heading "Redirecting to sign in" [level=2] [ref=e5]
-      - paragraph [ref=e6]: Protected pages require an active SchoolOS session.
-    - region "Notifications alt+T"
-  - alert [ref=e7]

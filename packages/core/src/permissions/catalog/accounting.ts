@@ -1,6 +1,15 @@
 export const accountingPermissions = [
-  { resource: "finance:approvals", action: "review", description: "Independently review financial correction requests before approval" },
-  { resource: "accounting:journals", action: "review", description: "Independently review a submitted manual journal" },
+  {
+    resource: "finance:approvals",
+    action: "review",
+    description:
+      "Independently review financial correction requests before approval",
+  },
+  {
+    resource: "accounting:journals",
+    action: "review",
+    description: "Independently review a submitted manual journal",
+  },
   {
     resource: "accounting",
     action: "read",
@@ -196,12 +205,14 @@ export const accountingPermissions = [
   {
     resource: "accounting:reconciliation",
     action: "review",
-    description: "Independently review reconciliation balances and matching exceptions",
+    description:
+      "Independently review reconciliation balances and matching exceptions",
   },
   {
     resource: "accounting:reconciliation",
     action: "finalize",
-    description: "Finalize an independently reviewed balanced bank reconciliation session",
+    description:
+      "Finalize an independently reviewed balanced bank reconciliation session",
   },
   {
     resource: "finance:principal",

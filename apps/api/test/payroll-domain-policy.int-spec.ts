@@ -729,7 +729,7 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
         results.filter((result) => result.status === 'fulfilled'),
       ).toHaveLength(1);
       const rejected = results.find((result) => result.status === 'rejected');
-      if (!rejected || rejected.status !== 'rejected') {
+      if (rejected?.status !== 'rejected') {
         throw new Error('Expected concurrent finalization to be rejected');
       }
       expect(rejected.reason).toBeInstanceOf(ConflictException);

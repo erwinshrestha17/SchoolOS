@@ -21,14 +21,14 @@ const duties = {
   REJECT: 'accounting:journals:reject',
   CANCEL: 'accounting:journals:cancel',
 } as const;
-type JournalEvidence = {
+interface JournalEvidence {
   status: string;
   sourceType: string;
   createdById: string | null;
   reviewedById?: string | null;
   approvedById?: string | null;
   approvedSourceFingerprint?: string | null;
-};
+}
 export function journalDutyPermission(duty: JournalDuty) {
   return duties[duty];
 }

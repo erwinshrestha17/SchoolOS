@@ -288,139 +288,173 @@ export class ApprovalWorkflowService {
     actor: AuthContext,
     reason: string,
   ) {
-    return withSchoolAuthorizationTransaction(
-      this.prisma,
-      actor,
-      'accounting:fiscal:reopen',
-      [],
-      async (tx) => {
-        if (dto.idempotencyKey) {
-          const existing = await tx.approvalRequest.findFirst({
+    try {
+      return await withSchoolAuthorizationTransaction(
+        this.prisma,
+        actor,
+        'accounting:fiscal:reopen',
+        [],
+        async (tx) => {
+          if (dto.idempotencyKey) {
+            const existing = await tx.approvalRequest.findFirst({
+              where: {
+                tenantId: actor.tenantId,
+                idempotencyKey: dto.idempotencyKey,
+              },
+              include: { steps: true, decisions: true, comments: true },
+            });
+            if (existing) {
+              if (
+                existing.workflowType !== dto.workflowType ||
+                existing.targetId !== dto.targetId ||
+                existing.reason !== reason ||
+                existing.requestedById !== actor.userId ||
+                existing.finalActionKey !== dto.finalActionKey
+              )
+                throw new ConflictException(
+                  'Idempotency key belongs to another fiscal reopen request',
+                );
+              return existing;
+            }
+          }
+          const unresolved = await tx.approvalRequest.findFirst({
             where: {
               tenantId: actor.tenantId,
-              idempotencyKey: dto.idempotencyKey,
+              workflowType: dto.workflowType,
+              targetId: dto.targetId,
+              status: {
+                in: [
+                  ApprovalRequestStatus.PENDING,
+                  ApprovalRequestStatus.APPROVED,
+                ],
+              },
+            },
+            select: { id: true },
+          });
+          if (unresolved)
+            throw new ConflictException(
+              'A fiscal reopen request for this target is already pending',
+            );
+          if (dto.workflowType === ApprovalWorkflowType.FISCAL_PERIOD_REOPEN) {
+            const period = await tx.fiscalPeriod.findFirst({
+              where: { id: dto.targetId, tenantId: actor.tenantId },
+              include: { fiscalYear: true },
+            });
+            if (!period) throw new NotFoundException('Fiscal period not found');
+            if (
+              period.status !== 'CLOSED' ||
+              period.fiscalYear.status !== 'OPEN'
+            )
+              throw new ConflictException(
+                'Fiscal period is no longer eligible for reopening',
+              );
+          } else {
+            const year = await tx.fiscalYear.findFirst({
+              where: { id: dto.targetId, tenantId: actor.tenantId },
+              include: { periods: true },
+            });
+            if (!year) throw new NotFoundException('Fiscal year not found');
+            if (
+              year.status !== 'CLOSED' ||
+              year.periods.some((period) => period.status !== 'CLOSED')
+            )
+              throw new ConflictException(
+                'Fiscal year is no longer eligible for reopening',
+              );
+          }
+          const policy = await tx.approvalPolicy.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              workflowType: dto.workflowType,
+              isActive: true,
+            },
+            orderBy: { createdAt: 'asc' },
+          });
+          if (
+            policy?.finalActionKey &&
+            policy.finalActionKey !== dto.finalActionKey
+          )
+            throw new ConflictException(
+              'Active fiscal approval policy has an incompatible final action',
+            );
+          if (dto.policyId && dto.policyId !== policy?.id)
+            throw new ConflictException(
+              'Fiscal reopen requires the active approval policy',
+            );
+          const steps = this.buildSteps(policy, 'advanced:approvals:decide');
+          if (
+            !steps.every((step) => step.approverRole || step.approverPermission)
+          )
+            throw new ConflictException(
+              'Fiscal reopen policy must require an explicit approver capability',
+            );
+          const request = await tx.approvalRequest.create({
+            data: {
+              tenantId: actor.tenantId,
+              policyId: policy?.id ?? null,
+              workflowType: dto.workflowType,
+              title: dto.title.trim(),
+              reason,
+              targetModule: dto.targetModule,
+              targetType: dto.targetType,
+              targetId: dto.targetId,
+              requestedById: actor.userId,
+              beforeContext: dto.beforeContext as
+                | Prisma.InputJsonValue
+                | undefined,
+              afterContext: dto.afterContext as
+                | Prisma.InputJsonValue
+                | undefined,
+              safeContext: dto.safeContext as Prisma.InputJsonValue | undefined,
+              finalActionKey: dto.finalActionKey,
+              finalActionPayload: { reason },
+              idempotencyKey: dto.idempotencyKey ?? null,
+              deadlineAt: dto.deadlineAt
+                ? this.parseFutureDeadline(dto.deadlineAt)
+                : null,
+              steps: {
+                create: steps.map((step) => ({
+                  tenantId: actor.tenantId,
+                  ...step,
+                })),
+              },
             },
             include: { steps: true, decisions: true, comments: true },
           });
-          if (existing) {
-            if (
-              existing.workflowType !== dto.workflowType ||
-              existing.targetId !== dto.targetId ||
-              existing.reason !== reason ||
-              existing.requestedById !== actor.userId ||
-              existing.finalActionKey !== dto.finalActionKey
-            )
-              throw new ConflictException(
-                'Idempotency key belongs to another fiscal reopen request',
-              );
-            return existing;
-          }
-        }
-        if (dto.workflowType === ApprovalWorkflowType.FISCAL_PERIOD_REOPEN) {
-          const period = await tx.fiscalPeriod.findFirst({
-            where: { id: dto.targetId, tenantId: actor.tenantId },
-            include: { fiscalYear: true },
-          });
-          if (!period) throw new NotFoundException('Fiscal period not found');
-          if (period.status !== 'CLOSED' || period.fiscalYear.status !== 'OPEN')
-            throw new ConflictException(
-              'Fiscal period is no longer eligible for reopening',
-            );
-        } else {
-          const year = await tx.fiscalYear.findFirst({
-            where: { id: dto.targetId, tenantId: actor.tenantId },
-            include: { periods: true },
-          });
-          if (!year) throw new NotFoundException('Fiscal year not found');
-          if (
-            year.status !== 'CLOSED' ||
-            year.periods.some((period) => period.status !== 'CLOSED')
-          )
-            throw new ConflictException(
-              'Fiscal year is no longer eligible for reopening',
-            );
-        }
-        const policy = await tx.approvalPolicy.findFirst({
-          where: {
-            tenantId: actor.tenantId,
-            workflowType: dto.workflowType,
-            isActive: true,
-          },
-          orderBy: { createdAt: 'asc' },
-        });
-        if (
-          policy?.finalActionKey &&
-          policy.finalActionKey !== dto.finalActionKey
-        )
-          throw new ConflictException(
-            'Active fiscal approval policy has an incompatible final action',
-          );
-        if (dto.policyId && dto.policyId !== policy?.id)
-          throw new ConflictException(
-            'Fiscal reopen requires the active approval policy',
-          );
-        const steps = this.buildSteps(policy, 'advanced:approvals:decide');
-        if (
-          !steps.every((step) => step.approverRole || step.approverPermission)
-        )
-          throw new ConflictException(
-            'Fiscal reopen policy must require an explicit approver capability',
-          );
-        const request = await tx.approvalRequest.create({
-          data: {
-            tenantId: actor.tenantId,
-            policyId: policy?.id ?? null,
-            workflowType: dto.workflowType,
-            title: dto.title.trim(),
-            reason,
-            targetModule: dto.targetModule,
-            targetType: dto.targetType,
-            targetId: dto.targetId,
-            requestedById: actor.userId,
-            beforeContext: dto.beforeContext as
-              | Prisma.InputJsonValue
-              | undefined,
-            afterContext: dto.afterContext as Prisma.InputJsonValue | undefined,
-            safeContext: dto.safeContext as Prisma.InputJsonValue | undefined,
-            finalActionKey: dto.finalActionKey,
-            finalActionPayload: { reason },
-            idempotencyKey: dto.idempotencyKey ?? null,
-            deadlineAt: dto.deadlineAt
-              ? this.parseFutureDeadline(dto.deadlineAt)
-              : null,
-            steps: {
-              create: steps.map((step) => ({
-                tenantId: actor.tenantId,
-                ...step,
-              })),
+          await this.auditService.record(
+            {
+              action: 'approval_request_created',
+              resource: 'approval_request',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: request.id,
+              before: dto.beforeContext,
+              after: {
+                workflowType: request.workflowType,
+                status: request.status,
+                finalActionKey: request.finalActionKey,
+                targetType: request.targetType,
+                targetId: request.targetId,
+                reason,
+              },
             },
-          },
-          include: { steps: true, decisions: true, comments: true },
-        });
-        await this.auditService.record(
-          {
-            action: 'approval_request_created',
-            resource: 'approval_request',
-            tenantId: actor.tenantId,
-            userId: actor.userId,
-            resourceId: request.id,
-            before: dto.beforeContext,
-            after: {
-              workflowType: request.workflowType,
-              status: request.status,
-              finalActionKey: request.finalActionKey,
-              targetType: request.targetType,
-              targetId: request.targetId,
-              reason,
-            },
-          },
-          tx,
+            tx,
+          );
+          return request;
+        },
+        false,
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === 'P2002' || error.code === 'P2034')
+      )
+        throw new ConflictException(
+          'A fiscal reopen request changed concurrently; reload before retrying',
         );
-        return request;
-      },
-      false,
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+      throw error;
+    }
   }
 
   async decide(

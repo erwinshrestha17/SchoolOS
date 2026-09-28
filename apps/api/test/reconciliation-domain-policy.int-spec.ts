@@ -12,6 +12,11 @@ import { AuditService } from '../src/audit/audit.service';
 import { BankReconciliationService } from '../src/accounting/bank-reconciliation.service';
 import { AccountingService } from '../src/accounting/accounting.service';
 import { AccountingPostingService } from '../src/accounting/accounting-posting.service';
+import { AccountingBankImportJobsService } from '../src/accounting/accounting-bank-import-jobs.service';
+import {
+  bankStatementImportFingerprint,
+  validateBankStatementImportLines,
+} from '../src/accounting/bank-statement-import.util';
 import type { AuthContext } from '../src/auth/auth.types';
 import {
   authTestDatabaseUrl,
@@ -40,8 +45,9 @@ describeDatabase('Phase 2 reconciliation duties (isolated PostgreSQL)', () => {
   );
   const scope = <T>(work: () => Promise<T>) =>
     prisma.runWithTenantScope(tenantId, work);
-  const itTenant = (name: string, work: () => Promise<void>) =>
+  const itTenant = (name: string, work: () => Promise<void>) => {
     it(name, () => scope(work));
+  };
   const prepareDto = () => ({
     accountId: debitAccountId,
     fiscalPeriodId: periodId,
@@ -224,9 +230,11 @@ describeDatabase('Phase 2 reconciliation duties (isolated PostgreSQL)', () => {
         include: { lines: true },
       });
       journalId = entry.id;
-      lineId = entry.lines.find(
+      const debitLine = entry.lines.find(
         (row) => row.chartAccountId === debitAccountId,
-      )!.id;
+      );
+      if (!debitLine) throw new Error('Missing synthetic debit journal line');
+      lineId = debitLine.id;
       statementId = (
         await prisma.bankStatement.create({
           data: {
@@ -257,6 +265,11 @@ describeDatabase('Phase 2 reconciliation duties (isolated PostgreSQL)', () => {
           where: { tenantId },
         });
         await prisma.bankStatement.deleteMany({ where: { tenantId } });
+        await prisma.bankStatementImportJob.deleteMany({ where: { tenantId } });
+        await prisma.bankStatementImportBatch.deleteMany({
+          where: { tenantId },
+        });
+        await prisma.fileAsset.deleteMany({ where: { tenantId } });
         await prisma.auditLog.deleteMany({ where: { tenantId } });
         await prisma.journalLine.deleteMany({ where: { tenantId } });
         await prisma.journalEntry.deleteMany({ where: { tenantId } });
@@ -515,9 +528,9 @@ describeDatabase('Phase 2 reconciliation duties (isolated PostgreSQL)', () => {
           debitAmount: 25,
         },
       ];
-      jest.spyOn(audit, 'record').mockRejectedValueOnce(
-        new Error('Synthetic import audit failure'),
-      );
+      jest
+        .spyOn(audit, 'record')
+        .mockRejectedValueOnce(new Error('Synthetic import audit failure'));
       await expect(
         accounting.importBankStatement(debitAccountId, lines, actors.preparer),
       ).rejects.toThrow('Synthetic import audit failure');
@@ -537,6 +550,187 @@ describeDatabase('Phase 2 reconciliation duties (isolated PostgreSQL)', () => {
       await expect(
         accounting.importBankStatement(debitAccountId, lines, actors.preparer),
       ).rejects.toThrow(ForbiddenException);
+    },
+  );
+  itTenant(
+    'commits a queued multi-chunk import atomically only while importer authority remains live',
+    async () => {
+      const lines = Array.from({ length: 501 }, (_, index) => ({
+        statementDate: '2026-05-03',
+        description: `Synthetic queued import ${String(index)}`,
+        debitAmount: 1,
+      }));
+      const buffer = Buffer.from(JSON.stringify(lines));
+      const fingerprint = bankStatementImportFingerprint(
+        debitAccountId,
+        validateBankStatementImportLines(lines),
+      );
+      const asset = await prisma.fileAsset.create({
+        data: {
+          tenantId,
+          originalFilename: 'synthetic-bank-import.json',
+          objectKey: `${tenantId}/synthetic-bank-import`,
+          mimeType: 'application/json',
+          sizeBytes: BigInt(buffer.length),
+        },
+      });
+      const job = await prisma.bankStatementImportJob.create({
+        data: {
+          tenantId,
+          accountId: debitAccountId,
+          fingerprint,
+          totalRows: lines.length,
+          fileAssetId: asset.id,
+          requestedBy: actors.preparer.userId,
+          status: 'RUNNING',
+        },
+      });
+      const jobs = new AccountingBankImportJobsService(
+        prisma,
+        { getFileMetadata: jest.fn().mockResolvedValue(asset) } as never,
+        { getObjectBuffer: jest.fn().mockResolvedValue(buffer) } as never,
+        audit,
+        { add: jest.fn() } as never,
+      );
+      const input = {
+        jobRecordId: job.id,
+        accountId: debitAccountId,
+        actor: actors.preparer,
+      };
+      jest
+        .spyOn(audit, 'record')
+        .mockRejectedValueOnce(
+          new Error('Synthetic queued import audit failure'),
+        );
+      await expect(
+        jobs.completeQueuedBankStatementImport(input),
+      ).rejects.toThrow('Synthetic queued import audit failure');
+      expect(
+        await prisma.bankStatementImportBatch.count({ where: { tenantId } }),
+      ).toBe(0);
+      expect(
+        await prisma.bankStatement.count({
+          where: { tenantId, importBatchId: `IMPORT-${fingerprint}` },
+        }),
+      ).toBe(0);
+      jest.restoreAllMocks();
+      await prisma.userRole.updateMany({
+        where: { tenantId, userId: actors.preparer.userId },
+        data: { revokedAt: new Date() },
+      });
+      await expect(
+        jobs.completeQueuedBankStatementImport(input),
+      ).rejects.toThrow(ForbiddenException);
+      await prisma.userRole.updateMany({
+        where: { tenantId, userId: actors.preparer.userId },
+        data: { revokedAt: null },
+      });
+      await jobs.completeQueuedBankStatementImport(input);
+      expect(
+        await prisma.bankStatement.count({
+          where: { tenantId, importBatchId: `IMPORT-${fingerprint}` },
+        }),
+      ).toBe(lines.length);
+      expect(
+        await prisma.bankStatementImportJob.findUniqueOrThrow({
+          where: { id: job.id },
+        }),
+      ).toMatchObject({ status: 'COMPLETED', processedRows: lines.length });
+      expect(
+        await prisma.auditLog.count({
+          where: { tenantId, resource: 'bank_statement', action: 'import' },
+        }),
+      ).toBe(1);
+    },
+  );
+  itTenant(
+    'does not queue a bank import unless the queue record and audit commit together',
+    async () => {
+      const lines = Array.from({ length: 501 }, (_, index) => ({
+        statementDate: '2026-05-04',
+        description: `Synthetic queue submission ${String(index)}`,
+        debitAmount: 1,
+      }));
+      const buffer = Buffer.from(JSON.stringify(lines));
+      const asset = await prisma.fileAsset.create({
+        data: {
+          tenantId,
+          originalFilename: 'synthetic-queue-import.json',
+          objectKey: `${tenantId}/synthetic-queue-import`,
+          mimeType: 'application/json',
+          sizeBytes: BigInt(buffer.length),
+        },
+      });
+      const add = jest.fn();
+      const getJob = jest.fn().mockResolvedValue(undefined);
+      const jobs = new AccountingBankImportJobsService(
+        prisma,
+        { registerGeneratedFile: jest.fn().mockResolvedValue(asset) } as never,
+        { getObjectBuffer: jest.fn().mockResolvedValue(buffer) } as never,
+        audit,
+        { add, getJob } as never,
+      );
+      jest
+        .spyOn(audit, 'record')
+        .mockRejectedValueOnce(new Error('Synthetic queue audit failure'));
+      await expect(
+        jobs.queueBankStatementImport(debitAccountId, lines, actors.preparer),
+      ).rejects.toThrow('Synthetic queue audit failure');
+      expect(
+        await prisma.bankStatementImportJob.count({ where: { tenantId } }),
+      ).toBe(0);
+      expect(add).not.toHaveBeenCalled();
+      jest.restoreAllMocks();
+      const queued = await jobs.queueBankStatementImport(
+        debitAccountId,
+        lines,
+        actors.preparer,
+      );
+      expect(queued).toMatchObject({ status: 'QUEUED', reused: false });
+      expect(add).toHaveBeenCalledTimes(1);
+      expect(
+        await prisma.auditLog.count({
+          where: {
+            tenantId,
+            resource: 'bank_statement',
+            action: 'queue_bank_statement_import',
+          },
+        }),
+      ).toBe(1);
+      if (!queued.jobId) throw new Error('Missing queued bank import job id');
+      await prisma.bankStatementImportJob.update({
+        where: { id: queued.jobId },
+        data: { status: 'FAILED', errorSummary: 'Synthetic provider failure' },
+      });
+      const failedQueueJob = {
+        getState: jest.fn().mockResolvedValue('failed'),
+        updateData: jest.fn().mockResolvedValue(undefined),
+        retry: jest.fn().mockResolvedValue(undefined),
+      };
+      getJob.mockResolvedValue(failedQueueJob);
+      const retried = await jobs.queueBankStatementImport(
+        debitAccountId,
+        lines,
+        actors.preparer,
+      );
+      expect(retried).toMatchObject({
+        jobId: queued.jobId,
+        status: 'QUEUED',
+        reused: true,
+      });
+      expect(failedQueueJob.updateData).toHaveBeenCalledWith(
+        expect.objectContaining({ actor: actors.preparer }),
+      );
+      expect(failedQueueJob.retry).toHaveBeenCalledWith('failed');
+      expect(
+        await prisma.auditLog.count({
+          where: {
+            tenantId,
+            resource: 'bank_statement',
+            action: 'retry_bank_statement_import',
+          },
+        }),
+      ).toBe(1);
     },
   );
   itTenant(

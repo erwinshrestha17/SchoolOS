@@ -62,6 +62,8 @@ test.describe.serial('M7/M11 role and tenant boundaries', () => {
       { role: 'e2eAccountant', forbiddenAction: 'approve' },
       { role: 'accountingReviewer', forbiddenAction: 'approve' },
       { role: 'accountingApprover', forbiddenAction: 'submit' },
+      { role: 'accountingApprover', forbiddenAction: 'post' },
+      { role: 'accountingPoster', forbiddenAction: 'approve' },
     ];
 
     for (const roleCase of cases) {

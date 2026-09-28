@@ -102,6 +102,7 @@ describe('AccountingService - Slices 2-5', () => {
     permissions: [
       'accounting:journals:create',
       'accounting:fiscal:reopen',
+      'accounting:fiscal:manage',
       'accounting:reconciliation:manage',
     ],
   } as unknown as import('../auth/auth.types').AuthContext;
@@ -173,7 +174,7 @@ describe('AccountingService - Slices 2-5', () => {
         create: jest.fn(),
       },
       $transaction: jest.fn(),
-      $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'fy-1', count: 0 }]),
     };
     prisma.$transaction.mockImplementation(async (input: unknown) =>
       typeof input === 'function'

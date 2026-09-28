@@ -16,11 +16,12 @@ export function requireStaffFieldWrites(
 export function staffFieldWritePermissions(fields: object): string[] {
   const values = fields as Record<string, unknown>;
   const permissions: string[] = [];
-  for (const [keys, permission] of [
-    [['bankAccount', 'bankName'], 'hr:bank:write'],
-    [['panNumber'], 'hr:tax:write'],
-    [['citizenshipNo'], 'hr:identity:write'],
-  ] as const) {
+  const fieldPermissions: Array<{ keys: string[]; permission: string }> = [
+    { keys: ['bankAccount', 'bankName'], permission: 'hr:bank:write' },
+    { keys: ['panNumber'], permission: 'hr:tax:write' },
+    { keys: ['citizenshipNo'], permission: 'hr:identity:write' },
+  ];
+  for (const { keys, permission } of fieldPermissions) {
     if (keys.some((key) => values[key] !== undefined))
       permissions.push(permission);
   }

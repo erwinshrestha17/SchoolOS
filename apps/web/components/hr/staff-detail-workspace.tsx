@@ -65,7 +65,8 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
 
   const staff = staffQuery.data;
   const fields = staff?.allowedSensitiveFields;
-  const canEditIdentity = fields?.identityRead === true && fields?.identityWrite === true;
+  const canEditIdentity =
+    fields?.identityRead === true && fields?.identityWrite === true;
   const canEditBank = fields?.bankRead === true && fields?.bankWrite === true;
   const canEditTax = fields?.taxRead === true && fields?.taxWrite === true;
 
@@ -158,8 +159,15 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
         qualifications: optionalTrim(draft.qualifications),
         experience: optionalTrim(draft.experience),
         teacherRegistryId: optionalTrim(draft.teacherRegistryId),
-        ...(canEditBank ? { bankName: optionalTrim(draft.bankName), bankAccount: optionalTrim(draft.bankAccount) } : {}),
-        ...(canEditIdentity ? { citizenshipNo: optionalTrim(draft.citizenshipNo) } : {}),
+        ...(canEditBank
+          ? {
+              bankName: optionalTrim(draft.bankName),
+              bankAccount: optionalTrim(draft.bankAccount),
+            }
+          : {}),
+        ...(canEditIdentity
+          ? { citizenshipNo: optionalTrim(draft.citizenshipNo) }
+          : {}),
         ...(canEditTax ? { panNumber: optionalTrim(draft.panNumber) } : {}),
       });
     },
@@ -359,10 +367,12 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
             <Briefcase size={14} />
             Employment
           </TabsTrigger>
-          {fields?.documentsRead && <TabsTrigger value="documents" className="gap-2">
-            <FileText size={14} />
-            Documents
-          </TabsTrigger>}
+          {fields?.documentsRead && (
+            <TabsTrigger value="documents" className="gap-2">
+              <FileText size={14} />
+              Documents
+            </TabsTrigger>
+          )}
           <TabsTrigger value="attendance" className="gap-2">
             <ClipboardCheck size={14} />
             Attendance
@@ -559,23 +569,23 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                     />
                     {!canEditIdentity && (
                       <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-                        Masked. Requires explicit access to this protected field.
+                        Masked. Requires explicit access to this protected
+                        field.
                       </p>
                     )}
                   </FormField>
                   <FormField label="PAN Number">
                     <Input
                       value={draft.panNumber}
-                      disabled={
-                        staff.status === 'TERMINATED' || !canEditTax
-                      }
+                      disabled={staff.status === 'TERMINATED' || !canEditTax}
                       onChange={(e: any) =>
                         setDraft((c) => ({ ...c, panNumber: e.target.value }))
                       }
                     />
                     {!canEditTax && (
                       <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-                        Masked. Requires explicit access to this protected field.
+                        Masked. Requires explicit access to this protected
+                        field.
                       </p>
                     )}
                   </FormField>
@@ -591,9 +601,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                   <FormField label="Bank Name">
                     <Input
                       value={draft.bankName}
-                      disabled={
-                        staff.status === 'TERMINATED' || !canEditBank
-                      }
+                      disabled={staff.status === 'TERMINATED' || !canEditBank}
                       onChange={(e: any) =>
                         setDraft((c) => ({ ...c, bankName: e.target.value }))
                       }
@@ -607,16 +615,15 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                   <FormField label="Account Number">
                     <Input
                       value={draft.bankAccount}
-                      disabled={
-                        staff.status === 'TERMINATED' || !canEditBank
-                      }
+                      disabled={staff.status === 'TERMINATED' || !canEditBank}
                       onChange={(e: any) =>
                         setDraft((c) => ({ ...c, bankAccount: e.target.value }))
                       }
                     />
                     {!canEditBank && (
                       <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-                        Masked. Requires explicit access to this protected field.
+                        Masked. Requires explicit access to this protected
+                        field.
                       </p>
                     )}
                   </FormField>
@@ -626,7 +633,9 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
 
             {/* Tab: Documents */}
             <TabsContent value="documents" className="m-0 outline-none">
-              {fields?.documentsRead && <StaffDocumentsPanel staffId={staffId} />}
+              {fields?.documentsRead && (
+                <StaffDocumentsPanel staffId={staffId} />
+              )}
             </TabsContent>
 
             {/* Tab: Attendance */}

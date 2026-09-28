@@ -18,19 +18,19 @@ describe('Staff protected field policy', () => {
   it.each(['bankAccount', 'bankName', 'panNumber', 'citizenshipNo'])(
     'denies basic HR writing %s, including clearing the field',
     (key) => {
-      expect(() => requireStaffFieldWrites(actor, { [key]: null })).toThrow(
-        ForbiddenException,
-      );
+      expect(() => {
+        requireStaffFieldWrites(actor, { [key]: null });
+      }).toThrow(ForbiddenException);
     },
   );
   it('allows an explicit bank writer without granting tax or identity authority', () => {
     const bankActor = { ...actor, permissions: ['hr:bank:write'] };
-    expect(() =>
-      requireStaffFieldWrites(bankActor, { bankAccount: 'changed' }),
-    ).not.toThrow();
-    expect(() =>
-      requireStaffFieldWrites(bankActor, { panNumber: 'tax' }),
-    ).toThrow(ForbiddenException);
+    expect(() => {
+      requireStaffFieldWrites(bankActor, { bankAccount: 'changed' });
+    }).not.toThrow();
+    expect(() => {
+      requireStaffFieldWrites(bankActor, { panNumber: 'tax' });
+    }).toThrow(ForbiddenException);
   });
   it('projects salary separately from bank, tax and nested raw records', () => {
     const row = {
@@ -76,12 +76,12 @@ describe('Staff protected field policy', () => {
           'CONTRACT',
         ),
       ).toEqual({ id: 'contract' });
-      expect(() =>
+      expect(() => {
         requireStaffFieldWrites(
           { ...invalidActor, permissions: ['hr:bank:write'] },
           { bankAccount: 'changed' },
-        ),
-      ).toThrow(ForbiddenException);
+        );
+      }).toThrow(ForbiddenException);
     },
   );
 });

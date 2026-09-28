@@ -210,6 +210,7 @@ describe('Attendance Hardening (E2E)', () => {
         firstName: 'Tara',
         lastName: 'Teacher',
         status: StaffStatus.ACTIVE,
+        joiningDate: new Date('2020-01-01T00:00:00.000Z'),
       },
     ];
 

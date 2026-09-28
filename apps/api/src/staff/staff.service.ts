@@ -234,7 +234,10 @@ export class StaffService {
   }
 
   async getStaffProfile(actor: AuthContext) {
-    if (!hasDomainPermission(actor, 'staff:read') && !hasDomainPermission(actor, 'hr:staff:read'))
+    if (
+      !hasDomainPermission(actor, 'staff:read') &&
+      !hasDomainPermission(actor, 'hr:staff:read')
+    )
       throw new ForbiddenException('Staff profile access is not available');
     const staff = await this.prisma.staff.findFirst({
       where: {
@@ -266,7 +269,10 @@ export class StaffService {
   }
 
   async getStaffDetail(staffId: string, actor: AuthContext) {
-    if (!hasDomainPermission(actor, 'staff:read') && !hasDomainPermission(actor, 'hr:staff:read'))
+    if (
+      !hasDomainPermission(actor, 'staff:read') &&
+      !hasDomainPermission(actor, 'hr:staff:read')
+    )
       throw new ForbiddenException('Staff profile access is not available');
     const staff = await this.prisma.staff.findFirst({
       where: { id: staffId, tenantId: actor.tenantId },
@@ -379,7 +385,7 @@ export class StaffService {
       }
     }
 
-    const updated = await withSchoolAuthorizationTransaction(
+    const staffResult = await withSchoolAuthorizationTransaction(
       this.prisma,
       actor,
       ['staff:update', ...staffFieldWritePermissions(dto)],
@@ -476,7 +482,7 @@ export class StaffService {
       },
     );
 
-    return mapStaffDetail(updated, actor);
+    return mapStaffDetail(staffResult, actor);
   }
 
   async transitionStaffStatus(

@@ -236,7 +236,9 @@ describe('P0-01 guardian scoping (real database)', () => {
         userId: foreignParentUserId,
         fullName: `Parent B ${SUFFIX}`,
         relation: 'MOTHER',
-        primaryPhone: '9800000002',
+        // Contact identity is not relationship authority, even when a
+        // guardian in another school shares the same phone number.
+        primaryPhone: '9800000001',
       },
     });
     const fc = await makeStudent(tenantBId, classBId, yearB.id, 'ForeignChild');
@@ -381,6 +383,29 @@ describe('P0-01 guardian scoping (real database)', () => {
         ),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    it('lets a custody restriction override a previously held capability', async () => {
+      await resetChildOne({
+        status: 'SUSPENDED',
+        restrictionReasonRef: 'custody-order-evidence-1',
+      });
+
+      await expect(
+        requireGuardianCapability(
+          prisma,
+          parentActor(),
+          childOneId,
+          GuardianCapability.ACADEMICS_VIEW,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      await expect(
+        getParentStudentIds(
+          prisma,
+          parentActor(),
+          GuardianCapability.ACADEMICS_VIEW,
+        ),
+      ).resolves.toEqual([childTwoId]);
+    });
   });
 
   describe('effective dating', () => {
@@ -437,6 +462,20 @@ describe('P0-01 guardian scoping (real database)', () => {
     });
 
     it("denies another tenant's child even with a real student id", async () => {
+      await expect(
+        requireGuardianCapability(
+          prisma,
+          parentActor(),
+          foreignChildId,
+          GuardianCapability.ACADEMICS_VIEW,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('does not treat a shared phone as a cross-school guardian link', async () => {
+      await expect(getParentStudentIds(prisma, parentActor())).resolves.toEqual(
+        [childOneId, childTwoId],
+      );
       await expect(
         requireGuardianCapability(
           prisma,

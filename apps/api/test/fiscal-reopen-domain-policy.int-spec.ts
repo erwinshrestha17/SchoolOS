@@ -32,8 +32,9 @@ describeDatabase(
     const actors: Record<string, AuthContext> = {};
     const scope = <T>(work: () => Promise<T>) =>
       prisma.runWithTenantScope(tenantId, work);
-    const itTenant = (name: string, work: () => Promise<void>) =>
+    const itTenant = (name: string, work: () => Promise<void>) => {
       it(name, () => scope(work));
+    };
     const year = () =>
       prisma.fiscalYear.findFirstOrThrow({ where: { id: yearId, tenantId } });
     const period = () =>
@@ -79,6 +80,7 @@ describeDatabase(
           tenantId = tenant.id;
           const keys = [
             'accounting:fiscal:reopen',
+            'accounting:fiscal:manage',
             'advanced:approvals:decide',
             'advanced:approvals:manage',
           ];
@@ -178,6 +180,10 @@ describeDatabase(
           await prisma.auditLog.deleteMany({ where: { tenantId } });
           await prisma.approvalRequest.deleteMany({ where: { tenantId } });
           await prisma.approvalPolicy.deleteMany({ where: { tenantId } });
+          await prisma.journalLine.deleteMany({ where: { tenantId } });
+          await prisma.journalEntry.deleteMany({ where: { tenantId } });
+          await prisma.journalEntrySequence.deleteMany({ where: { tenantId } });
+          await prisma.chartAccount.deleteMany({ where: { tenantId } });
           await prisma.fiscalPeriod.deleteMany({ where: { tenantId } });
           await prisma.fiscalYear.deleteMany({ where: { tenantId } });
           await prisma.rolePermission.deleteMany({
@@ -237,6 +243,171 @@ describeDatabase(
       },
     );
     itTenant(
+      'permits one pending fiscal reopen request per target under concurrent submission',
+      async () => {
+        const attempts = await Promise.allSettled([
+          requestYear(),
+          requestYear(),
+        ]);
+        expect(
+          attempts.filter((attempt) => attempt.status === 'fulfilled'),
+        ).toHaveLength(1);
+        expect(
+          await prisma.approvalRequest.count({
+            where: {
+              tenantId,
+              workflowType: 'FISCAL_YEAR_REOPEN',
+              targetId: yearId,
+              status: 'PENDING',
+            },
+          }),
+        ).toBe(1);
+        await expect(requestYear()).rejects.toThrow(ConflictException);
+      },
+    );
+    itTenant(
+      'rolls back fiscal period close when its audit record fails',
+      async () => {
+        await prisma.fiscalYear.update({
+          where: { id: yearId },
+          data: { status: 'OPEN' },
+        });
+        await prisma.fiscalPeriod.update({
+          where: { id: periodId },
+          data: { status: 'LOCKED' },
+        });
+        jest
+          .spyOn(audit, 'record')
+          .mockRejectedValueOnce(
+            new Error('Synthetic fiscal close audit failure'),
+          );
+        await expect(
+          accounting.closeFiscalPeriod(
+            periodId,
+            { reason: 'Close period after reconciliation review' },
+            actors.requester,
+          ),
+        ).rejects.toThrow('Synthetic fiscal close audit failure');
+        expect((await period()).status).toBe('LOCKED');
+        jest.restoreAllMocks();
+        expect(
+          (
+            await accounting.closeFiscalPeriod(
+              periodId,
+              { reason: 'Close period after reconciliation review' },
+              actors.requester,
+            )
+          ).status,
+        ).toBe('CLOSED');
+      },
+    );
+    itTenant(
+      'commits fiscal-year status, closing journal and audit as one transaction',
+      async () => {
+        await prisma.fiscalYear.update({
+          where: { id: yearId },
+          data: { status: 'OPEN' },
+        });
+        await prisma.fiscalPeriod.create({
+          data: {
+            tenantId,
+            fiscalYearId: yearId,
+            label: 'Synthetic December',
+            periodNumber: 12,
+            startDate: new Date('2026-12-01'),
+            endDate: new Date('2026-12-31'),
+            status: 'CLOSED',
+            closedAt: new Date(),
+            closedById: actors.requester.userId,
+            closeReason: 'Synthetic prior close',
+          },
+        });
+        const accounts = await Promise.all(
+          [
+            ['1001', 'Cash', 'ASSET'],
+            ['4001', 'Revenue', 'REVENUE'],
+            ['5001', 'Expense', 'EXPENSE'],
+            ['3100', 'Retained earnings', 'EQUITY'],
+          ].map(([code, name, type]) =>
+            prisma.chartAccount.create({
+              data: {
+                tenantId,
+                code,
+                name,
+                type: type as 'ASSET' | 'REVENUE' | 'EXPENSE' | 'EQUITY',
+              },
+            }),
+          ),
+        );
+        const accountId = (code: string) => {
+          const account = accounts.find((item) => item.code === code);
+          if (!account) throw new Error(`Missing synthetic account ${code}`);
+          return account.id;
+        };
+        await prisma.journalEntry.create({
+          data: {
+            tenantId,
+            fiscalYearId: yearId,
+            fiscalPeriodId: periodId,
+            entryDate: new Date('2026-05-05'),
+            entryNumber: `synthetic-${randomUUID()}`,
+            narration: 'Synthetic revenue and expense before close',
+            status: 'POSTED',
+            sourceType: 'MANUAL',
+            postedAt: new Date(),
+            postedById: actors.requester.userId,
+            lines: {
+              create: [
+                [accountId('1001'), 'DEBIT', 100],
+                [accountId('4001'), 'CREDIT', 100],
+                [accountId('5001'), 'DEBIT', 20],
+                [accountId('1001'), 'CREDIT', 20],
+              ].map(([chartAccountId, side, amount]) => ({
+                tenantId,
+                chartAccountId: String(chartAccountId),
+                side: side as 'DEBIT' | 'CREDIT',
+                amount: Number(amount),
+                debit: side === 'DEBIT' ? Number(amount) : 0,
+                credit: side === 'CREDIT' ? Number(amount) : 0,
+              })),
+            },
+          },
+        });
+        const originalRecord = audit.record.bind(audit);
+        jest.spyOn(audit, 'record').mockImplementation((event, tx) => {
+          if (event.resource === 'fiscal_year' && event.action === 'close')
+            throw new Error('Synthetic year close audit failure');
+          return originalRecord(event, tx);
+        });
+        await expect(
+          accounting.closeFiscalYear(
+            yearId,
+            { reason: 'Close the year after reviewed financial results' },
+            actors.requester,
+          ),
+        ).rejects.toThrow('Synthetic year close audit failure');
+        expect((await year()).status).toBe('OPEN');
+        expect(
+          await prisma.journalEntry.count({
+            where: { tenantId, sourceType: 'CLOSING_ENTRY' },
+          }),
+        ).toBe(0);
+        jest.restoreAllMocks();
+        const result = await accounting.closeFiscalYear(
+          yearId,
+          { reason: 'Close the year after reviewed financial results' },
+          actors.requester,
+        );
+        expect(result.fiscalYear.status).toBe('CLOSED');
+        expect(result.closingEntry.sourceType).toBe('CLOSING_ENTRY');
+        expect(
+          await prisma.journalEntry.count({
+            where: { tenantId, sourceType: 'CLOSING_ENTRY' },
+          }),
+        ).toBe(1);
+      },
+    );
+    itTenant(
       'requires two distinct approvers when active policy raises the threshold',
       async () => {
         await prisma.approvalPolicy.create({
@@ -287,9 +458,11 @@ describeDatabase(
           },
           actors.requester,
         );
-        jest.spyOn(audit, 'record').mockRejectedValueOnce(
-          new Error('Synthetic fiscal policy audit failure'),
-        );
+        jest
+          .spyOn(audit, 'record')
+          .mockRejectedValueOnce(
+            new Error('Synthetic fiscal policy audit failure'),
+          );
         await expect(
           approvals.createPolicy(
             {

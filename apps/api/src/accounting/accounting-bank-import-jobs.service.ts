@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +11,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { StorageService } from '../storage/storage.service';
 import { AuditService } from '../audit/audit.service';
+import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
+import { requireDomainPermission } from '../authorization/policies/domain-permission';
 import type { AuthContext } from '../auth/auth.types';
 import { ImportBankStatementLineDto } from './dto/import-bank-statement.dto';
 import {
@@ -51,6 +54,7 @@ export class AccountingBankImportJobsService {
     lines: ImportBankStatementLineDto[],
     actor: AuthContext,
   ) {
+    requireDomainPermission(actor, 'accounting:reconciliation:manage');
     if (!Array.isArray(lines) || lines.length <= BANK_IMPORT_SYNC_ROW_LIMIT) {
       throw new BadRequestException(
         `Bank statement import has ${lines?.length ?? 0} rows and can be imported synchronously via the standard import endpoint.`,
@@ -88,6 +92,13 @@ export class AccountingBankImportJobsService {
       select: { id: true, lineCount: true },
     });
     if (existingBatch) {
+      await withSchoolAuthorizationTransaction(
+        this.prisma,
+        actor,
+        'accounting:reconciliation:manage',
+        [],
+        () => Promise.resolve(undefined),
+      );
       return {
         jobId: null,
         status: 'COMPLETED' as const,
@@ -102,17 +113,82 @@ export class AccountingBankImportJobsService {
       where: { tenantId: actor.tenantId, accountId, fingerprint },
       orderBy: { createdAt: 'desc' },
     });
+    if (existingJob && existingJob.requestedBy !== actor.userId)
+      throw new ConflictException(
+        'The existing bank import belongs to another requester',
+      );
     if (
       existingJob &&
       existingJob.status !== 'FAILED' &&
       existingJob.status !== 'CANCELLED'
     ) {
+      await withSchoolAuthorizationTransaction(
+        this.prisma,
+        actor,
+        'accounting:reconciliation:manage',
+        [],
+        () => Promise.resolve(undefined),
+      );
+      if (existingJob.status === 'QUEUED')
+        await this.enqueueImportJob(existingJob.id, accountId, actor);
       return {
         jobId: existingJob.id,
         status: existingJob.status,
         importBatchId: existingJob.importBatchId,
         totalRows: existingJob.totalRows,
         processedRows: existingJob.processedRows,
+        reused: true,
+      };
+    }
+    if (existingJob) {
+      const retried = await withSchoolAuthorizationTransaction(
+        this.prisma,
+        actor,
+        'accounting:reconciliation:manage',
+        [],
+        async (tx) => {
+          const claim = await tx.bankStatementImportJob.updateMany({
+            where: {
+              id: existingJob.id,
+              tenantId: actor.tenantId,
+              requestedBy: actor.userId,
+              status: { in: ['FAILED', 'CANCELLED'] },
+            },
+            data: {
+              status: 'QUEUED',
+              processedRows: 0,
+              insertedRows: null,
+              duplicateRows: null,
+              errorRows: null,
+              errorSummary: null,
+              completedAt: null,
+            },
+          });
+          if (claim.count !== 1)
+            throw new ConflictException('Bank import job changed before retry');
+          await this.auditService.record(
+            {
+              action: 'retry_bank_statement_import',
+              resource: 'bank_statement',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: existingJob.id,
+              after: { accountId, fingerprint },
+            },
+            tx,
+          );
+          return tx.bankStatementImportJob.findFirstOrThrow({
+            where: { id: existingJob.id, tenantId: actor.tenantId },
+          });
+        },
+      );
+      await this.enqueueImportJob(retried.id, accountId, actor);
+      return {
+        jobId: retried.id,
+        status: 'QUEUED' as const,
+        importBatchId: null,
+        totalRows: retried.totalRows,
+        processedRows: 0,
         reused: true,
       };
     }
@@ -129,17 +205,52 @@ export class AccountingBankImportJobsService {
 
     let job: Prisma.BankStatementImportJobGetPayload<Record<string, never>>;
     try {
-      job = await this.prisma.bankStatementImportJob.create({
-        data: {
-          tenantId: actor.tenantId,
-          accountId,
-          fingerprint,
-          totalRows: sanitizedLines.length,
-          fileAssetId: asset.id,
-          requestedBy: actor.userId,
-          status: 'QUEUED',
+      job = await withSchoolAuthorizationTransaction(
+        this.prisma,
+        actor,
+        'accounting:reconciliation:manage',
+        [],
+        async (tx) => {
+          const currentAccount = await tx.chartAccount.findFirst({
+            where: {
+              id: accountId,
+              tenantId: actor.tenantId,
+              type: ChartAccountType.ASSET,
+              isActive: true,
+            },
+            select: { id: true },
+          });
+          if (!currentAccount)
+            throw new NotFoundException('Bank account is no longer active');
+          const created = await tx.bankStatementImportJob.create({
+            data: {
+              tenantId: actor.tenantId,
+              accountId,
+              fingerprint,
+              totalRows: sanitizedLines.length,
+              fileAssetId: asset.id,
+              requestedBy: actor.userId,
+              status: 'QUEUED',
+            },
+          });
+          await this.auditService.record(
+            {
+              action: 'queue_bank_statement_import',
+              resource: 'bank_statement',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: created.id,
+              after: {
+                accountId,
+                totalRows: sanitizedLines.length,
+                fileAssetId: asset.id,
+              },
+            },
+            tx,
+          );
+          return created;
         },
-      });
+      );
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -162,28 +273,7 @@ export class AccountingBankImportJobsService {
       throw error;
     }
 
-    await this.bankImportQueue.add(
-      'importBankStatementChunked',
-      {
-        jobRecordId: job.id,
-        accountId,
-        actor,
-      } satisfies AccountingBankImportJob,
-      { jobId: job.id },
-    );
-
-    await this.auditService.record({
-      action: 'queue_bank_statement_import',
-      resource: 'bank_statement',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: job.id,
-      after: {
-        accountId,
-        totalRows: sanitizedLines.length,
-        fileAssetId: asset.id,
-      },
-    });
+    await this.enqueueImportJob(job.id, accountId, actor);
 
     return {
       jobId: job.id,
@@ -207,6 +297,34 @@ export class AccountingBankImportJobsService {
     return job;
   }
 
+  private async enqueueImportJob(
+    jobRecordId: string,
+    accountId: string,
+    actor: AuthContext,
+  ) {
+    const data = {
+      jobRecordId,
+      accountId,
+      actor,
+    } satisfies AccountingBankImportJob;
+    const existing = await this.bankImportQueue.getJob(jobRecordId);
+    if (!existing) {
+      await this.bankImportQueue.add('importBankStatementChunked', data, {
+        jobId: jobRecordId,
+      });
+      return;
+    }
+    const state = await existing.getState();
+    if (state === 'failed' || state === 'completed') {
+      await existing.updateData(data);
+      await existing.retry(state);
+    } else if (state === 'unknown') {
+      throw new ConflictException(
+        'Bank import queue state is unavailable; retry the request',
+      );
+    }
+  }
+
   async listBankImportJobs(accountId: string, actor: AuthContext) {
     return this.prisma.bankStatementImportJob.findMany({
       where: { tenantId: actor.tenantId, accountId },
@@ -226,30 +344,11 @@ export class AccountingBankImportJobsService {
     if (!job) {
       throw new BadRequestException('Bank statement import job not found');
     }
+    if (job.requestedBy !== input.actor.userId)
+      throw new BadRequestException(
+        'Bank statement import requester changed after queueing',
+      );
     if (job.status === 'COMPLETED') {
-      return;
-    }
-
-    const existingBatch = await this.prisma.bankStatementImportBatch.findFirst({
-      where: {
-        tenantId: input.actor.tenantId,
-        accountId: input.accountId,
-        fingerprint: job.fingerprint,
-      },
-    });
-    if (existingBatch) {
-      await this.prisma.bankStatementImportJob.update({
-        where: { id: job.id },
-        data: {
-          status: 'COMPLETED',
-          importBatchId: existingBatch.id,
-          insertedRows: existingBatch.lineCount,
-          duplicateRows: 0,
-          errorRows: 0,
-          processedRows: existingBatch.lineCount,
-          completedAt: new Date(),
-        },
-      });
       return;
     }
 
@@ -279,118 +378,99 @@ export class AccountingBankImportJobsService {
 
     const importBatchId = `IMPORT-${fingerprint}`;
     const chunks = chunkArray(sanitizedLines, BANK_IMPORT_CHUNK_SIZE);
-
-    try {
-      let processed = 0;
-      for (let i = 0; i < chunks.length; i += 1) {
-        const chunk = chunks[i];
-        await this.prisma.$transaction(async (tx) => {
-          if (i === 0) {
-            await tx.bankStatementImportBatch.create({
-              data: {
-                id: importBatchId,
-                tenantId: input.actor.tenantId,
-                accountId: input.accountId,
-                fingerprint,
-                lineCount: sanitizedLines.length,
-                createdById: input.actor.userId,
-              },
-            });
-          }
-          await Promise.all(
-            chunk.map((line) =>
-              tx.bankStatement.create({
-                data: {
-                  tenantId: input.actor.tenantId,
-                  accountId: input.accountId,
-                  statementDate: line.statementDate,
-                  description: line.description,
-                  reference: line.reference,
-                  debitAmount: line.debitAmount,
-                  creditAmount: line.creditAmount,
-                  importBatchId,
-                },
-              }),
-            ),
+    await withSchoolAuthorizationTransaction(
+      this.prisma,
+      input.actor,
+      'accounting:reconciliation:manage',
+      [],
+      async (tx) => {
+        const currentJob = await tx.bankStatementImportJob.findFirst({
+          where: {
+            id: job.id,
+            tenantId: input.actor.tenantId,
+            accountId: input.accountId,
+            requestedBy: input.actor.userId,
+          },
+        });
+        if (currentJob?.fingerprint !== fingerprint)
+          throw new BadRequestException(
+            'Bank statement import job changed before execution',
           );
+        if (currentJob.status === 'COMPLETED') return;
+        const account = await tx.chartAccount.findFirst({
+          where: {
+            id: input.accountId,
+            tenantId: input.actor.tenantId,
+            type: ChartAccountType.ASSET,
+            isActive: true,
+          },
+          select: { id: true },
         });
-        processed += chunk.length;
-        await this.prisma.bankStatementImportJob.update({
-          where: { id: job.id },
-          data: { processedRows: processed, status: 'RUNNING' },
-        });
-      }
-
-      await this.prisma.bankStatementImportJob.update({
-        where: { id: job.id },
-        data: {
-          status: 'COMPLETED',
-          importBatchId,
-          insertedRows: sanitizedLines.length,
-          duplicateRows: 0,
-          errorRows: 0,
-          processedRows: sanitizedLines.length,
-          completedAt: new Date(),
-        },
-      });
-
-      await this.auditService.record({
-        action: 'import',
-        resource: 'bank_statement',
-        tenantId: input.actor.tenantId,
-        userId: input.actor.userId,
-        resourceId: importBatchId,
-        after: {
-          accountId: input.accountId,
-          lineCount: sanitizedLines.length,
-          async: true,
-          jobId: job.id,
-        },
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        const raceBatch = await this.prisma.bankStatementImportBatch.findFirst({
+        if (!account)
+          throw new NotFoundException('Bank account is no longer active');
+        const existingBatch = await tx.bankStatementImportBatch.findFirst({
           where: {
             tenantId: input.actor.tenantId,
             accountId: input.accountId,
             fingerprint,
           },
         });
-        if (raceBatch) {
-          await this.prisma.bankStatementImportJob.update({
-            where: { id: job.id },
+        if (!existingBatch) {
+          await tx.bankStatementImportBatch.create({
             data: {
-              status: 'COMPLETED',
-              importBatchId: raceBatch.id,
-              insertedRows: raceBatch.lineCount,
-              processedRows: raceBatch.lineCount,
-              completedAt: new Date(),
+              id: importBatchId,
+              tenantId: input.actor.tenantId,
+              accountId: input.accountId,
+              fingerprint,
+              lineCount: sanitizedLines.length,
+              createdById: input.actor.userId,
             },
           });
-          return;
+          for (const chunk of chunks)
+            await tx.bankStatement.createMany({
+              data: chunk.map((line) => ({
+                tenantId: input.actor.tenantId,
+                accountId: input.accountId,
+                statementDate: line.statementDate,
+                description: line.description,
+                reference: line.reference,
+                debitAmount: line.debitAmount,
+                creditAmount: line.creditAmount,
+                importBatchId,
+              })),
+            });
+          await this.auditService.record(
+            {
+              action: 'import',
+              resource: 'bank_statement',
+              tenantId: input.actor.tenantId,
+              userId: input.actor.userId,
+              resourceId: importBatchId,
+              after: {
+                accountId: input.accountId,
+                lineCount: sanitizedLines.length,
+                async: true,
+                jobId: job.id,
+              },
+            },
+            tx,
+          );
         }
-      }
-
-      // A partial multi-chunk commit can't be left half-applied: without this cleanup a
-      // resubmitted import would double-count the rows that already landed before the failure.
-      await this.prisma.bankStatement.deleteMany({
-        where: {
-          tenantId: input.actor.tenantId,
-          accountId: input.accountId,
-          importBatchId,
-        },
-      });
-      await this.prisma.bankStatementImportBatch.deleteMany({
-        where: {
-          tenantId: input.actor.tenantId,
-          accountId: input.accountId,
-          id: importBatchId,
-        },
-      });
-      throw error;
-    }
+        await tx.bankStatementImportJob.update({
+          where: { id: job.id },
+          data: {
+            status: 'COMPLETED',
+            importBatchId: existingBatch?.id ?? importBatchId,
+            insertedRows: existingBatch?.lineCount ?? sanitizedLines.length,
+            duplicateRows: 0,
+            errorRows: 0,
+            processedRows: existingBatch?.lineCount ?? sanitizedLines.length,
+            completedAt: new Date(),
+          },
+        });
+      },
+      false,
+      { timeoutMs: 120000 },
+    );
   }
 }

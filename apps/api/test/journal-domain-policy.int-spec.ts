@@ -384,7 +384,7 @@ describeDatabase('Phase 2 journal duties (isolated PostgreSQL)', () => {
         results.filter((result) => result.status === 'fulfilled'),
       ).toHaveLength(1);
       const rejected = results.find((result) => result.status === 'rejected');
-      if (!rejected || rejected.status !== 'rejected')
+      if (rejected?.status !== 'rejected')
         throw new Error('Expected one concurrent posting to be rejected');
       expect(rejected.reason).toBeInstanceOf(ConflictException);
       expect((await current()).status).toBe('POSTED');

@@ -467,7 +467,13 @@ export function JournalDetailDialog({
               )}
 
               {entry.status === 'SUBMITTED' && canReview && (
-                <Button type="button" onClick={() => actionMutation.mutate({ id: entry.id, action: 'review' })} isLoading={actionMutation.isPending}>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    actionMutation.mutate({ id: entry.id, action: 'review' })
+                  }
+                  isLoading={actionMutation.isPending}
+                >
                   Complete Review
                 </Button>
               )}

@@ -152,7 +152,7 @@ function buildService(
             sectionId?: string;
             assignmentType?: { in: TeacherAssignmentType[] };
             effectiveFrom?: { lte: Date };
-            OR?: Array<{ effectiveUntil: null | { gt: Date } }>;
+            OR?: { effectiveUntil: null | { gt: Date } }[];
           };
         }) =>
           Promise.resolve(

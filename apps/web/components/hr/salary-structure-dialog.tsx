@@ -55,8 +55,10 @@ export function SalaryStructureDialog({
 }: SalaryStructureDialogProps) {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
-  const canEditBank = hasPermissions(['hr:bank:read']) && hasPermissions(['hr:bank:write']);
-  const canEditTax = hasPermissions(['hr:tax:read']) && hasPermissions(['hr:tax:write']);
+  const canEditBank =
+    hasPermissions(['hr:bank:read']) && hasPermissions(['hr:bank:write']);
+  const canEditTax =
+    hasPermissions(['hr:tax:read']) && hasPermissions(['hr:tax:write']);
   const [toastError, setToastError] = useState<string | null>(null);
 
   const isEdit = !!existingStructure;
@@ -221,9 +223,14 @@ export function SalaryStructureDialog({
       pfEnabled: canEditTax ? pfEnabled : undefined,
       tdsEnabled: canEditTax ? tdsEnabled : undefined,
       paymentMethod,
-      bankName: canEditBank && paymentMethod === 'BANK' ? optionalTrim(bankName) : undefined,
+      bankName:
+        canEditBank && paymentMethod === 'BANK'
+          ? optionalTrim(bankName)
+          : undefined,
       bankAccount:
-        canEditBank && paymentMethod === 'BANK' ? optionalTrim(bankAccount) : undefined,
+        canEditBank && paymentMethod === 'BANK'
+          ? optionalTrim(bankAccount)
+          : undefined,
       notes: optionalTrim(notes),
       components,
     };

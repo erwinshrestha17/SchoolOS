@@ -172,10 +172,18 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
       address: formData.address.trim(),
       phone: formData.phone ? normalizeNepalPhone(formData.phone) : undefined,
       teacherRegistryId: optionalTrim(formData.teacherRegistryId),
-      citizenshipNo: hasPermissions(['hr:identity:write']) ? optionalTrim(formData.citizenshipNo) : undefined,
-      panNumber: hasPermissions(['hr:tax:write']) ? optionalTrim(formData.panNumber) : undefined,
-      bankAccount: hasPermissions(['hr:bank:write']) ? optionalTrim(formData.bankAccount) : undefined,
-      bankName: hasPermissions(['hr:bank:write']) ? optionalTrim(formData.bankName) : undefined,
+      citizenshipNo: hasPermissions(['hr:identity:write'])
+        ? optionalTrim(formData.citizenshipNo)
+        : undefined,
+      panNumber: hasPermissions(['hr:tax:write'])
+        ? optionalTrim(formData.panNumber)
+        : undefined,
+      bankAccount: hasPermissions(['hr:bank:write'])
+        ? optionalTrim(formData.bankAccount)
+        : undefined,
+      bankName: hasPermissions(['hr:bank:write'])
+        ? optionalTrim(formData.bankName)
+        : undefined,
       qualifications: optionalTrim(formData.qualifications),
       experience: optionalTrim(formData.experience),
       probationEndDate: optionalTrim(formData.probationEndDate),

@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import {
   AuthMethod,
-  JournalEntryStatus,
   JournalLineSide,
   JournalSourceType,
   Prisma,
@@ -35,6 +34,7 @@ const actor = {
   permissions: [
     'accounting:reverse',
     'accounting:fiscal:reopen',
+    'accounting:fiscal:manage',
     ...['submit', 'review', 'approve', 'post', 'reject', 'cancel'].map(
       (duty) => `accounting:journals:${duty}`,
     ),
@@ -269,7 +269,7 @@ describe('fiscal period lifecycle management', () => {
       fiscalPeriod: period,
     });
 
-    // Mock findFirst to return the current period first, then null for the previous period check
+    // Mock findFirst to return the current period, readiness projection, then prior period.
     (prisma.fiscalPeriod.findFirst as jest.Mock)
       .mockResolvedValueOnce(period)
       .mockResolvedValueOnce({
@@ -284,7 +284,7 @@ describe('fiscal period lifecycle management', () => {
 
     await service.closeFiscalPeriod('p1', { reason: 'Audited' }, actor);
 
-    expect(prisma.fiscalPeriod.update).toHaveBeenCalledWith(
+    expect(prisma.fiscalPeriod.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           status: 'CLOSED',
@@ -551,7 +551,12 @@ function buildService(options: {
     },
     fiscalPeriod: {
       findFirst: jest.fn().mockResolvedValue(options.fiscalPeriod),
+      findFirstOrThrow: jest.fn().mockResolvedValue({
+        ...(options.fiscalPeriod as Record<string, unknown>),
+        status: 'CLOSED',
+      }),
       update: jest.fn().mockResolvedValue(options.fiscalPeriod),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     journalLine: {
       aggregate: jest.fn().mockResolvedValue({

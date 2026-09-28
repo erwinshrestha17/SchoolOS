@@ -339,7 +339,7 @@ export class PayrollService {
     const effectiveTo = dto.effectiveTo ? new Date(dto.effectiveTo) : null;
     assertSalaryStructureDateRange(effectiveFrom, effectiveTo);
 
-    const structure = await this.payrollTransaction(
+    const createdStructure = await this.payrollTransaction(
       actor,
       [
         'payroll:salary:write',
@@ -397,7 +397,7 @@ export class PayrollService {
       true,
     );
 
-    return serializeSalaryStructure(structure, actor);
+    return serializeSalaryStructure(createdStructure, actor);
   }
 
   async listSalaryStructures(
@@ -531,7 +531,7 @@ export class PayrollService {
       : existing.effectiveTo;
     assertSalaryStructureDateRange(effectiveFrom, effectiveTo);
 
-    const updated = await this.payrollTransaction(
+    const savedStructure = await this.payrollTransaction(
       actor,
       [
         'payroll:salary:write',
@@ -544,10 +544,7 @@ export class PayrollService {
         const current = await tx.salaryStructure.findFirst({
           where: { id: existing.id, tenantId: actor.tenantId },
         });
-        if (
-          !current ||
-          current.updatedAt.getTime() !== existing.updatedAt.getTime()
-        )
+        if (current?.updatedAt.getTime() !== existing.updatedAt.getTime())
           throw new ConflictException(
             'Salary structure changed while the form was open',
           );
@@ -606,7 +603,7 @@ export class PayrollService {
       true,
     );
 
-    return serializeSalaryStructure(updated, actor);
+    return serializeSalaryStructure(savedStructure, actor);
   }
 
   async activateSalaryStructure(id: string, actor: AuthContext) {
@@ -624,7 +621,7 @@ export class PayrollService {
       structure.effectiveTo,
     );
 
-    const updated = await this.payrollTransaction(
+    const activatedStructure = await this.payrollTransaction(
       actor,
       'payroll:salary:write',
       async (tx) => {
@@ -689,7 +686,7 @@ export class PayrollService {
       true,
     );
 
-    return serializeSalaryStructure(updated, actor);
+    return serializeSalaryStructure(activatedStructure, actor);
   }
 
   async archiveSalaryStructure(id: string, actor: AuthContext) {
@@ -702,7 +699,7 @@ export class PayrollService {
       throw new NotFoundException('Salary structure not found');
     }
 
-    const updated = await this.payrollTransaction(
+    const archivedStructure = await this.payrollTransaction(
       actor,
       'payroll:salary:write',
       async (tx) => {
@@ -731,7 +728,7 @@ export class PayrollService {
       true,
     );
 
-    return serializeSalaryStructure(updated, actor);
+    return serializeSalaryStructure(archivedStructure, actor);
   }
 
   async listPayrollRuns(

@@ -376,7 +376,8 @@ export class FileRegistryService {
       },
     });
 
-    await this.auditService.record({
+    await this.auditService.record(
+      {
         action: 'file_linked',
         resource: 'file_registry',
         resourceId: asset.id,
@@ -394,7 +395,9 @@ export class FileRegistryService {
           ownerType: input.ownerType ?? input.module,
           ownerId: input.ownerId ?? input.entityId,
         },
-    }, tx);
+      },
+      tx,
+    );
 
     return updated;
   }

@@ -903,7 +903,12 @@ export type FinanceApprovalRequestView = {
     | "EXECUTED"
     | "FAILED";
   paymentId: string;
-  allowedActions: { review: boolean; approve: boolean; reject: boolean; execute: boolean };
+  allowedActions: {
+    review: boolean;
+    approve: boolean;
+    reject: boolean;
+    execute: boolean;
+  };
   requiredApprovalCount: number;
   approvalCount: number;
   amount: FinanceMoneyAmount | null;

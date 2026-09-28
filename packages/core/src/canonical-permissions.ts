@@ -454,7 +454,11 @@ const legacyPermissionMetadata = {
     "finance_write",
     "1.0.0",
   ],
-  "accounting:journals:review": ["accounting:journals:review", "finance_write", "1.0.0"],
+  "accounting:journals:review": [
+    "accounting:journals:review",
+    "finance_write",
+    "1.0.0",
+  ],
   "accounting:journals:approve": [
     "accounting:journals:approve",
     "finance_approval",
@@ -591,7 +595,11 @@ const legacyPermissionMetadata = {
     "finance_critical",
     "1.0.0",
   ],
-  "accounting:reconciliation:review": ["accounting:reconciliation:review", "finance_approval", "1.0.0"],
+  "accounting:reconciliation:review": [
+    "accounting:reconciliation:review",
+    "finance_approval",
+    "1.0.0",
+  ],
   "accounting:reconciliation:finalize": [
     "accounting:reconciliation:finalize",
     "finance_critical",
@@ -876,9 +884,21 @@ const legacyPermissionMetadata = {
   "fees:discount": ["fees:discount:manage", "finance_critical", "1.0.0"],
   "fees:adjust": ["fees:invoice:adjust", "finance_critical", "1.0.0"],
   "payments:collect": ["fees:payment:collect", "finance_write", "1.0.0"],
-  "payments:refund:request": ["payments:refund:request", "finance_write", "1.0.0"],
-  "payments:reverse:request": ["payments:reverse:request", "finance_write", "1.0.0"],
-  "finance:approvals:review": ["finance:approvals:review", "finance_write", "1.0.0"],
+  "payments:refund:request": [
+    "payments:refund:request",
+    "finance_write",
+    "1.0.0",
+  ],
+  "payments:reverse:request": [
+    "payments:reverse:request",
+    "finance_write",
+    "1.0.0",
+  ],
+  "finance:approvals:review": [
+    "finance:approvals:review",
+    "finance_write",
+    "1.0.0",
+  ],
   "payments:refund": ["fees:payment:refund", "finance_critical", "1.0.0"],
   "payments:close": ["fees:payment:close", "finance_critical", "1.0.0"],
   "payments:reverse": ["fees:payment:reverse", "finance_critical", "1.0.0"],

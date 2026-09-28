@@ -636,7 +636,7 @@ export class BankReconciliationService {
         }
         await this.claim(tx, session, actor, data);
         await this.history(tx, session, actor, duty.toLowerCase(), note, {
-          status: data.status as string,
+          status: data.status,
         });
         return this.project(await this.load(tx, id, actor), actor);
       },

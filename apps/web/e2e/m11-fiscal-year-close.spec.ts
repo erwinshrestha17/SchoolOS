@@ -127,6 +127,18 @@ test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting
   expect(submitJournal.ok()).toBeTruthy();
   await accountant.context.close();
 
+  const reviewer = await roleContext(
+    browser,
+    authStateFor,
+    'accountingReviewer',
+  );
+  const reviewJournal = await reviewer.context.request.post(
+    `${API_BASE_URL}/accounting/journals/${createdJournal.data.id}/review`,
+    { headers: csrfHeaders(reviewer.state), data: {} },
+  );
+  expect(reviewJournal.ok()).toBeTruthy();
+  await reviewer.context.close();
+
   const approver = await roleContext(
     browser,
     authStateFor,
@@ -137,12 +149,14 @@ test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting
     { headers: csrfHeaders(approver.state), data: {} },
   );
   expect(approveJournal.ok()).toBeTruthy();
-  const postJournal = await approver.context.request.post(
+  await approver.context.close();
+  const poster = await roleContext(browser, authStateFor, 'accountingPoster');
+  const postJournal = await poster.context.request.post(
     `${API_BASE_URL}/accounting/journals/${createdJournal.data.id}/post`,
-    { headers: csrfHeaders(approver.state), data: {} },
+    { headers: csrfHeaders(poster.state), data: {} },
   );
   expect(postJournal.ok()).toBeTruthy();
-  await approver.context.close();
+  await poster.context.close();
 
   // --- Resolve the OPEN_PERIODS issue: lock then close every period, in
   // order (a period cannot close until its predecessor is closed). ---

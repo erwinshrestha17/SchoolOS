@@ -11,12 +11,14 @@ import { useSession } from '../session-provider';
 interface FiscalPeriodActionsProps {
   periodId: string;
   status: string;
+  fiscalYearStatus: string;
   label: string;
 }
 
 export function FiscalPeriodActions({
   periodId,
   status,
+  fiscalYearStatus,
   label,
 }: FiscalPeriodActionsProps) {
   const queryClient = useQueryClient();
@@ -139,7 +141,7 @@ export function FiscalPeriodActions({
               )}
             </>
           )}
-          {status === 'CLOSED' && canReopen && (
+          {status === 'CLOSED' && fiscalYearStatus === 'OPEN' && canReopen && (
             <Button
               type="button"
               variant="ghost"
