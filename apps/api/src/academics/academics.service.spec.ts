@@ -62,6 +62,7 @@ describe('AcademicsService report-card projection', () => {
       {} as never,
       new GradeCalculatorService(),
       {} as never,
+      {} as never,
     );
     const actor = { tenantId: 'tenant-1' } as AuthContext;
 
@@ -92,6 +93,7 @@ describe('AcademicsService report-card projection', () => {
       {} as never,
       {} as never,
       new GradeCalculatorService(),
+      {} as never,
       {} as never,
     );
     const actor = {

@@ -18,4 +18,5 @@ export * from "./school-settings-integrations.js";
 export * from "./school-academic-calendar.js";
 export * from "./admission-cases.js";
 export * from "./admission-policies.js";
+export * from "./external-authority-handoff.js";
 export * from "./support-override.js";

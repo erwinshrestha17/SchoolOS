@@ -14,6 +14,8 @@ import type {
   GuardianRecoveryActionPayload,
   GuardianSessionRevocationPayload,
   IemisExportResult,
+  IemisHandoff,
+  ExternalAuthorityHandoffStatus,
   MarkDuplicateStudentPairNotDuplicatePayload,
   PaginatedResponse,
   RemoteLookupPage,
@@ -418,6 +420,29 @@ export const studentsApi = {
   },
   exportIemisStudents: () =>
     request<IemisExportResult>('/students/iemis/export'),
+  listIemisHandoffs: () =>
+    request<IemisHandoff[]>('/students/iemis/handoffs'),
+  createIemisHandoff: (body: {
+    reportExportId: string;
+    supersedesHandoffId?: string;
+  }) =>
+    request<IemisHandoff>('/students/iemis/handoffs', {
+      method: 'POST',
+      json: body,
+    }),
+  recordIemisHandoffEvent: (
+    id: string,
+    body: {
+      status: ExternalAuthorityHandoffStatus;
+      evidenceFileId?: string;
+      externalReceiptReference?: string;
+      note?: string;
+    },
+  ) =>
+    request<IemisHandoff>(`/students/iemis/handoffs/${encodeURIComponent(id)}/events`, {
+      method: 'POST',
+      json: body,
+    }),
   listIemisReadiness: (params?: {
     classId?: string;
     sectionId?: string;

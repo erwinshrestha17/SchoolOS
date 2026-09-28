@@ -31,6 +31,7 @@ import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
 import { GradeCalculatorService } from './grade-calculator.service';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { TeacherProfessionalEligibilityService } from '../teacher-scope/teacher-professional-eligibility.service';
 
 interface ReportCardPdfComponent {
   max: number;
@@ -81,6 +82,7 @@ export class AcademicsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly gradeCalculator: GradeCalculatorService,
     private readonly teacherScopeService: TeacherScopeService,
+    private readonly teacherEligibility: TeacherProfessionalEligibilityService,
   ) {}
 
   async listSubjects(actor: AuthContext) {
@@ -244,6 +246,15 @@ export class AcademicsService {
 
     await this.ensureSection(actor, dto.sectionId, dto.classId);
 
+    const eligibilityAssessmentId =
+      await this.teacherEligibility.preflightAssignment({
+        tenantId: actor.tenantId,
+        staffId: dto.staffId,
+        classId: dto.classId,
+        subjectId: dto.subjectId,
+        actorId: actor.userId,
+      });
+
     const assignment = await this.prisma.$transaction(async (tx) => {
       await tx.subjectTeacherAssignment.create({
         data: {
@@ -270,6 +281,7 @@ export class AcademicsService {
           effectiveFrom: academicYear.startsOn,
           effectiveUntil: academicYear.endsOn,
           createdById: actor.userId,
+          eligibilityAssessmentId,
         },
         include: {
           academicYear: true,

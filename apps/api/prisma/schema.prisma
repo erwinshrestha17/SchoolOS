@@ -3593,6 +3593,14 @@ model User {
   auditLogs                   AuditLog[]
   reviewedNepalEducationPolicies NepalEducationPolicyVersion[] @relation("ReviewedNepalEducationPolicies")
   approvedNepalEducationPolicies NepalEducationPolicyVersion[] @relation("ApprovedNepalEducationPolicies")
+  reviewedNepalHrPolicies NepalHrPolicyVersion[] @relation("ReviewedNepalHrPolicies")
+  approvedNepalHrPolicies NepalHrPolicyVersion[] @relation("ApprovedNepalHrPolicies")
+  verifiedStaffEmployments StaffEmployment[] @relation("VerifiedStaffEmployments")
+  verifiedTeacherQualifications TeacherQualificationEvidence[] @relation("VerifiedTeacherQualifications")
+  verifiedTeachingLicences TeachingLicenceEvidence[] @relation("VerifiedTeachingLicences")
+  evaluatedTeacherEligibility TeacherEligibilityAssessment[] @relation("EvaluatedTeacherEligibility")
+  createdExternalAuthorityHandoffs ExternalAuthorityHandoff[] @relation("CreatedExternalAuthorityHandoffs")
+  externalAuthorityHandoffEvents ExternalAuthorityHandoffEvent[] @relation("ExternalAuthorityHandoffActors")
   student                     Student?                     @relation("StudentUser")
   staff                       Staff?                       @relation("StaffUser")
   guardian                    Guardian?                    @relation("GuardianUser")
@@ -4898,6 +4906,79 @@ model PromotionRecord {
 }
 
 
+// ─── Compiled from schema/external-authority-handoff.prisma ───
+// P0-N4 records handoff evidence. SchoolOS never becomes NEB, CEHRD/iEMIS or
+// TSC's source of truth. A prepared file is not a submission or acknowledgement.
+enum ExternalAuthorityCode {
+  NEB
+  CEHRD_IEMIS
+  TSC
+  OTHER
+}
+
+enum ExternalAuthorityHandoffStatus {
+  READY
+  EXPORTED
+  SUBMITTED
+  ACKNOWLEDGED
+  REJECTED
+  CORRECTION_REQUIRED
+}
+
+model ExternalAuthorityHandoff {
+  id                     String                         @id @default(uuid())
+  tenantId               String
+  authority              ExternalAuthorityCode
+  purpose                String
+  externalSchoolReference String?
+  reportExportId         String?
+  supersedesId           String?                        @unique
+  snapshotFileId         String
+  snapshotChecksumSha256 String
+  schemaAuthority        String
+  officialFormatVerified Boolean                        @default(false)
+  directSyncSupported    Boolean                        @default(false)
+  status                 ExternalAuthorityHandoffStatus @default(READY)
+  createdById            String
+  createdAt              DateTime                       @default(now())
+  exportedAt             DateTime?
+  submittedAt            DateTime?
+  acknowledgedAt         DateTime?
+  externalReceiptReference String?
+
+  tenant       Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  reportExport ReportExport?                  @relation(fields: [reportExportId], references: [id], onDelete: Restrict)
+  supersedes  ExternalAuthorityHandoff?       @relation("ExternalAuthorityHandoffLineage", fields: [supersedesId], references: [id], onDelete: Restrict)
+  supersededBy ExternalAuthorityHandoff?      @relation("ExternalAuthorityHandoffLineage")
+  snapshotFile FileAsset                      @relation("ExternalAuthoritySnapshot", fields: [snapshotFileId], references: [id], onDelete: Restrict)
+  createdBy    User                           @relation("CreatedExternalAuthorityHandoffs", fields: [createdById], references: [id], onDelete: Restrict)
+  events       ExternalAuthorityHandoffEvent[]
+
+  @@index([tenantId, authority, status, createdAt])
+  @@unique([tenantId, reportExportId])
+}
+
+// Append-only event log for manual authority handoffs and external responses.
+model ExternalAuthorityHandoffEvent {
+  id                      String                         @id @default(uuid())
+  tenantId                String
+  handoffId               String
+  status                  ExternalAuthorityHandoffStatus
+  actorId                 String
+  occurredAt              DateTime                       @default(now())
+  externalReceiptReference String?
+  evidenceFileId          String?
+  note                    String?                        @db.Text
+
+  tenant       Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  handoff      ExternalAuthorityHandoff  @relation(fields: [handoffId], references: [id], onDelete: Restrict)
+  actor        User                      @relation("ExternalAuthorityHandoffActors", fields: [actorId], references: [id], onDelete: Restrict)
+  evidenceFile FileAsset?                @relation("ExternalAuthorityHandoffEvidence", fields: [evidenceFileId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, handoffId, occurredAt])
+}
+
+
 // ─── Compiled from schema/finance.prisma ───
 model FeeHead {
   id            String       @id @default(uuid())
@@ -5474,6 +5555,7 @@ model NepalProvince {
 
   districts NepalDistrict[]
   educationPolicies NepalEducationPolicyVersion[]
+  hrPolicies NepalHrPolicyVersion[]
 
   @@index([nameEn])
   @@index([nameNe])
@@ -5493,6 +5575,7 @@ model NepalDistrict {
   province    NepalProvince     @relation(fields: [provinceId], references: [id], onDelete: Restrict)
   localLevels NepalLocalLevel[]
   educationPolicies NepalEducationPolicyVersion[]
+  hrPolicies NepalHrPolicyVersion[]
 
   @@unique([provinceId, nameEn])
   @@index([provinceId])
@@ -5525,6 +5608,8 @@ model NepalLocalLevel {
 
   addresses Address[]
   educationPolicies NepalEducationPolicyVersion[]
+  hrPolicies NepalHrPolicyVersion[]
+  staffEmployments StaffEmployment[]
 
   @@unique([districtId, nameEn])
   @@index([districtId])
@@ -6868,6 +6953,87 @@ model NepalEducationPolicyVersion {
 }
 
 
+// ─── Compiled from schema/nepal-hr-policy.prisma ───
+// Reviewed Nepal HR/legal inputs are evidence, not automatic statutory
+// certification. Consumers must select an approved version for the event date.
+enum NepalHrPolicyKind {
+  EMPLOYMENT_POST_CLASSIFICATION
+  CONTRACT_SERVICE_CONDITIONS
+  WORKING_TIME_LEAVE
+  COMPENSATION_MINIMUM
+  STATUTORY_SCHEME_TAX
+  TEACHER_PROFESSIONAL_ELIGIBILITY
+}
+
+enum NepalHrPolicyReviewStatus {
+  DRAFT
+  IN_REVIEW
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+model NepalHrPolicyVersion {
+  id                     String                     @id @default(uuid())
+  policyKey              String
+  version                Int
+  kind                   NepalHrPolicyKind
+  scope                  NepalEducationPolicyScope
+  tenantId               String?
+  provinceId             Int?
+  districtId             Int?
+  localLevelId           Int?
+  schoolTypeCode         String?
+  employmentType         StaffEmploymentType?
+  postCategoryCode       String?
+  classLevelMin          Int?
+  classLevelMax          Int?
+  subjectCode            String?
+  isMandatoryBaseline    Boolean                    @default(false)
+  // Typed fields are the authoritative inputs used by the P0 teacher gate.
+  // NULL means the reviewed policy has not resolved that requirement.
+  requiresQualification  Boolean?
+  requiresLicence        Boolean?
+  minimumMonthlyNpr      Decimal?                   @db.Decimal(12, 2)
+  payloadSchemaVersion   Int                        @default(1)
+  payload                Json
+  reviewStatus           NepalHrPolicyReviewStatus  @default(DRAFT)
+  reviewedById           String?
+  reviewedAt             DateTime?
+  approvedById           String?
+  approvedAt             DateTime?
+  reviewNote             String?                    @db.Text
+  effectiveFrom          DateTime
+  effectiveTo            DateTime?
+  supersedesId           String?                    @unique
+  sourceTitle            String
+  sourcePublisher        String?
+  sourceUri              String?
+  sourcePublishedAt      DateTime?
+  sourceChecksumSha256   String?
+  evidenceFileAssetId    String?
+  createdAt              DateTime                   @default(now())
+
+  tenant          Tenant?                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  province        NepalProvince?        @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+  district        NepalDistrict?        @relation(fields: [districtId], references: [id], onDelete: Restrict)
+  localLevel      NepalLocalLevel?      @relation(fields: [localLevelId], references: [id], onDelete: Restrict)
+  reviewedBy      User?                 @relation("ReviewedNepalHrPolicies", fields: [reviewedById], references: [id], onDelete: Restrict)
+  approvedBy      User?                 @relation("ApprovedNepalHrPolicies", fields: [approvedById], references: [id], onDelete: Restrict)
+  evidenceFile    FileAsset?            @relation(fields: [evidenceFileAssetId], references: [id], onDelete: Restrict)
+  supersedes      NepalHrPolicyVersion? @relation("NepalHrPolicyLineage", fields: [supersedesId], references: [id], onDelete: Restrict)
+  supersededBy    NepalHrPolicyVersion? @relation("NepalHrPolicyLineage")
+  employments     StaffEmployment[]      @relation("EmploymentPolicy")
+  teacherAssessments TeacherEligibilityAssessment[]
+
+  @@unique([policyKey, version])
+  @@index([kind, scope, reviewStatus, effectiveFrom])
+  @@index([tenantId, kind, reviewStatus, effectiveFrom])
+  @@index([localLevelId, kind, reviewStatus, effectiveFrom])
+  @@index([policyKey, reviewStatus, effectiveFrom])
+}
+
+
 // ─── Compiled from schema/payroll.prisma ───
 model SalaryStructure {
   id            String                @id @default(uuid())
@@ -7390,6 +7556,7 @@ model ReportExport {
   completedAt  DateTime?
 
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  externalAuthorityHandoffs ExternalAuthorityHandoff[]
 
   @@index([tenantId, createdAt])
   @@index([scope, reportKey])
@@ -7580,6 +7747,9 @@ model Staff {
   payrollExceptions          PayrollException[]
   payslips                   Payslip[]
   qualificationsRecords      StaffQualification[]
+  employments               StaffEmployment[]
+  teacherProfile            TeacherProfile?
+  teacherEligibilityAssessments TeacherEligibilityAssessment[]
   experienceRecords          StaffExperienceRecord[]
   conversationParticipants   ConversationParticipant[]
   messages                   Message[]
@@ -7709,6 +7879,7 @@ model StaffContract {
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   staff        Staff         @relation(fields: [staffId], references: [id], onDelete: Cascade)
   payrollLines PayrollLine[]
+  employments StaffEmployment[]
 
   @@unique([tenantId, contractNumber])
   @@index([tenantId, staffId, status])
@@ -8355,6 +8526,7 @@ model TeacherAssignment {
   createdById String?
   revokedById String?
   revokedAt   DateTime?
+  eligibilityAssessmentId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -8366,6 +8538,7 @@ model TeacherAssignment {
   subject      Subject?     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   createdBy    User?        @relation("CreatedTeacherAssignments", fields: [createdById], references: [id], onDelete: SetNull)
   revokedBy    User?        @relation("RevokedTeacherAssignments", fields: [revokedById], references: [id], onDelete: SetNull)
+  eligibilityAssessment TeacherEligibilityAssessment? @relation(fields: [eligibilityAssessmentId], references: [id], onDelete: Restrict)
 
   delegations              TeacherDelegation[]  @relation("DelegationSourceAssignment")
   replacementsAsSource     TeacherReplacement[] @relation("ReplacementSourceAssignment")
@@ -8391,6 +8564,7 @@ model TeacherDelegation {
 
   grantorStaffId    String
   recipientStaffId  String
+  eligibilityAssessmentId String?
   sourceAssignmentId String?
 
   classId        String
@@ -8420,6 +8594,7 @@ model TeacherDelegation {
   academicYear          AcademicYear           @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
   grantor               Staff                  @relation("DelegationGrantor", fields: [grantorStaffId], references: [id], onDelete: Restrict)
   recipient             Staff                  @relation("DelegationRecipient", fields: [recipientStaffId], references: [id], onDelete: Restrict)
+  eligibilityAssessment TeacherEligibilityAssessment? @relation("DelegationEligibility", fields: [eligibilityAssessmentId], references: [id], onDelete: Restrict)
   sourceAssignment      TeacherAssignment?     @relation("DelegationSourceAssignment", fields: [sourceAssignmentId], references: [id], onDelete: SetNull)
   timetableSubstitution TimetableSubstitution? @relation(fields: [timetableSubstitutionId], references: [id], onDelete: SetNull)
   class                 Class                  @relation(fields: [classId], references: [id], onDelete: Restrict)
@@ -8527,6 +8702,172 @@ model TeacherHandoverNote {
 }
 
 
+// ─── Compiled from schema/teacher-professional-eligibility.prisma ───
+// P0-N3: employment, teacher identity, professional evidence and eligibility
+// are independent facts. A SchoolOS role or an academic assignment is none of
+// these facts. Evidence and decisions are tenant-scoped and time-bounded.
+enum ProfessionalEvidenceStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  REVOKED
+}
+
+enum StaffEmploymentStatus {
+  PENDING
+  VERIFIED
+  ENDED
+  REJECTED
+}
+
+enum TeacherProfileStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TeacherEligibilityOutcome {
+  ELIGIBLE
+  INELIGIBLE
+}
+
+model StaffEmployment {
+  id                 String                @id @default(uuid())
+  tenantId           String
+  staffId            String
+  employmentType     StaffEmploymentType
+  postCategoryCode   String
+  schoolTypeCode     String
+  localLevelId       Int?
+  effectiveFrom      DateTime
+  effectiveTo        DateTime?
+  status             StaffEmploymentStatus @default(PENDING)
+  verifiedById       String?
+  verifiedAt         DateTime?
+  endedAt            DateTime?
+  endReason          String?               @db.Text
+  contractId         String?
+  policyVersionId    String?
+  createdAt          DateTime              @default(now())
+
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff         Staff                   @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  verifiedBy   User?                   @relation("VerifiedStaffEmployments", fields: [verifiedById], references: [id], onDelete: Restrict)
+  contract     StaffContract?          @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  policy       NepalHrPolicyVersion?   @relation("EmploymentPolicy", fields: [policyVersionId], references: [id], onDelete: Restrict)
+  localLevel   NepalLocalLevel?       @relation(fields: [localLevelId], references: [id], onDelete: Restrict)
+  assessments  TeacherEligibilityAssessment[]
+
+  @@index([tenantId, staffId, status, effectiveFrom])
+}
+
+model TeacherProfile {
+  id             String               @id @default(uuid())
+  tenantId       String
+  staffId        String               @unique
+  status         TeacherProfileStatus @default(ACTIVE)
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  createdAt      DateTime             @default(now())
+
+  tenant         Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff          Staff                          @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  qualifications TeacherQualificationEvidence[]
+  licences       TeachingLicenceEvidence[]
+  assessments    TeacherEligibilityAssessment[]
+
+  @@index([tenantId, status, effectiveFrom])
+}
+
+model TeacherQualificationEvidence {
+  id             String                     @id @default(uuid())
+  tenantId       String
+  profileId      String
+  qualification  String
+  institution    String?
+  subjectCode    String?
+  levelCode      String?
+  issuedOn       DateTime?
+  validFrom      DateTime
+  validUntil     DateTime?
+  status         ProfessionalEvidenceStatus @default(PENDING)
+  documentId     String?
+  sourceUri      String?
+  verifiedById   String?
+  verifiedAt     DateTime?
+  revokedAt      DateTime?
+  revocationReason String?                  @db.Text
+  createdAt      DateTime                   @default(now())
+
+  tenant       Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  profile      TeacherProfile               @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  document     FileAsset?                   @relation("TeacherQualificationDocument", fields: [documentId], references: [id], onDelete: Restrict)
+  verifiedBy   User?                        @relation("VerifiedTeacherQualifications", fields: [verifiedById], references: [id], onDelete: Restrict)
+  assessments  TeacherEligibilityAssessment[]
+
+  @@index([tenantId, profileId, status, validFrom])
+}
+
+model TeachingLicenceEvidence {
+  id             String                     @id @default(uuid())
+  tenantId       String
+  profileId      String
+  authorityCode  String
+  externalReference String
+  subjectCode    String?
+  levelCode      String?
+  issuedOn       DateTime?
+  validFrom      DateTime
+  validUntil     DateTime?
+  status         ProfessionalEvidenceStatus @default(PENDING)
+  documentId     String?
+  sourceUri      String?
+  verifiedById   String?
+  verifiedAt     DateTime?
+  revokedAt      DateTime?
+  revocationReason String?                  @db.Text
+  createdAt      DateTime                   @default(now())
+
+  tenant       Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  profile      TeacherProfile               @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  document     FileAsset?                   @relation("TeachingLicenceDocument", fields: [documentId], references: [id], onDelete: Restrict)
+  verifiedBy   User?                        @relation("VerifiedTeachingLicences", fields: [verifiedById], references: [id], onDelete: Restrict)
+  assessments  TeacherEligibilityAssessment[]
+
+  @@index([tenantId, profileId, status, validFrom])
+}
+
+// Immutable decision snapshot. Live authorization still rechecks employment,
+// policy and evidence, so a past ELIGIBLE decision never grants future access.
+model TeacherEligibilityAssessment {
+  id                String                    @id @default(uuid())
+  tenantId          String
+  staffId           String
+  profileId         String
+  employmentId      String
+  policyVersionId   String
+  qualificationId   String?
+  licenceId         String?
+  outcome           TeacherEligibilityOutcome
+  reasonCode        String
+  evaluatedAt       DateTime                  @default(now())
+  validUntil        DateTime?
+  evaluatedById     String?
+
+  tenant        Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff         Staff                          @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  profile       TeacherProfile                 @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  employment    StaffEmployment                @relation(fields: [employmentId], references: [id], onDelete: Restrict)
+  policy        NepalHrPolicyVersion           @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+  qualification TeacherQualificationEvidence? @relation(fields: [qualificationId], references: [id], onDelete: Restrict)
+  licence       TeachingLicenceEvidence?       @relation(fields: [licenceId], references: [id], onDelete: Restrict)
+  evaluatedBy   User?                          @relation("EvaluatedTeacherEligibility", fields: [evaluatedById], references: [id], onDelete: Restrict)
+  assignments   TeacherAssignment[]
+  delegations   TeacherDelegation[] @relation("DelegationEligibility")
+
+  @@index([tenantId, staffId, evaluatedAt])
+}
+
+
 // ─── Compiled from schema/tenant.prisma ───
 model Tenant {
   id        String   @id @default(uuid())
@@ -8541,6 +8882,14 @@ model Tenant {
 
   users                         User[]
   nepalEducationPolicies        NepalEducationPolicyVersion[]
+  nepalHrPolicies               NepalHrPolicyVersion[]
+  staffEmployments              StaffEmployment[]
+  teacherProfiles               TeacherProfile[]
+  teacherQualificationEvidence  TeacherQualificationEvidence[]
+  teachingLicenceEvidence       TeachingLicenceEvidence[]
+  teacherEligibilityAssessments TeacherEligibilityAssessment[]
+  externalAuthorityHandoffs ExternalAuthorityHandoff[]
+  externalAuthorityHandoffEvents ExternalAuthorityHandoffEvent[]
   roles                         Role[]
   classes                       Class[]
   streams                       Stream[]
@@ -8835,6 +9184,11 @@ model FileAsset {
   generatedDocuments  GeneratedDocument[]
   dataExportJobs      DataExportJob[]
   nepalEducationPolicyEvidence NepalEducationPolicyVersion[]
+  nepalHrPolicyEvidence NepalHrPolicyVersion[]
+  teacherQualificationDocuments TeacherQualificationEvidence[] @relation("TeacherQualificationDocument")
+  teachingLicenceDocuments TeachingLicenceEvidence[] @relation("TeachingLicenceDocument")
+  externalAuthoritySnapshots ExternalAuthorityHandoff[] @relation("ExternalAuthoritySnapshot")
+  externalAuthorityHandoffEvidence ExternalAuthorityHandoffEvent[] @relation("ExternalAuthorityHandoffEvidence")
 
   @@index([tenantId, module, entityId])
   @@index([tenantId, ownerType, ownerId])

@@ -21,6 +21,7 @@ model NepalProvince {
 
   districts NepalDistrict[]
   educationPolicies NepalEducationPolicyVersion[]
+  hrPolicies NepalHrPolicyVersion[]
 
   @@index([nameEn])
   @@index([nameNe])
@@ -40,6 +41,7 @@ model NepalDistrict {
   province    NepalProvince     @relation(fields: [provinceId], references: [id], onDelete: Restrict)
   localLevels NepalLocalLevel[]
   educationPolicies NepalEducationPolicyVersion[]
+  hrPolicies NepalHrPolicyVersion[]
 
   @@unique([provinceId, nameEn])
   @@index([provinceId])
@@ -72,6 +74,8 @@ model NepalLocalLevel {
 
   addresses Address[]
   educationPolicies NepalEducationPolicyVersion[]
+  hrPolicies NepalHrPolicyVersion[]
+  staffEmployments StaffEmployment[]
 
   @@unique([districtId, nameEn])
   @@index([districtId])

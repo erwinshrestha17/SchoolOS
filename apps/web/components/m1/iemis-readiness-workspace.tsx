@@ -29,6 +29,7 @@ import { LoadingState } from '../ui/loading-state';
 import { ProtectedFileButton } from '../ui/protected-file';
 import { StatusBadge } from '../ui/status-badge';
 import { Toast } from '../ui/toast';
+import { IemisHandoffPanel } from './iemis-handoff-panel';
 
 type IssueRow = {
   key: string;
@@ -965,6 +966,11 @@ export function IemisReadinessWorkspace() {
           </div>
         </aside>
       </div>
+
+      <IemisHandoffPanel
+        exportResult={exportResult}
+        canManage={canPrepareReportingCsv}
+      />
 
       <ConfirmDialog
         isOpen={importDialogOpen && pendingImport !== null}

@@ -18,6 +18,7 @@ import {
   TeacherCapability,
   type TeacherRecordStatus,
 } from './teacher-capability';
+import { TeacherProfessionalEligibilityService } from './teacher-professional-eligibility.service';
 
 export interface TeacherScopeGrant {
   source: 'ASSIGNMENT' | 'DELEGATION';
@@ -168,6 +169,7 @@ export class TeacherScopeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly eligibility: TeacherProfessionalEligibilityService,
   ) {}
 
   /** Resolves the caller's active Staff row. Inactive/missing staff -> null. */
@@ -416,9 +418,23 @@ export class TeacherScopeService {
       },
     });
 
-    const matchingAssignment = assignments.find((assignment) =>
-      this.matchesScope(assignment, rule, params),
-    );
+    let matchingAssignment: (typeof assignments)[number] | undefined;
+    for (const assignment of assignments) {
+      if (!this.matchesScope(assignment, rule, params)) continue;
+      if (
+        await this.eligibility.isLive({
+          tenantId: params.tenantId,
+          staffId: params.staffId,
+          assessmentId: assignment.eligibilityAssessmentId,
+          classId: assignment.classId,
+          subjectId: assignment.subjectId,
+          at: now,
+        })
+      ) {
+        matchingAssignment = assignment;
+        break;
+      }
+    }
 
     if (matchingAssignment) {
       return {
@@ -444,11 +460,26 @@ export class TeacherScopeService {
       },
     });
 
-    const matchingDelegation = delegations.find(
-      (delegation) =>
-        delegation.allowedCapabilities.includes(params.capability) &&
-        this.matchesScope(delegation, rule, params),
-    );
+    let matchingDelegation: (typeof delegations)[number] | undefined;
+    for (const delegation of delegations) {
+      if (
+        !delegation.allowedCapabilities.includes(params.capability) ||
+        !this.matchesScope(delegation, rule, params)
+      ) continue;
+      if (
+        await this.eligibility.isLive({
+          tenantId: params.tenantId,
+          staffId: params.staffId,
+          assessmentId: delegation.eligibilityAssessmentId,
+          classId: delegation.classId,
+          subjectId: delegation.subjectId,
+          at: now,
+        })
+      ) {
+        matchingDelegation = delegation;
+        break;
+      }
+    }
 
     if (matchingDelegation) {
       return {
@@ -591,8 +622,44 @@ export class TeacherScopeService {
       }),
     ]);
 
+    const liveAssignments = (
+      await Promise.all(
+        assignments.map(async (assignment) => ({
+          assignment,
+          allowed: await this.eligibility.isLive({
+            tenantId: actor.tenantId,
+            staffId,
+            assessmentId: assignment.eligibilityAssessmentId,
+            classId: assignment.classId,
+            subjectId: assignment.subjectId,
+            at: now,
+          }),
+        })),
+      )
+    )
+      .filter((result) => result.allowed)
+      .map((result) => result.assignment);
+
+    const liveDelegations = (
+      await Promise.all(
+        delegations.map(async (delegation) => ({
+          delegation,
+          allowed: await this.eligibility.isLive({
+            tenantId: actor.tenantId,
+            staffId,
+            assessmentId: delegation.eligibilityAssessmentId,
+            classId: delegation.classId,
+            subjectId: delegation.subjectId,
+            at: now,
+          }),
+        })),
+      )
+    )
+      .filter((result) => result.allowed)
+      .map((result) => result.delegation);
+
     return [
-      ...assignments.map((assignment) => ({
+      ...liveAssignments.map((assignment) => ({
         assignmentId: assignment.id,
         assignmentType: assignment.assignmentType,
         academicYearId: assignment.academicYearId,
@@ -608,7 +675,7 @@ export class TeacherScopeService {
       // A temporary substitution is a real, time-bounded teaching scope, so
       // it belongs in the selector alongside permanent assignments -- clearly
       // marked, and it disappears on its own when `effectiveUntil` passes.
-      ...delegations.map((delegation) => ({
+      ...liveDelegations.map((delegation) => ({
         assignmentId: delegation.id,
         assignmentType: TeacherAssignmentType.SUBSTITUTE_TEACHER,
         academicYearId: delegation.academicYearId,
@@ -766,6 +833,7 @@ export class TeacherScopeService {
             effectiveFrom: true,
             effectiveUntil: true,
             status: true,
+            eligibilityAssessmentId: true,
           },
           orderBy: { id: 'asc' },
         },
@@ -789,6 +857,7 @@ export class TeacherScopeService {
             componentScope: true,
             allowedCapabilities: true,
             timetableSubstitutionId: true,
+            eligibilityAssessmentId: true,
             effectiveFrom: true,
             effectiveUntil: true,
             status: true,
@@ -799,8 +868,30 @@ export class TeacherScopeService {
     });
 
     const isActive = staff?.status === 'ACTIVE' && staff.joiningDate <= now;
+    const liveAssignmentIds = isActive
+      ? new Set(
+          (
+            await Promise.all(
+              staff.teacherAssignmentRecords.map(async (assignment) => ({
+                id: assignment.id,
+                allowed: await this.eligibility.isLive({
+                  tenantId: actor.tenantId,
+                  staffId: staff.id,
+                  assessmentId: assignment.eligibilityAssessmentId,
+                  classId: assignment.classId,
+                  subjectId: assignment.subjectId,
+                  at: now,
+                }),
+              })),
+            )
+          )
+            .filter((result) => result.allowed)
+            .map((result) => result.id),
+        )
+      : new Set<string>();
     const assignments = isActive
       ? staff.teacherAssignmentRecords
+          .filter((assignment) => liveAssignmentIds.has(assignment.id))
           .map((assignment) => ({
             id: assignment.id,
             tenantId: assignment.tenantId,
@@ -815,11 +906,34 @@ export class TeacherScopeService {
             effectiveFrom: assignment.effectiveFrom.toISOString(),
             effectiveUntil: assignment.effectiveUntil?.toISOString() ?? null,
             status: assignment.status,
+            eligibilityAssessmentId: assignment.eligibilityAssessmentId,
           }))
           .sort((left, right) => left.id.localeCompare(right.id))
       : [];
+    const liveDelegationIds = isActive
+      ? new Set(
+          (
+            await Promise.all(
+              staff.delegationsReceived.map(async (delegation) => ({
+                id: delegation.id,
+                allowed: await this.eligibility.isLive({
+                  tenantId: actor.tenantId,
+                  staffId: staff.id,
+                  assessmentId: delegation.eligibilityAssessmentId,
+                  classId: delegation.classId,
+                  subjectId: delegation.subjectId,
+                  at: now,
+                }),
+              })),
+            )
+          )
+            .filter((result) => result.allowed)
+            .map((result) => result.id),
+        )
+      : new Set<string>();
     const delegations = isActive
       ? staff.delegationsReceived
+          .filter((delegation) => liveDelegationIds.has(delegation.id))
           .map((delegation) => ({
             id: delegation.id,
             tenantId: delegation.tenantId,
@@ -836,6 +950,7 @@ export class TeacherScopeService {
             effectiveFrom: delegation.effectiveFrom.toISOString(),
             effectiveUntil: delegation.effectiveUntil.toISOString(),
             status: delegation.status,
+            eligibilityAssessmentId: delegation.eligibilityAssessmentId,
           }))
           .sort((left, right) => left.id.localeCompare(right.id))
       : [];

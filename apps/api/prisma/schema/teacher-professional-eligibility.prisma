@@ -1,0 +1,163 @@
+// P0-N3: employment, teacher identity, professional evidence and eligibility
+// are independent facts. A SchoolOS role or an academic assignment is none of
+// these facts. Evidence and decisions are tenant-scoped and time-bounded.
+enum ProfessionalEvidenceStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  REVOKED
+}
+
+enum StaffEmploymentStatus {
+  PENDING
+  VERIFIED
+  ENDED
+  REJECTED
+}
+
+enum TeacherProfileStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TeacherEligibilityOutcome {
+  ELIGIBLE
+  INELIGIBLE
+}
+
+model StaffEmployment {
+  id                 String                @id @default(uuid())
+  tenantId           String
+  staffId            String
+  employmentType     StaffEmploymentType
+  postCategoryCode   String
+  schoolTypeCode     String
+  localLevelId       Int?
+  effectiveFrom      DateTime
+  effectiveTo        DateTime?
+  status             StaffEmploymentStatus @default(PENDING)
+  verifiedById       String?
+  verifiedAt         DateTime?
+  endedAt            DateTime?
+  endReason          String?               @db.Text
+  contractId         String?
+  policyVersionId    String?
+  createdAt          DateTime              @default(now())
+
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff         Staff                   @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  verifiedBy   User?                   @relation("VerifiedStaffEmployments", fields: [verifiedById], references: [id], onDelete: Restrict)
+  contract     StaffContract?          @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  policy       NepalHrPolicyVersion?   @relation("EmploymentPolicy", fields: [policyVersionId], references: [id], onDelete: Restrict)
+  localLevel   NepalLocalLevel?       @relation(fields: [localLevelId], references: [id], onDelete: Restrict)
+  assessments  TeacherEligibilityAssessment[]
+
+  @@index([tenantId, staffId, status, effectiveFrom])
+}
+
+model TeacherProfile {
+  id             String               @id @default(uuid())
+  tenantId       String
+  staffId        String               @unique
+  status         TeacherProfileStatus @default(ACTIVE)
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  createdAt      DateTime             @default(now())
+
+  tenant         Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff          Staff                          @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  qualifications TeacherQualificationEvidence[]
+  licences       TeachingLicenceEvidence[]
+  assessments    TeacherEligibilityAssessment[]
+
+  @@index([tenantId, status, effectiveFrom])
+}
+
+model TeacherQualificationEvidence {
+  id             String                     @id @default(uuid())
+  tenantId       String
+  profileId      String
+  qualification  String
+  institution    String?
+  subjectCode    String?
+  levelCode      String?
+  issuedOn       DateTime?
+  validFrom      DateTime
+  validUntil     DateTime?
+  status         ProfessionalEvidenceStatus @default(PENDING)
+  documentId     String?
+  sourceUri      String?
+  verifiedById   String?
+  verifiedAt     DateTime?
+  revokedAt      DateTime?
+  revocationReason String?                  @db.Text
+  createdAt      DateTime                   @default(now())
+
+  tenant       Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  profile      TeacherProfile               @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  document     FileAsset?                   @relation("TeacherQualificationDocument", fields: [documentId], references: [id], onDelete: Restrict)
+  verifiedBy   User?                        @relation("VerifiedTeacherQualifications", fields: [verifiedById], references: [id], onDelete: Restrict)
+  assessments  TeacherEligibilityAssessment[]
+
+  @@index([tenantId, profileId, status, validFrom])
+}
+
+model TeachingLicenceEvidence {
+  id             String                     @id @default(uuid())
+  tenantId       String
+  profileId      String
+  authorityCode  String
+  externalReference String
+  subjectCode    String?
+  levelCode      String?
+  issuedOn       DateTime?
+  validFrom      DateTime
+  validUntil     DateTime?
+  status         ProfessionalEvidenceStatus @default(PENDING)
+  documentId     String?
+  sourceUri      String?
+  verifiedById   String?
+  verifiedAt     DateTime?
+  revokedAt      DateTime?
+  revocationReason String?                  @db.Text
+  createdAt      DateTime                   @default(now())
+
+  tenant       Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  profile      TeacherProfile               @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  document     FileAsset?                   @relation("TeachingLicenceDocument", fields: [documentId], references: [id], onDelete: Restrict)
+  verifiedBy   User?                        @relation("VerifiedTeachingLicences", fields: [verifiedById], references: [id], onDelete: Restrict)
+  assessments  TeacherEligibilityAssessment[]
+
+  @@index([tenantId, profileId, status, validFrom])
+}
+
+// Immutable decision snapshot. Live authorization still rechecks employment,
+// policy and evidence, so a past ELIGIBLE decision never grants future access.
+model TeacherEligibilityAssessment {
+  id                String                    @id @default(uuid())
+  tenantId          String
+  staffId           String
+  profileId         String
+  employmentId      String
+  policyVersionId   String
+  qualificationId   String?
+  licenceId         String?
+  outcome           TeacherEligibilityOutcome
+  reasonCode        String
+  evaluatedAt       DateTime                  @default(now())
+  validUntil        DateTime?
+  evaluatedById     String?
+
+  tenant        Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff         Staff                          @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  profile       TeacherProfile                 @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  employment    StaffEmployment                @relation(fields: [employmentId], references: [id], onDelete: Restrict)
+  policy        NepalHrPolicyVersion           @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+  qualification TeacherQualificationEvidence? @relation(fields: [qualificationId], references: [id], onDelete: Restrict)
+  licence       TeachingLicenceEvidence?       @relation(fields: [licenceId], references: [id], onDelete: Restrict)
+  evaluatedBy   User?                          @relation("EvaluatedTeacherEligibility", fields: [evaluatedById], references: [id], onDelete: Restrict)
+  assignments   TeacherAssignment[]
+  delegations   TeacherDelegation[] @relation("DelegationEligibility")
+
+  @@index([tenantId, staffId, evaluatedAt])
+}

@@ -19,6 +19,7 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TeacherProfessionalEligibilityService } from '../teacher-scope/teacher-professional-eligibility.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
@@ -49,6 +50,7 @@ export class TimetableSubstitutionService {
     private readonly auditService: AuditService,
     private readonly lifecycleService: TimetableLifecycleService,
     private readonly attendanceService: AttendanceService,
+    private readonly teacherEligibility: TeacherProfessionalEligibilityService,
   ) {}
 
   @OnEvent('staff.leave.approved', { async: true })
@@ -751,12 +753,25 @@ export class TimetableSubstitutionService {
     const effectiveUntil = new Date(effectiveFrom);
     effectiveUntil.setHours(23, 59, 59, 999);
 
+    const eligibilityAssessmentId =
+      await this.teacherEligibility.preflightAssignment(
+        {
+          tenantId: input.tenantId,
+          staffId: input.recipientStaffId,
+          classId: input.classId,
+          subjectId: input.subjectId,
+          actorId: input.actorUserId,
+        },
+        tx,
+      );
+
     await tx.teacherDelegation.create({
       data: {
         tenantId: input.tenantId,
         academicYearId: input.academicYearId,
         grantorStaffId: input.grantorStaffId,
         recipientStaffId: input.recipientStaffId,
+        eligibilityAssessmentId,
         classId: input.classId,
         sectionId: input.sectionId,
         subjectId: input.subjectId,

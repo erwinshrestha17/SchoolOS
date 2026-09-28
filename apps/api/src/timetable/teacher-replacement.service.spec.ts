@@ -4,6 +4,7 @@ import { TeacherAssignmentStatus, TeacherAssignmentType } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeacherReplacementService } from './teacher-replacement.service';
+import { TeacherProfessionalEligibilityService } from '../teacher-scope/teacher-professional-eligibility.service';
 
 interface ReplacementTransactionMock {
   teacherAssignment: {
@@ -43,6 +44,10 @@ describe('TeacherReplacementService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TeacherReplacementService,
+        {
+          provide: TeacherProfessionalEligibilityService,
+          useValue: { preflightAssignment: jest.fn().mockResolvedValue('assessment-1') },
+        },
         {
           provide: PrismaService,
           useValue: {

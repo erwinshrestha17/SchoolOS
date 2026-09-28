@@ -8,6 +8,7 @@ import { TeacherAssignmentStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { TeacherProfessionalEligibilityService } from '../teacher-scope/teacher-professional-eligibility.service';
 import {
   CancelTeacherReplacementDto,
   CreateReplacementHandoverNoteDto,
@@ -28,6 +29,7 @@ export class TeacherReplacementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly teacherEligibility: TeacherProfessionalEligibilityService,
   ) {}
 
   async list(actor: AuthContext, query: TeacherReplacementQueryDto) {
@@ -156,6 +158,15 @@ export class TeacherReplacementService {
       );
     }
 
+    const eligibilityAssessmentId =
+      await this.teacherEligibility.preflightAssignment({
+        tenantId: actor.tenantId,
+        staffId: replacement.replacementStaffId,
+        classId: replacement.classId,
+        subjectId: replacement.subjectId,
+        actorId: actor.userId,
+      });
+
     const activated = await this.prisma.$transaction(async (tx) => {
       const source = await tx.teacherAssignment.findFirst({
         where: {
@@ -195,6 +206,7 @@ export class TeacherReplacementService {
           effectiveFrom: cutover,
           status: TeacherAssignmentStatus.ACTIVE,
           createdById: actor.userId,
+          eligibilityAssessmentId,
         },
       });
 

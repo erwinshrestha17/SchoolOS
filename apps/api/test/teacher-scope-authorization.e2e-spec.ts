@@ -129,6 +129,7 @@ function makeService(
   const service = new TeacherScopeService(
     prisma as unknown as PrismaService,
     auditService as unknown as AuditService,
+    { isLive: jest.fn().mockResolvedValue(true) } as never,
   );
   return { service, prisma, auditService };
 }
@@ -516,6 +517,7 @@ describe('TeacherScopeService authorization (Teacher Persona acceptance criteria
     const service = new TeacherScopeService(
       prisma as unknown as PrismaService,
       { record: jest.fn() } as unknown as AuditService,
+      { isLive: jest.fn().mockResolvedValue(true) } as never,
     );
     const staffId = await service.resolveActiveStaffId({
       tenantId: TENANT_A,

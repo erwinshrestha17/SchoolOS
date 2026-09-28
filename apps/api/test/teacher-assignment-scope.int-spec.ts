@@ -3,6 +3,7 @@ import { TeacherAssignmentType } from '@prisma/client';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService, TENANT_ID_KEY } from '../src/prisma/prisma.service';
 import { TeacherScopeService } from '../src/teacher-scope/teacher-scope.service';
+import { TeacherProfessionalEligibilityService } from '../src/teacher-scope/teacher-professional-eligibility.service';
 import { TeacherCapability } from '../src/teacher-scope/teacher-capability';
 import type { AuditService } from '../src/audit/audit.service';
 import type { AuthContext } from '../src/auth/auth.types';
@@ -74,7 +75,11 @@ describe('P0-01 teacher assignment scoping (real database)', () => {
 
   beforeAll(async () => {
     prisma = new PrismaService(cls as unknown as ClsService);
-    service = new TeacherScopeService(prisma, audit);
+    service = new TeacherScopeService(
+      prisma,
+      audit,
+      new TeacherProfessionalEligibilityService(prisma),
+    );
 
     cls.setTenant(undefined);
     await prisma.runWithoutTenantScope(

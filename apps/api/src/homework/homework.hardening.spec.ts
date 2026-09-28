@@ -117,6 +117,7 @@ describe('Homework Hardening', () => {
             new TeacherScopeService(
               scopeDeps.prisma as unknown as PrismaService,
               scopeDeps.audit as unknown as AuditService,
+              { isLive: jest.fn().mockResolvedValue(true) } as never,
             ),
         },
       ],

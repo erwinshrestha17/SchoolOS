@@ -145,6 +145,7 @@ function buildService(options: BuildServiceOptions = {}) {
     prisma as never,
     audit as never,
     teacherScope as never,
+    { preflightAssignment: jest.fn().mockResolvedValue('assessment-1') } as never,
   );
 
   return { service, prisma, audit, tx, teacherScope };
@@ -558,6 +559,7 @@ describe('DEF-04 class-teacher assignment grants homeroom attendance write', () 
     const teacherScopeService = new TeacherScopeService(
       deps.prisma as never,
       deps.audit as never,
+      { isLive: jest.fn().mockResolvedValue(true) } as never,
     );
 
     const grant = await teacherScopeService.canActorAccess(

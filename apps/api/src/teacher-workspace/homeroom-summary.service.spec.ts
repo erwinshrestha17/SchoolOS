@@ -46,6 +46,7 @@ function buildService(
   const teacherScope = new TeacherScopeService(
     scopeDeps.prisma as never,
     scopeDeps.audit as never,
+    { isLive: jest.fn().mockResolvedValue(true) } as never,
   );
 
   const markGroupBy = jest.fn().mockResolvedValue([

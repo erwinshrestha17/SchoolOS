@@ -54,6 +54,7 @@ describe('CasRecordsService', () => {
             return new TeacherScopeService(
               deps.prisma as never,
               deps.audit as never,
+              { isLive: jest.fn().mockResolvedValue(true) } as never,
             );
           },
         },

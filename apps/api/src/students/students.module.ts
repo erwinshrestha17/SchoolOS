@@ -19,6 +19,8 @@ import { StudentsService } from './students.service';
 import { StudentsController } from './students.controller';
 import { StudentQrService } from './student-qr.service';
 import { StudentQrController } from './student-qr.controller';
+import { IemisHandoffController } from './iemis-handoff.controller';
+import { IemisHandoffService } from './iemis-handoff.service';
 import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
 
 @Module({
@@ -41,6 +43,7 @@ import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
     StudentDocumentRetentionCron,
     StudentDuplicateReviewService,
     StudentQrService,
+    IemisHandoffService,
   ],
   controllers: [
     StudentSearchController,
@@ -48,6 +51,7 @@ import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
     StudentPhotoController,
     StudentDocumentAccessController,
     StudentQrController,
+    IemisHandoffController,
   ],
   exports: [
     StudentsService,

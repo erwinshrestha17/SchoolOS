@@ -1,0 +1,70 @@
+// P0-N4 records handoff evidence. SchoolOS never becomes NEB, CEHRD/iEMIS or
+// TSC's source of truth. A prepared file is not a submission or acknowledgement.
+enum ExternalAuthorityCode {
+  NEB
+  CEHRD_IEMIS
+  TSC
+  OTHER
+}
+
+enum ExternalAuthorityHandoffStatus {
+  READY
+  EXPORTED
+  SUBMITTED
+  ACKNOWLEDGED
+  REJECTED
+  CORRECTION_REQUIRED
+}
+
+model ExternalAuthorityHandoff {
+  id                     String                         @id @default(uuid())
+  tenantId               String
+  authority              ExternalAuthorityCode
+  purpose                String
+  externalSchoolReference String?
+  reportExportId         String?
+  supersedesId           String?                        @unique
+  snapshotFileId         String
+  snapshotChecksumSha256 String
+  schemaAuthority        String
+  officialFormatVerified Boolean                        @default(false)
+  directSyncSupported    Boolean                        @default(false)
+  status                 ExternalAuthorityHandoffStatus @default(READY)
+  createdById            String
+  createdAt              DateTime                       @default(now())
+  exportedAt             DateTime?
+  submittedAt            DateTime?
+  acknowledgedAt         DateTime?
+  externalReceiptReference String?
+
+  tenant       Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  reportExport ReportExport?                  @relation(fields: [reportExportId], references: [id], onDelete: Restrict)
+  supersedes  ExternalAuthorityHandoff?       @relation("ExternalAuthorityHandoffLineage", fields: [supersedesId], references: [id], onDelete: Restrict)
+  supersededBy ExternalAuthorityHandoff?      @relation("ExternalAuthorityHandoffLineage")
+  snapshotFile FileAsset                      @relation("ExternalAuthoritySnapshot", fields: [snapshotFileId], references: [id], onDelete: Restrict)
+  createdBy    User                           @relation("CreatedExternalAuthorityHandoffs", fields: [createdById], references: [id], onDelete: Restrict)
+  events       ExternalAuthorityHandoffEvent[]
+
+  @@index([tenantId, authority, status, createdAt])
+  @@unique([tenantId, reportExportId])
+}
+
+// Append-only event log for manual authority handoffs and external responses.
+model ExternalAuthorityHandoffEvent {
+  id                      String                         @id @default(uuid())
+  tenantId                String
+  handoffId               String
+  status                  ExternalAuthorityHandoffStatus
+  actorId                 String
+  occurredAt              DateTime                       @default(now())
+  externalReceiptReference String?
+  evidenceFileId          String?
+  note                    String?                        @db.Text
+
+  tenant       Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  handoff      ExternalAuthorityHandoff  @relation(fields: [handoffId], references: [id], onDelete: Restrict)
+  actor        User                      @relation("ExternalAuthorityHandoffActors", fields: [actorId], references: [id], onDelete: Restrict)
+  evidenceFile FileAsset?                @relation("ExternalAuthorityHandoffEvidence", fields: [evidenceFileId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, handoffId, occurredAt])
+}

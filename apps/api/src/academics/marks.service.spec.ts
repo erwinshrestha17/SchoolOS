@@ -517,6 +517,7 @@ describe('MarksService', () => {
       const teacherScopeService = new TeacherScopeService(
         deps.prisma as never,
         deps.audit as never,
+        { isLive: jest.fn().mockResolvedValue(true) } as never,
       );
       return new MarksService(
         prisma as unknown as PrismaService,

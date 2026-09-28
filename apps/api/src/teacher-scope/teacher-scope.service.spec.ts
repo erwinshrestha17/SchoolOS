@@ -223,6 +223,7 @@ function buildService(
     {
       record: auditRecord,
     } as never,
+    { isLive: jest.fn().mockResolvedValue(true) } as never,
   );
 
   return { service, auditRecord, prisma };

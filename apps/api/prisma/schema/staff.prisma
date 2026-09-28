@@ -50,6 +50,9 @@ model Staff {
   payrollExceptions          PayrollException[]
   payslips                   Payslip[]
   qualificationsRecords      StaffQualification[]
+  employments               StaffEmployment[]
+  teacherProfile            TeacherProfile?
+  teacherEligibilityAssessments TeacherEligibilityAssessment[]
   experienceRecords          StaffExperienceRecord[]
   conversationParticipants   ConversationParticipant[]
   messages                   Message[]
@@ -179,6 +182,7 @@ model StaffContract {
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   staff        Staff         @relation(fields: [staffId], references: [id], onDelete: Cascade)
   payrollLines PayrollLine[]
+  employments StaffEmployment[]
 
   @@unique([tenantId, contractNumber])
   @@index([tenantId, staffId, status])

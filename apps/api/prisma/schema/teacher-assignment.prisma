@@ -32,6 +32,7 @@ model TeacherAssignment {
   createdById String?
   revokedById String?
   revokedAt   DateTime?
+  eligibilityAssessmentId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -43,6 +44,7 @@ model TeacherAssignment {
   subject      Subject?     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   createdBy    User?        @relation("CreatedTeacherAssignments", fields: [createdById], references: [id], onDelete: SetNull)
   revokedBy    User?        @relation("RevokedTeacherAssignments", fields: [revokedById], references: [id], onDelete: SetNull)
+  eligibilityAssessment TeacherEligibilityAssessment? @relation(fields: [eligibilityAssessmentId], references: [id], onDelete: Restrict)
 
   delegations              TeacherDelegation[]  @relation("DelegationSourceAssignment")
   replacementsAsSource     TeacherReplacement[] @relation("ReplacementSourceAssignment")
@@ -68,6 +70,7 @@ model TeacherDelegation {
 
   grantorStaffId    String
   recipientStaffId  String
+  eligibilityAssessmentId String?
   sourceAssignmentId String?
 
   classId        String
@@ -97,6 +100,7 @@ model TeacherDelegation {
   academicYear          AcademicYear           @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
   grantor               Staff                  @relation("DelegationGrantor", fields: [grantorStaffId], references: [id], onDelete: Restrict)
   recipient             Staff                  @relation("DelegationRecipient", fields: [recipientStaffId], references: [id], onDelete: Restrict)
+  eligibilityAssessment TeacherEligibilityAssessment? @relation("DelegationEligibility", fields: [eligibilityAssessmentId], references: [id], onDelete: Restrict)
   sourceAssignment      TeacherAssignment?     @relation("DelegationSourceAssignment", fields: [sourceAssignmentId], references: [id], onDelete: SetNull)
   timetableSubstitution TimetableSubstitution? @relation(fields: [timetableSubstitutionId], references: [id], onDelete: SetNull)
   class                 Class                  @relation(fields: [classId], references: [id], onDelete: Restrict)

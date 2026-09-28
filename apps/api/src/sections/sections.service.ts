@@ -18,6 +18,7 @@ import {
   TeacherScopeService,
 } from '../teacher-scope/teacher-scope.service';
 import { AssignClassTeacherDto } from './dto/assign-class-teacher.dto';
+import { TeacherProfessionalEligibilityService } from '../teacher-scope/teacher-professional-eligibility.service';
 import { CreateSectionDto } from './dto/create-section.dto';
 
 const SAFE_CLASS_TEACHER_STAFF_SELECT = {
@@ -33,6 +34,7 @@ export class SectionsService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly teacherScopeService: TeacherScopeService,
+    private readonly teacherEligibility: TeacherProfessionalEligibilityService,
   ) {}
 
   async listSections(actor: AuthContext) {
@@ -242,6 +244,14 @@ export class SectionsService {
       dto.academicYearId,
     );
 
+    const eligibilityAssessmentId =
+      await this.teacherEligibility.preflightAssignment({
+        tenantId: actor.tenantId,
+        staffId: dto.staffId,
+        classId: section.classId,
+        actorId: actor.userId,
+      });
+
     const priorActive = await this.prisma.teacherAssignment.findFirst({
       where: {
         tenantId: actor.tenantId,
@@ -292,6 +302,7 @@ export class SectionsService {
               effectiveUntil: academicYear.endsOn,
               revokedById: null,
               revokedAt: null,
+              eligibilityAssessmentId,
             },
             include: {
               staff: { select: SAFE_CLASS_TEACHER_STAFF_SELECT },
@@ -314,6 +325,7 @@ export class SectionsService {
               effectiveFrom: academicYear.startsOn,
               effectiveUntil: academicYear.endsOn,
               createdById: actor.userId,
+              eligibilityAssessmentId,
             },
             include: {
               staff: { select: SAFE_CLASS_TEACHER_STAFF_SELECT },

@@ -9,6 +9,7 @@ import { CommunicationsService } from '../communications/communications.service'
 import { PrismaService } from '../prisma/prisma.service';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { TimetableSubstitutionService } from './timetable-substitution.service';
+import { TeacherProfessionalEligibilityService } from '../teacher-scope/teacher-professional-eligibility.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { CreateSubstitutionDto } from './dto/timetable-setup.dto';
 
@@ -50,6 +51,10 @@ describe('TimetableSubstitutionService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TimetableSubstitutionService,
+        {
+          provide: TeacherProfessionalEligibilityService,
+          useValue: { preflightAssignment: jest.fn().mockResolvedValue('assessment-1') },
+        },
         {
           provide: PrismaService,
           useValue: {

@@ -11,6 +11,14 @@ model Tenant {
 
   users                         User[]
   nepalEducationPolicies        NepalEducationPolicyVersion[]
+  nepalHrPolicies               NepalHrPolicyVersion[]
+  staffEmployments              StaffEmployment[]
+  teacherProfiles               TeacherProfile[]
+  teacherQualificationEvidence  TeacherQualificationEvidence[]
+  teachingLicenceEvidence       TeachingLicenceEvidence[]
+  teacherEligibilityAssessments TeacherEligibilityAssessment[]
+  externalAuthorityHandoffs ExternalAuthorityHandoff[]
+  externalAuthorityHandoffEvents ExternalAuthorityHandoffEvent[]
   roles                         Role[]
   classes                       Class[]
   streams                       Stream[]
@@ -305,6 +313,11 @@ model FileAsset {
   generatedDocuments  GeneratedDocument[]
   dataExportJobs      DataExportJob[]
   nepalEducationPolicyEvidence NepalEducationPolicyVersion[]
+  nepalHrPolicyEvidence NepalHrPolicyVersion[]
+  teacherQualificationDocuments TeacherQualificationEvidence[] @relation("TeacherQualificationDocument")
+  teachingLicenceDocuments TeachingLicenceEvidence[] @relation("TeachingLicenceDocument")
+  externalAuthoritySnapshots ExternalAuthorityHandoff[] @relation("ExternalAuthoritySnapshot")
+  externalAuthorityHandoffEvidence ExternalAuthorityHandoffEvent[] @relation("ExternalAuthorityHandoffEvidence")
 
   @@index([tenantId, module, entityId])
   @@index([tenantId, ownerType, ownerId])

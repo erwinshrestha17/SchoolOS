@@ -1,0 +1,78 @@
+// Reviewed Nepal HR/legal inputs are evidence, not automatic statutory
+// certification. Consumers must select an approved version for the event date.
+enum NepalHrPolicyKind {
+  EMPLOYMENT_POST_CLASSIFICATION
+  CONTRACT_SERVICE_CONDITIONS
+  WORKING_TIME_LEAVE
+  COMPENSATION_MINIMUM
+  STATUTORY_SCHEME_TAX
+  TEACHER_PROFESSIONAL_ELIGIBILITY
+}
+
+enum NepalHrPolicyReviewStatus {
+  DRAFT
+  IN_REVIEW
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+model NepalHrPolicyVersion {
+  id                     String                     @id @default(uuid())
+  policyKey              String
+  version                Int
+  kind                   NepalHrPolicyKind
+  scope                  NepalEducationPolicyScope
+  tenantId               String?
+  provinceId             Int?
+  districtId             Int?
+  localLevelId           Int?
+  schoolTypeCode         String?
+  employmentType         StaffEmploymentType?
+  postCategoryCode       String?
+  classLevelMin          Int?
+  classLevelMax          Int?
+  subjectCode            String?
+  isMandatoryBaseline    Boolean                    @default(false)
+  // Typed fields are the authoritative inputs used by the P0 teacher gate.
+  // NULL means the reviewed policy has not resolved that requirement.
+  requiresQualification  Boolean?
+  requiresLicence        Boolean?
+  minimumMonthlyNpr      Decimal?                   @db.Decimal(12, 2)
+  payloadSchemaVersion   Int                        @default(1)
+  payload                Json
+  reviewStatus           NepalHrPolicyReviewStatus  @default(DRAFT)
+  reviewedById           String?
+  reviewedAt             DateTime?
+  approvedById           String?
+  approvedAt             DateTime?
+  reviewNote             String?                    @db.Text
+  effectiveFrom          DateTime
+  effectiveTo            DateTime?
+  supersedesId           String?                    @unique
+  sourceTitle            String
+  sourcePublisher        String?
+  sourceUri              String?
+  sourcePublishedAt      DateTime?
+  sourceChecksumSha256   String?
+  evidenceFileAssetId    String?
+  createdAt              DateTime                   @default(now())
+
+  tenant          Tenant?                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  province        NepalProvince?        @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+  district        NepalDistrict?        @relation(fields: [districtId], references: [id], onDelete: Restrict)
+  localLevel      NepalLocalLevel?      @relation(fields: [localLevelId], references: [id], onDelete: Restrict)
+  reviewedBy      User?                 @relation("ReviewedNepalHrPolicies", fields: [reviewedById], references: [id], onDelete: Restrict)
+  approvedBy      User?                 @relation("ApprovedNepalHrPolicies", fields: [approvedById], references: [id], onDelete: Restrict)
+  evidenceFile    FileAsset?            @relation(fields: [evidenceFileAssetId], references: [id], onDelete: Restrict)
+  supersedes      NepalHrPolicyVersion? @relation("NepalHrPolicyLineage", fields: [supersedesId], references: [id], onDelete: Restrict)
+  supersededBy    NepalHrPolicyVersion? @relation("NepalHrPolicyLineage")
+  employments     StaffEmployment[]      @relation("EmploymentPolicy")
+  teacherAssessments TeacherEligibilityAssessment[]
+
+  @@unique([policyKey, version])
+  @@index([kind, scope, reviewStatus, effectiveFrom])
+  @@index([tenantId, kind, reviewStatus, effectiveFrom])
+  @@index([localLevelId, kind, reviewStatus, effectiveFrom])
+  @@index([policyKey, reviewStatus, effectiveFrom])
+}

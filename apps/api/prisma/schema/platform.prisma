@@ -318,6 +318,7 @@ model ReportExport {
   completedAt  DateTime?
 
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  externalAuthorityHandoffs ExternalAuthorityHandoff[]
 
   @@index([tenantId, createdAt])
   @@index([scope, reportKey])
