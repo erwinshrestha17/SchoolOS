@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/errors/app_exception.dart';
@@ -13,20 +12,19 @@ import '../domain/parent_action_centre_models.dart';
 import '../domain/parent_service_request_models.dart';
 import '../domain/parent_weekly_progress_models.dart';
 import '../../learning_support/domain/learning_support_models.dart';
+import 'parent_protected_download_store.dart';
 
 class ParentRepository {
-  ParentRepository(this._client, {this.cache});
+  ParentRepository(this._client, {this.cache, this.protectedDownloads});
 
   final ApiClient _client;
   final PrivateReadCache? cache;
+  final ParentProtectedDownloadStore? protectedDownloads;
 
   /// Downloads currently being written, keyed by their destination file.
   ///
-  /// Every protected download writes to a path derived from the record id, so
-  /// two overlapping downloads of the same record would interleave their bytes
-  /// into one corrupt file. Screens guard their own buttons, but the invariant
-  /// belongs here: this is the layer that owns the path. Callers that ask for
-  /// a download already in flight join it instead of starting a second write.
+  /// Callers asking for the same child/record download join its in-flight
+  /// request. The file store also serializes writes with child-link pruning.
   final Map<String, Future<Object>> _downloadsInFlight = {};
 
   Future<T> _singleFlightDownload<T extends Object>(
@@ -50,6 +48,17 @@ class ParentRepository {
     final data = await _getMap(
       '/mobile/me/students',
       cacheKey: 'parent_children',
+      onFresh: (fresh) async {
+        // The parent provider can be built before authentication settles.
+        // Only a signed-in guardian has a protected-file namespace to prune.
+        if (protectedDownloads?.hasValidScope != true) return;
+        final items = fresh['items'] as List<dynamic>? ?? const [];
+        await protectedDownloads?.pruneUnlinked(
+          items.whereType<Map<String, dynamic>>().map(
+            (item) => GuardianChild.fromJson(item).id,
+          ),
+        );
+      },
     );
     final items = data['items'] as List<dynamic>? ?? const [];
 
@@ -606,12 +615,13 @@ class ParentRepository {
       throw const NotFoundAppException('This request evidence is unavailable.');
     }
     final fileName = _safeFileName(attachment.fileName);
-    final file = await _protectedFile(
-      'service-request-evidence',
-      attachment.id,
-      fileName,
+    final file = await _saveProtectedDownload(
+      childId: request.studentId,
+      bucket: 'service-request-evidence',
+      recordId: attachment.id,
+      fileName: fileName,
+      bytes: bytes,
     );
-    await file.writeAsBytes(bytes, flush: true);
     return ParentProtectedFileDownload(fileName: fileName, filePath: file.path);
   }
 
@@ -653,15 +663,14 @@ class ParentRepository {
       throw StateError('Receipt PDF was empty.');
     }
 
-    final temporaryDir = await getTemporaryDirectory();
-    final receiptDir = Directory('${temporaryDir.path}/schoolos/receipts');
-    if (!receiptDir.existsSync()) {
-      await receiptDir.create(recursive: true);
-    }
-
     final fileName = '${_safeFileName(receipt.receiptNumber)}.pdf';
-    final file = File('${receiptDir.path}/$fileName');
-    await file.writeAsBytes(bytes, flush: true);
+    final file = await _saveProtectedDownload(
+      childId: childId,
+      bucket: 'receipts',
+      recordId: receipt.receiptNumber,
+      fileName: fileName,
+      bytes: bytes,
+    );
 
     return ParentReceiptPdfDownload(
       fileName: fileName,
@@ -696,17 +705,14 @@ class ParentRepository {
       throw StateError('Report card PDF was empty.');
     }
 
-    final temporaryDir = await getTemporaryDirectory();
-    final reportCardDir = Directory(
-      '${temporaryDir.path}/schoolos/report-cards',
-    );
-    if (!reportCardDir.existsSync()) {
-      await reportCardDir.create(recursive: true);
-    }
-
     final fileName = '${_safeFileName(reportCard.id)}.pdf';
-    final file = File('${reportCardDir.path}/$fileName');
-    await file.writeAsBytes(bytes, flush: true);
+    final file = await _saveProtectedDownload(
+      childId: childId,
+      bucket: 'report-cards',
+      recordId: reportCard.id,
+      fileName: fileName,
+      bytes: bytes,
+    );
 
     return ParentProtectedFileDownload(fileName: fileName, filePath: file.path);
   }
@@ -758,8 +764,13 @@ class ParentRepository {
     // Scoped by record id: the display name alone is not unique, so two
     // different documents both called "birth.pdf" would otherwise share one
     // path and could be written concurrently.
-    final file = await _protectedFile('documents', document.id, fileName);
-    await file.writeAsBytes(bytes, flush: true);
+    final file = await _saveProtectedDownload(
+      childId: childId,
+      bucket: 'documents',
+      recordId: document.id,
+      fileName: fileName,
+      bytes: bytes,
+    );
 
     return ParentProtectedFileDownload(fileName: fileName, filePath: file.path);
   }
@@ -809,12 +820,13 @@ class ParentRepository {
     }
 
     final fileName = _safeFileName(access.fileName);
-    final file = await _protectedFile(
-      'homework-attachments',
-      attachment.id,
-      fileName,
+    final file = await _saveProtectedDownload(
+      childId: childId,
+      bucket: 'homework-attachments',
+      recordId: attachment.id,
+      fileName: fileName,
+      bytes: bytes,
     );
-    await file.writeAsBytes(bytes, flush: true);
 
     return ParentProtectedFileDownload(fileName: fileName, filePath: file.path);
   }
@@ -823,6 +835,7 @@ class ParentRepository {
     String path, {
     String? cacheKey,
     Map<String, dynamic>? queryParameters,
+    Future<void> Function(Map<String, dynamic>)? onFresh,
   }) async {
     try {
       final response = await _client.get(
@@ -832,6 +845,7 @@ class ParentRepository {
       final data = Map<String, dynamic>.from(
         response.data as Map<String, dynamic>,
       );
+      await onFresh?.call(data);
       data['_mobileLastUpdated'] = DateTime.now().toIso8601String();
       if (cacheKey != null) {
         await cache?.write(cacheKey, data);
@@ -845,32 +859,36 @@ class ParentRepository {
       return cached.withMetadata();
     }
   }
-}
 
-/// Resolves the on-disk location for a protected download.
-///
-/// The record id is part of the path, not just the display name, so two
-/// records that happen to share a filename cannot collide - and cannot be
-/// written concurrently, which [_singleFlightDownload] only prevents for
-/// repeat requests of the *same* record.
-Future<File> _protectedFile(
-  String bucket,
-  String recordId,
-  String fileName,
-) async {
-  final temporaryDir = await getTemporaryDirectory();
-  final directory = Directory(
-    '${temporaryDir.path}/schoolos/$bucket/${_safeFileName(recordId)}',
-  );
-  if (!directory.existsSync()) {
-    await directory.create(recursive: true);
+  Future<File> _saveProtectedDownload({
+    required String childId,
+    required String bucket,
+    required String recordId,
+    required String fileName,
+    required List<int> bytes,
+  }) async {
+    final store = protectedDownloads;
+    if (store == null) {
+      throw const PermissionException(
+        'Parent file access requires a signed-in guardian.',
+        'ACCESS_CHANGED',
+      );
+    }
+    return store.save(
+      childId: childId,
+      bucket: bucket,
+      recordId: recordId,
+      fileName: fileName,
+      bytes: bytes,
+    );
   }
-  return File('${directory.path}/$fileName');
 }
 
 String _safeFileName(String value) {
   final sanitized = value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '-');
-  return sanitized.isEmpty ? 'receipt' : sanitized;
+  return sanitized.isEmpty || sanitized == '.' || sanitized == '..'
+      ? 'file'
+      : sanitized;
 }
 
 String _qrLabel(String? studentSystemId, ParentQrStatus? qrStatus) {
