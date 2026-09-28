@@ -10,6 +10,7 @@ model Tenant {
   createdAt DateTime @default(now())
 
   users                         User[]
+  nepalEducationPolicies        NepalEducationPolicyVersion[]
   roles                         Role[]
   classes                       Class[]
   streams                       Stream[]
@@ -303,6 +304,7 @@ model FileAsset {
   schoolServiceRequestAttachments SchoolServiceRequestAttachment[]
   generatedDocuments  GeneratedDocument[]
   dataExportJobs      DataExportJob[]
+  nepalEducationPolicyEvidence NepalEducationPolicyVersion[]
 
   @@index([tenantId, module, entityId])
   @@index([tenantId, ownerType, ownerId])

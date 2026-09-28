@@ -20,6 +20,7 @@ model NepalProvince {
   updatedAt      DateTime @updatedAt
 
   districts NepalDistrict[]
+  educationPolicies NepalEducationPolicyVersion[]
 
   @@index([nameEn])
   @@index([nameNe])
@@ -38,6 +39,7 @@ model NepalDistrict {
 
   province    NepalProvince     @relation(fields: [provinceId], references: [id], onDelete: Restrict)
   localLevels NepalLocalLevel[]
+  educationPolicies NepalEducationPolicyVersion[]
 
   @@unique([provinceId, nameEn])
   @@index([provinceId])
@@ -69,6 +71,7 @@ model NepalLocalLevel {
   type     NepalLocalLevelType @relation(fields: [typeId], references: [id], onDelete: Restrict)
 
   addresses Address[]
+  educationPolicies NepalEducationPolicyVersion[]
 
   @@unique([districtId, nameEn])
   @@index([districtId])
