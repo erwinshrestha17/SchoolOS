@@ -83,6 +83,11 @@ model JournalEntry {
   submittedById  String?
   submissionNote String?
 
+  reviewedAt DateTime?
+  reviewedById String?
+  reviewNote String?
+  approvedSourceFingerprint String?
+
   approvedAt   DateTime?
   approvedById String?
   approvalNote String?
@@ -436,6 +441,16 @@ model BankReconciliationSession {
   closingBankBalance  Decimal                  @db.Decimal(18, 2)
   difference          Decimal                  @default(0) @db.Decimal(18, 2)
   status              BankReconciliationStatus @default(OPEN)
+  revision            Int                      @default(0)
+  submittedAt         DateTime?
+  submittedById       String?
+  reviewedAt          DateTime?
+  reviewedById        String?
+  reviewReason        String?
+  sourceFingerprint   String?
+  sourceSnapshot      Json?
+  cancelledAt         DateTime?
+  cancelledById       String?
   finalizedAt         DateTime?
   finalizedById       String?
   reopenReason        String?
@@ -472,7 +487,7 @@ model BankReconciliationMatch {
 
   session BankReconciliationSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, sessionId, bankStatementId, journalLineId])
+  @@index([tenantId, sessionId, bankStatementId, journalLineId])
   @@index([tenantId, sessionId, status])
   @@index([tenantId, bankStatementId])
   @@index([tenantId, journalLineId])

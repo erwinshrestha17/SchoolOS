@@ -164,6 +164,7 @@ enum FiscalBudgetStatus {
 enum JournalEntryStatus {
   DRAFT
   SUBMITTED
+  REVIEWED
   APPROVED
   POSTED
   REJECTED
@@ -578,9 +579,11 @@ enum TimetableSubstitutionStatus {
 enum PayrollRunStatus {
   DRAFT
   GENERATED
+  VALIDATED
   UNDER_REVIEW
   REVIEWED
   APPROVED
+  FINALIZED
   POSTED
   PAID
   CANCELLED
@@ -596,6 +599,7 @@ enum PayrollLineStatus {
 enum PayslipStatus {
   DRAFT
   ISSUED
+  VOID
 }
 
 enum PayrollExceptionSeverity {
@@ -694,8 +698,11 @@ enum FinancePayableStatus {
 
 enum BankReconciliationStatus {
   OPEN
+  SUBMITTED
+  REVIEWED
   FINALIZED
   REOPENED
+  CANCELLED
 }
 
 enum BankReconciliationMatchType {
@@ -1211,6 +1218,7 @@ enum FinanceRequestType {
 
 enum FinanceRequestStatus {
   PENDING
+  REVIEWED
   PROCESSING
   APPROVED
   REJECTED
@@ -1220,6 +1228,7 @@ enum FinanceRequestStatus {
 
 enum FinanceRequestHistoryAction {
   REQUESTED
+  REVIEWED
   REVIEW_STARTED
   APPROVED
   REJECTED
@@ -1240,6 +1249,7 @@ enum ApprovalWorkflowType {
   PLATFORM_SUPPORT_OVERRIDE
   ADMISSION_CASE
   FISCAL_PERIOD_REOPEN
+  FISCAL_YEAR_REOPEN
 }
 
 enum ApprovalRequestStatus {

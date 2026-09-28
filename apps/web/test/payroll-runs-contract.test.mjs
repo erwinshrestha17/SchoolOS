@@ -43,6 +43,9 @@ describe('Payroll Runs UI contracts', () => {
     for (const helper of [
       'listPayrollRuns',
       'createPayrollRun',
+      'validatePayrollRun',
+      'finalizePayrollRun',
+      'cancelFinalizedPayrollRun',
       'approvePayrollRun',
       'postPayrollRun',
       'getPayrollPreview',
@@ -63,7 +66,10 @@ describe('Payroll Runs UI contracts', () => {
     assert.match(apiClient, /salary-slip\.pdf/);
     assert.match(apiClient, /%PDF-/);
     assert.match(payrollRuns, /openApprovedSalarySlipPdf/);
-    assert.match(payrollRuns, /selectedRun\.status === ['"]APPROVED['"]/);
+    assert.match(
+      payrollRuns,
+      /\[\s*'FINALIZED',\s*'POSTED',\s*'PAID',?\s*\]\.includes\(\s*selectedRun\.status,?\s*\)/,
+    );
     assert.match(payrollRuns, /Download Salary Slip PDF/);
     assert.match(payrollRuns, /Post to M11 Accounting/);
 
@@ -77,10 +83,10 @@ describe('Payroll Runs UI contracts', () => {
     const apiClient = readMany(['lib/api/payroll.ts', 'lib/api/client.ts']);
     const payrollRuns = read('components/hr/payroll-runs.tsx');
 
-    assert.match(payrollRuns, /Approval locks payroll calculations/i);
+    assert.match(payrollRuns, /Finalization locks payroll calculations/i);
     assert.match(
       payrollRuns,
-      /Posting is a separate\s+APPROVED-to-POSTED action/i,
+      /Posting is a separate\s+FINALIZED-to-POSTED action/i,
     );
     assert.match(payrollRuns, /creates the M11 payroll accrual\s+journal/i);
     assert.match(payrollRuns, /backend accounting posting\s+boundary/i);
@@ -93,7 +99,10 @@ describe('Payroll Runs UI contracts', () => {
       payrollRuns,
       /posted runs remain\s+immutable|allow editing posted runs|enable editing posted runs/i,
     );
-    assert.match(payrollRuns, /selectedRun\.status === ['"]APPROVED['"]/);
+    assert.match(
+      payrollRuns,
+      /\[\s*'FINALIZED',\s*'POSTED',\s*'PAID',?\s*\]\.includes\(\s*selectedRun\.status,?\s*\)/,
+    );
     assert.match(payrollRuns, /selectedRun\.status === ['"]POSTED['"]/);
 
     assert.doesNotMatch(payrollRuns, /createJournalEntry/);
@@ -120,9 +129,12 @@ describe('Payroll Runs UI contracts', () => {
     const apiClient = readMany(['lib/api/payroll.ts', 'lib/api/client.ts']);
     const payrollRuns = read('components/hr/payroll-runs.tsx');
 
-    assert.match(payrollRuns, /hasPermissions\(\[['"]payroll:manage['"]\]\)/);
+    assert.match(
+      payrollRuns,
+      /hasPermissions\(\[['"]payroll:run:create['"]\]\)/,
+    );
     assert.match(payrollRuns, /payroll:read/);
-    assert.match(payrollRuns, /payroll:manage/);
+    assert.match(payrollRuns, /payroll:run:create/);
     assert.doesNotMatch(payrollRuns, /tenantId/);
     assert.doesNotMatch(payrollRuns, /objectKey|storageObjectKey|database/i);
     assert.doesNotMatch(

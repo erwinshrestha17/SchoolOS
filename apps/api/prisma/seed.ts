@@ -3293,10 +3293,11 @@ async function seedCanonicalPayslip(
   });
   const run = await prisma.payrollRun.upsert({
     where: {
-      tenantId_periodMonth_periodYear: {
+      tenantId_periodMonth_periodYear_revision: {
         tenantId,
         periodMonth: period.month,
         periodYear: period.year,
+        revision: 1,
       },
     },
     update: {

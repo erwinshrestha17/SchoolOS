@@ -2,7 +2,7 @@ import { IsIn, IsOptional, IsString } from 'class-validator';
 import { FinanceRequestStatus } from '@prisma/client';
 
 export class ReviewFinanceRequestDto {
-  @IsIn([FinanceRequestStatus.APPROVED, FinanceRequestStatus.REJECTED])
+  @IsIn([FinanceRequestStatus.REVIEWED])
   status!: FinanceRequestStatus;
 
   @IsOptional()

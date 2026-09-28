@@ -35,8 +35,15 @@ import {
   requirePersonName,
   requireProfileEmail,
 } from '../common/validation/contact-profile';
+import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
 import { ListStaffQueryDto } from './dto/list-staff-query.dto';
 import { ListStaffOptionsDto } from './dto/list-staff-options.dto';
+import { hasDomainPermission } from '../authorization/policies/domain-permission';
+import {
+  requireStaffFieldWrites,
+  staffFieldWritePermissions,
+  projectStaffFinancialRecord,
+} from '../authorization/policies/staff.policy';
 
 @Injectable()
 export class StaffService {
@@ -50,6 +57,7 @@ export class StaffService {
   ) {}
 
   async createStaff(dto: CreateStaffDto, actor: AuthContext) {
+    requireStaffFieldWrites(actor, dto);
     const firstName = requirePersonName(dto.firstName, 'firstName');
     const lastName = requirePersonName(dto.lastName, 'lastName');
     const email = requireProfileEmail(dto.email);
@@ -206,7 +214,28 @@ export class StaffService {
     };
   }
 
+  private async auditStaffProjection(staffId: string, actor: AuthContext) {
+    const sections = [
+      'hr:identity:read',
+      'hr:bank:read',
+      'hr:tax:read',
+      'payroll:salary:read',
+      'hr:documents:read',
+    ].filter((permission) => hasDomainPermission(actor, permission));
+    if (sections.length)
+      await this.auditService.record({
+        action: 'sensitive_access',
+        resource: 'staff',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: staffId,
+        after: { sections },
+      });
+  }
+
   async getStaffProfile(actor: AuthContext) {
+    if (!hasDomainPermission(actor, 'staff:read') && !hasDomainPermission(actor, 'hr:staff:read'))
+      throw new ForbiddenException('Staff profile access is not available');
     const staff = await this.prisma.staff.findFirst({
       where: {
         tenantId: actor.tenantId,
@@ -232,10 +261,13 @@ export class StaffService {
       throw new NotFoundException('Staff profile not found');
     }
 
+    await this.auditStaffProjection(staff.id, actor);
     return mapStaffDetail(staff, actor);
   }
 
   async getStaffDetail(staffId: string, actor: AuthContext) {
+    if (!hasDomainPermission(actor, 'staff:read') && !hasDomainPermission(actor, 'hr:staff:read'))
+      throw new ForbiddenException('Staff profile access is not available');
     const staff = await this.prisma.staff.findFirst({
       where: { id: staffId, tenantId: actor.tenantId },
       include: {
@@ -302,10 +334,12 @@ export class StaffService {
       throw new ForbiddenException('You can only view your own staff profile');
     }
 
+    await this.auditStaffProjection(staff.id, actor);
     return mapStaffDetail(staff, actor);
   }
 
   async updateStaff(staffId: string, dto: UpdateStaffDto, actor: AuthContext) {
+    requireStaffFieldWrites(actor, dto);
     const existing = await this.prisma.staff.findFirst({
       where: { id: staffId, tenantId: actor.tenantId },
       include: { user: { select: { email: true } } },
@@ -345,89 +379,102 @@ export class StaffService {
       }
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      if (dto.email && requireProfileEmail(dto.email) !== existing.user.email) {
-        await tx.user.update({
-          where: { id: existing.userId },
-          data: { email: requireProfileEmail(dto.email) },
-        });
-      }
-
-      if (dto.addresses?.length) {
-        for (const addressInput of dto.addresses) {
-          await this.addressService.upsertAddress(tx, {
-            tenantId: actor.tenantId,
-            ownerType: AddressOwnerType.STAFF,
-            ownerId: existing.id,
-            input: addressInput,
-            legacyText:
-              (addressInput.addressType ?? AddressType.OTHER) ===
-              AddressType.PERMANENT
-                ? (dto.address ?? existing.address)
-                : undefined,
+    const updated = await withSchoolAuthorizationTransaction(
+      this.prisma,
+      actor,
+      ['staff:update', ...staffFieldWritePermissions(dto)],
+      [],
+      async (tx) => {
+        if (
+          dto.email &&
+          requireProfileEmail(dto.email) !== existing.user.email
+        ) {
+          await tx.user.update({
+            where: { id: existing.userId },
+            data: { email: requireProfileEmail(dto.email) },
           });
         }
-      }
 
-      return tx.staff.update({
-        where: { id: existing.id },
-        data: buildStaffUpdateData(dto),
-        include: {
-          user: {
-            include: {
-              userRoles: {
-                include: {
-                  role: true,
+        if (dto.addresses?.length) {
+          for (const addressInput of dto.addresses) {
+            await this.addressService.upsertAddress(tx, {
+              tenantId: actor.tenantId,
+              ownerType: AddressOwnerType.STAFF,
+              ownerId: existing.id,
+              input: addressInput,
+              legacyText:
+                (addressInput.addressType ?? AddressType.OTHER) ===
+                AddressType.PERMANENT
+                  ? (dto.address ?? existing.address)
+                  : undefined,
+            });
+          }
+        }
+
+        const updated = await tx.staff.update({
+          where: { id: existing.id },
+          data: buildStaffUpdateData(dto),
+          include: {
+            user: {
+              include: {
+                userRoles: {
+                  include: {
+                    role: true,
+                  },
                 },
               },
             },
+            staffContracts: true,
+            salaryStructures: {
+              include: { components: true },
+            },
+            attendanceRecords: { take: 0 },
+            leaveBalances: true,
+            leaveRequests: { take: 0 },
+            payrollLines: { take: 0 },
+            qualificationsRecords: true,
+            experienceRecords: true,
+            teacherAssignments: true,
           },
-          staffContracts: true,
-          salaryStructures: {
-            include: { components: true },
+        });
+        await this.auditService.record(
+          {
+            action: 'update',
+            resource: 'staff',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: updated.id,
+            before: {
+              employeeId: existing.employeeId,
+              staffCode: existing.staffCode,
+              status: existing.status,
+              email: existing.user.email,
+              firstName: existing.firstName,
+              lastName: existing.lastName,
+              joiningDate: existing.joiningDate,
+              contractType: existing.contractType,
+              department: existing.department,
+              designation: existing.designation,
+            },
+            after: {
+              protectedFieldsUpdated: staffFieldWritePermissions(dto),
+              employeeId: updated.employeeId,
+              staffCode: updated.staffCode,
+              status: updated.status,
+              email: updated.user.email,
+              firstName: updated.firstName,
+              lastName: updated.lastName,
+              joiningDate: updated.joiningDate,
+              contractType: updated.contractType,
+              department: updated.department,
+              designation: updated.designation,
+            },
           },
-          attendanceRecords: { take: 0 },
-          leaveBalances: true,
-          leaveRequests: { take: 0 },
-          payrollLines: { take: 0 },
-          qualificationsRecords: true,
-          experienceRecords: true,
-          teacherAssignments: true,
-        },
-      });
-    });
-
-    await this.auditService.record({
-      action: 'update',
-      resource: 'staff',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      before: {
-        employeeId: existing.employeeId,
-        staffCode: existing.staffCode,
-        status: existing.status,
-        email: existing.user.email,
-        firstName: existing.firstName,
-        lastName: existing.lastName,
-        joiningDate: existing.joiningDate,
-        contractType: existing.contractType,
-        department: existing.department,
-        designation: existing.designation,
+          tx,
+        );
+        return updated;
       },
-      after: {
-        employeeId: updated.employeeId,
-        staffCode: updated.staffCode,
-        status: updated.status,
-        email: updated.user.email,
-        firstName: updated.firstName,
-        lastName: updated.lastName,
-        joiningDate: updated.joiningDate,
-        contractType: updated.contractType,
-        department: updated.department,
-        designation: updated.designation,
-      },
-    });
+    );
 
     return mapStaffDetail(updated, actor);
   }
@@ -852,9 +899,15 @@ export class StaffService {
         type: `LIFECYCLE_${event.eventType}`,
         occurredAt: event.eventDate,
         title: event.eventType,
-        reason: event.reason,
-        notes: event.notes,
-        metadata: event.metadata,
+        reason: hasDomainPermission(actor, 'hr:disciplinary:read')
+          ? event.reason
+          : null,
+        notes: hasDomainPermission(actor, 'hr:disciplinary:read')
+          ? event.notes
+          : null,
+        metadata: hasDomainPermission(actor, 'hr:disciplinary:read')
+          ? event.metadata
+          : null,
       })),
       ...contracts.map((contract) => ({
         id: contract.id,
@@ -895,7 +948,10 @@ export class StaffService {
             : null,
         },
       })),
-      ...documents.map((document) => ({
+      ...(actor && hasDomainPermission(actor, 'hr:documents:read')
+        ? documents
+        : []
+      ).map((document) => ({
         id: document.id,
         type: 'DOCUMENT',
         occurredAt: document.createdAt,
@@ -1523,17 +1579,14 @@ function getMonthYearPairs(startsOn: Date, endsOn: Date) {
 
 function canManageHr(actor?: AuthContext) {
   return Boolean(
-    actor?.permissions?.includes('hr:manage') ||
-    actor?.permissions?.includes('hr:staff:update'),
+    actor &&
+    (hasDomainPermission(actor, 'hr:manage') ||
+      hasDomainPermission(actor, 'hr:staff:update')),
   );
 }
 
 function canSeeSensitiveStaffData(actor?: AuthContext) {
-  return Boolean(
-    actor?.permissions?.includes('hr:manage') ||
-    actor?.permissions?.includes('payroll:manage') ||
-    actor?.permissions?.includes('payroll:salary:read'),
-  );
+  return Boolean(actor && hasDomainPermission(actor, 'payroll:salary:read'));
 }
 
 function buildStaffUpdateData(dto: UpdateStaffDto): Prisma.StaffUpdateInput {
@@ -1629,15 +1682,32 @@ function mapStaffDetail(
 ) {
   const canSeeSensitive = canSeeSensitiveStaffData(actor);
 
-  const mask = (val: string | null | undefined) => {
+  const mask = (val: string | null | undefined, permission: string) => {
     if (!val) return val;
-    if (canSeeSensitive) return val;
+    if (actor && hasDomainPermission(actor, permission)) return val;
     if (val.length <= 4) return '****';
     return val.substring(0, 2) + '****' + val.substring(val.length - 2);
   };
 
   return {
     ...staff,
+    allowedSensitiveFields: Object.fromEntries(
+      [
+        ['identityRead', 'hr:identity:read'],
+        ['identityWrite', 'hr:identity:write'],
+        ['bankRead', 'hr:bank:read'],
+        ['bankWrite', 'hr:bank:write'],
+        ['taxRead', 'hr:tax:read'],
+        ['taxWrite', 'hr:tax:write'],
+        ['documentsRead', 'hr:documents:read'],
+        ['documentsManage', 'hr:documents:manage'],
+        ['salaryRead', 'payroll:salary:read'],
+        ['disciplinaryRead', 'hr:disciplinary:read'],
+      ].map(([key, permission]) => [
+        key,
+        Boolean(actor && hasDomainPermission(actor, permission)),
+      ]),
+    ),
     // `staff.user` (spread above) is the raw Prisma User relation, which
     // carries passwordHash/lockedUntil/failedLoginCount -- the type
     // annotation on this function's parameter narrows it, but that's a
@@ -1646,14 +1716,33 @@ function mapStaffDetail(
     // Explicitly clear it so the raw relation never survives into the
     // response; `email`/`roles` below are the only safe derived fields.
     user: undefined,
-    citizenshipNo: mask(staff.citizenshipNo),
-    panNumber: mask(staff.panNumber),
-    bankAccount: mask(staff.bankAccount),
+    citizenshipNo: mask(staff.citizenshipNo, 'hr:identity:read'),
+    panNumber: mask(staff.panNumber, 'hr:tax:read'),
+    bankAccount: mask(staff.bankAccount, 'hr:bank:read'),
+    bankName:
+      actor && hasDomainPermission(actor, 'hr:bank:read')
+        ? staff.bankName
+        : null,
+    staffContracts: (staff.staffContracts ?? []).map((item) =>
+      projectStaffFinancialRecord(item, actor, 'CONTRACT'),
+    ),
+    qualificationsRecords:
+      actor && hasDomainPermission(actor, 'hr:documents:read')
+        ? staff.qualificationsRecords
+        : [],
+    experienceRecords:
+      actor && hasDomainPermission(actor, 'hr:documents:read')
+        ? staff.experienceRecords
+        : [],
     salaryStructures: canSeeSensitive
-      ? staff.salaryStructures
+      ? staff.salaryStructures?.map((item) =>
+          projectStaffFinancialRecord(item, actor, 'SALARY'),
+        )
       : maskSalaryStructures(staff.salaryStructures),
     payrollLines: canSeeSensitive
-      ? staff.payrollLines
+      ? staff.payrollLines?.map((item) =>
+          projectStaffFinancialRecord(item, actor, 'PAYROLL'),
+        )
       : maskPayrollLines(staff.payrollLines),
     email: staff.user?.email ?? null,
     roles: staff.user?.userRoles?.map(({ role }) => role.name) ?? [],
@@ -1679,35 +1768,35 @@ function mapStaffDetail(
 }
 
 function maskSalaryStructures(items?: unknown[]) {
-  return (items ?? []).map((item) => {
-    if (!item || typeof item !== 'object') return item;
-    return {
-      ...(item as Record<string, unknown>),
-      basicSalary: null,
-      allowances: null,
-      deductions: null,
-      bankAccount: null,
-      bankName: null,
-      components: [],
-      masked: true,
-    };
-  });
+  return (items ?? []).map((item) => ({
+    id:
+      item && typeof item === 'object'
+        ? (item as Record<string, unknown>).id
+        : undefined,
+    basicSalary: null,
+    allowances: null,
+    deductions: null,
+    bankAccount: null,
+    bankName: null,
+    components: [],
+    masked: true,
+  }));
 }
 
 function maskPayrollLines(items?: unknown[]) {
-  return (items ?? []).map((item) => {
-    if (!item || typeof item !== 'object') return item;
-    return {
-      ...(item as Record<string, unknown>),
-      basicSalary: null,
-      earnings: null,
-      grossSalary: null,
-      allowances: null,
-      deductions: null,
-      netSalary: null,
-      masked: true,
-    };
-  });
+  return (items ?? []).map((item) => ({
+    id:
+      item && typeof item === 'object'
+        ? (item as Record<string, unknown>).id
+        : undefined,
+    basicSalary: null,
+    earnings: null,
+    grossSalary: null,
+    allowances: null,
+    deductions: null,
+    netSalary: null,
+    masked: true,
+  }));
 }
 
 function isInactiveStaffStatus(

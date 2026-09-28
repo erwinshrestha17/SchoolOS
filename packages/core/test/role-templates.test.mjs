@@ -39,6 +39,8 @@ const requiredPhase1ATemplates = [
   "Cashier",
   "Accountant",
   "Finance Approver",
+  "Finance Clerk",
+  "Posting Authority",
   "Auditor",
   "Parent/Guardian",
   "Student",
@@ -173,6 +175,7 @@ test("new catalog keys cannot enter Admin or Principal through all-except filter
 test("new duty templates do not gain incompatible effective finance authority", () => {
   const denied = {
     admissions_officer: ["students:read", "guardians:read"],
+    posting_authority: ["payroll:run:create", "payroll:run:review", "payroll:run:approve", "payroll:run:finalize", "accounting:journals:create", "accounting:journals:approve", "payments:collect", "finance:approvals:review", "finance:approvals:decide"],
     payroll_preparer: [
       "payroll:run:review",
       "payroll:run:approve",
@@ -192,6 +195,8 @@ test("new duty templates do not gain incompatible effective finance authority", 
       "payroll:run:pay",
     ],
     cashier: ["payments:refund", "payments:reverse", "payments:close"],
+    finance_clerk: ["payments:refund", "payments:reverse", "finance:approvals:review", "finance:approvals:decide", "accounting:journals:approve", "accounting:journals:post"],
+    accountant: ["payments:refund", "finance:approvals:decide", "accounting:journals:approve", "accounting:journals:post", "accounting:payroll-handoff:post"],
     finance_approver: [
       "advanced:approvals:read",
       "advanced:approvals:decide",

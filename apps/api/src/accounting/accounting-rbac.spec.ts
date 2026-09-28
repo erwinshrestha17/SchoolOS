@@ -38,9 +38,34 @@ describe('Accounting RBAC Hardening', () => {
     }
   });
 
-  it('accountant keeps full operational accounting access (unaffected by the principal fix)', () => {
-    for (const key of accountingOperationalKeys) {
+  it('separates accountant review, finance approval and independent posting', () => {
+    for (const key of accountingOperationalKeys.filter(
+      (key) =>
+        !['accounting:journals:approve', 'accounting:journals:post'].includes(
+          key,
+        ),
+    ))
       expect(systemRolePermissions.accountant).toContain(key);
-    }
+    expect(systemRolePermissions.accountant).toContain(
+      'accounting:journals:review',
+    );
+    expect(systemRolePermissions.accountant).not.toContain(
+      'accounting:journals:approve',
+    );
+    expect(systemRolePermissions.accountant).not.toContain(
+      'accounting:journals:post',
+    );
+    expect(systemRolePermissions.finance_approver).toContain(
+      'accounting:journals:approve',
+    );
+    expect(systemRolePermissions.finance_approver).not.toContain(
+      'accounting:journals:review',
+    );
+    expect(systemRolePermissions.posting_authority).toContain(
+      'accounting:journals:post',
+    );
+    expect(systemRolePermissions.posting_authority).not.toContain(
+      'accounting:journals:approve',
+    );
   });
 });

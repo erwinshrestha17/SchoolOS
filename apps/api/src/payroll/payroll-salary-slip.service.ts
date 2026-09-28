@@ -55,7 +55,7 @@ export class PayrollSalarySlipService {
 
     if (!canGenerateSalarySlipForRunStatus(line.payrollRun.status)) {
       throw new ConflictException(
-        'Salary slips can only be generated for approved payroll runs',
+        'Salary slips can only be generated for finalized payroll runs',
       );
     }
 
@@ -72,14 +72,14 @@ export class PayrollSalarySlipService {
       attendanceDays: line.attendanceDays,
       workingDays: line.workingDays,
       approvedAt: line.payrollRun.approvedAt,
-      status: 'Payroll Approved',
+      status: 'Payroll Finalized',
     });
   }
 }
 
 export function canGenerateSalarySlipForRunStatus(status: string) {
   return [
-    PayrollRunStatus.APPROVED,
+    PayrollRunStatus.FINALIZED,
     PayrollRunStatus.POSTED,
     PayrollRunStatus.PAID,
   ].some((allowedStatus) => allowedStatus === status);
@@ -105,7 +105,7 @@ export function buildApprovedSalarySlipLines(input: SalarySlipPdfInput) {
     `Approved Date: ${
       input.approvedAt ? input.approvedAt.toISOString().slice(0, 10) : 'N/A'
     }`,
-    'Note: This salary slip is generated from an approved payroll run only.',
-    'No M9 accounting journal entry or salary disbursement is created by this PDF.',
+    'Note: This salary slip is generated from a finalized payroll run only.',
+    'No M11 accounting journal entry or salary disbursement is created by this PDF.',
   ];
 }

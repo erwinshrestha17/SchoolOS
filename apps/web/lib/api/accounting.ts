@@ -7,6 +7,8 @@ import type {
   AccountingReportFilters,
   AccountingTrialBalanceResponse,
   BankReconciliationSuggestion,
+  BankReconciliationSessionView,
+  PrepareBankReconciliation,
   BankReconciliationSummary,
   BankStatementImportLine,
   BankStatementImportPreview,
@@ -29,6 +31,7 @@ import type {
   PaginatedResult,
 } from '@schoolos/core';
 import { getNepalSchoolDay } from '@schoolos/core';
+import type { ApprovalRequestSummary } from './advanced-operations';
 import {
   API_BASE_URL,
   JsonBody,
@@ -129,7 +132,7 @@ export const accountingApi = {
       { method: 'POST', json: body },
     ),
   reopenFiscalPeriod: (id: string, body: JsonBody) =>
-    request<FiscalPeriodSummary>(
+    request<ApprovalRequestSummary>(
       `/accounting/fiscal-periods/${encodeURIComponent(id)}/reopen`,
       { method: 'POST', json: body },
     ),
@@ -316,10 +319,13 @@ export const accountingApi = {
       json: body,
     }),
   reopenFiscalYear: (id: string, body: JsonBody) =>
-    request<any>(`/accounting/fiscal-years/${id}/reopen-year`, {
-      method: 'POST',
-      json: body,
-    }),
+    request<ApprovalRequestSummary>(
+      `/accounting/fiscal-years/${encodeURIComponent(id)}/reopen-year`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   previewBankStatementImport: (
     accountId: string,
     lines: BankStatementImportLine[],
@@ -364,18 +370,52 @@ export const accountingApi = {
     request<BankReconciliationSuggestion[]>(
       `/accounting/bank-reconciliation/${accountId}/auto-match`,
     ),
-  reconcileStatement: (statementId: string, journalLineId: string) =>
-    request<BankStatementLineSummary>(
-      '/accounting/bank-reconciliation/reconcile',
-      {
-        method: 'POST',
-        json: { statementId, journalLineId },
-      },
+  listBankReconciliationSessions: (accountId: string) =>
+    request<BankReconciliationSessionView[]>(
+      `/accounting/bank-reconciliation/sessions/account/${encodeURIComponent(accountId)}`,
     ),
-  unreconcileStatement: (statementId: string, reason: string) =>
-    request<BankStatementLineSummary>(
+  prepareBankReconciliation: (data: PrepareBankReconciliation) =>
+    request<BankReconciliationSessionView>(
+      '/accounting/bank-reconciliation/sessions',
+      { method: 'POST', json: data },
+    ),
+  amendBankReconciliation: (
+    id: string,
+    data: Pick<
+      PrepareBankReconciliation,
+      'openingBankBalance' | 'closingBankBalance' | 'statementReference'
+    > & { reason: string },
+  ) =>
+    request<BankReconciliationSessionView>(
+      `/accounting/bank-reconciliation/sessions/${encodeURIComponent(id)}`,
+      { method: 'PATCH', json: data },
+    ),
+  transitionBankReconciliation: (
+    id: string,
+    action: 'submit' | 'review' | 'return' | 'finalize' | 'cancel',
+    reason?: string,
+  ) =>
+    request<BankReconciliationSessionView>(
+      `/accounting/bank-reconciliation/sessions/${encodeURIComponent(id)}/${action}`,
+      { method: 'POST', json: reason ? { reason } : {} },
+    ),
+  reconcileStatement: (
+    sessionId: string,
+    statementId: string,
+    journalLineId: string,
+  ) =>
+    request<BankReconciliationSessionView>(
+      '/accounting/bank-reconciliation/reconcile',
+      { method: 'POST', json: { sessionId, statementId, journalLineId } },
+    ),
+  unreconcileStatement: (
+    sessionId: string,
+    statementId: string,
+    reason: string,
+  ) =>
+    request<BankReconciliationSessionView>(
       '/accounting/bank-reconciliation/unreconcile',
-      { method: 'POST', json: { statementId, reason } },
+      { method: 'POST', json: { sessionId, statementId, reason } },
     ),
   getReconciliationSummary: (accountId: string) =>
     request<BankReconciliationSummary>(
@@ -418,6 +458,11 @@ export const accountingApi = {
         method: 'POST',
         json: body,
       },
+    ),
+  reviewJournal: (id: string, body: JsonBody = {}) =>
+    request<JournalEntryView>(
+      `/accounting/journals/${encodeURIComponent(id)}/review`,
+      { method: 'POST', json: body },
     ),
   approveJournal: (id: string, body: JsonBody = {}) =>
     request<JournalEntryView>(

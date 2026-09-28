@@ -34,6 +34,8 @@ export const payrollPermissions = [
     action: "review",
     description: "Review payroll runs",
   },
+  { resource: "payroll:run", action: "validate", description: "Validate payroll inputs before independent review" },
+  { resource: "payroll:run", action: "finalize", description: "Finalize an independently approved payroll snapshot before accounting posting" },
   {
     resource: "payroll:run",
     action: "approve",

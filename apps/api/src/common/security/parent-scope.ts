@@ -1,9 +1,11 @@
 import { ForbiddenException } from '@nestjs/common';
-import { type GuardianCapability, type Prisma } from '@prisma/client';
+import { type GuardianCapability } from '@prisma/client';
 import type { AuditService } from '../../audit/audit.service';
 import type { AuthContext } from '../../auth/auth.types';
 import type { PrismaService } from '../../prisma/prisma.service';
 import { recordAuthorizationDenial } from './authorization-audit';
+import { buildActiveGuardianRelationshipWhere } from '../../authorization/policies/guardian.policy';
+export { buildActiveGuardianRelationshipWhere } from '../../authorization/policies/guardian.policy';
 
 export const GUARDIAN_CAPABILITY_DENIED_CODE = 'GUARDIAN_CAPABILITY_DENIED';
 
@@ -20,24 +22,6 @@ export function createGuardianCapabilityDeniedException(
     message: GUARDIAN_CAPABILITY_DENIED_MESSAGE,
     ...(capability ? { capability } : {}),
   });
-}
-
-export function buildActiveGuardianRelationshipWhere(
-  now = new Date(),
-  capability?: GuardianCapability,
-): Prisma.StudentGuardianWhereInput {
-  return {
-    status: 'ACTIVE',
-    verificationStatus: 'VERIFIED',
-    approvalStatus: 'APPROVED',
-    effectiveFrom: { lte: now },
-    AND: [
-      {
-        OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: now } }],
-      },
-      ...(capability ? [{ capabilities: { has: capability } }] : []),
-    ],
-  };
 }
 
 /**
@@ -107,9 +91,13 @@ export async function getParentStudentIds(
       studentLinks: {
         where: {
           ...buildActiveGuardianRelationshipWhere(new Date(), capability),
+          tenantId: actor.tenantId,
           student: {
+            tenantId: actor.tenantId,
             lifecycleStatus: 'ACTIVE',
-            enrollments: { some: { status: 'ACTIVE' } },
+            enrollments: {
+              some: { tenantId: actor.tenantId, status: 'ACTIVE' },
+            },
           },
         },
         select: { studentId: true },

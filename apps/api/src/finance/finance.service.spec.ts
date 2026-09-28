@@ -9,6 +9,7 @@ import {
   JournalSourceType,
   NotificationChannel,
   PaymentMethod,
+  PaymentStatus,
   Prisma,
 } from '@prisma/client';
 import sharp from 'sharp';
@@ -18,6 +19,18 @@ import {
 } from './finance.service';
 import { UsageService } from '../usage/usage.service';
 import { InvoiceAdjustmentDirection } from './dto/create-invoice-adjustment.dto';
+
+// Current persisted authority and source/policy binding are independently
+// exercised by finance-domain-policy.int-spec.ts against isolated PostgreSQL.
+jest.mock('../auth/school-authorization-transaction', () => ({
+  withSchoolAuthorizationTransaction: (
+    prisma: { $transaction: (work: unknown) => unknown },
+    _actor: unknown,
+    _permissions: unknown,
+    _targets: unknown,
+    work: unknown,
+  ) => prisma.$transaction(work),
+}));
 
 const actor = {
   tenantId: 'tenant-1',
@@ -31,6 +44,9 @@ const actor = {
     'fees:discount',
     'fees:manage',
     'payments:collect',
+    'finance:approvals:read',
+    'finance:approvals:review',
+    'finance:approvals:decide',
     'payments:refund',
     'payments:reverse',
     'payments:close',
@@ -1662,21 +1678,28 @@ describe('finance production controls', () => {
       status: InvoiceStatus.PARTIAL,
       paidAt: null,
     };
-    const { service, prisma, auditService, accountingPostingService } =
-      buildService({
-        invoice: null,
-        feeHead: null,
-        payment,
-        sourceJournal,
-        createdRefund,
-        createdJournalEntry: createdRefundJournal,
-        updatedInvoice,
-        paymentRefundCount: 0,
-        journalCount: 4,
-      });
+    const {
+      service,
+      prisma,
+      auditService,
+      accountingPostingService,
+      approveCorrection,
+    } = buildService({
+      invoice: null,
+      feeHead: null,
+      payment,
+      sourceJournal,
+      createdRefund,
+      createdJournalEntry: createdRefundJournal,
+      updatedInvoice,
+      paymentRefundCount: 0,
+      journalCount: 4,
+    });
     (prisma.paymentAllocation.aggregate as jest.Mock).mockResolvedValue({
       _sum: { amount: new Prisma.Decimal(300) },
     });
+
+    await approveCorrection('REFUND', '200.00', 'Parent requested correction');
 
     const result = await service.refundPayment(
       payment.id,
@@ -1684,7 +1707,7 @@ describe('finance production controls', () => {
         amount: '200.00',
         reason: ' Parent requested correction ',
         refundDate: '2026-04-27',
-        idempotencyKey: 'refund-success-1',
+        idempotencyKey: 'finance-request:fixture-correction',
       },
       actor,
     );
@@ -1744,6 +1767,7 @@ describe('finance production controls', () => {
         resource: 'payment_refund',
         resourceId: createdRefund.id,
       }),
+      prisma,
     );
   });
 
@@ -1785,7 +1809,7 @@ describe('finance production controls', () => {
       amount: new Prisma.Decimal(400),
       refundDate: new Date('2026-04-27T12:00:00.000Z'),
     };
-    const { service, prisma } = buildService({
+    const { service, prisma, approveCorrection } = buildService({
       invoice: null,
       feeHead: null,
       payment,
@@ -1800,12 +1824,18 @@ describe('finance production controls', () => {
       }),
     );
 
+    await approveCorrection(
+      'REFUND',
+      '400.00',
+      'Correct multi-invoice allocation',
+    );
+
     const result = await service.refundPayment(
       payment.id,
       {
         amount: '400.00',
         reason: 'Correct multi-invoice allocation',
-        idempotencyKey: 'refund-multi-allocation-1',
+        idempotencyKey: 'finance-request:fixture-correction',
       },
       actor,
     );
@@ -1859,7 +1889,7 @@ describe('finance production controls', () => {
         },
       ],
     });
-    const { service, prisma } = buildService({
+    const { service, prisma, approveCorrection } = buildService({
       invoice: null,
       feeHead: null,
       payment,
@@ -1872,11 +1902,13 @@ describe('finance production controls', () => {
       }),
     );
 
+    await approveCorrection('REVERSAL', undefined, 'Wrong student payment');
+
     const result = await service.reversePayment(
       payment.id,
       {
         reason: 'Wrong student payment',
-        idempotencyKey: 'reverse-multi-allocation-1',
+        idempotencyKey: 'finance-request:fixture-correction',
       },
       actor,
     );
@@ -1945,7 +1977,7 @@ describe('finance production controls', () => {
     });
 
     await expect(
-      service.refundPayment(
+      service.requestRefund(
         payment.id,
         {
           amount: '150.00',
@@ -1954,7 +1986,7 @@ describe('finance production controls', () => {
         },
         actor,
       ),
-    ).rejects.toThrow('Refund exceeds the remaining refundable amount');
+    ).rejects.toThrow('The correction exceeds the remaining refundable amount');
   });
 
   it('blocks refunding an already fully refunded payment', async () => {
@@ -1970,7 +2002,7 @@ describe('finance production controls', () => {
     });
 
     await expect(
-      service.refundPayment(
+      service.requestRefund(
         payment.id,
         {
           reason: 'Duplicate counter entry',
@@ -1978,7 +2010,7 @@ describe('finance production controls', () => {
         },
         actor,
       ),
-    ).rejects.toThrow('Payment has already been fully refunded');
+    ).rejects.toThrow('The correction exceeds the remaining refundable amount');
   });
 
   it('blocks refunding payments attached to voided invoices', async () => {
@@ -1994,12 +2026,14 @@ describe('finance production controls', () => {
         ],
       }),
     });
-    const { service } = buildService({
+    const { service, approveCorrection } = buildService({
       invoice: null,
       feeHead: null,
       payment,
       sourceJournal: buildPaymentJournal({ amount: new Prisma.Decimal(500) }),
     });
+
+    await approveCorrection('REFUND', '100.00', 'Correction');
 
     await expect(
       service.refundPayment(
@@ -2007,7 +2041,7 @@ describe('finance production controls', () => {
         {
           amount: '100.00',
           reason: 'Correction',
-          idempotencyKey: 'refund-voided',
+          idempotencyKey: 'finance-request:fixture-correction',
         },
         actor,
       ),
@@ -2800,7 +2834,7 @@ describe('finance production controls', () => {
     }).service;
 
     await expect(
-      missingJournalService.refundPayment(
+      missingJournalService.requestRefund(
         payment.id,
         {
           amount: '50.00',
@@ -2809,9 +2843,7 @@ describe('finance production controls', () => {
         },
         actor,
       ),
-    ).rejects.toThrow(
-      'Original payment journal entry was not found for this payment',
-    );
+    ).rejects.toThrow('The original posted payment journal is required');
   });
 
   it('resolves invoice status after adjustments from paid amount', () => {
@@ -2886,6 +2918,8 @@ function buildInvoicePayment(overrides: Record<string, unknown> = {}) {
 
 function buildPayment(overrides: Record<string, unknown> = {}) {
   return {
+    status: PaymentStatus.SUCCESS,
+    allocations: [],
     id: 'payment-1',
     tenantId: actor.tenantId,
     studentId: 'student-1',
@@ -2913,8 +2947,9 @@ function buildPayment(overrides: Record<string, unknown> = {}) {
 }
 
 function buildPaymentJournal(overrides: Record<string, unknown> = {}) {
-  return {
+  const journal = {
     id: 'journal-payment-1',
+    status: 'POSTED',
     entryNumber: 'JE-2026-00004',
     sourceType: JournalSourceType.FEE_PAYMENT,
     sourceId: 'payment-1',
@@ -2922,17 +2957,26 @@ function buildPaymentJournal(overrides: Record<string, unknown> = {}) {
       {
         chartAccountId: 'cash',
         side: JournalLineSide.DEBIT,
-        amount: new Prisma.Decimal(500),
+        amount: (overrides.amount ?? new Prisma.Decimal(500)) as Prisma.Decimal,
         description: 'Payment receipt REC-2026-00001',
       },
       {
         chartAccountId: 'income',
         side: JournalLineSide.CREDIT,
-        amount: new Prisma.Decimal(500),
+        amount: (overrides.amount ?? new Prisma.Decimal(500)) as Prisma.Decimal,
         description: 'Tuition',
       },
     ],
     ...overrides,
+  };
+  return {
+    ...journal,
+    lines: journal.lines.map((line, index) => ({
+      ...line,
+      id: `fixture-source-line-${String(index)}`,
+      debit: line.side === 'DEBIT' ? line.amount : new Prisma.Decimal(0),
+      credit: line.side === 'CREDIT' ? line.amount : new Prisma.Decimal(0),
+    })),
   };
 }
 
@@ -3012,7 +3056,55 @@ function buildService(options: {
       }[];
     }[];
   }[];
+  let correctionState: Record<string, unknown> | null = null;
+  const requireCorrectionState = () => {
+    if (!correctionState)
+      throw new Error('Synthetic correction fixture is missing');
+    return correctionState;
+  };
   const prisma = {
+    approvalPolicy: { findMany: jest.fn().mockResolvedValue([]) },
+    financeApprovalRequest: {
+      findFirst: jest.fn(
+        async ({ where }: { where: Record<string, unknown> }) =>
+          correctionState &&
+          (where.id === correctionState.id ||
+            where.idempotencyKey === correctionState.idempotencyKey ||
+            where.paymentId === correctionState.paymentId)
+            ? { ...correctionState }
+            : null,
+      ),
+      findFirstOrThrow: jest.fn(async () => correctionState),
+      create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        correctionState = {
+          ...data,
+          id: 'fixture-correction',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          history: [],
+          decisions: [],
+          reviewNote: null,
+          failureMessage: null,
+        };
+        return correctionState;
+      }),
+      updateMany: jest.fn(
+        async ({ data }: { data: Record<string, unknown> }) => {
+          correctionState = { ...correctionState, ...data };
+          return { count: 1 };
+        },
+      ),
+    },
+    financeApprovalRequestHistory: { create: jest.fn() },
+    financeApprovalDecision: {
+      create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        requireCorrectionState().decisions = [
+          ...(requireCorrectionState().decisions as Record<string, unknown>[]),
+          data,
+        ];
+        return data;
+      }),
+    },
     student: {
       findFirst: jest.fn().mockResolvedValue(options.student ?? null),
     },
@@ -3298,6 +3390,7 @@ function buildService(options: {
     recordDeliveryRecords: jest.fn().mockResolvedValue({ count: 0 }),
   };
   const accountingPostingService = {
+    lockPostingPeriod: jest.fn(),
     postFeePayment: jest
       .fn()
       .mockResolvedValue(
@@ -3338,21 +3431,52 @@ function buildService(options: {
     emit: jest.fn(),
   };
 
+  const service = new FinanceService(
+    prisma as never,
+    auditService as never,
+    communicationsService as never,
+    accountingPostingService as never,
+    eventEmitter as never,
+    {
+      verifyLimit: jest.fn().mockResolvedValue(undefined),
+      checkLimit: jest.fn().mockResolvedValue(undefined),
+      incrementUsage: jest.fn().mockResolvedValue(undefined),
+    } as unknown as UsageService,
+    { jwtSecret: 'finance-test-secret' } as never,
+    options.fileRegistryService as never,
+  );
   return {
-    service: new FinanceService(
-      prisma as never,
-      auditService as never,
-      communicationsService as never,
-      accountingPostingService as never,
-      eventEmitter as never,
-      {
-        verifyLimit: jest.fn().mockResolvedValue(undefined),
-        checkLimit: jest.fn().mockResolvedValue(undefined),
-        incrementUsage: jest.fn().mockResolvedValue(undefined),
-      } as unknown as UsageService,
-      { jwtSecret: 'finance-test-secret' } as never,
-      options.fileRegistryService as never,
-    ),
+    service,
+    approveCorrection: async (
+      type: 'REFUND' | 'REVERSAL',
+      amount: string | undefined,
+      reason: string,
+    ) => {
+      const paymentId = (options.payment as { id: string }).id;
+      const preparer = { ...actor, userId: 'fixture-preparer' };
+      const prepared =
+        type === 'REFUND'
+          ? await service.requestRefund(
+              paymentId,
+              { amount, reason, idempotencyKey: 'fixture-request' },
+              preparer,
+            )
+          : await service.requestReversal(
+              paymentId,
+              { reason, idempotencyKey: 'fixture-request' },
+              preparer,
+            );
+      await service.reviewApprovalRequest(
+        prepared.id,
+        { status: 'REVIEWED' },
+        { ...actor, userId: 'fixture-reviewer' },
+      );
+      await service.decideApprovalRequest(
+        prepared.id,
+        { status: 'APPROVED' },
+        { ...actor, userId: 'fixture-approver' },
+      );
+    },
     prisma,
     auditService,
     eventEmitter,

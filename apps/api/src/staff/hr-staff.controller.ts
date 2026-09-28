@@ -186,7 +186,7 @@ export class HrStaffController {
   }
 
   @Get(':staffId/documents')
-  @Permissions('hr:staff:read')
+  @Permissions('hr:documents:read')
   listDocuments(
     @Param('staffId') staffId: string,
     @CurrentAuth() auth: AuthContext,
@@ -197,7 +197,7 @@ export class HrStaffController {
   }
 
   @Post(':staffId/documents')
-  @Permissions('hr:staff:update')
+  @Permissions('hr:documents:manage')
   addDocument(
     @Param('staffId') staffId: string,
     @Body() dto: AddStaffDocumentDto,
@@ -207,7 +207,7 @@ export class HrStaffController {
   }
 
   @Post(':staffId/documents/:documentId/verify')
-  @Permissions('hr:staff:update')
+  @Permissions('hr:documents:manage')
   verifyDocument(
     @Param('documentId') documentId: string,
     @Body() dto: VerifyStaffDocumentDto,

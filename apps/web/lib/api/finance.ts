@@ -570,11 +570,23 @@ export const financeApi = {
     }),
   reviewFinanceApprovalRequest: (
     requestId: string,
-    body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string },
+    body: { status: 'REVIEWED'; reviewNote?: string },
   ) =>
     request(`/payments/requests/${encodeURIComponent(requestId)}/review`, {
       method: 'POST',
       json: body,
+    }),
+  decideFinanceApprovalRequest: (
+    requestId: string,
+    body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string },
+  ) =>
+    request(`/payments/requests/${encodeURIComponent(requestId)}/decision`, {
+      method: 'POST',
+      json: body,
+    }),
+  executeFinanceApprovalRequest: (requestId: string) =>
+    request(`/payments/requests/${encodeURIComponent(requestId)}/execute`, {
+      method: 'POST',
     }),
   getReceiptReprintHistory: (receiptId: string) =>
     request<ReceiptReprintHistory>(

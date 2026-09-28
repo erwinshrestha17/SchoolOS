@@ -381,7 +381,7 @@ describe('MobileService', () => {
             student: expect.objectContaining({
               lifecycleStatus: 'ACTIVE',
               enrollments: {
-                some: { status: 'ACTIVE' },
+                some: { tenantId: 'tenant-1', status: 'ACTIVE' },
               },
             }),
           }),

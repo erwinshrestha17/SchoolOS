@@ -224,6 +224,21 @@ export const payrollApi = {
     }),
   createPayrollRun: (body: JsonBody) =>
     request<PayrollRunSummary>('/payroll/runs', { method: 'POST', json: body }),
+  validatePayrollRun: (id: string) =>
+    request<PayrollRunSummary>(
+      `/payroll/runs/${encodeURIComponent(id)}/validate`,
+      { method: 'POST', json: {} },
+    ),
+  finalizePayrollRun: (id: string) =>
+    request<PayrollRunSummary>(
+      `/payroll/runs/${encodeURIComponent(id)}/finalize`,
+      { method: 'POST', json: {} },
+    ),
+  cancelFinalizedPayrollRun: (id: string, body: JsonBody) =>
+    request<PayrollRunSummary>(
+      `/payroll/runs/${encodeURIComponent(id)}/cancel-finalized`,
+      { method: 'POST', json: body },
+    ),
   reviewPayrollRun: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${id}/review`, {
       method: 'POST',

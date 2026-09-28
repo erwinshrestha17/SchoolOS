@@ -414,6 +414,7 @@ function workflowLabel(value: string) {
     PLATFORM_SUPPORT_OVERRIDE: 'Platform support override',
     ADMISSION_CASE: 'Admission case',
     FISCAL_PERIOD_REOPEN: 'Fiscal period reopen',
+    FISCAL_YEAR_REOPEN: 'Fiscal year reopen',
   };
   return labels[value] ?? humanize(value);
 }

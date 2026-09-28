@@ -454,7 +454,7 @@ export function getPayrollCapabilities(
   const canPrepare = hasPermission(session, 'payroll:run:create');
   const canReview = hasPermission(session, 'payroll:run:review');
   const canApprove = hasPermission(session, 'payroll:run:approve');
-  const canFinalize = hasPermission(session, 'payroll:run:post');
+  const canFinalize = hasPermission(session, 'payroll:run:finalize');
   const canViewSalary = hasPermission(session, 'payroll:salary:read');
   const canExport = hasPermission(session, 'payroll:exports:create');
   const canGeneratePayslip = hasPermission(session, 'payroll:payslip:generate');

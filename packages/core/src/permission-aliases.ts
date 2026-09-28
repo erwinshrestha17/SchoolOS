@@ -41,6 +41,8 @@ export const PERMISSION_ALIASES: Record<string, string[]> = {
   "timetable:read_published": ["timetable:read"],
   "homework:read_published": ["homework:read"],
   "hr:staff:read": ["staff:read", "hr:read"],
+  "payments:refund:request": ["payments:collect"],
+  "payments:reverse:request": ["payments:collect"],
   "hr:staff:create": ["staff:create", "hr:manage"],
   "hr:staff:update": ["hr:manage"],
   "hr:staff:lifecycle": ["hr:manage"],

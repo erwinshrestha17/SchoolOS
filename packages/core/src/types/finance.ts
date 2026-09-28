@@ -896,12 +896,16 @@ export type FinanceApprovalRequestView = {
   type: "REFUND" | "REVERSAL";
   status:
     | "PENDING"
+    | "REVIEWED"
     | "PROCESSING"
     | "APPROVED"
     | "REJECTED"
     | "EXECUTED"
     | "FAILED";
   paymentId: string;
+  allowedActions: { review: boolean; approve: boolean; reject: boolean; execute: boolean };
+  requiredApprovalCount: number;
+  approvalCount: number;
   amount: FinanceMoneyAmount | null;
   reason: string;
   reviewNote: string | null;
@@ -913,6 +917,7 @@ export type FinanceApprovalRequestView = {
     action:
       | "REQUESTED"
       | "REVIEW_STARTED"
+      | "REVIEWED"
       | "APPROVED"
       | "REJECTED"
       | "EXECUTED"

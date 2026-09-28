@@ -17,6 +17,12 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { FinanceService } from '../finance/finance.service';
+import { BankReconciliationService } from './bank-reconciliation.service';
+import {
+  AmendReconciliationDto,
+  PrepareReconciliationDto,
+  ReconciliationReasonDto,
+} from './dto/reconciliation-session.dto';
 import { AccountingService } from './accounting.service';
 import { AccountingBankImportJobsService } from './accounting-bank-import-jobs.service';
 import { AccountingSourceMappingService } from './accounting-source-mapping.service';
@@ -67,6 +73,7 @@ export class AccountingController {
     private readonly financeService: FinanceService,
     private readonly sourceMappings: AccountingSourceMappingService,
     private readonly bankImportJobsService: AccountingBankImportJobsService,
+    private readonly bankReconciliation: BankReconciliationService,
   ) {}
 
   @Get('dashboard-summary')
@@ -385,6 +392,16 @@ export class AccountingController {
     return this.accountingService.submitManualJournal(id, dto, auth);
   }
 
+  @Post('journals/:id/review')
+  @Permissions('accounting:journals:review')
+  reviewManualJournal(
+    @Param('id') id: string,
+    @Body() dto: ApproveJournalDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.reviewManualJournal(id, dto, auth);
+  }
+
   @Post('journals/:id/approve')
   @Permissions('accounting:journals:approve')
   approveManualJournal(
@@ -568,7 +585,7 @@ export class AccountingController {
   // ─── Slice 5: Bank Reconciliation ────────────────────────────────
 
   @Post('bank-reconciliation/:accountId/import-preview')
-  @Permissions('accounting:settings:update')
+  @Permissions('accounting:reconciliation:manage')
   previewBankStatementImport(
     @Param('accountId') accountId: string,
     @Body() body: ImportBankStatementDto,
@@ -582,7 +599,7 @@ export class AccountingController {
   }
 
   @Post('bank-reconciliation/:accountId/import')
-  @Permissions('accounting:settings:update')
+  @Permissions('accounting:reconciliation:manage')
   importBankStatement(
     @Param('accountId') accountId: string,
     @Body() body: ImportBankStatementDto,
@@ -597,7 +614,7 @@ export class AccountingController {
   }
 
   @Post('bank-reconciliation/:accountId/import-queue')
-  @Permissions('accounting:settings:update')
+  @Permissions('accounting:reconciliation:manage')
   queueBankStatementImport(
     @Param('accountId') accountId: string,
     @Body() body: QueueImportBankStatementDto,
@@ -649,13 +666,105 @@ export class AccountingController {
     );
   }
 
+  @Get('bank-reconciliation/sessions/account/:accountId')
+  @Permissions('accounting:reconciliation:read')
+  listReconciliationSessions(
+    @Param('accountId') accountId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankReconciliation.list(accountId, auth);
+  }
+
+  @Get('bank-reconciliation/sessions/:id')
+  @Permissions('accounting:reconciliation:read')
+  getReconciliationSession(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankReconciliation.get(id, auth);
+  }
+
+  @Post('bank-reconciliation/sessions')
+  @Permissions('accounting:reconciliation:manage')
+  prepareReconciliation(
+    @Body() body: PrepareReconciliationDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankReconciliation.prepare(body, auth);
+  }
+
+  @Patch('bank-reconciliation/sessions/:id')
+  @Permissions('accounting:reconciliation:manage')
+  amendReconciliation(
+    @Param('id') id: string,
+    @Body() body: AmendReconciliationDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankReconciliation.amend(id, body, auth);
+  }
+
+  @Post('bank-reconciliation/sessions/:id/submit')
+  @Permissions('accounting:reconciliation:manage')
+  submitReconciliation(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankReconciliation.transition(id, 'SUBMIT', undefined, auth);
+  }
+
+  @Post('bank-reconciliation/sessions/:id/review')
+  @Permissions('accounting:reconciliation:review')
+  reviewReconciliation(
+    @Param('id') id: string,
+    @Body() body: ReconciliationReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankReconciliation.transition(id, 'REVIEW', body.reason, auth);
+  }
+
+  @Post('bank-reconciliation/sessions/:id/return')
+  @Permissions('accounting:reconciliation:review')
+  returnReconciliation(
+    @Param('id') id: string,
+    @Body() body: ReconciliationReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankReconciliation.transition(id, 'RETURN', body.reason, auth);
+  }
+
+  @Post('bank-reconciliation/sessions/:id/finalize')
+  @Permissions('accounting:reconciliation:finalize')
+  finalizeReconciliation(
+    @Param('id') id: string,
+    @Body() body: ReconciliationReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankReconciliation.transition(
+      id,
+      'FINALIZE',
+      body.reason,
+      auth,
+    );
+  }
+
+  @Post('bank-reconciliation/sessions/:id/cancel')
+  @Permissions('accounting:reconciliation:manage')
+  cancelReconciliation(
+    @Param('id') id: string,
+    @Body() body: ReconciliationReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankReconciliation.cancel(id, body.reason, auth);
+  }
+
   @Post('bank-reconciliation/reconcile')
-  @Permissions('accounting:settings:update')
+  @Permissions('accounting:reconciliation:manage')
   reconcileStatement(
     @Body() body: ReconcileBankStatementDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.accountingService.reconcileStatement(
+    return this.bankReconciliation.match(
+      body.sessionId,
       body.statementId,
       body.journalLineId,
       auth,
@@ -663,12 +772,13 @@ export class AccountingController {
   }
 
   @Post('bank-reconciliation/unreconcile')
-  @Permissions('accounting:settings:update')
+  @Permissions('accounting:reconciliation:manage')
   unreconcileStatement(
     @Body() body: UnreconcileBankStatementDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.accountingService.unreconcileStatement(
+    return this.bankReconciliation.unmatch(
+      body.sessionId,
       body.statementId,
       body.reason,
       auth,

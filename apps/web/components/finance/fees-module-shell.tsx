@@ -78,6 +78,11 @@ const moreNavigation: FeesNavigationItem[] = [
     icon: ShieldAlert,
     permissions: [
       'payments:collect',
+      'payments:refund:request',
+      'payments:reverse:request',
+      'finance:approvals:read',
+      'finance:approvals:review',
+      'finance:approvals:decide',
       'payments:refund',
       'payments:reverse',
       'fees:adjust',

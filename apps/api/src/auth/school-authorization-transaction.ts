@@ -15,10 +15,11 @@ import { lockAuthTenant, lockAuthUsers } from './auth-account-locks';
 export async function withSchoolAuthorizationTransaction<T>(
   prisma: PrismaService,
   actor: AuthContext,
-  permission: string,
+  permission: string | readonly string[],
   targetUserIds: string[],
   work: (tx: Prisma.TransactionClient, locked: Set<string>) => Promise<T>,
   exclusive = false,
+  options: { isolationLevel?: Prisma.TransactionIsolationLevel } = {},
 ): Promise<T> {
   if (
     actor.securityDomain === SecurityDomain.PLATFORM ||
@@ -110,29 +111,35 @@ export async function withSchoolAuthorizationTransaction<T>(
             ({ permission: grant }) => `${grant.resource}:${grant.action}`,
           ),
         );
+        const requiredPermissions =
+          typeof permission === 'string' ? [permission] : permission;
         if (
           grants.some(({ role }) => isPlatformRoleName(role.name)) ||
-          !hasEffectivePermission(permissions, permission) ||
-          !grants.some((g) =>
-            grantAllows(
-              {
-                assignmentId: g.id,
-                tenantId: actor.tenantId,
-                role: g.role.name,
-                permissions: g.role.rolePermissions.map(
-                  ({ permission: p }) => `${p.resource}:${p.action}`,
+          !requiredPermissions.length ||
+          requiredPermissions.some(
+            (requiredPermission) =>
+              !hasEffectivePermission(permissions, requiredPermission) ||
+              !grants.some((g) =>
+                grantAllows(
+                  {
+                    assignmentId: g.id,
+                    tenantId: actor.tenantId,
+                    role: g.role.name,
+                    permissions: g.role.rolePermissions.map(
+                      ({ permission: p }) => `${p.resource}:${p.action}`,
+                    ),
+                    scopes: g.scopeGrants,
+                  },
+                  requiredPermission,
+                  actor.tenantId,
                 ),
-                scopes: g.scopeGrants,
-              },
-              permission,
-              actor.tenantId,
-            ),
+              ),
           )
         )
           throw new ForbiddenException('Insufficient permissions');
         return work(tx, locked);
       },
-      { timeout: 10000 },
+      { ...options, timeout: 10000 },
     ),
   );
 }

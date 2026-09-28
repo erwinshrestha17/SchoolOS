@@ -21,6 +21,7 @@ import {
   Ban,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Button } from '../ui/button';
 import { useSession } from '../session-provider';
 import { api } from '../../lib/api';
 import { JournalEntryDialog } from '../accounting/journal-entry-dialog';
@@ -104,11 +105,13 @@ function payrollStageRank(status: string) {
   const stageRanks: Record<string, number> = {
     DRAFT: 0,
     GENERATED: 0,
-    UNDER_REVIEW: 1,
-    REVIEWED: 2,
-    APPROVED: 3,
-    POSTED: 4,
-    PAID: 5,
+    VALIDATED: 1,
+    UNDER_REVIEW: 2,
+    REVIEWED: 3,
+    APPROVED: 4,
+    FINALIZED: 5,
+    POSTED: 6,
+    PAID: 7,
   };
 
   return stageRanks[status] ?? -1;
@@ -119,9 +122,11 @@ function statusClasses(status: string) {
     case 'DRAFT':
     case 'GENERATED':
       return 'border-amber-200 bg-amber-100 text-amber-700';
+    case 'VALIDATED':
     case 'REVIEWED':
     case 'UNDER_REVIEW':
       return 'border-[var(--color-mod-hr-border)] bg-[var(--color-mod-hr-soft)] text-[var(--color-mod-hr-text)]';
+    case 'FINALIZED':
     case 'APPROVED':
       return 'border-success-200 bg-success-100 text-success-700';
     case 'POSTED':
@@ -154,15 +159,7 @@ function getStaffName(line: PayrollLineView) {
 export function PayrollRuns() {
   const queryClient = useQueryClient();
   const { status, hasPermissions } = useSession();
-  const canManagePayroll = hasPermissions(['payroll:manage']);
-  const canReviewRun =
-    hasPermissions(['payroll:run:review']) || canManagePayroll;
-  const canApproveRun =
-    hasPermissions(['payroll:run:approve']) || canManagePayroll;
-  const canPostRun = hasPermissions(['payroll:run:post']) || canManagePayroll;
-  const canReverseRun =
-    hasPermissions(['payroll:run:reverse']) || canManagePayroll;
-
+  const canPreparePayroll = hasPermissions(['payroll:run:create']);
   const [currentPeriod] = useState(() => getNepalNow());
   const currentMonth = currentPeriod.month;
   const currentYear = currentPeriod.year;
@@ -323,11 +320,11 @@ export function PayrollRuns() {
           </div>
           <div className="space-y-1">
             <p className="text-sm font-bold text-amber-900">
-              Payroll Runs — Phase 2 accounting boundary
+              Payroll approval and posting
             </p>
             <p className="text-xs leading-relaxed text-amber-800">
-              Approval locks payroll calculations. Posting is a separate
-              APPROVED-to-POSTED action that creates the M11 payroll accrual
+              Finalization locks payroll calculations. Posting is a separate
+              FINALIZED-to-POSTED action that creates the M11 payroll accrual
               journal through the backend accounting posting boundary. It does
               not disburse salaries or pay staff, and posted runs remain
               immutable; reversal is a separate reasoned backend workflow.
@@ -424,7 +421,7 @@ export function PayrollRuns() {
               <button
                 type="button"
                 disabled={
-                  !canManagePayroll ||
+                  !canPreparePayroll ||
                   previewRows.length === 0 ||
                   createDraftMutation.isPending
                 }
@@ -441,10 +438,10 @@ export function PayrollRuns() {
             </div>
           </div>
 
-          {!canManagePayroll && (
+          {!canPreparePayroll && (
             <p className="rounded-xl bg-gray-50 px-4 py-3 text-xs font-medium text-gray-600">
               You can view payroll previews with payroll:read. Creating a draft
-              requires payroll:manage.
+              requires payroll:run:create.
             </p>
           )}
 
@@ -589,8 +586,8 @@ export function PayrollRuns() {
           <div className="border-b border-gray-100 p-5">
             <h3 className="text-lg font-bold text-gray-900">Payroll Runs</h3>
             <p className="text-xs text-gray-500">
-              Draft, reviewed, approved, and posted payroll runs. Posting is a
-              controlled M11 accrual action.
+              Validate, review, approve, finalize and post payroll runs. Posting
+              is a controlled M11 accrual action.
             </p>
           </div>
           <PaginatedDataTable
@@ -688,18 +685,20 @@ export function PayrollRuns() {
               </div>
 
               {/* Status Stepper */}
-              <div className="flex items-center justify-between px-2 py-4">
+              <div className="grid grid-cols-4 gap-x-2 gap-y-4 px-2 py-4">
                 {[
                   { label: 'Draft', rank: 0 },
-                  { label: 'Review', rank: 1 },
-                  { label: 'Reviewed', rank: 2 },
-                  { label: 'Approved', rank: 3 },
-                  { label: 'Posted', rank: 4 },
-                  { label: 'Paid', rank: 5 },
-                ].map((step, idx, arr) => (
+                  { label: 'Validated', rank: 1 },
+                  { label: 'In review', rank: 2 },
+                  { label: 'Reviewed', rank: 3 },
+                  { label: 'Approved', rank: 4 },
+                  { label: 'Finalized', rank: 5 },
+                  { label: 'Posted', rank: 6 },
+                  { label: 'Paid', rank: 7 },
+                ].map((step, idx) => (
                   <div
                     key={step.label}
-                    className="flex items-center flex-1 last:flex-none"
+                    className="flex items-center justify-center"
                   >
                     <div className="flex flex-col items-center gap-1">
                       <div
@@ -727,17 +726,6 @@ export function PayrollRuns() {
                         {step.label}
                       </span>
                     </div>
-                    {idx < arr.length - 1 && (
-                      <div
-                        className={cn(
-                          'h-[2px] flex-1 mx-2 mb-4',
-                          payrollStageRank(selectedRun.status) >=
-                            arr[idx + 1].rank
-                            ? 'bg-[var(--color-mod-hr-accent)]'
-                            : 'bg-slate-100',
-                        )}
-                      />
-                    )}
                   </div>
                 ))}
               </div>
@@ -766,10 +754,33 @@ export function PayrollRuns() {
               </div>
 
               <div className="flex flex-col gap-2">
+                {(
+                  [
+                    ['canValidate', 'VALIDATE', 'Validate Payroll'],
+                    ['canFinalize', 'FINALIZE', 'Finalize Payroll'],
+                    [
+                      'canCancelFinalized',
+                      'CANCEL_FINALIZED',
+                      'Cancel Unposted Run',
+                    ],
+                  ] as const
+                ).map(([capability, action, label]) =>
+                  selectedRunActions?.[capability] ? (
+                    <Button
+                      key={action}
+                      onClick={() => {
+                        setActionType(action);
+                        setIsActionDialogOpen(true);
+                      }}
+                    >
+                      <ShieldCheck size={14} />
+                      {label}
+                    </Button>
+                  ) : null,
+                )}
                 {selectedRunActions?.canSubmitReview && (
                   <button
                     type="button"
-                    disabled={!canReviewRun}
                     onClick={() => {
                       setActionType('SUBMIT_REVIEW');
                       setIsActionDialogOpen(true);
@@ -788,7 +799,6 @@ export function PayrollRuns() {
                     {selectedRunActions.canCompleteReview && (
                       <button
                         type="button"
-                        disabled={!canReviewRun}
                         onClick={() => {
                           setActionType('COMPLETE_REVIEW');
                           setIsActionDialogOpen(true);
@@ -802,7 +812,6 @@ export function PayrollRuns() {
                     {selectedRunActions.canReject && (
                       <button
                         type="button"
-                        disabled={!canReviewRun}
                         onClick={() => {
                           setActionType('REJECT');
                           setIsActionDialogOpen(true);
@@ -816,7 +825,6 @@ export function PayrollRuns() {
                     {selectedRunActions.canApprove && (
                       <button
                         type="button"
-                        disabled={!canApproveRun}
                         onClick={() => {
                           setActionType('APPROVE');
                           setIsActionDialogOpen(true);
@@ -833,7 +841,6 @@ export function PayrollRuns() {
                 {selectedRunActions?.canPost && (
                   <button
                     type="button"
-                    disabled={!canPostRun}
                     onClick={() => {
                       setActionType('POST');
                       setIsActionDialogOpen(true);
@@ -848,7 +855,6 @@ export function PayrollRuns() {
                 {selectedRunActions?.canReverse && (
                   <button
                     type="button"
-                    disabled={!canReverseRun}
                     onClick={() => {
                       setActionType('REVERSE');
                       setIsActionDialogOpen(true);
@@ -962,21 +968,24 @@ export function PayrollRuns() {
                           </p>
                         </div>
                       </div>
-                      {selectedRun.status === 'APPROVED' && line.id && (
-                        <button
-                          type="button"
-                          disabled={salarySlipMutation.isPending}
-                          onClick={() => salarySlipMutation.mutate(line)}
-                          className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[var(--color-mod-hr-border)] px-3 py-1.5 text-xs font-bold text-[var(--color-mod-hr-text)] transition-colors hover:bg-[var(--color-mod-hr-soft)] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {salarySlipMutation.isPending ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <Download size={14} />
-                          )}
-                          Download Salary Slip PDF
-                        </button>
-                      )}
+                      {['FINALIZED', 'POSTED', 'PAID'].includes(
+                        selectedRun.status,
+                      ) &&
+                        line.id && (
+                          <button
+                            type="button"
+                            disabled={salarySlipMutation.isPending}
+                            onClick={() => salarySlipMutation.mutate(line)}
+                            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[var(--color-mod-hr-border)] px-3 py-1.5 text-xs font-bold text-[var(--color-mod-hr-text)] transition-colors hover:bg-[var(--color-mod-hr-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {salarySlipMutation.isPending ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Download size={14} />
+                            )}
+                            Download Salary Slip PDF
+                          </button>
+                        )}
                     </div>
                   ))
                 ) : (

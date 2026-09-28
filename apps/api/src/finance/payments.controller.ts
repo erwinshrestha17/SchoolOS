@@ -2,7 +2,6 @@ import { ServiceAuthorization } from '../authorization/service-authorization.dec
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Param,
   Post,
@@ -31,6 +30,7 @@ import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
 import { ReversePaymentDto } from './dto/reverse-payment.dto';
 import { ReallocatePaymentDto } from './dto/reallocate-payment.dto';
 import { CreateFinanceRequestDto } from './dto/create-finance-request.dto';
+import { DecideFinanceRequestDto } from './dto/decide-finance-request.dto';
 import { ReviewFinanceRequestDto } from './dto/review-finance-request.dto';
 import { FinanceService } from './finance.service';
 import {
@@ -51,7 +51,7 @@ export class PaymentsController {
   constructor(private readonly financeService: FinanceService) {}
 
   @Get()
-  @Permissions('payments:collect')
+  @ServiceAuthorization('PAYMENT_CORRECTION_SOURCE_READ')
   listPayments(
     @Query() query: ListPaymentsQueryDto,
     @CurrentAuth() auth: AuthContext,
@@ -262,7 +262,7 @@ export class PaymentsController {
   }
 
   @Post(':id/refund/request')
-  @Permissions('payments:collect')
+  @Permissions('payments:refund:request')
   requestRefund(
     @Param('id') paymentId: string,
     @Body() dto: CreateFinanceRequestDto,
@@ -272,7 +272,7 @@ export class PaymentsController {
   }
 
   @Post(':id/reverse/request')
-  @Permissions('payments:collect')
+  @Permissions('payments:reverse:request')
   requestReversal(
     @Param('id') paymentId: string,
     @Body() dto: CreateFinanceRequestDto,
@@ -287,28 +287,33 @@ export class PaymentsController {
     @Query() query: ListFinanceApprovalRequestsQueryDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    const hasRefund = auth.permissions.includes('payments:refund');
-    const hasReverse = auth.permissions.includes('payments:reverse');
-    const isSuperAdmin = auth.roles.includes('platform_super_admin');
-    if (!hasRefund && !hasReverse && !isSuperAdmin) {
-      throw new ForbiddenException('Insufficient permissions');
-    }
     return this.financeService.listApprovalRequests(query, auth);
   }
 
   @Post('requests/:id/review')
-  @ServiceAuthorization('FINANCE_REQUEST_REVIEW')
+  @Permissions('finance:approvals:review')
   reviewApprovalRequest(
     @Param('id') requestId: string,
     @Body() dto: ReviewFinanceRequestDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    const hasRefund = auth.permissions.includes('payments:refund');
-    const hasReverse = auth.permissions.includes('payments:reverse');
-    const isSuperAdmin = auth.roles.includes('platform_super_admin');
-    if (!hasRefund && !hasReverse && !isSuperAdmin) {
-      throw new ForbiddenException('Insufficient permissions');
-    }
     return this.financeService.reviewApprovalRequest(requestId, dto, auth);
+  }
+  @Post('requests/:id/decision')
+  @Permissions('finance:approvals:decide')
+  decideApprovalRequest(
+    @Param('id') requestId: string,
+    @Body() dto: DecideFinanceRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.decideApprovalRequest(requestId, dto, auth);
+  }
+  @Post('requests/:id/execute')
+  @ServiceAuthorization('FINANCE_REQUEST_REVIEW')
+  executeApprovalRequest(
+    @Param('id') requestId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.executeApprovalRequest(requestId, auth);
   }
 }

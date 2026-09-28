@@ -11,7 +11,7 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   'http://localhost:4000/api/v1';
 
-test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting, and reopens with reason', async ({
+test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting, and requests reasoned reopen', async ({
   authStateFor,
   browser,
 }) => {
@@ -286,7 +286,7 @@ test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting
   await yearCard.getByRole('button', { name: 'Reopen', exact: true }).click();
   const reopenDialog = page.getByRole('dialog');
   const confirmReopen = reopenDialog.getByRole('button', {
-    name: 'Confirm Reopen',
+    name: 'Submit Reopen Request',
   });
   await expect(confirmReopen).toBeDisabled();
   await reopenDialog
@@ -294,9 +294,11 @@ test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting
     .fill('E2E authorized correction requires fiscal-year reopen.');
   await expect(confirmReopen).toBeEnabled();
   await confirmReopen.click();
-  await expect(reopenDialog).not.toBeVisible();
+  await expect(reopenDialog.getByRole('status')).toContainText(
+    'The fiscal year remains closed',
+  );
   await expect(yearCard.locator('span.uppercase.tracking-wider')).toHaveText(
-    'OPEN',
+    'CLOSED',
   );
 
   await fiscalController.context.close();

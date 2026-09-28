@@ -3,6 +3,8 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { ReconciliationSessionsPanel } from './reconciliation-sessions-panel';
+import { useSession } from '../session-provider';
 import { SectionCard } from '../ui/section-card';
 import { Button } from '@/components/ui/button';
 import { Select } from '../ui/select';
@@ -25,12 +27,18 @@ import type {
   BankStatementImportPreview,
   BankStatementImportJobStatus,
   BankStatementLineSummary,
+  BankReconciliationSessionView,
 } from '@schoolos/core';
 
 const BANK_IMPORT_SYNC_ROW_LIMIT = 500;
 
 export function BankReconciliationWorkspace() {
   const queryClient = useQueryClient();
+  const { hasPermissions } = useSession();
+  const canImport = hasPermissions(['accounting:reconciliation:manage']);
+  const [activeSession, setActiveSession] =
+    useState<BankReconciliationSessionView | null>(null);
+  const canMatch = activeSession?.allowedActions.manage === true;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [importing, setImporting] = useState(false);
@@ -177,9 +185,16 @@ export function BankReconciliationWorkspace() {
 
   const reconcileMutation = useMutation({
     mutationFn: (data: { statementId: string; journalLineId: string }) =>
-      api.reconcileStatement(data.statementId, data.journalLineId),
+      api.reconcileStatement(
+        activeSession?.id ?? '',
+        data.statementId,
+        data.journalLineId,
+      ),
     onSuccess: () => {
-      setMessage('Transaction reconciled');
+      setMessage('Statement line matched in this reconciliation session.');
+      queryClient.invalidateQueries({
+        queryKey: ['bank-reconciliation-sessions'],
+      });
       setError(null);
       queryClient.invalidateQueries({
         queryKey: ['bank-recon-summary', selectedAccountId],
@@ -277,6 +292,9 @@ export function BankReconciliationWorkspace() {
             value={selectedAccountId}
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
               setSelectedAccountId(e.target.value);
+              setActiveSession(null);
+              setMatching(null);
+              setIsConfirmingRecon(null);
               setImportPreview(null);
               setPendingImportLines([]);
             }}
@@ -297,7 +315,9 @@ export function BankReconciliationWorkspace() {
               type="button"
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
-              disabled={importing || queueImportMutation.isPending}
+              disabled={
+                !canImport || importing || queueImportMutation.isPending
+              }
               isLoading={
                 queueImportMutation.isPending || previewImportMutation.isPending
               }
@@ -316,7 +336,9 @@ export function BankReconciliationWorkspace() {
               accept=".csv"
               className="hidden"
               onChange={handleFileUpload}
-              disabled={importing || queueImportMutation.isPending}
+              disabled={
+                !canImport || importing || queueImportMutation.isPending
+              }
             />
             <Button
               type="button"
@@ -338,6 +360,14 @@ export function BankReconciliationWorkspace() {
           </div>
         )}
       </div>
+
+      {selectedAccountId && (
+        <ReconciliationSessionsPanel
+          accountId={selectedAccountId}
+          fiscalYearId={activeFiscalYear?.id}
+          onSessionChange={setActiveSession}
+        />
+      )}
 
       {selectedAccountId && importPreview && (
         <SectionCard
@@ -462,9 +492,11 @@ export function BankReconciliationWorkspace() {
                       type="button"
                       size="sm"
                       disabled={
+                        !canMatch ||
                         candidate.warningFlags?.includes(
                           'DUPLICATE_CANDIDATE',
-                        ) || candidate.confidence === 'LOW'
+                        ) ||
+                        candidate.confidence === 'LOW'
                       }
                       onClick={() =>
                         setIsConfirmingRecon({
@@ -508,7 +540,7 @@ export function BankReconciliationWorkspace() {
           </div>
           <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-6 shadow-sm">
             <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest">
-              Reconciled
+              Matched statement lines
             </p>
             <p className="mt-1 text-2xl font-bold text-emerald-700">
               {summaryQuery.data.reconciledStatements}
@@ -516,7 +548,7 @@ export function BankReconciliationWorkspace() {
           </div>
           <div className="rounded-2xl bg-amber-50 border border-amber-100 p-6 shadow-sm">
             <p className="text-xs font-bold text-amber-600 uppercase tracking-widest">
-              Unreconciled
+              Unmatched statement lines
             </p>
             <p className="mt-1 text-2xl font-bold text-amber-700">
               {summaryQuery.data.unreconciledStatements}
@@ -528,8 +560,8 @@ export function BankReconciliationWorkspace() {
             </p>
             <p className="mt-1 text-2xl font-bold text-[var(--color-mod-accounting-text)]">
               {(
-                Number(summaryQuery.data.statementBalance.debit || 0) -
-                Number(summaryQuery.data.statementBalance.credit || 0)
+                Number(summaryQuery.data.ledgerBalance.debit || 0) -
+                Number(summaryQuery.data.ledgerBalance.credit || 0)
               ).toLocaleString(undefined, {
                 style: 'currency',
                 currency: 'NPR',
@@ -584,6 +616,7 @@ export function BankReconciliationWorkspace() {
                           <Button
                             type="button"
                             size="sm"
+                            disabled={!canMatch}
                             variant={
                               matching === stmt.id ? 'default' : 'secondary'
                             }
@@ -621,6 +654,7 @@ export function BankReconciliationWorkspace() {
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                 />
                 <Input
+                  aria-label="Search ledger entries by journal number or amount"
                   placeholder="Search by journal # or amount..."
                   className="pl-10 rounded-2xl border-slate-200"
                   value={journalFilter}
@@ -672,8 +706,9 @@ export function BankReconciliationWorkspace() {
                             <Button
                               type="button"
                               size="icon"
+                              aria-label={`Match journal ${row.entryNumber ?? row.journalLineId}`}
                               variant="secondary"
-                              disabled={!matching}
+                              disabled={!matching || !canMatch}
                               onClick={() =>
                                 matching &&
                                 setIsConfirmingRecon({

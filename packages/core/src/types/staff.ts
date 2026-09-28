@@ -52,6 +52,11 @@ export type StaffAttendanceRosterPage = {
 };
 
 export type StaffDetail = StaffSummary & {
+  allowedSensitiveFields?: {
+    identityRead: boolean; identityWrite: boolean; bankRead: boolean; bankWrite: boolean;
+    taxRead: boolean; taxWrite: boolean; documentsRead: boolean; documentsManage: boolean;
+    salaryRead: boolean; disciplinaryRead: boolean;
+  };
   personal?: {
     dateOfBirth: string;
     gender: string;

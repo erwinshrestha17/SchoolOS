@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSession } from '../session-provider';
 import { api } from '../../lib/api';
 import {
   Dialog,
@@ -53,6 +54,9 @@ export function SalaryStructureDialog({
   existingStructure,
 }: SalaryStructureDialogProps) {
   const queryClient = useQueryClient();
+  const { hasPermissions } = useSession();
+  const canEditBank = hasPermissions(['hr:bank:read']) && hasPermissions(['hr:bank:write']);
+  const canEditTax = hasPermissions(['hr:tax:read']) && hasPermissions(['hr:tax:write']);
   const [toastError, setToastError] = useState<string | null>(null);
 
   const isEdit = !!existingStructure;
@@ -214,12 +218,12 @@ export function SalaryStructureDialog({
       basicSalary,
       allowances: allowancesSum,
       deductions: deductionsSum,
-      pfEnabled,
-      tdsEnabled,
+      pfEnabled: canEditTax ? pfEnabled : undefined,
+      tdsEnabled: canEditTax ? tdsEnabled : undefined,
       paymentMethod,
-      bankName: paymentMethod === 'BANK' ? optionalTrim(bankName) : undefined,
+      bankName: canEditBank && paymentMethod === 'BANK' ? optionalTrim(bankName) : undefined,
       bankAccount:
-        paymentMethod === 'BANK' ? optionalTrim(bankAccount) : undefined,
+        canEditBank && paymentMethod === 'BANK' ? optionalTrim(bankAccount) : undefined,
       notes: optionalTrim(notes),
       components,
     };
@@ -319,6 +323,7 @@ export function SalaryStructureDialog({
                   <input
                     type="checkbox"
                     checked={pfEnabled}
+                    disabled={!canEditTax}
                     onChange={(e) => setPfEnabled(e.target.checked)}
                     className="rounded border-slate-300 text-[var(--color-mod-hr-accent)] focus:ring-[var(--color-mod-hr-border)]/50 h-4 w-4"
                   />
@@ -336,6 +341,7 @@ export function SalaryStructureDialog({
                   <input
                     type="checkbox"
                     checked={tdsEnabled}
+                    disabled={!canEditTax}
                     onChange={(e) => setTdsEnabled(e.target.checked)}
                     className="rounded border-slate-300 text-[var(--color-mod-hr-accent)] focus:ring-[var(--color-mod-hr-border)]/50 h-4 w-4"
                   />
@@ -542,6 +548,7 @@ export function SalaryStructureDialog({
                   <Input
                     type="text"
                     value={bankName}
+                    disabled={!canEditBank}
                     onChange={(e) => setBankName(e.target.value)}
                     placeholder="Bank Name"
                   />
@@ -554,6 +561,7 @@ export function SalaryStructureDialog({
                 <Input
                   type="text"
                   value={bankAccount}
+                  disabled={!canEditBank}
                   onChange={(e) => setBankAccount(e.target.value)}
                   placeholder="Disbursement bank account number"
                 />

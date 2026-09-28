@@ -6,7 +6,7 @@ import {
 } from './payroll-salary-slip.service';
 
 describe('payroll salary slip PDFs', () => {
-  it('allows salary slip generation only for approved payroll runs', () => {
+  it('allows salary slip generation only for finalized payroll runs', () => {
     expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.DRAFT)).toBe(
       false,
     );
@@ -14,6 +14,9 @@ describe('payroll salary slip PDFs', () => {
       false,
     );
     expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.APPROVED)).toBe(
+      false,
+    );
+    expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.FINALIZED)).toBe(
       true,
     );
     expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.POSTED)).toBe(
@@ -55,7 +58,7 @@ describe('payroll salary slip PDFs', () => {
     expect(lines).toContain('Approved Date: 2026-05-31');
   });
 
-  it('returns a valid PDF buffer without creating M9 accounting entries', () => {
+  it('returns a valid PDF buffer without creating M11 accounting entries', () => {
     const pdf = buildApprovedSalarySlipPdf({
       schoolName: 'Sunrise Academy',
       staffName: 'Sita Sharma',
@@ -74,6 +77,6 @@ describe('payroll salary slip PDFs', () => {
 
     expect(Buffer.isBuffer(pdf)).toBe(true);
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
-    expect(pdf.toString()).toContain('No M9 accounting journal entry');
+    expect(pdf.toString()).toContain('No M11 accounting journal entry');
   });
 });

@@ -4,6 +4,14 @@ export type JournalEntryView = {
   entryDate: string;
   narration: string;
   status: string;
+  allowedActions?: {
+    submit: boolean;
+    review: boolean;
+    approve: boolean;
+    post: boolean;
+    reject: boolean;
+    cancel: boolean;
+  };
   sourceModule?: string | null;
   sourceType: string;
   sourceId?: string | null;
@@ -121,6 +129,7 @@ export type FiscalPeriodCloseReadiness = {
       | "APPROVED_UNPOSTED_JOURNALS"
       | "POSTED_SOURCE_WITHOUT_MAPPING"
       | "UNRECONCILED_BANK_ITEMS"
+      | "UNFINALIZED_RECONCILIATIONS"
       | "UNBALANCED_POSTED_JOURNALS"
       | "UNBALANCED_TRIAL_BALANCE";
     count: number;
@@ -137,6 +146,7 @@ export type FiscalCloseIssueSeverity = "BLOCKING" | "WARNING" | "INFO";
 
 export type FiscalYearCloseIssueCode =
   | "OPEN_PERIODS"
+  | "UNFINALIZED_RECONCILIATIONS"
   | "DRAFT_JOURNALS"
   | "SUBMITTED_JOURNALS"
   | "APPROVED_UNPOSTED_JOURNALS"
@@ -602,4 +612,64 @@ export type BankReconciliationSummary = {
   unreconciledStatements: number;
   statementBalance: { debit: string; credit: string };
   ledgerBalance: { debit: string; credit: string };
+};
+
+export type BankReconciliationSessionView = {
+  id: string;
+  accountId: string;
+  fiscalPeriodId: string | null;
+  statementFrom: string;
+  statementTo: string;
+  status:
+    | "OPEN"
+    | "SUBMITTED"
+    | "REVIEWED"
+    | "FINALIZED"
+    | "REOPENED"
+    | "CANCELLED";
+  revision: number;
+  statementReference: string | null;
+  openingBookBalance: string;
+  closingBookBalance: string;
+  openingBankBalance: string;
+  closingBankBalance: string;
+  difference: string;
+  createdById: string;
+  submittedById: string | null;
+  reviewedById: string | null;
+  reviewReason: string | null;
+  finalizedById: string | null;
+  finalizedAt: string | null;
+  issues: string[];
+  unmatchedStatementCount: number;
+  unmatchedBookCount: number;
+  matches: Array<{
+    id: string;
+    statementId: string;
+    journalLineId: string | null;
+    status: "MATCHED" | "UNMATCHED";
+    bankAmount: string;
+    bookAmount: string;
+    reason: string | null;
+  }>;
+  history: Array<{
+    id: string;
+    action: string;
+    actorUserId: string;
+    reason: string | null;
+    createdAt: string;
+  }>;
+  allowedActions: Record<
+    "manage" | "submit" | "review" | "return" | "finalize" | "cancel",
+    boolean
+  >;
+};
+export type PrepareBankReconciliation = {
+  accountId: string;
+  fiscalPeriodId: string;
+  statementFrom: string;
+  statementTo: string;
+  openingBankBalance: string;
+  closingBankBalance: string;
+  statementReference: string;
 };

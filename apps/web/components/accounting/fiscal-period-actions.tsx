@@ -29,6 +29,7 @@ export function FiscalPeriodActions({
   >(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [reopenRequestId, setReopenRequestId] = useState<string | null>(null);
 
   const readinessQuery = useQuery({
     queryKey: ['fiscal-period-close-readiness', periodId],
@@ -37,20 +38,43 @@ export function FiscalPeriodActions({
   });
 
   const mutation = useMutation({
-    mutationFn: (data: {
+    mutationFn: async (data: {
       type: 'lock' | 'unlock' | 'close' | 'reopen';
       reason: string;
     }) => {
       if (data.type === 'lock')
-        return api.lockFiscalPeriod(periodId, { reason: data.reason });
+        return {
+          type: 'other' as const,
+          result: await api.lockFiscalPeriod(periodId, { reason: data.reason }),
+        };
       if (data.type === 'unlock')
-        return api.unlockFiscalPeriod(periodId, { reason: data.reason });
+        return {
+          type: 'other' as const,
+          result: await api.unlockFiscalPeriod(periodId, {
+            reason: data.reason,
+          }),
+        };
       if (data.type === 'close')
-        return api.closeFiscalPeriod(periodId, { reason: data.reason });
-      return api.reopenFiscalPeriod(periodId, { reason: data.reason });
+        return {
+          type: 'other' as const,
+          result: await api.closeFiscalPeriod(periodId, {
+            reason: data.reason,
+          }),
+        };
+      return {
+        type: 'reopen' as const,
+        result: await api.reopenFiscalPeriod(periodId, { reason: data.reason }),
+      };
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['fiscal-years'] });
+    onSuccess: (result) => {
+      if (result.type === 'reopen') {
+        setReopenRequestId(result.result.id);
+        void queryClient.invalidateQueries({
+          queryKey: ['principal-approval-centre'],
+        });
+      } else {
+        void queryClient.invalidateQueries({ queryKey: ['fiscal-years'] });
+      }
       setIsConfirmOpen(false);
       setReason('');
       setError(null);
@@ -70,62 +94,73 @@ export function FiscalPeriodActions({
 
   return (
     <>
-      <div className="flex gap-1">
-        {status === 'OPEN' && canManage && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => handleAction('lock')}
-            className="h-7 w-7 text-slate-400 hover:text-amber-600"
-            title="Lock Period"
-            aria-label="Lock Period"
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex gap-1">
+          {status === 'OPEN' && canManage && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => handleAction('lock')}
+              className="h-7 w-7 text-slate-400 hover:text-amber-600"
+              title="Lock Period"
+              aria-label="Lock Period"
+            >
+              <Lock size={14} />
+            </Button>
+          )}
+          {status === 'LOCKED' && (
+            <>
+              {canManage && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleAction('close')}
+                  className="h-7 w-7 text-slate-400 hover:text-emerald-600"
+                  title="Close Period"
+                  aria-label="Close Period"
+                >
+                  <CheckCircle2 size={14} />
+                </Button>
+              )}
+              {canManage && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleAction('unlock')}
+                  className="h-7 w-7 text-slate-400 hover:text-[var(--color-mod-accounting-accent)]"
+                  title="Unlock Period"
+                  aria-label="Unlock Period"
+                >
+                  <Unlock size={14} />
+                </Button>
+              )}
+            </>
+          )}
+          {status === 'CLOSED' && canReopen && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => handleAction('reopen')}
+              className="h-7 w-7 text-slate-400 hover:text-[var(--color-mod-accounting-accent)]"
+              title="Request Period Reopen"
+              aria-label="Request Period Reopen"
+            >
+              <Unlock size={14} />
+            </Button>
+          )}
+        </div>
+        {reopenRequestId && status === 'CLOSED' && (
+          <span
+            role="status"
+            className="text-[10px] font-semibold text-amber-700"
+            aria-label={`Reopen request pending for ${label}`}
           >
-            <Lock size={14} />
-          </Button>
-        )}
-        {status === 'LOCKED' && (
-          <>
-            {canManage && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => handleAction('close')}
-                className="h-7 w-7 text-slate-400 hover:text-emerald-600"
-                title="Close Period"
-                aria-label="Close Period"
-              >
-                <CheckCircle2 size={14} />
-              </Button>
-            )}
-            {canManage && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => handleAction('unlock')}
-                className="h-7 w-7 text-slate-400 hover:text-[var(--color-mod-accounting-accent)]"
-                title="Unlock Period"
-                aria-label="Unlock Period"
-              >
-                <Unlock size={14} />
-              </Button>
-            )}
-          </>
-        )}
-        {status === 'CLOSED' && canReopen && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => handleAction('reopen')}
-            className="h-7 w-7 text-slate-400 hover:text-[var(--color-mod-accounting-accent)]"
-            title="Reopen Period"
-            aria-label="Reopen Period"
-          >
-            <Unlock size={14} />
-          </Button>
+            Reopen requested
+          </span>
         )}
       </div>
 
@@ -133,12 +168,21 @@ export function FiscalPeriodActions({
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={() => mutation.mutate({ type: actionType!, reason })}
-        title={`${actionType?.toUpperCase()} Period ${label}`}
-        description={`Are you sure you want to ${actionType} this fiscal period? This action is audited.`}
-        confirmLabel={mutation.isPending ? 'Processing...' : 'Confirm'}
+        title={
+          actionType === 'reopen'
+            ? `Request Reopen for Period ${label}`
+            : `${actionType?.toUpperCase()} Period ${label}`
+        }
+        description={
+          actionType === 'reopen'
+            ? 'Submit a reasoned request. The period remains closed until an independent approver applies it.'
+            : `Are you sure you want to ${actionType} this fiscal period? This action is audited.`
+        }
+        confirmLabel={actionType === 'reopen' ? 'Submit Request' : 'Confirm'}
+        isConfirming={mutation.isPending}
         variant={actionType === 'reopen' ? 'default' : 'warning'}
         confirmDisabled={
-          reason.trim().length < 5 ||
+          reason.trim().length < (actionType === 'reopen' ? 10 : 5) ||
           (actionType === 'close' &&
             (readinessQuery.isPending ||
               readinessQuery.isError ||
@@ -189,12 +233,13 @@ export function FiscalPeriodActions({
             placeholder="Required for reopening, recommended for others..."
             className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-[var(--color-mod-accounting-accent)] min-h-[80px]"
           />
-          {reason.trim().length > 0 && reason.trim().length < 5 && (
-            <p className="flex items-center gap-1 text-[10px] text-rose-500 font-bold uppercase">
-              <AlertCircle size={10} />
-              Enter at least 5 characters
-            </p>
-          )}
+          {reason.trim().length > 0 &&
+            reason.trim().length < (actionType === 'reopen' ? 10 : 5) && (
+              <p className="flex items-center gap-1 text-[10px] text-rose-500 font-bold uppercase">
+                <AlertCircle size={10} />
+                Enter at least {actionType === 'reopen' ? 10 : 5} characters
+              </p>
+            )}
         </div>
       </ConfirmDialog>
     </>

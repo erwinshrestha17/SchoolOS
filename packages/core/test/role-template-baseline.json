@@ -1,7 +1,7 @@
 {
   "accountant": {
     "displayName": "Accountant",
-    "version": 1,
+    "version": 3,
     "securityDomain": "SCHOOL",
     "permissions": [
       "accounting:accounts:read",
@@ -15,24 +15,21 @@
       "accounting:exports:create",
       "accounting:fiscal:manage",
       "accounting:fiscal:reopen",
-      "accounting:journals:approve",
       "accounting:journals:cancel",
       "accounting:journals:create",
-      "accounting:journals:post",
       "accounting:journals:read",
       "accounting:journals:reject",
       "accounting:journals:reverse",
+      "accounting:journals:review",
       "accounting:journals:submit",
       "accounting:payables:read",
       "accounting:payables:write",
-      "accounting:payroll-handoff:post",
       "accounting:payroll-handoff:read",
       "accounting:posting-batches:read",
       "accounting:posting-batches:retry",
       "accounting:read",
-      "accounting:reconciliation:finalize",
-      "accounting:reconciliation:manage",
       "accounting:reconciliation:read",
+      "accounting:reconciliation:review",
       "accounting:reports:balance-sheet",
       "accounting:reports:budget-vs-actual",
       "accounting:reports:cash-book",
@@ -51,10 +48,11 @@
       "fees:bill",
       "fees:discount",
       "fees:manage",
+      "finance:approvals:read",
+      "finance:approvals:review",
       "ledger:read",
       "payments:close",
       "payments:collect",
-      "payments:refund",
       "receipts:manage",
       "receipts:read",
       "reports:export",
@@ -319,9 +317,15 @@
   },
   "cashier": {
     "displayName": "Cashier",
-    "version": 1,
+    "version": 2,
     "securityDomain": "SCHOOL",
-    "permissions": ["payments:collect", "receipts:read", "settings:read_public"]
+    "permissions": [
+      "payments:collect",
+      "payments:refund:request",
+      "payments:reverse:request",
+      "receipts:read",
+      "settings:read_public"
+    ]
   },
   "driver": {
     "displayName": "Driver",
@@ -337,17 +341,41 @@
   },
   "finance_approver": {
     "displayName": "Finance Approver",
-    "version": 1,
+    "version": 3,
     "securityDomain": "SCHOOL",
     "permissions": [
+      "accounting:journals:approve",
+      "accounting:journals:read",
+      "accounting:journals:reject",
+      "accounting:read",
+      "accounting:reconciliation:finalize",
+      "accounting:reconciliation:read",
       "finance:approvals:decide",
       "finance:approvals:read",
       "settings:read_public"
     ]
   },
+  "finance_clerk": {
+    "displayName": "Finance Clerk",
+    "version": 2,
+    "securityDomain": "SCHOOL",
+    "permissions": [
+      "accounting:journals:cancel",
+      "accounting:journals:create",
+      "accounting:journals:read",
+      "accounting:journals:submit",
+      "accounting:read",
+      "accounting:reconciliation:manage",
+      "accounting:reconciliation:read",
+      "payments:refund:request",
+      "payments:reverse:request",
+      "receipts:read",
+      "settings:read_public"
+    ]
+  },
   "financial_auditor": {
     "displayName": "Auditor",
-    "version": 1,
+    "version": 2,
     "securityDomain": "SCHOOL",
     "permissions": [
       "accounting:accounts:read",
@@ -369,6 +397,7 @@
       "accounting:reports:trial-balance",
       "accounting:settings:read",
       "accounting:vendors:read",
+      "finance:approvals:read",
       "receipts:read",
       "reports:export",
       "reports:read",
@@ -379,13 +408,21 @@
   },
   "hr_manager": {
     "displayName": "HR Manager",
-    "version": 1,
+    "version": 2,
     "securityDomain": "SCHOOL",
     "permissions": [
       "events:read",
       "hr:attendance:correct",
       "hr:attendance:read",
       "hr:attendance:write",
+      "hr:bank:read",
+      "hr:bank:write",
+      "hr:disciplinary:manage",
+      "hr:disciplinary:read",
+      "hr:documents:manage",
+      "hr:documents:read",
+      "hr:identity:read",
+      "hr:identity:write",
       "hr:leave:adjust",
       "hr:leave:approve",
       "hr:leave:read",
@@ -398,6 +435,8 @@
       "hr:staff:read",
       "hr:staff:terminate",
       "hr:staff:update",
+      "hr:tax:read",
+      "hr:tax:write",
       "notices:create",
       "notices:read",
       "payroll:payslip:generate",
@@ -456,10 +495,11 @@
   },
   "payroll_approver": {
     "displayName": "Payroll Approver",
-    "version": 1,
+    "version": 2,
     "securityDomain": "SCHOOL",
     "permissions": [
       "payroll:run:approve",
+      "payroll:run:finalize",
       "payroll:run:read",
       "payroll:salary:read",
       "settings:read_public"
@@ -467,7 +507,7 @@
   },
   "payroll_preparer": {
     "displayName": "Payroll Preparer",
-    "version": 1,
+    "version": 2,
     "securityDomain": "SCHOOL",
     "permissions": [
       "hr:attendance:read",
@@ -475,6 +515,7 @@
       "hr:staff:read",
       "payroll:run:create",
       "payroll:run:read",
+      "payroll:run:validate",
       "payroll:salary:read",
       "settings:read_public"
     ]
@@ -559,6 +600,25 @@
       "platform:reports:read",
       "platform:tenants:read",
       "platform:usage:read"
+    ]
+  },
+  "posting_authority": {
+    "displayName": "Posting Authority",
+    "version": 2,
+    "securityDomain": "SCHOOL",
+    "permissions": [
+      "accounting:journals:post",
+      "accounting:journals:read",
+      "accounting:payroll-handoff:post",
+      "accounting:payroll-handoff:read",
+      "accounting:read",
+      "finance:approvals:read",
+      "payments:refund",
+      "payments:reverse",
+      "payroll:read",
+      "payroll:run:post",
+      "payroll:run:read",
+      "settings:read_public"
     ]
   },
   "principal": {

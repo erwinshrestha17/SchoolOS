@@ -54,14 +54,6 @@ function formatMaskableNpr(value: PayrollMoneyAmount | null | undefined) {
 export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
-  // Mirrors the backend's canSeeSensitiveStaffData gate (apps/api staff.service.ts).
-  // Viewers without this access receive partially-masked PAN/bank values and
-  // fully-nulled salary figures — those must never be treated as editable or
-  // round-tripped back to the server.
-  const canSeeSensitiveHrData =
-    hasPermissions(['hr:manage']) ||
-    hasPermissions(['payroll:manage']) ||
-    hasPermissions(['payroll:salary:read']);
   const staffQuery = useQuery({
     queryKey: ['staff-detail', staffId],
     queryFn: () => api.getStaffDetail(staffId),
@@ -72,6 +64,10 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
   });
 
   const staff = staffQuery.data;
+  const fields = staff?.allowedSensitiveFields;
+  const canEditIdentity = fields?.identityRead === true && fields?.identityWrite === true;
+  const canEditBank = fields?.bankRead === true && fields?.bankWrite === true;
+  const canEditTax = fields?.taxRead === true && fields?.taxWrite === true;
 
   // Form states
   const [draft, setDraft] = useState({
@@ -162,19 +158,9 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
         qualifications: optionalTrim(draft.qualifications),
         experience: optionalTrim(draft.experience),
         teacherRegistryId: optionalTrim(draft.teacherRegistryId),
-        // The backend partially masks these three fields for viewers without
-        // sensitive-HR access (e.g. "12****89"). Never send them back unless
-        // this viewer received the real value — otherwise saving any other
-        // field on this form would silently overwrite the real PAN/bank
-        // details with the masked placeholder string.
-        ...(canSeeSensitiveHrData
-          ? {
-              bankName: optionalTrim(draft.bankName),
-              bankAccount: optionalTrim(draft.bankAccount),
-              citizenshipNo: optionalTrim(draft.citizenshipNo),
-              panNumber: optionalTrim(draft.panNumber),
-            }
-          : {}),
+        ...(canEditBank ? { bankName: optionalTrim(draft.bankName), bankAccount: optionalTrim(draft.bankAccount) } : {}),
+        ...(canEditIdentity ? { citizenshipNo: optionalTrim(draft.citizenshipNo) } : {}),
+        ...(canEditTax ? { panNumber: optionalTrim(draft.panNumber) } : {}),
       });
     },
     onSuccess: () => {
@@ -373,10 +359,10 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
             <Briefcase size={14} />
             Employment
           </TabsTrigger>
-          <TabsTrigger value="documents" className="gap-2">
+          {fields?.documentsRead && <TabsTrigger value="documents" className="gap-2">
             <FileText size={14} />
             Documents
-          </TabsTrigger>
+          </TabsTrigger>}
           <TabsTrigger value="attendance" className="gap-2">
             <ClipboardCheck size={14} />
             Attendance
@@ -562,7 +548,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                     <Input
                       value={draft.citizenshipNo}
                       disabled={
-                        staff.status === 'TERMINATED' || !canSeeSensitiveHrData
+                        staff.status === 'TERMINATED' || !canEditIdentity
                       }
                       onChange={(e: any) =>
                         setDraft((c) => ({
@@ -571,10 +557,9 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                         }))
                       }
                     />
-                    {!canSeeSensitiveHrData && (
+                    {!canEditIdentity && (
                       <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-                        Masked. Requires HR or payroll sensitive-data access to
-                        view or edit.
+                        Masked. Requires explicit access to this protected field.
                       </p>
                     )}
                   </FormField>
@@ -582,16 +567,15 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                     <Input
                       value={draft.panNumber}
                       disabled={
-                        staff.status === 'TERMINATED' || !canSeeSensitiveHrData
+                        staff.status === 'TERMINATED' || !canEditTax
                       }
                       onChange={(e: any) =>
                         setDraft((c) => ({ ...c, panNumber: e.target.value }))
                       }
                     />
-                    {!canSeeSensitiveHrData && (
+                    {!canEditTax && (
                       <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-                        Masked. Requires HR or payroll sensitive-data access to
-                        view or edit.
+                        Masked. Requires explicit access to this protected field.
                       </p>
                     )}
                   </FormField>
@@ -608,15 +592,15 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                     <Input
                       value={draft.bankName}
                       disabled={
-                        staff.status === 'TERMINATED' || !canSeeSensitiveHrData
+                        staff.status === 'TERMINATED' || !canEditBank
                       }
                       onChange={(e: any) =>
                         setDraft((c) => ({ ...c, bankName: e.target.value }))
                       }
                     />
-                    {!canSeeSensitiveHrData && (
+                    {!canEditBank && (
                       <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-                        Requires HR or payroll sensitive-data access to edit.
+                        Requires explicit bank editing permission.
                       </p>
                     )}
                   </FormField>
@@ -624,16 +608,15 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                     <Input
                       value={draft.bankAccount}
                       disabled={
-                        staff.status === 'TERMINATED' || !canSeeSensitiveHrData
+                        staff.status === 'TERMINATED' || !canEditBank
                       }
                       onChange={(e: any) =>
                         setDraft((c) => ({ ...c, bankAccount: e.target.value }))
                       }
                     />
-                    {!canSeeSensitiveHrData && (
+                    {!canEditBank && (
                       <p className="mt-1.5 text-[11px] font-semibold text-slate-400">
-                        Masked. Requires HR or payroll sensitive-data access to
-                        view or edit.
+                        Masked. Requires explicit access to this protected field.
                       </p>
                     )}
                   </FormField>
@@ -643,7 +626,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
 
             {/* Tab: Documents */}
             <TabsContent value="documents" className="m-0 outline-none">
-              <StaffDocumentsPanel staffId={staffId} />
+              {fields?.documentsRead && <StaffDocumentsPanel staffId={staffId} />}
             </TabsContent>
 
             {/* Tab: Attendance */}

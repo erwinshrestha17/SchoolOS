@@ -209,14 +209,17 @@ export class AccountingPostingService {
       include: { lines: true },
     });
 
-    await this.auditService.record({
-      action: 'create',
-      resource: 'journal_entry',
-      tenantId: input.tenantId,
-      userId: actor.userId,
-      resourceId: entry.id,
-      after: { status: entry.status },
-    });
+    await this.auditService.record(
+      {
+        action: 'create',
+        resource: 'journal_entry',
+        tenantId: input.tenantId,
+        userId: actor.userId,
+        resourceId: entry.id,
+        after: { status: entry.status },
+      },
+      tx,
+    );
 
     return entry;
   }
@@ -238,16 +241,67 @@ export class AccountingPostingService {
       include: { lines: true },
     });
 
-    await this.auditService.record({
-      action: 'update_status',
-      resource: 'journal_entry',
-      tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      after: { status: updated.status, ...extraData },
-    });
+    await this.auditService.record(
+      {
+        action: 'update_status',
+        resource: 'journal_entry',
+        tenantId,
+        userId: actor.userId,
+        resourceId: updated.id,
+        after: { status: updated.status, ...extraData },
+      },
+      tx,
+    );
 
     return updated;
+  }
+
+  async compareAndSetUnpostedManualJournal(
+    id: string,
+    actor: AuthContext,
+    expected: {
+      status: JournalEntryStatus;
+      createdById: string | null;
+      reviewedById: string | null;
+      approvedById: string | null;
+      approvedSourceFingerprint: string | null;
+    },
+    data: Prisma.JournalEntryUpdateManyMutationInput,
+    tx: Prisma.TransactionClient,
+  ) {
+    if (
+      expected.status === JournalEntryStatus.POSTED ||
+      expected.status === JournalEntryStatus.REVERSED
+    )
+      throw new ConflictException(
+        'Posted journals cannot be changed through the approval workflow',
+      );
+    return tx.journalEntry.updateMany({
+      where: {
+        id,
+        tenantId: actor.tenantId,
+        sourceType: JournalSourceType.MANUAL,
+        ...expected,
+      },
+      data,
+    });
+  }
+
+  async lockPostingPeriod(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    entryDate: Date,
+  ) {
+    const postingDate = toUtcDateOnly(entryDate);
+    // Hold the fiscal year and period through commit. A concurrent close waits
+    // for these locks; the authoritative status check runs after acquisition.
+    await tx.$queryRaw(Prisma.sql`
+      SELECT p."id" FROM "FiscalPeriod" p JOIN "FiscalYear" y ON y."id" = p."fiscalYearId"
+      WHERE p."tenantId" = ${tenantId} AND y."tenantId" = ${tenantId}
+        AND p."startDate" <= ${postingDate} AND p."endDate" >= ${postingDate}
+      FOR SHARE OF p, y
+    `);
+    return this.ensurePostingPeriodIsOpen(tx, tenantId, entryDate);
   }
 
   async postPayrollAccrual(
@@ -460,18 +514,21 @@ export class AccountingPostingService {
       },
     });
 
-    await this.auditService.record({
-      action: 'post',
-      resource: 'journal_entry',
-      tenantId: input.tenantId,
-      userId: actor.userId,
-      resourceId: entry.id,
-      after: {
-        sourceType: entry.sourceType,
-        sourceId: entry.sourceId,
-        amount: input.grossAmount.toString(),
+    await this.auditService.record(
+      {
+        action: 'post',
+        resource: 'journal_entry',
+        tenantId: input.tenantId,
+        userId: actor.userId,
+        resourceId: entry.id,
+        after: {
+          sourceType: entry.sourceType,
+          sourceId: entry.sourceId,
+          amount: input.grossAmount.toString(),
+        },
       },
-    });
+      tx,
+    );
 
     await this.recordPostedSourceBatch(tx, {
       tenantId: input.tenantId,
@@ -591,18 +648,21 @@ export class AccountingPostingService {
       include: { lines: true },
     });
 
-    await this.auditService.record({
-      action: 'post',
-      resource: 'journal_entry',
-      tenantId: input.tenantId,
-      userId: actor.userId,
-      resourceId: entry.id,
-      after: {
-        sourceType: entry.sourceType,
-        sourceId: entry.sourceId,
-        amount: input.netAmount.toString(),
+    await this.auditService.record(
+      {
+        action: 'post',
+        resource: 'journal_entry',
+        tenantId: input.tenantId,
+        userId: actor.userId,
+        resourceId: entry.id,
+        after: {
+          sourceType: entry.sourceType,
+          sourceId: entry.sourceId,
+          amount: input.netAmount.toString(),
+        },
       },
-    });
+      tx,
+    );
 
     await this.recordPostedSourceBatch(tx, {
       tenantId: input.tenantId,
@@ -687,18 +747,21 @@ export class AccountingPostingService {
       include: { lines: true },
     });
 
-    await this.auditService.record({
-      action: 'post',
-      resource: 'journal_entry',
-      tenantId: input.tenantId,
-      userId: actor.userId,
-      resourceId: entry.id,
-      after: {
-        sourceType: entry.sourceType,
-        sourceId: entry.sourceId,
-        entryNumber: entry.entryNumber,
+    await this.auditService.record(
+      {
+        action: 'post',
+        resource: 'journal_entry',
+        tenantId: input.tenantId,
+        userId: actor.userId,
+        resourceId: entry.id,
+        after: {
+          sourceType: entry.sourceType,
+          sourceId: entry.sourceId,
+          entryNumber: entry.entryNumber,
+        },
       },
-    });
+      tx,
+    );
 
     return entry;
   }
@@ -779,19 +842,22 @@ export class AccountingPostingService {
       },
     });
 
-    await this.auditService.record({
-      action: 'correct',
-      resource: 'journal_entry',
-      tenantId: input.tenantId,
-      userId: actor.userId,
-      resourceId: correction.id,
-      after: {
-        originalEntryId: original.id,
-        reversalEntryId: reversal.id,
-        correctionEntryNumber: correction.entryNumber,
-        reason: input.reason,
+    await this.auditService.record(
+      {
+        action: 'correct',
+        resource: 'journal_entry',
+        tenantId: input.tenantId,
+        userId: actor.userId,
+        resourceId: correction.id,
+        after: {
+          originalEntryId: original.id,
+          reversalEntryId: reversal.id,
+          correctionEntryNumber: correction.entryNumber,
+          reason: input.reason,
+        },
       },
-    });
+      tx,
+    );
 
     return { reversal, correction };
   }
@@ -868,18 +934,21 @@ export class AccountingPostingService {
       },
     });
 
-    await this.auditService.record({
-      action: 'reverse',
-      resource: 'journal_entry',
-      tenantId: input.tenantId,
-      userId: actor.userId,
-      resourceId: entry.id,
-      after: {
-        sourceType: entry.sourceType,
-        sourceId: entry.sourceId,
-        reversalOfId: input.originalEntryId,
+    await this.auditService.record(
+      {
+        action: 'reverse',
+        resource: 'journal_entry',
+        tenantId: input.tenantId,
+        userId: actor.userId,
+        resourceId: entry.id,
+        after: {
+          sourceType: entry.sourceType,
+          sourceId: entry.sourceId,
+          reversalOfId: input.originalEntryId,
+        },
       },
-    });
+      tx,
+    );
 
     return entry;
   }
@@ -997,18 +1066,21 @@ export class AccountingPostingService {
       include: { lines: true },
     });
 
-    await this.auditService.record({
-      action: 'post',
-      resource: 'journal_entry',
-      tenantId: input.tenantId,
-      userId: actor.userId,
-      resourceId: entry.id,
-      after: {
-        sourceType: entry.sourceType,
-        sourceId: entry.sourceId,
-        amount: input.paymentAmount.toString(),
+    await this.auditService.record(
+      {
+        action: 'post',
+        resource: 'journal_entry',
+        tenantId: input.tenantId,
+        userId: actor.userId,
+        resourceId: entry.id,
+        after: {
+          sourceType: entry.sourceType,
+          sourceId: entry.sourceId,
+          amount: input.paymentAmount.toString(),
+        },
       },
-    });
+      tx,
+    );
 
     await this.recordPostedSourceBatch(tx, {
       tenantId: input.tenantId,
@@ -1139,18 +1211,21 @@ export class AccountingPostingService {
       include: { lines: true },
     });
 
-    await this.auditService.record({
-      action: 'post',
-      resource: 'journal_entry',
-      tenantId: input.tenantId,
-      userId: actor.userId,
-      resourceId: entry.id,
-      after: {
-        sourceType: entry.sourceType,
-        sourceId: entry.sourceId,
-        amount: input.totalAmount.toString(),
+    await this.auditService.record(
+      {
+        action: 'post',
+        resource: 'journal_entry',
+        tenantId: input.tenantId,
+        userId: actor.userId,
+        resourceId: entry.id,
+        after: {
+          sourceType: entry.sourceType,
+          sourceId: entry.sourceId,
+          amount: input.totalAmount.toString(),
+        },
       },
-    });
+      tx,
+    );
 
     await this.recordPostedSourceBatch(tx, {
       tenantId: input.tenantId,
@@ -1292,18 +1367,21 @@ export class AccountingPostingService {
       },
     });
 
-    await this.auditService.record({
-      action: 'post',
-      resource: 'journal_entry',
-      tenantId: input.tenantId,
-      userId: actor.userId,
-      resourceId: entry.id,
-      after: {
-        sourceType: entry.sourceType,
-        sourceId: entry.sourceId,
-        amount: absAmount.toString(),
+    await this.auditService.record(
+      {
+        action: 'post',
+        resource: 'journal_entry',
+        tenantId: input.tenantId,
+        userId: actor.userId,
+        resourceId: entry.id,
+        after: {
+          sourceType: entry.sourceType,
+          sourceId: entry.sourceId,
+          amount: absAmount.toString(),
+        },
       },
-    });
+      tx,
+    );
 
     return entry;
   }
@@ -1407,18 +1485,21 @@ export class AccountingPostingService {
       include: { lines: true },
     });
 
-    await this.auditService.record({
-      action: 'post',
-      resource: 'journal_entry',
-      tenantId: input.tenantId,
-      userId: actor.userId,
-      resourceId: entry.id,
-      after: {
-        sourceType: entry.sourceType,
-        sourceId: entry.sourceId,
-        amount: input.amount.toString(),
+    await this.auditService.record(
+      {
+        action: 'post',
+        resource: 'journal_entry',
+        tenantId: input.tenantId,
+        userId: actor.userId,
+        resourceId: entry.id,
+        after: {
+          sourceType: entry.sourceType,
+          sourceId: entry.sourceId,
+          amount: input.amount.toString(),
+        },
       },
-    });
+      tx,
+    );
 
     await this.recordPostedSourceBatch(tx, {
       tenantId: input.tenantId,
@@ -1533,18 +1614,21 @@ export class AccountingPostingService {
       include: { lines: true },
     });
 
-    await this.auditService.record({
-      action: 'post',
-      resource: 'journal_entry',
-      tenantId: input.tenantId,
-      userId: actor.userId,
-      resourceId: entry.id,
-      after: {
-        sourceType: entry.sourceType,
-        sourceId: entry.sourceId,
-        amount: input.amount.toString(),
+    await this.auditService.record(
+      {
+        action: 'post',
+        resource: 'journal_entry',
+        tenantId: input.tenantId,
+        userId: actor.userId,
+        resourceId: entry.id,
+        after: {
+          sourceType: entry.sourceType,
+          sourceId: entry.sourceId,
+          amount: input.amount.toString(),
+        },
       },
-    });
+      tx,
+    );
 
     await this.recordPostedSourceBatch(tx, {
       tenantId: input.tenantId,

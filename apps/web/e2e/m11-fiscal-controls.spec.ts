@@ -11,7 +11,7 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   'http://localhost:4000/api/v1';
 
-test('M11 fiscal controls enforce backend readiness, lock, close, and reasoned reopen', async ({
+test('M11 fiscal controls enforce backend readiness, lock, close, and reasoned reopen request', async ({
   authStateFor,
   browser,
 }) => {
@@ -133,14 +133,17 @@ test('M11 fiscal controls enforce backend readiness, lock, close, and reasoned r
   await expect(dialog).not.toBeVisible();
   await expect(periodCard.getByText('CLOSED', { exact: true })).toBeVisible();
 
-  await periodCard.getByTitle('Reopen Period').click();
+  await periodCard.getByTitle('Request Period Reopen').click();
   dialog = page.getByRole('dialog');
   await dialog
     .getByLabel('Reason for action')
     .fill('E2E authorized correction requires reopen');
-  await dialog.getByRole('button', { name: 'Confirm' }).click();
+  await dialog.getByRole('button', { name: 'Submit Request' }).click();
   await expect(dialog).not.toBeVisible();
-  await expect(periodCard.getByText('OPEN', { exact: true })).toBeVisible();
+  await expect(periodCard.getByText('CLOSED', { exact: true })).toBeVisible();
+  await expect(periodCard.getByRole('status')).toContainText(
+    'Reopen requested',
+  );
 
   const otherTenant = await roleContext(browser, authStateFor, 'otherTenant');
   const crossTenantReadiness = await otherTenant.context.request.get(
@@ -162,7 +165,9 @@ test('M11 fiscal controls enforce backend readiness, lock, close, and reasoned r
   const readOnlyPeriod = readOnlyPage.getByTestId(`fiscal-period-${periodId}`);
   await expect(readOnlyPeriod).toBeVisible();
   await expect(readOnlyPeriod.getByTitle('Lock Period')).toHaveCount(0);
-  await expect(readOnlyPeriod.getByTitle('Reopen Period')).toHaveCount(0);
+  await expect(readOnlyPeriod.getByTitle('Request Period Reopen')).toHaveCount(
+    0,
+  );
   await readOnly.context.close();
 
   await fiscalController.context.close();

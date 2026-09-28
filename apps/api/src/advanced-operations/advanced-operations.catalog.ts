@@ -76,7 +76,14 @@ export const approvalWorkflowCatalog = [
     module: 'accounting',
     targetType: 'fiscal_period',
     defaultFinalActionKey: 'accounting.fiscal_period.reopen',
-    defaultApproverPermission: 'finance:approvals:decide',
+    defaultApproverPermission: 'advanced:approvals:decide',
+  },
+  {
+    workflowType: ApprovalWorkflowType.FISCAL_YEAR_REOPEN,
+    module: 'accounting',
+    targetType: 'fiscal_year',
+    defaultFinalActionKey: 'accounting.fiscal_year.reopen',
+    defaultApproverPermission: 'advanced:approvals:decide',
   },
 ] as const;
 

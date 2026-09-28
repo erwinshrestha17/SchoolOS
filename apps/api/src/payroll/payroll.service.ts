@@ -28,6 +28,23 @@ import {
 import type { Job, Queue } from 'bullmq';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import { AuditService } from '../audit/audit.service';
+import { createHash } from 'node:crypto';
+import {
+  requirePayrollDuty,
+  payrollDutyAvailable,
+  type PayrollDuty,
+  payrollDutyPermission,
+} from '../authorization/policies/payroll.policy';
+import {
+  hasDomainPermission,
+  requireDomainPermission,
+} from '../authorization/policies/domain-permission';
+import {
+  requireStaffFieldWrites,
+  staffFieldWritePermissions,
+} from '../authorization/policies/staff.policy';
+import { isFinancialTransactionConflict } from '../authorization/policies/financial-transaction-conflict';
+import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
 import type { AuthContext } from '../auth/auth.types';
 import { buildSalarySlipPdf, type PdfImage } from '../common/pdf/simple-pdf';
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
@@ -97,7 +114,7 @@ interface PayslipGenerationTarget {
 const PAYSLIP_FILE_UNAVAILABLE_MESSAGE =
   'Protected payslip file is unavailable. Regenerate payslips before downloading.';
 const PAYSLIP_GENERATION_RUN_STATUSES: ReadonlySet<PayrollRunStatus> = new Set([
-  PayrollRunStatus.APPROVED,
+  PayrollRunStatus.FINALIZED,
   PayrollRunStatus.POSTED,
   PayrollRunStatus.PAID,
 ]);
@@ -306,6 +323,10 @@ export class PayrollService {
     dto: CreateSalaryStructureDto,
     actor: AuthContext,
   ) {
+    requireDomainPermission(actor, 'payroll:salary:write');
+    requireStaffFieldWrites(actor, dto);
+    if (dto.pfEnabled !== undefined || dto.tdsEnabled !== undefined)
+      requireDomainPermission(actor, 'hr:tax:write');
     const staff = await this.prisma.staff.findFirst({
       where: { id: dto.staffId, tenantId: actor.tenantId },
     });
@@ -318,48 +339,65 @@ export class PayrollService {
     const effectiveTo = dto.effectiveTo ? new Date(dto.effectiveTo) : null;
     assertSalaryStructureDateRange(effectiveFrom, effectiveTo);
 
-    const structure = await this.prisma.salaryStructure.create({
-      data: {
-        tenantId: actor.tenantId,
-        staffId: dto.staffId,
-        effectiveFrom,
-        effectiveTo,
-        basicSalary: new Prisma.Decimal(dto.basicSalary),
-        allowances: new Prisma.Decimal(dto.allowances ?? 0),
-        deductions: new Prisma.Decimal(dto.deductions ?? 0),
-        pfEnabled: dto.pfEnabled ?? false,
-        tdsEnabled: dto.tdsEnabled ?? false,
-        paymentMethod: dto.paymentMethod ?? 'BANK',
-        bankAccount: dto.bankAccount ?? staff.bankAccount,
-        bankName: dto.bankName ?? staff.bankName,
-        notes: dto.notes ?? null,
-        components: {
-          create: (dto.components ?? []).map((component) => ({
+    const structure = await this.payrollTransaction(
+      actor,
+      [
+        'payroll:salary:write',
+        ...staffFieldWritePermissions(dto),
+        ...(dto.pfEnabled !== undefined || dto.tdsEnabled !== undefined
+          ? ['hr:tax:write']
+          : []),
+      ],
+      async (tx) => {
+        const structure = await tx.salaryStructure.create({
+          data: {
             tenantId: actor.tenantId,
-            name: component.name,
-            componentType: component.componentType,
-            amount: new Prisma.Decimal(component.amount),
-            taxable: component.taxable ?? true,
-          })),
-        },
-      },
-      include: { staff: true, components: true },
-    });
+            staffId: dto.staffId,
+            effectiveFrom,
+            effectiveTo,
+            basicSalary: new Prisma.Decimal(dto.basicSalary),
+            allowances: new Prisma.Decimal(dto.allowances ?? 0),
+            deductions: new Prisma.Decimal(dto.deductions ?? 0),
+            pfEnabled: dto.pfEnabled ?? false,
+            tdsEnabled: dto.tdsEnabled ?? false,
+            paymentMethod: dto.paymentMethod ?? 'BANK',
+            bankAccount: dto.bankAccount ?? staff.bankAccount,
+            bankName: dto.bankName ?? staff.bankName,
+            notes: dto.notes ?? null,
+            components: {
+              create: (dto.components ?? []).map((component) => ({
+                tenantId: actor.tenantId,
+                name: component.name,
+                componentType: component.componentType,
+                amount: new Prisma.Decimal(component.amount),
+                taxable: component.taxable ?? true,
+              })),
+            },
+          },
+          include: { staff: true, components: true },
+        });
 
-    await this.auditService.record({
-      action: 'create',
-      resource: 'salary_structure',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: structure.id,
-      after: {
-        staffId: structure.staffId,
-        basicSalary: structure.basicSalary.toString(),
-        effectiveFrom: structure.effectiveFrom,
+        await this.auditService.record(
+          {
+            action: 'create',
+            resource: 'salary_structure',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: structure.id,
+            after: {
+              staffId: structure.staffId,
+              basicSalary: structure.basicSalary.toString(),
+              effectiveFrom: structure.effectiveFrom,
+            },
+          },
+          tx,
+        );
+        return structure;
       },
-    });
+      true,
+    );
 
-    return structure;
+    return serializeSalaryStructure(structure, actor);
   }
 
   async listSalaryStructures(
@@ -408,7 +446,12 @@ export class PayrollService {
       this.prisma.salaryStructure.count({ where }),
     ]);
 
-    return paginated(items.map(serializeSalaryStructure), total, page, limit);
+    return paginated(
+      items.map((item) => serializeSalaryStructure(item, actor)),
+      total,
+      page,
+      limit,
+    );
   }
 
   async getActiveSalaryStructure(staffId: string, actor: AuthContext) {
@@ -423,7 +466,7 @@ export class PayrollService {
     });
 
     if (structure) {
-      return structure;
+      return serializeSalaryStructure(structure, actor);
     }
 
     const contract = await this.prisma.staffContract.findFirst({
@@ -438,7 +481,16 @@ export class PayrollService {
       );
     }
 
-    return contract;
+    return {
+      ...contract,
+      staff: serializeStaff(contract.staff),
+      bankAccount: hasDomainPermission(actor, 'hr:bank:read')
+        ? contract.staff.bankAccount
+        : null,
+      bankName: hasDomainPermission(actor, 'hr:bank:read')
+        ? contract.staff.bankName
+        : null,
+    };
   }
 
   async updateSalaryStructure(
@@ -446,6 +498,10 @@ export class PayrollService {
     dto: UpdateSalaryStructureDto,
     actor: AuthContext,
   ) {
+    requireDomainPermission(actor, 'payroll:salary:write');
+    requireStaffFieldWrites(actor, dto);
+    if (dto.pfEnabled !== undefined || dto.tdsEnabled !== undefined)
+      requireDomainPermission(actor, 'hr:tax:write');
     const existing = await this.prisma.salaryStructure.findFirst({
       where: { id, tenantId: actor.tenantId },
       include: { components: true },
@@ -475,50 +531,86 @@ export class PayrollService {
       : existing.effectiveTo;
     assertSalaryStructureDateRange(effectiveFrom, effectiveTo);
 
-    const updated = await this.prisma.salaryStructure.update({
-      where: { id: existing.id },
-      data: {
-        effectiveFrom: dto.effectiveFrom ? effectiveFrom : undefined,
-        effectiveTo: dto.effectiveTo ? effectiveTo : undefined,
-        basicSalary:
-          dto.basicSalary !== undefined
-            ? new Prisma.Decimal(dto.basicSalary)
-            : undefined,
-        allowances:
-          dto.allowances !== undefined
-            ? new Prisma.Decimal(dto.allowances)
-            : undefined,
-        deductions:
-          dto.deductions !== undefined
-            ? new Prisma.Decimal(dto.deductions)
-            : undefined,
-        pfEnabled: dto.pfEnabled,
-        tdsEnabled: dto.tdsEnabled,
-        paymentMethod: dto.paymentMethod,
-        bankAccount: dto.bankAccount,
-        bankName: dto.bankName,
-        notes: dto.notes,
-      },
-      include: { staff: true, components: true },
-    });
+    const updated = await this.payrollTransaction(
+      actor,
+      [
+        'payroll:salary:write',
+        ...staffFieldWritePermissions(dto),
+        ...(dto.pfEnabled !== undefined || dto.tdsEnabled !== undefined
+          ? ['hr:tax:write']
+          : []),
+      ],
+      async (tx) => {
+        const current = await tx.salaryStructure.findFirst({
+          where: { id: existing.id, tenantId: actor.tenantId },
+        });
+        if (
+          !current ||
+          current.updatedAt.getTime() !== existing.updatedAt.getTime()
+        )
+          throw new ConflictException(
+            'Salary structure changed while the form was open',
+          );
+        if (
+          await tx.payrollLine.count({
+            where: { tenantId: actor.tenantId, salaryStructureId: existing.id },
+          })
+        )
+          throw new ConflictException(
+            'Salary structure used by payroll cannot be mutated retroactively',
+          );
+        const updated = await tx.salaryStructure.update({
+          where: { id: existing.id },
+          data: {
+            effectiveFrom: dto.effectiveFrom ? effectiveFrom : undefined,
+            effectiveTo: dto.effectiveTo ? effectiveTo : undefined,
+            basicSalary:
+              dto.basicSalary !== undefined
+                ? new Prisma.Decimal(dto.basicSalary)
+                : undefined,
+            allowances:
+              dto.allowances !== undefined
+                ? new Prisma.Decimal(dto.allowances)
+                : undefined,
+            deductions:
+              dto.deductions !== undefined
+                ? new Prisma.Decimal(dto.deductions)
+                : undefined,
+            pfEnabled: dto.pfEnabled,
+            tdsEnabled: dto.tdsEnabled,
+            paymentMethod: dto.paymentMethod,
+            bankAccount: dto.bankAccount,
+            bankName: dto.bankName,
+            notes: dto.notes,
+          },
+          include: { staff: true, components: true },
+        });
 
-    await this.auditService.record({
-      action: 'update',
-      resource: 'salary_structure',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      before: { status: existing.status },
-      after: {
-        status: updated.status,
-        basicSalary: updated.basicSalary.toString(),
+        await this.auditService.record(
+          {
+            action: 'update',
+            resource: 'salary_structure',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: updated.id,
+            before: { status: existing.status },
+            after: {
+              status: updated.status,
+              basicSalary: updated.basicSalary.toString(),
+            },
+          },
+          tx,
+        );
+        return updated;
       },
-    });
+      true,
+    );
 
-    return updated;
+    return serializeSalaryStructure(updated, actor);
   }
 
   async activateSalaryStructure(id: string, actor: AuthContext) {
+    requireDomainPermission(actor, 'payroll:salary:write');
     const structure = await this.prisma.salaryStructure.findFirst({
       where: { id, tenantId: actor.tenantId },
     });
@@ -532,7 +624,9 @@ export class PayrollService {
       structure.effectiveTo,
     );
 
-    const updated = await this.prisma.$transaction(
+    const updated = await this.payrollTransaction(
+      actor,
+      'payroll:salary:write',
       async (tx) => {
         const overlappingStructures = await tx.salaryStructure.findMany({
           where: {
@@ -571,7 +665,7 @@ export class PayrollService {
           });
         }
 
-        return tx.salaryStructure.update({
+        const updated = await tx.salaryStructure.update({
           where: { id: structure.id },
           data: {
             status: SalaryStructureStatus.ACTIVE,
@@ -579,23 +673,27 @@ export class PayrollService {
           },
           include: { staff: true, components: true },
         });
+        await this.auditService.record(
+          {
+            action: 'activate',
+            resource: 'salary_structure',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: updated.id,
+            after: { staffId: updated.staffId, status: updated.status },
+          },
+          tx,
+        );
+        return updated;
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      true,
     );
 
-    await this.auditService.record({
-      action: 'activate',
-      resource: 'salary_structure',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      after: { staffId: updated.staffId, status: updated.status },
-    });
-
-    return updated;
+    return serializeSalaryStructure(updated, actor);
   }
 
   async archiveSalaryStructure(id: string, actor: AuthContext) {
+    requireDomainPermission(actor, 'payroll:salary:write');
     const structure = await this.prisma.salaryStructure.findFirst({
       where: { id, tenantId: actor.tenantId },
     });
@@ -604,25 +702,36 @@ export class PayrollService {
       throw new NotFoundException('Salary structure not found');
     }
 
-    const updated = await this.prisma.salaryStructure.update({
-      where: { id: structure.id },
-      data: {
-        status: SalaryStructureStatus.ARCHIVED,
-        archivedAt: new Date(),
+    const updated = await this.payrollTransaction(
+      actor,
+      'payroll:salary:write',
+      async (tx) => {
+        const updated = await tx.salaryStructure.update({
+          where: { id: structure.id },
+          data: {
+            status: SalaryStructureStatus.ARCHIVED,
+            archivedAt: new Date(),
+          },
+          include: { staff: true, components: true },
+        });
+
+        await this.auditService.record(
+          {
+            action: 'archive',
+            resource: 'salary_structure',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: updated.id,
+            after: { status: updated.status },
+          },
+          tx,
+        );
+        return updated;
       },
-      include: { staff: true, components: true },
-    });
+      true,
+    );
 
-    await this.auditService.record({
-      action: 'archive',
-      resource: 'salary_structure',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      after: { status: updated.status },
-    });
-
-    return updated;
+    return serializeSalaryStructure(updated, actor);
   }
 
   async listPayrollRuns(
@@ -654,7 +763,12 @@ export class PayrollService {
       this.prisma.payrollRun.count({ where }),
     ]);
 
-    return paginated(items.map(serializePayrollRunSummary), total, page, limit);
+    return paginated(
+      items.map((run) => serializePayrollRunSummary(run, actor)),
+      total,
+      page,
+      limit,
+    );
   }
 
   async getPayrollDashboardSummary(
@@ -844,11 +958,15 @@ export class PayrollService {
             pfEmployeeAmount: moneyString(selectedRun.pfEmployeeAmount),
             pfEmployerAmount: moneyString(selectedRun.pfEmployerAmount),
             tdsAmount: moneyString(selectedRun.tdsAmount),
-            approvalReadiness: getPayrollRunActions(selectedRun.status),
+            approvalReadiness: getPayrollRunActions(
+              selectedRun.status,
+              actor,
+              selectedRun,
+            ),
             postingReadiness: {
               canPost:
-                getPayrollRunActions(selectedRun.status).canPost &&
-                exceptionReadiness?.readinessStatus !== 'BLOCKED',
+                getPayrollRunActions(selectedRun.status, actor, selectedRun)
+                  .canPost && exceptionReadiness?.readinessStatus !== 'BLOCKED',
               accountingJournalId: selectedRun.journalEntryId,
               disbursementJournalEntryId:
                 selectedRun.disbursementJournalEntryId,
@@ -884,30 +1002,30 @@ export class PayrollService {
   }
 
   async createPayrollRun(dto: CreatePayrollRunDto, actor: AuthContext) {
-    await this.payrollReadinessService?.assertActionAllowed(
+    requireDomainPermission(actor, 'payroll:run:create');
+    if (!this.payrollReadinessService)
+      throw new ConflictException('Payroll readiness is unavailable');
+    await this.payrollReadinessService.assertActionAllowed(
       actor,
       'CREATE_DRAFT',
       { year: dto.periodYear, month: dto.periodMonth },
     );
-    const existing = await this.prisma.payrollRun.findUnique({
+    const existing = await this.prisma.payrollRun.findFirst({
       where: {
-        tenantId_periodMonth_periodYear: {
-          tenantId: actor.tenantId,
-          periodMonth: dto.periodMonth,
-          periodYear: dto.periodYear,
-        },
+        tenantId: actor.tenantId,
+        periodMonth: dto.periodMonth,
+        periodYear: dto.periodYear,
       },
+      orderBy: { revision: 'desc' },
     });
-
-    if (existing && existing.status !== PayrollRunStatus.VOID) {
+    if (
+      existing &&
+      existing.status !== PayrollRunStatus.VOID &&
+      existing.status !== PayrollRunStatus.CANCELLED
+    )
       throw new ConflictException(
-        'A payroll run already exists for this period. Void the existing one first if a re-run is needed.',
+        'A payroll run already exists for this period. Cancel or reverse it with an audited reason before preparing a replacement.',
       );
-    }
-
-    if (existing?.status === PayrollRunStatus.VOID) {
-      await this.prisma.payrollRun.delete({ where: { id: existing.id } });
-    }
 
     const workingDays = dto.workingDays ?? 30;
 
@@ -926,55 +1044,82 @@ export class PayrollService {
       include: { lines: { include: { staff: true } } };
     }>;
     try {
-      run = await this.prisma.payrollRun.create({
-        data: {
-          tenantId: actor.tenantId,
-          periodMonth: dto.periodMonth,
-          periodYear: dto.periodYear,
-          periodStart: getPayrollPeriod(dto.periodYear, dto.periodMonth)
-            .startsOn,
-          periodEnd: getPayrollPeriod(dto.periodYear, dto.periodMonth).endsOn,
-          status: PayrollRunStatus.GENERATED,
-          generatedById: actor.userId,
-          notes: dto.notes ?? null,
-          grossAmount: new Prisma.Decimal(totals.grossAmount),
-          deductionAmount: new Prisma.Decimal(totals.deductionAmount),
-          netAmount: new Prisma.Decimal(totals.netAmount),
-          pfEmployeeAmount: new Prisma.Decimal(totals.pfEmployeeAmount),
-          pfEmployerAmount: new Prisma.Decimal(totals.pfEmployerAmount),
-          tdsAmount: new Prisma.Decimal(totals.tdsAmount),
-          lines: {
-            create: lines.map((line) => ({
+      run = await this.payrollTransaction(
+        actor,
+        'payroll:run:create',
+        async (tx) => {
+          const created = await tx.payrollRun.create({
+            data: {
               tenantId: actor.tenantId,
-              staffId: line.staffId,
-              contractId: line.contractId,
-              salaryStructureId: line.salaryStructureId,
-              basicSalary: new Prisma.Decimal(line.baseSalary),
-              earnings: new Prisma.Decimal(line.earnings),
-              grossSalary: new Prisma.Decimal(line.grossSalary),
-              allowances: new Prisma.Decimal(line.allowances),
-              leaveDeductions: new Prisma.Decimal(line.leaveDeductions),
-              pfEmployee: new Prisma.Decimal(line.pfEmployee),
-              pfEmployer: new Prisma.Decimal(line.pfEmployer),
-              tds: new Prisma.Decimal(line.tds),
-              otherDeductions: new Prisma.Decimal(line.otherDeductions),
-              deductions: new Prisma.Decimal(line.deductions),
-              netSalary: new Prisma.Decimal(line.netSalary),
-              paidDays: new Prisma.Decimal(line.attendanceDays),
-              unpaidDays: new Prisma.Decimal(line.unpaidLeaveDays),
-              attendanceDays: line.attendanceDays,
-              workingDays: line.workingDays,
-            })),
-          },
-        },
-        include: {
-          lines: {
-            include: {
-              staff: true,
+              periodMonth: dto.periodMonth,
+              periodYear: dto.periodYear,
+              revision: (existing?.revision ?? 0) + 1,
+              predecessorRunId: existing?.id ?? null,
+              periodStart: getPayrollPeriod(dto.periodYear, dto.periodMonth)
+                .startsOn,
+              periodEnd: getPayrollPeriod(dto.periodYear, dto.periodMonth)
+                .endsOn,
+              status: PayrollRunStatus.GENERATED,
+              generatedById: actor.userId,
+              notes: dto.notes ?? null,
+              grossAmount: new Prisma.Decimal(totals.grossAmount),
+              deductionAmount: new Prisma.Decimal(totals.deductionAmount),
+              netAmount: new Prisma.Decimal(totals.netAmount),
+              pfEmployeeAmount: new Prisma.Decimal(totals.pfEmployeeAmount),
+              pfEmployerAmount: new Prisma.Decimal(totals.pfEmployerAmount),
+              tdsAmount: new Prisma.Decimal(totals.tdsAmount),
+              lines: {
+                create: lines.map((line) => ({
+                  tenantId: actor.tenantId,
+                  staffId: line.staffId,
+                  contractId: line.contractId,
+                  salaryStructureId: line.salaryStructureId,
+                  basicSalary: new Prisma.Decimal(line.baseSalary),
+                  earnings: new Prisma.Decimal(line.earnings),
+                  grossSalary: new Prisma.Decimal(line.grossSalary),
+                  allowances: new Prisma.Decimal(line.allowances),
+                  leaveDeductions: new Prisma.Decimal(line.leaveDeductions),
+                  pfEmployee: new Prisma.Decimal(line.pfEmployee),
+                  pfEmployer: new Prisma.Decimal(line.pfEmployer),
+                  tds: new Prisma.Decimal(line.tds),
+                  otherDeductions: new Prisma.Decimal(line.otherDeductions),
+                  deductions: new Prisma.Decimal(line.deductions),
+                  netSalary: new Prisma.Decimal(line.netSalary),
+                  paidDays: new Prisma.Decimal(line.attendanceDays),
+                  unpaidDays: new Prisma.Decimal(line.unpaidLeaveDays),
+                  attendanceDays: line.attendanceDays,
+                  workingDays: line.workingDays,
+                })),
+              },
             },
-          },
+            include: {
+              lines: {
+                include: {
+                  staff: true,
+                },
+              },
+            },
+          });
+          await this.auditService.record(
+            {
+              action: 'create',
+              resource: 'payroll_run',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: created.id,
+              after: {
+                periodMonth: created.periodMonth,
+                periodYear: created.periodYear,
+                lineCount: created.lines.length,
+                netAmount: created.netAmount.toString(),
+              },
+            },
+            tx,
+          );
+          return created;
         },
-      });
+        true,
+      );
     } catch (error) {
       const err = error as Record<string, unknown>;
       if (err?.code === 'P2002') {
@@ -985,21 +1130,10 @@ export class PayrollService {
       throw error;
     }
 
-    await this.auditService.record({
-      action: 'create',
-      resource: 'payroll_run',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: run.id,
-      after: {
-        periodMonth: run.periodMonth,
-        periodYear: run.periodYear,
-        lineCount: run.lines.length,
-        netAmount: run.netAmount.toString(),
-      },
-    });
-
-    return run;
+    return serializePayrollRunSummary(
+      { ...run, _count: { lines: run.lines.length } },
+      actor,
+    );
   }
 
   async getPayrollPreview(
@@ -1259,170 +1393,285 @@ export class PayrollService {
     };
   }
 
-  async approvePayrollRun(id: string, actor: AuthContext) {
-    const run = await this.getPayrollRunOrThrow(id, actor);
-    await this.payrollReadinessService?.assertActionAllowed(actor, 'APPROVE', {
-      year: run.periodYear,
-      month: run.periodMonth,
-      payrollRunId: run.id,
-    });
-    const actions = getPayrollRunActions(run.status);
-
-    if (run.status === PayrollRunStatus.POSTED) {
-      throw new ConflictException('Posted payroll cannot be re-approved');
-    }
-
-    if (run.status === PayrollRunStatus.APPROVED) {
-      return serializePayrollRunSummary(run);
-    }
-
-    if (!actions.canApprove) {
-      throw new ConflictException(
-        `Payroll run in ${run.status} status cannot be approved`,
-      );
-    }
-
-    await this.prisma.payrollLine.updateMany({
-      where: { tenantId: actor.tenantId, payrollRunId: run.id },
-      data: { status: PayrollLineStatus.APPROVED },
-    });
-
-    const lines = await this.prisma.payrollLine.findMany({
-      where: { tenantId: actor.tenantId, payrollRunId: run.id },
-    });
-
-    await this.prisma.payslip.createMany({
-      data: lines.map((line, index) => ({
-        tenantId: actor.tenantId,
-        payrollRunId: run.id,
-        payrollLineId: line.id,
-        staffId: line.staffId,
-        payslipNumber: `PS-${run.periodYear}-${String(run.periodMonth).padStart(2, '0')}-${String(index + 1).padStart(4, '0')}`,
-        status: 'ISSUED',
-        grossSalary: line.grossSalary,
-        deductionAmount: line.deductions,
-        pfEmployee: line.pfEmployee,
-        pfEmployer: line.pfEmployer,
-        tds: line.tds,
-        netSalary: line.netSalary,
-        issuedAt: new Date(),
-      })),
-      skipDuplicates: true,
-    });
-
-    const updated = await this.prisma.payrollRun.update({
-      where: { id: run.id },
-      data: {
-        status: PayrollRunStatus.APPROVED,
-        approvedAt: new Date(),
-        approvedById: actor.userId,
-      },
-      include: {
-        lines: {
-          include: {
-            staff: true,
-          },
-        },
-      },
-    });
-
-    await this.auditService.record({
-      action: 'approve',
-      resource: 'payroll_run',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      after: {
-        status: updated.status,
-        approvedAt: updated.approvedAt,
-      },
-    });
-
-    return serializePayrollRunSummary(updated);
+  async validatePayrollRun(id: string, actor: AuthContext) {
+    return this.transitionPayrollDuty(
+      id,
+      actor,
+      'VALIDATE',
+      [PayrollRunStatus.DRAFT, PayrollRunStatus.GENERATED],
+      PayrollRunStatus.VALIDATED,
+      { validatedById: actor.userId, validatedAt: new Date() },
+    );
   }
 
   async submitPayrollRunForReview(id: string, actor: AuthContext) {
-    const run = await this.getPayrollRunOrThrow(id, actor);
-    await this.payrollReadinessService?.assertActionAllowed(
+    return this.transitionPayrollDuty(
+      id,
       actor,
       'SUBMIT_REVIEW',
-      {
-        year: run.periodYear,
-        month: run.periodMonth,
-        payrollRunId: run.id,
-      },
+      [PayrollRunStatus.VALIDATED],
+      PayrollRunStatus.UNDER_REVIEW,
+      {},
     );
-    const actions = getPayrollRunActions(run.status);
-
-    if (!actions.canSubmitReview) {
-      throw new ConflictException(
-        `Payroll run in ${run.status} status cannot be submitted for review`,
-      );
-    }
-
-    const updated = await this.prisma.payrollRun.update({
-      where: { id: run.id },
-      data: { status: PayrollRunStatus.UNDER_REVIEW },
-      include: {
-        lines: {
-          include: {
-            staff: true,
-          },
-        },
-      },
-    });
-
-    await this.auditService.record({
-      action: 'submit_review',
-      resource: 'payroll_run',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      before: { status: run.status },
-      after: { status: updated.status },
-    });
-
-    return serializePayrollRunSummary(updated);
   }
 
   async reviewPayrollRun(id: string, actor: AuthContext) {
+    return this.transitionPayrollDuty(
+      id,
+      actor,
+      'REVIEW',
+      [PayrollRunStatus.UNDER_REVIEW],
+      PayrollRunStatus.REVIEWED,
+      { reviewedById: actor.userId, reviewedAt: new Date() },
+    );
+  }
+
+  async approvePayrollRun(id: string, actor: AuthContext) {
+    return this.transitionPayrollDuty(
+      id,
+      actor,
+      'APPROVE',
+      [PayrollRunStatus.REVIEWED],
+      PayrollRunStatus.APPROVED,
+      { approvedById: actor.userId, approvedAt: new Date() },
+    );
+  }
+
+  async finalizePayrollRun(id: string, actor: AuthContext) {
+    return this.transitionPayrollDuty(
+      id,
+      actor,
+      'FINALIZE',
+      [PayrollRunStatus.APPROVED],
+      PayrollRunStatus.FINALIZED,
+      { finalizedById: actor.userId, finalizedAt: new Date() },
+    );
+  }
+
+  private async transitionPayrollDuty(
+    id: string,
+    actor: AuthContext,
+    duty: PayrollDuty,
+    expected: PayrollRunStatus[],
+    target: PayrollRunStatus,
+    data: Prisma.PayrollRunUpdateManyMutationInput,
+  ) {
     const run = await this.getPayrollRunOrThrow(id, actor);
-    const actions = getPayrollRunActions(run.status);
-
-    if (!actions.canCompleteReview) {
+    requirePayrollDuty(actor, duty, run);
+    if (!expected.includes(run.status))
       throw new ConflictException(
-        `Payroll run in ${run.status} status cannot complete review`,
+        `Payroll run in ${run.status} status cannot perform ${duty.toLowerCase()}`,
       );
-    }
+    if (duty === 'APPROVE' && (!run.reviewedById || !run.reviewedAt))
+      throw new ConflictException(
+        'Independent payroll review evidence is required',
+      );
+    if (!this.payrollReadinessService)
+      throw new ConflictException('Payroll readiness is unavailable');
+    await this.payrollReadinessService.assertActionAllowed(
+      actor,
+      duty === 'VALIDATE'
+        ? 'CREATE_DRAFT'
+        : duty === 'FINALIZE'
+          ? 'POST'
+          : duty === 'APPROVE'
+            ? 'APPROVE'
+            : 'SUBMIT_REVIEW',
+      { year: run.periodYear, month: run.periodMonth, payrollRunId: run.id },
+    );
 
-    const updated = await this.prisma.payrollRun.update({
-      where: { id: run.id },
-      data: { status: PayrollRunStatus.REVIEWED },
-      include: {
-        lines: {
-          include: {
-            staff: true,
+    const updated = await this.payrollTransaction(
+      actor,
+      payrollDutyPermission(duty),
+      async (tx) => {
+        const fingerprint = await this.payrollSourceFingerprint(
+          tx,
+          run.id,
+          actor.tenantId,
+        );
+        if (
+          duty === 'FINALIZE' &&
+          (!run.approvedSourceFingerprint ||
+            fingerprint !== run.approvedSourceFingerprint)
+        )
+          throw new ConflictException(
+            'Payroll source data changed after approval. Return the run for a new review and approval.',
+          );
+        const claim = await tx.payrollRun.updateMany({
+          where: {
+            id: run.id,
+            tenantId: actor.tenantId,
+            status: run.status,
+            generatedById: run.generatedById,
+            reviewedById: run.reviewedById,
+            approvedSourceFingerprint: run.approvedSourceFingerprint,
+          },
+          data: {
+            ...data,
+            status: target,
+            ...(duty === 'APPROVE'
+              ? { approvedSourceFingerprint: fingerprint }
+              : {}),
+          },
+        });
+        if (claim.count !== 1)
+          throw new ConflictException(
+            'Payroll run changed while the action was being applied',
+          );
+        if (duty === 'FINALIZE') {
+          await tx.payrollLine.updateMany({
+            where: { tenantId: actor.tenantId, payrollRunId: run.id },
+            data: { status: PayrollLineStatus.APPROVED },
+          });
+          const lines = await tx.payrollLine.findMany({
+            where: { tenantId: actor.tenantId, payrollRunId: run.id },
+            orderBy: { id: 'asc' },
+          });
+          await tx.payslip.createMany({
+            data: lines.map((line, index) => ({
+              tenantId: actor.tenantId,
+              payrollRunId: run.id,
+              payrollLineId: line.id,
+              staffId: line.staffId,
+              payslipNumber: `PS-${run.periodYear}-${String(run.periodMonth).padStart(2, '0')}${run.revision > 1 ? `-R${run.revision}` : ''}-${String(index + 1).padStart(4, '0')}`,
+              status: 'ISSUED',
+              grossSalary: line.grossSalary,
+              deductionAmount: line.deductions,
+              pfEmployee: line.pfEmployee,
+              pfEmployer: line.pfEmployer,
+              tds: line.tds,
+              netSalary: line.netSalary,
+              issuedAt: new Date(),
+            })),
+          });
+        }
+        await this.auditService.record(
+          {
+            action: duty.toLowerCase(),
+            resource: 'payroll_run',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: run.id,
+            before: { status: run.status },
+            after: { status: target },
+          },
+          tx,
+        );
+        return tx.payrollRun.findFirstOrThrow({
+          where: { id: run.id, tenantId: actor.tenantId },
+          include: { lines: { include: { staff: true } } },
+        });
+      },
+      true,
+    );
+    return serializePayrollRunSummary(updated, actor);
+  }
+
+  private async payrollTransaction<T>(
+    actor: AuthContext,
+    permission: string | readonly string[],
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+    serializable = false,
+  ): Promise<T> {
+    try {
+      return await withSchoolAuthorizationTransaction(
+        this.prisma,
+        actor,
+        permission,
+        [],
+        work,
+        false,
+        serializable
+          ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+          : {},
+      );
+    } catch (error) {
+      if (isFinancialTransactionConflict(error))
+        throw new ConflictException(
+          'Payroll source data changed concurrently. Reload and retry the action.',
+        );
+      throw error;
+    }
+  }
+
+  private async payrollSourceFingerprint(
+    tx: Prisma.TransactionClient,
+    runId: string,
+    tenantId: string,
+  ) {
+    const lines = await tx.payrollLine.findMany({
+      where: { tenantId, payrollRunId: runId },
+      orderBy: { id: 'asc' },
+      select: {
+        id: true,
+        staffId: true,
+        contractId: true,
+        salaryStructureId: true,
+        basicSalary: true,
+        earnings: true,
+        grossSalary: true,
+        allowances: true,
+        leaveDeductions: true,
+        pfEmployee: true,
+        pfEmployer: true,
+        tds: true,
+        otherDeductions: true,
+        deductions: true,
+        netSalary: true,
+        paidDays: true,
+        unpaidDays: true,
+        attendanceDays: true,
+        workingDays: true,
+        staff: {
+          select: {
+            status: true,
+            joiningDate: true,
+            bankAccount: true,
+            bankName: true,
+            panNumber: true,
+          },
+        },
+        salaryStructure: {
+          select: {
+            status: true,
+            effectiveFrom: true,
+            effectiveTo: true,
+            basicSalary: true,
+            allowances: true,
+            deductions: true,
+            paymentMethod: true,
+            bankAccount: true,
+            bankName: true,
+            pfEnabled: true,
+            tdsEnabled: true,
+          },
+        },
+        contract: {
+          select: {
+            status: true,
+            startDate: true,
+            endDate: true,
+            baseSalary: true,
+            allowances: true,
+            deductions: true,
           },
         },
       },
     });
-
-    await this.auditService.record({
-      action: 'complete_review',
-      resource: 'payroll_run',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      before: { status: run.status },
-      after: { status: updated.status },
-    });
-
-    return serializePayrollRunSummary(updated);
+    if (!lines.length)
+      throw new ConflictException('Payroll requires verified staff lines');
+    return createHash('sha256')
+      .update('schoolos:payroll-sources:v1\0')
+      .update(JSON.stringify(lines))
+      .digest('hex');
   }
 
   async postPayrollRun(id: string, actor: AuthContext) {
     const run = await this.getPayrollRunOrThrow(id, actor);
-    await this.payrollReadinessService?.assertActionAllowed(actor, 'POST', {
+    requirePayrollDuty(actor, 'POST', run);
+    if (!this.payrollReadinessService)
+      throw new ConflictException('Payroll readiness is unavailable');
+    await this.payrollReadinessService.assertActionAllowed(actor, 'POST', {
       year: run.periodYear,
       month: run.periodMonth,
       payrollRunId: run.id,
@@ -1442,94 +1691,117 @@ export class PayrollService {
 
     if (!actions.canPost) {
       throw new ConflictException(
-        'Payroll run must be approved before posting',
+        'Payroll run must be finalized before posting',
       );
     }
 
-    const posted = await this.prisma.$transaction(async (tx) => {
-      // Claim the row by flipping status inside the transaction, guarded by
-      // the exact status/journalEntryId we validated above. A concurrent
-      // posting request racing in blocks on the row lock, then finds this
-      // where clause no longer matches once we commit, so it fails closed
-      // with a clean conflict instead of a raw duplicate-journal P2002.
-      const claimed = await tx.payrollRun.updateMany({
-        where: {
-          id: run.id,
-          tenantId: actor.tenantId,
-          status: run.status,
-          journalEntryId: null,
-        },
-        data: { status: PayrollRunStatus.POSTED },
-      });
-
-      if (claimed.count === 0) {
-        throw new ConflictException('Payroll run is already posted');
-      }
-
-      const journalEntry =
-        await this.accountingPostingService.postPayrollAccrual(
-          {
-            tenantId: actor.tenantId,
-            payrollRunId: run.id,
-            periodMonth: run.periodMonth,
-            periodYear: run.periodYear,
-            grossAmount: run.grossAmount,
-            deductionAmount: run.deductionAmount,
-            netAmount: run.netAmount,
-            pfEmployeeAmount: run.pfEmployeeAmount,
-            pfEmployerAmount: run.pfEmployerAmount,
-            tdsAmount: run.tdsAmount,
-            entryDate:
-              run.periodEnd ??
-              getPayrollPeriod(run.periodYear, run.periodMonth).endsOn,
-          },
-          actor,
+    const posted = await this.payrollTransaction(
+      actor,
+      'payroll:run:post',
+      async (tx) => {
+        const fingerprint = await this.payrollSourceFingerprint(
           tx,
+          run.id,
+          actor.tenantId,
         );
+        if (
+          !run.approvedSourceFingerprint ||
+          run.approvedSourceFingerprint !== fingerprint
+        )
+          throw new ConflictException(
+            'Finalized payroll source data changed. Cancel this unposted run with a reason and prepare a replacement.',
+          );
+        // Claim the row by flipping status inside the transaction, guarded by
+        // the exact status/journalEntryId we validated above. A concurrent
+        // posting request racing in blocks on the row lock, then finds this
+        // where clause no longer matches once we commit, so it fails closed
+        // with a clean conflict instead of a raw duplicate-journal P2002.
+        const claimed = await tx.payrollRun.updateMany({
+          where: {
+            id: run.id,
+            tenantId: actor.tenantId,
+            status: run.status,
+            journalEntryId: null,
+          },
+          data: { status: PayrollRunStatus.POSTED },
+        });
 
-      await tx.payrollLine.updateMany({
-        where: { tenantId: actor.tenantId, payrollRunId: run.id },
-        data: { status: PayrollLineStatus.POSTED },
-      });
+        if (claimed.count === 0) {
+          throw new ConflictException('Payroll run is already posted');
+        }
 
-      return tx.payrollRun.update({
-        where: { id: run.id },
-        data: {
-          postedAt: new Date(),
-          postedById: actor.userId,
-          journalEntryId: journalEntry.id,
-        },
-        include: {
-          lines: {
-            include: {
-              staff: true,
+        const journalEntry =
+          await this.accountingPostingService.postPayrollAccrual(
+            {
+              tenantId: actor.tenantId,
+              payrollRunId: run.id,
+              periodMonth: run.periodMonth,
+              periodYear: run.periodYear,
+              grossAmount: run.grossAmount,
+              deductionAmount: run.deductionAmount,
+              netAmount: run.netAmount,
+              pfEmployeeAmount: run.pfEmployeeAmount,
+              pfEmployerAmount: run.pfEmployerAmount,
+              tdsAmount: run.tdsAmount,
+              entryDate:
+                run.periodEnd ??
+                getPayrollPeriod(run.periodYear, run.periodMonth).endsOn,
+            },
+            actor,
+            tx,
+          );
+
+        await tx.payrollLine.updateMany({
+          where: { tenantId: actor.tenantId, payrollRunId: run.id },
+          data: { status: PayrollLineStatus.POSTED },
+        });
+
+        const updated = await tx.payrollRun.update({
+          where: { id: run.id },
+          data: {
+            postedAt: new Date(),
+            postedById: actor.userId,
+            journalEntryId: journalEntry.id,
+          },
+          include: {
+            lines: {
+              include: {
+                staff: true,
+              },
+            },
+            payslips: true,
+          },
+        });
+        await this.auditService.record(
+          {
+            action: 'post',
+            resource: 'payroll_run',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: run.id,
+            after: {
+              journalEntryId: updated.journalEntryId,
+              grossAmount: updated.grossAmount.toString(),
+              netAmount: updated.netAmount.toString(),
             },
           },
-          payslips: true,
+          tx,
+        );
+        return updated;
+      },
+      true,
+    );
+
+    return serializePayrollRunSummary(
+      {
+        ...posted,
+        _count: {
+          lines: posted.lines.length,
+          payslips: posted.payslips.length,
         },
-      });
-    });
-
-    await this.auditService.record({
-      action: 'post',
-      resource: 'payroll_run',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: run.id,
-      after: {
-        journalEntryId: posted.journalEntryId,
-        grossAmount: posted.grossAmount.toString(),
-        netAmount: posted.netAmount.toString(),
       },
-    });
-
-    return serializePayrollRunSummary({
-      ...posted,
-      _count: {
-        lines: posted.lines.length,
-        payslips: posted.payslips.length,
-      },
-    });
+      actor,
+    );
   }
 
   async reverseAndCorrectPayrollRun(
@@ -1537,6 +1809,7 @@ export class PayrollService {
     dto: PayrollActionDto,
     actor: AuthContext,
   ) {
+    requireDomainPermission(actor, 'payroll:run:reverse');
     const run = await this.getPayrollRunOrThrow(id, actor);
     const actions = getPayrollRunActions(run.status);
 
@@ -1551,63 +1824,88 @@ export class PayrollService {
       throw new ConflictException('No journal entry found to reverse');
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const originalEntry = await tx.journalEntry.findUnique({
-        where: { id: journalEntryId },
-        include: { lines: true },
-      });
+    const result = await this.payrollTransaction(
+      actor,
+      'payroll:run:reverse',
+      async (tx) => {
+        const claimed = await tx.payrollRun.updateMany({
+          where: {
+            id: run.id,
+            tenantId: actor.tenantId,
+            status: run.status,
+            journalEntryId: run.journalEntryId,
+            disbursementJournalEntryId: run.disbursementJournalEntryId,
+          },
+          data: { status: PayrollRunStatus.VOID },
+        });
+        if (claimed.count !== 1)
+          throw new ConflictException(
+            'Payroll run changed while the action was being applied',
+          );
 
-      if (!originalEntry) {
-        throw new ConflictException('Payroll journal entry was not found');
-      }
+        const originalEntry = await tx.journalEntry.findUnique({
+          where: { id: journalEntryId },
+          include: { lines: true },
+        });
 
-      // 1. Reverse in accounting
-      const reversalEntry = await this.accountingPostingService.postReversal(
-        {
-          tenantId: actor.tenantId,
-          originalEntryId: originalEntry.id,
-          reversalDate: new Date(),
-          narration: `Reversal of payroll run ${run.periodMonth}/${run.periodYear}`,
-          reason: dto.reason || 'Payroll correction',
-          lines: originalEntry.lines.map((line) => ({
-            chartAccountId: line.chartAccountId,
-            side:
-              line.side === JournalLineSide.DEBIT
-                ? JournalLineSide.CREDIT
-                : JournalLineSide.DEBIT,
-            amount: line.amount,
-            description: `Reversal of ${line.description}`,
-          })),
-        },
-        actor,
-        tx,
-      );
+        if (!originalEntry) {
+          throw new ConflictException('Payroll journal entry was not found');
+        }
 
-      // 2. Void current run
-      const updated = await tx.payrollRun.update({
-        where: { id: run.id },
-        data: {
-          status: PayrollRunStatus.VOID,
-          reversalAt: new Date(),
-          reversalReason: dto.reason || 'Payroll correction',
-          reversedById: actor.userId,
-        },
-      });
+        // 1. Reverse in accounting
+        const reversalEntry = await this.accountingPostingService.postReversal(
+          {
+            tenantId: actor.tenantId,
+            originalEntryId: originalEntry.id,
+            reversalDate: new Date(),
+            narration: `Reversal of payroll run ${run.periodMonth}/${run.periodYear}`,
+            reason: dto.reason || 'Payroll correction',
+            lines: originalEntry.lines.map((line) => ({
+              chartAccountId: line.chartAccountId,
+              side:
+                line.side === JournalLineSide.DEBIT
+                  ? JournalLineSide.CREDIT
+                  : JournalLineSide.DEBIT,
+              amount: line.amount,
+              description: `Reversal of ${line.description}`,
+            })),
+          },
+          actor,
+          tx,
+        );
 
-      return { updated, reversalEntry };
-    });
+        // 2. Void current run
+        const updated = await tx.payrollRun.update({
+          where: { id: run.id },
+          data: {
+            status: PayrollRunStatus.VOID,
+            reversalAt: new Date(),
+            reversalReason: dto.reason || 'Payroll correction',
+            reversedById: actor.userId,
+          },
+        });
 
-    await this.auditService.record({
-      action: 'reverse',
-      resource: 'payroll_run',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: run.id,
-      after: {
-        status: PayrollRunStatus.VOID,
-        reversalEntryId: result.reversalEntry.id,
+        await tx.payslip.updateMany({
+          where: { tenantId: actor.tenantId, payrollRunId: run.id },
+          data: { status: PayslipStatus.VOID },
+        });
+        await this.auditService.record(
+          {
+            action: 'reverse',
+            resource: 'payroll_run',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: run.id,
+            after: {
+              status: PayrollRunStatus.VOID,
+              reversalEntryId: reversalEntry.id,
+            },
+          },
+          tx,
+        );
+        return { updated, reversalEntry };
       },
-    });
+    );
 
     return result;
   }
@@ -1618,43 +1916,109 @@ export class PayrollService {
     actor: AuthContext,
   ) {
     const run = await this.getPayrollRunOrThrow(id, actor);
-    const actions = getPayrollRunActions(run.status);
-
-    if (!actions.canReject) {
+    requirePayrollDuty(actor, 'REVIEW', run);
+    if (
+      ![
+        PayrollRunStatus.UNDER_REVIEW,
+        PayrollRunStatus.REVIEWED,
+        PayrollRunStatus.APPROVED,
+      ].some((status) => status === run.status)
+    )
       throw new ConflictException(
         `Payroll run in ${run.status} status cannot be returned for correction`,
       );
-    }
-
     const reason = dto.reason?.trim();
-    if (!reason) {
-      throw new BadRequestException('Correction reason is required');
-    }
-
-    const updated = await this.prisma.payrollRun.update({
-      where: { id: run.id },
-      data: {
-        status: PayrollRunStatus.GENERATED,
-        notes: reason,
+    if (!reason) throw new BadRequestException('Correction reason is required');
+    const updated = await this.payrollTransaction(
+      actor,
+      'payroll:run:review',
+      async (tx) => {
+        const claim = await tx.payrollRun.updateMany({
+          where: { id: run.id, tenantId: actor.tenantId, status: run.status },
+          data: {
+            status: PayrollRunStatus.GENERATED,
+            notes: reason,
+            validatedById: null,
+            validatedAt: null,
+            reviewedById: null,
+            reviewedAt: null,
+            approvedById: null,
+            approvedAt: null,
+            approvedSourceFingerprint: null,
+          },
+        });
+        if (claim.count !== 1)
+          throw new ConflictException('Payroll run changed while returning it');
+        await this.auditService.record(
+          {
+            action: 'return_for_correction',
+            resource: 'payroll_run',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: run.id,
+            before: { status: run.status },
+            after: { status: PayrollRunStatus.GENERATED, reason },
+          },
+          tx,
+        );
+        return tx.payrollRun.findFirstOrThrow({
+          where: { id: run.id, tenantId: actor.tenantId },
+          include: { lines: { include: { staff: true } } },
+        });
       },
-      include: { lines: { include: { staff: true } } },
-    });
+    );
+    return serializePayrollRunSummary(updated, actor);
+  }
 
-    await this.auditService.record({
-      action: 'reject',
-      resource: 'payroll_run',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      before: { status: run.status },
-      after: {
-        status: updated.status,
-        reason,
-        returnedForCorrection: true,
-      },
+  async cancelFinalizedPayrollRun(
+    id: string,
+    dto: PayrollActionDto,
+    actor: AuthContext,
+  ) {
+    const run = await this.getPayrollRunOrThrow(id, actor);
+    requirePayrollDuty(actor, 'FINALIZE', run);
+    const reason = dto.reason?.trim();
+    if (!reason)
+      throw new BadRequestException('Cancellation reason is required');
+    if (run.status !== PayrollRunStatus.FINALIZED || run.journalEntryId)
+      throw new ConflictException(
+        'Only finalized unposted payroll can be cancelled',
+      );
+    await this.payrollTransaction(actor, 'payroll:run:finalize', async (tx) => {
+      const claim = await tx.payrollRun.updateMany({
+        where: {
+          id: run.id,
+          tenantId: actor.tenantId,
+          status: PayrollRunStatus.FINALIZED,
+          journalEntryId: null,
+        },
+        data: {
+          status: PayrollRunStatus.VOID,
+          reversalReason: reason,
+          reversalAt: new Date(),
+          reversedById: actor.userId,
+        },
+      });
+      if (claim.count !== 1)
+        throw new ConflictException('Payroll run changed while cancelling it');
+      await tx.payslip.updateMany({
+        where: { tenantId: actor.tenantId, payrollRunId: run.id },
+        data: { status: 'VOID' },
+      });
+      await this.auditService.record(
+        {
+          action: 'cancel_finalized',
+          resource: 'payroll_run',
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          resourceId: run.id,
+          before: { status: run.status },
+          after: { status: PayrollRunStatus.VOID, reason },
+        },
+        tx,
+      );
     });
-
-    return serializePayrollRunSummary(updated);
+    return this.getPayrollRun(id, actor);
   }
 
   async markPayrollRunPaid(
@@ -1662,6 +2026,7 @@ export class PayrollService {
     dto: PayrollActionDto,
     actor: AuthContext,
   ) {
+    requireDomainPermission(actor, 'payroll:run:pay');
     const run = await this.getPayrollRunOrThrow(id, actor);
     await this.payrollReadinessService?.assertActionAllowed(
       actor,
@@ -1685,57 +2050,79 @@ export class PayrollService {
       throw new ConflictException('Payroll run is already marked as paid');
     }
 
-    const paid = await this.prisma.$transaction(async (tx) => {
-      const journalEntry =
-        await this.accountingPostingService.postPayrollDisbursement(
-          {
+    const paid = await this.payrollTransaction(
+      actor,
+      'payroll:run:pay',
+      async (tx) => {
+        const claimed = await tx.payrollRun.updateMany({
+          where: {
+            id: run.id,
             tenantId: actor.tenantId,
-            payrollRunId: run.id,
-            periodMonth: run.periodMonth,
-            periodYear: run.periodYear,
-            netAmount: run.netAmount,
-            paymentAccountCode: dto.paymentAccountCode,
-            entryDate:
-              run.periodEnd ??
-              getPayrollPeriod(run.periodYear, run.periodMonth).endsOn,
+            status: run.status,
+            journalEntryId: run.journalEntryId,
+            disbursementJournalEntryId: run.disbursementJournalEntryId,
           },
-          actor,
+          data: { status: PayrollRunStatus.PAID },
+        });
+        if (claimed.count !== 1)
+          throw new ConflictException(
+            'Payroll run changed while the action was being applied',
+          );
+
+        const journalEntry =
+          await this.accountingPostingService.postPayrollDisbursement(
+            {
+              tenantId: actor.tenantId,
+              payrollRunId: run.id,
+              periodMonth: run.periodMonth,
+              periodYear: run.periodYear,
+              netAmount: run.netAmount,
+              paymentAccountCode: dto.paymentAccountCode,
+              entryDate:
+                run.periodEnd ??
+                getPayrollPeriod(run.periodYear, run.periodMonth).endsOn,
+            },
+            actor,
+            tx,
+          );
+
+        await tx.payrollLine.updateMany({
+          where: { tenantId: actor.tenantId, payrollRunId: run.id },
+          data: { paymentStatus: PayrollPaymentStatus.PAID },
+        });
+
+        await tx.payslip.updateMany({
+          where: { tenantId: actor.tenantId, payrollRunId: run.id },
+          data: { paymentStatus: PayrollPaymentStatus.PAID },
+        });
+
+        const updated = await tx.payrollRun.update({
+          where: { id: run.id },
+          data: {
+            status: PayrollRunStatus.PAID,
+            paidAt: new Date(),
+            paidById: actor.userId,
+            disbursementJournalEntryId: journalEntry.id,
+          },
+          include: { lines: { include: { staff: true } }, payslips: true },
+        });
+        await this.auditService.record(
+          {
+            action: 'mark_paid',
+            resource: 'payroll_run',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: updated.id,
+            after: {
+              disbursementJournalEntryId: updated.disbursementJournalEntryId,
+              reason: dto.reason ?? null,
+            },
+          },
           tx,
         );
-
-      await tx.payrollLine.updateMany({
-        where: { tenantId: actor.tenantId, payrollRunId: run.id },
-        data: { paymentStatus: PayrollPaymentStatus.PAID },
-      });
-
-      await tx.payslip.updateMany({
-        where: { tenantId: actor.tenantId, payrollRunId: run.id },
-        data: { paymentStatus: PayrollPaymentStatus.PAID },
-      });
-
-      return tx.payrollRun.update({
-        where: { id: run.id },
-        data: {
-          status: PayrollRunStatus.PAID,
-          paidAt: new Date(),
-          paidById: actor.userId,
-          disbursementJournalEntryId: journalEntry.id,
-        },
-        include: { lines: { include: { staff: true } }, payslips: true },
-      });
-    });
-
-    await this.auditService.record({
-      action: 'mark_paid',
-      resource: 'payroll_run',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: paid.id,
-      after: {
-        disbursementJournalEntryId: paid.disbursementJournalEntryId,
-        reason: dto.reason ?? null,
+        return updated;
       },
-    });
+    );
 
     return paid;
   }
@@ -1750,6 +2137,7 @@ export class PayrollService {
       throw new ConflictException('Reversal reason is required');
     }
 
+    requireDomainPermission(actor, 'payroll:run:reverse');
     const run = await this.getPayrollRunOrThrow(id, actor);
 
     if (
@@ -1761,103 +2149,129 @@ export class PayrollService {
       );
     }
 
-    const reversed = await this.prisma.$transaction(async (tx) => {
-      // 1. Reverse Disbursement if paid
-      if (run.disbursementJournalEntryId) {
-        const originalEntry = await tx.journalEntry.findUnique({
-          where: { id: run.disbursementJournalEntryId },
-          include: { lines: true },
+    const reversed = await this.payrollTransaction(
+      actor,
+      'payroll:run:reverse',
+      async (tx) => {
+        const claimed = await tx.payrollRun.updateMany({
+          where: {
+            id: run.id,
+            tenantId: actor.tenantId,
+            status: run.status,
+            journalEntryId: run.journalEntryId,
+            disbursementJournalEntryId: run.disbursementJournalEntryId,
+          },
+          data: { status: PayrollRunStatus.CANCELLED },
         });
-        if (!originalEntry) {
+        if (claimed.count !== 1)
           throw new ConflictException(
-            'Payroll disbursement journal entry was not found',
+            'Payroll run changed while the action was being applied',
+          );
+
+        // 1. Reverse Disbursement if paid
+        if (run.disbursementJournalEntryId) {
+          const originalEntry = await tx.journalEntry.findUnique({
+            where: { id: run.disbursementJournalEntryId },
+            include: { lines: true },
+          });
+          if (!originalEntry) {
+            throw new ConflictException(
+              'Payroll disbursement journal entry was not found',
+            );
+          }
+          await this.accountingPostingService.postReversal(
+            {
+              tenantId: actor.tenantId,
+              originalEntryId: originalEntry.id,
+              reversalDate: new Date(),
+              narration: `Reversal of Payroll Disbursement for ${run.periodMonth}/${run.periodYear}`,
+              reason,
+              lines: originalEntry.lines.map((l) => ({
+                chartAccountId: l.chartAccountId,
+                side:
+                  l.side === JournalLineSide.DEBIT
+                    ? JournalLineSide.CREDIT
+                    : JournalLineSide.DEBIT,
+                amount: l.amount,
+                description: `Reversal of ${l.description}`,
+              })),
+            },
+            actor,
+            tx,
           );
         }
-        await this.accountingPostingService.postReversal(
-          {
-            tenantId: actor.tenantId,
-            originalEntryId: originalEntry.id,
-            reversalDate: new Date(),
-            narration: `Reversal of Payroll Disbursement for ${run.periodMonth}/${run.periodYear}`,
-            reason,
-            lines: originalEntry.lines.map((l) => ({
-              chartAccountId: l.chartAccountId,
-              side:
-                l.side === JournalLineSide.DEBIT
-                  ? JournalLineSide.CREDIT
-                  : JournalLineSide.DEBIT,
-              amount: l.amount,
-              description: `Reversal of ${l.description}`,
-            })),
-          },
-          actor,
-          tx,
-        );
-      }
 
-      // 2. Reverse Accrual
-      if (run.journalEntryId) {
-        const originalEntry = await tx.journalEntry.findUnique({
-          where: { id: run.journalEntryId },
-          include: { lines: true },
-        });
-        if (!originalEntry) {
-          throw new ConflictException(
-            'Payroll accrual journal entry was not found',
+        // 2. Reverse Accrual
+        if (run.journalEntryId) {
+          const originalEntry = await tx.journalEntry.findUnique({
+            where: { id: run.journalEntryId },
+            include: { lines: true },
+          });
+          if (!originalEntry) {
+            throw new ConflictException(
+              'Payroll accrual journal entry was not found',
+            );
+          }
+          await this.accountingPostingService.postReversal(
+            {
+              tenantId: actor.tenantId,
+              originalEntryId: originalEntry.id,
+              reversalDate: new Date(),
+              narration: `Reversal of Payroll Accrual for ${run.periodMonth}/${run.periodYear}`,
+              reason,
+              lines: originalEntry.lines.map((l) => ({
+                chartAccountId: l.chartAccountId,
+                side:
+                  l.side === JournalLineSide.DEBIT
+                    ? JournalLineSide.CREDIT
+                    : JournalLineSide.DEBIT,
+                amount: l.amount,
+                description: `Reversal of ${l.description}`,
+              })),
+            },
+            actor,
+            tx,
           );
         }
-        await this.accountingPostingService.postReversal(
-          {
-            tenantId: actor.tenantId,
-            originalEntryId: originalEntry.id,
-            reversalDate: new Date(),
-            narration: `Reversal of Payroll Accrual for ${run.periodMonth}/${run.periodYear}`,
-            reason,
-            lines: originalEntry.lines.map((l) => ({
-              chartAccountId: l.chartAccountId,
-              side:
-                l.side === JournalLineSide.DEBIT
-                  ? JournalLineSide.CREDIT
-                  : JournalLineSide.DEBIT,
-              amount: l.amount,
-              description: `Reversal of ${l.description}`,
-            })),
+
+        // 3. Update Payroll Run Status
+        const updated = await tx.payrollRun.update({
+          where: { id: run.id },
+          data: {
+            status: PayrollRunStatus.CANCELLED,
+            reversalReason: dto.reason,
+            reversalAt: new Date(),
+            reversedById: actor.userId,
           },
-          actor,
+        });
+        await tx.payslip.updateMany({
+          where: { tenantId: actor.tenantId, payrollRunId: run.id },
+          data: { status: PayslipStatus.VOID },
+        });
+        await this.auditService.record(
+          {
+            action: 'reverse',
+            resource: 'payroll_run',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: updated.id,
+            after: {
+              status: updated.status,
+              reason: dto.reason,
+            },
+          },
           tx,
         );
-      }
-
-      // 3. Update Payroll Run Status
-      return tx.payrollRun.update({
-        where: { id: run.id },
-        data: {
-          status: PayrollRunStatus.CANCELLED,
-          reversalReason: dto.reason,
-          reversalAt: new Date(),
-          reversedById: actor.userId,
-        },
-      });
-    });
-
-    await this.auditService.record({
-      action: 'reverse',
-      resource: 'payroll_run',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: reversed.id,
-      after: {
-        status: reversed.status,
-        reason: dto.reason,
+        return updated;
       },
-    });
+    );
 
     return reversed;
   }
 
   async getPayrollRun(id: string, actor: AuthContext) {
     const run = await this.getPayrollRunOrThrow(id, actor);
-    return serializePayrollRunDetail(run);
+    return serializePayrollRunDetail(run, actor);
   }
 
   async queuePayslipRegenerationJob(
@@ -3001,48 +3415,92 @@ export class PayrollService {
       actor,
     );
 
-    return this.prisma.$transaction(async (tx) => {
-      await tx.payrollLine.deleteMany({
-        where: { tenantId: actor.tenantId, payrollRunId: run.id },
-      });
-
-      return tx.payrollRun.update({
-        where: { id: run.id },
-        data: {
-          grossAmount: new Prisma.Decimal(totals.grossAmount),
-          deductionAmount: new Prisma.Decimal(totals.deductionAmount),
-          netAmount: new Prisma.Decimal(totals.netAmount),
-          pfEmployeeAmount: new Prisma.Decimal(totals.pfEmployeeAmount),
-          pfEmployerAmount: new Prisma.Decimal(totals.pfEmployerAmount),
-          tdsAmount: new Prisma.Decimal(totals.tdsAmount),
-          status: PayrollRunStatus.GENERATED,
-          lines: {
-            create: lines.map((line) => ({
-              tenantId: actor.tenantId,
-              staffId: line.staffId,
-              contractId: line.contractId,
-              salaryStructureId: line.salaryStructureId,
-              basicSalary: new Prisma.Decimal(line.baseSalary),
-              earnings: new Prisma.Decimal(line.earnings),
-              grossSalary: new Prisma.Decimal(line.grossSalary),
-              allowances: new Prisma.Decimal(line.allowances),
-              leaveDeductions: new Prisma.Decimal(line.leaveDeductions),
-              pfEmployee: new Prisma.Decimal(line.pfEmployee),
-              pfEmployer: new Prisma.Decimal(line.pfEmployer),
-              tds: new Prisma.Decimal(line.tds),
-              otherDeductions: new Prisma.Decimal(line.otherDeductions),
-              deductions: new Prisma.Decimal(line.deductions),
-              netSalary: new Prisma.Decimal(line.netSalary),
-              paidDays: new Prisma.Decimal(line.attendanceDays),
-              unpaidDays: new Prisma.Decimal(line.unpaidLeaveDays),
-              attendanceDays: line.attendanceDays,
-              workingDays: line.workingDays,
-            })),
+    return this.payrollTransaction(
+      actor,
+      'payroll:run:create',
+      async (tx) => {
+        const claimed = await tx.payrollRun.updateMany({
+          where: {
+            id: run.id,
+            tenantId: actor.tenantId,
+            status: run.status,
+            updatedAt: run.updatedAt,
           },
-        },
-        include: { lines: true },
-      });
-    });
+          data: {
+            status: PayrollRunStatus.GENERATED,
+            generatedById: actor.userId,
+            validatedById: null,
+            validatedAt: null,
+            reviewedById: null,
+            reviewedAt: null,
+            approvedById: null,
+            approvedAt: null,
+            approvedSourceFingerprint: null,
+          },
+        });
+        if (claimed.count !== 1)
+          throw new ConflictException(
+            'Payroll run changed while regenerating its lines',
+          );
+        await tx.payrollLine.deleteMany({
+          where: { tenantId: actor.tenantId, payrollRunId: run.id },
+        });
+
+        const updated = await tx.payrollRun.update({
+          where: { id: run.id },
+          data: {
+            grossAmount: new Prisma.Decimal(totals.grossAmount),
+            deductionAmount: new Prisma.Decimal(totals.deductionAmount),
+            netAmount: new Prisma.Decimal(totals.netAmount),
+            pfEmployeeAmount: new Prisma.Decimal(totals.pfEmployeeAmount),
+            pfEmployerAmount: new Prisma.Decimal(totals.pfEmployerAmount),
+            tdsAmount: new Prisma.Decimal(totals.tdsAmount),
+            status: PayrollRunStatus.GENERATED,
+            lines: {
+              create: lines.map((line) => ({
+                tenantId: actor.tenantId,
+                staffId: line.staffId,
+                contractId: line.contractId,
+                salaryStructureId: line.salaryStructureId,
+                basicSalary: new Prisma.Decimal(line.baseSalary),
+                earnings: new Prisma.Decimal(line.earnings),
+                grossSalary: new Prisma.Decimal(line.grossSalary),
+                allowances: new Prisma.Decimal(line.allowances),
+                leaveDeductions: new Prisma.Decimal(line.leaveDeductions),
+                pfEmployee: new Prisma.Decimal(line.pfEmployee),
+                pfEmployer: new Prisma.Decimal(line.pfEmployer),
+                tds: new Prisma.Decimal(line.tds),
+                otherDeductions: new Prisma.Decimal(line.otherDeductions),
+                deductions: new Prisma.Decimal(line.deductions),
+                netSalary: new Prisma.Decimal(line.netSalary),
+                paidDays: new Prisma.Decimal(line.attendanceDays),
+                unpaidDays: new Prisma.Decimal(line.unpaidLeaveDays),
+                attendanceDays: line.attendanceDays,
+                workingDays: line.workingDays,
+              })),
+            },
+          },
+          include: {
+            lines: { include: { staff: true, payslip: true } },
+            payslips: true,
+          },
+        });
+        await this.auditService.record(
+          {
+            action: 'regenerate',
+            resource: 'payroll_run',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: run.id,
+            before: { status: run.status },
+            after: { status: updated.status, lineCount: lines.length },
+          },
+          tx,
+        );
+        return serializePayrollRunDetail(updated, actor);
+      },
+      true,
+    );
   }
 }
 
@@ -3134,28 +3592,48 @@ export function calculatePayrollTotals(
   );
 }
 
-export function getPayrollRunActions(status: string) {
-  const canSubmitReview =
+export function getPayrollRunActions(
+  status: string,
+  actor?: AuthContext,
+  run = {},
+) {
+  const available = (duty: PayrollDuty) =>
+    actor ? payrollDutyAvailable(actor, duty, run) : true;
+  const editable =
     status === PayrollRunStatus.DRAFT || status === PayrollRunStatus.GENERATED;
-
   return {
-    canEdit: canSubmitReview,
-    canReview: canSubmitReview,
-    canSubmitReview,
-    canCompleteReview: status === PayrollRunStatus.UNDER_REVIEW,
-    canApprove: status === PayrollRunStatus.REVIEWED,
+    canEdit: editable && available('SUBMIT_REVIEW'),
+    canValidate: editable && available('VALIDATE'),
+    canReview:
+      status === PayrollRunStatus.VALIDATED && available('SUBMIT_REVIEW'),
+    canSubmitReview:
+      status === PayrollRunStatus.VALIDATED && available('SUBMIT_REVIEW'),
+    canCompleteReview:
+      status === PayrollRunStatus.UNDER_REVIEW && available('REVIEW'),
+    canApprove: status === PayrollRunStatus.REVIEWED && available('APPROVE'),
+    canFinalize: status === PayrollRunStatus.APPROVED && available('FINALIZE'),
+    canCancelFinalized:
+      status === PayrollRunStatus.FINALIZED && available('FINALIZE'),
     canReject:
-      status === PayrollRunStatus.UNDER_REVIEW ||
-      status === PayrollRunStatus.REVIEWED,
-    canPost: status === PayrollRunStatus.APPROVED,
-    canPay: status === PayrollRunStatus.POSTED,
+      (status === PayrollRunStatus.UNDER_REVIEW ||
+        status === PayrollRunStatus.REVIEWED ||
+        status === PayrollRunStatus.APPROVED) &&
+      available('REVIEW'),
+    canPost: status === PayrollRunStatus.FINALIZED && available('POST'),
+    canPay:
+      status === PayrollRunStatus.POSTED &&
+      (!actor || hasDomainPermission(actor, 'payroll:run:pay')),
     canReverse:
-      status === PayrollRunStatus.POSTED || status === PayrollRunStatus.PAID,
-    isLocked:
-      status === PayrollRunStatus.POSTED ||
-      status === PayrollRunStatus.PAID ||
-      status === PayrollRunStatus.CANCELLED ||
-      status === PayrollRunStatus.VOID,
+      (status === PayrollRunStatus.POSTED ||
+        status === PayrollRunStatus.PAID) &&
+      (!actor || hasDomainPermission(actor, 'payroll:run:reverse')),
+    isLocked: [
+      PayrollRunStatus.FINALIZED,
+      PayrollRunStatus.POSTED,
+      PayrollRunStatus.PAID,
+      PayrollRunStatus.CANCELLED,
+      PayrollRunStatus.VOID,
+    ].some((lockedStatus) => lockedStatus === status),
   };
 }
 
@@ -3298,81 +3776,147 @@ function serializeStaff(staff?: MinimalStaff | null) {
   };
 }
 
-function serializeSalaryStructure(structure: {
-  id: string;
-  staffId: string;
-  effectiveFrom: Date;
-  effectiveTo: Date | null;
-  basicSalary: Prisma.Decimal;
-  allowances: Prisma.Decimal;
-  deductions: Prisma.Decimal;
-  pfEnabled: boolean;
-  tdsEnabled: boolean;
-  paymentMethod: string;
-  bankAccount?: string | null;
-  bankName?: string | null;
-  status: string;
-  notes?: string | null;
-  activatedAt?: Date | null;
-  archivedAt?: Date | null;
-  createdAt?: Date;
-  updatedAt?: Date;
-  staff?: MinimalStaff | null;
-  components?: Array<{
+function serializeSalaryStructure(
+  structure: {
     id: string;
-    name: string;
-    componentType: string;
-    amount: Prisma.Decimal;
-    taxable: boolean;
-  }>;
-}) {
+    staffId: string;
+    effectiveFrom: Date;
+    effectiveTo: Date | null;
+    basicSalary: Prisma.Decimal;
+    allowances: Prisma.Decimal;
+    deductions: Prisma.Decimal;
+    pfEnabled: boolean;
+    tdsEnabled: boolean;
+    paymentMethod: string;
+    bankAccount?: string | null;
+    bankName?: string | null;
+    status: string;
+    notes?: string | null;
+    activatedAt?: Date | null;
+    archivedAt?: Date | null;
+    createdAt?: Date;
+    updatedAt?: Date;
+    staff?: MinimalStaff | null;
+    components?: Array<{
+      id: string;
+      name: string;
+      componentType: string;
+      amount: Prisma.Decimal;
+      taxable: boolean;
+    }>;
+  },
+  actor?: AuthContext,
+) {
   return {
-    ...structure,
+    id: structure.id,
+    staffId: structure.staffId,
+    effectiveFrom: structure.effectiveFrom,
+    effectiveTo: structure.effectiveTo,
+    status: structure.status,
+    paymentMethod: structure.paymentMethod,
+    notes: structure.notes,
+    activatedAt: structure.activatedAt,
+    archivedAt: structure.archivedAt,
+    createdAt: structure.createdAt,
+    updatedAt: structure.updatedAt,
+    bankAccount:
+      actor && hasDomainPermission(actor, 'hr:bank:read')
+        ? structure.bankAccount
+        : null,
+    bankName:
+      actor && hasDomainPermission(actor, 'hr:bank:read')
+        ? structure.bankName
+        : null,
+    pfEnabled:
+      actor && hasDomainPermission(actor, 'hr:tax:read')
+        ? structure.pfEnabled
+        : null,
+    tdsEnabled:
+      actor && hasDomainPermission(actor, 'hr:tax:read')
+        ? structure.tdsEnabled
+        : null,
     basicSalary: moneyString(structure.basicSalary),
     allowances: moneyString(structure.allowances),
     deductions: moneyString(structure.deductions),
     staff: serializeStaff(structure.staff),
     components: (structure.components ?? []).map((component) => ({
-      ...component,
+      id: component.id,
+      name: component.name,
+      componentType: component.componentType,
+      taxable: component.taxable,
       amount: moneyString(component.amount),
     })),
   };
 }
 
-function serializePayrollRunSummary(run: {
-  id: string;
-  periodMonth: number;
-  periodYear: number;
-  periodStart?: Date | null;
-  periodEnd?: Date | null;
-  status: string;
-  grossAmount: Prisma.Decimal;
-  deductionAmount: Prisma.Decimal;
-  netAmount: Prisma.Decimal;
-  pfEmployeeAmount?: Prisma.Decimal;
-  pfEmployerAmount?: Prisma.Decimal;
-  tdsAmount?: Prisma.Decimal;
-  generatedById?: string | null;
-  approvedById?: string | null;
-  postedById?: string | null;
-  paidById?: string | null;
-  approvedAt?: Date | null;
-  postedAt?: Date | null;
-  paidAt?: Date | null;
-  journalEntryId?: string | null;
-  disbursementJournalEntryId?: string | null;
-  notes?: string | null;
-  reversalReason?: string | null;
-  reversalAt?: Date | null;
-  reversedById?: string | null;
-  createdAt?: Date;
-  updatedAt?: Date;
-  _count?: { lines?: number; payslips?: number };
-}) {
-  const { _count, ...rest } = run;
+function serializePayrollRunSummary(
+  run: {
+    id: string;
+    revision?: number;
+    predecessorRunId?: string | null;
+    periodMonth: number;
+    periodYear: number;
+    periodStart?: Date | null;
+    periodEnd?: Date | null;
+    status: string;
+    grossAmount: Prisma.Decimal;
+    deductionAmount: Prisma.Decimal;
+    netAmount: Prisma.Decimal;
+    pfEmployeeAmount?: Prisma.Decimal;
+    pfEmployerAmount?: Prisma.Decimal;
+    tdsAmount?: Prisma.Decimal;
+    generatedById?: string | null;
+    reviewedById?: string | null;
+    approvedById?: string | null;
+    postedById?: string | null;
+    paidById?: string | null;
+    approvedAt?: Date | null;
+    postedAt?: Date | null;
+    paidAt?: Date | null;
+    journalEntryId?: string | null;
+    disbursementJournalEntryId?: string | null;
+    notes?: string | null;
+    reversalReason?: string | null;
+    reversalAt?: Date | null;
+    reversedById?: string | null;
+    createdAt?: Date;
+    updatedAt?: Date;
+    lines?: unknown;
+    payslips?: unknown;
+    _count?: { lines?: number; payslips?: number };
+  },
+  actor?: AuthContext,
+) {
+  const _count = run._count;
+  const rest = {
+    id: run.id,
+    revision: run.revision,
+    predecessorRunId: run.predecessorRunId,
+    periodMonth: run.periodMonth,
+    periodYear: run.periodYear,
+    periodStart: run.periodStart,
+    periodEnd: run.periodEnd,
+    status: run.status,
+    generatedById: run.generatedById,
+    reviewedById: run.reviewedById,
+    approvedById: run.approvedById,
+    postedById: run.postedById,
+    paidById: run.paidById,
+    approvedAt: run.approvedAt,
+    postedAt: run.postedAt,
+    paidAt: run.paidAt,
+    journalEntryId: run.journalEntryId,
+    disbursementJournalEntryId: run.disbursementJournalEntryId,
+    notes: run.notes,
+    reversalReason: run.reversalReason,
+    reversalAt: run.reversalAt,
+    reversedById: run.reversedById,
+    createdAt: run.createdAt,
+    updatedAt: run.updatedAt,
+  };
   return {
     ...rest,
-    allowedActions: getPayrollRunActions(run.status),
+    allowedActions: getPayrollRunActions(run.status, actor, run),
     grossAmount: moneyString(run.grossAmount),
     deductionAmount: moneyString(run.deductionAmount),
     netAmount: moneyString(run.netAmount),
@@ -3405,12 +3949,16 @@ function serializePayrollRunDetail(
       payslips: true;
     };
   }>,
+  actor: AuthContext,
 ) {
   return {
-    ...serializePayrollRunSummary({
-      ...run,
-      _count: { lines: run.lines.length, payslips: run.payslips.length },
-    }),
+    ...serializePayrollRunSummary(
+      {
+        ...run,
+        _count: { lines: run.lines.length, payslips: run.payslips.length },
+      },
+      actor,
+    ),
     lines: run.lines.map(serializePayrollLine),
     payslips: run.payslips.map((payslip) =>
       serializePayslipSummary({ ...payslip, payrollRun: run, staff: null }),
