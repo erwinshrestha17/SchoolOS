@@ -21,6 +21,8 @@ model User {
   notificationReadReceipts    NotificationReadReceipt[]
   otpCodes                    OtpCode[]
   auditLogs                   AuditLog[]
+  reviewedNepalEducationPolicies NepalEducationPolicyVersion[] @relation("ReviewedNepalEducationPolicies")
+  approvedNepalEducationPolicies NepalEducationPolicyVersion[] @relation("ApprovedNepalEducationPolicies")
   student                     Student?                     @relation("StudentUser")
   staff                       Staff?                       @relation("StaffUser")
   guardian                    Guardian?                    @relation("GuardianUser")

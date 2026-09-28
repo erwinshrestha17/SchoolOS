@@ -1,0 +1,83 @@
+// P0-N1 policy evidence registry. These rows describe reviewed policy inputs;
+// they do not, by themselves, activate curriculum, grading or government
+// reporting behavior. Consumers must resolve an approved version as of the
+// authoritative event date and retain its id on historical records.
+enum NepalEducationPolicyKind {
+  JURISDICTION_PROFILE
+  SCHOOL_RECOGNITION
+  CURRICULUM
+  GRADING_ASSESSMENT
+  PROMOTION_REPORT_CARD
+  ACADEMIC_CALENDAR
+  GOVERNMENT_REPORTING
+}
+
+enum NepalEducationPolicyScope {
+  NATIONAL
+  PROVINCE
+  DISTRICT
+  LOCAL_LEVEL
+  SCHOOL
+}
+
+enum NepalEducationPolicyReviewStatus {
+  DRAFT
+  IN_REVIEW
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+model NepalEducationPolicyVersion {
+  id                   String                           @id @default(uuid())
+  // A stable, globally namespaced lineage key. Versions of one policy share
+  // this key; distinct scopes or policy subjects require different keys.
+  policyKey            String
+  version              Int
+  kind                 NepalEducationPolicyKind
+  scope                NepalEducationPolicyScope
+  tenantId             String?
+  provinceId           Int?
+  districtId           Int?
+  localLevelId         Int?
+  schoolTypeCode       String?
+  recognitionAuthority String?
+  recognitionReference String?
+  isMandatoryBaseline  Boolean                          @default(false)
+  // Payload structure is versioned so later typed validators can migrate
+  // category-specific rules without rewriting approved historical evidence.
+  payloadSchemaVersion Int                              @default(1)
+  payload              Json
+  reviewStatus         NepalEducationPolicyReviewStatus @default(DRAFT)
+  reviewedById         String?
+  reviewedAt           DateTime?
+  approvedById         String?
+  approvedAt           DateTime?
+  reviewNote           String?                          @db.Text
+  effectiveFrom        DateTime
+  effectiveTo          DateTime?
+  supersedesId         String?                          @unique
+  sourceTitle          String
+  sourcePublisher      String?
+  sourceUri            String?
+  sourcePublishedAt    DateTime?
+  sourceChecksumSha256 String?
+  evidenceFileAssetId  String?
+  createdAt            DateTime                         @default(now())
+
+  tenant        Tenant?                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  province      NepalProvince?                @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+  district      NepalDistrict?                @relation(fields: [districtId], references: [id], onDelete: Restrict)
+  localLevel    NepalLocalLevel?              @relation(fields: [localLevelId], references: [id], onDelete: Restrict)
+  reviewedBy    User?                         @relation("ReviewedNepalEducationPolicies", fields: [reviewedById], references: [id], onDelete: Restrict)
+  approvedBy    User?                         @relation("ApprovedNepalEducationPolicies", fields: [approvedById], references: [id], onDelete: Restrict)
+  evidenceFile  FileAsset?                    @relation(fields: [evidenceFileAssetId], references: [id], onDelete: Restrict)
+  supersedes    NepalEducationPolicyVersion?  @relation("NepalEducationPolicyLineage", fields: [supersedesId], references: [id], onDelete: Restrict)
+  supersededBy  NepalEducationPolicyVersion?  @relation("NepalEducationPolicyLineage")
+
+  @@unique([policyKey, version])
+  @@index([kind, scope, reviewStatus, effectiveFrom])
+  @@index([tenantId, kind, reviewStatus, effectiveFrom])
+  @@index([localLevelId, kind, reviewStatus, effectiveFrom])
+  @@index([policyKey, reviewStatus, effectiveFrom])
+}
