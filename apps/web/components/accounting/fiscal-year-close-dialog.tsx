@@ -31,11 +31,13 @@ export function FiscalYearCloseDialog({
   const queryClient = useQueryClient();
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [reopenRequestId, setReopenRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setReason('');
       setError(null);
+      setReopenRequestId(null);
     }
   }, [isOpen, fiscalYear?.id, mode]);
 
@@ -51,7 +53,14 @@ export function FiscalYearCloseDialog({
         return api.closeFiscalYear(fiscalYear.id, { reason: reason.trim() });
       return api.reopenFiscalYear(fiscalYear.id, { reason: reason.trim() });
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (mode === 'REOPEN') {
+        setReopenRequestId(result.id);
+        void queryClient.invalidateQueries({
+          queryKey: ['principal-approval-centre'],
+        });
+        return;
+      }
       void queryClient.invalidateQueries({ queryKey: ['fiscal-years'] });
       void queryClient.invalidateQueries({
         queryKey: ['fiscal-year-close-readiness', fiscalYear?.id],
@@ -64,14 +73,18 @@ export function FiscalYearCloseDialog({
   });
 
   const readiness = readinessQuery.data;
-  const reasonTooShort = reason.trim().length < 5;
+  const minimumReasonLength = mode === 'REOPEN' ? 10 : 5;
+  const reasonTooShort = reason.trim().length < minimumReasonLength;
   const closeBlockedByReadiness =
     mode === 'CLOSE' &&
     (readinessQuery.isLoading ||
       readinessQuery.isError ||
       !readiness?.readyToClose);
   const confirmDisabled =
-    reasonTooShort || closeBlockedByReadiness || mutation.isPending;
+    reasonTooShort ||
+    closeBlockedByReadiness ||
+    mutation.isPending ||
+    Boolean(reopenRequestId);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,12 +101,14 @@ export function FiscalYearCloseDialog({
             {mode === 'CLOSE' ? <Lock size={24} /> : <Unlock size={24} />}
           </div>
           <DialogTitle className="text-center">
-            {mode === 'CLOSE' ? 'Close Fiscal Year' : 'Reopen Fiscal Year'}
+            {mode === 'CLOSE'
+              ? 'Close Fiscal Year'
+              : 'Request Fiscal Year Reopen'}
           </DialogTitle>
           <p className="text-center text-sm text-slate-500 mt-2">
             {mode === 'CLOSE'
               ? `Are you sure you want to close ${fiscalYear?.name}? This will generate closing entries for all revenue and expense accounts and transfer net income to Retained Earnings.`
-              : `Reopening ${fiscalYear?.name} will allow further postings. Please provide a reason for the audit trail.`}
+              : `Request reopening ${fiscalYear?.name}. The year stays closed until an independent approver applies the request. Provide a reason for the audit trail.`}
           </p>
         </DialogHeader>
 
@@ -104,115 +119,140 @@ export function FiscalYearCloseDialog({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          {mode === 'CLOSE' && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Fiscal-year close readiness
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void readinessQuery.refetch()}
-                  disabled={readinessQuery.isFetching}
-                  isLoading={readinessQuery.isFetching}
-                  className="gap-1.5 text-[11px] font-bold"
-                >
-                  <RefreshCcw size={12} />
-                  Recompute
-                </Button>
-              </div>
+        {reopenRequestId && (
+          <div
+            role="status"
+            className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+          >
+            Reopen request submitted for independent approval. The fiscal year
+            remains closed.
+            <p className="mt-2">
+              An authorized independent approver can review the request in
+              Approval Centre.
+            </p>
+          </div>
+        )}
 
-              {readinessQuery.isLoading && (
-                <p className="text-xs font-semibold text-slate-500">
-                  Checking fiscal-year close readiness...
-                </p>
-              )}
-              {readinessQuery.isError && (
-                <p className="text-xs font-semibold text-rose-700">
-                  Readiness could not be checked. Confirm your fiscal permission
-                  and try again.
-                </p>
-              )}
-              {readiness && (
-                <div className="space-y-2">
-                  <p
-                    className={cn(
-                      'text-xs font-bold',
-                      readiness.readyToClose
-                        ? 'text-emerald-700'
-                        : 'text-rose-700',
-                    )}
+        {!reopenRequestId && (
+          <form onSubmit={handleSubmit} className="space-y-4 py-4">
+            {mode === 'CLOSE' && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Fiscal-year close readiness
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void readinessQuery.refetch()}
+                    disabled={readinessQuery.isFetching}
+                    isLoading={readinessQuery.isFetching}
+                    className="gap-1.5 text-[11px] font-bold"
                   >
-                    {readiness.readyToClose
-                      ? 'No blocking issues. This fiscal year can be closed.'
-                      : `${readiness.blockingIssueCount} blocking issue(s) must be resolved before closing.`}
-                  </p>
-                  {readiness.issues
-                    .filter((issue) => issue.severity === 'BLOCKING')
-                    .map((issue) => (
-                      <p key={issue.code} className="text-xs text-rose-700">
-                        {issue.safeMessage} ({issue.count})
-                      </p>
-                    ))}
-                  {readiness.issues
-                    .filter((issue) => issue.severity === 'WARNING')
-                    .map((issue) => (
-                      <p key={issue.code} className="text-xs text-amber-700">
-                        Warning: {issue.safeMessage} ({issue.count})
-                      </p>
-                    ))}
-                  <p className="text-[10px] text-slate-400">
-                    Last calculated{' '}
-                    {formatBsDateTime(readiness.lastCalculatedAt)}.
-                    Posting-failure, report-snapshot, export-job,
-                    fee-reconciliation, and warning-acknowledgement checks
-                    remain explicitly unavailable in this release.
-                  </p>
+                    <RefreshCcw size={12} />
+                    Recompute
+                  </Button>
                 </div>
+
+                {readinessQuery.isLoading && (
+                  <p className="text-xs font-semibold text-slate-500">
+                    Checking fiscal-year close readiness...
+                  </p>
+                )}
+                {readinessQuery.isError && (
+                  <p className="text-xs font-semibold text-rose-700">
+                    Readiness could not be checked. Confirm your fiscal
+                    permission and try again.
+                  </p>
+                )}
+                {readiness && (
+                  <div className="space-y-2">
+                    <p
+                      className={cn(
+                        'text-xs font-bold',
+                        readiness.readyToClose
+                          ? 'text-emerald-700'
+                          : 'text-rose-700',
+                      )}
+                    >
+                      {readiness.readyToClose
+                        ? 'No blocking issues. This fiscal year can be closed.'
+                        : `${readiness.blockingIssueCount} blocking issue(s) must be resolved before closing.`}
+                    </p>
+                    {readiness.issues
+                      .filter((issue) => issue.severity === 'BLOCKING')
+                      .map((issue) => (
+                        <p key={issue.code} className="text-xs text-rose-700">
+                          {issue.safeMessage} ({issue.count})
+                        </p>
+                      ))}
+                    {readiness.issues
+                      .filter((issue) => issue.severity === 'WARNING')
+                      .map((issue) => (
+                        <p key={issue.code} className="text-xs text-amber-700">
+                          Warning: {issue.safeMessage} ({issue.count})
+                        </p>
+                      ))}
+                    <p className="text-[10px] text-slate-400">
+                      Last calculated{' '}
+                      {formatBsDateTime(readiness.lastCalculatedAt)}.
+                      Posting-failure, report-snapshot, export-job,
+                      fee-reconciliation, and warning-acknowledgement checks
+                      remain explicitly unavailable in this release.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">
+                {mode === 'CLOSE'
+                  ? 'Reason for closing'
+                  : 'Reason for reopening'}
+              </label>
+              <textarea
+                className="w-full min-h-[100px] rounded-2xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-accounting-accent)]"
+                placeholder={
+                  mode === 'CLOSE'
+                    ? 'Describe why this fiscal year is being closed now...'
+                    : 'Describe why this fiscal year needs to be reopened...'
+                }
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                required
+                minLength={minimumReasonLength}
+              />
+              {reason.trim().length > 0 && reasonTooShort && (
+                <p className="text-[10px] font-bold uppercase text-rose-500">
+                  Enter at least {minimumReasonLength} characters
+                </p>
               )}
             </div>
-          )}
 
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700">
-              {mode === 'CLOSE' ? 'Reason for closing' : 'Reason for reopening'}
-            </label>
-            <textarea
-              className="w-full min-h-[100px] rounded-2xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-accounting-accent)]"
-              placeholder={
-                mode === 'CLOSE'
-                  ? 'Describe why this fiscal year is being closed now...'
-                  : 'Describe why this fiscal year needs to be reopened...'
-              }
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              required
-              minLength={5}
-            />
-            {reason.trim().length > 0 && reasonTooShort && (
-              <p className="text-[10px] font-bold uppercase text-rose-500">
-                Enter at least 5 characters
-              </p>
-            )}
-          </div>
-
-          <DialogFooter className="grid grid-cols-2 gap-2 pt-4 sm:space-x-0">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant={mode === 'CLOSE' ? 'destructive' : 'default'}
-              disabled={confirmDisabled}
-              isLoading={mutation.isPending}
-            >
-              {mode === 'CLOSE' ? 'Confirm Close' : 'Confirm Reopen'}
+            <DialogFooter className="grid grid-cols-2 gap-2 pt-4 sm:space-x-0">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant={mode === 'CLOSE' ? 'destructive' : 'default'}
+                disabled={confirmDisabled}
+                isLoading={mutation.isPending}
+              >
+                {mode === 'CLOSE' ? 'Confirm Close' : 'Submit Reopen Request'}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+        {reopenRequestId && (
+          <DialogFooter>
+            <Button type="button" onClick={onClose}>
+              Close
             </Button>
           </DialogFooter>
-        </form>
+        )}
       </DialogContent>
     </Dialog>
   );

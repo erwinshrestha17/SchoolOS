@@ -2,13 +2,30 @@ import { ConflictException } from '@nestjs/common';
 import { JournalLineSide, PayrollRunStatus, Prisma } from '@prisma/client';
 import { PayrollService } from './payroll.service';
 
+jest.mock('../auth/school-authorization-transaction', () => ({
+  withSchoolAuthorizationTransaction: (
+    prisma: { $transaction: (work: unknown, options: unknown) => unknown },
+    _actor: unknown,
+    _permission: string,
+    _targets: string[],
+    work: unknown,
+    _exclusive: boolean,
+    options: unknown,
+  ) => prisma.$transaction(work, options),
+}));
+
 const actor = {
   tenantId: 'tenant-1',
   tenantSlug: 'tenant-one',
   userId: 'user-1',
   email: 'admin@schoolos.test',
   roles: ['admin'],
-  permissions: ['payroll:run:reverse', 'payroll:run:post'],
+  permissions: [
+    'payroll:run:reverse',
+    'payroll:run:post',
+    'payroll:run:review',
+    'payroll:run:pay',
+  ],
 };
 
 describe('PayrollService reversal accounting reconciliation', () => {
@@ -171,6 +188,7 @@ function buildService(options: {
   journalEntries?: Record<string, unknown>;
 }) {
   const tx = {
+    payslip: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     journalEntry: {
       findUnique: jest.fn(
         async ({ where }: { where: { id: string } }) =>
@@ -182,6 +200,7 @@ function buildService(options: {
       updateMany: jest.fn(),
     },
     payrollRun: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest.fn().mockResolvedValue(
         buildPayrollRun({
           ...(options.payrollRun as Record<string, unknown> | undefined),
@@ -235,6 +254,7 @@ function buildPayrollRun(overrides: Record<string, unknown> = {}) {
     periodStart: new Date('2026-05-01T00:00:00.000Z'),
     periodEnd: new Date('2026-05-31T00:00:00.000Z'),
     status: PayrollRunStatus.POSTED,
+    generatedById: 'preparer-1',
     grossAmount: new Prisma.Decimal(50000),
     deductionAmount: new Prisma.Decimal(1000),
     netAmount: new Prisma.Decimal(49000),

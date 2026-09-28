@@ -297,6 +297,40 @@ describe('P0-01 teacher assignment scoping (real database)', () => {
   });
 
   describe('assignment lifecycle', () => {
+    it('does not restore an expired assignment by backdating the requested record', async () => {
+      const previousRecordDate = new Date(Date.now() - 10 * DAY);
+      await resetAssignment({ effectiveUntil: new Date(Date.now() - DAY) });
+      await expect(
+        service.canActorAccess(
+          marksWrite({ effectiveOn: previousRecordDate }) as never,
+          teacherActor(),
+        ),
+      ).resolves.toBeNull();
+    });
+
+    it('denies at the exact exclusive assignment end', async () => {
+      const boundary = new Date();
+      await resetAssignment({ effectiveUntil: boundary });
+      await expect(
+        service.canActorAccess(
+          marksWrite({ effectiveOn: boundary }) as never,
+          teacherActor(),
+        ),
+      ).resolves.toBeNull();
+    });
+
+    it('rejects locked marks after a form was opened', async () => {
+      await expect(
+        service.canActorAccess(marksWrite() as never, teacherActor()),
+      ).resolves.not.toBeNull();
+      await expect(
+        service.canActorAccess(
+          marksWrite({ recordStatus: 'LOCKED' }) as never,
+          teacherActor(),
+        ),
+      ).resolves.toBeNull();
+    });
+
     it.each([['REVOKED'], ['EXPIRED']])(
       'denies once the assignment status is %s',
       async (status) => {
@@ -403,6 +437,90 @@ describe('P0-01 teacher assignment scoping (real database)', () => {
         where: { id: teacherStaffId },
         data: { status: 'ACTIVE' },
       });
+    });
+
+    it('applies employment status to the staff-oriented entry point too', async () => {
+      await prisma.staff.update({
+        where: { id: teacherStaffId },
+        data: { status: 'TERMINATED' },
+      });
+      try {
+        await expect(
+          service.canAccess({
+            ...marksWrite(),
+            tenantId: tenantAId,
+            staffId: teacherStaffId,
+          } as never),
+        ).resolves.toBeNull();
+      } finally {
+        await prisma.staff.update({
+          where: { id: teacherStaffId },
+          data: { status: 'ACTIVE' },
+        });
+      }
+    });
+
+    it('denies an active staff record whose employment has not started', async () => {
+      await prisma.staff.update({
+        where: { id: teacherStaffId },
+        data: { joiningDate: new Date(Date.now() + DAY) },
+      });
+      try {
+        await expect(
+          service.canActorAccess(marksWrite() as never, teacherActor()),
+        ).resolves.toBeNull();
+      } finally {
+        await prisma.staff.update({
+          where: { id: teacherStaffId },
+          data: { joiningDate: new Date('2024-01-01') },
+        });
+      }
+    });
+  });
+
+  describe('temporary assignment year and capability boundaries', () => {
+    it('cannot use a current delegation in a different requested academic year', async () => {
+      await resetAssignment({ status: 'REVOKED' });
+      const delegation = await prisma.teacherDelegation.create({
+        data: {
+          tenantId: tenantAId,
+          academicYearId: yearAId,
+          grantorStaffId: teacherStaffId,
+          recipientStaffId: teacherStaffId,
+          classId: classAId,
+          sectionId: sectionAId,
+          subjectId: subjectMathId,
+          allowedCapabilities: [TeacherCapability.MARKS_ENTER],
+          reason: 'Synthetic bounded substitution',
+          effectiveFrom: new Date(Date.now() - DAY),
+          effectiveUntil: new Date(Date.now() + DAY),
+        },
+      });
+      try {
+        await expect(
+          service.canActorAccess(
+            marksWrite({ academicYearId: yearAId }) as never,
+            teacherActor(),
+          ),
+        ).resolves.toMatchObject({ source: 'DELEGATION' });
+        await expect(
+          service.canActorAccess(
+            marksWrite({ academicYearId: 'another-year' }) as never,
+            teacherActor(),
+          ),
+        ).resolves.toBeNull();
+        await expect(
+          service.canActorAccess(
+            {
+              ...marksWrite(),
+              capability: TeacherCapability.SUBJECT_HOMEWORK_CREATE,
+            } as never,
+            teacherActor(),
+          ),
+        ).resolves.toBeNull();
+      } finally {
+        await prisma.teacherDelegation.delete({ where: { id: delegation.id } });
+      }
     });
   });
 });

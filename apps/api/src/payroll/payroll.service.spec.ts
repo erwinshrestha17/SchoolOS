@@ -55,11 +55,14 @@ describe('payroll calculations', () => {
     });
   });
 
-  it('enforces draft to reviewed to approved to posted workflow actions', () => {
+  it('enforces validation, independent review, approval, finalization and posting workflow actions', () => {
     expect(getPayrollRunActions('DRAFT')).toEqual({
       canEdit: true,
-      canReview: true,
-      canSubmitReview: true,
+      canValidate: true,
+      canFinalize: false,
+      canCancelFinalized: false,
+      canReview: false,
+      canSubmitReview: false,
       canCompleteReview: false,
       canApprove: false,
       canReject: false,
@@ -67,6 +70,10 @@ describe('payroll calculations', () => {
       canPay: false,
       canReverse: false,
       isLocked: false,
+    });
+    expect(getPayrollRunActions('VALIDATED')).toMatchObject({
+      canSubmitReview: true,
+      canApprove: false,
     });
     expect(getPayrollRunActions('UNDER_REVIEW')).toMatchObject({
       canEdit: false,
@@ -86,8 +93,16 @@ describe('payroll calculations', () => {
     expect(getPayrollRunActions('APPROVED')).toMatchObject({
       canReview: false,
       canApprove: false,
-      canReject: false,
+      canReject: true,
+      canFinalize: true,
+      canPost: false,
+    });
+    expect(getPayrollRunActions('FINALIZED')).toMatchObject({
+      canEdit: false,
       canPost: true,
+      isLocked: true,
+      canReject: false,
+      canCancelFinalized: true,
     });
   });
 

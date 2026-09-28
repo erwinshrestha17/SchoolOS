@@ -157,6 +157,9 @@ describe('guardian-child capability scope', () => {
         GuardianCapability.ATTENDANCE_VIEW,
       ),
     ).resolves.toEqual(relationship);
+    expect(
+      prisma.guardian.findFirst.mock.calls[0]?.[0].where.studentLinks.some,
+    ).toMatchObject({ student: { tenantId: actor.tenantId } });
 
     await expect(
       requireGuardianCapability(

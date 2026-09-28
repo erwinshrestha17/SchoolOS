@@ -66,12 +66,17 @@ export default function PayrollDashboardPage() {
   const workflowSteps = [
     {
       label: 'Draft',
-      statuses: ['DRAFT', 'GENERATED', 'UNDER_REVIEW', 'REVIEWED'],
+      statuses: ['DRAFT', 'GENERATED', 'VALIDATED', 'UNDER_REVIEW', 'REVIEWED'],
       description: 'Generated or under review',
     },
     {
       label: 'Approved',
       statuses: ['APPROVED'],
+      description: 'Awaiting finalization',
+    },
+    {
+      label: 'Finalized',
+      statuses: ['FINALIZED'],
       description: 'Ready for posting',
     },
     {
@@ -95,7 +100,7 @@ export default function PayrollDashboardPage() {
       <ModuleHeader
         eyebrow="Staff & Finance"
         title="Payroll"
-        description="Review payroll runs, approve them, post approved runs to accounting, and open protected payslips and statutory reports."
+        description="Validate payroll runs, independently review and approve them, finalize them, and post them to accounting, and open protected payslips and statutory reports."
         primaryAction={
           <Link
             href="/dashboard/payroll/runs"

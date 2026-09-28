@@ -23,6 +23,7 @@ export type SchoolE2eRole =
   | 'e2eAccountant'
   | 'accountingReviewer'
   | 'accountingApprover'
+  | 'accountingPoster'
   | 'accountingFiscalController'
   | 'principalReadOnly'
   | 'auditorReadOnly'
@@ -154,6 +155,7 @@ function credentialsFor(role: SchoolE2eRole) {
     e2eAccountant: { email: 'e2e.accountant@schoolos.test' },
     accountingReviewer: { email: 'e2e.accounting-reviewer@schoolos.test' },
     accountingApprover: { email: 'e2e.accounting-approver@schoolos.test' },
+    accountingPoster: { email: 'e2e.accounting-poster@schoolos.test' },
     accountingFiscalController: {
       email: 'e2e.accounting-fiscal-controller@schoolos.test',
     },

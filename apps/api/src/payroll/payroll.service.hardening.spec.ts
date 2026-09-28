@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
   FileStatus,
@@ -11,13 +12,34 @@ import {
 import sharp from 'sharp';
 import { PayrollService } from './payroll.service';
 
+jest.mock('../auth/school-authorization-transaction', () => ({
+  withSchoolAuthorizationTransaction: (
+    prisma: { $transaction: (work: unknown, options: unknown) => unknown },
+    _actor: unknown,
+    _permission: string,
+    _targets: string[],
+    work: unknown,
+    _exclusive: boolean,
+    options: unknown,
+  ) => prisma.$transaction(work, options),
+}));
+
 const actor = {
   tenantId: 'tenant-1',
   tenantSlug: 'tenant-one',
   userId: 'user-1',
   email: 'admin@schoolos.test',
   roles: ['admin'],
-  permissions: ['payroll:run:read', 'payroll:run:approve', 'payroll:run:post'],
+  permissions: [
+    'payroll:salary:write',
+    'payroll:run:read',
+    'payroll:run:create',
+    'payroll:run:validate',
+    'payroll:run:review',
+    'payroll:run:approve',
+    'payroll:run:finalize',
+    'payroll:run:post',
+  ],
 };
 
 describe('PayrollService hardening boundaries', () => {
@@ -263,7 +285,7 @@ describe('PayrollService hardening boundaries', () => {
 
     await expect(
       service.approvePayrollRun('run-1', actor as never),
-    ).rejects.toThrow('Posted payroll cannot be re-approved');
+    ).rejects.toThrow('Payroll run in POSTED status cannot perform approve');
 
     expect(prisma.payrollRun.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -282,53 +304,63 @@ describe('PayrollService hardening boundaries', () => {
 
     await expect(
       service.approvePayrollRun('run-1', actor as never),
-    ).rejects.toThrow('Payroll run in GENERATED status cannot be approved');
+    ).rejects.toThrow('Payroll run in GENERATED status cannot perform approve');
 
     expect(prisma.payrollLine.updateMany).not.toHaveBeenCalled();
     expect(prisma.payslip.createMany).not.toHaveBeenCalled();
   });
 
-  it('separates review submission from review completion', async () => {
-    const generatedRun = buildPayrollRun({
-      status: PayrollRunStatus.GENERATED,
+  it('separates validated submission from independent review completion', async () => {
+    const validatedRun = buildPayrollRun({
+      status: PayrollRunStatus.VALIDATED,
     });
     const underReviewRun = buildPayrollRun({
       status: PayrollRunStatus.UNDER_REVIEW,
     });
-    const { service, prisma, auditService } = buildService({
-      payrollRunFindFirstQueue: [generatedRun, underReviewRun],
+    const { service, tx, auditService } = buildService({
+      payrollRunFindFirstQueue: [validatedRun, underReviewRun],
       updatedPayrollRunQueue: [
         underReviewRun,
         buildPayrollRun({ status: PayrollRunStatus.REVIEWED }),
       ],
     });
-
     await expect(
       service.submitPayrollRunForReview('run-1', actor as never),
     ).resolves.toMatchObject({ status: PayrollRunStatus.UNDER_REVIEW });
     await expect(
       service.reviewPayrollRun('run-1', actor as never),
     ).resolves.toMatchObject({ status: PayrollRunStatus.REVIEWED });
-
-    expect(prisma.payrollRun.update).toHaveBeenNthCalledWith(
+    expect(tx.payrollRun.updateMany).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        where: { id: 'run-1' },
+        where: expect.objectContaining({
+          id: 'run-1',
+          status: PayrollRunStatus.VALIDATED,
+          tenantId: actor.tenantId,
+        }),
         data: { status: PayrollRunStatus.UNDER_REVIEW },
       }),
     );
-    expect(prisma.payrollRun.update).toHaveBeenNthCalledWith(
+    expect(tx.payrollRun.updateMany).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        where: { id: 'run-1' },
-        data: { status: PayrollRunStatus.REVIEWED },
+        where: expect.objectContaining({
+          status: PayrollRunStatus.UNDER_REVIEW,
+        }),
+        data: expect.objectContaining({
+          status: PayrollRunStatus.REVIEWED,
+          reviewedById: actor.userId,
+          reviewedAt: expect.any(Date),
+        }),
       }),
     );
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'submit_review' }),
+      tx,
     );
     expect(auditService.record).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'complete_review' }),
+      expect.objectContaining({ action: 'review' }),
+      tx,
     );
   });
 
@@ -363,7 +395,7 @@ describe('PayrollService hardening boundaries', () => {
   });
 
   it('posts payroll through AccountingPostingService and stores journalEntryId', async () => {
-    const run = buildPayrollRun({ status: PayrollRunStatus.APPROVED });
+    const run = buildPayrollRun({ status: PayrollRunStatus.FINALIZED });
     const { service, prisma, tx, accountingPostingService } = buildService({
       payrollRun: run,
       postedPayrollRun: buildPayrollRun({
@@ -437,7 +469,7 @@ describe('PayrollService hardening boundaries', () => {
     // POSTED between our read and our write, so the guarded updateMany
     // claims 0 rows. Must reject cleanly rather than proceed to post a
     // second journal entry for the same payroll run.
-    const run = buildPayrollRun({ status: PayrollRunStatus.APPROVED });
+    const run = buildPayrollRun({ status: PayrollRunStatus.FINALIZED });
     const { service, tx, accountingPostingService } = buildService({
       payrollRun: run,
     });
@@ -581,7 +613,7 @@ describe('PayrollService hardening boundaries', () => {
         totalNet: '88000.15',
         pfEmployeeAmount: '5000.05',
         postingReadiness: expect.objectContaining({
-          canPost: true,
+          canPost: false,
           createsAccountingAccrualOnly: true,
           salaryDisbursementProviderSupported: false,
         }),
@@ -1255,6 +1287,7 @@ function buildService(options: {
         ),
     },
     payrollLine: {
+      findMany: jest.fn().mockResolvedValue([buildPayrollLine()]),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     salaryStructure: {
@@ -1262,12 +1295,18 @@ function buildService(options: {
       update: jest.fn().mockResolvedValue(buildSalaryStructure()),
     },
     payrollRun: {
+      findFirstOrThrow: jest
+        .fn()
+        .mockImplementation(
+          async () => updatedPayrollRunQueue.shift() ?? buildPayrollRun(),
+        ),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest
         .fn()
         .mockResolvedValue(options.postedPayrollRun ?? buildPayrollRun()),
     },
     payslip: {
+      createMany: jest.fn().mockResolvedValue({ count: 1 }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
   };
@@ -1391,6 +1430,10 @@ function buildService(options: {
       accountingPostingService as never,
       options.fileRegistryService as never,
       options.payrollQueue as never,
+      {
+        assertActionAllowed: jest.fn().mockResolvedValue(undefined),
+        getReadiness: jest.fn().mockResolvedValue({ readinessStatus: 'READY' }),
+      } as never,
     ),
     prisma,
     tx,
@@ -1460,6 +1503,14 @@ function buildPayrollRun(overrides: Record<string, unknown> = {}) {
     periodStart: new Date('2026-05-01T00:00:00.000Z'),
     periodEnd: new Date('2026-05-31T00:00:00.000Z'),
     status: PayrollRunStatus.GENERATED,
+    generatedById: 'preparer-1',
+    reviewedById: 'reviewer-1',
+    reviewedAt: new Date('2026-05-31'),
+    approvedById: 'approver-1',
+    approvedSourceFingerprint: createHash('sha256')
+      .update('schoolos:payroll-sources:v1\0')
+      .update(JSON.stringify([buildPayrollLine()]))
+      .digest('hex'),
     grossAmount: new Prisma.Decimal(50000),
     deductionAmount: new Prisma.Decimal(1000),
     netAmount: new Prisma.Decimal(49000),

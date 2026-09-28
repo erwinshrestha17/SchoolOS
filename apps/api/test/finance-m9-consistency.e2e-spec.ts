@@ -22,6 +22,18 @@ import {
   PrismaMock,
 } from './test-helpers';
 
+// This suite uses an in-memory Prisma mock for posting mechanics. The live
+// authorization transaction is covered by finance-domain-policy.int-spec.ts.
+jest.mock('../src/auth/school-authorization-transaction', () => ({
+  withSchoolAuthorizationTransaction: (
+    prisma: { $transaction: (work: unknown) => unknown },
+    _actor: unknown,
+    _permission: unknown,
+    _scopes: unknown,
+    work: unknown,
+  ) => prisma.$transaction(work),
+}));
+
 interface JournalCreateInput {
   data: {
     tenantId: string;
@@ -259,11 +271,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
       seedPaymentForReversal();
       seedOriginalPaymentJournal();
 
-      await financeService.reversePayment(
-        'pay-1',
-        { reason: 'Refund', idempotencyKey: 'reverse-pay-1' },
-        actor,
-      );
+      await postApprovedReversalJournal('Refund');
 
       expect(prisma.journalEntry.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -338,16 +346,13 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
           tenantId,
           resourceId: expect.any(String),
         }),
+        expect.any(Object),
       );
 
       seedPaymentForReversal();
       seedOriginalPaymentJournal();
 
-      await financeService.reversePayment(
-        'pay-1',
-        { reason: 'Test', idempotencyKey: 'reverse-pay-1-audit' },
-        actor,
-      );
+      await postApprovedReversalJournal('Test');
 
       expect(auditSpy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -356,7 +361,25 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
           tenantId,
           resourceId: expect.any(String),
         }),
+        expect.any(Object),
       );
+    });
+
+    it('rejects direct payment reversal without a reviewed approval request', async () => {
+      seedPaymentForReversal();
+      seedOriginalPaymentJournal();
+
+      await expect(
+        financeService.reversePayment(
+          'pay-1',
+          { reason: 'Unapproved reversal', idempotencyKey: 'direct-reversal' },
+          actor,
+        ),
+      ).rejects.toThrow(
+        'Execution requires a separately reviewed and approved correction request',
+      );
+      expect(prisma.journalEntry.update).not.toHaveBeenCalled();
+      expect(prisma.journalEntry.create).not.toHaveBeenCalled();
     });
   });
 
@@ -569,6 +592,37 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
     if (!prisma.__state.journalEntries.some((item) => item.id === journal.id)) {
       prisma.__state.journalEntries.push(journal);
     }
+  }
+
+  // This mock-backed suite checks the posting primitive. The full finance
+  // request/review/approval/execution path is covered with PostgreSQL in
+  // finance-domain-policy.int-spec.ts.
+  async function postApprovedReversalJournal(reason: string) {
+    const amount = new Prisma.Decimal(1000);
+    return postingService.postReversal(
+      {
+        tenantId,
+        originalEntryId: 'je-1',
+        reversalDate: new Date(),
+        narration: `Reversal of payment pay-1: ${reason}`,
+        reason,
+        lines: [
+          {
+            chartAccountId: 'acc-cash',
+            side: JournalLineSide.CREDIT,
+            amount,
+            description: 'Reverse original cash debit',
+          },
+          {
+            chartAccountId: 'acc-rev',
+            side: JournalLineSide.DEBIT,
+            amount,
+            description: 'Reverse original revenue credit',
+          },
+        ],
+      },
+      actor,
+    );
   }
 
   async function collectCashPayment(

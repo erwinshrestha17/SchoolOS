@@ -26,6 +26,7 @@ import {
   isParentOnly,
 } from '../common/security/parent-scope';
 import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
+import { requireDomainPermission } from '../authorization/policies/domain-permission';
 import { MAX_SIGNED_URL_TTL_SECONDS } from '../storage/storage.types';
 import { buildObjectKey, isTenantObjectKey } from '../storage/storage.utils';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
@@ -375,8 +376,8 @@ export class FileRegistryService {
       },
     });
 
-    await tx.auditLog.create({
-      data: {
+    await this.auditService.record(
+      {
         action: 'file_linked',
         resource: 'file_registry',
         resourceId: asset.id,
@@ -395,7 +396,8 @@ export class FileRegistryService {
           ownerId: input.ownerId ?? input.entityId,
         },
       },
-    });
+      tx,
+    );
 
     return updated;
   }
@@ -430,6 +432,35 @@ export class FileRegistryService {
     }
     if (asset.status !== FileStatus.UPLOADED) {
       throw new NotFoundException('File is not available');
+    }
+
+    if (
+      asset.module === 'staff' ||
+      asset.module === 'staff-documents' ||
+      asset.ownerType === 'staff' ||
+      asset.ownerType === 'staffs'
+    ) {
+      requireDomainPermission(auth, 'hr:documents:read');
+      const document = await this.prisma.staffDocument.findFirst({
+        where: {
+          tenantId: auth.tenantId,
+          fileId: asset.id,
+          status: { in: ['ACTIVE', 'VERIFIED'] },
+          staff: { tenantId: auth.tenantId },
+        },
+        select: { id: true, staffId: true },
+      });
+      if (!document)
+        throw new NotFoundException('Staff document is not available');
+      await this.auditService.record({
+        action: 'sensitive_access',
+        resource: 'staff_document',
+        tenantId: auth.tenantId,
+        userId: auth.userId,
+        resourceId: document.id,
+        after: { fileId: asset.id, staffId: document.staffId },
+      });
+      return;
     }
 
     if (asset.visibility === FileVisibility.OWNER) {

@@ -16,6 +16,18 @@ import {
   PrismaMock,
 } from './test-helpers';
 
+// This mock-backed suite exercises accounting arithmetic and tenancy. Live
+// authorization transactions are covered by journal-domain-policy.int-spec.ts.
+jest.mock('../src/auth/school-authorization-transaction', () => ({
+  withSchoolAuthorizationTransaction: (
+    prisma: { $transaction: (work: unknown) => unknown },
+    _actor: unknown,
+    _permission: unknown,
+    _scopes: unknown,
+    work: unknown,
+  ) => prisma.$transaction(work),
+}));
+
 describe('Accounting Module Hardening (E2E)', () => {
   let moduleRef: TestingModule;
   let prisma: PrismaMock;
@@ -24,8 +36,14 @@ describe('Accounting Module Hardening (E2E)', () => {
 
   const tenantA = 'tenant-a';
   const tenantB = 'tenant-b';
-  const actorA = createAuthContextMock({ tenantId: tenantA });
-  const actorB = createAuthContextMock({ tenantId: tenantB });
+  const actorA = createAuthContextMock({
+    tenantId: tenantA,
+    permissions: ['accounting:journals:create'],
+  });
+  const actorB = createAuthContextMock({
+    tenantId: tenantB,
+    permissions: ['accounting:journals:create'],
+  });
   const postingPeriodStub = (id: string, fiscalYearId: string) =>
     ({ id, fiscalYearId }) as Awaited<
       ReturnType<AccountingPostingService['ensurePostingPeriodIsOpen']>
@@ -210,6 +228,10 @@ describe('Accounting Module Hardening (E2E)', () => {
       (prisma.journalEntry.count as jest.Mock).mockResolvedValue(0);
       (prisma.journalEntry.create as jest.Mock).mockResolvedValue({
         id: 'je-1',
+        lines: [
+          { debit: new Prisma.Decimal(100), credit: new Prisma.Decimal(0) },
+          { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(100) },
+        ],
       });
 
       const entry = await accountingService.createManualJournal(

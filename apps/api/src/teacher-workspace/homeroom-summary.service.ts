@@ -138,6 +138,7 @@ export class HomeroomSummaryService {
         classId: params.classId,
         sectionId: params.sectionId,
         capability: TeacherCapability.HOMEROOM_ACADEMIC_SUMMARY_READ,
+        scopeOnly: true,
       },
       actor,
     );

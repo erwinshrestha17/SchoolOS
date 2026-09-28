@@ -19,14 +19,14 @@ describe('Reviewed controller authorization boundaries', () => {
       }));
     expect(JSON.parse(JSON.stringify(current))).toEqual(reviewed);
   });
-  it('permits only the 13 reviewed method-bound dynamic policies under RolesPermissionsGuard', () => {
+  it('permits only the 14 reviewed method-bound dynamic policies under RolesPermissionsGuard', () => {
     const dynamic = routes.filter(
       (r) =>
         !r.permissions.length &&
         !r.roles.length &&
         r.guards.includes('RolesPermissionsGuard'),
     );
-    expect(dynamic).toHaveLength(13);
+    expect(dynamic).toHaveLength(14);
     for (const r of dynamic) {
       expect(r.guards).toContain('JwtAuthGuard');
       expect(r.guards.indexOf('JwtAuthGuard')).toBeLessThan(

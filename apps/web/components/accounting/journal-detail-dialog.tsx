@@ -41,9 +41,10 @@ export function JournalDetailDialog({
 }: JournalDetailDialogProps) {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
-  const canSubmit = hasPermissions(['accounting:journals:submit']);
-  const canApprove = hasPermissions(['accounting:journals:approve']);
-  const canPost = hasPermissions(['accounting:journals:post']);
+  const canSubmit = entry?.allowedActions?.submit === true;
+  const canReview = entry?.allowedActions?.review === true;
+  const canApprove = entry?.allowedActions?.approve === true;
+  const canPost = entry?.allowedActions?.post === true;
   const canReverse = hasPermissions(['accounting:journals:reverse']);
   const [isReversing, setIsReversing] = useState(false);
   const [isCorrecting, setIsCorrecting] = useState(false);
@@ -60,9 +61,10 @@ export function JournalDetailDialog({
       action,
     }: {
       id: string;
-      action: 'submit' | 'approve' | 'post';
+      action: 'submit' | 'review' | 'approve' | 'post';
     }) => {
       if (action === 'submit') return api.submitJournal(id, {});
+      if (action === 'review') return api.reviewJournal(id, {});
       if (action === 'approve') return api.approveJournal(id, {});
       return api.postJournal(id);
     },
@@ -73,6 +75,7 @@ export function JournalDetailDialog({
     onError: (err: Error, variables) => {
       const actionFailureTitle = {
         submit: 'Submission failed',
+        review: 'Review failed',
         approve: 'Approval failed',
         post: 'Posting failed',
       } as const;
@@ -146,6 +149,7 @@ export function JournalDetailDialog({
         return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
       case 'DRAFT':
         return 'bg-slate-500/10 text-slate-600 border-slate-500/20';
+      case 'REVIEWED':
       case 'SUBMITTED':
         return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
       case 'REVERSED':
@@ -458,11 +462,23 @@ export function JournalDetailDialog({
                   {!actionMutation.isPending ? (
                     <CheckCircle2 size={16} />
                   ) : null}
-                  Submit for Approval
+                  Submit for Review
                 </Button>
               )}
 
-              {entry.status === 'SUBMITTED' && canApprove && (
+              {entry.status === 'SUBMITTED' && canReview && (
+                <Button
+                  type="button"
+                  onClick={() =>
+                    actionMutation.mutate({ id: entry.id, action: 'review' })
+                  }
+                  isLoading={actionMutation.isPending}
+                >
+                  Complete Review
+                </Button>
+              )}
+
+              {entry.status === 'REVIEWED' && canApprove && (
                 <Button
                   type="button"
                   onClick={() =>

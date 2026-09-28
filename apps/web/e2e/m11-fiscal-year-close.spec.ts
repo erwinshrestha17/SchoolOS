@@ -11,7 +11,7 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   'http://localhost:4000/api/v1';
 
-test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting, and reopens with reason', async ({
+test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting, and requests reasoned reopen', async ({
   authStateFor,
   browser,
 }) => {
@@ -127,6 +127,18 @@ test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting
   expect(submitJournal.ok()).toBeTruthy();
   await accountant.context.close();
 
+  const reviewer = await roleContext(
+    browser,
+    authStateFor,
+    'accountingReviewer',
+  );
+  const reviewJournal = await reviewer.context.request.post(
+    `${API_BASE_URL}/accounting/journals/${createdJournal.data.id}/review`,
+    { headers: csrfHeaders(reviewer.state), data: {} },
+  );
+  expect(reviewJournal.ok()).toBeTruthy();
+  await reviewer.context.close();
+
   const approver = await roleContext(
     browser,
     authStateFor,
@@ -137,12 +149,14 @@ test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting
     { headers: csrfHeaders(approver.state), data: {} },
   );
   expect(approveJournal.ok()).toBeTruthy();
-  const postJournal = await approver.context.request.post(
+  await approver.context.close();
+  const poster = await roleContext(browser, authStateFor, 'accountingPoster');
+  const postJournal = await poster.context.request.post(
     `${API_BASE_URL}/accounting/journals/${createdJournal.data.id}/post`,
-    { headers: csrfHeaders(approver.state), data: {} },
+    { headers: csrfHeaders(poster.state), data: {} },
   );
   expect(postJournal.ok()).toBeTruthy();
-  await approver.context.close();
+  await poster.context.close();
 
   // --- Resolve the OPEN_PERIODS issue: lock then close every period, in
   // order (a period cannot close until its predecessor is closed). ---
@@ -286,7 +300,7 @@ test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting
   await yearCard.getByRole('button', { name: 'Reopen', exact: true }).click();
   const reopenDialog = page.getByRole('dialog');
   const confirmReopen = reopenDialog.getByRole('button', {
-    name: 'Confirm Reopen',
+    name: 'Submit Reopen Request',
   });
   await expect(confirmReopen).toBeDisabled();
   await reopenDialog
@@ -294,9 +308,11 @@ test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting
     .fill('E2E authorized correction requires fiscal-year reopen.');
   await expect(confirmReopen).toBeEnabled();
   await confirmReopen.click();
-  await expect(reopenDialog).not.toBeVisible();
+  await expect(reopenDialog.getByRole('status')).toContainText(
+    'The fiscal year remains closed',
+  );
   await expect(yearCard.locator('span.uppercase.tracking-wider')).toHaveText(
-    'OPEN',
+    'CLOSED',
   );
 
   await fiscalController.context.close();

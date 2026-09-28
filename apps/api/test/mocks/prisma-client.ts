@@ -1,3 +1,5 @@
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
+
 class Decimal {
   private readonly numericValue: number;
 
@@ -133,6 +135,7 @@ export const TransactionIsolationLevel = {
 } as const;
 
 export const Prisma = {
+  PrismaClientKnownRequestError,
   Decimal,
   TransactionIsolationLevel,
   empty: { strings: [''], values: [] },
@@ -290,6 +293,7 @@ export const ApprovalWorkflowType = {
   PLATFORM_SUPPORT_OVERRIDE: 'PLATFORM_SUPPORT_OVERRIDE',
   ADMISSION_CASE: 'ADMISSION_CASE',
   FISCAL_PERIOD_REOPEN: 'FISCAL_PERIOD_REOPEN',
+  FISCAL_YEAR_REOPEN: 'FISCAL_YEAR_REOPEN',
 } as const;
 
 export const ApprovalRequestStatus = {
@@ -514,6 +518,7 @@ export const PaymentMethod = {
 
 export const FinanceRequestStatus = {
   PENDING: 'PENDING',
+  REVIEWED: 'REVIEWED',
   PROCESSING: 'PROCESSING',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
@@ -523,6 +528,7 @@ export const FinanceRequestStatus = {
 
 export const FinanceRequestHistoryAction = {
   REQUESTED: 'REQUESTED',
+  REVIEWED: 'REVIEWED',
   REVIEW_STARTED: 'REVIEW_STARTED',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
@@ -599,6 +605,7 @@ export const ChartAccountType = {
 export const JournalEntryStatus = {
   DRAFT: 'DRAFT',
   SUBMITTED: 'SUBMITTED',
+  REVIEWED: 'REVIEWED',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
   POSTED: 'POSTED',
@@ -1025,9 +1032,11 @@ export const TimetableSubstitutionStatus = {
 export const PayrollRunStatus = {
   DRAFT: 'DRAFT',
   GENERATED: 'GENERATED',
+  VALIDATED: 'VALIDATED',
   UNDER_REVIEW: 'UNDER_REVIEW',
   REVIEWED: 'REVIEWED',
   APPROVED: 'APPROVED',
+  FINALIZED: 'FINALIZED',
   POSTED: 'POSTED',
   PAID: 'PAID',
   CANCELLED: 'CANCELLED',
@@ -1077,6 +1086,7 @@ export const PayrollLineStatus = {
 export const PayslipStatus = {
   DRAFT: 'DRAFT',
   ISSUED: 'ISSUED',
+  VOID: 'VOID',
 } as const;
 
 export const AccountingPeriodStatus = {

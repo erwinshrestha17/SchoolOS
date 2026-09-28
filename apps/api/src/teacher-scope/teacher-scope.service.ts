@@ -9,6 +9,11 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  activeTeacherStaffWhere,
+  teacherAuthorityWindow,
+  teacherRecordDenial,
+} from '../authorization/policies/teacher.policy';
+import {
   CAPABILITY_RULES,
   TeacherCapability,
   type TeacherRecordStatus,
@@ -54,10 +59,13 @@ export interface RequireTeacherAccessParams {
    * non-draft-only visibility and write-after-submit attempts.
    */
   recordStatus?: TeacherRecordStatus | null;
+  /** Server-only aggregate preflight. Callers must filter every returned
+   * record to the capability's permitted lifecycle states. */
+  scopeOnly?: boolean;
   /**
    * The date the record applies to (attendance date, homework assigned date,
-   * marks entry date). Defaults to now. An assignment that had ended by this
-   * date does not authorize the action.
+   * marks entry date). Defaults to now. Authority must be active both today
+   * and on this date; an old record date cannot restore an expired assignment.
    */
   effectiveOn?: Date;
 }
@@ -166,9 +174,8 @@ export class TeacherScopeService {
   async resolveActiveStaffId(actor: AuthContext): Promise<string | null> {
     const staff = await this.prisma.staff.findFirst({
       where: {
-        tenantId: actor.tenantId,
+        ...activeTeacherStaffWhere(actor.tenantId, new Date()),
         userId: actor.userId,
-        status: 'ACTIVE',
       },
       select: { id: true },
     });
@@ -356,30 +363,39 @@ export class TeacherScopeService {
     options: { audit: boolean },
   ): Promise<TeacherScopeGrant | null> {
     const rule = CAPABILITY_RULES[params.capability];
-    const now = params.effectiveOn ?? new Date();
-
-    // Lifecycle gate. Checked before any assignment lookup because it applies
-    // regardless of who is asking: a status the capability does not cover is
-    // simply not reachable through that capability.
+    const now = new Date();
+    const effectiveOn = params.effectiveOn ?? now;
     if (
-      rule.visibleRecordStatuses &&
-      params.recordStatus &&
-      !rule.visibleRecordStatuses.includes(params.recordStatus)
+      !rule ||
+      !Number.isFinite(+effectiveOn) ||
+      !params.tenantId ||
+      !params.staffId ||
+      !params.classId ||
+      (actor && actor.tenantId !== params.tenantId)
     ) {
-      if (options.audit) await this.recordDenial(params, actor, 'lifecycle');
+      if (options.audit)
+        await this.recordDenial(params, actor, 'missing_scope');
       return null;
     }
 
-    // Record-ownership gate. `requiresRecordOwnership` capabilities are for
-    // acting on your own work; teaching the subject is necessary but not
-    // sufficient.
-    if (
-      rule.requiresRecordOwnership &&
-      params.recordOwnerStaffId !== null &&
-      params.recordOwnerStaffId !== undefined &&
-      params.recordOwnerStaffId !== params.staffId
-    ) {
-      if (options.audit) await this.recordDenial(params, actor, 'ownership');
+    const denial = teacherRecordDenial(params);
+    if (denial) {
+      if (options.audit) await this.recordDenial(params, actor, denial);
+      return null;
+    }
+
+    // Staff-oriented callers must obey the same live employment boundary as
+    // actor-oriented callers. A retained assignment never restores inactive staff.
+    const staff = await this.prisma.staff.findFirst({
+      where: {
+        ...activeTeacherStaffWhere(params.tenantId, now),
+        id: params.staffId,
+        ...(actor ? { userId: actor.userId } : {}),
+      },
+      select: { id: true },
+    });
+    if (!staff) {
+      if (options.audit) await this.recordDenial(params, actor, 'employment');
       return null;
     }
 
@@ -396,8 +412,7 @@ export class TeacherScopeService {
         ...(params.sectionId ? { sectionId: params.sectionId } : {}),
         status: 'ACTIVE',
         assignmentType: { in: rule.allowedAssignmentTypes },
-        effectiveFrom: { lte: now },
-        OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: now } }],
+        ...teacherAuthorityWindow(now, effectiveOn),
       },
     });
 
@@ -418,11 +433,14 @@ export class TeacherScopeService {
       where: {
         tenantId: params.tenantId,
         recipientStaffId: params.staffId,
+        ...(params.academicYearId
+          ? { academicYearId: params.academicYearId }
+          : {}),
         classId: params.classId,
         ...(params.sectionId ? { sectionId: params.sectionId } : {}),
         status: 'ACTIVE',
-        effectiveFrom: { lte: now },
-        effectiveUntil: { gte: now },
+        effectiveFrom: { lte: new Date(Math.min(+now, +effectiveOn)) },
+        effectiveUntil: { gt: new Date(Math.max(+now, +effectiveOn)) },
       },
     });
 
@@ -448,7 +466,12 @@ export class TeacherScopeService {
   private async recordDenial(
     params: RequireTeacherAccessParams,
     actor: AuthContext | undefined,
-    reason: 'lifecycle' | 'ownership' | 'no_assignment',
+    reason:
+      | 'lifecycle'
+      | 'ownership'
+      | 'no_assignment'
+      | 'missing_scope'
+      | 'employment',
   ) {
     await this.auditService.record({
       action: 'teacher_scope.denied',
@@ -538,7 +561,8 @@ export class TeacherScopeService {
     const staffId = await this.resolveActiveStaffId(actor);
     if (!staffId) return [];
 
-    const now = options.effectiveOn ?? new Date();
+    const now = new Date();
+    const effectiveOn = options.effectiveOn ?? now;
 
     const [assignments, delegations] = await Promise.all([
       this.prisma.teacherAssignment.findMany({
@@ -549,8 +573,7 @@ export class TeacherScopeService {
           ...(options.academicYearId
             ? { academicYearId: options.academicYearId }
             : {}),
-          effectiveFrom: { lte: now },
-          OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: now } }],
+          ...teacherAuthorityWindow(now, effectiveOn),
         },
         orderBy: [{ assignmentType: 'asc' }, { createdAt: 'desc' }],
       }),
@@ -562,8 +585,8 @@ export class TeacherScopeService {
           ...(options.academicYearId
             ? { academicYearId: options.academicYearId }
             : {}),
-          effectiveFrom: { lte: now },
-          effectiveUntil: { gte: now },
+          effectiveFrom: { lte: new Date(Math.min(+now, +effectiveOn)) },
+          effectiveUntil: { gt: new Date(Math.max(+now, +effectiveOn)) },
         },
       }),
     ]);
@@ -721,12 +744,13 @@ export class TeacherScopeService {
       select: {
         id: true,
         status: true,
+        joiningDate: true,
         teacherAssignmentRecords: {
           where: {
             tenantId: actor.tenantId,
             status: 'ACTIVE',
             effectiveFrom: { lte: now },
-            OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: now } }],
+            OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: now } }],
           },
           select: {
             id: true,
@@ -750,7 +774,7 @@ export class TeacherScopeService {
             tenantId: actor.tenantId,
             status: 'ACTIVE',
             effectiveFrom: { lte: now },
-            effectiveUntil: { gte: now },
+            effectiveUntil: { gt: now },
           },
           select: {
             id: true,
@@ -774,7 +798,7 @@ export class TeacherScopeService {
       },
     });
 
-    const isActive = staff?.status === 'ACTIVE';
+    const isActive = staff?.status === 'ACTIVE' && staff.joiningDate <= now;
     const assignments = isActive
       ? staff.teacherAssignmentRecords
           .map((assignment) => ({

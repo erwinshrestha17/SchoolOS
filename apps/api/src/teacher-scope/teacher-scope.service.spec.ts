@@ -152,6 +152,7 @@ function buildService(
             sectionId?: string;
             assignmentType?: { in: TeacherAssignmentType[] };
             effectiveFrom?: { lte: Date };
+            OR?: { effectiveUntil: null | { gt: Date } }[];
           };
         }) =>
           Promise.resolve(
@@ -173,7 +174,15 @@ function buildService(
                 return false;
               const on: Date = where.effectiveFrom?.lte ?? new Date();
               if (row.effectiveFrom > on) return false;
-              if (row.effectiveUntil && row.effectiveUntil < on) return false;
+              const expiresAfter = where.OR?.find(
+                (item) => item.effectiveUntil !== null,
+              )?.effectiveUntil;
+              if (
+                row.effectiveUntil &&
+                expiresAfter &&
+                row.effectiveUntil <= expiresAfter.gt
+              )
+                return false;
               return true;
             }),
           ),
@@ -183,7 +192,26 @@ function buildService(
       }),
     },
     teacherDelegation: {
-      findMany: jest.fn().mockResolvedValue(delegations),
+      findMany: jest.fn(
+        ({
+          where,
+        }: {
+          where: {
+            academicYearId?: string;
+            effectiveFrom: { lte: Date };
+            effectiveUntil: { gt: Date };
+          };
+        }) =>
+          Promise.resolve(
+            delegations.filter(
+              (row) =>
+                (!where.academicYearId ||
+                  row.academicYearId === where.academicYearId) &&
+                (row.effectiveFrom as Date) <= where.effectiveFrom.lte &&
+                (row.effectiveUntil as Date) > where.effectiveUntil.gt,
+            ),
+          ),
+      ),
       aggregate: jest.fn().mockResolvedValue({
         _max: { updatedAt: new Date('2026-07-31T12:00:00.000Z') },
       }),
@@ -496,7 +524,7 @@ describe('TeacherScopeService — assignment-based authorization', () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
-    it('still allows a record dated while the assignment was live', async () => {
+    it('DENIES an expired assignment even when the requested record date was in its old window', async () => {
       const ended = [
         assignment(
           'a-expired',
@@ -515,7 +543,7 @@ describe('TeacherScopeService — assignment-based authorization', () => {
           }),
           actor,
         ),
-      ).resolves.toBeTruthy();
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('DENIES a future-dated assignment today', async () => {
@@ -684,6 +712,7 @@ describe('TeacherScopeService — assignment-based authorization', () => {
           tenantId: TENANT,
           userId: actor.userId,
           status: 'ACTIVE',
+          joiningDate: { lte: expect.any(Date) },
         },
         select: { id: true },
       });
@@ -786,6 +815,7 @@ describe('TeacherScopeService — assignment-based authorization', () => {
     }
 
     interface ScopeStaffFixture {
+      joiningDate: Date;
       id: string;
       status: string;
       teacherAssignmentRecords: ScopeAssignmentFixture[];
@@ -878,6 +908,7 @@ describe('TeacherScopeService — assignment-based authorization', () => {
     ): ScopeStaffFixture => ({
       id: STAFF,
       status,
+      joiningDate: new Date('2024-01-01'),
       teacherAssignmentRecords: assignments,
       delegationsReceived: delegations,
     });

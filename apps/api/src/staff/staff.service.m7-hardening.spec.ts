@@ -20,6 +20,17 @@ const hrActor: AuthContext = {
   permissions: ['hr:manage', 'staff:read'],
 };
 
+// The isolated policy database suite covers live session/grant authorization.
+jest.mock('../auth/school-authorization-transaction', () => ({
+  withSchoolAuthorizationTransaction: (
+    prisma: { $transaction: (work: unknown) => unknown },
+    _actor: unknown,
+    _permission: unknown,
+    _targets: unknown,
+    work: unknown,
+  ) => prisma.$transaction(work),
+}));
+
 describe('StaffService M7 HR hardening', () => {
   it('returns paginated staff options without email, role, or payroll details', async () => {
     const { service, prisma } = buildService({

@@ -180,6 +180,7 @@ enum FiscalBudgetStatus {
 enum JournalEntryStatus {
   DRAFT
   SUBMITTED
+  REVIEWED
   APPROVED
   POSTED
   REJECTED
@@ -594,9 +595,11 @@ enum TimetableSubstitutionStatus {
 enum PayrollRunStatus {
   DRAFT
   GENERATED
+  VALIDATED
   UNDER_REVIEW
   REVIEWED
   APPROVED
+  FINALIZED
   POSTED
   PAID
   CANCELLED
@@ -612,6 +615,7 @@ enum PayrollLineStatus {
 enum PayslipStatus {
   DRAFT
   ISSUED
+  VOID
 }
 
 enum PayrollExceptionSeverity {
@@ -710,8 +714,11 @@ enum FinancePayableStatus {
 
 enum BankReconciliationStatus {
   OPEN
+  SUBMITTED
+  REVIEWED
   FINALIZED
   REOPENED
+  CANCELLED
 }
 
 enum BankReconciliationMatchType {
@@ -1227,6 +1234,7 @@ enum FinanceRequestType {
 
 enum FinanceRequestStatus {
   PENDING
+  REVIEWED
   PROCESSING
   APPROVED
   REJECTED
@@ -1236,6 +1244,7 @@ enum FinanceRequestStatus {
 
 enum FinanceRequestHistoryAction {
   REQUESTED
+  REVIEWED
   REVIEW_STARTED
   APPROVED
   REJECTED
@@ -1256,6 +1265,7 @@ enum ApprovalWorkflowType {
   PLATFORM_SUPPORT_OVERRIDE
   ADMISSION_CASE
   FISCAL_PERIOD_REOPEN
+  FISCAL_YEAR_REOPEN
 }
 
 enum ApprovalRequestStatus {
@@ -1967,6 +1977,11 @@ model JournalEntry {
   submittedById  String?
   submissionNote String?
 
+  reviewedAt DateTime?
+  reviewedById String?
+  reviewNote String?
+  approvedSourceFingerprint String?
+
   approvedAt   DateTime?
   approvedById String?
   approvalNote String?
@@ -2320,6 +2335,16 @@ model BankReconciliationSession {
   closingBankBalance  Decimal                  @db.Decimal(18, 2)
   difference          Decimal                  @default(0) @db.Decimal(18, 2)
   status              BankReconciliationStatus @default(OPEN)
+  revision            Int                      @default(0)
+  submittedAt         DateTime?
+  submittedById       String?
+  reviewedAt          DateTime?
+  reviewedById        String?
+  reviewReason        String?
+  sourceFingerprint   String?
+  sourceSnapshot      Json?
+  cancelledAt         DateTime?
+  cancelledById       String?
   finalizedAt         DateTime?
   finalizedById       String?
   reopenReason        String?
@@ -2356,7 +2381,7 @@ model BankReconciliationMatch {
 
   session BankReconciliationSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
 
-  @@unique([tenantId, sessionId, bankStatementId, journalLineId])
+  @@index([tenantId, sessionId, bankStatementId, journalLineId])
   @@index([tenantId, sessionId, status])
   @@index([tenantId, bankStatementId])
   @@index([tenantId, journalLineId])
@@ -5370,6 +5395,15 @@ model FinanceApprovalRequest {
   reviewNote    String?
   failureMessage String?
   reviewedAt    DateTime?
+  approvedById String?
+  approvedAt DateTime?
+  approvalNote String?
+  executedById String?
+  executedAt DateTime?
+  policyFingerprint String?
+  policySnapshot Json?
+  sourceFingerprint String?
+  requiredApprovalCount Int @default(1)
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
@@ -5378,6 +5412,7 @@ model FinanceApprovalRequest {
   requestedBy User    @relation("RequestedFinanceApprovals", fields: [requestedById], references: [id])
   reviewedBy  User?   @relation("ReviewedFinanceApprovals", fields: [reviewedById], references: [id])
   history     FinanceApprovalRequestHistory[]
+  decisions FinanceApprovalDecision[]
 
   @@index([tenantId, status])
   @@unique([tenantId, idempotencyKey])
@@ -5398,6 +5433,18 @@ model FinanceApprovalRequestHistory {
 
   @@index([tenantId, requestId, createdAt])
   @@index([tenantId, status, createdAt])
+}
+
+model FinanceApprovalDecision {
+  id String @id @default(uuid())
+  tenantId String
+  requestId String
+  actorUserId String
+  note String?
+  createdAt DateTime @default(now())
+  request FinanceApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  @@unique([requestId, actorUserId])
+  @@index([tenantId, requestId, createdAt])
 }
 
 
@@ -6784,6 +6831,8 @@ model PayrollRun {
   fiscalYearId               String?
   periodMonth                Int
   periodYear                 Int
+  revision                   Int              @default(1)
+  predecessorRunId           String?          @unique
   periodStart                DateTime?
   periodEnd                  DateTime?
   status                     PayrollRunStatus @default(DRAFT)
@@ -6794,7 +6843,14 @@ model PayrollRun {
   pfEmployerAmount           Decimal          @default(0) @db.Decimal(12, 2)
   tdsAmount                  Decimal          @default(0) @db.Decimal(12, 2)
   generatedById              String?
+  validatedById              String?
+  validatedAt                DateTime?
+  reviewedById               String?
+  reviewedAt                 DateTime?
   approvedById               String?
+  finalizedById              String?
+  finalizedAt                DateTime?
+  approvedSourceFingerprint  String?
   postedById                 String?
   paidById                   String?
   approvedAt                 DateTime?
@@ -6812,11 +6868,13 @@ model PayrollRun {
   tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   fiscalYear FiscalYear?   @relation(fields: [fiscalYearId], references: [id], onDelete: SetNull)
   reversedBy User?         @relation("ReversedPayrollRuns", fields: [reversedById], references: [id], onDelete: SetNull)
+  predecessor PayrollRun? @relation("PayrollRevisions", fields: [predecessorRunId], references: [id], onDelete: Restrict)
+  replacement PayrollRun? @relation("PayrollRevisions")
   lines      PayrollLine[]
   payslips   Payslip[]
   exceptions PayrollException[]
 
-  @@unique([tenantId, periodMonth, periodYear])
+  @@unique([tenantId, periodMonth, periodYear, revision])
   @@index([tenantId, status])
 }
 

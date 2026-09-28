@@ -33,7 +33,7 @@ type PendingDecision =
   | {
       kind: 'REVIEW';
       requestId: string;
-      status: 'APPROVED' | 'REJECTED';
+      status: 'REVIEWED' | 'APPROVED' | 'REJECTED' | 'EXECUTED';
       note: string;
     };
 
@@ -58,9 +58,10 @@ export function FinanceApprovalQueue() {
   const type = searchParams.get('approvalType') ?? '';
   const search = searchParams.get('approvalSearch') ?? '';
   const paymentSearch = searchParams.get('paymentSearch') ?? '';
-  const canRequest = hasPermissions(['payments:collect']);
-  const canApproveRefund = hasPermissions(['payments:refund']);
-  const canApproveReversal = hasPermissions(['payments:reverse']);
+  const canRequestRefund = hasPermissions(['payments:refund:request']);
+  const canRequestReversal = hasPermissions(['payments:reverse:request']);
+  const canRequest = canRequestRefund || canRequestReversal;
+  const canReadQueue = canRequest || hasPermissions(['finance:approvals:read']);
   const [requestType, setRequestType] = useState<'REFUND' | 'REVERSAL'>(
     'REFUND',
   );
@@ -85,7 +86,7 @@ export function FinanceApprovalQueue() {
         type: (type || undefined) as 'REFUND' | 'REVERSAL' | undefined,
         search: search || undefined,
       }),
-    enabled: canApproveRefund || canApproveReversal,
+    enabled: canReadQueue,
   });
   const paymentsQuery = useQuery({
     queryKey: ['finance-payments', paymentSearch],
@@ -120,7 +121,14 @@ export function FinanceApprovalQueue() {
   const decisionMutation = useMutation({
     mutationFn: async (decision: PendingDecision) => {
       if (decision.kind === 'REVIEW') {
-        return api.reviewFinanceApprovalRequest(decision.requestId, {
+        if (decision.status === 'EXECUTED')
+          return api.executeFinanceApprovalRequest(decision.requestId);
+        if (decision.status === 'REVIEWED')
+          return api.reviewFinanceApprovalRequest(decision.requestId, {
+            status: 'REVIEWED',
+            reviewNote: decision.note || undefined,
+          });
+        return api.decideFinanceApprovalRequest(decision.requestId, {
           status: decision.status,
           reviewNote: decision.note || undefined,
         });
@@ -161,6 +169,23 @@ export function FinanceApprovalQueue() {
     },
   });
 
+  const decisionTarget =
+    pendingDecision?.kind === 'REQUEST'
+      ? {
+          type: pendingDecision.requestType,
+          paymentId: pendingDecision.paymentId,
+          amount:
+            pendingDecision.amount ??
+            paymentsQuery.data?.items.find(
+              (payment) => payment.id === pendingDecision.paymentId,
+            )?.amount ??
+            null,
+          reason: pendingDecision.reason,
+        }
+      : approvalQuery.data?.items.find(
+          (request) => request.id === pendingDecision?.requestId,
+        );
+
   return (
     <div className="space-y-8">
       {canRequest ? (
@@ -174,6 +199,7 @@ export function FinanceApprovalQueue() {
                 Find confirmed payment
               </label>
               <input
+                aria-label="Find confirmed payment"
                 value={paymentSearch}
                 onChange={(event) =>
                   updateUrl({ paymentSearch: event.target.value })
@@ -182,6 +208,7 @@ export function FinanceApprovalQueue() {
                 className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm"
               />
               <select
+                aria-label="Confirmed payment"
                 value={paymentId}
                 onChange={(event) => setPaymentId(event.target.value)}
                 className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm"
@@ -198,16 +225,22 @@ export function FinanceApprovalQueue() {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <select
+                  aria-label="Correction type"
                   value={requestType}
                   onChange={(event) =>
                     setRequestType(event.target.value as 'REFUND' | 'REVERSAL')
                   }
                   className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 >
-                  <option value="REFUND">Refund</option>
-                  <option value="REVERSAL">Full reversal</option>
+                  {canRequestRefund ? (
+                    <option value="REFUND">Refund</option>
+                  ) : null}
+                  {canRequestReversal ? (
+                    <option value="REVERSAL">Full reversal</option>
+                  ) : null}
                 </select>
                 <input
+                  aria-label="Refund amount"
                   type="number"
                   min={0.01}
                   step="0.01"
@@ -219,6 +252,7 @@ export function FinanceApprovalQueue() {
                 />
               </div>
               <textarea
+                aria-label="Correction reason"
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
                 placeholder="Required correction reason"
@@ -228,6 +262,9 @@ export function FinanceApprovalQueue() {
                 type="button"
                 disabled={
                   !paymentId ||
+                  (requestType === 'REFUND'
+                    ? !canRequestRefund
+                    : !canRequestReversal) ||
                   reason.trim().length < 5 ||
                   (requestType === 'REFUND' && (!amount || Number(amount) <= 0))
                 }
@@ -253,10 +290,11 @@ export function FinanceApprovalQueue() {
         title="Refund and Reversal Approval Queue"
         description="Tenant-scoped request, review, execution, and status history."
       >
-        {canApproveRefund || canApproveReversal ? (
+        {canReadQueue ? (
           <>
             <div className="mb-5 grid gap-3 md:grid-cols-3">
               <input
+                aria-label="Search correction requests"
                 value={search}
                 onChange={(event) =>
                   updateUrl({ approvalSearch: event.target.value })
@@ -265,6 +303,7 @@ export function FinanceApprovalQueue() {
                 className="h-11 rounded-xl border border-slate-200 px-4 text-sm"
               />
               <select
+                aria-label="Correction request type"
                 value={type}
                 onChange={(event) =>
                   updateUrl({ approvalType: event.target.value })
@@ -276,6 +315,7 @@ export function FinanceApprovalQueue() {
                 <option value="REVERSAL">Reversal</option>
               </select>
               <select
+                aria-label="Correction request status"
                 value={status}
                 onChange={(event) =>
                   updateUrl({ approvalStatus: event.target.value })
@@ -285,6 +325,8 @@ export function FinanceApprovalQueue() {
                 <option value="">All statuses</option>
                 {[
                   'PENDING',
+                  'REVIEWED',
+                  'APPROVED',
                   'PROCESSING',
                   'EXECUTED',
                   'REJECTED',
@@ -313,11 +355,6 @@ export function FinanceApprovalQueue() {
                   <ApprovalRequestCard
                     key={request.id}
                     request={request}
-                    canApprove={
-                      request.type === 'REFUND'
-                        ? canApproveRefund
-                        : canApproveReversal
-                    }
                     reviewNote={reviewNote}
                     setReviewNote={setReviewNote}
                     onDecision={(status) =>
@@ -332,7 +369,7 @@ export function FinanceApprovalQueue() {
                 ))}
                 <div className="flex items-center justify-between text-xs font-bold text-slate-500">
                   <span>{approvalQuery.data.total} requests</span>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
                       variant="outline"
@@ -363,8 +400,7 @@ export function FinanceApprovalQueue() {
           </>
         ) : (
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-600">
-            You can submit a correction request, but only an authorized approver
-            can view and decide the approval queue.
+            Correction request access is unavailable for this account.
           </div>
         )}
       </SectionCard>
@@ -398,15 +434,46 @@ export function FinanceApprovalQueue() {
       >
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Confirm high-risk finance action</DialogTitle>
+            <DialogTitle>Confirm financial correction</DialogTitle>
             <DialogDescription>
               {pendingDecision?.kind === 'REQUEST'
-                ? 'Submit this correction for review. It will not change the confirmed payment until a different authorized user approves it.'
+                ? 'Submit this correction for independent review and approval. Payment changes require a separate authorized execution.'
                 : pendingDecision?.status === 'APPROVED'
-                  ? 'Approval immediately executes the idempotent correction and accounting entry.'
-                  : 'Reject this request with the recorded review note.'}
+                  ? 'Record independent approval. Payment and accounting records change only after a separate authorized execution.'
+                  : pendingDecision?.status === 'REVIEWED'
+                    ? 'Record review of the payment, amount and correction reason.'
+                    : pendingDecision?.status === 'EXECUTED'
+                      ? 'Execute the approved correction and accounting entry. Current authority, source records and fiscal period are checked again.'
+                      : 'Reject this request with the recorded review note.'}
             </DialogDescription>
           </DialogHeader>
+          {decisionTarget ? (
+            <dl className="space-y-3 px-5 py-4 text-sm">
+              <div>
+                <dt className="font-semibold text-muted-foreground">Payment</dt>
+                <dd className="break-words font-semibold">
+                  {decisionTarget.paymentId}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-muted-foreground">
+                  Correction
+                </dt>
+                <dd>
+                  {decisionTarget.type === 'REFUND'
+                    ? 'Refund'
+                    : 'Full reversal'}
+                  {decisionTarget.amount !== null
+                    ? ` · ${money(decisionTarget.amount)}`
+                    : ''}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-muted-foreground">Reason</dt>
+                <dd className="break-words">{decisionTarget.reason}</dd>
+              </div>
+            </dl>
+          ) : null}
           <DialogFooter>
             <Button
               type="button"
@@ -418,7 +485,12 @@ export function FinanceApprovalQueue() {
             </Button>
             <Button
               type="button"
-              variant="destructive"
+              variant={
+                pendingDecision?.kind === 'REVIEW' &&
+                ['EXECUTED', 'REJECTED'].includes(pendingDecision.status)
+                  ? 'destructive'
+                  : 'default'
+              }
               disabled={
                 decisionMutation.isPending ||
                 (pendingDecision?.kind === 'REVIEW' &&
@@ -440,16 +512,16 @@ export function FinanceApprovalQueue() {
 
 function ApprovalRequestCard({
   request,
-  canApprove,
   reviewNote,
   setReviewNote,
   onDecision,
 }: {
   request: FinanceApprovalRequestView;
-  canApprove: boolean;
   reviewNote: string;
   setReviewNote: (value: string) => void;
-  onDecision: (status: 'APPROVED' | 'REJECTED') => void;
+  onDecision: (
+    status: 'REVIEWED' | 'APPROVED' | 'REJECTED' | 'EXECUTED',
+  ) => void;
 }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -490,26 +562,42 @@ function ApprovalRequestCard({
           </div>
         ))}
       </div>
-      {canApprove && request.status === 'PENDING' ? (
+      {Object.values(request.allowedActions ?? {}).some(Boolean) ? (
         <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
           <textarea
             value={reviewNote}
             onChange={(event) => setReviewNote(event.target.value)}
+            aria-label={`Review note for correction ${request.paymentId}`}
             placeholder="Review note (required for rejection)"
             className="min-h-20 w-full rounded-xl border border-slate-200 p-3 text-sm"
           />
-          <div className="flex gap-2">
-            <Button type="button" onClick={() => onDecision('APPROVED')}>
-              Approve
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={!reviewNote.trim()}
-              onClick={() => onDecision('REJECTED')}
-            >
-              Reject
-            </Button>
+          <div className="flex flex-wrap gap-2">
+            {request.allowedActions.review ? (
+              <Button type="button" onClick={() => onDecision('REVIEWED')}>
+                Complete review
+              </Button>
+            ) : null}
+            {request.allowedActions.approve ? (
+              <Button type="button" onClick={() => onDecision('APPROVED')}>
+                Approve ({request.approvalCount}/{request.requiredApprovalCount}
+                )
+              </Button>
+            ) : null}
+            {request.allowedActions.execute && request.status === 'APPROVED' ? (
+              <Button type="button" onClick={() => onDecision('EXECUTED')}>
+                Execute correction
+              </Button>
+            ) : null}
+            {request.allowedActions.reject ? (
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={!reviewNote.trim()}
+                onClick={() => onDecision('REJECTED')}
+              >
+                Reject
+              </Button>
+            ) : null}
           </div>
         </div>
       ) : null}

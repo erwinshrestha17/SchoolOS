@@ -1,5 +1,55 @@
 export const hrPermissions = [
   {
+    resource: "hr:documents",
+    action: "read",
+    description: "Read protected staff document records and files",
+  },
+  {
+    resource: "hr:documents",
+    action: "manage",
+    description: "Manage and verify protected staff documents",
+  },
+  {
+    resource: "hr:identity",
+    action: "read",
+    description: "Read protected staff identity numbers",
+  },
+  {
+    resource: "hr:identity",
+    action: "write",
+    description: "Update protected staff identity numbers",
+  },
+  {
+    resource: "hr:bank",
+    action: "read",
+    description: "Read staff and compensation bank details",
+  },
+  {
+    resource: "hr:bank",
+    action: "write",
+    description: "Update staff and compensation bank details",
+  },
+  {
+    resource: "hr:tax",
+    action: "read",
+    description: "Read staff tax identity and statutory details",
+  },
+  {
+    resource: "hr:tax",
+    action: "write",
+    description: "Update staff tax identity and statutory details",
+  },
+  {
+    resource: "hr:disciplinary",
+    action: "read",
+    description: "Read restricted staff disciplinary evidence",
+  },
+  {
+    resource: "hr:disciplinary",
+    action: "manage",
+    description: "Manage restricted staff disciplinary evidence",
+  },
+  {
     resource: "hr",
     action: "manage",
     description: "Manage HR contracts and staff employment records",

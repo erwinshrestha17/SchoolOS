@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   MaxLength,
   MinLength,
@@ -57,6 +58,9 @@ export class ImportBankStatementDto {
 }
 
 export class ReconcileBankStatementDto {
+  @IsUUID()
+  sessionId!: string;
+
   @IsString()
   @IsNotEmpty()
   statementId!: string;
@@ -67,6 +71,9 @@ export class ReconcileBankStatementDto {
 }
 
 export class UnreconcileBankStatementDto {
+  @IsUUID()
+  sessionId!: string;
+
   @IsString()
   @IsNotEmpty()
   statementId!: string;

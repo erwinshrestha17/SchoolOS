@@ -7,7 +7,12 @@ import {
   Optional,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import {
+  createHash,
+  createHmac,
+  randomUUID,
+  timingSafeEqual,
+} from 'node:crypto';
 import {
   AccountingPeriodStatus,
   AudienceType,
@@ -31,11 +36,21 @@ import {
   AuthMethod,
   FinanceRequestType,
   FinanceRequestStatus,
-  FinanceRequestHistoryAction,
   GuardianCapability,
   ReceiptFileStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
+import {
+  hasDomainPermission,
+  requireDomainPermission,
+} from '../authorization/policies/domain-permission';
+import {
+  financeRequestAllowedActions,
+  requireFinanceRequestDuty,
+} from '../authorization/policies/finance-request.policy';
+import { isFinancialTransactionConflict } from '../authorization/policies/financial-transaction-conflict';
+import { DecideFinanceRequestDto } from './dto/decide-finance-request.dto';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import type { AuthContext } from '../auth/auth.types';
 import {
@@ -126,6 +141,8 @@ import {
   type ParentSandboxPaymentProvider,
 } from './sandbox-payment-provider';
 import {
+  getCanonicalPermissionForLegacyKey,
+  getCanonicalPermissionByCode,
   FINANCIAL_REPORT_DEFINITION_VERSION,
   NEPAL_TIME_ZONE,
   findFinancialReportDefinition,
@@ -7249,342 +7266,688 @@ export class FinanceService {
     return mapPaymentReallocationResult(result.allocations, result.disposition);
   }
 
+  private async financeTransaction<T>(
+    actor: AuthContext,
+    permission: string | readonly string[],
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    for (const required of typeof permission === 'string'
+      ? [permission]
+      : permission)
+      requireDomainPermission(actor, required);
+    try {
+      return await withSchoolAuthorizationTransaction(
+        this.prisma,
+        actor,
+        permission,
+        [],
+        work,
+        false,
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        isFinancialTransactionConflict(error) ||
+        isPrismaUniqueConstraintError(error)
+      )
+        throw new ConflictException(
+          'The financial record changed concurrently. Reload before retrying.',
+        );
+      throw error;
+    }
+  }
+
+  private async financeCorrectionPolicy(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+  ) {
+    const policies = await tx.approvalPolicy.findMany({
+      where: { tenantId, workflowType: 'FEE_REVERSAL_REFUND', isActive: true },
+      orderBy: { id: 'asc' },
+    });
+    if (policies.length > 1)
+      throw new ConflictException(
+        'Select one active refund/reversal approval policy before continuing',
+      );
+    const policy = policies[0];
+    const strings = (value: unknown): string[] => {
+      if (
+        !Array.isArray(value) ||
+        value.some((item) => typeof item !== 'string')
+      )
+        throw new ConflictException('The financial approval policy is invalid');
+      return [...new Set(value as string[])].sort();
+    };
+    const requiredApprovalCount = policy?.minApprovals ?? 1;
+    if (
+      !Number.isInteger(requiredApprovalCount) ||
+      requiredApprovalCount < 1 ||
+      requiredApprovalCount > 10
+    )
+      throw new ConflictException(
+        'The financial approval count must be between one and ten',
+      );
+    const permissions = policy
+      ? strings(policy.approverPermissions).map((key) => {
+          const definition =
+            getCanonicalPermissionForLegacyKey(key) ??
+            getCanonicalPermissionByCode(key);
+          if (!definition || !definition.allowedScopeTypes.includes('TENANT'))
+            throw new ConflictException(
+              'The financial approval policy contains an unsupported permission',
+            );
+          return definition.legacyKey;
+        })
+      : [];
+    const snapshot = {
+      version: 'finance-duties-v1',
+      policyId: policy?.id ?? null,
+      policyUpdatedAt: policy?.updatedAt.toISOString() ?? null,
+      requiredApprovalCount,
+      approverRoles: policy ? strings(policy.approverRoles) : [],
+      approverPermissions: permissions,
+    };
+    const fingerprint = createHash('sha256')
+      .update(JSON.stringify(snapshot))
+      .digest('hex');
+    return { snapshot, fingerprint, requiredApprovalCount };
+  }
+
+  private async financeCorrectionSource(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    paymentId: string,
+  ) {
+    const payment = await tx.payment.findFirst({
+      where: { tenantId, id: paymentId },
+      include: {
+        refunds: { orderBy: { id: 'asc' } },
+        allocations: {
+          where: { reversedAt: null },
+          include: { invoice: true },
+          orderBy: { id: 'asc' },
+        },
+        invoice: true,
+      },
+    });
+    if (!payment)
+      throw new NotFoundException('Payment not found in this tenant');
+    const journal = await tx.journalEntry.findFirst({
+      where: {
+        tenantId,
+        sourceType: JournalSourceType.FEE_PAYMENT,
+        sourceId: payment.id,
+        status: 'POSTED',
+      },
+      include: { lines: { orderBy: { id: 'asc' } } },
+    });
+    if (!journal)
+      throw new ConflictException(
+        'The original posted payment journal is required',
+      );
+    const fingerprint = createHash('sha256')
+      .update(
+        JSON.stringify({
+          version: 'finance-source-v1',
+          paymentId: payment.id,
+          amount: payment.amount.toFixed(2),
+          status: payment.status,
+          method: payment.method,
+          invoice: payment.invoice
+            ? {
+                id: payment.invoice.id,
+                status: payment.invoice.status,
+                total: payment.invoice.totalAmount.toFixed(2),
+              }
+            : null,
+          refunds: payment.refunds.map((refund) => ({
+            id: refund.id,
+            amount: refund.amount.toFixed(2),
+          })),
+          allocations: payment.allocations.map((allocation) => ({
+            id: allocation.id,
+            invoiceId: allocation.invoiceId,
+            amount: allocation.amount.toFixed(2),
+            invoiceStatus: allocation.invoice?.status,
+            invoiceTotal: allocation.invoice?.totalAmount.toFixed(2),
+          })),
+          journalId: journal.id,
+          journalStatus: journal.status,
+          lines: journal.lines.map((line) => ({
+            id: line.id,
+            account: line.chartAccountId,
+            side: line.side,
+            amount: line.amount.toFixed(2),
+            debit: line.debit.toFixed(2),
+            credit: line.credit.toFixed(2),
+          })),
+        }),
+      )
+      .digest('hex');
+    return { payment, fingerprint };
+  }
+
+  private async assertFinanceRequestCurrent(
+    tx: Prisma.TransactionClient,
+    actor: AuthContext,
+    request: {
+      paymentId: string;
+      policyFingerprint: string | null;
+      sourceFingerprint: string | null;
+    },
+  ) {
+    const policy = await this.financeCorrectionPolicy(tx, actor.tenantId);
+    if (
+      !request.policyFingerprint ||
+      request.policyFingerprint !== policy.fingerprint
+    )
+      throw new ConflictException(
+        'Approval policy changed after this request. Reject it and submit a new request.',
+      );
+    const source = await this.financeCorrectionSource(
+      tx,
+      actor.tenantId,
+      request.paymentId,
+    );
+    if (
+      !request.sourceFingerprint ||
+      request.sourceFingerprint !== source.fingerprint
+    )
+      throw new ConflictException(
+        'Payment sources changed after this request. Reject it and submit a new request.',
+      );
+    return { policy, source };
+  }
+
+  private async createFinanceCorrectionRequest(
+    type: 'REFUND' | 'REVERSAL',
+    paymentId: string,
+    dto: CreateFinanceRequestDto,
+    actor: AuthContext,
+  ) {
+    const permission =
+      type === 'REFUND'
+        ? 'payments:refund:request'
+        : 'payments:reverse:request';
+    const idempotencyKey = dto.idempotencyKey.trim();
+    const reason = dto.reason.trim();
+    if (!idempotencyKey || !reason)
+      throw new BadRequestException('A reason and request key are required');
+    const request = await this.financeTransaction(
+      actor,
+      permission,
+      async (tx) => {
+        const replay = await tx.financeApprovalRequest.findFirst({
+          where: { tenantId: actor.tenantId, idempotencyKey },
+          include: {
+            decisions: true,
+            history: { orderBy: { createdAt: 'asc' } },
+          },
+        });
+        if (replay) {
+          if (
+            replay.paymentId !== paymentId ||
+            replay.type !== type ||
+            replay.reason !== reason ||
+            (dto.amount !== undefined &&
+              !replay.amount?.equals(new Prisma.Decimal(dto.amount)))
+          )
+            throw new ConflictException(
+              'This request key belongs to a different financial correction',
+            );
+          return { request: replay, disposition: 'REPLAYED' as const };
+        }
+        const { payment, fingerprint } = await this.financeCorrectionSource(
+          tx,
+          actor.tenantId,
+          paymentId,
+        );
+        if (payment.status !== PaymentStatus.SUCCESS)
+          throw new ConflictException(
+            'Only confirmed successful payments can be corrected',
+          );
+        const remaining = payment.amount.sub(
+          sumRefundedAmount(payment.refunds),
+        );
+        const amount =
+          type === 'REFUND'
+            ? dto.amount === undefined
+              ? remaining
+              : new Prisma.Decimal(dto.amount)
+            : payment.amount;
+        if (type === 'REVERSAL' && payment.refunds.length)
+          throw new ConflictException(
+            'A partially refunded payment cannot be reversed',
+          );
+        if (amount.lte(0) || amount.decimalPlaces() > 2 || amount.gt(remaining))
+          throw new ConflictException(
+            'The correction exceeds the remaining refundable amount',
+          );
+        const pending = await tx.financeApprovalRequest.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            paymentId,
+            status: { in: ['PENDING', 'REVIEWED', 'APPROVED', 'PROCESSING'] },
+          },
+          select: { id: true },
+        });
+        if (pending)
+          throw new ConflictException(
+            'An active correction request already exists for this payment',
+          );
+        const policy = await this.financeCorrectionPolicy(tx, actor.tenantId);
+        const created = await tx.financeApprovalRequest.create({
+          data: {
+            tenantId: actor.tenantId,
+            type,
+            status: FinanceRequestStatus.PENDING,
+            paymentId,
+            amount,
+            reason,
+            idempotencyKey,
+            requestedById: actor.userId,
+            policyFingerprint: policy.fingerprint,
+            policySnapshot: policy.snapshot,
+            sourceFingerprint: fingerprint,
+            requiredApprovalCount: policy.requiredApprovalCount,
+            history: {
+              create: {
+                tenantId: actor.tenantId,
+                action: 'REQUESTED',
+                status: 'PENDING',
+                actorUserId: actor.userId,
+                note: reason,
+              },
+            },
+          },
+          include: {
+            decisions: true,
+            history: { orderBy: { createdAt: 'asc' } },
+          },
+        });
+        await this.auditService.record(
+          {
+            action: 'request',
+            resource: 'finance_approval_request',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: created.id,
+            after: {
+              type,
+              paymentId,
+              amount: amount.toFixed(2),
+              reason,
+              requiredApprovalCount: policy.requiredApprovalCount,
+              policy: policy.snapshot,
+            },
+          },
+          tx,
+        );
+        return { request: created, disposition: 'SUCCEEDED' as const };
+      },
+    );
+    return {
+      ...serializeFinanceApprovalRequest(request.request),
+      allowedActions: financeRequestAllowedActions(actor, request.request),
+      disposition: request.disposition,
+    };
+  }
+
   async requestRefund(
     paymentId: string,
     dto: CreateFinanceRequestDto,
     actor: AuthContext,
   ) {
-    assertFinancePermission(actor, 'payments:collect');
-    const idempotencyKey = dto.idempotencyKey.trim();
-    const replay = await this.prisma.financeApprovalRequest.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        idempotencyKey,
-      },
-      include: {
-        payment: true,
-        requestedBy: { select: { id: true, email: true } },
-        history: { orderBy: [{ createdAt: 'asc' }] },
-      },
-    });
-    if (replay) {
-      await this.auditService.record({
-        action: 'idempotent_replay',
-        resource: 'finance_approval_request',
-        resourceId: replay.id,
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        after: {
-          paymentId: replay.paymentId,
-          type: replay.type,
-        },
-      });
-      return {
-        ...serializeFinanceApprovalRequest(replay),
-        disposition: 'REPLAYED' as const,
-      };
-    }
-
-    const payment = await this.prisma.payment.findFirst({
-      where: { id: paymentId, tenantId: actor.tenantId },
-      include: { refunds: true },
-    });
-
-    if (!payment) {
-      throw new NotFoundException('Payment not found in this tenant');
-    }
-
-    if (payment.status === PaymentStatus.REVERSED) {
-      throw new ConflictException('Reversed payments cannot be refunded');
-    }
-
-    const refundedSoFar = sumRefundedAmount(payment.refunds);
-    const refundableAmount = payment.amount.sub(refundedSoFar);
-
-    if (refundableAmount.lte(0)) {
-      throw new ConflictException('Payment has already been fully refunded');
-    }
-
-    const refundAmount =
-      dto.amount === undefined
-        ? refundableAmount
-        : new Prisma.Decimal(dto.amount);
-    if (refundAmount.gt(refundableAmount)) {
-      throw new ConflictException(
-        'Refund exceeds the remaining refundable amount',
-      );
-    }
-
-    if (refundAmount.lte(0) || refundAmount.decimalPlaces() > 2) {
-      throw new BadRequestException(
-        'Refund amount must be a positive value with no more than two decimal places',
-      );
-    }
-
-    // Check for pending requests
-    const pendingRequest = await this.prisma.financeApprovalRequest.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        paymentId,
-        status: FinanceRequestStatus.PENDING,
-      },
-    });
-
-    if (pendingRequest) {
-      throw new ConflictException(
-        'A pending approval request already exists for this payment',
-      );
-    }
-
-    let request: Prisma.FinanceApprovalRequestGetPayload<{
-      include: {
-        payment: true;
-        requestedBy: { select: { id: true; email: true } };
-        history: true;
-      };
-    }>;
-    try {
-      request = await this.prisma.financeApprovalRequest.create({
-        data: {
-          tenantId: actor.tenantId,
-          type: FinanceRequestType.REFUND,
-          paymentId,
-          idempotencyKey,
-          amount: refundAmount,
-          reason: dto.reason.trim(),
-          status: FinanceRequestStatus.PENDING,
-          requestedById: actor.userId,
-          history: {
-            create: {
-              tenantId: actor.tenantId,
-              action: FinanceRequestHistoryAction.REQUESTED,
-              status: FinanceRequestStatus.PENDING,
-              actorUserId: actor.userId,
-              note: dto.reason.trim(),
-            },
-          },
-        },
-        include: {
-          payment: true,
-          requestedBy: { select: { id: true, email: true } },
-          history: true,
-        },
-      });
-    } catch (error) {
-      if (!isPrismaUniqueConstraintError(error)) {
-        throw error;
-      }
-      const concurrentReplay =
-        await this.prisma.financeApprovalRequest.findFirst({
-          where: {
-            tenantId: actor.tenantId,
-            idempotencyKey,
-          },
-          include: {
-            payment: true,
-            requestedBy: { select: { id: true, email: true } },
-            history: { orderBy: [{ createdAt: 'asc' }] },
-          },
-        });
-      if (!concurrentReplay) {
-        throw new ConflictException(
-          'The refund request could not be recorded safely. Retry with the same request key.',
-        );
-      }
-      await this.auditService.record({
-        action: 'idempotent_replay',
-        resource: 'finance_approval_request',
-        resourceId: concurrentReplay.id,
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        after: {
-          paymentId: concurrentReplay.paymentId,
-          type: concurrentReplay.type,
-          concurrent: true,
-        },
-      });
-      return {
-        ...serializeFinanceApprovalRequest(concurrentReplay),
-        disposition: 'REPLAYED' as const,
-      };
-    }
-
-    await this.auditService.record({
-      action: 'create',
-      resource: 'finance_approval_request',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: request.id,
-      after: {
-        paymentId,
-        type: FinanceRequestType.REFUND,
-        amount: refundAmount.toFixed(2),
-        reason: dto.reason,
-      },
-    });
-
-    return {
-      ...serializeFinanceApprovalRequest(request),
-      disposition: 'SUCCEEDED' as const,
-    };
+    return this.createFinanceCorrectionRequest('REFUND', paymentId, dto, actor);
   }
-
   async requestReversal(
     paymentId: string,
     dto: CreateFinanceRequestDto,
     actor: AuthContext,
   ) {
-    assertFinancePermission(actor, 'payments:collect');
-    const idempotencyKey = dto.idempotencyKey.trim();
-    const replay = await this.prisma.financeApprovalRequest.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        idempotencyKey,
-      },
-      include: {
-        payment: true,
-        requestedBy: { select: { id: true, email: true } },
-        history: { orderBy: [{ createdAt: 'asc' }] },
-      },
-    });
-    if (replay) {
-      await this.auditService.record({
-        action: 'idempotent_replay',
-        resource: 'finance_approval_request',
-        resourceId: replay.id,
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        after: {
-          paymentId: replay.paymentId,
-          type: replay.type,
-        },
-      });
-      return { ...replay, disposition: 'REPLAYED' as const };
-    }
+    return this.createFinanceCorrectionRequest(
+      'REVERSAL',
+      paymentId,
+      dto,
+      actor,
+    );
+  }
 
-    const payment = await this.prisma.payment.findFirst({
-      where: { id: paymentId, tenantId: actor.tenantId },
-      include: { refunds: true },
-    });
-
-    if (!payment) {
-      throw new NotFoundException('Payment not found in this tenant');
-    }
-
-    if (payment.status === PaymentStatus.REVERSED) {
-      throw new ConflictException('Payment is already reversed');
-    }
-
-    if (payment.refunds.length > 0) {
-      throw new ConflictException(
-        'Cannot reverse a payment that has been partially or fully refunded',
+  async reviewApprovalRequest(
+    requestId: string,
+    dto: ReviewFinanceRequestDto,
+    actor: AuthContext,
+  ) {
+    if (dto.status !== FinanceRequestStatus.REVIEWED)
+      throw new BadRequestException(
+        'Review records a REVIEWED request; approval and execution are separate actions',
       );
-    }
+    return this.transitionFinanceRequest(
+      requestId,
+      'REVIEW',
+      dto.reviewNote,
+      actor,
+    );
+  }
+  async decideApprovalRequest(
+    requestId: string,
+    dto: DecideFinanceRequestDto,
+    actor: AuthContext,
+  ) {
+    return this.transitionFinanceRequest(
+      requestId,
+      dto.status === 'REJECTED' ? 'REJECT' : 'APPROVE',
+      dto.reviewNote,
+      actor,
+    );
+  }
 
-    // Check for pending requests
-    const pendingRequest = await this.prisma.financeApprovalRequest.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        paymentId,
-        status: FinanceRequestStatus.PENDING,
-      },
-    });
-
-    if (pendingRequest) {
-      throw new ConflictException(
-        'A pending approval request already exists for this payment',
-      );
-    }
-
-    let request: Prisma.FinanceApprovalRequestGetPayload<{
-      include: {
-        payment: true;
-        requestedBy: { select: { id: true; email: true } };
-        history: true;
-      };
-    }>;
-    try {
-      request = await this.prisma.financeApprovalRequest.create({
-        data: {
-          tenantId: actor.tenantId,
-          type: FinanceRequestType.REVERSAL,
-          paymentId,
-          idempotencyKey,
-          amount: null,
-          reason: dto.reason.trim(),
-          status: FinanceRequestStatus.PENDING,
-          requestedById: actor.userId,
-          history: {
-            create: {
-              tenantId: actor.tenantId,
-              action: FinanceRequestHistoryAction.REQUESTED,
-              status: FinanceRequestStatus.PENDING,
-              actorUserId: actor.userId,
-              note: dto.reason.trim(),
-            },
-          },
-        },
-        include: {
-          payment: true,
-          requestedBy: { select: { id: true, email: true } },
-          history: true,
-        },
-      });
-    } catch (error) {
-      if (!isPrismaUniqueConstraintError(error)) {
-        throw error;
-      }
-      const concurrentReplay =
-        await this.prisma.financeApprovalRequest.findFirst({
+  private async transitionFinanceRequest(
+    requestId: string,
+    duty: 'REVIEW' | 'APPROVE' | 'REJECT',
+    note: string | undefined,
+    actor: AuthContext,
+  ) {
+    requireDomainPermission(
+      actor,
+      duty === 'REVIEW'
+        ? 'finance:approvals:review'
+        : 'finance:approvals:decide',
+    );
+    const policyBefore =
+      duty === 'APPROVE'
+        ? await this.financeCorrectionPolicy(this.prisma, actor.tenantId)
+        : null;
+    const required = [
+      duty === 'REVIEW'
+        ? 'finance:approvals:review'
+        : 'finance:approvals:decide',
+      ...(policyBefore?.snapshot.approverPermissions ?? []),
+    ];
+    const updated = await this.financeTransaction(
+      actor,
+      required,
+      async (tx) => {
+        const request = await tx.financeApprovalRequest.findFirst({
+          where: { id: requestId, tenantId: actor.tenantId },
+          include: { decisions: true },
+        });
+        if (!request) throw new NotFoundException('Approval request not found');
+        requireFinanceRequestDuty(actor, request, duty);
+        const reason = note?.trim() || null;
+        if (duty === 'REJECT' && !reason)
+          throw new BadRequestException('A rejection reason is required');
+        let status: FinanceRequestStatus =
+          duty === 'REVIEW'
+            ? FinanceRequestStatus.REVIEWED
+            : FinanceRequestStatus.REJECTED;
+        let data: Prisma.FinanceApprovalRequestUncheckedUpdateManyInput =
+          duty === 'REVIEW'
+            ? {
+                reviewedById: actor.userId,
+                reviewedAt: new Date(),
+                reviewNote: reason,
+              }
+            : {};
+        if (duty !== 'REJECT') {
+          const current = await this.assertFinanceRequestCurrent(
+            tx,
+            actor,
+            request,
+          );
+          if (duty === 'APPROVE') {
+            if (current.policy.fingerprint !== policyBefore?.fingerprint)
+              throw new ConflictException(
+                'Approval policy changed while the form was open',
+              );
+            const roles = current.policy.snapshot.approverRoles;
+            if (
+              roles.length &&
+              !(await tx.userRole.findFirst({
+                where: {
+                  tenantId: actor.tenantId,
+                  userId: actor.userId,
+                  revokedAt: null,
+                  assignedAt: { lte: new Date() },
+                  OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+                  role: { tenantId: actor.tenantId, name: { in: roles } },
+                },
+                select: { id: true },
+              }))
+            )
+              throw new ForbiddenException(
+                'This user is not designated by the financial approval policy',
+              );
+            await tx.financeApprovalDecision.create({
+              data: {
+                tenantId: actor.tenantId,
+                requestId: request.id,
+                actorUserId: actor.userId,
+                note: reason,
+              },
+            });
+            status =
+              request.decisions.length + 1 >= request.requiredApprovalCount
+                ? FinanceRequestStatus.APPROVED
+                : FinanceRequestStatus.REVIEWED;
+            data =
+              status === FinanceRequestStatus.APPROVED
+                ? {
+                    approvedById: actor.userId,
+                    approvedAt: new Date(),
+                    approvalNote: reason,
+                  }
+                : {};
+          }
+        }
+        const claim = await tx.financeApprovalRequest.updateMany({
           where: {
+            id: request.id,
             tenantId: actor.tenantId,
-            idempotencyKey,
+            status: request.status,
+            updatedAt: request.updatedAt,
           },
-          include: {
-            payment: true,
-            requestedBy: { select: { id: true, email: true } },
-            history: { orderBy: [{ createdAt: 'asc' }] },
+          data: { ...data, status, failureMessage: null },
+        });
+        if (claim.count !== 1)
+          throw new ConflictException(
+            'The financial request changed concurrently',
+          );
+        await tx.financeApprovalRequestHistory.create({
+          data: {
+            tenantId: actor.tenantId,
+            requestId: request.id,
+            action:
+              duty === 'REVIEW'
+                ? 'REVIEWED'
+                : duty === 'APPROVE'
+                  ? 'APPROVED'
+                  : 'REJECTED',
+            status,
+            actorUserId: actor.userId,
+            note: reason,
           },
         });
-      if (!concurrentReplay) {
-        throw new ConflictException(
-          'The reversal request could not be recorded safely. Retry with the same request key.',
+        await this.auditService.record(
+          {
+            action: duty.toLowerCase(),
+            resource: 'finance_approval_request',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: request.id,
+            before: { status: request.status },
+            after: { status, reason },
+          },
+          tx,
         );
-      }
-      await this.auditService.record({
-        action: 'idempotent_replay',
-        resource: 'finance_approval_request',
-        resourceId: concurrentReplay.id,
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        after: {
-          paymentId: concurrentReplay.paymentId,
-          type: concurrentReplay.type,
-          concurrent: true,
-        },
-      });
-      return {
-        ...serializeFinanceApprovalRequest(concurrentReplay),
-        disposition: 'REPLAYED' as const,
-      };
-    }
+        return tx.financeApprovalRequest.findFirstOrThrow({
+          where: { id: request.id, tenantId: actor.tenantId },
+          include: {
+            decisions: true,
+            history: { orderBy: { createdAt: 'asc' } },
+          },
+        });
+      },
+    );
+    return {
+      ...serializeFinanceApprovalRequest(updated),
+      allowedActions: financeRequestAllowedActions(actor, updated),
+    };
+  }
 
-    await this.auditService.record({
-      action: 'create',
-      resource: 'finance_approval_request',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: request.id,
-      after: {
+  private async financialExecutionRequest(
+    paymentId: string,
+    idempotencyKey: string,
+    type: 'REFUND' | 'REVERSAL',
+    actor: AuthContext,
+    tx?: Prisma.TransactionClient,
+  ): Promise<
+    Prisma.FinanceApprovalRequestGetPayload<{ include: { decisions: true } }>
+  > {
+    if (!tx)
+      return this.financeTransaction(
+        actor,
+        type === 'REFUND' ? 'payments:refund' : 'payments:reverse',
+        (client) =>
+          this.financialExecutionRequest(
+            paymentId,
+            idempotencyKey,
+            type,
+            actor,
+            client,
+          ),
+      );
+    const prefix = 'finance-request:';
+    if (!idempotencyKey.startsWith(prefix))
+      throw new ConflictException(
+        'Execution requires a separately reviewed and approved correction request',
+      );
+    const request = await tx.financeApprovalRequest.findFirst({
+      where: {
+        id: idempotencyKey.slice(prefix.length),
+        tenantId: actor.tenantId,
         paymentId,
-        type: FinanceRequestType.REVERSAL,
-        reason: dto.reason,
+        type,
+      },
+      include: { decisions: true },
+    });
+    if (!request)
+      throw new NotFoundException(
+        'Approved financial correction request not found',
+      );
+    requireFinanceRequestDuty(actor, request, 'EXECUTE');
+    return request;
+  }
+
+  private async claimFinancialExecution(
+    tx: Prisma.TransactionClient,
+    actor: AuthContext,
+    paymentId: string,
+    idempotencyKey: string,
+    type: 'REFUND' | 'REVERSAL',
+    amount: Prisma.Decimal,
+    reason: string,
+  ) {
+    const request = await this.financialExecutionRequest(
+      paymentId,
+      idempotencyKey,
+      type,
+      actor,
+      tx,
+    );
+    if (request.status !== FinanceRequestStatus.APPROVED)
+      throw new ConflictException(
+        'Financial correction execution is already recorded',
+      );
+    if (!request.amount?.eq(amount) || request.reason !== reason)
+      throw new ConflictException(
+        'Execution must use the approved amount and reason',
+      );
+    await this.assertFinanceRequestCurrent(tx, actor, request);
+    const claim = await tx.financeApprovalRequest.updateMany({
+      where: {
+        id: request.id,
+        tenantId: actor.tenantId,
+        status: 'APPROVED',
+        updatedAt: request.updatedAt,
+      },
+      data: { status: 'PROCESSING' },
+    });
+    if (claim.count !== 1)
+      throw new ConflictException(
+        'The approved correction changed concurrently',
+      );
+    return request;
+  }
+
+  private async finishFinancialExecution(
+    tx: Prisma.TransactionClient,
+    actor: AuthContext,
+    requestId: string,
+  ) {
+    const completion = await tx.financeApprovalRequest.updateMany({
+      where: { id: requestId, tenantId: actor.tenantId, status: 'PROCESSING' },
+      data: {
+        status: 'EXECUTED',
+        executedById: actor.userId,
+        executedAt: new Date(),
+        failureMessage: null,
       },
     });
+    if (completion.count !== 1)
+      throw new ConflictException(
+        'Financial execution state changed concurrently',
+      );
+    await tx.financeApprovalRequestHistory.create({
+      data: {
+        tenantId: actor.tenantId,
+        requestId,
+        action: 'EXECUTED',
+        status: 'EXECUTED',
+        actorUserId: actor.userId,
+        note: 'Approved correction executed idempotently.',
+      },
+    });
+    await this.auditService.record(
+      {
+        action: 'execute',
+        resource: 'finance_approval_request',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: requestId,
+        after: { status: 'EXECUTED' },
+      },
+      tx,
+    );
+  }
 
+  async executeApprovalRequest(requestId: string, actor: AuthContext) {
+    if (
+      !hasDomainPermission(actor, 'payments:refund') &&
+      !hasDomainPermission(actor, 'payments:reverse')
+    )
+      throw new ForbiddenException('Financial execution authority is required');
+    const request = await this.prisma.financeApprovalRequest.findFirst({
+      where: { id: requestId, tenantId: actor.tenantId },
+      include: { decisions: true },
+    });
+    if (!request) throw new NotFoundException('Approval request not found');
+    requireFinanceRequestDuty(actor, request, 'EXECUTE');
+    const dto = {
+      idempotencyKey: `finance-request:${request.id}`,
+      reason: request.reason,
+      amount: request.amount?.toFixed(2),
+    };
+    if (request.type === 'REFUND')
+      await this.refundPayment(request.paymentId, dto, actor);
+    else await this.reversePayment(request.paymentId, dto, actor);
+    const updated = await this.prisma.financeApprovalRequest.findFirstOrThrow({
+      where: { id: request.id, tenantId: actor.tenantId },
+      include: { decisions: true, history: { orderBy: { createdAt: 'asc' } } },
+    });
     return {
-      ...serializeFinanceApprovalRequest(request),
-      disposition: 'SUCCEEDED' as const,
+      ...serializeFinanceApprovalRequest(updated),
+      allowedActions: financeRequestAllowedActions(actor, updated),
     };
   }
 
@@ -7592,20 +7955,20 @@ export class FinanceService {
     query: ListFinanceApprovalRequestsQueryDto,
     actor: AuthContext,
   ) {
-    // Permission: either refund or reverse allows listing requests
-    const hasRefundPerm = actor.permissions.includes('payments:refund');
-    const hasReversePerm = actor.permissions.includes('payments:reverse');
-    const hasAdmin = actor.roles.includes('admin');
-    if (!hasRefundPerm && !hasReversePerm && !hasAdmin) {
+    const canReadAll = hasDomainPermission(actor, 'finance:approvals:read');
+    if (
+      !canReadAll &&
+      !hasDomainPermission(actor, 'payments:refund:request') &&
+      !hasDomainPermission(actor, 'payments:reverse:request')
+    )
       throw new ForbiddenException(
-        'You do not have permission to view approval requests',
+        'You do not have permission to view financial requests',
       );
-    }
-
     const pagination = resolveFinancePagination(query);
     const search = query.search?.trim();
     const where: Prisma.FinanceApprovalRequestWhereInput = {
       tenantId: actor.tenantId,
+      ...(!canReadAll ? { requestedById: actor.userId } : {}),
       ...(query.type ? { type: query.type } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(search
@@ -7670,6 +8033,7 @@ export class FinanceService {
           },
           requestedBy: { select: { id: true, email: true } },
           reviewedBy: { select: { id: true, email: true } },
+          decisions: true,
           history: {
             orderBy: [{ createdAt: 'asc' }],
           },
@@ -7681,224 +8045,13 @@ export class FinanceService {
       this.prisma.financeApprovalRequest.count({ where }),
     ]);
     return buildFinancePage(
-      items.map(serializeFinanceApprovalRequest),
+      items.map((request) => ({
+        ...serializeFinanceApprovalRequest(request),
+        allowedActions: financeRequestAllowedActions(actor, request),
+      })),
       total,
       pagination,
     );
-  }
-
-  async reviewApprovalRequest(
-    requestId: string,
-    dto: ReviewFinanceRequestDto,
-    actor: AuthContext,
-  ) {
-    const request = await this.prisma.financeApprovalRequest.findFirst({
-      where: { id: requestId, tenantId: actor.tenantId },
-    });
-
-    if (!request) {
-      throw new NotFoundException('Approval request not found');
-    }
-
-    if (request.status !== FinanceRequestStatus.PENDING) {
-      throw new ConflictException('This request has already been reviewed');
-    }
-
-    // Gate by specific action permission
-    if (request.type === FinanceRequestType.REFUND) {
-      assertFinancePermission(actor, 'payments:refund');
-    } else {
-      assertFinancePermission(actor, 'payments:reverse');
-    }
-    if (
-      request.requestedById === actor.userId &&
-      !actor.roles.includes('platform_super_admin')
-    ) {
-      throw new ForbiddenException(
-        'A finance request must be reviewed by a different authorized user.',
-      );
-    }
-    const reviewNote = dto.reviewNote?.trim() || null;
-    if (dto.status === FinanceRequestStatus.REJECTED && !reviewNote) {
-      throw new BadRequestException(
-        'A review note is required to reject a finance request.',
-      );
-    }
-
-    if (dto.status === FinanceRequestStatus.REJECTED) {
-      const rejected = await this.prisma.$transaction(async (tx) => {
-        const claim = await tx.financeApprovalRequest.updateMany({
-          where: {
-            id: request.id,
-            tenantId: actor.tenantId,
-            status: FinanceRequestStatus.PENDING,
-          },
-          data: {
-            status: FinanceRequestStatus.REJECTED,
-            reviewedById: actor.userId,
-            reviewedAt: new Date(),
-            reviewNote,
-            failureMessage: null,
-          },
-        });
-        if (claim.count !== 1) {
-          throw new ConflictException(
-            'This finance request was already reviewed.',
-          );
-        }
-        await tx.financeApprovalRequestHistory.create({
-          data: {
-            tenantId: actor.tenantId,
-            requestId: request.id,
-            action: FinanceRequestHistoryAction.REJECTED,
-            status: FinanceRequestStatus.REJECTED,
-            actorUserId: actor.userId,
-            note: reviewNote,
-          },
-        });
-        return tx.financeApprovalRequest.findUniqueOrThrow({
-          where: { id: request.id },
-          include: {
-            payment: true,
-            requestedBy: { select: { id: true, email: true } },
-            reviewedBy: { select: { id: true, email: true } },
-            history: { orderBy: [{ createdAt: 'asc' }] },
-          },
-        });
-      });
-      await this.auditService.record({
-        action: 'reject',
-        resource: 'finance_approval_request',
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        resourceId: request.id,
-        after: { status: rejected.status, reviewNote },
-      });
-      return serializeFinanceApprovalRequest(rejected);
-    }
-
-    const claim = await this.prisma.financeApprovalRequest.updateMany({
-      where: {
-        id: request.id,
-        tenantId: actor.tenantId,
-        status: FinanceRequestStatus.PENDING,
-      },
-      data: {
-        status: FinanceRequestStatus.PROCESSING,
-        reviewedById: actor.userId,
-        reviewedAt: new Date(),
-        reviewNote,
-        failureMessage: null,
-      },
-    });
-    if (claim.count !== 1) {
-      throw new ConflictException('This finance request was already reviewed.');
-    }
-    await this.prisma.financeApprovalRequestHistory.create({
-      data: {
-        tenantId: actor.tenantId,
-        requestId: request.id,
-        action: FinanceRequestHistoryAction.REVIEW_STARTED,
-        status: FinanceRequestStatus.PROCESSING,
-        actorUserId: actor.userId,
-        note: reviewNote,
-      },
-    });
-
-    try {
-      const executionIdempotencyKey = `finance-request:${request.id}`;
-      if (request.type === FinanceRequestType.REFUND) {
-        await this.refundPayment(
-          request.paymentId,
-          {
-            amount: request.amount?.toFixed(2),
-            reason: request.reason,
-            idempotencyKey: executionIdempotencyKey,
-          },
-          actor,
-        );
-      } else {
-        await this.reversePayment(
-          request.paymentId,
-          {
-            reason: request.reason,
-            idempotencyKey: executionIdempotencyKey,
-          },
-          actor,
-        );
-      }
-    } catch {
-      await this.prisma.$transaction([
-        this.prisma.financeApprovalRequest.update({
-          where: { id: request.id },
-          data: {
-            status: FinanceRequestStatus.FAILED,
-            failureMessage:
-              'The approved correction could not be executed safely. Review the payment state before retrying.',
-          },
-        }),
-        this.prisma.financeApprovalRequestHistory.create({
-          data: {
-            tenantId: actor.tenantId,
-            requestId: request.id,
-            action: FinanceRequestHistoryAction.EXECUTION_FAILED,
-            status: FinanceRequestStatus.FAILED,
-            actorUserId: actor.userId,
-            note: 'Execution failed safely; no raw provider or database detail was recorded.',
-          },
-        }),
-      ]);
-      throw new ConflictException(
-        'The approved correction could not be executed safely. Review the payment state before retrying.',
-      );
-    }
-
-    const updated = await this.prisma.financeApprovalRequest.update({
-      where: { id: request.id },
-      data: {
-        status: FinanceRequestStatus.EXECUTED,
-        failureMessage: null,
-        history: {
-          create: [
-            {
-              tenantId: actor.tenantId,
-              action: FinanceRequestHistoryAction.APPROVED,
-              status: FinanceRequestStatus.APPROVED,
-              actorUserId: actor.userId,
-              note: reviewNote,
-            },
-            {
-              tenantId: actor.tenantId,
-              action: FinanceRequestHistoryAction.EXECUTED,
-              status: FinanceRequestStatus.EXECUTED,
-              actorUserId: actor.userId,
-              note: 'Approved correction executed idempotently.',
-            },
-          ],
-        },
-      },
-      include: {
-        payment: true,
-        requestedBy: { select: { id: true, email: true } },
-        reviewedBy: { select: { id: true, email: true } },
-        history: { orderBy: [{ createdAt: 'asc' }] },
-      },
-    });
-
-    await this.auditService.record({
-      action: 'review',
-      resource: 'finance_approval_request',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: request.id,
-      after: {
-        status: updated.status,
-        reviewNote: updated.reviewNote,
-        reviewedAt: updated.reviewedAt,
-      },
-    });
-
-    return serializeFinanceApprovalRequest(updated);
   }
 
   async refundPayment(
@@ -7906,13 +8059,28 @@ export class FinanceService {
     dto: CreatePaymentRefundDto,
     actor: AuthContext,
   ) {
-    assertFinancePermission(actor, 'payments:refund');
+    requireDomainPermission(actor, 'payments:refund');
     const reason = dto.reason?.trim();
     const idempotencyKey = dto.idempotencyKey.trim();
 
     if (!reason) {
       throw new BadRequestException('Refund reason is required');
     }
+
+    const approvedRequest = await this.financialExecutionRequest(
+      paymentId,
+      idempotencyKey,
+      'REFUND',
+      actor,
+    );
+    if (
+      approvedRequest.reason !== reason ||
+      (dto.amount &&
+        !approvedRequest.amount?.eq(new Prisma.Decimal(dto.amount)))
+    )
+      throw new ConflictException(
+        'Execution must use the approved amount and reason',
+      );
 
     const existingRefund = await this.prisma.paymentRefund.findFirst({
       where: {
@@ -7934,6 +8102,14 @@ export class FinanceService {
       },
     });
     if (existingRefund) {
+      if (
+        existingRefund.paymentId !== paymentId ||
+        approvedRequest.status !== 'EXECUTED' ||
+        !approvedRequest.amount?.eq(existingRefund.amount)
+      )
+        throw new ConflictException(
+          'Refund replay does not match the executed approval',
+        );
       const journalEntry = await this.prisma.journalEntry.findFirst({
         where: {
           tenantId: actor.tenantId,
@@ -8120,149 +8296,189 @@ export class FinanceService {
       updatedInvoices: Array<Prisma.InvoiceGetPayload<Record<string, never>>>;
     };
     try {
-      result = await this.prisma.$transaction(async (tx) => {
-        await tx.$queryRaw(Prisma.sql`
+      result = await this.financeTransaction(
+        actor,
+        'payments:refund',
+        async (tx) => {
+          await tx.$queryRaw(Prisma.sql`
         SELECT "id"
         FROM "Payment"
         WHERE "id" = ${payment.id}
           AND "tenantId" = ${actor.tenantId}
         FOR UPDATE
       `);
-        const currentPayment = await tx.payment.findFirst({
-          where: {
-            id: payment.id,
-            tenantId: actor.tenantId,
-          },
-          select: { status: true },
-        });
-        if (
-          !currentPayment ||
-          currentPayment.status === PaymentStatus.REVERSED
-        ) {
-          throw new ConflictException(
-            'This payment is no longer eligible for a refund.',
-          );
-        }
-        const currentRefunds = await tx.paymentRefund.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            paymentId: payment.id,
-          },
-          select: { amount: true },
-        });
-        const currentRefundableAmount = payment.amount.sub(
-          sumRefundedAmount(currentRefunds),
-        );
-        if (
-          currentRefundableAmount.lte(0) ||
-          refundAmount.gt(currentRefundableAmount)
-        ) {
-          throw new ConflictException(
-            'Another refund already changed the remaining refundable amount. Refresh and review the payment before retrying.',
-          );
-        }
-
-        const refundNumber = await this.generateRefundNumber(
-          actor.tenantId,
-          tx,
-        );
-        const refund = await tx.paymentRefund.create({
-          data: {
-            tenantId: actor.tenantId,
-            paymentId: payment.id,
-            refundNumber,
-            amount: refundAmount,
-            refundDate,
-            reason,
-            idempotencyKey,
-            referenceNumber: dto.referenceNumber?.trim() || null,
-            narration: dto.narration?.trim() || null,
-            createdById: actor.userId,
-          },
-        });
-
-        await Promise.all(
-          correctionPlan.map((allocation) =>
-            tx.paymentAllocation.create({
-              data: {
-                tenantId: actor.tenantId,
-                paymentId: payment.id,
-                invoiceId: allocation.invoiceId,
-                amount: allocation.amount.negated(),
-                allocationType: PaymentAllocationType.REFUND,
-                allocationGroupId: refund.id,
-                reason,
-                allocatedAt: refundDate,
-                allocatedById: actor.userId,
-              },
-            }),
-          ),
-        );
-
-        const journalEntry =
-          await this.accountingPostingService.postPaymentRefund(
-            {
+          const currentPayment = await tx.payment.findFirst({
+            where: {
+              id: payment.id,
               tenantId: actor.tenantId,
-              refundId: refund.id,
-              paymentId: payment.id,
-              amount: refundAmount,
-              reason,
-              paymentMethod: payment.method,
-              paymentAccountCode: resolveCashAccountCode(payment.method),
-              entryDate: refundDate,
-              lines: reversedDebitLines.map((line) => ({
-                chartAccountId: line.chartAccountId,
-                amount: line.amount,
-                description: line.description ?? 'Payment refund reversal',
-              })),
             },
+            select: { status: true },
+          });
+          if (
+            !currentPayment ||
+            currentPayment.status === PaymentStatus.REVERSED
+          ) {
+            throw new ConflictException(
+              'This payment is no longer eligible for a refund.',
+            );
+          }
+          const currentRefunds = await tx.paymentRefund.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              paymentId: payment.id,
+            },
+            select: { amount: true },
+          });
+          const currentRefundableAmount = payment.amount.sub(
+            sumRefundedAmount(currentRefunds),
+          );
+          if (
+            currentRefundableAmount.lte(0) ||
+            refundAmount.gt(currentRefundableAmount)
+          ) {
+            throw new ConflictException(
+              'Another refund already changed the remaining refundable amount. Refresh and review the payment before retrying.',
+            );
+          }
+
+          const execution = await this.claimFinancialExecution(
+            tx,
             actor,
+            payment.id,
+            idempotencyKey,
+            'REFUND',
+            refundAmount,
+            reason,
+          );
+          await this.accountingPostingService.lockPostingPeriod(
+            tx,
+            actor.tenantId,
+            refundDate,
+          );
+
+          const refundNumber = await this.generateRefundNumber(
+            actor.tenantId,
             tx,
           );
+          const refund = await tx.paymentRefund.create({
+            data: {
+              tenantId: actor.tenantId,
+              paymentId: payment.id,
+              refundNumber,
+              amount: refundAmount,
+              refundDate,
+              reason,
+              idempotencyKey,
+              referenceNumber: dto.referenceNumber?.trim() || null,
+              narration: dto.narration?.trim() || null,
+              createdById: actor.userId,
+            },
+          });
 
-        const updatedInvoices = await Promise.all(
-          correctionPlan
-            .flatMap((allocation) =>
-              allocation.invoiceId ? [allocation.invoiceId] : [],
-            )
-            .map(async (invoiceId) => {
-              const target = allocatedInvoices.find(
-                (invoice) => invoice.id === invoiceId,
-              );
-              if (!target) {
-                throw new ConflictException(
-                  'An invoice allocation changed while the refund was being recorded.',
-                );
-              }
-              const aggregate = await tx.paymentAllocation.aggregate({
-                where: {
-                  tenantId: actor.tenantId,
-                  invoiceId,
-                  reversedAt: null,
-                },
-                _sum: { amount: true },
-              });
-              const netPaidAmount = decimalOrZero(aggregate._sum.amount);
-              return tx.invoice.update({
-                where: { id: invoiceId },
+          await Promise.all(
+            correctionPlan.map((allocation) =>
+              tx.paymentAllocation.create({
                 data: {
-                  status: resolveInvoiceStatusAfterAdjustment(
-                    target.status,
-                    netPaidAmount,
-                    target.totalAmount,
-                  ),
-                  paidAt:
-                    netPaidAmount.gte(target.totalAmount) &&
-                    target.totalAmount.gt(0)
-                      ? (target.paidAt ?? refundDate)
-                      : null,
+                  tenantId: actor.tenantId,
+                  paymentId: payment.id,
+                  invoiceId: allocation.invoiceId,
+                  amount: allocation.amount.negated(),
+                  allocationType: PaymentAllocationType.REFUND,
+                  allocationGroupId: refund.id,
+                  reason,
+                  allocatedAt: refundDate,
+                  allocatedById: actor.userId,
                 },
-              });
-            }),
-        );
+              }),
+            ),
+          );
 
-        return { refund, journalEntry, updatedInvoices };
-      });
+          const journalEntry =
+            await this.accountingPostingService.postPaymentRefund(
+              {
+                tenantId: actor.tenantId,
+                refundId: refund.id,
+                paymentId: payment.id,
+                amount: refundAmount,
+                reason,
+                paymentMethod: payment.method,
+                paymentAccountCode: resolveCashAccountCode(payment.method),
+                entryDate: refundDate,
+                lines: reversedDebitLines.map((line) => ({
+                  chartAccountId: line.chartAccountId,
+                  amount: line.amount,
+                  description: line.description ?? 'Payment refund reversal',
+                })),
+              },
+              actor,
+              tx,
+            );
+
+          const updatedInvoices = await Promise.all(
+            correctionPlan
+              .flatMap((allocation) =>
+                allocation.invoiceId ? [allocation.invoiceId] : [],
+              )
+              .map(async (invoiceId) => {
+                const target = allocatedInvoices.find(
+                  (invoice) => invoice.id === invoiceId,
+                );
+                if (!target) {
+                  throw new ConflictException(
+                    'An invoice allocation changed while the refund was being recorded.',
+                  );
+                }
+                const aggregate = await tx.paymentAllocation.aggregate({
+                  where: {
+                    tenantId: actor.tenantId,
+                    invoiceId,
+                    reversedAt: null,
+                  },
+                  _sum: { amount: true },
+                });
+                const netPaidAmount = decimalOrZero(aggregate._sum.amount);
+                return tx.invoice.update({
+                  where: { id: invoiceId },
+                  data: {
+                    status: resolveInvoiceStatusAfterAdjustment(
+                      target.status,
+                      netPaidAmount,
+                      target.totalAmount,
+                    ),
+                    paidAt:
+                      netPaidAmount.gte(target.totalAmount) &&
+                      target.totalAmount.gt(0)
+                        ? (target.paidAt ?? refundDate)
+                        : null,
+                  },
+                });
+              }),
+          );
+
+          await this.auditService.record(
+            {
+              action: 'refund',
+              resource: 'payment_refund',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: refund.id,
+              before: {
+                paymentId: payment.id,
+                amount: payment.amount.toFixed(2),
+              },
+              after: {
+                refundId: refund.id,
+                amount: refund.amount.toFixed(2),
+                invoiceIds: updatedInvoices.map((invoice) => invoice.id),
+                statuses: updatedInvoices.map((invoice) => invoice.status),
+              },
+            },
+            tx,
+          );
+          await this.finishFinancialExecution(tx, actor, execution.id);
+          return { refund, journalEntry, updatedInvoices };
+        },
+      );
     } catch (error) {
       if (!isPrismaUniqueConstraintError(error)) {
         throw error;
@@ -8331,24 +8547,6 @@ export class FinanceService {
       };
     }
 
-    await this.auditService.record({
-      action: 'refund',
-      resource: 'payment_refund',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: result.refund.id,
-      before: {
-        paymentId: payment.id,
-        amount: payment.amount.toFixed(2),
-      },
-      after: {
-        refundId: result.refund.id,
-        amount: result.refund.amount.toFixed(2),
-        invoiceIds: result.updatedInvoices.map((invoice) => invoice.id),
-        statuses: result.updatedInvoices.map((invoice) => invoice.status),
-      },
-    });
-
     return {
       refundId: result.refund.id,
       refundNumber: result.refund.refundNumber,
@@ -8369,7 +8567,7 @@ export class FinanceService {
     dto: ReversePaymentDto,
     actor: AuthContext,
   ) {
-    assertFinancePermission(actor, 'payments:reverse');
+    requireDomainPermission(actor, 'payments:reverse');
     if (this.entitlementsService) {
       await this.entitlementsService.assertFeatureEnabled(
         actor.tenantId,
@@ -8384,6 +8582,15 @@ export class FinanceService {
         'A reason is required to reverse this payment.',
       );
     }
+
+    const approvedRequest = await this.financialExecutionRequest(
+      paymentId,
+      idempotencyKey,
+      'REVERSAL',
+      actor,
+    );
+    if (approvedRequest.reason !== reason)
+      throw new ConflictException('Execution must use the approved reason');
 
     const payment = await this.prisma.payment.findFirst({
       where: { id: paymentId, tenantId: actor.tenantId },
@@ -8407,6 +8614,13 @@ export class FinanceService {
       payment.reversalIdempotencyKey === idempotencyKey &&
       (payment.status === PaymentStatus.REVERSED || payment.reversedAt)
     ) {
+      if (
+        approvedRequest.status !== 'EXECUTED' ||
+        !approvedRequest.amount?.eq(payment.amount)
+      )
+        throw new ConflictException(
+          'Reversal replay does not match the executed approval',
+        );
       return {
         paymentId: payment.id,
         invoiceId: payment.invoiceId,
@@ -8525,111 +8739,133 @@ export class FinanceService {
     });
 
     const reversalDate = new Date();
-    const result = await this.prisma.$transaction(async (tx) => {
-      const claim = await tx.payment.updateMany({
-        where: {
-          id: payment.id,
-          tenantId: actor.tenantId,
-          status: { not: PaymentStatus.REVERSED },
-          reversedAt: null,
-        },
-        data: {
-          status: PaymentStatus.REVERSED,
-          reversedAt: reversalDate,
-          reversedById: actor.userId,
-          reversalReason: reason,
-          reversalIdempotencyKey: idempotencyKey,
-        },
-      });
-      if (claim.count !== 1) {
-        throw new ConflictException(
-          'This payment was already reversed or is being reversed.',
-        );
-      }
-
-      const reversal = await this.accountingPostingService.postReversal(
-        {
-          tenantId: actor.tenantId,
-          originalEntryId: sourceJournal.id,
-          reversalDate,
-          narration: `Voiding Payment ${payment.receipt?.receiptNumber ?? payment.id}: ${reason}`,
+    const result = await this.financeTransaction(
+      actor,
+      'payments:reverse',
+      async (tx) => {
+        const execution = await this.claimFinancialExecution(
+          tx,
+          actor,
+          payment.id,
+          idempotencyKey,
+          'REVERSAL',
+          payment.amount,
           reason,
-          lines: sourceJournal.lines.map((line) => ({
-            chartAccountId: line.chartAccountId,
-            side:
-              line.side === JournalLineSide.DEBIT
-                ? JournalLineSide.CREDIT
-                : JournalLineSide.DEBIT,
-            amount: line.amount,
-            description: `Reversal of ${sourceJournal.entryNumber}`,
-          })),
-        },
-        actor,
-        tx,
-      );
+        );
+        await this.accountingPostingService.lockPostingPeriod(
+          tx,
+          actor.tenantId,
+          reversalDate,
+        );
+        const claim = await tx.payment.updateMany({
+          where: {
+            id: payment.id,
+            tenantId: actor.tenantId,
+            status: { not: PaymentStatus.REVERSED },
+            reversedAt: null,
+          },
+          data: {
+            status: PaymentStatus.REVERSED,
+            reversedAt: reversalDate,
+            reversedById: actor.userId,
+            reversalReason: reason,
+            reversalIdempotencyKey: idempotencyKey,
+          },
+        });
+        if (claim.count !== 1) {
+          throw new ConflictException(
+            'This payment was already reversed or is being reversed.',
+          );
+        }
 
-      await Promise.all(
-        correctionPlan.map((allocation) =>
-          tx.paymentAllocation.create({
-            data: {
-              tenantId: actor.tenantId,
-              paymentId: payment.id,
-              invoiceId: allocation.invoiceId,
-              amount: allocation.amount.negated(),
-              allocationType: PaymentAllocationType.REVERSAL,
-              allocationGroupId: payment.id,
-              reason,
-              allocatedAt: reversalDate,
-              allocatedById: actor.userId,
-            },
+        const reversal = await this.accountingPostingService.postReversal(
+          {
+            tenantId: actor.tenantId,
+            originalEntryId: sourceJournal.id,
+            reversalDate,
+            narration: `Voiding Payment ${payment.receipt?.receiptNumber ?? payment.id}: ${reason}`,
+            reason,
+            lines: sourceJournal.lines.map((line) => ({
+              chartAccountId: line.chartAccountId,
+              side:
+                line.side === JournalLineSide.DEBIT
+                  ? JournalLineSide.CREDIT
+                  : JournalLineSide.DEBIT,
+              amount: line.amount,
+              description: `Reversal of ${sourceJournal.entryNumber}`,
+            })),
+          },
+          actor,
+          tx,
+        );
+
+        await Promise.all(
+          correctionPlan.map((allocation) =>
+            tx.paymentAllocation.create({
+              data: {
+                tenantId: actor.tenantId,
+                paymentId: payment.id,
+                invoiceId: allocation.invoiceId,
+                amount: allocation.amount.negated(),
+                allocationType: PaymentAllocationType.REVERSAL,
+                allocationGroupId: payment.id,
+                reason,
+                allocatedAt: reversalDate,
+                allocatedById: actor.userId,
+              },
+            }),
+          ),
+        );
+
+        const updatedInvoices = await Promise.all(
+          allocatedInvoices.map(async (invoice) => {
+            const aggregate = await tx.paymentAllocation.aggregate({
+              where: {
+                tenantId: actor.tenantId,
+                invoiceId: invoice.id,
+                reversedAt: null,
+              },
+              _sum: { amount: true },
+            });
+            const paidAmount = decimalOrZero(aggregate._sum.amount);
+            return tx.invoice.update({
+              where: { id: invoice.id },
+              data: {
+                status: resolveInvoiceStatusAfterAdjustment(
+                  invoice.status,
+                  paidAmount,
+                  invoice.totalAmount,
+                ),
+                paidAt:
+                  paidAmount.gte(invoice.totalAmount) &&
+                  invoice.totalAmount.gt(0)
+                    ? invoice.paidAt
+                    : null,
+              },
+            });
           }),
-        ),
-      );
+        );
 
-      const updatedInvoices = await Promise.all(
-        allocatedInvoices.map(async (invoice) => {
-          const aggregate = await tx.paymentAllocation.aggregate({
-            where: {
-              tenantId: actor.tenantId,
-              invoiceId: invoice.id,
-              reversedAt: null,
+        await this.auditService.record(
+          {
+            action: 'reversal_completed',
+            resource: 'payment',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: paymentId,
+            after: {
+              invoiceId: payment.invoiceId,
+              invoiceIds: updatedInvoices.map((invoice) => invoice.id),
+              amount: payment.amount.toFixed(2),
+              reason,
             },
-            _sum: { amount: true },
-          });
-          const paidAmount = decimalOrZero(aggregate._sum.amount);
-          return tx.invoice.update({
-            where: { id: invoice.id },
-            data: {
-              status: resolveInvoiceStatusAfterAdjustment(
-                invoice.status,
-                paidAmount,
-                invoice.totalAmount,
-              ),
-              paidAt:
-                paidAmount.gte(invoice.totalAmount) && invoice.totalAmount.gt(0)
-                  ? invoice.paidAt
-                  : null,
-            },
-          });
-        }),
-      );
-
-      return { reversal, updatedInvoices };
-    });
-
-    await this.auditService.record({
-      action: 'reversal_completed',
-      resource: 'payment',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: paymentId,
-      after: {
-        invoiceId: payment.invoiceId,
-        invoiceIds: result.updatedInvoices.map((invoice) => invoice.id),
-        amount: payment.amount.toFixed(2),
-        reason,
+          },
+          tx,
+        );
+        await this.finishFinancialExecution(tx, actor, execution.id);
+        return { reversal, updatedInvoices };
       },
-    });
+    );
 
     return {
       paymentId: payment.id,
@@ -9821,7 +10057,15 @@ export class FinanceService {
   }
 
   async listPayments(query: ListPaymentsQueryDto, actor: AuthContext) {
-    assertAnyFinancePermission(actor, ['payments:collect', 'fees:manage']);
+    if (
+      ![
+        'payments:collect',
+        'fees:manage',
+        'payments:refund:request',
+        'payments:reverse:request',
+      ].some((permission) => hasDomainPermission(actor, permission))
+    )
+      throw new ForbiddenException('Payment source access is unavailable');
     const pagination = resolveFinancePagination(query);
     const search = query.search?.trim();
     const where: Prisma.PaymentWhereInput = {
@@ -12287,23 +12531,51 @@ function sumMoneyStrings(values: string[]) {
     .toFixed(2);
 }
 
-function serializeFinanceApprovalRequest<
-  T extends {
-    amount?: Prisma.Decimal | null;
-    payment?: { amount: Prisma.Decimal } | null;
-  },
->(request: T) {
+function serializeFinanceApprovalRequest(request: {
+  id: string;
+  type: string;
+  status: string;
+  paymentId: string;
+  amount?: Prisma.Decimal | null;
+  reason: string;
+  reviewNote: string | null;
+  failureMessage: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  requiredApprovalCount: number;
+  decisions?: Array<{ actorUserId: string }>;
+  history?: Array<{
+    id: string;
+    action: string;
+    status: string;
+    actorUserId: string;
+    note: string | null;
+    createdAt: Date;
+  }>;
+}) {
   return {
-    ...request,
+    id: request.id,
+    type: request.type,
+    status: request.status,
+    paymentId: request.paymentId,
     amount: request.amount?.toFixed(2) ?? null,
-    ...(request.payment
-      ? {
-          payment: {
-            ...request.payment,
-            amount: request.payment.amount.toFixed(2),
-          },
-        }
-      : {}),
+    reason: request.reason,
+    reviewNote: request.reviewNote,
+    failureMessage: request.failureMessage,
+    createdAt: request.createdAt,
+    updatedAt: request.updatedAt,
+    requiredApprovalCount: request.requiredApprovalCount,
+    approvalCount: request.decisions?.length ?? 0,
+    history: (request.history ?? []).map(
+      ({ id, action, status, actorUserId, note, createdAt }) => ({
+        id,
+        action,
+        status,
+        actorUserId,
+        note,
+        createdAt,
+      }),
+    ),
   };
 }
 

@@ -241,6 +241,17 @@ export const permissionCatalog = [
 
   // ─── Compiled from catalog/accounting.ts ───
   {
+    resource: "finance:approvals",
+    action: "review",
+    description:
+      "Independently review financial correction requests before approval",
+  },
+  {
+    resource: "accounting:journals",
+    action: "review",
+    description: "Independently review a submitted manual journal",
+  },
+  {
     resource: "accounting",
     action: "read",
     description: "Read accounting periods and financial reports",
@@ -434,8 +445,15 @@ export const permissionCatalog = [
   },
   {
     resource: "accounting:reconciliation",
+    action: "review",
+    description:
+      "Independently review reconciliation balances and matching exceptions",
+  },
+  {
+    resource: "accounting:reconciliation",
     action: "finalize",
-    description: "Finalize a balanced bank reconciliation session",
+    description:
+      "Finalize an independently reviewed balanced bank reconciliation session",
   },
   {
     resource: "finance:principal",
@@ -883,6 +901,19 @@ export const permissionCatalog = [
 
   // ─── Compiled from catalog/finance.ts ───
   {
+    resource: "payments:refund",
+    action: "request",
+    description:
+      "Request an independently reviewed and approved payment refund",
+  },
+  {
+    resource: "payments:reverse",
+    action: "request",
+    description:
+      "Request an independently reviewed and approved payment reversal",
+  },
+
+  {
     resource: "fees",
     action: "manage",
     description: "Manage fee heads, plans, and student assignments",
@@ -939,6 +970,56 @@ export const permissionCatalog = [
   },
 
   // ─── Compiled from catalog/hr.ts ───
+  {
+    resource: "hr:documents",
+    action: "read",
+    description: "Read protected staff document records and files",
+  },
+  {
+    resource: "hr:documents",
+    action: "manage",
+    description: "Manage and verify protected staff documents",
+  },
+  {
+    resource: "hr:identity",
+    action: "read",
+    description: "Read protected staff identity numbers",
+  },
+  {
+    resource: "hr:identity",
+    action: "write",
+    description: "Update protected staff identity numbers",
+  },
+  {
+    resource: "hr:bank",
+    action: "read",
+    description: "Read staff and compensation bank details",
+  },
+  {
+    resource: "hr:bank",
+    action: "write",
+    description: "Update staff and compensation bank details",
+  },
+  {
+    resource: "hr:tax",
+    action: "read",
+    description: "Read staff tax identity and statutory details",
+  },
+  {
+    resource: "hr:tax",
+    action: "write",
+    description: "Update staff tax identity and statutory details",
+  },
+  {
+    resource: "hr:disciplinary",
+    action: "read",
+    description: "Read restricted staff disciplinary evidence",
+  },
+  {
+    resource: "hr:disciplinary",
+    action: "manage",
+    description: "Manage restricted staff disciplinary evidence",
+  },
   {
     resource: "hr",
     action: "manage",
@@ -1193,6 +1274,17 @@ export const permissionCatalog = [
     resource: "payroll:run",
     action: "review",
     description: "Review payroll runs",
+  },
+  {
+    resource: "payroll:run",
+    action: "validate",
+    description: "Validate payroll inputs before independent review",
+  },
+  {
+    resource: "payroll:run",
+    action: "finalize",
+    description:
+      "Finalize an independently approved payroll snapshot before accounting posting",
   },
   {
     resource: "payroll:run",

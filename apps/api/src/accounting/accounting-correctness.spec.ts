@@ -400,6 +400,7 @@ describe('Accounting Correctness Hardening', () => {
       });
       expect(mockAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'reverse' }),
+        mockPrisma,
       );
     });
 
@@ -468,6 +469,7 @@ describe('Accounting Correctness Hardening', () => {
       expect(mockPrisma.journalEntry.update).toHaveBeenCalledTimes(2); // One for original status, one for correction linkage
       expect(mockAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'correct' }),
+        mockPrisma,
       );
     });
 

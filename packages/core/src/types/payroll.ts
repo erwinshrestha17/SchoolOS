@@ -18,8 +18,8 @@ export type SalaryStructureSummary = {
   basicSalary: PayrollMoneyAmount;
   allowances: PayrollMoneyAmount;
   deductions: PayrollMoneyAmount;
-  pfEnabled: boolean;
-  tdsEnabled: boolean;
+  pfEnabled: boolean | null;
+  tdsEnabled: boolean | null;
   paymentMethod: string;
   bankAccount?: string | null;
   bankName?: string | null;
@@ -30,10 +30,13 @@ export type SalaryStructureSummary = {
 
 export type PayrollRunAllowedActions = {
   canEdit: boolean;
+  canValidate: boolean;
   canReview: boolean;
   canSubmitReview: boolean;
   canCompleteReview: boolean;
   canApprove: boolean;
+  canFinalize: boolean;
+  canCancelFinalized: boolean;
   canReject: boolean;
   canPost: boolean;
   canPay: boolean;

@@ -236,7 +236,9 @@ describe('P0-01 guardian scoping (real database)', () => {
         userId: foreignParentUserId,
         fullName: `Parent B ${SUFFIX}`,
         relation: 'MOTHER',
-        primaryPhone: '9800000002',
+        // Contact identity is not relationship authority, even when a
+        // guardian in another school shares the same phone number.
+        primaryPhone: '9800000001',
       },
     });
     const fc = await makeStudent(tenantBId, classBId, yearB.id, 'ForeignChild');
@@ -381,6 +383,29 @@ describe('P0-01 guardian scoping (real database)', () => {
         ),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    it('lets a custody restriction override a previously held capability', async () => {
+      await resetChildOne({
+        status: 'SUSPENDED',
+        restrictionReasonRef: 'custody-order-evidence-1',
+      });
+
+      await expect(
+        requireGuardianCapability(
+          prisma,
+          parentActor(),
+          childOneId,
+          GuardianCapability.ACADEMICS_VIEW,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      await expect(
+        getParentStudentIds(
+          prisma,
+          parentActor(),
+          GuardianCapability.ACADEMICS_VIEW,
+        ),
+      ).resolves.toEqual([childTwoId]);
+    });
   });
 
   describe('effective dating', () => {
@@ -445,6 +470,47 @@ describe('P0-01 guardian scoping (real database)', () => {
           GuardianCapability.ACADEMICS_VIEW,
         ),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('does not treat a shared phone as a cross-school guardian link', async () => {
+      const linked = await getParentStudentIds(prisma, parentActor());
+      expect([...(linked ?? [])].sort()).toEqual(
+        [childOneId, childTwoId].sort(),
+      );
+      await expect(
+        requireGuardianCapability(
+          prisma,
+          parentActor(),
+          foreignChildId,
+          GuardianCapability.ACADEMICS_VIEW,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects a malformed local link to a student owned by another tenant', async () => {
+      const guardian = await prisma.guardian.findFirstOrThrow({
+        where: { tenantId: tenantAId, userId: parentUserId },
+        select: { id: true },
+      });
+      await expect(
+        prisma.runWithoutTenantScope(
+          'attempt a deliberately malformed cross-tenant relationship fixture',
+          () =>
+            prisma.studentGuardian.create({
+              data: {
+                tenantId: tenantAId,
+                guardianId: guardian.id,
+                studentId: foreignChildId,
+                relation: 'FATHER',
+                status: 'ACTIVE',
+                verificationStatus: 'VERIFIED',
+                approvalStatus: 'APPROVED',
+                effectiveFrom: new Date(Date.now() - DAY),
+                capabilities: [GuardianCapability.ACADEMICS_VIEW],
+              },
+            }),
+        ),
+      ).rejects.toThrow('Tenant-owned reference is not available');
     });
 
     it('denies a foreign parent claiming this tenant', async () => {

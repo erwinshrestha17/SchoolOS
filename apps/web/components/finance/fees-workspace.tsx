@@ -101,6 +101,15 @@ export function FeesWorkspace({ section }: { section: FeesSection }) {
   const canClose = hasPermissions(['payments:close']);
   const canUseCorrectionWorkflow =
     canCollect ||
+    (
+      [
+        'payments:refund:request',
+        'payments:reverse:request',
+        'finance:approvals:read',
+        'finance:approvals:review',
+        'finance:approvals:decide',
+      ] as const
+    ).some((permission) => hasPermissions([permission])) ||
     hasPermissions(['payments:refund']) ||
     hasPermissions(['payments:reverse']);
   const copy = sectionCopy[section];

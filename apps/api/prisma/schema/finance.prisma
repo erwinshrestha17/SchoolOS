@@ -496,6 +496,15 @@ model FinanceApprovalRequest {
   reviewNote    String?
   failureMessage String?
   reviewedAt    DateTime?
+  approvedById String?
+  approvedAt DateTime?
+  approvalNote String?
+  executedById String?
+  executedAt DateTime?
+  policyFingerprint String?
+  policySnapshot Json?
+  sourceFingerprint String?
+  requiredApprovalCount Int @default(1)
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
@@ -504,6 +513,7 @@ model FinanceApprovalRequest {
   requestedBy User    @relation("RequestedFinanceApprovals", fields: [requestedById], references: [id])
   reviewedBy  User?   @relation("ReviewedFinanceApprovals", fields: [reviewedById], references: [id])
   history     FinanceApprovalRequestHistory[]
+  decisions FinanceApprovalDecision[]
 
   @@index([tenantId, status])
   @@unique([tenantId, idempotencyKey])
@@ -524,4 +534,16 @@ model FinanceApprovalRequestHistory {
 
   @@index([tenantId, requestId, createdAt])
   @@index([tenantId, status, createdAt])
+}
+
+model FinanceApprovalDecision {
+  id String @id @default(uuid())
+  tenantId String
+  requestId String
+  actorUserId String
+  note String?
+  createdAt DateTime @default(now())
+  request FinanceApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  @@unique([requestId, actorUserId])
+  @@index([tenantId, requestId, createdAt])
 }

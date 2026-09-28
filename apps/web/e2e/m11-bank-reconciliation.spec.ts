@@ -24,13 +24,25 @@ test('M11 bank reconciliation previews and idempotently commits a statement befo
   const accountsPayload = (await accountsResponse.json()) as {
     data: Array<{ id: string; code: string; name: string }>;
   };
-  const bankAccount = accountsPayload.data.find(
-    (account) => account.code === '1010',
-  );
   const incomeAccount = accountsPayload.data.find(
     (account) => account.code === '4000',
   );
-  expect(bankAccount && incomeAccount).toBeTruthy();
+  const bankAccountResponse = await preparer.context.request.post(
+    `${API_BASE_URL}/accounting/accounts`,
+    {
+      headers: csrfHeaders(preparer.state),
+      data: {
+        code: `E2E${runKey}`,
+        name: `E2E reconciliation bank ${runKey}`,
+        type: 'ASSET',
+      },
+    },
+  );
+  expect(bankAccountResponse.ok()).toBeTruthy();
+  const bankAccount = (await bankAccountResponse.json()) as {
+    data: { id: string };
+  };
+  expect(incomeAccount).toBeTruthy();
 
   const narration = `E2E bank reconciliation ${runKey}`;
   const amount = 4321.25;
@@ -43,7 +55,7 @@ test('M11 bank reconciliation previews and idempotently commits a statement befo
         narration,
         lines: [
           {
-            chartAccountId: bankAccount!.id,
+            chartAccountId: bankAccount.data.id,
             side: 'DEBIT',
             amount,
           },
@@ -69,6 +81,18 @@ test('M11 bank reconciliation previews and idempotently commits a statement befo
   expect(submitResponse.ok()).toBeTruthy();
   await preparer.context.close();
 
+  const reviewer = await roleContext(
+    browser,
+    authStateFor,
+    'accountingReviewer',
+  );
+  const reviewResponse = await reviewer.context.request.post(
+    `${API_BASE_URL}/accounting/journals/${journalId}/review`,
+    { headers: csrfHeaders(reviewer.state), data: {} },
+  );
+  expect(reviewResponse.ok()).toBeTruthy();
+  await reviewer.context.close();
+
   const approver = await roleContext(
     browser,
     authStateFor,
@@ -79,22 +103,25 @@ test('M11 bank reconciliation previews and idempotently commits a statement befo
     { headers: csrfHeaders(approver.state), data: {} },
   );
   expect(approveResponse.ok()).toBeTruthy();
-  const postResponse = await approver.context.request.post(
+  await approver.context.close();
+
+  const poster = await roleContext(browser, authStateFor, 'accountingPoster');
+  const postResponse = await poster.context.request.post(
     `${API_BASE_URL}/accounting/journals/${journalId}/post`,
-    { headers: csrfHeaders(approver.state), data: {} },
+    { headers: csrfHeaders(poster.state), data: {} },
   );
   expect(postResponse.ok()).toBeTruthy();
   const posted = (await postResponse.json()) as {
     data: { entryNumber: string };
   };
-  await approver.context.close();
+  await poster.context.close();
 
   const accountant = await roleContext(browser, authStateFor, 'e2eAccountant');
   const page = await accountant.context.newPage();
   await page.goto('/dashboard/accounting/reconciliation');
   await page
     .getByLabel('Select Bank/Cash Account')
-    .selectOption(bankAccount!.id);
+    .selectOption(bankAccount.data.id);
 
   const csv = [
     'Date,Description,Reference,Debit,Credit',
@@ -120,7 +147,7 @@ test('M11 bank reconciliation previews and idempotently commits a statement befo
   ).toBeVisible();
 
   const duplicatePreview = await accountant.context.request.post(
-    `${API_BASE_URL}/accounting/bank-reconciliation/${bankAccount!.id}/import-preview`,
+    `${API_BASE_URL}/accounting/bank-reconciliation/${bankAccount.data.id}/import-preview`,
     {
       headers: csrfHeaders(accountant.state),
       data: {
@@ -144,6 +171,51 @@ test('M11 bank reconciliation previews and idempotently commits a statement befo
   expect(duplicatePreview.status()).toBe(400);
   expect(await duplicatePreview.text()).toContain('duplicates another row');
 
+  const yearsResponse = await accountant.context.request.get(
+    `${API_BASE_URL}/accounting/fiscal-years`,
+  );
+  expect(yearsResponse.ok()).toBeTruthy();
+  const years = (await yearsResponse.json()) as {
+    data: Array<{
+      periods: Array<{
+        id: string;
+        status: string;
+        startDate: string;
+        endDate: string;
+      }>;
+    }>;
+  };
+  const statementDate = new Date().toISOString().slice(0, 10);
+  const openPeriod = years.data
+    .flatMap((year) => year.periods)
+    .find(
+      (period) =>
+        period.status === 'OPEN' &&
+        period.startDate.slice(0, 10) <= statementDate &&
+        period.endDate.slice(0, 10) >= statementDate,
+    );
+  expect(openPeriod).toBeTruthy();
+  const sessionResponse = await accountant.context.request.post(
+    `${API_BASE_URL}/accounting/bank-reconciliation/sessions`,
+    {
+      headers: csrfHeaders(accountant.state),
+      data: {
+        accountId: bankAccount.data.id,
+        fiscalPeriodId: openPeriod!.id,
+        statementFrom: statementDate,
+        statementTo: statementDate,
+        openingBankBalance: '0.00',
+        closingBankBalance: '4341.00',
+        statementReference: `E2E statement ${runKey}`,
+      },
+    },
+  );
+  expect(sessionResponse.ok()).toBeTruthy();
+  await page.reload();
+  await page
+    .getByLabel('Select Bank/Cash Account')
+    .selectOption(bankAccount.data.id);
+
   await page.getByTestId('bank-reconciliation-auto-match').click();
   const suggestions = page.getByTestId('bank-reconciliation-suggestions');
   await expect(suggestions.getByText(narration).first()).toBeVisible();
@@ -154,11 +226,13 @@ test('M11 bank reconciliation previews and idempotently commits a statement befo
   const confirmDialog = page.getByRole('dialog');
   await expect(confirmDialog.getByText('Confirm Reconciliation')).toBeVisible();
   await confirmDialog.getByRole('button', { name: 'Confirm' }).click();
-  await expect(page.getByText('Transaction reconciled')).toBeVisible();
+  await expect(
+    page.getByText('Statement line matched in this reconciliation session.'),
+  ).toBeVisible();
   await expect(page.getByText(`Unmatched E2E row ${runKey}`)).toBeVisible();
 
   const summaryResponse = await accountant.context.request.get(
-    `${API_BASE_URL}/accounting/bank-reconciliation/${bankAccount!.id}/summary`,
+    `${API_BASE_URL}/accounting/bank-reconciliation/${bankAccount.data.id}/summary`,
   );
   expect(summaryResponse.ok()).toBeTruthy();
   const summary = (await summaryResponse.json()) as {
@@ -171,7 +245,7 @@ test('M11 bank reconciliation previews and idempotently commits a statement befo
     response
       .url()
       .includes(
-        `/accounting/reports/bank-reconciliation/${bankAccount!.id}/export.pdf`,
+        `/accounting/reports/bank-reconciliation/${bankAccount.data.id}/export.pdf`,
       ),
   );
   await page.getByRole('button', { name: 'Export PDF' }).click();
@@ -179,7 +253,7 @@ test('M11 bank reconciliation previews and idempotently commits a statement befo
   expect(pdfResponse.ok()).toBeTruthy();
   expect(pdfResponse.headers()['content-type']).toContain('application/pdf');
   const protectedPdf = await accountant.context.request.get(
-    `${API_BASE_URL}/accounting/reports/bank-reconciliation/${bankAccount!.id}/export.pdf`,
+    `${API_BASE_URL}/accounting/reports/bank-reconciliation/${bankAccount.data.id}/export.pdf`,
   );
   expect(protectedPdf.ok()).toBeTruthy();
   expect(protectedPdf.headers()['content-type']).toContain('application/pdf');

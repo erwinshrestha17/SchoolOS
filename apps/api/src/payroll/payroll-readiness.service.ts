@@ -617,12 +617,12 @@ export class PayrollReadinessService {
         candidates.push(
           candidate(year, month, runId, line.staffId, {
             code: PayrollExceptionCode.MISSING_PAN,
-            severity: PayrollExceptionSeverity.WARNING,
+            severity: PayrollExceptionSeverity.BLOCKING,
             title: 'PAN not recorded',
             safeMessage:
               'This payroll line has a tax deduction but the staff PAN is not recorded.',
             resolutionRoute: `/dashboard/hr/staff/${line.staffId}`,
-            blockedActions: ['APPROVE'],
+            blockedActions: ['SUBMIT_REVIEW', 'APPROVE', 'POST', 'MARK_PAID'],
           }),
         );
       }
@@ -634,12 +634,12 @@ export class PayrollReadinessService {
         candidates.push(
           candidate(year, month, runId, line.staffId, {
             code: PayrollExceptionCode.MISSING_BANK_ACCOUNT,
-            severity: PayrollExceptionSeverity.WARNING,
+            severity: PayrollExceptionSeverity.BLOCKING,
             title: 'Bank payment details missing',
             safeMessage:
               'Bank payment is selected but no bank account is configured for this payroll line.',
             resolutionRoute: `/dashboard/hr/staff/${line.staffId}`,
-            blockedActions: ['MARK_PAID'],
+            blockedActions: ['SUBMIT_REVIEW', 'APPROVE', 'POST', 'MARK_PAID'],
           }),
         );
       }
@@ -647,7 +647,8 @@ export class PayrollReadinessService {
 
     if (
       runId &&
-      selectedRun?.status === PayrollRunStatus.APPROVED &&
+      (selectedRun?.status === PayrollRunStatus.APPROVED ||
+        selectedRun?.status === PayrollRunStatus.FINALIZED) &&
       !mapping
     ) {
       candidates.push(
@@ -664,7 +665,8 @@ export class PayrollReadinessService {
     }
     if (
       runId &&
-      selectedRun?.status === PayrollRunStatus.APPROVED &&
+      (selectedRun?.status === PayrollRunStatus.APPROVED ||
+        selectedRun?.status === PayrollRunStatus.FINALIZED) &&
       fiscalPeriod &&
       fiscalPeriod.status !== AccountingPeriodStatus.OPEN
     ) {
@@ -954,12 +956,16 @@ function nextActionForStatus(status: PayrollRunStatus): string | null {
   switch (status) {
     case PayrollRunStatus.DRAFT:
     case PayrollRunStatus.GENERATED:
+      return 'VALIDATE';
+    case PayrollRunStatus.VALIDATED:
       return 'SUBMIT_REVIEW';
     case PayrollRunStatus.UNDER_REVIEW:
       return 'COMPLETE_REVIEW';
     case PayrollRunStatus.REVIEWED:
       return 'APPROVE';
     case PayrollRunStatus.APPROVED:
+      return 'FINALIZE';
+    case PayrollRunStatus.FINALIZED:
       return 'POST';
     case PayrollRunStatus.POSTED:
       return 'MARK_PAID';

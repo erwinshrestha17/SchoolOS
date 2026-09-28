@@ -1,4 +1,5 @@
 import { ConflictException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import {
   AccountingPeriodStatus,
   ChartAccountType,
@@ -13,7 +14,20 @@ import { AccountingPostingService } from '../src/accounting/accounting-posting.s
 import { AuditService } from '../src/audit/audit.service';
 import { AuthContext } from '../src/auth/auth.types';
 import { PayrollService } from '../src/payroll/payroll.service';
+import { PayrollReadinessService } from '../src/payroll/payroll-readiness.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+// This mock-backed accounting suite isolates posting behavior; the live
+// authorization transaction is exercised by payroll-domain-policy.int-spec.ts.
+jest.mock('../src/auth/school-authorization-transaction', () => ({
+  withSchoolAuthorizationTransaction: (
+    prisma: { $transaction: (work: unknown) => unknown },
+    _actor: unknown,
+    _permission: unknown,
+    _scopes: unknown,
+    work: unknown,
+  ) => prisma.$transaction(work),
+}));
 
 interface JournalCreateInput {
   data: {
@@ -48,13 +62,16 @@ interface TransactionMock {
   chartAccount: PayrollM9PrismaMock['chartAccount'];
   payrollLine: {
     updateMany: jest.Mock;
+    findMany: jest.Mock;
   };
   payslip: {
     updateMany: jest.Mock;
+    createMany: jest.Mock;
   };
   payrollRun: {
     update: jest.Mock;
     updateMany: jest.Mock;
+    findFirstOrThrow: jest.Mock;
   };
 }
 
@@ -112,7 +129,13 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
     email: 'payroll-admin@schoolos.test',
     authMethod: 'PASSWORD' as never,
     roles: ['admin'],
-    permissions: ['payroll:run:approve', 'payroll:run:post'],
+    permissions: [
+      'payroll:run:review',
+      'payroll:run:approve',
+      'payroll:run:finalize',
+      'payroll:run:post',
+      'payroll:run:pay',
+    ],
   };
 
   let prisma: PayrollM9PrismaMock;
@@ -131,6 +154,11 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
       prisma as unknown as PrismaService,
       auditService as unknown as AuditService,
       accountingPostingService,
+      undefined,
+      undefined,
+      {
+        assertActionAllowed: jest.fn().mockResolvedValue(undefined),
+      } as unknown as PayrollReadinessService,
     );
   });
 
@@ -142,11 +170,8 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
     const approved = await payrollService.approvePayrollRun('run-1', actor);
 
     expect(approved.status).toBe(PayrollRunStatus.APPROVED);
-    expect(prisma.payrollLine.updateMany).toHaveBeenCalledWith({
-      where: { tenantId, payrollRunId: 'run-1' },
-      data: { status: PayrollLineStatus.APPROVED },
-    });
-    expect(prisma.payslip.createMany).toHaveBeenCalled();
+    expect(prisma.__tx?.payrollLine.updateMany).not.toHaveBeenCalled();
+    expect(prisma.__tx?.payslip.createMany).not.toHaveBeenCalled();
     expect(prisma.journalEntry.create).not.toHaveBeenCalled();
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -155,16 +180,35 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
         tenantId,
         resourceId: 'run-1',
       }),
+      expect.any(Object),
     );
   });
 
-  it('posts approved payroll through AccountingPostingService as a balanced accrual journal', async () => {
+  it('finalizes independently approved payroll and issues payslips without posting', async () => {
+    prisma.__currentRun = buildPayrollRun({
+      status: PayrollRunStatus.APPROVED,
+      approvedSourceFingerprint: payrollSourceFingerprint(),
+    });
+
+    const finalized = await payrollService.finalizePayrollRun('run-1', actor);
+
+    expect(finalized.status).toBe(PayrollRunStatus.FINALIZED);
+    expect(prisma.__tx?.payrollLine.updateMany).toHaveBeenCalledWith({
+      where: { tenantId, payrollRunId: 'run-1' },
+      data: { status: PayrollLineStatus.APPROVED },
+    });
+    expect(prisma.__tx?.payslip.createMany).toHaveBeenCalled();
+    expect(prisma.journalEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('posts finalized payroll through AccountingPostingService as a balanced accrual journal', async () => {
     const postingSpy = jest.spyOn(
       accountingPostingService,
       'postPayrollAccrual',
     );
     prisma.__currentRun = buildPayrollRun({
-      status: PayrollRunStatus.APPROVED,
+      status: PayrollRunStatus.FINALIZED,
+      approvedSourceFingerprint: payrollSourceFingerprint(),
     });
 
     const posted = await payrollService.postPayrollRun('run-1', actor);
@@ -213,6 +257,7 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
         resource: 'journal_entry',
         tenantId,
       }),
+      expect.any(Object),
     );
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -221,6 +266,7 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
         tenantId,
         resourceId: 'run-1',
       }),
+      expect.any(Object),
     );
   });
 
@@ -242,7 +288,8 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
     'rejects payroll posting into %s fiscal period',
     async (status) => {
       prisma.__currentRun = buildPayrollRun({
-        status: PayrollRunStatus.APPROVED,
+        status: PayrollRunStatus.FINALIZED,
+        approvedSourceFingerprint: payrollSourceFingerprint(),
       });
       prisma.__periodStatus = status;
 
@@ -483,11 +530,14 @@ function buildTransactionMock(root: PayrollM9PrismaMock): TransactionMock {
     chartAccount: root.chartAccount,
     payrollLine: {
       updateMany: jest.fn(() => Promise.resolve({ count: 1 })),
+      findMany: root.payrollLine.findMany,
     },
     payslip: {
       updateMany: jest.fn(() => Promise.resolve({ count: 1 })),
+      createMany: root.payslip.createMany,
     },
     payrollRun: {
+      findFirstOrThrow: jest.fn(() => Promise.resolve(root.__currentRun)),
       updateMany: jest.fn((q: { data?: Record<string, unknown> }) => {
         root.__currentRun = {
           ...root.__currentRun,
@@ -517,6 +567,12 @@ function buildPayrollRun(overrides: Record<string, unknown> = {}) {
     periodStart: new Date('2026-05-01T00:00:00.000Z'),
     periodEnd: new Date('2026-05-31T23:59:59.999Z'),
     status: PayrollRunStatus.GENERATED,
+    revision: 1,
+    generatedById: 'independent-preparer',
+    reviewedById: 'independent-reviewer',
+    reviewedAt: new Date('2026-05-31T00:00:00.000Z'),
+    approvedById: 'independent-approver',
+    approvedSourceFingerprint: null,
     grossAmount: new Prisma.Decimal(50000),
     deductionAmount: new Prisma.Decimal(1000),
     netAmount: new Prisma.Decimal(49000),
@@ -546,6 +602,15 @@ function buildPayrollLine(overrides: Record<string, unknown> = {}) {
     netSalary: new Prisma.Decimal(49000),
     ...overrides,
   };
+}
+
+function payrollSourceFingerprint() {
+  return createHash('sha256')
+    .update('schoolos:payroll-sources:v1\0')
+    .update(
+      JSON.stringify([buildPayrollLine({ id: 'line-1', staffId: 'staff-1' })]),
+    )
+    .digest('hex');
 }
 
 function chartAccountForCode(code = '1010') {

@@ -90,9 +90,13 @@ export class ParentScopeContextService {
             studentLinks: {
               where: {
                 ...buildActiveGuardianRelationshipWhere(),
+                tenantId: actor.tenantId,
                 student: {
+                  tenantId: actor.tenantId,
                   lifecycleStatus: 'ACTIVE',
-                  enrollments: { some: { status: 'ACTIVE' } },
+                  enrollments: {
+                    some: { tenantId: actor.tenantId, status: 'ACTIVE' },
+                  },
                 },
               },
               select: { studentId: true, capabilities: true },

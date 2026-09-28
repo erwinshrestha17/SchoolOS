@@ -32,7 +32,7 @@ import { cn } from '../../lib/utils';
 export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
-  const canUpdateStaff = hasPermissions(['hr:staff:update']);
+  const canUpdateStaff = hasPermissions(['hr:documents:manage']);
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedDocToVerify, setSelectedDocToVerify] = useState<{
@@ -86,13 +86,15 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
           </div>
           Staff Documents
         </h3>
-        <button
-          onClick={() => setIsUploadOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 border border-slate-200 hover:border-[var(--color-mod-hr-border)] hover:bg-[var(--color-mod-hr-soft)]/60 text-slate-700 hover:text-[var(--color-mod-hr-text)] rounded-xl font-bold text-xs transition-all active:scale-[0.98]"
-        >
-          <Plus size={14} />
-          Upload Document
-        </button>
+        {canUpdateStaff && (
+          <button
+            onClick={() => setIsUploadOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200 hover:border-[var(--color-mod-hr-border)] hover:bg-[var(--color-mod-hr-soft)]/60 text-slate-700 hover:text-[var(--color-mod-hr-text)] rounded-xl font-bold text-xs transition-all active:scale-[0.98]"
+          >
+            <Plus size={14} />
+            Upload Document
+          </button>
+        )}
       </div>
 
       {fileViewError ? (

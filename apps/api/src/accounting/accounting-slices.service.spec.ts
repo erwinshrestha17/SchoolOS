@@ -8,7 +8,20 @@ import { AccountingService } from './accounting.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AccountingPostingService } from './accounting-posting.service';
+import { ApprovalWorkflowService } from '../advanced-operations/approval-workflow.service';
 import { JournalLineSide } from '@prisma/client';
+
+// Unit transitions use local doubles; real session/grant checks are exercised
+// in journal-domain-policy.int-spec.ts.
+jest.mock('../auth/school-authorization-transaction', () => ({
+  withSchoolAuthorizationTransaction: (
+    prisma: { $transaction: (work: unknown) => unknown },
+    _actor: unknown,
+    _permission: unknown,
+    _targets: unknown,
+    work: unknown,
+  ) => prisma.$transaction(work),
+}));
 
 describe('AccountingService - Slices 2-5', () => {
   let service: AccountingService;
@@ -57,6 +70,7 @@ describe('AccountingService - Slices 2-5', () => {
       findFirst: jest.Mock;
       findMany: jest.Mock;
     };
+    bankReconciliationSession: { findMany: jest.Mock };
     bankStatement: {
       create: jest.Mock;
       findFirst: jest.Mock;
@@ -71,8 +85,10 @@ describe('AccountingService - Slices 2-5', () => {
     $queryRaw: jest.Mock;
   };
   let auditService: { record: jest.Mock };
+  let approvalWorkflowService: { createRequest: jest.Mock };
   let postingService: {
     createDraftJournal: jest.Mock;
+    lockPostingPeriod: jest.Mock;
     postManualJournal: jest.Mock;
     ensurePostingPeriodIsOpen: jest.Mock;
     generateJournalEntryNumber: jest.Mock;
@@ -82,8 +98,13 @@ describe('AccountingService - Slices 2-5', () => {
   const actor = {
     userId: 'user-1',
     tenantId: 'tenant-1',
-    role: 'ADMIN',
-    permissions: [],
+    roles: ['finance_clerk'],
+    permissions: [
+      'accounting:journals:create',
+      'accounting:fiscal:reopen',
+      'accounting:fiscal:manage',
+      'accounting:reconciliation:manage',
+    ],
   } as unknown as import('../auth/auth.types').AuthContext;
 
   beforeEach(async () => {
@@ -136,6 +157,7 @@ describe('AccountingService - Slices 2-5', () => {
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      bankReconciliationSession: { findMany: jest.fn().mockResolvedValue([]) },
       bankStatement: {
         create: jest.fn(),
         findFirst: jest.fn(),
@@ -152,7 +174,7 @@ describe('AccountingService - Slices 2-5', () => {
         create: jest.fn(),
       },
       $transaction: jest.fn(),
-      $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'fy-1', count: 0 }]),
     };
     prisma.$transaction.mockImplementation(async (input: unknown) =>
       typeof input === 'function'
@@ -163,8 +185,14 @@ describe('AccountingService - Slices 2-5', () => {
     auditService = {
       record: jest.fn().mockResolvedValue(undefined),
     };
+    approvalWorkflowService = {
+      createRequest: jest
+        .fn()
+        .mockResolvedValue({ id: 'fiscal-approval-1', status: 'PENDING' }),
+    };
 
     postingService = {
+      lockPostingPeriod: jest.fn().mockResolvedValue(null),
       createDraftJournal: jest.fn(),
       postManualJournal: jest.fn(),
       ensurePostingPeriodIsOpen: jest.fn().mockResolvedValue(null),
@@ -178,6 +206,7 @@ describe('AccountingService - Slices 2-5', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: auditService },
         { provide: AccountingPostingService, useValue: postingService },
+        { provide: ApprovalWorkflowService, useValue: approvalWorkflowService },
       ],
     }).compile();
 
@@ -626,31 +655,31 @@ describe('AccountingService - Slices 2-5', () => {
   });
 
   describe('reopenFiscalYear', () => {
-    it('should reopen a closed fiscal year', async () => {
+    it('requests independent approval before reopening a closed fiscal year', async () => {
       prisma.fiscalYear.findFirst.mockResolvedValue({
         id: 'fy-1',
         tenantId: 'tenant-1',
+        name: 'Synthetic FY',
         status: 'CLOSED',
+        periods: [{ status: 'CLOSED' }],
       });
-
-      prisma.fiscalYear.update.mockResolvedValue({
-        id: 'fy-1',
-        status: 'OPEN',
-      });
-
       const result = await service.reopenFiscalYear(
         'fy-1',
-        { reason: 'Need to adjust entries' },
+        { reason: 'Adjust audited year' },
         actor,
       );
-
-      expect(result.status).toBe('OPEN');
-      expect(auditService.record).toHaveBeenCalledWith(
+      expect(result.status).toBe('PENDING');
+      expect(approvalWorkflowService.createRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'reopen',
-          resource: 'fiscal_year',
+          workflowType: 'FISCAL_YEAR_REOPEN',
+          targetId: 'fy-1',
+          finalActionKey: 'accounting.fiscal_year.reopen',
+          finalActionPayload: { reason: 'Adjust audited year' },
         }),
+        actor,
       );
+      expect(prisma.fiscalYear.update).not.toHaveBeenCalled();
+      expect(auditService.record).not.toHaveBeenCalled();
     });
 
     it('should reject reopening an open fiscal year', async () => {
@@ -660,7 +689,11 @@ describe('AccountingService - Slices 2-5', () => {
       });
 
       await expect(
-        service.reopenFiscalYear('fy-1', { reason: 'test' }, actor),
+        service.reopenFiscalYear(
+          'fy-1',
+          { reason: 'Attempt to reopen an active year' },
+          actor,
+        ),
       ).rejects.toThrow('Fiscal year is not closed');
     });
   });
@@ -712,6 +745,7 @@ describe('AccountingService - Slices 2-5', () => {
           action: 'import',
           resource: 'bank_statement',
         }),
+        prisma,
       );
     });
 
@@ -760,7 +794,7 @@ describe('AccountingService - Slices 2-5', () => {
 
       expect(result.idempotent).toBe(true);
       expect(result.count).toBe(1);
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
 
     it('rejects duplicate rows inside one import', async () => {
@@ -814,78 +848,17 @@ describe('AccountingService - Slices 2-5', () => {
     });
   });
 
-  describe('reconcileStatement', () => {
-    it('should match a bank statement line to a journal line', async () => {
-      prisma.bankStatement.findFirst
-        .mockResolvedValueOnce({
-          id: 'bs-1',
-          tenantId: 'tenant-1',
-          accountId: 'bank-acc',
-          debitAmount: 500,
-          creditAmount: 0,
-          isReconciled: false,
-        })
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({
-          id: 'bs-1',
-          isReconciled: true,
-          journalLineId: 'jl-1',
-        });
-
-      prisma.journalLine.findFirst.mockResolvedValue({
-        id: 'jl-1',
-        tenantId: 'tenant-1',
-        chartAccountId: 'bank-acc',
-        debit: 500,
-        credit: 0,
-      });
-
-      prisma.bankStatement.updateMany.mockResolvedValue({ count: 1 });
-
-      const result = await service.reconcileStatement('bs-1', 'jl-1', actor);
-
-      expect(result).not.toBeNull();
-      if (!result) throw new Error('Expected a reconciled bank statement');
-      expect(result.isReconciled).toBe(true);
-      expect(result.journalLineId).toBe('jl-1');
-      expect(auditService.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'reconcile',
-          resource: 'bank_statement',
-        }),
-      );
-    });
-
-    it('should reject reconciling already reconciled statement', async () => {
-      prisma.bankStatement.findFirst.mockResolvedValue({
-        id: 'bs-1',
-        tenantId: 'tenant-1',
-        isReconciled: true,
-      });
-
+  describe('session-bound reconciliation', () => {
+    it('rejects legacy direct matching without a reconciliation session', async () => {
       await expect(
         service.reconcileStatement('bs-1', 'jl-1', actor),
-      ).rejects.toThrow('Statement line is already reconciled');
+      ).rejects.toThrow('A reconciliation session is required');
+      expect(prisma.bankStatement.updateMany).not.toHaveBeenCalled();
     });
-
-    it('rejects a journal line whose amount differs from the statement', async () => {
-      prisma.bankStatement.findFirst.mockResolvedValue({
-        id: 'bs-1',
-        tenantId: 'tenant-1',
-        accountId: 'bank-acc',
-        debitAmount: 500,
-        creditAmount: 0,
-        isReconciled: false,
-      });
-      prisma.journalLine.findFirst.mockResolvedValue({
-        id: 'jl-1',
-        debit: 499,
-        credit: 0,
-      });
-
+    it('rejects legacy unmatching without a reconciliation session', async () => {
       await expect(
-        service.reconcileStatement('bs-1', 'jl-1', actor),
-      ).rejects.toThrow('amounts must match');
+        service.unreconcileStatement('bs-1', 'Correction reason', actor),
+      ).rejects.toThrow('A reconciliation session is required');
       expect(prisma.bankStatement.updateMany).not.toHaveBeenCalled();
     });
   });

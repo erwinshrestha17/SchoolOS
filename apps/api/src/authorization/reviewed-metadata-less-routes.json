@@ -29,7 +29,9 @@
     "method": "POST",
     "prefix": "auth",
     "path": "change-password",
-    "guards": ["JwtAuthGuard"]
+    "guards": [
+      "JwtAuthGuard"
+    ]
   },
   {
     "controller": "AuthController",
@@ -37,7 +39,9 @@
     "method": "POST",
     "prefix": "auth",
     "path": "mfa/setup/confirm",
-    "guards": ["JwtAuthGuard"]
+    "guards": [
+      "JwtAuthGuard"
+    ]
   },
   {
     "controller": "AuthController",
@@ -61,7 +65,9 @@
     "method": "GET",
     "prefix": "auth",
     "path": "sessions",
-    "guards": ["JwtAuthGuard"]
+    "guards": [
+      "JwtAuthGuard"
+    ]
   },
   {
     "controller": "AuthController",
@@ -85,7 +91,9 @@
     "method": "GET",
     "prefix": "auth",
     "path": "me",
-    "guards": ["JwtAuthGuard"]
+    "guards": [
+      "JwtAuthGuard"
+    ]
   },
   {
     "controller": "AuthController",
@@ -101,7 +109,9 @@
     "method": "POST",
     "prefix": "auth",
     "path": "mfa/setup/request",
-    "guards": ["JwtAuthGuard"]
+    "guards": [
+      "JwtAuthGuard"
+    ]
   },
   {
     "controller": "AuthController",
@@ -133,7 +143,9 @@
     "method": "POST",
     "prefix": "auth",
     "path": "sessions/revoke-others",
-    "guards": ["JwtAuthGuard"]
+    "guards": [
+      "JwtAuthGuard"
+    ]
   },
   {
     "controller": "AuthController",
@@ -141,7 +153,9 @@
     "method": "POST",
     "prefix": "auth",
     "path": "sessions/:sessionId/revoke",
-    "guards": ["JwtAuthGuard"]
+    "guards": [
+      "JwtAuthGuard"
+    ]
   },
   {
     "controller": "AuthController",
@@ -157,7 +171,9 @@
     "method": "POST",
     "prefix": "auth",
     "path": "verify-password",
-    "guards": ["JwtAuthGuard"]
+    "guards": [
+      "JwtAuthGuard"
+    ]
   },
   {
     "controller": "DemoRequestsController",
@@ -173,7 +189,11 @@
     "method": "GET",
     "prefix": "fees",
     "path": "dashboard-summary",
-    "guards": ["JwtAuthGuard", "RolesPermissionsGuard", "EntitlementGuard"],
+    "guards": [
+      "JwtAuthGuard",
+      "RolesPermissionsGuard",
+      "EntitlementGuard"
+    ],
     "servicePolicy": "FINANCE_DASHBOARD"
   },
   {
@@ -182,7 +202,11 @@
     "method": "POST",
     "prefix": "files",
     "path": ":id/complete-upload",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard",
+      "RolesPermissionsGuard"
+    ],
     "servicePolicy": "FILE_UPLOAD_OWNER"
   },
   {
@@ -191,7 +215,11 @@
     "method": "POST",
     "prefix": "files",
     "path": "signed-upload",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard",
+      "RolesPermissionsGuard"
+    ],
     "servicePolicy": "FILE_MODULE_UPLOAD"
   },
   {
@@ -200,7 +228,11 @@
     "method": "GET",
     "prefix": "files",
     "path": ":id/download",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard",
+      "RolesPermissionsGuard"
+    ],
     "servicePolicy": "FILE_RESOURCE_ACCESS"
   },
   {
@@ -209,7 +241,11 @@
     "method": "GET",
     "prefix": "files",
     "path": ":id/view",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard",
+      "RolesPermissionsGuard"
+    ],
     "servicePolicy": "FILE_RESOURCE_ACCESS"
   },
   {
@@ -218,7 +254,11 @@
     "method": "GET",
     "prefix": "files",
     "path": ":id/signed-download",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard",
+      "RolesPermissionsGuard"
+    ],
     "servicePolicy": "FILE_RESOURCE_ACCESS"
   },
   {
@@ -227,7 +267,11 @@
     "method": "GET",
     "prefix": "files",
     "path": ":id/signed-preview",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard",
+      "RolesPermissionsGuard"
+    ],
     "servicePolicy": "FILE_RESOURCE_ACCESS"
   },
   {
@@ -236,7 +280,11 @@
     "method": "GET",
     "prefix": "files",
     "path": ":id/preview",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard",
+      "RolesPermissionsGuard"
+    ],
     "servicePolicy": "FILE_RESOURCE_ACCESS"
   },
   {
@@ -245,7 +293,11 @@
     "method": "POST",
     "prefix": "files",
     "path": "upload",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard",
+      "RolesPermissionsGuard"
+    ],
     "servicePolicy": "FILE_MODULE_UPLOAD"
   },
   {
@@ -254,7 +306,10 @@
     "method": "GET",
     "prefix": "reference/nepal",
     "path": "local-levels/:id",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard"
+    ]
   },
   {
     "controller": "GeographyController",
@@ -262,7 +317,10 @@
     "method": "GET",
     "prefix": "reference/nepal",
     "path": "version",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard"
+    ]
   },
   {
     "controller": "GeographyController",
@@ -270,7 +328,10 @@
     "method": "GET",
     "prefix": "reference/nepal",
     "path": "districts",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard"
+    ]
   },
   {
     "controller": "GeographyController",
@@ -278,7 +339,10 @@
     "method": "GET",
     "prefix": "reference/nepal",
     "path": "local-levels",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard"
+    ]
   },
   {
     "controller": "GeographyController",
@@ -286,7 +350,10 @@
     "method": "GET",
     "prefix": "reference/nepal",
     "path": "local-level-types",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard"
+    ]
   },
   {
     "controller": "GeographyController",
@@ -294,7 +361,10 @@
     "method": "GET",
     "prefix": "reference/nepal",
     "path": "provinces",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard"
+    ]
   },
   {
     "controller": "GeographyController",
@@ -302,7 +372,10 @@
     "method": "GET",
     "prefix": "reference/nepal",
     "path": "search",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -310,7 +383,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "students/:id/attendance-corrections/:requestId/cancel",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -318,7 +394,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "service-requests/:requestId/cancel",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -326,7 +405,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "students/:id/sandbox-payments/fees",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -334,7 +416,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "service-requests/:requestId/confirm-resolution",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -342,7 +427,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "students/:id/attendance-corrections",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -350,7 +438,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "students/:id/leave-requests",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -358,7 +449,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "students/:id/service-requests",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -366,7 +460,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "me/consents/decision",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -374,7 +471,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "service-requests/:requestId/attachments/:attachmentId",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -382,7 +482,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "me/dashboard",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -390,7 +493,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "me/consents",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -398,7 +504,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "me/notifications/:id/attachment",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -406,7 +515,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "me/notifications/:id",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -414,7 +526,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "me/notifications/unread-count",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -422,7 +537,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "me/action-centre",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -430,7 +548,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/activity-feed",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -438,7 +559,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/attendance-summary",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -446,7 +570,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/canteen",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -454,7 +581,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/documents/:documentId/download-url",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -462,7 +592,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/exam-schedule",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -470,7 +603,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/fees-summary",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -478,7 +614,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/homework",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -486,7 +625,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/homework/:homeworkId/attachments/:attachmentId/download-url",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -494,7 +636,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/homework/:homeworkId/attachments",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -502,7 +647,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/learning-summary",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -510,7 +658,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/library",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -518,7 +669,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/payment-gateway-readiness",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -526,7 +680,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/profile",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -534,7 +691,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/receipts/:receiptNumber.pdf",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -542,7 +702,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/report-cards/:reportCardId.pdf",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -550,7 +713,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/report-cards",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -558,7 +724,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "service-requests/:requestId",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -566,7 +735,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/timetable",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -574,7 +746,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/transport",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -582,7 +757,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/weekly-progress",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -590,7 +768,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "students/:id/payment-intents",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -598,7 +779,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "me/students",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -606,7 +790,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "me/notifications",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -614,7 +801,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/attendance-corrections",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -622,7 +812,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/leave-requests",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -630,7 +823,10 @@
     "method": "GET",
     "prefix": "mobile",
     "path": "students/:id/service-requests",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -638,7 +834,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "me/notifications/mark-all-read",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -646,7 +845,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "me/notifications/:id/read",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -654,7 +856,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "service-requests/:requestId/reopen",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -662,7 +867,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "students/:id/sandbox-payments/canteen-top-up",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobileController",
@@ -670,7 +878,10 @@
     "method": "POST",
     "prefix": "mobile",
     "path": "service-requests/:requestId/attachments",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobilePushTokensController",
@@ -678,7 +889,10 @@
     "method": "POST",
     "prefix": "mobile/push-tokens",
     "path": "",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
   },
   {
     "controller": "MobilePushTokensController",
@@ -686,7 +900,23 @@
     "method": "DELETE",
     "prefix": "mobile/push-tokens",
     "path": ":installationId",
-    "guards": ["JwtAuthGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
+  },
+  {
+    "controller": "PaymentsController",
+    "handler": "executeApprovalRequest",
+    "method": "POST",
+    "prefix": "payments",
+    "path": "requests/:id/execute",
+    "guards": [
+      "JwtAuthGuard",
+      "RolesPermissionsGuard",
+      "EntitlementGuard"
+    ],
+    "servicePolicy": "FINANCE_REQUEST_REVIEW"
   },
   {
     "controller": "PaymentsController",
@@ -694,7 +924,11 @@
     "method": "GET",
     "prefix": "payments",
     "path": "requests",
-    "guards": ["JwtAuthGuard", "RolesPermissionsGuard", "EntitlementGuard"],
+    "guards": [
+      "JwtAuthGuard",
+      "RolesPermissionsGuard",
+      "EntitlementGuard"
+    ],
     "servicePolicy": "FINANCE_REQUEST_REVIEW"
   },
   {
@@ -703,17 +937,25 @@
     "method": "GET",
     "prefix": "payments",
     "path": ":id/allocations",
-    "guards": ["JwtAuthGuard", "RolesPermissionsGuard", "EntitlementGuard"],
+    "guards": [
+      "JwtAuthGuard",
+      "RolesPermissionsGuard",
+      "EntitlementGuard"
+    ],
     "servicePolicy": "PAYMENT_ALLOCATIONS"
   },
   {
     "controller": "PaymentsController",
-    "handler": "reviewApprovalRequest",
-    "method": "POST",
+    "handler": "listPayments",
+    "method": "GET",
     "prefix": "payments",
-    "path": "requests/:id/review",
-    "guards": ["JwtAuthGuard", "RolesPermissionsGuard", "EntitlementGuard"],
-    "servicePolicy": "FINANCE_REQUEST_REVIEW"
+    "path": "",
+    "guards": [
+      "JwtAuthGuard",
+      "RolesPermissionsGuard",
+      "EntitlementGuard"
+    ],
+    "servicePolicy": "PAYMENT_CORRECTION_SOURCE_READ"
   },
   {
     "controller": "PaymentsWebhookController",
@@ -729,7 +971,11 @@
     "method": "PATCH",
     "prefix": "settings",
     "path": ":key",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard", "RolesPermissionsGuard"],
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard",
+      "RolesPermissionsGuard"
+    ],
     "servicePolicy": "SETTING_KEY_WRITE"
   },
   {
@@ -738,6 +984,10 @@
     "method": "GET",
     "prefix": "sync",
     "path": "authority",
-    "guards": ["JwtAuthGuard", "TenantActiveGuard", "EntitlementGuard"]
+    "guards": [
+      "JwtAuthGuard",
+      "TenantActiveGuard",
+      "EntitlementGuard"
+    ]
   }
 ]

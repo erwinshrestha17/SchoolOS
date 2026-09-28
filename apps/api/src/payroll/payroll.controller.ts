@@ -254,6 +254,28 @@ export class PayrollController {
     return this.payrollService.approvePayrollRun(id, auth);
   }
 
+  @Post('runs/:id/validate')
+  @Permissions('payroll:run:validate')
+  validateRun(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.payrollService.validatePayrollRun(id, auth);
+  }
+
+  @Post('runs/:id/finalize')
+  @Permissions('payroll:run:finalize')
+  finalizeRun(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.payrollService.finalizePayrollRun(id, auth);
+  }
+
+  @Post('runs/:id/cancel-finalized')
+  @Permissions('payroll:run:finalize')
+  cancelFinalizedRun(
+    @Param('id') id: string,
+    @Body() dto: PayrollActionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.cancelFinalizedPayrollRun(id, dto, auth);
+  }
+
   @Post('runs/:id/review')
   @Permissions('payroll:run:review')
   reviewRun(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
@@ -261,7 +283,7 @@ export class PayrollController {
   }
 
   @Post('runs/:id/submit-review')
-  @Permissions('payroll:run:review')
+  @Permissions('payroll:run:create')
   submitReview(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.payrollService.submitPayrollRunForReview(id, auth);
   }

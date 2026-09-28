@@ -1,5 +1,18 @@
 export const financePermissions = [
   {
+    resource: "payments:refund",
+    action: "request",
+    description:
+      "Request an independently reviewed and approved payment refund",
+  },
+  {
+    resource: "payments:reverse",
+    action: "request",
+    description:
+      "Request an independently reviewed and approved payment reversal",
+  },
+
+  {
     resource: "fees",
     action: "manage",
     description: "Manage fee heads, plans, and student assignments",

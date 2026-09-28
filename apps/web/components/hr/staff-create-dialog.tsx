@@ -14,6 +14,7 @@ import {
 import { Button } from '../ui/button';
 import { FormField, Input, Select, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
+import { useSession } from '../session-provider';
 import { X, Shield } from 'lucide-react';
 import {
   getNepalSchoolDay,
@@ -38,6 +39,7 @@ type StaffCreateDialogProps = {
 export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { hasPermissions } = useSession();
 
   const [toastError, setToastError] = useState<string | null>(null);
 
@@ -170,10 +172,18 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
       address: formData.address.trim(),
       phone: formData.phone ? normalizeNepalPhone(formData.phone) : undefined,
       teacherRegistryId: optionalTrim(formData.teacherRegistryId),
-      citizenshipNo: optionalTrim(formData.citizenshipNo),
-      panNumber: optionalTrim(formData.panNumber),
-      bankAccount: optionalTrim(formData.bankAccount),
-      bankName: optionalTrim(formData.bankName),
+      citizenshipNo: hasPermissions(['hr:identity:write'])
+        ? optionalTrim(formData.citizenshipNo)
+        : undefined,
+      panNumber: hasPermissions(['hr:tax:write'])
+        ? optionalTrim(formData.panNumber)
+        : undefined,
+      bankAccount: hasPermissions(['hr:bank:write'])
+        ? optionalTrim(formData.bankAccount)
+        : undefined,
+      bankName: hasPermissions(['hr:bank:write'])
+        ? optionalTrim(formData.bankName)
+        : undefined,
       qualifications: optionalTrim(formData.qualifications),
       experience: optionalTrim(formData.experience),
       probationEndDate: optionalTrim(formData.probationEndDate),
@@ -372,6 +382,7 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                 <Input
                   type="text"
                   value={formData.citizenshipNo}
+                  disabled={!hasPermissions(['hr:identity:write'])}
                   onChange={(e) =>
                     handleChange('citizenshipNo', e.target.value)
                   }
@@ -382,6 +393,7 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                 <Input
                   type="text"
                   value={formData.panNumber}
+                  disabled={!hasPermissions(['hr:tax:write'])}
                   onChange={(e) => handleChange('panNumber', e.target.value)}
                   placeholder="Taxpayer identity (PAN)"
                 />
@@ -408,6 +420,7 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                 <Input
                   type="text"
                   value={formData.bankName}
+                  disabled={!hasPermissions(['hr:bank:write'])}
                   onChange={(e) => handleChange('bankName', e.target.value)}
                   placeholder="Standard bank name"
                 />
@@ -416,6 +429,7 @@ export function StaffCreateDialog({ isOpen, onClose }: StaffCreateDialogProps) {
                 <Input
                   type="text"
                   value={formData.bankAccount}
+                  disabled={!hasPermissions(['hr:bank:write'])}
                   onChange={(e) => handleChange('bankAccount', e.target.value)}
                   placeholder="Disbursement account number"
                 />

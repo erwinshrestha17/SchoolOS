@@ -22,6 +22,18 @@ import {
 } from '@nestjs/common';
 import { InvoiceAdjustmentDirection } from './dto/create-invoice-adjustment.dto';
 
+// Transaction authentication is proved with persisted grants/sessions by
+// finance-domain-policy.int-spec.ts; these bounded units exercise domain effects.
+jest.mock('../auth/school-authorization-transaction', () => ({
+  withSchoolAuthorizationTransaction: (
+    prisma: { $transaction: (work: unknown) => unknown },
+    _actor: unknown,
+    _permissions: unknown,
+    _targets: unknown,
+    work: unknown,
+  ) => prisma.$transaction(work),
+}));
+
 describe('FinanceService - Hardening', () => {
   let service: FinanceService;
   let prisma: PrismaService;
@@ -40,6 +52,9 @@ describe('FinanceService - Hardening', () => {
       'payments:reverse',
       'payments:close',
       'payments:collect',
+      'finance:approvals:read',
+      'finance:approvals:review',
+      'finance:approvals:decide',
       'accounting:reconciliation:manage',
       'accounting:journals:post',
       'receipts:manage',
@@ -48,7 +63,41 @@ describe('FinanceService - Hardening', () => {
     authMethod: AuthMethod.PASSWORD,
   };
 
+  let requestState: Record<string, unknown> | null;
+  const requireRequestState = () => {
+    if (!requestState) throw new Error('Synthetic request fixture is missing');
+    return requestState;
+  };
+  const storedApproval = (
+    type: 'REFUND' | 'REVERSAL',
+    amount: number,
+    reason: string,
+    status = 'APPROVED',
+  ) => {
+    requestState = {
+      id: 'fixture-request',
+      tenantId: actor.tenantId,
+      type,
+      paymentId: 'p1',
+      status,
+      requestedById: 'preparer',
+      reviewedById: 'reviewer',
+      approvedById: 'approver',
+      decisions: [{ actorUserId: 'approver' }],
+      requiredApprovalCount: 1,
+      amount: new Prisma.Decimal(amount),
+      reason,
+      sourceFingerprint: 'fixture-source',
+      policyFingerprint: 'fixture-policy',
+      history: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      reviewNote: null,
+      failureMessage: null,
+    };
+  };
   beforeEach(async () => {
+    requestState = null;
     const mockPrisma = {
       payment: {
         findUnique: jest.fn().mockResolvedValue(null),
@@ -97,7 +146,31 @@ describe('FinanceService - Hardening', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
       },
-      journalEntry: { findFirst: jest.fn() },
+      journalEntry: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'j1',
+          status: 'POSTED',
+          lines: [
+            {
+              id: 'l1',
+              chartAccountId: 'acc1',
+              side: 'DEBIT',
+              amount: new Prisma.Decimal(2000),
+              debit: new Prisma.Decimal(2000),
+              credit: new Prisma.Decimal(0),
+            },
+            {
+              id: 'l2',
+              chartAccountId: 'acc2',
+              side: 'CREDIT',
+              amount: new Prisma.Decimal(2000),
+              debit: new Prisma.Decimal(0),
+              credit: new Prisma.Decimal(2000),
+            },
+          ],
+        }),
+      },
+      approvalPolicy: { findMany: jest.fn().mockResolvedValue([]) },
       accountingPeriod: { findFirst: jest.fn().mockResolvedValue(null) },
       receipt: { findFirst: jest.fn(), count: jest.fn() },
       fileAsset: {
@@ -116,11 +189,46 @@ describe('FinanceService - Hardening', () => {
         update: jest.fn(),
       },
       financeApprovalRequest: {
-        findFirst: jest.fn(),
+        findFirst: jest.fn(
+          async ({ where }: { where: Record<string, unknown> }) =>
+            requestState &&
+            (where.id === requestState.id ||
+              where.idempotencyKey === requestState.idempotencyKey ||
+              where.paymentId === requestState.paymentId)
+              ? requestState
+              : null,
+        ),
+        findFirstOrThrow: jest.fn(async () => requestState),
         findMany: jest.fn(),
-        create: jest.fn(),
+        create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          requestState = {
+            ...data,
+            id: 'fixture-request',
+            decisions: [],
+            history: [],
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            reviewNote: null,
+            failureMessage: null,
+          };
+          return requestState;
+        }),
         update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn(
+          async ({ data }: { data: Record<string, unknown> }) => {
+            requestState = { ...requestState, ...data };
+            return { count: 1 };
+          },
+        ),
+      },
+      financeApprovalDecision: {
+        create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          requireRequestState().decisions = [
+            ...(requireRequestState().decisions as Record<string, unknown>[]),
+            data,
+          ];
+          return data;
+        }),
       },
       financeApprovalRequestHistory: { create: jest.fn() },
       feeHead: {
@@ -185,6 +293,7 @@ describe('FinanceService - Hardening', () => {
           provide: AccountingPostingService,
           useValue: {
             postPaymentRefund: jest.fn(),
+            lockPostingPeriod: jest.fn(),
             postReversal: jest.fn().mockResolvedValue({ id: 'rev-1' }),
             postInvoiceAdjustment: jest.fn().mockResolvedValue({ id: 'adj-1' }),
             postManualJournal: jest.fn().mockResolvedValue({ id: 'journal-1' }),
@@ -219,10 +328,13 @@ describe('FinanceService - Hardening', () => {
   });
 
   describe('refundPayment', () => {
-    it('prevents refund exceeding net paid amount', async () => {
+    it('prevents refund request exceeding net paid amount', async () => {
       const mockPayment = {
         id: 'p1',
         invoiceId: 'i1',
+        status: PaymentStatus.SUCCESS,
+        method: 'CASH',
+        allocations: [],
         amount: new Prisma.Decimal(1000),
         refunds: [{ amount: new Prisma.Decimal(600) }],
         invoice: {
@@ -236,24 +348,28 @@ describe('FinanceService - Hardening', () => {
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
       (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue({
         id: 'j1',
-        lines: [{ id: 'l1' }],
+        status: 'POSTED',
+        lines: [],
       });
 
       await expect(
-        service.refundPayment(
+        service.requestRefund(
           'p1',
           {
             amount: '500.00',
-            refundDate: '2026-05-01',
             reason: 'Overpaid',
             idempotencyKey: 'refund-overpaid',
           },
           actor as unknown as Parameters<typeof service.refundPayment>[2],
         ),
-      ).rejects.toThrow('Refund exceeds the remaining refundable amount');
+      ).rejects.toThrow(
+        'The correction exceeds the remaining refundable amount',
+      );
     });
 
     it('returns the original refund for an idempotent replay', async () => {
+      storedApproval('REFUND', 250, 'Correction', 'EXECUTED');
+      requireRequestState().paymentId = 'payment-1';
       (
         prisma.paymentRefund.findFirst as unknown as jest.Mock
       ).mockResolvedValue({
@@ -279,7 +395,7 @@ describe('FinanceService - Hardening', () => {
         {
           amount: '250.00',
           reason: 'Correction',
-          idempotencyKey: 'refund-replay',
+          idempotencyKey: 'finance-request:fixture-request',
         },
         actor as unknown as Parameters<typeof service.refundPayment>[2],
       );
@@ -343,6 +459,7 @@ describe('FinanceService - Hardening', () => {
     });
 
     it('prevents reversal of already refunded payments', async () => {
+      storedApproval('REVERSAL', 1000, 'Error', 'APPROVED');
       const mockPayment = {
         id: 'p1',
         amount: new Prisma.Decimal(1000),
@@ -362,13 +479,17 @@ describe('FinanceService - Hardening', () => {
       await expect(
         service.reversePayment(
           'p1',
-          { reason: 'Error', idempotencyKey: 'reverse-refunded' },
+          {
+            reason: 'Error',
+            idempotencyKey: 'finance-request:fixture-request',
+          },
           actor as unknown as Parameters<typeof service.reversePayment>[2],
         ),
       ).rejects.toThrow(ConflictException);
     });
 
     it('prevents reversal of already reversed payments', async () => {
+      storedApproval('REVERSAL', 1000, 'Incorrect collection', 'APPROVED');
       const mockPayment = {
         id: 'p1',
         amount: new Prisma.Decimal(1000),
@@ -386,7 +507,7 @@ describe('FinanceService - Hardening', () => {
           'p1',
           {
             reason: 'Incorrect collection',
-            idempotencyKey: 'reverse-already',
+            idempotencyKey: 'finance-request:fixture-request',
           },
           actor as unknown as Parameters<typeof service.reversePayment>[2],
         ),
@@ -394,6 +515,7 @@ describe('FinanceService - Hardening', () => {
     });
 
     it('blocks reversal for a closed cashier day', async () => {
+      storedApproval('REVERSAL', 1000, 'Incorrect collection', 'APPROVED');
       const mockPayment = {
         id: 'p1',
         amount: new Prisma.Decimal(1000),
@@ -423,7 +545,7 @@ describe('FinanceService - Hardening', () => {
           'p1',
           {
             reason: 'Incorrect collection',
-            idempotencyKey: 'reverse-closed',
+            idempotencyKey: 'finance-request:fixture-request',
           },
           actor as unknown as Parameters<typeof service.reversePayment>[2],
         ),
@@ -440,6 +562,7 @@ describe('FinanceService - Hardening', () => {
         amount: new Prisma.Decimal(1000),
         status: PaymentStatus.SUCCESS,
         refunds: [],
+        allocations: [],
         tenantId: 't1',
         invoiceId: 'i1',
         paidAt: new Date('2026-05-01T10:00:00.000Z'),
@@ -452,6 +575,7 @@ describe('FinanceService - Hardening', () => {
       (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue({
         id: 'j1',
         entryNumber: 'JE-001',
+        status: 'POSTED',
         lines: [],
       });
       (prisma.paymentAllocation.aggregate as jest.Mock).mockResolvedValue({
@@ -462,11 +586,26 @@ describe('FinanceService - Hardening', () => {
         status: InvoiceStatus.ISSUED,
       });
 
+      await service.requestReversal(
+        'p1',
+        { reason: 'Incorrect charge', idempotencyKey: 'unit-request' },
+        { ...actor, userId: 'preparer' } as never,
+      );
+      await service.reviewApprovalRequest(
+        'fixture-request',
+        { status: 'REVIEWED' },
+        { ...actor, userId: 'reviewer' } as never,
+      );
+      await service.decideApprovalRequest(
+        'fixture-request',
+        { status: 'APPROVED' },
+        { ...actor, userId: 'approver' } as never,
+      );
       await service.reversePayment(
         'p1',
         {
           reason: 'Incorrect charge',
-          idempotencyKey: 'reverse-valid',
+          idempotencyKey: 'finance-request:fixture-request',
         },
         actor as unknown as Parameters<typeof service.reversePayment>[2],
       );
@@ -490,13 +629,15 @@ describe('FinanceService - Hardening', () => {
     });
 
     it('returns the original reversal for an idempotent replay', async () => {
+      storedApproval('REVERSAL', 1000, 'Incorrect charge', 'EXECUTED');
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
         id: 'p1',
         invoiceId: 'i1',
         status: PaymentStatus.REVERSED,
         reversedAt: new Date('2026-05-01T10:00:00.000Z'),
         reversalReason: 'Incorrect charge',
-        reversalIdempotencyKey: 'reverse-replay',
+        amount: new Prisma.Decimal(1000),
+        reversalIdempotencyKey: 'finance-request:fixture-request',
         refunds: [],
         receipt: null,
         invoice: { id: 'i1' },
@@ -506,7 +647,7 @@ describe('FinanceService - Hardening', () => {
         'p1',
         {
           reason: 'Incorrect charge',
-          idempotencyKey: 'reverse-replay',
+          idempotencyKey: 'finance-request:fixture-request',
         },
         actor as unknown as Parameters<typeof service.reversePayment>[2],
       );
@@ -1089,6 +1230,9 @@ describe('FinanceService - Hardening', () => {
     it('creates a PENDING refund approval request successfully', async () => {
       const mockPayment = {
         id: 'p-req-1',
+        allocations: [],
+        method: 'CASH',
+        invoice: null,
         amount: new Prisma.Decimal(2000),
         status: PaymentStatus.SUCCESS,
         refunds: [],
@@ -1098,11 +1242,6 @@ describe('FinanceService - Hardening', () => {
       (prisma.financeApprovalRequest.findFirst as jest.Mock).mockResolvedValue(
         null,
       );
-      (prisma.financeApprovalRequest.create as jest.Mock).mockResolvedValue({
-        id: 'req-refund-1',
-        status: 'PENDING',
-        amount: new Prisma.Decimal(1000),
-      });
 
       const result = await service.requestRefund(
         'p-req-1',
@@ -1123,12 +1262,15 @@ describe('FinanceService - Hardening', () => {
           }),
         }),
       );
-      expect(result.id).toBe('req-refund-1');
+      expect(result.id).toBe('fixture-request');
     });
 
     it('creates a PENDING reversal approval request successfully', async () => {
       const mockPayment = {
         id: 'p-req-2',
+        allocations: [],
+        method: 'CASH',
+        invoice: null,
         amount: new Prisma.Decimal(2000),
         status: PaymentStatus.SUCCESS,
         refunds: [],
@@ -1138,10 +1280,6 @@ describe('FinanceService - Hardening', () => {
       (prisma.financeApprovalRequest.findFirst as jest.Mock).mockResolvedValue(
         null,
       );
-      (prisma.financeApprovalRequest.create as jest.Mock).mockResolvedValue({
-        id: 'req-reverse-1',
-        status: 'PENDING',
-      });
 
       const result = await service.requestReversal(
         'p-req-2',
@@ -1156,100 +1294,24 @@ describe('FinanceService - Hardening', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             type: 'REVERSAL',
-            amount: null,
+            amount: new Prisma.Decimal(2000),
             status: 'PENDING',
           }),
         }),
       );
-      expect(result.id).toBe('req-reverse-1');
+      expect(result.id).toBe('fixture-request');
     });
 
-    it('approves a request and runs actual refund', async () => {
-      const mockRequest = {
-        id: 'req-1',
-        type: 'REFUND',
-        paymentId: 'p1',
-        amount: new Prisma.Decimal(500),
-        reason: 'Double billing',
-        status: 'PENDING',
-        requestedById: 'different-requester',
-      };
-
-      (prisma.financeApprovalRequest.findFirst as jest.Mock).mockResolvedValue(
-        mockRequest,
-      );
-      (prisma.financeApprovalRequest.updateMany as jest.Mock).mockResolvedValue(
-        { count: 1 },
-      );
-      (prisma.financeApprovalRequest.update as jest.Mock).mockResolvedValue({
-        ...mockRequest,
-        status: 'EXECUTED',
-        history: [],
-      });
-
-      // Mock refundPayment dependencies
-      const mockPayment = {
-        id: 'p1',
-        invoiceId: 'i1',
-        amount: new Prisma.Decimal(1000),
-        status: PaymentStatus.SUCCESS,
-        refunds: [],
-        invoice: {
-          id: 'i1',
-          status: InvoiceStatus.PAID,
-          totalAmount: new Prisma.Decimal(1000),
-          payments: [],
-        },
-      };
-      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
-      (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue({
-        id: 'j1',
-        entryNumber: 'JE-001',
-        lines: [
-          {
-            chartAccountId: 'acc-1',
-            amount: new Prisma.Decimal(1000),
-            description: 'Fee payment revenue line',
-            side: 'CREDIT',
-          },
-        ],
-      });
-      (prisma.paymentRefund.count as jest.Mock).mockResolvedValue(0);
-      (prisma.paymentRefund.create as jest.Mock).mockResolvedValue({
-        id: 'refund-1',
-        refundNumber: 'RFD-2026-00001',
-        paymentId: 'p1',
-        amount: new Prisma.Decimal(500),
-        refundDate: new Date('2026-05-01T00:00:00.000Z'),
-      });
-      (prisma.invoice.update as jest.Mock).mockResolvedValue({
-        id: 'i1',
-        status: 'PARTIAL',
-      });
-      (
-        accountingPostingService.postPaymentRefund as jest.Mock
-      ).mockResolvedValue({
-        entryNumber: 'JE-REF-001',
-      });
-
-      const result = await service.reviewApprovalRequest(
-        'req-1',
-        {
-          status: FinanceRequestStatus.APPROVED,
-          reviewNote: 'Approved by principal',
-        },
-        actor as unknown as Parameters<typeof service.reviewApprovalRequest>[2],
-      );
-
-      expect(result.status).toBe('EXECUTED');
-      expect(prisma.financeApprovalRequest.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'req-1' },
-          data: expect.objectContaining({
-            status: 'EXECUTED',
-          }),
-        }),
-      );
+    it('rejects attempts to approve or execute through the review endpoint', async () => {
+      await expect(
+        service.reviewApprovalRequest(
+          'req-1',
+          { status: FinanceRequestStatus.APPROVED },
+          actor as never,
+        ),
+      ).rejects.toThrow('approval and execution are separate actions');
+      expect(prisma.financeApprovalRequest.updateMany).not.toHaveBeenCalled();
+      expect(prisma.paymentRefund.create).not.toHaveBeenCalled();
     });
   });
 
@@ -1421,13 +1483,16 @@ describe('FinanceService - Hardening', () => {
     });
 
     it('does not double-reverse when reversePayment is called concurrently', async () => {
+      storedApproval('REVERSAL', 1000, 'Incorrect charge', 'EXECUTED');
+      requireRequestState().paymentId = 'p-reversed';
       const reversedPayment = {
         id: 'p-reversed',
         invoiceId: 'i1',
         status: PaymentStatus.REVERSED,
         reversedAt: new Date('2026-05-01T10:00:00.000Z'),
         reversalReason: 'Incorrect charge',
-        reversalIdempotencyKey: 'reverse-concurrent',
+        amount: new Prisma.Decimal(1000),
+        reversalIdempotencyKey: 'finance-request:fixture-request',
         refunds: [],
         receipt: null,
         invoice: { id: 'i1' },
@@ -1439,12 +1504,18 @@ describe('FinanceService - Hardening', () => {
       const [first, second] = await Promise.all([
         service.reversePayment(
           'p-reversed',
-          { reason: 'Incorrect charge', idempotencyKey: 'reverse-concurrent' },
+          {
+            reason: 'Incorrect charge',
+            idempotencyKey: 'finance-request:fixture-request',
+          },
           actor as unknown as Parameters<typeof service.reversePayment>[2],
         ),
         service.reversePayment(
           'p-reversed',
-          { reason: 'Incorrect charge', idempotencyKey: 'reverse-concurrent' },
+          {
+            reason: 'Incorrect charge',
+            idempotencyKey: 'finance-request:fixture-request',
+          },
           actor as unknown as Parameters<typeof service.reversePayment>[2],
         ),
       ]);

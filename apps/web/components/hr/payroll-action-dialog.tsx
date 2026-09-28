@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '../ui/dialog';
 import { Button } from '../ui/button';
@@ -16,6 +17,9 @@ import { Toast } from '../ui/toast';
 import { X, ShieldAlert, Landmark, ShieldCheck, Ban } from 'lucide-react';
 
 export type PayrollActionType =
+  | 'VALIDATE'
+  | 'FINALIZE'
+  | 'CANCEL_FINALIZED'
   | 'SUBMIT_REVIEW'
   | 'COMPLETE_REVIEW'
   | 'APPROVE'
@@ -47,6 +51,14 @@ export function PayrollActionDialog({
       const trimmedReason = reason.trim();
 
       switch (actionType) {
+        case 'VALIDATE':
+          return api.validatePayrollRun(runId);
+        case 'FINALIZE':
+          return api.finalizePayrollRun(runId);
+        case 'CANCEL_FINALIZED':
+          return api.cancelFinalizedPayrollRun(runId, {
+            reason: trimmedReason,
+          });
         case 'SUBMIT_REVIEW':
           return api.submitPayrollRunReview(runId);
         case 'COMPLETE_REVIEW':
@@ -84,10 +96,47 @@ export function PayrollActionDialog({
 
   const getActionConfig = () => {
     switch (actionType) {
+      case 'VALIDATE':
+        return {
+          title: 'Validate Payroll',
+          description:
+            'Check current staff, compensation, attendance and policy inputs before submission.',
+          icon: <ShieldCheck size={20} />,
+          warning:
+            'Any blocking exception must be resolved at its source. Validation does not approve payroll.',
+          requiresReason: false,
+          confirmText: 'Validate',
+          confirmVariant: 'default' as const,
+        };
+      case 'FINALIZE':
+        return {
+          title: 'Finalize Payroll',
+          description:
+            'Freeze this independently approved payroll run and issue its payslips.',
+          icon: <ShieldCheck size={20} />,
+          warning:
+            'Source changes since approval require a new review. Finalized calculations remain immutable; a separate posting authority posts them to M11.',
+          requiresReason: false,
+          confirmText: 'Finalize',
+          confirmVariant: 'default' as const,
+        };
+      case 'CANCEL_FINALIZED':
+        return {
+          title: 'Cancel Unposted Payroll',
+          description:
+            'Preserve this finalized run as void and prepare a replacement.',
+          icon: <Ban size={20} />,
+          warning:
+            'This action requires a reason and keeps the original run and void payslips in the audit history. Posted runs require an accounting reversal.',
+          requiresReason: true,
+          confirmText: 'Cancel Run',
+          confirmVariant: 'destructive' as const,
+        };
       case 'SUBMIT_REVIEW':
         return {
           title: 'Submit for Review',
-          description: 'Submit this payroll run for administrative review.',
+          description:
+            'Submit this validated payroll run for independent review.',
           icon: (
             <ShieldAlert
               size={20}
@@ -95,7 +144,7 @@ export function PayrollActionDialog({
             />
           ),
           warning:
-            'This will lock the draft and alert reviewers. No direct edits are allowed during review.',
+            'This submits the validated run. No direct edits are allowed during review.',
           requiresReason: false,
           confirmText: 'Submit Review',
           confirmVariant: 'default' as const,
@@ -104,10 +153,10 @@ export function PayrollActionDialog({
         return {
           title: 'Approve Payroll',
           description:
-            'Approve this payroll run, finalising all earnings, deductions, and net payouts.',
+            'Approve the independently reviewed earnings, deductions and net obligations.',
           icon: <ShieldCheck size={20} className="text-emerald-500" />,
           warning:
-            'Approve locks the calculations. Approved runs are ready for M11 posting and payslip downloads. This action is irreversible.',
+            'A different user from the preparer and reviewer must approve. Finalization is required before payslips or M11 posting.',
           requiresReason: false,
           confirmText: 'Approve',
           confirmVariant: 'default' as const,
@@ -136,7 +185,7 @@ export function PayrollActionDialog({
             'Return this payroll run to generated state so authorised payroll staff can correct it.',
           icon: <Ban size={20} className="text-red-500" />,
           warning:
-            'The correction reason is audited. The run must pass submission and review again before approval.',
+            'The correction reason is audited. The run must pass validation, submission and review again before approval.',
           requiresReason: true,
           confirmText: 'Return for Correction',
           confirmVariant: 'destructive' as const,
@@ -144,7 +193,7 @@ export function PayrollActionDialog({
       case 'POST':
         return {
           title: 'Post to Accounting',
-          description: 'Post this approved payroll run to M11 General Ledger.',
+          description: 'Post this finalized payroll run to M11 General Ledger.',
           icon: <Landmark size={20} className="text-purple-500" />,
           warning:
             'Posting generates the M11 payroll accrual journal entries. This action locks the run against deletions or changes.',
@@ -189,6 +238,9 @@ export function PayrollActionDialog({
               {config.icon}
               {config.title}
             </DialogTitle>
+            <DialogDescription className="mt-2 text-sm">
+              {config.description}
+            </DialogDescription>
             <p className="text-xs text-slate-500 mt-1">
               Run Period:{' '}
               <span className="font-semibold text-slate-800">{periodText}</span>
@@ -196,6 +248,7 @@ export function PayrollActionDialog({
           </div>
           <button
             type="button"
+            aria-label="Close payroll action"
             onClick={onClose}
             className="absolute top-6 right-6 p-2 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
           >

@@ -778,6 +778,8 @@ const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
       'accounting:journals:create',
       'accounting:journals:read',
       'accounting:journals:submit',
+      'accounting:reconciliation:read',
+      'accounting:reconciliation:manage',
       'accounting:reports:read',
       'accounting:settings:read',
       'accounting:settings:update',
@@ -791,6 +793,7 @@ const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
     permissions: [
       'accounting:accounts:read',
       'accounting:journals:read',
+      'accounting:journals:review',
       'accounting:journals:reject',
       'accounting:reports:read',
       'accounting:settings:read',
@@ -799,11 +802,21 @@ const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
   {
     name: 'e2e_accounting_approver',
     email: 'e2e.accounting-approver@schoolos.test',
-    description: 'Local E2E accounting approver and poster',
+    description: 'Local E2E independent accounting approver',
     permissions: [
       'accounting:accounts:read',
       'accounting:journals:read',
       'accounting:journals:approve',
+      'accounting:reports:read',
+    ],
+  },
+  {
+    name: 'e2e_accounting_poster',
+    email: 'e2e.accounting-poster@schoolos.test',
+    description: 'Local E2E independent accounting poster',
+    permissions: [
+      'accounting:accounts:read',
+      'accounting:journals:read',
       'accounting:journals:post',
       'accounting:journals:reverse',
       'accounting:reports:read',
@@ -942,23 +955,23 @@ async function seedE2eRoleUser(
   });
 
   const permissions = await Promise.all(
-    Array.from(new Set(['roles:read', ...roleSeed.permissions])).map(
-      async (permissionKey) => {
-        const parts = permissionKey.split(':');
-        const action = parts.pop();
-        const resource = parts.join(':');
-        if (!resource || !action) {
-          throw new Error(`Invalid E2E permission key: ${permissionKey}`);
-        }
-        const permission = await prisma.permission.findUnique({
-          where: { resource_action: { resource, action } },
-        });
-        if (!permission) {
-          throw new Error(`Missing E2E permission: ${permissionKey}`);
-        }
-        return permission;
-      },
-    ),
+    Array.from(
+      new Set(['roles:read', 'settings:read_public', ...roleSeed.permissions]),
+    ).map(async (permissionKey) => {
+      const parts = permissionKey.split(':');
+      const action = parts.pop();
+      const resource = parts.join(':');
+      if (!resource || !action) {
+        throw new Error(`Invalid E2E permission key: ${permissionKey}`);
+      }
+      const permission = await prisma.permission.findUnique({
+        where: { resource_action: { resource, action } },
+      });
+      if (!permission) {
+        throw new Error(`Missing E2E permission: ${permissionKey}`);
+      }
+      return permission;
+    }),
   );
 
   await prisma.$transaction([
@@ -3293,10 +3306,11 @@ async function seedCanonicalPayslip(
   });
   const run = await prisma.payrollRun.upsert({
     where: {
-      tenantId_periodMonth_periodYear: {
+      tenantId_periodMonth_periodYear_revision: {
         tenantId,
         periodMonth: period.month,
         periodYear: period.year,
+        revision: 1,
       },
     },
     update: {

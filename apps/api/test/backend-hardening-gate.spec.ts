@@ -384,8 +384,9 @@ describe('backend hardening gate', () => {
 
   it('keeps production raw SQL on an exact reviewed inventory with tenant anchors', () => {
     const expectedInventory = {
-      '/accounting/accounting-posting.service.ts': 1,
-      '/accounting/accounting.service.ts': 2,
+      // Phase 2 adds the tenant-anchored fiscal period/year lock for manual journal transitions.
+      '/accounting/accounting-posting.service.ts': 2,
+      '/accounting/accounting.service.ts': 5,
       '/app.service.ts': 1,
       '/auth/auth-account-locks.ts': 2,
       '/auth/school-authorization-transaction.ts': 1,

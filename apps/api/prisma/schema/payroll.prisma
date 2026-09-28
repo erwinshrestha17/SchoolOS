@@ -51,6 +51,8 @@ model PayrollRun {
   fiscalYearId               String?
   periodMonth                Int
   periodYear                 Int
+  revision                   Int              @default(1)
+  predecessorRunId           String?          @unique
   periodStart                DateTime?
   periodEnd                  DateTime?
   status                     PayrollRunStatus @default(DRAFT)
@@ -61,7 +63,14 @@ model PayrollRun {
   pfEmployerAmount           Decimal          @default(0) @db.Decimal(12, 2)
   tdsAmount                  Decimal          @default(0) @db.Decimal(12, 2)
   generatedById              String?
+  validatedById              String?
+  validatedAt                DateTime?
+  reviewedById               String?
+  reviewedAt                 DateTime?
   approvedById               String?
+  finalizedById              String?
+  finalizedAt                DateTime?
+  approvedSourceFingerprint  String?
   postedById                 String?
   paidById                   String?
   approvedAt                 DateTime?
@@ -79,11 +88,13 @@ model PayrollRun {
   tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   fiscalYear FiscalYear?   @relation(fields: [fiscalYearId], references: [id], onDelete: SetNull)
   reversedBy User?         @relation("ReversedPayrollRuns", fields: [reversedById], references: [id], onDelete: SetNull)
+  predecessor PayrollRun? @relation("PayrollRevisions", fields: [predecessorRunId], references: [id], onDelete: Restrict)
+  replacement PayrollRun? @relation("PayrollRevisions")
   lines      PayrollLine[]
   payslips   Payslip[]
   exceptions PayrollException[]
 
-  @@unique([tenantId, periodMonth, periodYear])
+  @@unique([tenantId, periodMonth, periodYear, revision])
   @@index([tenantId, status])
 }
 

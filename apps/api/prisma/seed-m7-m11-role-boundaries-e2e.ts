@@ -72,6 +72,8 @@ const roleSeeds = [
       'accounting:journals:create',
       'accounting:journals:read',
       'accounting:journals:submit',
+      'accounting:reconciliation:read',
+      'accounting:reconciliation:manage',
       'accounting:reports:read',
       'accounting:settings:read',
       'accounting:settings:update',
@@ -84,6 +86,7 @@ const roleSeeds = [
     permissions: [
       'accounting:accounts:read',
       'accounting:journals:read',
+      'accounting:journals:review',
       'accounting:journals:reject',
       'accounting:reports:read',
       'accounting:settings:read',
@@ -96,6 +99,15 @@ const roleSeeds = [
       'accounting:accounts:read',
       'accounting:journals:read',
       'accounting:journals:approve',
+      'accounting:reports:read',
+    ],
+  },
+  {
+    name: 'e2e_accounting_poster',
+    email: 'e2e.accounting-poster@schoolos.test',
+    permissions: [
+      'accounting:accounts:read',
+      'accounting:journals:read',
       'accounting:journals:post',
       'accounting:journals:reverse',
       'accounting:reports:read',
@@ -161,7 +173,9 @@ function assertE2eFixtureAllowed() {
     );
   }
   if (FIXTURE_PASSWORD.length < 12) {
-    throw new Error('The M7/M11 fixture password must be at least 12 characters.');
+    throw new Error(
+      'The M7/M11 fixture password must be at least 12 characters.',
+    );
   }
 }
 
@@ -172,7 +186,10 @@ async function seedRoleUser(
 ) {
   const role = await prisma.role.upsert({
     where: { tenantId_name: { tenantId, name: seed.name } },
-    update: { description: 'Dedicated local E2E role-boundary fixture', isSystem: false },
+    update: {
+      description: 'Dedicated local E2E role-boundary fixture',
+      isSystem: false,
+    },
     create: {
       tenantId,
       name: seed.name,
@@ -182,7 +199,9 @@ async function seedRoleUser(
   });
 
   const permissions = await Promise.all(
-    [...new Set(['roles:read', ...seed.permissions])].map(async (key) => {
+    [
+      ...new Set(['roles:read', 'settings:read_public', ...seed.permissions]),
+    ].map(async (key) => {
       const parts = key.split(':');
       const action = parts.pop();
       const resource = parts.join(':');
@@ -223,7 +242,9 @@ async function seedRoleUser(
       }),
     ),
     prisma.userRole.deleteMany({ where: { tenantId, userId: user.id } }),
-    prisma.userRole.create({ data: { tenantId, userId: user.id, roleId: role.id } }),
+    prisma.userRole.create({
+      data: { tenantId, userId: user.id, roleId: role.id },
+    }),
   ]);
 
   return user;
@@ -237,8 +258,19 @@ async function seedBoundaryTenant(input: {
 }) {
   const tenant = await prisma.tenant.upsert({
     where: { slug: input.slug },
-    update: { name: input.slug, mode: Mode.SINGLE, plan: 'Enterprise', isActive: input.isActive },
-    create: { slug: input.slug, name: input.slug, mode: Mode.SINGLE, plan: 'Enterprise', isActive: input.isActive },
+    update: {
+      name: input.slug,
+      mode: Mode.SINGLE,
+      plan: 'Enterprise',
+      isActive: input.isActive,
+    },
+    create: {
+      slug: input.slug,
+      name: input.slug,
+      mode: Mode.SINGLE,
+      plan: 'Enterprise',
+      isActive: input.isActive,
+    },
   });
   await seedRoleUser(
     tenant.id,
@@ -271,7 +303,8 @@ async function main() {
   }
 
   const selfService = users.get('e2e.staff-self-service@schoolos.test');
-  if (!selfService) throw new Error('Staff self-service fixture was not created.');
+  if (!selfService)
+    throw new Error('Staff self-service fixture was not created.');
   await prisma.staff.upsert({
     where: { userId: selfService.id },
     update: { tenantId: tenant.id, status: 'ACTIVE' },

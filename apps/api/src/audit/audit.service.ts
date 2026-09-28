@@ -3,6 +3,8 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClsService } from 'nestjs-cls';
 import { REQUEST_ID_KEY } from '../common/security/cls-keys';
+import { randomUUID } from 'node:crypto';
+import { safeAuditPayload } from '../authorization/audit/audit-payload';
 
 interface AuditLogInput {
   action: string;
@@ -29,7 +31,15 @@ export class AuditService {
   ) {}
 
   async record(input: AuditLogInput, client: AuditPrismaClient = this.prisma) {
-    const requestId = input.requestId ?? this.cls.get(REQUEST_ID_KEY);
+    const suppliedRequestId: unknown =
+      input.requestId ?? this.cls.get(REQUEST_ID_KEY);
+    const requestId =
+      typeof suppliedRequestId === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        suppliedRequestId,
+      )
+        ? suppliedRequestId
+        : randomUUID();
 
     // Audit rows always carry an explicit tenantId from the caller, and audit
     // writes must succeed on unauthenticated paths too (failed logins, password
@@ -46,11 +56,15 @@ export class AuditService {
             tenantId: input.tenantId,
             userId: input.userId ?? null,
             resourceId: input.resourceId ?? null,
-            before: input.before as Prisma.InputJsonValue | undefined,
-            after: input.after as Prisma.InputJsonValue | undefined,
+            before: safeAuditPayload(input.before) as
+              | Prisma.InputJsonValue
+              | undefined,
+            after: safeAuditPayload(input.after) as
+              | Prisma.InputJsonValue
+              | undefined,
             ipAddress: input.ipAddress ?? null,
             userAgent: input.userAgent ?? null,
-            requestId: requestId ?? null,
+            requestId,
           },
         }),
     );

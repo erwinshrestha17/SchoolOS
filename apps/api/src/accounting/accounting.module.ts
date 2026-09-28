@@ -6,6 +6,7 @@ import { FinanceModule } from '../finance/finance.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { StorageModule } from '../storage/storage.module';
 import { AccountingController } from './accounting.controller';
+import { BankReconciliationService } from './bank-reconciliation.service';
 import { AccountingService } from './accounting.service';
 import { AccountingPostingModule } from './accounting-posting.module';
 import { AccountingReportsController } from './accounting-reports.controller';
@@ -45,6 +46,7 @@ import { AdvancedOperationsModule } from '../advanced-operations/advanced-operat
     AccountingBudgetController,
   ],
   providers: [
+    BankReconciliationService,
     AccountingService,
     AccountingReportsService,
     AccountingReportExportsService,
