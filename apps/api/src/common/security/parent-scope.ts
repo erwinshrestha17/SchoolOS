@@ -147,6 +147,7 @@ export async function requireGuardianCapability(
         some: {
           tenantId: actor.tenantId,
           studentId,
+          student: { tenantId: actor.tenantId },
           ...buildActiveGuardianRelationshipWhere(now, capability),
         },
       },
@@ -157,6 +158,7 @@ export async function requireGuardianCapability(
         where: {
           tenantId: actor.tenantId,
           studentId,
+          student: { tenantId: actor.tenantId },
           ...buildActiveGuardianRelationshipWhere(now, capability),
         },
         select: {

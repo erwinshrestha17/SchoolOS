@@ -473,8 +473,9 @@ describe('P0-01 guardian scoping (real database)', () => {
     });
 
     it('does not treat a shared phone as a cross-school guardian link', async () => {
-      await expect(getParentStudentIds(prisma, parentActor())).resolves.toEqual(
-        [childOneId, childTwoId],
+      const linked = await getParentStudentIds(prisma, parentActor());
+      expect([...(linked ?? [])].sort()).toEqual(
+        [childOneId, childTwoId].sort(),
       );
       await expect(
         requireGuardianCapability(
@@ -484,6 +485,32 @@ describe('P0-01 guardian scoping (real database)', () => {
           GuardianCapability.ACADEMICS_VIEW,
         ),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects a malformed local link to a student owned by another tenant', async () => {
+      const guardian = await prisma.guardian.findFirstOrThrow({
+        where: { tenantId: tenantAId, userId: parentUserId },
+        select: { id: true },
+      });
+      await expect(
+        prisma.runWithoutTenantScope(
+          'attempt a deliberately malformed cross-tenant relationship fixture',
+          () =>
+            prisma.studentGuardian.create({
+              data: {
+                tenantId: tenantAId,
+                guardianId: guardian.id,
+                studentId: foreignChildId,
+                relation: 'FATHER',
+                status: 'ACTIVE',
+                verificationStatus: 'VERIFIED',
+                approvalStatus: 'APPROVED',
+                effectiveFrom: new Date(Date.now() - DAY),
+                capabilities: [GuardianCapability.ACADEMICS_VIEW],
+              },
+            }),
+        ),
+      ).rejects.toThrow('Tenant-owned reference is not available');
     });
 
     it('denies a foreign parent claiming this tenant', async () => {
