@@ -46,7 +46,9 @@ describe('TeacherReplacementService', () => {
         TeacherReplacementService,
         {
           provide: TeacherProfessionalEligibilityService,
-          useValue: { preflightAssignment: jest.fn().mockResolvedValue('assessment-1') },
+          useValue: {
+            preflightAssignment: jest.fn().mockResolvedValue('assessment-1'),
+          },
         },
         {
           provide: PrismaService,
