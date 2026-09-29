@@ -402,6 +402,9 @@ describe('backend hardening gate', () => {
       '/students/student-document-access.service.ts': 1,
       '/students/student-duplicate-review.service.ts': 3,
       '/students/student-search.service.ts': 1,
+      // P0-N3: parameterized call to schoolos_teacher_eligibility_live(); every
+      // table read inside the function is anchored on the tenant argument.
+      '/teacher-scope/teacher-professional-eligibility.service.ts': 1,
     };
     const globalProbeFiles = new Set([
       '/app.service.ts',

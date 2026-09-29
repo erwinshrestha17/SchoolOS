@@ -7,6 +7,10 @@ import { TeacherProfessionalEligibilityService } from '../src/teacher-scope/teac
 import { TeacherCapability } from '../src/teacher-scope/teacher-capability';
 import type { AuditService } from '../src/audit/audit.service';
 import type { AuthContext } from '../src/auth/auth.types';
+import {
+  establishTeacherEligibility,
+  retireEligibilityTenant,
+} from './helpers/teacher-eligibility-fixture';
 
 /**
  * P0-01 teacher assignment matrix, against a real database.
@@ -60,6 +64,7 @@ describe('P0-01 teacher assignment scoping (real database)', () => {
   let teacherUserId: string;
   let teacherStaffId: string;
   let assignmentId: string;
+  let eligibilityAssessmentId: string;
 
   const teacherActor = (): AuthContext =>
     ({
@@ -185,8 +190,20 @@ describe('P0-01 teacher assignment scoping (real database)', () => {
         subjectMathId = math.id;
         subjectSciId = sci.id;
 
+        // P0-N3: an ACTIVE assignment is rejected by the database unless it
+        // references a live professional-eligibility assessment.
+        ({ assessmentId: eligibilityAssessmentId } =
+          await establishTeacherEligibility(prisma, {
+            tenantId: tenantAId,
+            staffId: teacherStaffId,
+            classId: classAId,
+            subjectId: subjectMathId,
+            suffix: SUFFIX,
+          }));
+
         const assignment = await prisma.teacherAssignment.create({
           data: {
+            eligibilityAssessmentId,
             tenantId: tenantAId,
             academicYearId: yearAId,
             staffId: teacherStaffId,
@@ -208,6 +225,9 @@ describe('P0-01 teacher assignment scoping (real database)', () => {
   afterAll(async () => {
     cls.setTenant(undefined);
     await prisma.runWithoutTenantScope('teardown', async () => {
+      await prisma.teacherDelegation.deleteMany({
+        where: { tenantId: { in: [tenantAId, tenantBId] } },
+      });
       await prisma.teacherAssignment.deleteMany({
         where: { academicYear: { name: { contains: SUFFIX } } },
       });
@@ -221,13 +241,12 @@ describe('P0-01 teacher assignment scoping (real database)', () => {
       await prisma.academicYear.deleteMany({
         where: { name: { contains: SUFFIX } },
       });
-      await prisma.staff.deleteMany({ where: { lastName: SUFFIX } });
-      await prisma.user.deleteMany({
-        where: { email: { contains: SUFFIX } },
-      });
-      await prisma.tenant.deleteMany({
-        where: { slug: { contains: SUFFIX } },
-      });
+      // Tenant A's staff, users and tenant are referenced by append-only
+      // eligibility history (policy review, employment, evidence, decisions),
+      // which the database forbids deleting. Retain it and make the tenant
+      // inert; tenant B holds no history and is removed.
+      await retireEligibilityTenant(prisma, tenantAId);
+      await prisma.tenant.deleteMany({ where: { id: tenantBId } });
     });
     await prisma.$disconnect();
   });
@@ -499,6 +518,7 @@ describe('P0-01 teacher assignment scoping (real database)', () => {
           reason: 'Synthetic bounded substitution',
           effectiveFrom: new Date(Date.now() - DAY),
           effectiveUntil: new Date(Date.now() + DAY),
+          eligibilityAssessmentId,
         },
       });
       try {

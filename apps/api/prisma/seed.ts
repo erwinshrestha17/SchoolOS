@@ -48,6 +48,7 @@ import {
   AccountingReportMappingType,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { ensureDemoTeacherEligibility } from './demo-teacher-eligibility';
 import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
 import {
@@ -345,6 +346,24 @@ async function main() {
   await seedCanteenData(tenant.id);
   await seedPlatformInfrastructure();
   await seedM7M11E2eIdentities(tenant.id);
+
+  // P0-N3: ACTIVE teacher assignments require live professional eligibility.
+  // Demo teachers receive clearly-labelled DEMO evidence before the backfill;
+  // the backfill itself never fabricates eligibility.
+  const [demoClassTeachers, demoSubjectTeachers] = await Promise.all([
+    prisma.section.findMany({
+      where: { tenantId: tenant.id, classTeacherId: { not: null } },
+      select: { classTeacherId: true },
+    }),
+    prisma.subjectTeacherAssignment.findMany({
+      where: { tenantId: tenant.id },
+      select: { staffId: true },
+    }),
+  ]);
+  await ensureDemoTeacherEligibility(prisma, tenant.id, [
+    ...demoClassTeachers.map((row) => row.classTeacherId!),
+    ...demoSubjectTeachers.map((row) => row.staffId),
+  ]);
 
   console.log(
     'Backfilling canonical TeacherAssignment rows for smoke fixtures...',

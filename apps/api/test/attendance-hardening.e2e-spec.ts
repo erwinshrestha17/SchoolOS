@@ -342,23 +342,47 @@ describe('Attendance Hardening (E2E)', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    const assignedRegisterRow = () => ({
+      id: 'assign-1',
+      tenantId,
+      staffId: 'staff-1',
+      academicYearId: 'year-2081',
+      assignmentType: 'SUBJECT_TEACHER',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      subjectId: 'sub-1',
+      status: 'ACTIVE',
+      effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
+      effectiveUntil: null,
+      eligibilityAssessmentId: 'eligibility-1',
+    });
+
+    it('denies an assigned teacher whose professional eligibility is not live', async () => {
+      prisma.__state.teacherAssignments = [assignedRegisterRow()];
+      prisma.__state.liveEligibilityAssessments = [];
+
+      await expect(
+        attendanceController.exportMonthlyRegister(
+          {
+            academicYearId: 'year-2081',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            month: 5,
+            year: 2026,
+          },
+          'csv',
+          teacherActor,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it('allows teacher to export a register for their assigned class/section', async () => {
       // Canonical TeacherAssignment row -- authorization now resolves from
-      // this table rather than the legacy SubjectTeacherAssignment one.
-      prisma.__state.teacherAssignments = [
-        {
-          id: 'assign-1',
-          tenantId,
-          staffId: 'staff-1',
-          academicYearId: 'year-2081',
-          assignmentType: 'SUBJECT_TEACHER',
-          classId: 'class-1',
-          sectionId: 'section-1',
-          subjectId: 'sub-1',
-          status: 'ACTIVE',
-          effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
-          effectiveUntil: null,
-        },
+      // this table rather than the legacy SubjectTeacherAssignment one, and
+      // (P0-N3) only while its professional-eligibility assessment is live.
+      prisma.__state.teacherAssignments = [assignedRegisterRow()];
+      prisma.__state.liveEligibilityAssessments = [
+        { tenantId, staffId: 'staff-1', assessmentId: 'eligibility-1' },
       ];
 
       const result = await attendanceController.exportMonthlyRegister(

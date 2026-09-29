@@ -4,6 +4,7 @@ import {
   TeacherDelegationStatus,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { ensureDemoTeacherEligibility } from './demo-teacher-eligibility';
 import 'dotenv/config';
 
 /**
@@ -77,11 +78,16 @@ async function upsertAssignment(
     select: { id: true },
   });
 
+  // P0-N3: ACTIVE assignments require live (demo-labelled) eligibility.
+  const eligibility = await ensureDemoTeacherEligibility(prisma, ctx.tenantId, [
+    input.staffId,
+  ]);
   const data = {
     effectiveFrom: ctx.startsOn,
     effectiveUntil: ctx.endsOn,
     status: 'ACTIVE' as const,
     isPrimary: true,
+    eligibilityAssessmentId: eligibility.get(input.staffId)!,
   };
 
   if (existing) {
@@ -277,7 +283,13 @@ async function main() {
     select: { id: true },
   });
 
+  const recipientEligibility = await ensureDemoTeacherEligibility(
+    prisma,
+    tenant.id,
+    [teacherC.id],
+  );
   const delegationData = {
+    eligibilityAssessmentId: recipientEligibility.get(teacherC.id)!,
     allowedCapabilities: ['MARKS_ENTER', 'PERIOD_ATTENDANCE_MARK'],
     reason: 'Covering Mathematics while the assigned teacher is on leave',
     effectiveFrom: new Date(),

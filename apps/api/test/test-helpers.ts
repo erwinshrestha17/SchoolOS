@@ -357,6 +357,13 @@ export function createPrismaMock() {
     // Canonical assignment tables the TeacherScopeService resolver reads.
     teacherAssignments: [] as Record<string, unknown>[],
     teacherDelegations: [] as Record<string, unknown>[],
+    // P0-N3: assessment ids the fake treats as live for
+    // schoolos_teacher_eligibility_live(); anything else is not live.
+    liveEligibilityAssessments: [] as {
+      tenantId: string;
+      staffId: string;
+      assessmentId: string;
+    }[],
     attendanceSessions: [] as Record<string, unknown>[],
     attendanceRecords: [] as Record<string, unknown>[],
     schoolCalendarDays: [] as Record<string, unknown>[],
@@ -676,6 +683,19 @@ export function createPrismaMock() {
             )
             .map(({ id }) => ({ id })),
         );
+      }
+      if (text.includes('schoolos_teacher_eligibility_live(')) {
+        const [tenantId, staffId, assessmentId] = values;
+        return Promise.resolve([
+          {
+            allowed: state.liveEligibilityAssessments.some(
+              (row) =>
+                row.tenantId === tenantId &&
+                row.staffId === staffId &&
+                row.assessmentId === assessmentId,
+            ),
+          },
+        ]);
       }
       if (text.includes('FROM "User"') && text.includes('FOR UPDATE')) {
         return Promise.resolve(

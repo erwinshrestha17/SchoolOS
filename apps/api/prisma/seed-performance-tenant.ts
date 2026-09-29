@@ -57,6 +57,7 @@ import {
   UserStatus,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { ensureDemoTeacherEligibility } from './demo-teacher-eligibility';
 import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
 import { SCHOOL_CONFIG_OWNER_ROLE } from '@schoolos/core';
@@ -788,6 +789,16 @@ async function seedStaff(
         effectiveFrom,
       });
     }
+  }
+
+  // P0-N3: ACTIVE assignments require live (demo-labelled) eligibility.
+  const eligibility = await ensureDemoTeacherEligibility(
+    prisma,
+    tenantId,
+    teachers.map((teacher) => teacher.staffId),
+  );
+  for (const assignment of assignments) {
+    assignment.eligibilityAssessmentId = eligibility.get(assignment.staffId)!;
   }
 
   await insertInBatches('teacher assignments', assignments, (chunk) =>

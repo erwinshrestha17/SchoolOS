@@ -24,6 +24,12 @@ const prisma = new PrismaClient({ adapter });
  * after further legacy changes just refreshes existing rows rather than
  * duplicating them.
  *
+ * P0-N3: an ACTIVE assignment must reference a live professional-eligibility
+ * assessment (enforced by a database trigger). This backfill never creates or
+ * infers eligibility: it attaches the teacher's most recent assessment only
+ * when the database confirms it is live for that class/subject, and otherwise
+ * skips the row and reports it as blocked until verified evidence exists.
+ *
  * CLASS_TEACHER caveat: Section has no per-academic-year classTeacherId
  * history, so each backfilled row is scoped to the tenant's *current*
  * academic year. Tenants with no current academic year are skipped (logged),
@@ -35,12 +41,40 @@ const prisma = new PrismaClient({ adapter });
  * Teacher Persona spec (4.5), so a null-section legacy row fans out into one
  * TeacherAssignment per section actually belonging to that class.
  */
+async function liveAssessmentFor(input: {
+  tenantId: string;
+  staffId: string;
+  classId: string;
+  subjectId: string | null;
+}): Promise<string | null> {
+  const candidates = await prisma.teacherEligibilityAssessment.findMany({
+    where: {
+      tenantId: input.tenantId,
+      staffId: input.staffId,
+      outcome: 'ELIGIBLE',
+    },
+    orderBy: [{ evaluatedAt: 'desc' }, { id: 'desc' }],
+    select: { id: true },
+    take: 5,
+  });
+  for (const candidate of candidates) {
+    const rows = await prisma.$queryRaw<Array<{ allowed: boolean }>>`
+      SELECT schoolos_teacher_eligibility_live(
+        ${input.tenantId}, ${input.staffId}, ${candidate.id}, now(),
+        ${input.classId}, ${input.subjectId}
+      ) AS allowed`;
+    if (rows[0]?.allowed) return candidate.id;
+  }
+  return null;
+}
+
 async function main() {
   console.log('--- TeacherAssignment backfill: Starting ---');
 
   let classTeacherCount = 0;
   let subjectTeacherCount = 0;
   let skippedTenants = 0;
+  let blockedPendingEligibility = 0;
 
   const tenants = await prisma.tenant.findMany({ select: { id: true } });
 
@@ -75,6 +109,16 @@ async function main() {
           componentScope: null,
         },
       });
+      const eligibilityAssessmentId = await liveAssessmentFor({
+        tenantId,
+        staffId: section.classTeacherId!,
+        classId: section.classId,
+        subjectId: null,
+      });
+      if (!eligibilityAssessmentId) {
+        blockedPendingEligibility += 1;
+        continue;
+      }
       if (existing) {
         await prisma.teacherAssignment.update({
           where: { id: existing.id },
@@ -82,6 +126,7 @@ async function main() {
             effectiveFrom: currentYear.startsOn,
             effectiveUntil: currentYear.endsOn,
             status: 'ACTIVE',
+            eligibilityAssessmentId,
           },
         });
       } else {
@@ -94,6 +139,7 @@ async function main() {
             classId: section.classId,
             sectionId: section.id,
             isPrimary: true,
+            eligibilityAssessmentId,
             effectiveFrom: currentYear.startsOn,
             effectiveUntil: currentYear.endsOn,
           },
@@ -129,6 +175,16 @@ async function main() {
             componentScope: null,
           },
         });
+        const eligibilityAssessmentId = await liveAssessmentFor({
+          tenantId,
+          staffId: assignment.staffId,
+          classId: assignment.classId,
+          subjectId: assignment.subjectId,
+        });
+        if (!eligibilityAssessmentId) {
+          blockedPendingEligibility += 1;
+          continue;
+        }
         if (existing) {
           await prisma.teacherAssignment.update({
             where: { id: existing.id },
@@ -136,6 +192,7 @@ async function main() {
               effectiveFrom: currentYear.startsOn,
               effectiveUntil: currentYear.endsOn,
               status: 'ACTIVE',
+              eligibilityAssessmentId,
             },
           });
         } else {
@@ -149,6 +206,7 @@ async function main() {
               sectionId,
               subjectId: assignment.subjectId,
               isPrimary: true,
+              eligibilityAssessmentId,
               effectiveFrom: currentYear.startsOn,
               effectiveUntil: currentYear.endsOn,
             },
@@ -161,6 +219,11 @@ async function main() {
 
   console.log(`Class Teacher assignments backfilled: ${classTeacherCount}`);
   console.log(`Subject Teacher assignments backfilled: ${subjectTeacherCount}`);
+  if (blockedPendingEligibility > 0) {
+    console.log(
+      `Blocked ${blockedPendingEligibility} assignment(s) pending verified professional eligibility (not activated).`,
+    );
+  }
   if (skippedTenants > 0) {
     console.log(
       `Skipped ${skippedTenants} tenant(s) with no current academic year.`,

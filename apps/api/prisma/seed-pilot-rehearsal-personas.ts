@@ -19,6 +19,7 @@ import {
   UserStatus,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { ensureDemoTeacherEligibility } from './demo-teacher-eligibility';
 import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
 
@@ -154,7 +155,11 @@ async function ensureStaffProfile(
   });
 }
 
-async function upsertTenantSetting(tenantId: string, key: string, value: string) {
+async function upsertTenantSetting(
+  tenantId: string,
+  key: string,
+  value: string,
+) {
   await prisma.tenantSetting.upsert({
     where: { tenantId_key: { tenantId, key } },
     update: { value },
@@ -212,11 +217,18 @@ async function upsertTeacherAssignment(input: {
     select: { id: true },
   });
 
+  // P0-N3: ACTIVE assignments require live (demo-labelled) eligibility.
+  const eligibility = await ensureDemoTeacherEligibility(
+    prisma,
+    input.tenantId,
+    [input.staffId],
+  );
   const data = {
     effectiveFrom: input.effectiveFrom,
     effectiveUntil: input.effectiveUntil,
     status: 'ACTIVE' as const,
     isPrimary: true,
+    eligibilityAssessmentId: eligibility.get(input.staffId)!,
   };
 
   if (existing) {
@@ -410,7 +422,9 @@ async function seedStudentWithGuardian(input: {
 async function main() {
   assertPilotRehearsalFixtureAllowed();
 
-  const tenant = await prisma.tenant.findUnique({ where: { slug: PILOT_SLUG } });
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug: PILOT_SLUG },
+  });
   if (!tenant) {
     throw new Error(
       `Tenant "${PILOT_SLUG}" not found. Run pnpm db:seed:pilot-rehearsal first.`,
@@ -428,7 +442,9 @@ async function main() {
     where: { tenantId: tenant.id, name: 'Class 1' },
   });
   if (!schoolClass) {
-    throw new Error('Class 1 not found. Run pnpm db:seed:pilot-rehearsal first.');
+    throw new Error(
+      'Class 1 not found. Run pnpm db:seed:pilot-rehearsal first.',
+    );
   }
 
   const sectionA = await prisma.section.upsert({
@@ -647,7 +663,9 @@ async function main() {
   console.log(`Sections: ${sectionA.name}, ${sectionB.name}`);
   console.log(`Subjects: ${nepali.name}, ${english.name}, ${mathematics.name}`);
   console.log('Persona credentials: configured for local rehearsal only');
-  console.log('Smoke personas: principal, classteacher.1a, subjectteacher.math,');
+  console.log(
+    'Smoke personas: principal, classteacher.1a, subjectteacher.math,',
+  );
   console.log('  guardian.c01a001, staff, accountant, driver');
   console.log('');
   console.log('Next: pnpm smoke:pilot:rehearsal');
