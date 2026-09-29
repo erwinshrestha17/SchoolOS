@@ -73,12 +73,16 @@ export function IemisHandoffPanel({
   useEffect(() => {
     if (selected && selected.id !== selectedId) setSelectedId(selected.id);
   }, [selected, selectedId]);
+  const selectedHandoffId = selected?.id;
+  const selectedHandoffStatus = selected?.status;
   useEffect(() => {
-    if (selected) setNextStatus(nextStates[selected.status][0] ?? 'EXPORTED');
+    if (selectedHandoffStatus) {
+      setNextStatus(nextStates[selectedHandoffStatus][0] ?? 'EXPORTED');
+    }
     setEvidenceFile(null);
     setReceipt('');
     setNote('');
-  }, [selected?.id, selected?.status]);
+  }, [selectedHandoffId, selectedHandoffStatus]);
 
   const createMutation = useMutation({
     mutationFn: () =>
