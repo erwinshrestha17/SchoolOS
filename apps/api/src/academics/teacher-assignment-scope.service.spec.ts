@@ -46,7 +46,9 @@ function buildService() {
     {} as never,
     {} as never,
     teacherScope,
-    { preflightAssignment: jest.fn().mockResolvedValue('assessment-1') } as never,
+    {
+      preflightAssignment: jest.fn().mockResolvedValue('assessment-1'),
+    } as never,
   );
 
   return { service, findMany, staffFindFirst };
@@ -190,7 +192,9 @@ describe('AcademicsService.assignTeacher', () => {
       {} as never,
       {} as never,
       {} as never,
-      { preflightAssignment: jest.fn().mockResolvedValue('assessment-1') } as never,
+      {
+        preflightAssignment: jest.fn().mockResolvedValue('assessment-1'),
+      } as never,
     );
     const actor = actorFor(['admin'], ['academics:update']);
 
