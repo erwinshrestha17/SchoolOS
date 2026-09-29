@@ -44,6 +44,9 @@ const actor = {
   ],
 };
 
+/** Evidence EntitlementGuard records for `@Entitlement('module.students')`. */
+const studentsEntitlement = { module: 'students', state: 'ENABLED' } as const;
+
 describe('students lifecycle hardening', () => {
   it('creates the student, login, enrollment, lifecycle evidence, and audit atomically', async () => {
     const admissionDate = new Date('2026-04-20T00:00:00.000Z');
@@ -2408,6 +2411,7 @@ describe('students lifecycle hardening', () => {
         rollNumber: 8,
       },
       actor,
+      studentsEntitlement,
     );
 
     expect(prisma.class.findFirst).toHaveBeenCalledWith({
@@ -2525,6 +2529,7 @@ describe('students lifecycle hardening', () => {
         confirmNoDisability: true,
       },
       actor,
+      studentsEntitlement,
     );
 
     expect(prisma.transaction.enrollment.updateMany).toHaveBeenCalledWith({
@@ -2676,6 +2681,7 @@ describe('students lifecycle hardening', () => {
         isPrimary: true,
       },
       actor,
+      studentsEntitlement,
     );
 
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
@@ -2770,6 +2776,7 @@ describe('students lifecycle hardening', () => {
       'guardian-2',
       { isPrimary: true },
       actor,
+      studentsEntitlement,
     );
 
     expect(prisma.transaction.studentGuardian.updateMany).toHaveBeenCalledWith({
@@ -2981,6 +2988,7 @@ describe('students lifecycle hardening', () => {
         restrictionReasonRef: 'family-court-order-24',
       },
       actor,
+      studentsEntitlement,
     );
 
     expect(prisma.transaction.studentGuardian.updateMany).toHaveBeenCalledWith({
@@ -3093,6 +3101,7 @@ describe('students lifecycle hardening', () => {
         emergencyContactPriority: 2,
       },
       actor,
+      studentsEntitlement,
     );
 
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
@@ -4833,8 +4842,46 @@ describe('students lifecycle hardening', () => {
     });
     const { service, fileRegistryService } = buildService(prisma);
 
-    const profile = await service.getStudentProfile(student.id, actor);
+    const fullReader = {
+      ...actor,
+      permissions: [
+        ...actor.permissions,
+        'guardians:read',
+        'ledger:read',
+        'attendance:read',
+        'activity_feed:read',
+      ],
+    };
+    const profile = await service.getStudentProfile(
+      student.id,
+      fullReader,
+      studentsEntitlement,
+    );
 
+    expect(profile.authorization).toEqual(
+      expect.objectContaining({
+        contractVersion: 1,
+        lifecycleState: 'ACTIVE',
+        entitlementState: { module: 'students', state: 'ENABLED' },
+        allowedActions: [
+          'MANAGE_DOCUMENTS',
+          'MANAGE_LIFECYCLE',
+          'UPDATE_PROFILE',
+        ],
+      }),
+    );
+    expect(profile.authorization.authorizedSections).toEqual(
+      expect.arrayContaining([
+        'identity',
+        'guardianContacts',
+        'guardianAdministration',
+        'health',
+        'documents',
+        'fees',
+        'attendance',
+        'activity',
+      ]),
+    );
     expect(prisma.student.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -4933,30 +4980,50 @@ describe('students lifecycle hardening', () => {
     });
     const { service, fileRegistryService } = buildService(prisma);
 
-    const profile = await service.getStudentProfile(student.id, {
-      ...actor,
-      isSupportOverride: true,
-      supportOverrideReadOnly: true,
-      supportOverrideScopes: ['STUDENT_RECORDS' as const],
-    });
-
-    expect(profile.invoices).toEqual([]);
-    expect(profile.documents).toEqual([]);
-    expect(profile.generatedDocuments).toEqual([]);
-    expect(profile.attendanceRecords).toEqual([]);
-    expect(profile.activityPosts).toEqual([]);
-    expect(profile.student).toEqual(
-      expect.objectContaining({
-        medicalConditions: null,
-        severeAllergies: null,
-        medications: null,
-        specialNeeds: null,
-        studentIdentityCode: null,
-        activeIdentity: null,
-        photoVersion: null,
-        qrCredential: null,
-      }),
+    const profile = await service.getStudentProfile(
+      student.id,
+      {
+        ...actor,
+        isSupportOverride: true,
+        supportOverrideReadOnly: true,
+        supportOverrideScopes: ['STUDENT_RECORDS' as const],
+      },
+      studentsEntitlement,
     );
+
+    // Phase 3B: denied sections are absent from the payload, not nulled.
+    for (const key of [
+      'invoices',
+      'documents',
+      'generatedDocuments',
+      'attendanceRecords',
+      'activityPosts',
+    ])
+      expect(profile).not.toHaveProperty(key);
+    for (const key of [
+      'medicalConditions',
+      'severeAllergies',
+      'medications',
+      'specialNeeds',
+      'emergencyName',
+      'emergencyPhone',
+      'doctorName',
+      'doctorPhone',
+      'disabilityFlag',
+      'nationalStudentId',
+      'studentIdentityCode',
+      'activeIdentity',
+      'qrCredential',
+    ])
+      expect(profile.student).not.toHaveProperty(key);
+    expect(profile.student.photoVersion).toBeNull();
+    expect(profile.authorization.allowedActions).toEqual([]);
+    expect(profile.authorization.authorizedSections).toEqual([
+      'guardianAdministration',
+      'guardianContacts',
+      'identity',
+    ]);
+    expect(JSON.stringify(profile)).not.toMatch(/Private|PRIVATE|private-/);
     expect(profile.guardians[0].restrictionReasonRef).toBeNull();
     const supportSelect = prisma.student.findFirst.mock.calls[0][0].select;
     const serializedSelect = JSON.stringify(supportSelect);
@@ -6534,6 +6601,176 @@ describe('Cross-Tenant Access Hardening', () => {
     });
   });
 
+  it('projects an assigned teacher to identity, attendance and verified guardian contacts only (Phase 3B)', async () => {
+    const guardianLink = (
+      id: string,
+      status: GuardianRelationshipStatus,
+      verificationStatus: GuardianRelationshipVerificationStatus,
+    ) => ({
+      guardian: {
+        id,
+        fullName: `Guardian ${id}`,
+        relation: 'mother',
+        primaryPhone: `98000${String(id.length)}0000`,
+        secondaryPhone: null,
+        email: `${id}@example.test`,
+        occupation: 'Private occupation',
+        wardNumber: 'Private ward',
+        privacyConsentAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+      relation: 'mother',
+      isPrimary: id === 'active-verified',
+      capabilities: [GuardianCapability.FEES_PAY],
+      verificationStatus,
+      status,
+      effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+      effectiveUntil: null,
+      emergencyContactPriority: 1,
+      approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+      restrictionReasonRef: 'SAFEGUARD-PRIVATE-REF',
+    });
+    const student = {
+      ...buildStudent({
+        enrollments: [
+          {
+            id: 'enrollment-1',
+            status: EnrollmentStatus.ACTIVE,
+            academicYearId: 'academic-year-1',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            academicYear: { name: '2083' },
+            class: { name: 'Grade 1' },
+            section: { name: 'A' },
+            rollNumber: 7,
+            admissionDate: new Date('2026-04-01T00:00:00.000Z'),
+          },
+        ],
+        guardianLinks: [
+          guardianLink(
+            'active-verified',
+            GuardianRelationshipStatus.ACTIVE,
+            GuardianRelationshipVerificationStatus.VERIFIED,
+          ),
+          guardianLink(
+            'suspended',
+            GuardianRelationshipStatus.SUSPENDED,
+            GuardianRelationshipVerificationStatus.VERIFIED,
+          ),
+          guardianLink(
+            'unverified',
+            GuardianRelationshipStatus.ACTIVE,
+            GuardianRelationshipVerificationStatus.UNVERIFIED,
+          ),
+        ],
+        documents: [{ id: 'private-document' }],
+        generatedDocuments: [{ id: 'generated-private-document' }],
+        invoices: [{ id: 'private-invoice' }],
+        identities: [{ identityCode: 'PRIVATE-CREDENTIAL', status: 'ACTIVE' }],
+      }),
+      medicalConditions: 'Private condition',
+      severeAllergies: 'Private allergy',
+      medications: 'Private medication',
+      specialNeeds: 'Private support note',
+      disabilityFlag: 'Private disability',
+      nationalStudentId: 'PRIVATE-NSID',
+      emergencyName: 'Private contact',
+      emergencyPhone: '9800000001',
+      doctorName: 'Private doctor',
+      doctorPhone: '9800000002',
+      studentIdentityCode: 'PRIVATE-CREDENTIAL',
+    };
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      staffFindFirstResult: { id: 'staff-homeroom-1' },
+      subjectTeacherAssignmentFindFirstResult: null,
+      sectionFindFirstResult: { id: 'section-1' },
+    });
+    const { service } = buildService(prisma);
+
+    const profile = await service.getStudentProfile(
+      student.id,
+      {
+        ...actor,
+        userId: 'teacher-user-1',
+        roles: ['teacher'],
+        permissions: ['students:read', 'attendance:read'],
+      },
+      studentsEntitlement,
+    );
+
+    expect(profile.authorization.authorizedSections).toEqual([
+      'attendance',
+      'guardianContacts',
+      'identity',
+    ]);
+    expect(profile.authorization.allowedActions).toEqual([]);
+    expect(profile.authorization.capabilities).toEqual({
+      UPDATE_PROFILE: false,
+      MANAGE_LIFECYCLE: false,
+      MANAGE_DOCUMENTS: false,
+    });
+    for (const key of [
+      'invoices',
+      'documents',
+      'generatedDocuments',
+      'activityPosts',
+    ])
+      expect(profile).not.toHaveProperty(key);
+    expect(profile).toHaveProperty('attendanceRecords');
+    // Only the ACTIVE + VERIFIED relationship, and only its contact fields.
+    expect(profile.guardians).toEqual([
+      {
+        id: 'active-verified',
+        fullName: 'Guardian active-verified',
+        relation: 'mother',
+        primaryPhone: '98000150000',
+        secondaryPhone: null,
+        email: 'active-verified@example.test',
+        isPrimary: true,
+        emergencyContactPriority: 1,
+      },
+    ]);
+    expect(profile.student.guardians).toEqual(profile.guardians);
+    // No protected value reaches the serialized response by any path.
+    expect(JSON.stringify(profile)).not.toMatch(
+      /Private|PRIVATE|private-|SAFEGUARD|FEES_PAY|9800000001|9800000002/,
+    );
+    // Denied relations were never read (static include, no matching rows).
+    const fullQuery = prisma.student.findFirst.mock.calls[1][0];
+    for (const relation of [
+      'documents',
+      'generatedDocuments',
+      'invoices',
+      'identities',
+      'qrCredentials',
+    ])
+      expect(fullQuery.include[relation].where).toEqual({ id: { in: [] } });
+    expect(prisma.activityPost.findMany).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when no entitlement evidence accompanies the profile request', async () => {
+    const prisma = buildPrisma({ studentFindFirstQueue: [buildStudent()] });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.getStudentProfile('student-1', actor),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    for (const state of ['DISABLED', 'SUSPENDED', 'UNKNOWN'] as const)
+      await expect(
+        service.getStudentProfile('student-1', actor, {
+          module: 'students',
+          state,
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    // Evidence for a different module never enables the students profile.
+    await expect(
+      service.getStudentProfile('student-1', actor, {
+        module: 'fees',
+        state: 'UNKNOWN',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('allows getStudentProfile through the canonical homeroom assignment scope', async () => {
     const student = buildStudent({
       enrollments: [
@@ -6560,12 +6797,16 @@ describe('Cross-Tenant Access Hardening', () => {
     const { service, teacherScopeService } = buildService(prisma);
 
     await expect(
-      service.getStudentProfile(student.id, {
-        ...actor,
-        userId: 'teacher-user-1',
-        roles: ['teacher'],
-        permissions: ['students:read'],
-      }),
+      service.getStudentProfile(
+        student.id,
+        {
+          ...actor,
+          userId: 'teacher-user-1',
+          roles: ['teacher'],
+          permissions: ['students:read'],
+        },
+        studentsEntitlement,
+      ),
     ).resolves.toBeDefined();
     expect(teacherScopeService.requireActorAccess).toHaveBeenCalledWith(
       {

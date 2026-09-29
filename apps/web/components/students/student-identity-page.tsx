@@ -9,10 +9,16 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { LoadingState } from '@/components/ui/loading-state';
 import { SectionCard } from '@/components/ui/section-card';
 import { StudentQrCard } from './profile/student-qr-card';
+import { useSession } from '@/components/session-provider';
+import {
+  authorizationCacheScope,
+  resourceAccess,
+} from '@/lib/resource-authorization';
 
 export function StudentIdentityPage({ studentId }: { studentId: string }) {
+  const { session } = useSession();
   const profileQuery = useQuery({
-    queryKey: ['student-profile', studentId],
+    queryKey: ['student-profile', studentId, authorizationCacheScope(session)],
     queryFn: () => api.getStudentProfile(studentId),
     enabled: Boolean(studentId),
   });
@@ -30,7 +36,13 @@ export function StudentIdentityPage({ studentId }: { studentId: string }) {
     return <LoadingState variant="page" label="Loading student identity..." />;
   }
 
-  if (profileQuery.isError || !profile) {
+  // An absent qrCredential section is "not released to you", never "no
+  // credential exists"; do not render the QR surface without it.
+  if (
+    profileQuery.isError ||
+    !profile ||
+    !resourceAccess(profile.authorization).sees('qrCredential')
+  ) {
     return (
       <EmptyState
         title="Student identity unavailable"

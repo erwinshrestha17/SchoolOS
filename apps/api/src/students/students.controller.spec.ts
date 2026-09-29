@@ -142,15 +142,49 @@ describe('StudentsController M1 contracts', () => {
       ],
     });
 
-    const result = await controller.getStudentProfile('student-1', actor);
+    const result = await controller.getStudentProfile('student-1', actor, [
+      'students',
+    ]);
 
-    expect(service.getStudentProfile).toHaveBeenCalledWith('student-1', actor);
+    expect(service.getStudentProfile).toHaveBeenCalledWith('student-1', actor, {
+      module: 'students',
+      state: 'ENABLED',
+    });
     expect(JSON.stringify(result)).not.toContain('objectKey');
     expect(JSON.stringify(result)).not.toContain('publicUrl');
     expect(result).toEqual({
       student: { id: 'student-1' },
       documents: [{ id: 'doc-1', fileName: 'key.pdf' }],
     });
+  });
+
+  it('reports UNKNOWN entitlement when the guard recorded no students evidence', async () => {
+    const { controller, service } = createController();
+    service.getStudentProfile.mockResolvedValue({
+      student: { id: 'student-1' },
+    });
+
+    await controller.getStudentProfile('student-1', actor, []);
+    await controller.getStudentProfile('student-1', actor, ['fees']);
+
+    expect(service.getStudentProfile).toHaveBeenNthCalledWith(
+      1,
+      'student-1',
+      actor,
+      { module: 'students', state: 'UNKNOWN' },
+    );
+    expect(service.getStudentProfile).toHaveBeenNthCalledWith(
+      2,
+      'student-1',
+      actor,
+      { module: 'students', state: 'UNKNOWN' },
+    );
+  });
+
+  it('keeps the profile routes behind the students module entitlement guard', () => {
+    expect(Reflect.getMetadata('entitlement', StudentsController)).toBe(
+      'module.students',
+    );
   });
 
   it('delegates iEMIS export with tenant-scoped actor context', () => {

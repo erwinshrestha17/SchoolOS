@@ -463,6 +463,8 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       student.id,
       { classId: otherClass.id, confirmNoDisability: true },
       actor,
+      // Evidence EntitlementGuard records for @Entitlement('module.students').
+      { module: 'students', state: 'ENABLED' },
     );
 
     const enrollments = await prisma.enrollment.findMany({

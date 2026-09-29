@@ -3,8 +3,10 @@
 import {
   formatBsDate,
   formatBsDateTime,
+  isSectionAuthorized,
   parseBsDateInput,
   toGregorianDateFromBs,
+  type GuardianProfile,
   type StudentDocument,
   type StudentProfile,
 } from '@schoolos/core';
@@ -32,6 +34,8 @@ import {
 } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '../../lib/api';
+import { authorizationCacheScope } from '../../lib/resource-authorization';
+import { useSession } from '../session-provider';
 import {
   ApiRequestError,
   downloadProtectedFile,
@@ -53,12 +57,14 @@ import { Toast } from '../ui/toast';
 
 export function StudentDocumentsWorkspace() {
   const queryClient = useQueryClient();
+  const { session } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
-  const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(
-    null,
-  );
+  const [selectedStudent, setSelectedStudent] = useState<Omit<
+    StudentProfile,
+    'guardians'
+  > | null>(null);
   const [selectedDocument, setSelectedDocument] =
     useState<StudentDocument | null>(null);
   const [documentKind, setDocumentKind] = useState('BIRTH_CERTIFICATE');
@@ -107,13 +113,21 @@ export function StudentDocumentsWorkspace() {
       }),
   });
   const requestedProfileQuery = useQuery({
-    queryKey: ['student-profile', requestedStudentId],
+    queryKey: [
+      'student-profile',
+      requestedStudentId,
+      authorizationCacheScope(session),
+    ],
     queryFn: () => api.getStudentProfile(requestedStudentId!),
     enabled:
       Boolean(requestedStudentId) && selectedStudent?.id !== requestedStudentId,
   });
   const profileQuery = useQuery({
-    queryKey: ['student-profile', selectedStudent?.id],
+    queryKey: [
+      'student-profile',
+      selectedStudent?.id,
+      authorizationCacheScope(session),
+    ],
     queryFn: () => api.getStudentProfile(selectedStudent!.id),
     enabled: Boolean(selectedStudent),
   });
@@ -155,7 +169,7 @@ export function StudentDocumentsWorkspace() {
   useEffect(() => {
     if (!requestedDocumentId || selectedDocument?.id === requestedDocumentId)
       return;
-    const requestedDocument = profileQuery.data?.documents.find(
+    const requestedDocument = profileQuery.data?.documents?.find(
       (document) => document.id === requestedDocumentId,
     );
     if (requestedDocument) setSelectedDocument(requestedDocument);
@@ -415,6 +429,14 @@ export function StudentDocumentsWorkspace() {
   }
 
   const documents = profileQuery.data?.documents ?? [];
+  // Guardian removal is relationship administration: only rendered when the
+  // server released the full guardian records (guardianAdministration).
+  const guardianAdministration = isSectionAuthorized(
+    profileQuery.data?.authorization,
+    'guardianAdministration',
+  )
+    ? ((profileQuery.data?.guardians ?? []) as GuardianProfile[])
+    : null;
   const verified = documents.filter(
     (document) => document.status === 'VERIFIED',
   ).length;
@@ -679,83 +701,86 @@ export function StudentDocumentsWorkspace() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-black text-slate-950">
-                      Linked Guardians
-                    </h2>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Removing a guardian immediately revokes the student
-                      relationship and triggers a protected-file access review.
+              {guardianAdministration ? (
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-base font-black text-slate-950">
+                        Linked Guardians
+                      </h2>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Removing a guardian immediately revokes the student
+                        relationship and triggers a protected-file access
+                        review.
+                      </p>
+                    </div>
+                    <StatusBadge
+                      status={`${guardianAdministration.length} LINKED`}
+                      tone="info"
+                    />
+                  </div>
+                  {guardianAdministration.length === 0 ? (
+                    <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+                      No guardians are linked.
                     </p>
-                  </div>
-                  <StatusBadge
-                    status={`${profileQuery.data.guardians.length} LINKED`}
-                    tone="info"
-                  />
-                </div>
-                {profileQuery.data.guardians.length === 0 ? (
-                  <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
-                    No guardians are linked.
-                  </p>
-                ) : (
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    {profileQuery.data.guardians.map((guardian) => {
-                      const isOnlyGuardian =
-                        profileQuery.data.guardians.length <= 1;
-                      return (
-                        <article
-                          key={guardian.id}
-                          className="rounded-xl border border-slate-100 bg-slate-50/60 p-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="text-sm font-black text-slate-900">
-                                  {guardian.fullName}
-                                </h3>
-                                {guardian.isPrimary ? (
-                                  <StatusBadge status="PRIMARY" tone="info" />
-                                ) : null}
+                  ) : (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      {guardianAdministration.map((guardian) => {
+                        const isOnlyGuardian =
+                          guardianAdministration.length <= 1;
+                        return (
+                          <article
+                            key={guardian.id}
+                            className="rounded-xl border border-slate-100 bg-slate-50/60 p-4"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="text-sm font-black text-slate-900">
+                                    {guardian.fullName}
+                                  </h3>
+                                  {guardian.isPrimary ? (
+                                    <StatusBadge status="PRIMARY" tone="info" />
+                                  ) : null}
+                                </div>
+                                <p className="mt-1 text-xs font-semibold text-slate-500">
+                                  {guardian.relation} · {guardian.primaryPhone}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {guardian.email ?? 'Email not recorded'}
+                                </p>
                               </div>
-                              <p className="mt-1 text-xs font-semibold text-slate-500">
-                                {guardian.relation} · {guardian.primaryPhone}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {guardian.email ?? 'Email not recorded'}
-                              </p>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={isOnlyGuardian}
+                                title={
+                                  isOnlyGuardian
+                                    ? 'A student must have at least one guardian.'
+                                    : undefined
+                                }
+                                onClick={() => {
+                                  setGuardianToRemove({
+                                    id: guardian.id,
+                                    name: guardian.fullName,
+                                    isPrimary: guardian.isPrimary,
+                                  });
+                                  setGuardianRemovalEvidenceReference('');
+                                  setGuardianRemovalReplacementId('');
+                                  setGuardianRemovalAccessReviewed(false);
+                                }}
+                              >
+                                Revoke access
+                              </Button>
                             </div>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={isOnlyGuardian}
-                              title={
-                                isOnlyGuardian
-                                  ? 'A student must have at least one guardian.'
-                                  : undefined
-                              }
-                              onClick={() => {
-                                setGuardianToRemove({
-                                  id: guardian.id,
-                                  name: guardian.fullName,
-                                  isPrimary: guardian.isPrimary,
-                                });
-                                setGuardianRemovalEvidenceReference('');
-                                setGuardianRemovalReplacementId('');
-                                setGuardianRemovalAccessReviewed(false);
-                              }}
-                            >
-                              Revoke access
-                            </Button>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              ) : null}
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <KpiCard

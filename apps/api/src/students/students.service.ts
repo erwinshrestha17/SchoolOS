@@ -1,6 +1,12 @@
 import { grantAllows } from '../authorization/scopes/scope-resolver';
 import { studentResourceScope } from '../authorization/scopes/student-resource-scope';
 import {
+  authorizeStudentProfile,
+  authorizeSupportStudentProfile,
+  projectStudentProfile,
+  studentProfileSectionDecisions,
+} from './student-profile.projection';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -27,6 +33,7 @@ import {
 } from '@prisma/client';
 import sharp from 'sharp';
 import {
+  type EntitlementState,
   formatBsAcademicYear,
   formatBsDate,
   GUARDIAN_RECOVERY_VERIFICATION_METHODS,
@@ -1003,10 +1010,84 @@ export class StudentsService {
     return pairs.filter((pair) => !pair.blockedReason).length;
   }
 
-  async getStudentProfile(studentId: string, actor: AuthContext) {
+  async getStudentProfile(
+    studentId: string,
+    actor: AuthContext,
+    entitlementState: EntitlementState = {
+      module: 'students',
+      state: 'UNKNOWN',
+    },
+  ) {
     if (actor.isSupportOverride) {
-      return this.getSupportStudentProfile(studentId, actor);
+      return this.getSupportStudentProfile(studentId, actor, entitlementState);
     }
+
+    // Phase 3B: authorize sections from a minimal scope read BEFORE loading
+    // any protected relation, so denied sections are never queried.
+    const scopeRow = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId: actor.tenantId },
+      select: {
+        id: true,
+        tenantId: true,
+        classId: true,
+        sectionId: true,
+        lifecycleStatus: true,
+        enrollments: {
+          select: {
+            academicYearId: true,
+            classId: true,
+            sectionId: true,
+            status: true,
+            effectiveFrom: true,
+            effectiveUntil: true,
+            academicYear: { select: { isCurrent: true } },
+          },
+        },
+      },
+    });
+
+    if (!scopeRow) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const resourceScope = studentResourceScope(scopeRow);
+    if (
+      actor.accessGrants &&
+      !actor.accessGrants.some((grant) =>
+        grantAllows(grant, 'students:read', actor.tenantId, resourceScope),
+      )
+    )
+      throw new NotFoundException('Student not found in this tenant');
+
+    const teacherOnly = isTeacherOnly(actor);
+    if (teacherOnly) {
+      const activeEnrollment = scopeRow.enrollments.find(
+        (enrollment) => enrollment.status === EnrollmentStatus.ACTIVE,
+      );
+      if (!activeEnrollment) {
+        throw createTeacherScopeDeniedException();
+      }
+      await this.requireTeacherAssignedToClassSection(
+        actor,
+        activeEnrollment.classId,
+        activeEnrollment.sectionId,
+        activeEnrollment.academicYearId,
+      );
+    }
+
+    const authorization = authorizeStudentProfile({
+      actor,
+      resource: resourceScope,
+      teacherAssignmentVerified: teacherOnly,
+      lifecycleState: scopeRow.lifecycleStatus ?? null,
+      entitlementState,
+    });
+    if (!authorization.authorizedSections.includes('identity')) {
+      throw new ForbiddenException(
+        'Student profile is not available for this request',
+      );
+    }
+    const allowed = studentProfileSectionDecisions(authorization);
 
     const student = await this.prisma.student.findFirst({
       where: {
@@ -1026,16 +1107,21 @@ export class StudentsService {
             },
           },
         },
+        // Denied sections keep a static include shape but match no rows
+        // (id IN ()), so protected relations are never read.
         guardianLinks: {
+          where: allowed.guardianContacts ? {} : { id: { in: [] } },
           include: {
             guardian: true,
           },
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
         },
         documents: {
+          where: allowed.documents ? {} : { id: { in: [] } },
           orderBy: [{ createdAt: 'desc' }],
         },
         generatedDocuments: {
+          where: allowed.documents ? {} : { id: { in: [] } },
           orderBy: [{ generatedAt: 'desc' }],
         },
         enrollments: {
@@ -1047,6 +1133,7 @@ export class StudentsService {
           orderBy: [{ createdAt: 'desc' }],
         },
         invoices: {
+          where: allowed.fees ? {} : { id: { in: [] } },
           include: {
             lines: {
               include: {
@@ -1064,15 +1151,20 @@ export class StudentsService {
           take: 12,
         },
         attendanceRecords: {
+          where: allowed.attendance ? {} : { id: { in: [] } },
           include: {
             attendanceSession: true,
           },
           orderBy: [{ attendanceSession: { attendanceDate: 'desc' } }],
           take: 30,
         },
-        identities: true,
+        identities: {
+          where: allowed.identityCredentials ? {} : { id: { in: [] } },
+        },
         qrCredentials: {
-          where: { status: 'ACTIVE' },
+          where: allowed.qrCredential
+            ? { status: 'ACTIVE' }
+            : { id: { in: [] } },
           select: {
             id: true,
             status: true,
@@ -1090,38 +1182,7 @@ export class StudentsService {
       throw new NotFoundException('Student not found in this tenant');
     }
 
-    if (
-      actor.accessGrants &&
-      !actor.accessGrants.some((grant) =>
-        grantAllows(
-          grant,
-          'students:read',
-          actor.tenantId,
-          studentResourceScope(student),
-        ),
-      )
-    )
-      throw new NotFoundException('Student not found in this tenant');
-
-    if (isTeacherOnly(actor)) {
-      const activeEnrollment = student.enrollments.find(
-        (enrollment) => enrollment.status === EnrollmentStatus.ACTIVE,
-      );
-      if (!activeEnrollment) {
-        throw createTeacherScopeDeniedException();
-      }
-      await this.requireTeacherAssignedToClassSection(
-        actor,
-        activeEnrollment.classId,
-        activeEnrollment.sectionId,
-        activeEnrollment.academicYearId,
-      );
-    }
-
-    const isSupportOverride = Boolean(actor.isSupportOverride as unknown);
-    const canReadSupportAttendance =
-      actor.supportOverrideScopes?.includes('ATTENDANCE') ?? false;
-    const activityPosts = isSupportOverride
+    const activityPosts = !allowed.activity
       ? []
       : await this.prisma.activityPost.findMany({
           where: {
@@ -1176,7 +1237,9 @@ export class StudentsService {
 
     const photoVersion = student.photoFileId ?? null;
 
-    const guardians = (student.guardianLinks || []).map((link) => ({
+    const guardians = (
+      allowed.guardianContacts ? (student.guardianLinks ?? []) : []
+    ).map((link) => ({
       id: link.guardian.id,
       fullName: link.guardian.fullName,
       relation: link.relation || link.guardian.relation,
@@ -1197,55 +1260,55 @@ export class StudentsService {
       effectiveUntil: link.effectiveUntil?.toISOString() ?? null,
       emergencyContactPriority: link.emergencyContactPriority,
       approvalStatus: link.approvalStatus,
-      restrictionReasonRef: isSupportOverride
-        ? null
-        : link.restrictionReasonRef,
+      restrictionReasonRef: link.restrictionReasonRef,
     }));
 
-    const identities = isSupportOverride
-      ? []
-      : (student.identities || []).filter((id) => id.status === 'ACTIVE');
+    const identities = (
+      allowed.identityCredentials ? (student.identities ?? []) : []
+    ).filter((id) => id.status === 'ACTIVE');
 
-    return {
-      student: {
-        id: student.id,
-        studentSystemId: student.studentSystemId,
-        firstNameEn: student.firstNameEn,
-        lastNameEn: student.lastNameEn,
-        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
-        fullNameNp:
-          [student.firstNameNp, student.lastNameNp].filter(Boolean).join(' ') ||
-          null,
-        gender: student.gender,
-        dateOfBirth: student.dateOfBirth.toISOString(),
-        motherTongue: student.motherTongue,
-        disabilityFlag: student.disabilityFlag,
-        nationalStudentId: student.nationalStudentId,
-        photoVersion: isSupportOverride ? null : photoVersion,
-        className: student.class.name,
-        sectionName: student.sectionRef?.name ?? student.section,
-        class: {
-          id: student.class.id,
-          name: student.class.name,
-        },
-        section: student.sectionRef?.name ?? student.section,
-        rollNumber: student.rollNumber ?? latestEnrollment?.rollNumber ?? null,
-        guardians,
-        lifecycleStatus: student.lifecycleStatus,
-        medicalConditions: isSupportOverride ? null : student.medicalConditions,
-        severeAllergies: isSupportOverride ? null : student.severeAllergies,
-        medications: isSupportOverride ? null : student.medications,
-        specialNeeds: isSupportOverride ? null : student.specialNeeds,
-        emergencyName: isSupportOverride ? null : student.emergencyName,
-        emergencyPhone: isSupportOverride ? null : student.emergencyPhone,
-        doctorName: isSupportOverride ? null : student.doctorName,
-        doctorPhone: isSupportOverride ? null : student.doctorPhone,
-        studentIdentityCode: isSupportOverride
-          ? null
-          : (student.studentIdentityCode ?? null),
-        activeIdentity: identities[0]?.identityCode ?? null,
-        qrCredential:
-          !isSupportOverride && (student.qrCredentials ?? [])[0]
+    return projectStudentProfile(
+      {
+        student: {
+          id: student.id,
+          studentSystemId: student.studentSystemId,
+          firstNameEn: student.firstNameEn,
+          lastNameEn: student.lastNameEn,
+          fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+          fullNameNp:
+            [student.firstNameNp, student.lastNameNp]
+              .filter(Boolean)
+              .join(' ') || null,
+          gender: student.gender,
+          dateOfBirth: student.dateOfBirth.toISOString(),
+          motherTongue: student.motherTongue,
+          disabilityFlag: student.disabilityFlag,
+          nationalStudentId: student.nationalStudentId,
+          photoVersion,
+          className: student.class.name,
+          sectionName: student.sectionRef?.name ?? student.section,
+          class: {
+            id: student.class.id,
+            name: student.class.name,
+          },
+          section: student.sectionRef?.name ?? student.section,
+          rollNumber:
+            student.rollNumber ?? latestEnrollment?.rollNumber ?? null,
+          guardians,
+          lifecycleStatus: student.lifecycleStatus,
+          medicalConditions: student.medicalConditions,
+          severeAllergies: student.severeAllergies,
+          medications: student.medications,
+          specialNeeds: student.specialNeeds,
+          emergencyName: student.emergencyName,
+          emergencyPhone: student.emergencyPhone,
+          doctorName: student.doctorName,
+          doctorPhone: student.doctorPhone,
+          studentIdentityCode: student.studentIdentityCode ?? null,
+          activeIdentity: identities[0]?.identityCode ?? null,
+          qrCredential: (allowed.qrCredential
+            ? (student.qrCredentials ?? [])
+            : [])[0]
             ? {
                 id: student.qrCredentials[0].id,
                 status: student.qrCredentials[0].status,
@@ -1257,48 +1320,50 @@ export class StudentsService {
                 fileAssetId: student.qrCredentials[0].fileAssetId ?? null,
               }
             : null,
-        classTeacher,
-      },
-      guardians,
-      enrollments: (student.enrollments || []).map((enrollment) => ({
-        id: enrollment.id,
-        academicYearId: enrollment.academicYearId,
-        academicYear: enrollment.academicYear?.startsOn
-          ? formatBsAcademicYear(
-              toBsDateFromGregorian(enrollment.academicYear.startsOn),
-            )
-          : enrollment.academicYear?.name,
-        classId: enrollment.classId,
-        className: enrollment.class.name,
-        sectionId: enrollment.sectionId,
-        sectionName: enrollment.section?.name ?? null,
-        rollNumber: enrollment.rollNumber,
-        status: enrollment.status,
-        admissionDate: enrollment.admissionDate.toISOString(),
-        classTeacher:
-          enrollment.sectionId === student.sectionId ? classTeacher : null,
-      })),
-      documents: student.documents.map(toStudentDocumentResponse),
-      generatedDocuments: isSupportOverride
-        ? []
-        : (student.generatedDocuments || []).map((document) => ({
-            id: document.id,
-            studentId: document.studentId,
-            kind: document.kind,
-            title: document.title,
-            fileName: document.fileName,
-            contentType: document.contentType,
-            sizeBytes: document.sizeBytes,
-            generatedById: document.generatedById,
-            generatedAt: document.generatedAt.toISOString(),
-            signedAt: document.signedAt?.toISOString() ?? null,
-            version: document.version,
-            retentionUntil: document.retentionUntil?.toISOString() ?? null,
-            revokedAt: document.revokedAt?.toISOString() ?? null,
-          })),
-      invoices: isSupportOverride
-        ? []
-        : (student.invoices || []).map((invoice) => {
+          classTeacher,
+        },
+        guardians,
+        enrollments: (student.enrollments || []).map((enrollment) => ({
+          id: enrollment.id,
+          academicYearId: enrollment.academicYearId,
+          academicYear: enrollment.academicYear?.startsOn
+            ? formatBsAcademicYear(
+                toBsDateFromGregorian(enrollment.academicYear.startsOn),
+              )
+            : enrollment.academicYear?.name,
+          classId: enrollment.classId,
+          className: enrollment.class.name,
+          sectionId: enrollment.sectionId,
+          sectionName: enrollment.section?.name ?? null,
+          rollNumber: enrollment.rollNumber,
+          status: enrollment.status,
+          admissionDate: enrollment.admissionDate.toISOString(),
+          classTeacher:
+            enrollment.sectionId === student.sectionId ? classTeacher : null,
+        })),
+        documents: (allowed.documents ? (student.documents ?? []) : []).map(
+          toStudentDocumentResponse,
+        ),
+        generatedDocuments: (allowed.documents
+          ? (student.generatedDocuments ?? [])
+          : []
+        ).map((document) => ({
+          id: document.id,
+          studentId: document.studentId,
+          kind: document.kind,
+          title: document.title,
+          fileName: document.fileName,
+          contentType: document.contentType,
+          sizeBytes: document.sizeBytes,
+          generatedById: document.generatedById,
+          generatedAt: document.generatedAt.toISOString(),
+          signedAt: document.signedAt?.toISOString() ?? null,
+          version: document.version,
+          retentionUntil: document.retentionUntil?.toISOString() ?? null,
+          revokedAt: document.revokedAt?.toISOString() ?? null,
+        })),
+        invoices: (allowed.fees ? (student.invoices ?? []) : []).map(
+          (invoice) => {
             const paidAmount = sumStudentProfileNetPaidAmount(invoice.payments);
 
             return {
@@ -1325,72 +1390,76 @@ export class StudentsService {
                 totalAmount: Number(line.totalAmount),
               })),
             };
-          }),
-      attendanceRecords:
-        isSupportOverride && !canReadSupportAttendance
-          ? []
-          : (student.attendanceRecords || []).map((record) => ({
-              id: record.id,
-              attendanceDate: record.attendanceSession.attendanceDate
-                .toISOString()
-                .slice(0, 10),
-              status: record.status,
-              remark: record.remark,
-              lateAt: record.lateAt?.toISOString() ?? null,
-              submittedAt:
-                record.attendanceSession.submittedAt?.toISOString() ?? null,
-            })),
-      activityPosts: activityPosts.map((post) => ({
-        id: post.id,
-        title: post.title,
-        caption: post.caption,
-        category: post.category,
-        audienceType: post.audienceType,
-        classId: post.classId,
-        sectionId: post.sectionId,
-        publishedAt: post.publishedAt?.toISOString() ?? null,
-        attachments: post.attachments.map((attachment) => ({
-          id: attachment.id,
-          fileName: attachment.fileName,
-          contentType: attachment.contentType,
-          sizeBytes: attachment.sizeBytes,
-          sortOrder: attachment.sortOrder,
-          processingStatus: attachment.processingStatus,
-          thumbnailUrl:
-            attachment.thumbnailFileAssetId || attachment.optimizedObjectKey
-              ? buildActivityAttachmentAccessPath(attachment.id, 'thumbnail')
+          },
+        ),
+        attendanceRecords: (allowed.attendance
+          ? (student.attendanceRecords ?? [])
+          : []
+        ).map((record) => ({
+          id: record.id,
+          attendanceDate: record.attendanceSession.attendanceDate
+            .toISOString()
+            .slice(0, 10),
+          status: record.status,
+          remark: record.remark,
+          lateAt: record.lateAt?.toISOString() ?? null,
+          submittedAt:
+            record.attendanceSession.submittedAt?.toISOString() ?? null,
+        })),
+        activityPosts: activityPosts.map((post) => ({
+          id: post.id,
+          title: post.title,
+          caption: post.caption,
+          category: post.category,
+          audienceType: post.audienceType,
+          classId: post.classId,
+          sectionId: post.sectionId,
+          publishedAt: post.publishedAt?.toISOString() ?? null,
+          attachments: post.attachments.map((attachment) => ({
+            id: attachment.id,
+            fileName: attachment.fileName,
+            contentType: attachment.contentType,
+            sizeBytes: attachment.sizeBytes,
+            sortOrder: attachment.sortOrder,
+            processingStatus: attachment.processingStatus,
+            thumbnailUrl:
+              attachment.thumbnailFileAssetId || attachment.optimizedObjectKey
+                ? buildActivityAttachmentAccessPath(attachment.id, 'thumbnail')
+                : null,
+            previewUrl: attachment.fileAssetId
+              ? buildActivityAttachmentAccessPath(attachment.id, 'preview')
               : null,
-          previewUrl: attachment.fileAssetId
-            ? buildActivityAttachmentAccessPath(attachment.id, 'preview')
-            : null,
-          accessBlockedReason: null,
+            accessBlockedReason: null,
+          })),
+          studentTags: post.studentTags.map((tag) => ({
+            studentId: tag.studentId,
+            student: tag.student
+              ? {
+                  id: tag.student.id,
+                  studentSystemId: tag.student.studentSystemId,
+                  firstNameEn: tag.student.firstNameEn,
+                  lastNameEn: tag.student.lastNameEn,
+                }
+              : undefined,
+          })),
+          reactions: post.reactions.map((reaction) => ({
+            id: reaction.id,
+            activityPostId: reaction.activityPostId,
+            guardianId: reaction.guardianId,
+            studentId: reaction.studentId,
+            reaction: reaction.reaction,
+            createdAt: reaction.createdAt.toISOString(),
+          })),
         })),
-        studentTags: post.studentTags.map((tag) => ({
-          studentId: tag.studentId,
-          student: tag.student
-            ? {
-                id: tag.student.id,
-                studentSystemId: tag.student.studentSystemId,
-                firstNameEn: tag.student.firstNameEn,
-                lastNameEn: tag.student.lastNameEn,
-              }
-            : undefined,
-        })),
-        reactions: post.reactions.map((reaction) => ({
-          id: reaction.id,
-          activityPostId: reaction.activityPostId,
-          guardianId: reaction.guardianId,
-          studentId: reaction.studentId,
-          reaction: reaction.reaction,
-          createdAt: reaction.createdAt.toISOString(),
-        })),
-      })),
-    };
+      },
+      authorization,
+    );
   }
 
   private async getSupportStudentProfile(
     studentId: string,
     actor: AuthContext,
+    entitlementState: EntitlementState,
   ) {
     if (!actor.supportOverrideScopes?.includes('STUDENT_RECORDS')) {
       throw new ForbiddenException(
@@ -1505,67 +1574,75 @@ export class StudentsService {
     }));
     const latestEnrollment = student.enrollments[0] ?? null;
 
-    return {
-      student: {
-        id: student.id,
-        studentSystemId: student.studentSystemId,
-        firstNameEn: student.firstNameEn,
-        lastNameEn: student.lastNameEn,
-        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
-        fullNameNp:
-          [student.firstNameNp, student.lastNameNp].filter(Boolean).join(' ') ||
-          null,
-        gender: student.gender,
-        dateOfBirth: student.dateOfBirth.toISOString(),
-        motherTongue: student.motherTongue,
-        disabilityFlag: null,
-        nationalStudentId: null,
-        photoVersion: null,
-        className: student.class.name,
-        sectionName: student.sectionRef?.name ?? student.section,
-        class: { id: student.class.id, name: student.class.name },
-        section: student.sectionRef?.name ?? student.section,
-        rollNumber: student.rollNumber ?? latestEnrollment?.rollNumber ?? null,
+    return projectStudentProfile(
+      {
+        student: {
+          id: student.id,
+          studentSystemId: student.studentSystemId,
+          firstNameEn: student.firstNameEn,
+          lastNameEn: student.lastNameEn,
+          fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+          fullNameNp:
+            [student.firstNameNp, student.lastNameNp]
+              .filter(Boolean)
+              .join(' ') || null,
+          gender: student.gender,
+          dateOfBirth: student.dateOfBirth.toISOString(),
+          motherTongue: student.motherTongue,
+          disabilityFlag: null,
+          nationalStudentId: null,
+          photoVersion: null,
+          className: student.class.name,
+          sectionName: student.sectionRef?.name ?? student.section,
+          class: { id: student.class.id, name: student.class.name },
+          section: student.sectionRef?.name ?? student.section,
+          rollNumber:
+            student.rollNumber ?? latestEnrollment?.rollNumber ?? null,
+          guardians,
+          lifecycleStatus: student.lifecycleStatus,
+          medicalConditions: null,
+          severeAllergies: null,
+          medications: null,
+          specialNeeds: null,
+          emergencyName: null,
+          emergencyPhone: null,
+          doctorName: null,
+          doctorPhone: null,
+          studentIdentityCode: null,
+          activeIdentity: null,
+          qrCredential: null,
+          classTeacher,
+        },
         guardians,
-        lifecycleStatus: student.lifecycleStatus,
-        medicalConditions: null,
-        severeAllergies: null,
-        medications: null,
-        specialNeeds: null,
-        emergencyName: null,
-        emergencyPhone: null,
-        doctorName: null,
-        doctorPhone: null,
-        studentIdentityCode: null,
-        activeIdentity: null,
-        qrCredential: null,
-        classTeacher,
+        enrollments: student.enrollments.map((enrollment) => ({
+          id: enrollment.id,
+          academicYearId: enrollment.academicYearId,
+          academicYear: enrollment.academicYear.startsOn
+            ? formatBsAcademicYear(
+                toBsDateFromGregorian(enrollment.academicYear.startsOn),
+              )
+            : enrollment.academicYear.name,
+          classId: enrollment.classId,
+          className: enrollment.class.name,
+          sectionId: enrollment.sectionId,
+          sectionName: enrollment.section?.name ?? null,
+          rollNumber: enrollment.rollNumber,
+          status: enrollment.status,
+          admissionDate: enrollment.admissionDate.toISOString(),
+          classTeacher:
+            enrollment.sectionId === student.sectionId ? classTeacher : null,
+        })),
+        documents: [],
+        generatedDocuments: [],
+        invoices: [],
+        attendanceRecords: [],
+        activityPosts: [],
       },
-      guardians,
-      enrollments: student.enrollments.map((enrollment) => ({
-        id: enrollment.id,
-        academicYearId: enrollment.academicYearId,
-        academicYear: enrollment.academicYear.startsOn
-          ? formatBsAcademicYear(
-              toBsDateFromGregorian(enrollment.academicYear.startsOn),
-            )
-          : enrollment.academicYear.name,
-        classId: enrollment.classId,
-        className: enrollment.class.name,
-        sectionId: enrollment.sectionId,
-        sectionName: enrollment.section?.name ?? null,
-        rollNumber: enrollment.rollNumber,
-        status: enrollment.status,
-        admissionDate: enrollment.admissionDate.toISOString(),
-        classTeacher:
-          enrollment.sectionId === student.sectionId ? classTeacher : null,
-      })),
-      documents: [],
-      generatedDocuments: [],
-      invoices: [],
-      attendanceRecords: [],
-      activityPosts: [],
-    };
+      authorizeSupportStudentProfile({
+        lifecycleState: student.lifecycleStatus ?? null,
+        entitlementState,
+      }),
+    );
   }
 
   async getAttendanceHistory(
@@ -1686,6 +1763,7 @@ export class StudentsService {
     studentId: string,
     dto: UpdateStudentDto,
     actor: AuthContext,
+    entitlementState?: EntitlementState,
   ) {
     if (Object.prototype.hasOwnProperty.call(dto, 'studentSystemId')) {
       throw new BadRequestException('studentSystemId is immutable');
@@ -2058,7 +2136,7 @@ export class StudentsService {
       throw error;
     }
 
-    return this.getStudentProfile(student.id, actor);
+    return this.getStudentProfile(student.id, actor, entitlementState);
   }
 
   async updateStudentGuardian(
@@ -2066,6 +2144,7 @@ export class StudentsService {
     guardianId: string,
     dto: UpdateStudentGuardianDto,
     actor: AuthContext,
+    entitlementState?: EntitlementState,
   ) {
     this.assertGuardianAccessWriteAllowed(dto, actor);
     try {
@@ -2279,13 +2358,14 @@ export class StudentsService {
       throw error;
     }
 
-    return this.getStudentProfile(studentId, actor);
+    return this.getStudentProfile(studentId, actor, entitlementState);
   }
 
   async addStudentGuardian(
     studentId: string,
     dto: CreateStudentGuardianDto,
     actor: AuthContext,
+    entitlementState?: EntitlementState,
   ) {
     this.assertGuardianAccessWriteAllowed(dto, actor);
     const relation = assertNonEmpty(dto.relation, 'relation');
@@ -2434,7 +2514,7 @@ export class StudentsService {
       throw error;
     }
 
-    return this.getStudentProfile(studentId, actor);
+    return this.getStudentProfile(studentId, actor, entitlementState);
   }
 
   async getGuardianAccessAdministration(

@@ -81,7 +81,11 @@ describe('Student iEMIS readiness contract', () => {
       detail,
       /setQueryData\(\[['"]student-iemis-readiness['"]/,
     );
-    assert.match(detail, /hasPermissions\(\[["']students:update["']\]\)/);
+    // Edit is offered only when the server projection allows UPDATE_PROFILE.
+    assert.match(
+      detail,
+      /canEditStudent = access\.can\(['"]UPDATE_PROFILE['"]\)/,
+    );
     assert.match(header, /canEdit \? \(/);
     assert.match(
       header,

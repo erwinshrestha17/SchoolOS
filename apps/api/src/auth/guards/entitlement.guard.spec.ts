@@ -161,4 +161,68 @@ describe('EntitlementGuard (DEF-06)', () => {
       /The module 'students' is not included in your school's subscription plan/,
     );
   });
+
+  describe('Phase 3A entitlement evidence', () => {
+    function contextWithRequest(request: Record<string, unknown>) {
+      return {
+        switchToHttp: () => ({ getRequest: () => request }),
+        getHandler: () => ({}),
+        getClass: () => ({}),
+      } as ExecutionContext;
+    }
+
+    it('records only keys it verified, without the module. prefix', async () => {
+      mockMetadata({ featureKey: 'module.students' });
+      plansService.getTenantStatus.mockResolvedValue({
+        id: 'tenant-1',
+        isActive: true,
+      });
+      plansService.checkFeatureEnabled.mockResolvedValue({ allowed: true });
+      const request: Record<string, unknown> = {
+        auth: { tenantId: 'tenant-1' },
+      };
+
+      await expect(
+        guard.canActivate(contextWithRequest(request)),
+      ).resolves.toBe(true);
+      expect(request.entitlementEvidence).toEqual(['students']);
+    });
+
+    it('records nothing when the entitlement is denied', async () => {
+      mockMetadata({ featureKey: 'module.students' });
+      plansService.getTenantStatus.mockResolvedValue({
+        id: 'tenant-1',
+        isActive: true,
+      });
+      plansService.checkFeatureEnabled.mockResolvedValue({ allowed: false });
+      const request: Record<string, unknown> = {
+        auth: { tenantId: 'tenant-1' },
+      };
+
+      await expect(
+        guard.canActivate(contextWithRequest(request)),
+      ).rejects.toThrow(ForbiddenException);
+      expect(request.entitlementEvidence).toBeUndefined();
+    });
+
+    it('records nothing for the platform bypass or an opted-out route', async () => {
+      mockMetadata({ noModuleEntitlement: 'reason' });
+      plansService.getTenantStatus.mockResolvedValue({
+        id: 'tenant-1',
+        isActive: true,
+      });
+      const platform: Record<string, unknown> = {
+        auth: { tenantId: 'platform' },
+      };
+      const optedOut: Record<string, unknown> = {
+        auth: { tenantId: 'tenant-1' },
+      };
+
+      await guard.canActivate(contextWithRequest(platform));
+      await guard.canActivate(contextWithRequest(optedOut));
+
+      expect(platform.entitlementEvidence).toBeUndefined();
+      expect(optedOut.entitlementEvidence).toBeUndefined();
+    });
+  });
 });

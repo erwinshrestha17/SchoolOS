@@ -6,6 +6,7 @@ import type {
   StudentDuplicateReviewMetadata,
 } from "./common.js";
 import type { PermissionKey } from "../permissions.js";
+import type { StudentProfileAuthorization } from "../authorization-contract.js";
 
 export type GuardianProfile = {
   id: string;
@@ -373,18 +374,43 @@ export type StudentProfileAttendanceRecord = {
   submittedAt: string | null;
 };
 
+/** Guardian fields released by the `guardianContacts` section. */
+export type GuardianContactProfile = Pick<
+  GuardianProfile,
+  | "id"
+  | "fullName"
+  | "relation"
+  | "primaryPhone"
+  | "secondaryPhone"
+  | "email"
+  | "isPrimary"
+  | "emergencyContactPriority"
+>;
+
+/** Administrative guardian fields are present only with `guardianAdministration`. */
+export type ProjectedGuardianProfile = GuardianContactProfile &
+  Partial<Omit<GuardianProfile, keyof GuardianContactProfile>>;
+
+/**
+ * `GET /students/:id` (Phase 3B server projection). Section-bearing keys are
+ * OMITTED unless `authorization.authorizedSections` lists their section, so
+ * every section key is optional. `authorization` is absent only from an older
+ * server; readers must then treat every section and action as denied.
+ */
 export type StudentProfileDetail = {
-  student: StudentProfile & {
+  student: Omit<StudentProfile, "guardians"> & {
     lifecycleStatus?: string;
     classTeacher?: StudentClassTeacherSummary;
+    guardians?: ProjectedGuardianProfile[];
   };
-  guardians: GuardianProfile[];
+  guardians?: ProjectedGuardianProfile[];
   enrollments: StudentProfileEnrollment[];
-  documents: StudentDocument[];
-  generatedDocuments: GeneratedStudentDocumentMeta[];
-  invoices: StudentProfileInvoice[];
-  attendanceRecords: StudentProfileAttendanceRecord[];
-  activityPosts: ActivityPost[];
+  documents?: StudentDocument[];
+  generatedDocuments?: GeneratedStudentDocumentMeta[];
+  invoices?: StudentProfileInvoice[];
+  attendanceRecords?: StudentProfileAttendanceRecord[];
+  activityPosts?: ActivityPost[];
+  authorization?: StudentProfileAuthorization;
 };
 
 export type UpdateStudentProfilePayload = {

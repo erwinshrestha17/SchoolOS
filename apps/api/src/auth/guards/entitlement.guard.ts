@@ -121,6 +121,15 @@ export class EntitlementGuard implements CanActivate {
       }
     }
 
+    // Phase 3A: record only keys this guard actually verified, so response
+    // projections can report entitlementState from evidence, never assumption.
+    const verified = [requiredModule, requiredFeature, featureKey]
+      .filter((key): key is string => typeof key === 'string' && key !== '')
+      .map((key) => key.replace(/^module\./, ''));
+    request.entitlementEvidence = [
+      ...new Set([...(request.entitlementEvidence ?? []), ...verified]),
+    ];
+
     return true;
   }
 }

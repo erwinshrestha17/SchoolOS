@@ -23,6 +23,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
+import {
+  EntitlementEvidence,
+  entitlementStateFromEvidence,
+} from '../auth/decorators/entitlement-evidence.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
@@ -155,10 +159,12 @@ export class StudentsController {
   async getStudentProfile(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
+    @EntitlementEvidence() entitlementEvidence: readonly string[],
   ) {
     const profile = await this.studentsService.getStudentProfile(
       studentId,
       auth,
+      entitlementStateFromEvidence(entitlementEvidence, 'students'),
     );
     return sanitizeStudentProfileResponse(profile);
   }
@@ -174,12 +180,20 @@ export class StudentsController {
 
   @Patch(':id')
   @Permissions('students:update')
-  updateStudent(
+  async updateStudent(
     @Param('id') studentId: string,
     @Body() dto: UpdateStudentDto,
     @CurrentAuth() auth: AuthContext,
+    @EntitlementEvidence() entitlementEvidence: readonly string[],
   ) {
-    return this.studentsService.updateStudent(studentId, dto, auth);
+    return sanitizeStudentProfileResponse(
+      await this.studentsService.updateStudent(
+        studentId,
+        dto,
+        auth,
+        entitlementStateFromEvidence(entitlementEvidence, 'students'),
+      ),
+    );
   }
 
   @Patch(':id/guardians/:guardianId')
@@ -190,17 +204,21 @@ export class StudentsController {
       ttl: GUARDIAN_ADMIN_RATE_TTL_MS,
     },
   })
-  updateStudentGuardian(
+  async updateStudentGuardian(
     @Param('id') studentId: string,
     @Param('guardianId') guardianId: string,
     @Body() dto: UpdateStudentGuardianDto,
     @CurrentAuth() auth: AuthContext,
+    @EntitlementEvidence() entitlementEvidence: readonly string[],
   ) {
-    return this.studentsService.updateStudentGuardian(
-      studentId,
-      guardianId,
-      dto,
-      auth,
+    return sanitizeStudentProfileResponse(
+      await this.studentsService.updateStudentGuardian(
+        studentId,
+        guardianId,
+        dto,
+        auth,
+        entitlementStateFromEvidence(entitlementEvidence, 'students'),
+      ),
     );
   }
 
@@ -212,12 +230,20 @@ export class StudentsController {
       ttl: GUARDIAN_ADMIN_RATE_TTL_MS,
     },
   })
-  addStudentGuardian(
+  async addStudentGuardian(
     @Param('id') studentId: string,
     @Body() dto: CreateStudentGuardianDto,
     @CurrentAuth() auth: AuthContext,
+    @EntitlementEvidence() entitlementEvidence: readonly string[],
   ) {
-    return this.studentsService.addStudentGuardian(studentId, dto, auth);
+    return sanitizeStudentProfileResponse(
+      await this.studentsService.addStudentGuardian(
+        studentId,
+        dto,
+        auth,
+        entitlementStateFromEvidence(entitlementEvidence, 'students'),
+      ),
+    );
   }
 
   @Get(':id/guardians/:guardianId/access-administration')

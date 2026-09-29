@@ -71,8 +71,8 @@ export function ProfileHeader({
     `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() ||
     'Student';
   const primaryGuardian =
-    profile.guardians.find((guardian) => guardian.isPrimary) ??
-    profile.guardians[0];
+    profile.guardians?.find((guardian) => guardian.isPrimary) ??
+    profile.guardians?.[0];
   const className = formatClassLabel(student.className ?? student.class?.name);
   const sectionName =
     student.sectionName ?? student.section ?? 'Section not assigned';

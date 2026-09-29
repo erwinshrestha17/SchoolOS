@@ -264,14 +264,18 @@ describe('structured read-only support override', () => {
       studentDetail,
       /tab\.value !== ["']Documents["'] \|\| canManageDocuments/,
     );
+    // Phase 3A/3B: support sessions receive a server projection with no
+    // actions and no attendance/documents/fees/health sections (asserted in
+    // apps/api students.service.spec); the page derives flags only from it.
     assert.match(
       studentDetail,
-      /canViewAttendance =[\s\S]{0,100}!isSupportOverride && hasPermissions/,
+      /canViewAttendance = access\.sees\(['"]attendance['"]\)/,
     );
     assert.match(
       studentDetail,
-      /canManageDocuments =[\s\S]{0,100}!isSupportOverride && hasPermissions/,
+      /canManageDocuments =[\s\S]{0,60}access\.can\(['"]MANAGE_DOCUMENTS['"]\) &&[\s\S]{0,40}access\.sees\(['"]documents['"]\)/,
     );
+    assert.doesNotMatch(studentDetail, /hasPermissions\(/);
     assert.match(
       studentHeader,
       /\.\.\.\(canViewFees \? \[collectFeeAction\] : \[\]\)/,

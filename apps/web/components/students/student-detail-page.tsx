@@ -11,6 +11,10 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { useBreadcrumbLabel } from '@/components/schoolos/navigation/breadcrumb-label-context';
 import { useSession } from '@/components/session-provider';
+import {
+  authorizationCacheScope,
+  resourceAccess,
+} from '@/lib/resource-authorization';
 import { ProfileHeader } from './profile/profile-header';
 import { LifecyclePanel } from './profile/lifecycle-panel';
 import { StudentEditCard } from './profile/student-edit-card';
@@ -23,6 +27,10 @@ import {
   StudentTransferPayload,
   StudentArchivePayload,
   StudentDeletePayload,
+  type GuardianProfile,
+  type StudentProfileAction,
+  type StudentProfileDetail,
+  type StudentProfileSection,
 } from '@schoolos/core';
 
 type LifecycleAction = 'transfer' | 'archive' | 'alumni' | 'delete';
@@ -89,19 +97,40 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const focusTarget = searchParams.get('focus');
-  const { session, hasPermissions } = useSession();
+  const { session } = useSession();
   const isSupportOverride = session?.user.isSupportOverride === true;
-  const canEditStudent =
-    !isSupportOverride && hasPermissions(['students:update']);
-  const canViewAttendance =
-    !isSupportOverride && hasPermissions(['attendance:read']);
-  const canViewFees = !isSupportOverride && hasPermissions(['fees:read']);
+  // Phase 3A/3B: the server projection is the only source of which sections
+  // exist in the payload and which actions are offered. Absent/unknown
+  // projection => nothing protected is shown (fail closed).
+  const profileQueryKey = [
+    'student-profile',
+    studentId,
+    authorizationCacheScope(session),
+  ] as const;
+  const profileQuery = useQuery({
+    queryKey: profileQueryKey,
+    queryFn: () => api.getStudentProfile(studentId),
+    enabled: Boolean(studentId),
+  });
+  const access = resourceAccess<StudentProfileAction, StudentProfileSection>(
+    profileQuery.data?.authorization,
+  );
+  const canEditStudent = access.can('UPDATE_PROFILE');
+  const canManageLifecycle = access.can('MANAGE_LIFECYCLE');
   const canManageDocuments =
-    !isSupportOverride && hasPermissions(['student_documents:manage']);
-  const canViewQr = !isSupportOverride && hasPermissions(['students:qr:read']);
-  const canManageLifecycle =
-    !isSupportOverride && hasPermissions(['students:manage_lifecycle']);
+    access.can('MANAGE_DOCUMENTS') && access.sees('documents');
+  const canViewAttendance = access.sees('attendance');
+  const canViewFees = access.sees('fees');
+  const canViewQr = access.sees('qrCredential');
+  const canViewHealth = access.sees('health');
+  const canViewActivity = access.sees('activity');
+  const canViewGuardians = access.sees('guardianContacts');
+  const canAdministerGuardians =
+    canViewGuardians && access.sees('guardianAdministration');
+  const canViewHistory = access.sees('identity') && !isSupportOverride;
   const { record: recordRecentlyViewed } = useRecentlyViewed();
+  const cacheProfile = (profile: StudentProfileDetail) =>
+    queryClient.setQueryData(profileQueryKey, profile);
 
   useEffect(() => {
     if (searchParams.get('edit') === 'true' && canEditStudent) {
@@ -117,26 +146,24 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
       (normalizedTab !== 'Attendance' || canViewAttendance) &&
       (normalizedTab !== 'Fees' || canViewFees) &&
       (normalizedTab !== 'Documents' || canManageDocuments) &&
-      (normalizedTab !== 'Health' || !isSupportOverride) &&
-      (normalizedTab !== 'Activity' || !isSupportOverride) &&
-      (normalizedTab !== 'History' || !isSupportOverride);
+      (normalizedTab !== 'Guardians' || canViewGuardians) &&
+      (normalizedTab !== 'Health' || canViewHealth) &&
+      (normalizedTab !== 'Activity' || canViewActivity) &&
+      (normalizedTab !== 'History' || canViewHistory);
     if (isAvailable) {
       setActiveDetailTab(normalizedTab as DetailTab);
     }
   }, [
     canEditStudent,
     canManageDocuments,
+    canViewActivity,
     canViewAttendance,
     canViewFees,
-    isSupportOverride,
+    canViewGuardians,
+    canViewHealth,
+    canViewHistory,
     searchParams,
   ]);
-
-  const profileQuery = useQuery({
-    queryKey: ['student-profile', studentId],
-    queryFn: () => api.getStudentProfile(studentId),
-    enabled: Boolean(studentId),
-  });
 
   const loadedStudent = profileQuery.data?.student;
   const loadedStudentLabel = loadedStudent
@@ -170,7 +197,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     mutationFn: (body: UpdateStudentProfilePayload) =>
       api.updateStudent(studentId, body),
     onSuccess: (profile) => {
-      queryClient.setQueryData(['student-profile', studentId], profile);
+      cacheProfile(profile);
       void queryClient.invalidateQueries({
         queryKey: ['student-iemis-readiness', studentId],
       });
@@ -190,7 +217,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
       body: UpdateStudentGuardianPayload;
     }) => api.updateStudentGuardian(studentId, guardianId, body),
     onSuccess: (profile) => {
-      queryClient.setQueryData(['student-profile', studentId], profile);
+      cacheProfile(profile);
       void queryClient.invalidateQueries({
         queryKey: ['student-iemis-readiness', studentId],
       });
@@ -205,7 +232,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     mutationFn: (body: CreateStudentGuardianPayload) =>
       api.addStudentGuardian(studentId, body),
     onSuccess: (profile) => {
-      queryClient.setQueryData(['student-profile', studentId], profile);
+      cacheProfile(profile);
       void queryClient.invalidateQueries({
         queryKey: ['student-iemis-readiness', studentId],
       });
@@ -298,9 +325,14 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
       (tab.value !== 'Attendance' || canViewAttendance) &&
       (tab.value !== 'Fees' || canViewFees) &&
       (tab.value !== 'Documents' || canManageDocuments) &&
-      (tab.value !== 'History' || !isSupportOverride),
+      (tab.value !== 'Guardians' || canViewGuardians) &&
+      (tab.value !== 'History' || canViewHistory),
   );
-  const visibleOverflowTabs = isSupportOverride ? [] : overflowTabs;
+  const visibleOverflowTabs = overflowTabs.filter(
+    (tab) =>
+      (tab.value !== 'Health' || canViewHealth) &&
+      (tab.value !== 'Activity' || canViewActivity),
+  );
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
@@ -436,29 +468,41 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
           <TabsContent value="Profile" className="mt-0">
             <ProfileTabs.ProfileTab profile={profile} />
           </TabsContent>
-          <TabsContent value="Guardians" className="mt-0">
-            <ProfileTabs.GuardiansTab
-              studentId={studentId}
-              guardians={profile.guardians}
-              editingGuardianId={editingGuardianId}
-              isAddingGuardian={isAddingGuardian}
-              isSaving={
-                guardianUpdateMutation.isPending ||
-                guardianCreateMutation.isPending
-              }
-              error={
-                guardianUpdateMutation.error ?? guardianCreateMutation.error
-              }
-              onCancelEdit={() => setEditingGuardianId(null)}
-              onEditGuardian={setEditingGuardianId}
-              onSaveGuardian={(id, body) =>
-                guardianUpdateMutation.mutate({ guardianId: id, body })
-              }
-              onAddGuardian={() => setIsAddingGuardian(true)}
-              onCancelAdd={() => setIsAddingGuardian(false)}
-              onCreateGuardian={(body) => guardianCreateMutation.mutate(body)}
-            />
-          </TabsContent>
+          {canViewGuardians ? (
+            <TabsContent value="Guardians" className="mt-0">
+              {canAdministerGuardians ? (
+                <ProfileTabs.GuardiansTab
+                  studentId={studentId}
+                  // guardianAdministration releases the complete relationship
+                  // record, so the admin surface receives full profiles.
+                  guardians={(profile.guardians ?? []) as GuardianProfile[]}
+                  editingGuardianId={editingGuardianId}
+                  isAddingGuardian={isAddingGuardian}
+                  isSaving={
+                    guardianUpdateMutation.isPending ||
+                    guardianCreateMutation.isPending
+                  }
+                  error={
+                    guardianUpdateMutation.error ?? guardianCreateMutation.error
+                  }
+                  onCancelEdit={() => setEditingGuardianId(null)}
+                  onEditGuardian={setEditingGuardianId}
+                  onSaveGuardian={(id, body) =>
+                    guardianUpdateMutation.mutate({ guardianId: id, body })
+                  }
+                  onAddGuardian={() => setIsAddingGuardian(true)}
+                  onCancelAdd={() => setIsAddingGuardian(false)}
+                  onCreateGuardian={(body) =>
+                    guardianCreateMutation.mutate(body)
+                  }
+                />
+              ) : (
+                <ProfileTabs.GuardianContactsTab
+                  guardians={profile.guardians ?? []}
+                />
+              )}
+            </TabsContent>
+          ) : null}
           <TabsContent value="Academics" className="mt-0">
             <ProfileTabs.AcademicsTab
               profile={profile}
@@ -469,8 +513,8 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
             <TabsContent value="Documents" className="mt-0">
               <ProfileTabs.DocumentsTab
                 studentId={studentId}
-                documents={profile.documents}
-                generatedDocuments={profile.generatedDocuments}
+                documents={profile.documents ?? []}
+                generatedDocuments={profile.generatedDocuments ?? []}
                 onOpenPdf={openStudentPdf}
                 generationError={pdfError}
               />
@@ -480,11 +524,11 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
             <TabsContent value="Fees" className="mt-0">
               <ProfileTabs.FeesTab
                 studentId={studentId}
-                invoices={profile.invoices}
+                invoices={profile.invoices ?? []}
               />
             </TabsContent>
           ) : null}
-          {!isSupportOverride ? (
+          {canViewHealth ? (
             <TabsContent value="Health" className="mt-0">
               <ProfileTabs.HealthTab profile={profile} />
             </TabsContent>
@@ -494,12 +538,12 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
               <ProfileTabs.AttendanceTab profile={profile} />
             </TabsContent>
           ) : null}
-          {!isSupportOverride ? (
+          {canViewActivity ? (
             <TabsContent value="Activity" className="mt-0">
-              <ProfileTabs.ActivityTab posts={profile.activityPosts} />
+              <ProfileTabs.ActivityTab posts={profile.activityPosts ?? []} />
             </TabsContent>
           ) : null}
-          {!isSupportOverride ? (
+          {canViewHistory ? (
             <TabsContent value="History" className="mt-0">
               <ProfileTabs.HistoryTab profile={profile} />
             </TabsContent>

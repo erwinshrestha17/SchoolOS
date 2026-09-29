@@ -6,11 +6,14 @@ import {
   formatBsDateTime,
   type StudentDocument,
   type StudentIemisReadiness,
+  type StudentProfileAction,
   type StudentProfileDetail,
+  type StudentProfileSection,
 } from '@schoolos/core';
 import Link from 'next/link';
 import { useSession } from '@/components/session-provider';
 import { api } from '@/lib/api';
+import { resourceAccess } from '@/lib/resource-authorization';
 import { Badge } from '@/components/ui/badge';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/loading-state';
@@ -53,25 +56,33 @@ type StudentLifecycleTimelineItem = {
 };
 
 export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
-  const { session, hasPermissions } = useSession();
+  const { session } = useSession();
   const studentId = profile.student.id;
   const isSupportOverride = session?.user.isSupportOverride === true;
-  const canViewAttendance =
-    !isSupportOverride && hasPermissions(['attendance:read']);
-  const canViewFees = !isSupportOverride && hasPermissions(['fees:read']);
+  // Sections come from the server projection; an absent section is never
+  // rendered as an empty/zero value.
+  const access = resourceAccess<StudentProfileAction, StudentProfileSection>(
+    profile.authorization,
+  );
+  const canViewAttendance = access.sees('attendance');
+  const canViewFees = access.sees('fees');
   const canManageDocuments =
-    !isSupportOverride && hasPermissions(['student_documents:manage']);
-  const canViewQr = !isSupportOverride && hasPermissions(['students:qr:read']);
-  const canViewActivity = !isSupportOverride;
+    access.can('MANAGE_DOCUMENTS') && access.sees('documents');
+  const canViewQr = access.sees('qrCredential');
+  const canViewActivity = access.sees('activity');
+  const canViewGuardians = access.sees('guardianContacts');
+  // Separate endpoints (iEMIS readiness, lifecycle timeline) re-authorize
+  // server-side; they remain hidden for support-override sessions.
+  const canViewSchoolRecords = !isSupportOverride;
+  const guardians = profile.guardians ?? [];
   const primaryGuardian =
-    profile.guardians.find((guardian) => guardian.isPrimary) ??
-    profile.guardians[0];
+    guardians.find((guardian) => guardian.isPrimary) ?? guardians[0];
   const currentEnrollment =
     profile.enrollments.find(
       (enrollment) => enrollment.status.toUpperCase() === 'ACTIVE',
     ) ?? null;
   const documentIssues = canManageDocuments
-    ? getDocumentAttention(profile.documents)
+    ? getDocumentAttention(profile.documents ?? [])
     : [];
 
   const attendanceQuery = useQuery({
@@ -89,13 +100,13 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
   const iemisQuery = useQuery({
     queryKey: ['student-iemis-readiness', studentId],
     queryFn: () => api.getIemisReadiness(studentId),
-    enabled: Boolean(studentId) && canViewActivity,
+    enabled: Boolean(studentId) && canViewSchoolRecords,
   });
 
   const timelineQuery = useQuery<StudentLifecycleTimelineItem[]>({
     queryKey: ['student-lifecycle-timeline', studentId],
     queryFn: () => api.getStudentLifecycleTimeline(studentId),
-    enabled: Boolean(studentId) && canViewActivity,
+    enabled: Boolean(studentId) && canViewSchoolRecords,
   });
 
   const attentionItems = [
@@ -223,22 +234,24 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
                 onClick={() => onSelectTab('Fees')}
               />
             ) : null}
-            <GlanceCard
-              icon={<Users size={18} />}
-              label="Guardians"
-              value={profile.guardians.length.toString()}
-              detail={
-                primaryGuardian
-                  ? `Primary: ${primaryGuardian.fullName}`
-                  : 'No guardian linked'
-              }
-              onClick={() => onSelectTab('Guardians')}
-            />
+            {canViewGuardians ? (
+              <GlanceCard
+                icon={<Users size={18} />}
+                label="Guardians"
+                value={guardians.length.toString()}
+                detail={
+                  primaryGuardian
+                    ? `Primary: ${primaryGuardian.fullName}`
+                    : 'No guardian linked'
+                }
+                onClick={() => onSelectTab('Guardians')}
+              />
+            ) : null}
             {canManageDocuments ? (
               <GlanceCard
                 icon={<FileText size={18} />}
                 label="Documents"
-                value={profile.documents.length.toString()}
+                value={(profile.documents ?? []).length.toString()}
                 detail={
                   documentIssues.length > 0
                     ? `${documentIssues.length} need review`
@@ -250,7 +263,7 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
           </div>
         </SectionCard>
 
-        {canViewActivity ? (
+        {canViewSchoolRecords ? (
           <IemisReadinessCard query={iemisQuery} studentId={studentId} />
         ) : null}
       </section>
@@ -300,9 +313,9 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
                 <Clock size={15} aria-hidden="true" />
                 Recent student activity
               </div>
-              {profile.activityPosts.length > 0 ? (
+              {(profile.activityPosts ?? []).length > 0 ? (
                 <div className="space-y-3">
-                  {profile.activityPosts.slice(0, 3).map((post) => (
+                  {(profile.activityPosts ?? []).slice(0, 3).map((post) => (
                     <div key={post.id} className="rounded-xl bg-white p-3">
                       <p className="line-clamp-1 text-sm font-bold text-slate-900">
                         {post.title}
@@ -332,9 +345,9 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
         </div>
       </SectionCard>
 
-      {canViewActivity || canViewQr ? (
+      {canViewSchoolRecords || canViewQr ? (
         <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-          {canViewActivity ? (
+          {canViewSchoolRecords ? (
             <RecentTimelineCard
               query={timelineQuery}
               onViewTimeline={() => onSelectTab('History')}
@@ -354,7 +367,9 @@ function QuickSummaryCard({
 }: {
   profile: StudentProfileDetail;
   currentEnrollment: StudentProfileDetail['enrollments'][number] | null;
-  primaryGuardian: StudentProfileDetail['guardians'][number] | undefined;
+  primaryGuardian:
+    | NonNullable<StudentProfileDetail['guardians']>[number]
+    | undefined;
 }) {
   return (
     <SectionCard title="Quick summary">

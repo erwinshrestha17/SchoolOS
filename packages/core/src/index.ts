@@ -20,3 +20,4 @@ export * from "./admission-cases.js";
 export * from "./admission-policies.js";
 export * from "./external-authority-handoff.js";
 export * from "./support-override.js";
+export * from "./authorization-contract.js";

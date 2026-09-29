@@ -194,6 +194,7 @@ if (fs.existsSync(typesDir)) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { PermissionKey } from './permissions.js';
+import type { StudentProfileAuthorization } from './authorization-contract.js';
 
 `;
 
@@ -207,6 +208,7 @@ import type { PermissionKey } from './permissions.js';
         (source) =>
           source.startsWith('./') ||
           source.startsWith('../permissions') ||
+          source.startsWith('../authorization-contract') ||
           source.startsWith('../payroll'),
       );
 

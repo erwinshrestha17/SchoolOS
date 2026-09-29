@@ -8,3 +8,4 @@ export * from './attendance-tab';
 export * from './activity-tab';
 export * from './history-tab';
 export * from './academics-tab';
+export * from './guardian-contacts-tab';
