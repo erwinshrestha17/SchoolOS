@@ -1,11 +1,11 @@
 /** Manual external-authority evidence. These statuses never imply direct sync. */
 export type ExternalAuthorityHandoffStatus =
-  | 'READY'
-  | 'EXPORTED'
-  | 'SUBMITTED'
-  | 'ACKNOWLEDGED'
-  | 'REJECTED'
-  | 'CORRECTION_REQUIRED';
+  | "READY"
+  | "EXPORTED"
+  | "SUBMITTED"
+  | "ACKNOWLEDGED"
+  | "REJECTED"
+  | "CORRECTION_REQUIRED";
 
 export interface IemisHandoffEvent {
   id: string;
@@ -18,7 +18,7 @@ export interface IemisHandoffEvent {
 
 export interface IemisHandoff {
   id: string;
-  authority: 'CEHRD_IEMIS';
+  authority: "CEHRD_IEMIS";
   purpose: string;
   reportExportId: string | null;
   supersedesId: string | null;

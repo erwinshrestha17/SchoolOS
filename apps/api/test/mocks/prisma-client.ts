@@ -1452,6 +1452,56 @@ export const TeacherAssignmentStatus = {
   REVOKED: 'REVOKED',
 } as const;
 
+export const NepalHrPolicyKind = {
+  EMPLOYMENT_POST_CLASSIFICATION: 'EMPLOYMENT_POST_CLASSIFICATION',
+  CONTRACT_SERVICE_CONDITIONS: 'CONTRACT_SERVICE_CONDITIONS',
+  WORKING_TIME_LEAVE: 'WORKING_TIME_LEAVE',
+  COMPENSATION_MINIMUM: 'COMPENSATION_MINIMUM',
+  STATUTORY_SCHEME_TAX: 'STATUTORY_SCHEME_TAX',
+  TEACHER_PROFESSIONAL_ELIGIBILITY: 'TEACHER_PROFESSIONAL_ELIGIBILITY',
+} as const;
+
+export const NepalHrPolicyReviewStatus = {
+  DRAFT: 'DRAFT',
+  IN_REVIEW: 'IN_REVIEW',
+  REVIEWED: 'REVIEWED',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export const StaffEmploymentStatus = {
+  PENDING: 'PENDING',
+  VERIFIED: 'VERIFIED',
+  ENDED: 'ENDED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export const TeacherProfileStatus = {
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+} as const;
+
+export const TeacherEligibilityOutcome = {
+  ELIGIBLE: 'ELIGIBLE',
+  INELIGIBLE: 'INELIGIBLE',
+} as const;
+
+export const ExternalAuthorityCode = {
+  CEHRD_IEMIS: 'CEHRD_IEMIS',
+  NEB: 'NEB',
+  TSC: 'TSC',
+  OTHER: 'OTHER',
+} as const;
+
+export const ExternalAuthorityHandoffStatus = {
+  READY: 'READY',
+  EXPORTED: 'EXPORTED',
+  SUBMITTED: 'SUBMITTED',
+  ACKNOWLEDGED: 'ACKNOWLEDGED',
+  REJECTED: 'REJECTED',
+  CORRECTION_REQUIRED: 'CORRECTION_REQUIRED',
+} as const;
+
 export const TeacherDelegationStatus = {
   ACTIVE: 'ACTIVE',
   EXPIRED: 'EXPIRED',

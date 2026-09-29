@@ -9,13 +9,13 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
-type AssignmentContext = {
+interface AssignmentContext {
   tenantId: string;
   staffId: string;
   classId: string;
   subjectId?: string | null;
   actorId?: string;
-};
+}
 
 const PRECONDITION_MESSAGE =
   'Current verified employment and professional eligibility are required for this teaching assignment';
@@ -125,22 +125,23 @@ export class TeacherProfessionalEligibilityService {
       },
       take: 1000,
     });
-    if (candidates.length === 1000) reject('TEACHER_POLICY_CATALOG_LIMIT_REACHED');
-    const matching = candidates.filter((policy) =>
-      (policy.scope !== 'SCHOOL' ||
-        policy.localLevelId === employment.localLevelId) &&
-      (policy.schoolTypeCode === null ||
-        policy.schoolTypeCode === employment.schoolTypeCode) &&
-      (policy.employmentType === null ||
-        policy.employmentType === employment.employmentType) &&
-      (policy.postCategoryCode === null ||
-        policy.postCategoryCode === employment.postCategoryCode) &&
-      (policy.classLevelMin === null ||
-        policy.classLevelMin <= schoolClass.level) &&
-      (policy.classLevelMax === null ||
-        policy.classLevelMax >= schoolClass.level) &&
-      (policy.subjectCode === null ||
-        policy.subjectCode === subject?.code),
+    if (candidates.length === 1000)
+      reject('TEACHER_POLICY_CATALOG_LIMIT_REACHED');
+    const matching = candidates.filter(
+      (policy) =>
+        (policy.scope !== 'SCHOOL' ||
+          policy.localLevelId === employment.localLevelId) &&
+        (policy.schoolTypeCode === null ||
+          policy.schoolTypeCode === employment.schoolTypeCode) &&
+        (policy.employmentType === null ||
+          policy.employmentType === employment.employmentType) &&
+        (policy.postCategoryCode === null ||
+          policy.postCategoryCode === employment.postCategoryCode) &&
+        (policy.classLevelMin === null ||
+          policy.classLevelMin <= schoolClass.level) &&
+        (policy.classLevelMax === null ||
+          policy.classLevelMax >= schoolClass.level) &&
+        (policy.subjectCode === null || policy.subjectCode === subject?.code),
     );
     const latestByKey = new Map<string, (typeof matching)[number]>();
     for (const policy of matching) {
@@ -150,7 +151,8 @@ export class TeacherProfessionalEligibilityService {
         policy.effectiveFrom > prior.effectiveFrom ||
         (policy.effectiveFrom.getTime() === prior.effectiveFrom.getTime() &&
           policy.version > prior.version)
-      ) latestByKey.set(policy.policyKey, policy);
+      )
+        latestByKey.set(policy.policyKey, policy);
     }
     const applicable = [...latestByKey.values()];
     if (applicable.length === 0) reject('TEACHER_POLICY_UNAVAILABLE');
@@ -176,15 +178,16 @@ export class TeacherProfessionalEligibilityService {
         right.version - left.version,
     );
     const policy = applicable[0];
-    const peer = applicable[1];
-    if (
-      peer &&
-      peer.policyKey !== policy.policyKey &&
-      scopeRank[peer.scope] === scopeRank[policy.scope] &&
-      specificity(peer) === specificity(policy) &&
-      +peer.effectiveFrom === +policy.effectiveFrom
-    ) {
-      reject('TEACHER_POLICY_CONFLICT');
+    if (applicable.length > 1) {
+      const peer = applicable[1];
+      if (
+        peer.policyKey !== policy.policyKey &&
+        scopeRank[peer.scope] === scopeRank[policy.scope] &&
+        specificity(peer) === specificity(policy) &&
+        +peer.effectiveFrom === +policy.effectiveFrom
+      ) {
+        reject('TEACHER_POLICY_CONFLICT');
+      }
     }
 
     // Mandatory baselines remain in force even when a school policy is more
@@ -210,7 +213,12 @@ export class TeacherProfessionalEligibilityService {
             validFrom: { lte: now },
             OR: [{ validUntil: null }, { validUntil: { gt: now } }],
             AND: [
-              { OR: [{ subjectCode: null }, { subjectCode: subject?.code ?? null }] },
+              {
+                OR: [
+                  { subjectCode: null },
+                  { subjectCode: subject?.code ?? null },
+                ],
+              },
               {
                 OR: [
                   { levelCode: null },
@@ -231,7 +239,12 @@ export class TeacherProfessionalEligibilityService {
             validFrom: { lte: now },
             OR: [{ validUntil: null }, { validUntil: { gt: now } }],
             AND: [
-              { OR: [{ subjectCode: null }, { subjectCode: subject?.code ?? null }] },
+              {
+                OR: [
+                  { subjectCode: null },
+                  { subjectCode: subject?.code ?? null },
+                ],
+              },
               {
                 OR: [
                   { levelCode: null },
@@ -297,6 +310,6 @@ export class TeacherProfessionalEligibilityService {
         ${input.tenantId}, ${input.staffId}, ${input.assessmentId},
         ${input.at}, ${input.classId}, ${input.subjectId}
       ) AS allowed`;
-    return rows[0]?.allowed === true;
+    return rows[0]?.allowed ?? false;
   }
 }

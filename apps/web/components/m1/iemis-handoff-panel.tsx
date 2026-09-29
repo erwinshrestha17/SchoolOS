@@ -13,7 +13,10 @@ import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
 import { StatusBadge } from '../ui/status-badge';
 
-const nextStates: Record<ExternalAuthorityHandoffStatus, ExternalAuthorityHandoffStatus[]> = {
+const nextStates: Record<
+  ExternalAuthorityHandoffStatus,
+  ExternalAuthorityHandoffStatus[]
+> = {
   READY: ['EXPORTED'],
   EXPORTED: ['SUBMITTED'],
   SUBMITTED: ['ACKNOWLEDGED', 'REJECTED', 'CORRECTION_REQUIRED'],
@@ -48,7 +51,8 @@ export function IemisHandoffPanel({
 }) {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string>('');
-  const [nextStatus, setNextStatus] = useState<ExternalAuthorityHandoffStatus>('EXPORTED');
+  const [nextStatus, setNextStatus] =
+    useState<ExternalAuthorityHandoffStatus>('EXPORTED');
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [receipt, setReceipt] = useState('');
   const [note, setNote] = useState('');
@@ -60,9 +64,11 @@ export function IemisHandoffPanel({
     enabled: canManage,
   });
   const handoffs = handoffsQuery.data ?? [];
-  const selected = handoffs.find((item) => item.id === selectedId) ?? handoffs[0];
+  const selected =
+    handoffs.find((item) => item.id === selectedId) ?? handoffs[0];
   const terminal = handoffs.filter(
-    (item) => item.status === 'REJECTED' || item.status === 'CORRECTION_REQUIRED',
+    (item) =>
+      item.status === 'REJECTED' || item.status === 'CORRECTION_REQUIRED',
   );
   useEffect(() => {
     if (selected && selected.id !== selectedId) setSelectedId(selected.id);
@@ -81,7 +87,9 @@ export function IemisHandoffPanel({
         ...(supersedesId ? { supersedesHandoffId: supersedesId } : {}),
       }),
     onSuccess: async (created) => {
-      setFeedback('Internal snapshot registered. No government submission occurred.');
+      setFeedback(
+        'Internal snapshot registered. No government submission occurred.',
+      );
       setSelectedId(created.id);
       setSupersedesId('');
       await queryClient.invalidateQueries({ queryKey: ['iemis-handoffs'] });
@@ -101,7 +109,9 @@ export function IemisHandoffPanel({
       });
     },
     onSuccess: async () => {
-      setFeedback(`${nextStatus.replace(/_/g, ' ')} recorded with an audit event.`);
+      setFeedback(
+        `${nextStatus.replace(/_/g, ' ')} recorded with an audit event.`,
+      );
       setEvidenceFile(null);
       setReceipt('');
       setNote('');
@@ -127,14 +137,22 @@ export function IemisHandoffPanel({
       note.trim().length > 0);
 
   return (
-    <section className="border-t border-slate-200 pt-5" aria-labelledby="iemis-handoff-title">
+    <section
+      className="border-t border-slate-200 pt-5"
+      aria-labelledby="iemis-handoff-title"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="iemis-handoff-title" className="text-base font-bold text-slate-950">
+          <h2
+            id="iemis-handoff-title"
+            className="text-base font-bold text-slate-950"
+          >
             Manual authority handoff
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            SchoolOS stores snapshots and evidence. This internal CSV is not a verified official iEMIS format, and direct government synchronization is unavailable.
+            SchoolOS stores snapshots and evidence. This internal CSV is not a
+            verified official iEMIS format, and direct government
+            synchronization is unavailable.
           </p>
         </div>
         <Button
@@ -158,7 +176,8 @@ export function IemisHandoffPanel({
             <option value="">New, unrelated handoff</option>
             {terminal.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.status.replace(/_/g, ' ')} · {formatBsDateTime(item.createdAt)}
+                {item.status.replace(/_/g, ' ')} ·{' '}
+                {formatBsDateTime(item.createdAt)}
               </option>
             ))}
           </select>
@@ -166,10 +185,15 @@ export function IemisHandoffPanel({
       ) : null}
       {!canCreate && exportResult ? (
         <p className="mt-3 text-xs text-slate-600">
-          A handoff can be registered after all records and configuration checks pass, with a fresh export snapshot.
+          A handoff can be registered after all records and configuration checks
+          pass, with a fresh export snapshot.
         </p>
       ) : null}
-      {feedback ? <p className="mt-3 text-sm text-slate-700" role="status">{feedback}</p> : null}
+      {feedback ? (
+        <p className="mt-3 text-sm text-slate-700" role="status">
+          {feedback}
+        </p>
+      ) : null}
       {createMutation.isError || eventMutation.isError ? (
         <p className="mt-3 text-sm text-red-700" role="alert">
           {createMutation.error instanceof Error
@@ -188,13 +212,19 @@ export function IemisHandoffPanel({
       ) : handoffsQuery.isLoading ? (
         <p className="mt-4 text-sm text-slate-500">Loading handoff history…</p>
       ) : handoffs.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">No manual handoff has been registered.</p>
+        <p className="mt-4 text-sm text-slate-500">
+          No manual handoff has been registered.
+        </p>
       ) : (
         <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.8fr)]">
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs text-slate-600">
-                <tr><th className="px-3 py-2">Snapshot</th><th className="px-3 py-2">State</th><th className="px-3 py-2">Recorded</th></tr>
+                <tr>
+                  <th className="px-3 py-2">Snapshot</th>
+                  <th className="px-3 py-2">State</th>
+                  <th className="px-3 py-2">Recorded</th>
+                </tr>
               </thead>
               <tbody>
                 {handoffs.map((item) => (
@@ -205,11 +235,16 @@ export function IemisHandoffPanel({
                         className="text-left font-semibold text-info-800 underline-offset-2 hover:underline focus-visible:underline"
                         onClick={() => setSelectedId(item.id)}
                       >
-                        {item.reportExportId?.slice(0, 8) ?? item.id.slice(0, 8)}
+                        {item.reportExportId?.slice(0, 8) ??
+                          item.id.slice(0, 8)}
                       </button>
                     </td>
-                    <td className="px-3 py-2"><StatusBadge status={item.status} /></td>
-                    <td className="px-3 py-2 text-slate-600">{formatBsDateTime(item.createdAt)}</td>
+                    <td className="px-3 py-2">
+                      <StatusBadge status={item.status} />
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">
+                      {formatBsDateTime(item.createdAt)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -221,18 +256,25 @@ export function IemisHandoffPanel({
                 <StatusBadge status={selected.status} />
                 <span className="text-xs text-slate-500">{selected.id}</span>
               </div>
-              <p className="mt-2 text-sm text-slate-700">{statusDescription(selected.status)}</p>
+              <p className="mt-2 text-sm text-slate-700">
+                {statusDescription(selected.status)}
+              </p>
               {selected.supersedesId ? (
-                <p className="mt-2 text-xs text-slate-600">Corrects {selected.supersedesId}</p>
+                <p className="mt-2 text-xs text-slate-600">
+                  Corrects {selected.supersedesId}
+                </p>
               ) : null}
               {selected.externalReceiptReference ? (
-                <p className="mt-2 text-xs text-slate-700">Authority receipt: {selected.externalReceiptReference}</p>
+                <p className="mt-2 text-xs text-slate-700">
+                  Authority receipt: {selected.externalReceiptReference}
+                </p>
               ) : null}
               <ol className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-600">
                 <li>READY · {formatBsDateTime(selected.createdAt)}</li>
                 {selected.events.map((event) => (
                   <li key={event.id}>
-                    {event.status.replace(/_/g, ' ')} · {formatBsDateTime(event.occurredAt)}
+                    {event.status.replace(/_/g, ' ')} ·{' '}
+                    {formatBsDateTime(event.occurredAt)}
                     {event.note ? ` · ${event.note}` : ''}
                   </li>
                 ))}
@@ -244,10 +286,16 @@ export function IemisHandoffPanel({
                     <select
                       className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
                       value={nextStatus}
-                      onChange={(event) => setNextStatus(event.target.value as ExternalAuthorityHandoffStatus)}
+                      onChange={(event) =>
+                        setNextStatus(
+                          event.target.value as ExternalAuthorityHandoffStatus,
+                        )
+                      }
                     >
                       {nextStates[selected.status].map((status) => (
-                        <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>
+                        <option key={status} value={status}>
+                          {status.replace(/_/g, ' ')}
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -258,7 +306,9 @@ export function IemisHandoffPanel({
                         type="file"
                         className="mt-1 block w-full text-sm"
                         accept=".pdf,.png,.jpg,.jpeg,.csv,application/pdf,image/png,image/jpeg,text/csv"
-                        onChange={(event) => setEvidenceFile(event.target.files?.[0] ?? null)}
+                        onChange={(event) =>
+                          setEvidenceFile(event.target.files?.[0] ?? null)
+                        }
                       />
                     </label>
                   ) : null}
@@ -273,7 +323,8 @@ export function IemisHandoffPanel({
                       />
                     </label>
                   ) : null}
-                  {nextStatus === 'REJECTED' || nextStatus === 'CORRECTION_REQUIRED' ? (
+                  {nextStatus === 'REJECTED' ||
+                  nextStatus === 'CORRECTION_REQUIRED' ? (
                     <label className="block text-sm font-medium text-slate-700">
                       Authority response reason
                       <textarea

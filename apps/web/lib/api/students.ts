@@ -420,8 +420,7 @@ export const studentsApi = {
   },
   exportIemisStudents: () =>
     request<IemisExportResult>('/students/iemis/export'),
-  listIemisHandoffs: () =>
-    request<IemisHandoff[]>('/students/iemis/handoffs'),
+  listIemisHandoffs: () => request<IemisHandoff[]>('/students/iemis/handoffs'),
   createIemisHandoff: (body: {
     reportExportId: string;
     supersedesHandoffId?: string;
@@ -439,10 +438,13 @@ export const studentsApi = {
       note?: string;
     },
   ) =>
-    request<IemisHandoff>(`/students/iemis/handoffs/${encodeURIComponent(id)}/events`, {
-      method: 'POST',
-      json: body,
-    }),
+    request<IemisHandoff>(
+      `/students/iemis/handoffs/${encodeURIComponent(id)}/events`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   listIemisReadiness: (params?: {
     classId?: string;
     sectionId?: string;

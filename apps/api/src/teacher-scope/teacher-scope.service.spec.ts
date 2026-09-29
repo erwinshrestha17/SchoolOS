@@ -218,15 +218,16 @@ function buildService(
     },
   };
 
+  const eligibility = { isLive: jest.fn().mockResolvedValue(true) };
   const service = new TeacherScopeService(
     prisma as never,
     {
       record: auditRecord,
     } as never,
-    { isLive: jest.fn().mockResolvedValue(true) } as never,
+    eligibility as never,
   );
 
-  return { service, auditRecord, prisma };
+  return { service, auditRecord, prisma, eligibility };
 }
 
 function ask(
@@ -249,6 +250,19 @@ function ask(
 }
 
 describe('TeacherScopeService — assignment-based authorization', () => {
+  it('denies a teacher role and matching assignment after professional eligibility is lost', async () => {
+    const { service, eligibility } = buildService();
+    eligibility.isLive.mockResolvedValue(false);
+
+    await expect(
+      service.requireAccess(
+        ask(TeacherCapability.MARKS_ENTER, CLASS_1, SECTION_1A, MATHS),
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(eligibility.isLive).toHaveBeenCalled();
+  });
+
   describe('Subject Teacher: write is confined to the exact assignment', () => {
     it('allows marks entry for an assigned subject in an assigned section', async () => {
       const { service } = buildService();

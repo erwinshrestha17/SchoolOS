@@ -45,15 +45,23 @@ export class IemisHandoffController {
 
   @Post()
   @Permissions('students:manage_lifecycle', 'reports:export')
-  @ApiOperation({ summary: 'Register an internal reporting-readiness snapshot for manual review' })
+  @ApiOperation({
+    summary:
+      'Register an internal reporting-readiness snapshot for manual review',
+  })
   @ApiCreatedResponse({ type: Object })
-  create(@Body() dto: CreateIemisHandoffDto, @CurrentAuth() actor: AuthContext) {
+  create(
+    @Body() dto: CreateIemisHandoffDto,
+    @CurrentAuth() actor: AuthContext,
+  ) {
     return this.service.create(dto, actor);
   }
 
   @Post(':id/events')
   @Permissions('students:manage_lifecycle', 'reports:export')
-  @ApiOperation({ summary: 'Record evidence of a manual external handoff or response' })
+  @ApiOperation({
+    summary: 'Record evidence of a manual external handoff or response',
+  })
   @ApiCreatedResponse({ type: Object })
   recordEvent(
     @Param('id', ParseUUIDPipe) id: string,

@@ -6,6 +6,7 @@ import {
 import {
   ExternalAuthorityCode,
   ExternalAuthorityHandoffStatus,
+  Prisma,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -62,6 +63,23 @@ export class IemisHandoffService {
   }
 
   async create(dto: CreateIemisHandoffDto, actor: AuthContext) {
+    const findExisting = () =>
+      this.prisma.externalAuthorityHandoff.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          reportExportId: dto.reportExportId,
+          authority: ExternalAuthorityCode.CEHRD_IEMIS,
+        },
+      });
+    const existing = await findExisting();
+    if (existing) {
+      if (existing.supersedesId !== (dto.supersedesHandoffId ?? null)) {
+        throw new ConflictException(
+          'This export already has a different handoff',
+        );
+      }
+      return existing;
+    }
     const exportRecord = await this.prisma.reportExport.findFirst({
       where: {
         id: dto.reportExportId,
@@ -79,6 +97,7 @@ export class IemisHandoffService {
       },
     });
     if (!exportRecord) throw new NotFoundException('Export not found');
+    const snapshotChecksum = exportRecord.checksum;
     const filters =
       exportRecord.filters && typeof exportRecord.filters === 'object'
         ? (exportRecord.filters as Record<string, unknown>)
@@ -90,8 +109,8 @@ export class IemisHandoffService {
         : {};
     if (
       !exportRecord.fileAssetId ||
-      !exportRecord.checksum ||
-      !/^[0-9a-fA-F]{64}$/.test(exportRecord.checksum) ||
+      !snapshotChecksum ||
+      !/^[0-9a-fA-F]{64}$/.test(snapshotChecksum) ||
       filters.artifactPurpose !== 'REPORTING_READINESS_HANDOFF' ||
       filters.schemaAuthority !== 'SCHOOL_OS_INTERNAL_RULE_SET' ||
       filters.artifactStatus !== 'REQUIRES_AUTHORIZED_REVIEW' ||
@@ -131,46 +150,67 @@ export class IemisHandoffService {
         select: { snapshotChecksumSha256: true },
       });
       if (!previous) throw new NotFoundException('Prior handoff not found');
-      if (previous.snapshotChecksumSha256 === exportRecord.checksum) {
+      if (previous.snapshotChecksumSha256 === snapshotChecksum) {
         throw new ConflictException('A correction requires a new snapshot');
       }
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const handoff = await tx.externalAuthorityHandoff.create({
-        data: {
-          tenantId: actor.tenantId,
-          authority: ExternalAuthorityCode.CEHRD_IEMIS,
-          purpose: 'INTERNAL_REPORTING_READINESS_REVIEW',
-          reportExportId: exportRecord.id,
-          supersedesId: dto.supersedesHandoffId,
-          snapshotFileId: asset.id,
-          snapshotChecksumSha256: exportRecord.checksum!,
-          schemaAuthority: 'SCHOOL_OS_INTERNAL_RULE_SET',
-          officialFormatVerified: false,
-          directSyncSupported: false,
-          status: ExternalAuthorityHandoffStatus.READY,
-          createdById: actor.userId,
-        },
-      });
-      await this.audit.record(
-        {
-          action: 'create',
-          resource: 'external_authority_handoff',
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-          resourceId: handoff.id,
-          after: {
-            authority: handoff.authority,
-            status: handoff.status,
-            reportExportId: handoff.reportExportId,
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const handoff = await tx.externalAuthorityHandoff.create({
+          data: {
+            tenantId: actor.tenantId,
+            authority: ExternalAuthorityCode.CEHRD_IEMIS,
+            purpose: 'INTERNAL_REPORTING_READINESS_REVIEW',
+            reportExportId: exportRecord.id,
+            supersedesId: dto.supersedesHandoffId,
+            snapshotFileId: asset.id,
+            snapshotChecksumSha256: snapshotChecksum,
+            schemaAuthority: 'SCHOOL_OS_INTERNAL_RULE_SET',
+            officialFormatVerified: false,
             directSyncSupported: false,
+            status: ExternalAuthorityHandoffStatus.READY,
+            createdById: actor.userId,
           },
-        },
-        tx,
-      );
-      return handoff;
-    });
+        });
+        await this.audit.record(
+          {
+            action: 'create',
+            resource: 'external_authority_handoff',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: handoff.id,
+            after: {
+              authority: handoff.authority,
+              status: handoff.status,
+              reportExportId: handoff.reportExportId,
+              directSyncSupported: false,
+            },
+          },
+          tx,
+        );
+        return handoff;
+      });
+    } catch (error) {
+      // A concurrent retry can win the unique export constraint after the
+      // first read. Return only the matching tenant's completed handoff.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const concurrent = await findExisting();
+        if (
+          concurrent &&
+          concurrent.supersedesId === (dto.supersedesHandoffId ?? null)
+        ) {
+          return concurrent;
+        }
+        throw new ConflictException(
+          'This export already has a different handoff',
+        );
+      }
+      throw error;
+    }
   }
 
   async recordEvent(
