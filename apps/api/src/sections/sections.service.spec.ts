@@ -145,7 +145,9 @@ function buildService(options: BuildServiceOptions = {}) {
     prisma as never,
     audit as never,
     teacherScope as never,
-    { preflightAssignment: jest.fn().mockResolvedValue('assessment-1') } as never,
+    {
+      preflightAssignment: jest.fn().mockResolvedValue('assessment-1'),
+    } as never,
   );
 
   return { service, prisma, audit, tx, teacherScope };
