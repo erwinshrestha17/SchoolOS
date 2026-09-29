@@ -22,6 +22,11 @@ export type DrawerProps = {
   width?: 'sm' | 'md' | 'lg';
   /** Focus target restored after the drawer closes. */
   returnFocusRef?: RefObject<HTMLElement | null>;
+  /**
+   * Overrides the width class (used by the canonical Inspector to apply the
+   * Design System v2 inspector widths). Additive; defaults keep `width`.
+   */
+  panelClassName?: string;
 };
 
 const WIDTH_CLASSES: Record<NonNullable<DrawerProps['width']>, string> = {
@@ -47,6 +52,7 @@ export function Drawer({
   footer,
   width = 'md',
   returnFocusRef,
+  panelClassName,
 }: DrawerProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -158,7 +164,7 @@ export function Drawer({
         aria-describedby={description ? descriptionId : undefined}
         className={cn(
           'sidebar-transition relative flex h-full w-full flex-col bg-white shadow-lg',
-          WIDTH_CLASSES[width],
+          panelClassName ?? WIDTH_CLASSES[width],
         )}
       >
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 p-5">

@@ -77,7 +77,7 @@ describe('M12 and M15 rendered web workspaces', () => {
     );
 
     assert.match(list, /listNoticePage\(\{/);
-    assert.match(list, /totalItems=\{noticesQuery\.data\?\.total/);
+    assert.match(list, /totalItems(?:=\{|:\s*)noticesQuery\.data\?\.total/);
     assert.match(list, /URLSearchParams/);
     assert.doesNotMatch(list, /items\.length[^\n]*totalItems/);
     assert.match(center, /readStatus/);

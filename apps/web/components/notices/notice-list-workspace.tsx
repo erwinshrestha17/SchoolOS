@@ -7,17 +7,19 @@ import {
   type NoticeSummary,
 } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
-import { Search, SlidersHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo } from 'react';
 import { communicationsApi } from '@/lib/api/communications';
 import {
-  PaginatedDataTable,
+  DataWorkspace,
   type PaginatedDataTableColumn,
-} from '@/components/schoolos/data/paginated-data-table';
-import { FilterBar } from '@/components/ui/filter-bar';
-import { FilterChips } from '@/components/ui/filter-chips';
+} from '@/components/schoolos';
+import {
+  parseDensity,
+  parseHiddenColumns,
+  serializeHiddenColumns,
+} from '@/lib/workspace-view-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { useSession } from '@/components/session-provider';
 import { hasAnyPermission } from '@/lib/session';
@@ -46,7 +48,6 @@ export function NoticeListWorkspace({
     : (fixedLifecycleStatus ??
       (searchParams.get('lifecycleStatus') as NoticeLifecycleStatus | null) ??
       '');
-  const [searchDraft, setSearchDraft] = useState(search);
 
   const noticesQuery = useQuery({
     queryKey: [
@@ -71,12 +72,9 @@ export function NoticeListWorkspace({
       if (value === null || value === '' || value === 1) params.delete(key);
       else params.set(key, String(value));
     }
-    router.replace(`${pathname}${params.size ? `?${params}` : ''}`);
-  }
-
-  function submitSearch(event: FormEvent) {
-    event.preventDefault();
-    setFilters({ search: searchDraft.trim(), page: null });
+    router.replace(`${pathname}${params.size ? `?${params}` : ''}`, {
+      scroll: false,
+    });
   }
 
   const columns = useMemo<PaginatedDataTableColumn<NoticeSummary>[]>(
@@ -162,10 +160,7 @@ export function NoticeListWorkspace({
       ? {
           key: 'search',
           label: `Search: ${search}`,
-          onRemove: () => {
-            setSearchDraft('');
-            setFilters({ search: null, page: null });
-          },
+          onRemove: () => setFilters({ search: null, page: null }),
         }
       : null,
     priority
@@ -193,37 +188,46 @@ export function NoticeListWorkspace({
       : null,
   ].filter((chip): chip is NonNullable<typeof chip> => chip !== null);
 
+  const allColumnOptions = columns.map((column) => ({
+    id: column.id,
+    label: typeof column.header === 'string' ? column.header : column.id,
+    // The notice title identifies the row and always stays visible.
+    hideable: column.id !== 'title',
+  }));
+  const density = parseDensity(searchParams.get('density'));
+  const hiddenColumnIds = parseHiddenColumns(
+    searchParams.get('cols'),
+    allColumnOptions,
+  );
+  const clearFilters = () => {
+    const params = new URLSearchParams();
+    // View preferences are not filters; keep them when clearing.
+    for (const key of ['density', 'cols']) {
+      const value = searchParams.get(key);
+      if (value) params.set(key, value);
+    }
+    router.replace(`${pathname}${params.size ? `?${params}` : ''}`, {
+      scroll: false,
+    });
+  };
+
   return (
-    <div className="space-y-4" data-testid="notice-list-workspace">
-      <FilterBar
-        label="Notice filters"
+    <div data-testid="notice-list-workspace">
+      <DataWorkspace<NoticeSummary>
         description={
           isSupportOverride
             ? 'The server applies these filters only to published or expired notices in the selected school.'
             : 'The server applies these filters to the full notice record set.'
         }
-        searchSlot={
-          <form onSubmit={submitSearch} className="flex min-w-0 gap-2">
-            <label className="sr-only" htmlFor="notice-search">
-              Search notices
-            </label>
-            <input
-              id="notice-search"
-              value={searchDraft}
-              onChange={(event) => setSearchDraft(event.target.value)}
-              placeholder="Search title or message"
-              className="min-h-11 min-w-0 flex-1"
-            />
-            <button
-              type="submit"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700"
-            >
-              <Search size={16} /> Search
-            </button>
-          </form>
-        }
-        filterSlot={
-          <div className="flex flex-wrap gap-2">
+        search={{
+          value: search,
+          onChange: (value) => setFilters({ search: value.trim(), page: null }),
+          label: 'Search notices',
+          placeholder: 'Search title or message',
+          debounceMs: 400,
+        }}
+        filters={
+          <>
             <FilterSelect
               label="Priority"
               value={priority}
@@ -248,70 +252,58 @@ export function NoticeListWorkspace({
                 }
               />
             ) : null}
-          </div>
+          </>
         }
-        actionSlot={
-          hasActiveFilters ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchDraft('');
-                router.replace(pathname);
-              }}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700"
-            >
-              <SlidersHorizontal size={16} /> Clear
-            </button>
-          ) : null
-        }
-      />
-
-      <FilterChips
         chips={activeFilterChips}
-        onClearAll={
-          hasActiveFilters
-            ? () => {
-                setSearchDraft('');
-                router.replace(pathname);
-              }
-            : undefined
+        onClearFilters={hasActiveFilters ? clearFilters : undefined}
+        columnOptions={allColumnOptions}
+        hiddenColumnIds={hiddenColumnIds}
+        onHiddenColumnIdsChange={(hidden) =>
+          setFilters({ cols: serializeHiddenColumns(hidden) || null })
         }
-      />
-
-      <PaginatedDataTable
-        columns={columns}
-        items={noticesQuery.data?.items ?? []}
-        getRowId={(notice) => notice.id}
-        status={
-          !canRead
+        density={density}
+        onDensityChange={(next) =>
+          setFilters({ density: next === 'compact' ? 'compact' : null })
+        }
+        onRefresh={canRead ? () => void noticesQuery.refetch() : undefined}
+        isRefreshing={noticesQuery.isFetching && !noticesQuery.isLoading}
+        refreshError={
+          noticesQuery.isError && noticesQuery.data
+            ? 'Notices could not be refreshed.'
+            : null
+        }
+        table={{
+          columns,
+          items: noticesQuery.data?.items ?? [],
+          getRowId: (notice) => notice.id,
+          status: !canRead
             ? 'permission-denied'
             : noticesQuery.isLoading
               ? 'loading'
-              : noticesQuery.isError
+              : noticesQuery.isError && !noticesQuery.data
                 ? 'error'
-                : 'ready'
-        }
-        page={noticesQuery.data?.page ?? page}
-        pageSize={noticesQuery.data?.limit ?? PAGE_SIZE}
-        totalItems={noticesQuery.data?.total ?? 0}
-        onPageChange={(nextPage) => setFilters({ page: nextPage })}
-        hasActiveFilters={hasActiveFilters}
-        emptyTitle="No notices yet"
-        emptyDescription={
-          isSupportOverride
+                : 'ready',
+          page: noticesQuery.data?.page ?? page,
+          pageSize: noticesQuery.data?.limit ?? PAGE_SIZE,
+          totalItems: noticesQuery.data?.total ?? 0,
+          onPageChange: (nextPage) => setFilters({ page: nextPage }),
+          emptyTitle: 'No notices yet',
+          emptyDescription: isSupportOverride
             ? 'No published notices are available in this support scope.'
-            : 'Create a draft to begin the school notice workflow.'
-        }
-        noResultsTitle="No notices match these filters"
-        noResultsDescription="Clear one or more filters to widen the result set."
-        errorMessage="Notices could not be loaded. Your current filters have been preserved."
-        onRetry={() => void noticesQuery.refetch()}
-        caption={
-          <caption className="sr-only">
-            Notices matching the current filters. Total records:{' '}
-            {noticesQuery.data?.total ?? 0}.
-          </caption>
-        }
+            : 'Create a draft to begin the school notice workflow.',
+          noResultsTitle: 'No notices match these filters',
+          noResultsDescription:
+            'Clear one or more filters to widen the result set.',
+          errorMessage:
+            'Notices could not be loaded. Your current filters have been preserved.',
+          onRetry: () => void noticesQuery.refetch(),
+          caption: (
+            <caption className="sr-only">
+              Notices matching the current filters. Total records:{' '}
+              {noticesQuery.data?.total ?? 0}.
+            </caption>
+          ),
+        }}
       />
     </div>
   );

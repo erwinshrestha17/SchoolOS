@@ -316,6 +316,37 @@
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
   --radius-3xl: 1.5rem;
+
+  /*
+   * ─── Design System v2 geometry (Phase 3D) ───
+   * One explicit scale for canonical components in components/schoolos
+   * (SCHOOLOS_WEB_DESIGN_ASTRA §5.3/§5.4). Names are distinct from Tailwind's
+   * default radius-sm/md/lg so existing utilities do not shift.
+   *   rounded-chip | rounded-control | rounded-surface
+   *   h-control-compact | h-control | h-control-large
+   *   h-row-compact | h-row
+   *   w-inspector-sm | w-inspector-md | w-inspector-lg
+   *   px-gutter-compact | px-gutter | px-gutter-large
+   *   shadow-popover | shadow-overlay   (overlays only; surfaces use borders)
+   */
+  --radius-chip: 6px;
+  --radius-control: 8px;
+  --radius-surface: 12px;
+
+  --spacing-control-compact: 32px;
+  --spacing-control: 40px;
+  --spacing-control-large: 44px;
+  --spacing-row-compact: 44px;
+  --spacing-row: 48px;
+  --spacing-gutter-compact: 16px;
+  --spacing-gutter: 24px;
+  --spacing-gutter-large: 32px;
+  --spacing-inspector-sm: 360px;
+  --spacing-inspector-md: 440px;
+  --spacing-inspector-lg: 560px;
+
+  --shadow-popover: 0 8px 24px -8px rgba(15, 23, 42, 0.18), 0 2px 6px -2px rgba(15, 23, 42, 0.08);
+  --shadow-overlay: 0 24px 48px -16px rgba(15, 23, 42, 0.28), 0 4px 12px -4px rgba(15, 23, 42, 0.12);
 }
 
 /*

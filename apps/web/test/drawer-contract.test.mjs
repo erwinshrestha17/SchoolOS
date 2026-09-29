@@ -44,13 +44,20 @@ describe('shared Drawer primitive', () => {
 describe('Student Inspector uses the shared Drawer instead of an ad-hoc panel', () => {
   const directory = read('components/forms/student-directory.tsx');
 
-  it('renders through the shared Drawer component', () => {
+  it('renders through the canonical Inspector, which is the shared Drawer', () => {
     assert.match(
       directory,
-      /import \{ Drawer \} from ['"]\.\.\/ui\/drawer['"]/,
+      /import \{ Inspector, useInspectorState \} from ['"]\.\.\/schoolos['"]/,
     );
-    assert.match(directory, /<Drawer/);
+    assert.match(directory, /<Inspector/);
     assert.match(directory, /title=['"]Student Inspector['"]/);
+    assert.match(directory, /useInspectorState\(['"]student['"]\)/);
+    const inspector = read('components/schoolos/workspace/inspector.tsx');
+    assert.match(
+      inspector,
+      /import \{ Drawer \} from ['"]@\/components\/ui\/drawer['"]/,
+    );
+    assert.match(inspector, /<Drawer/);
   });
 
   it('removed the old hand-rolled fixed-position panel', () => {

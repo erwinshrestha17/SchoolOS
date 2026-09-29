@@ -10,10 +10,10 @@ import type {
   PaginatedResponse,
 } from '@schoolos/core';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import { StudentAvatar } from '../students/student-avatar';
-import { Drawer } from '../ui/drawer';
+import { Inspector, useInspectorState } from '../schoolos';
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
 import { ErrorState } from '../ui/error-state';
@@ -124,9 +124,13 @@ export function StudentDirectory({
   const currentPage = studentsResponse?.page ?? 1;
   const pageSize = studentsResponse?.limit ?? 25;
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const selectedStudentId = searchParams.get('student');
+  // Canonical Inspector state (Phase 3F): `?student=<id>` lives beside the
+  // directory filters and page, so closing returns to the same list view.
+  const {
+    inspectedId: selectedStudentId,
+    openInspector,
+    closeInspector,
+  } = useInspectorState('student');
   const { academicYearId, classId, sectionId, status, search } = filters;
 
   const currentAcademicYear = academicYears.find((year) => year.isCurrent);
@@ -159,15 +163,6 @@ export function StudentDirectory({
   const filteredStudents = students;
   const selectedStudent =
     students.find((student) => student.id === selectedStudentId) ?? null;
-
-  function updateSelectedStudent(studentId?: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (studentId) params.set('student', studentId);
-    else params.delete('student');
-    router.replace(`${pathname}${params.size ? `?${params.toString()}` : ''}`, {
-      scroll: false,
-    });
-  }
 
   if (isLoading) return <LoadingState label="Loading student directory..." />;
 
@@ -563,7 +558,7 @@ export function StudentDirectory({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => updateSelectedStudent(student.id)}
+                      onClick={() => openInspector(student.id)}
                     >
                       Quick view
                     </Button>
@@ -718,11 +713,11 @@ export function StudentDirectory({
         </div>
       )}
 
-      <Drawer
-        isOpen={Boolean(selectedStudent)}
-        onClose={() => updateSelectedStudent()}
+      <Inspector
+        open={Boolean(selectedStudent)}
+        onClose={closeInspector}
         title="Student Inspector"
-        width="sm"
+        size="sm"
       >
         {selectedStudent ? (
           <StudentInspector
@@ -733,7 +728,7 @@ export function StudentDirectory({
             isSupportOverride={isSupportOverride}
           />
         ) : null}
-      </Drawer>
+      </Inspector>
     </div>
   );
 }

@@ -99,6 +99,11 @@ export type PaginatedDataTableProps<T> = {
 
   caption?: ReactNode;
   className?: string;
+
+  /** Row height from the Design System v2 scale (Phase 3E). */
+  density?: 'compact' | 'standard';
+  /** Column ids hidden by the viewer (column visibility is presentation only). */
+  hiddenColumnIds?: ReadonlySet<string>;
 };
 
 function alignClass(align: PaginatedDataTableColumn<unknown>['align']) {
@@ -174,7 +179,13 @@ export function PaginatedDataTable<T>({
   moduleLockedDescription,
   caption,
   className,
+  density = 'standard',
+  hiddenColumnIds,
 }: PaginatedDataTableProps<T>) {
+  const visibleColumns = hiddenColumnIds
+    ? columns.filter((column) => !hiddenColumnIds.has(column.id))
+    : columns;
+  const rowHeightClass = density === 'compact' ? 'h-row-compact' : 'h-row';
   if (status === 'permission-denied') {
     return <PermissionDenied showNavigation={false} />;
   }
@@ -339,7 +350,7 @@ export function PaginatedDataTable<T>({
                 />
               </TableHead>
             ) : null}
-            {columns.map((column) => {
+            {visibleColumns.map((column) => {
               const isSorted = sort?.columnId === column.id;
               return (
                 <TableHead
@@ -394,7 +405,7 @@ export function PaginatedDataTable<T>({
           {status === 'loading' ? (
             <TableSkeletonRows
               columnCount={
-                columns.length +
+                visibleColumns.length +
                 (selectable ? 1 : 0) +
                 (onRowClick || rowActions ? 1 : 0)
               }
@@ -422,7 +433,9 @@ export function PaginatedDataTable<T>({
                         }
                       : undefined
                   }
+                  data-density={density}
                   className={cn(
+                    rowHeightClass,
                     onRowClick && 'cursor-pointer',
                     getRowClassName?.(row),
                   )}
@@ -439,7 +452,7 @@ export function PaginatedDataTable<T>({
                       />
                     </TableCell>
                   ) : null}
-                  {columns.map((column) => (
+                  {visibleColumns.map((column) => (
                     <TableCell
                       key={column.id}
                       className={cn(
