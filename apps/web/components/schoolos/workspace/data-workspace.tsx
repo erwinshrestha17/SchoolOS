@@ -185,7 +185,7 @@ export function DataWorkspace<T>({
               {showColumns ? (
                 <fieldset
                   id={columnsId}
-                  className="absolute right-0 z-20 mt-1 w-56 space-y-1 rounded-control border border-[var(--line)] bg-white p-2 shadow-popover"
+                  className="absolute right-0 z-20 mt-1 w-56 space-y-1 rounded-control border border-[var(--line)] bg-white p-2 shadow-popover max-sm:fixed max-sm:inset-x-4 max-sm:w-auto"
                 >
                   <legend className="sr-only">Visible columns</legend>
                   {columnOptions.map((option) => {

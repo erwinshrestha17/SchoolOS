@@ -212,7 +212,7 @@ export function NoticeListWorkspace({
   };
 
   return (
-    <div data-testid="notice-list-workspace">
+    <div data-testid="notice-list-workspace" className="p-gutter-compact">
       <DataWorkspace<NoticeSummary>
         description={
           isSupportOverride
