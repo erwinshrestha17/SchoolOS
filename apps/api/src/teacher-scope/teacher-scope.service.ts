@@ -465,7 +465,8 @@ export class TeacherScopeService {
       if (
         !delegation.allowedCapabilities.includes(params.capability) ||
         !this.matchesScope(delegation, rule, params)
-      ) continue;
+      )
+        continue;
       if (
         await this.eligibility.isLive({
           tenantId: params.tenantId,
