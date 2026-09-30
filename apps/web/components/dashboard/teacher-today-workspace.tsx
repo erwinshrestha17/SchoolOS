@@ -19,6 +19,7 @@ import { withOfflineReadCache } from '@/lib/offline-read-cache';
 import type {
   TeacherTodayAssignedClass,
   TeacherTodayPeriod,
+  TeacherTodaySummary,
 } from '@/lib/api/teacher-workspace';
 import { LoadingState } from '@/components/ui/loading-state';
 import { SectionCard } from '@/components/ui/section-card';
@@ -313,6 +314,14 @@ export function TeacherTodayWorkspace() {
             </SectionCard>
           </div>
 
+          <TeacherTodoCard
+            marks={data.marksToComplete}
+            corrections={data.corrections}
+            marksFailed={unavailable.has('marksToComplete')}
+            correctionsFailed={unavailable.has('corrections')}
+            onRetry={retry}
+          />
+
           {data.substitutions === null ? (
             <SectionCard
               title="Substitution Alerts"
@@ -459,6 +468,113 @@ function PeriodCard({
           )}
         </div>
       </div>
+    </SectionCard>
+  );
+}
+
+/**
+ * Teacher Today "To do" (Phase 4C): marks still to enter in open terms and
+ * the teacher's own attendance corrections. Every figure comes from the
+ * teacher-scoped server summary; a failed source is said, never shown as 0.
+ */
+function TeacherTodoCard({
+  marks,
+  corrections,
+  marksFailed,
+  correctionsFailed,
+  onRetry,
+}: {
+  marks: TeacherTodaySummary['marksToComplete'];
+  corrections: TeacherTodaySummary['corrections'];
+  marksFailed: boolean;
+  correctionsFailed: boolean;
+  onRetry: () => void;
+}) {
+  const marksList = marks ?? [];
+  const pending = corrections?.pending ?? 0;
+  const rejected = corrections?.rejectedRecently ?? 0;
+  const nothingToDo =
+    !marksFailed &&
+    !correctionsFailed &&
+    marks !== undefined &&
+    corrections !== undefined &&
+    marksList.length === 0 &&
+    pending === 0 &&
+    rejected === 0;
+
+  return (
+    <SectionCard
+      title="To do"
+      description="Marks still to enter and your attendance corrections."
+    >
+      {nothingToDo ? (
+        <p className="flex items-center gap-2 text-sm text-slate-600">
+          <CheckCircle2
+            className="h-4 w-4 shrink-0 text-success-600"
+            aria-hidden="true"
+          />
+          Nothing outstanding in your classes.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {marksFailed ? (
+            <li>
+              <PanelUnavailableNotice
+                panelName="Marks to enter"
+                onRetry={onRetry}
+              />
+            </li>
+          ) : (
+            marksList.map((item) => (
+              <li key={item.assessmentComponentId}>
+                <Link
+                  href="/dashboard/academics/marks"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-warning-100 bg-warning-50 p-3 text-sm transition hover:border-warning-700"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-bold text-slate-900">
+                      {item.componentName}
+                    </span>
+                    <span className="block truncate text-xs text-slate-600">
+                      {item.examTermName}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs font-bold text-warning-700">
+                    {item.missingCount} of {item.expectedCount} marks missing
+                  </span>
+                </Link>
+              </li>
+            ))
+          )}
+          {correctionsFailed ? (
+            <li>
+              <PanelUnavailableNotice
+                panelName="Your corrections"
+                onRetry={onRetry}
+              />
+            </li>
+          ) : pending > 0 || rejected > 0 ? (
+            <li>
+              <Link
+                href="/dashboard/attendance/corrections"
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3 text-sm transition hover:border-[var(--primary)]"
+              >
+                <span className="font-bold text-slate-900">
+                  Attendance corrections
+                </span>
+                <span className="text-xs font-bold text-slate-600">
+                  {[
+                    pending > 0 ? `${pending} awaiting review` : null,
+                    rejected > 0 ? `${rejected} rejected this week` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </Link>
+            </li>
+          ) : null}
+        </ul>
+      )}
     </SectionCard>
   );
 }

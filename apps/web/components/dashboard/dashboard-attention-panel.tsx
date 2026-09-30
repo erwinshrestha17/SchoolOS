@@ -1,8 +1,9 @@
 'use client';
 
-import type {
-  OperationalAttentionItem,
-  OperationalSummaryModule,
+import {
+  getNepalSchoolDay,
+  type OperationalAttentionItem,
+  type OperationalSummaryModule,
 } from '@schoolos/core';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
@@ -142,6 +143,7 @@ function AttentionRow({ item }: { item: DashboardAttentionItem }) {
         <p className="mt-0.5 truncate text-xs font-medium text-slate-600">
           {formatNumber(item.count)} {item.count === 1 ? 'item' : 'items'} in{' '}
           {definition.shortLabel}
+          {item.oldestAt ? ` · ${oldestAgeLabel(item.oldestAt)}` : ''}
         </p>
       </div>
       <span
@@ -178,4 +180,17 @@ function AttentionRow({ item }: { item: DashboardAttentionItem }) {
   ) : (
     <div className={className}>{content}</div>
   );
+}
+
+/** "oldest 4 days" from the server's oldest open record (Nepal school days). */
+export function oldestAgeLabel(oldestAt: string, now: Date = new Date()) {
+  const from = Date.parse(oldestAt);
+  if (Number.isNaN(from)) return '';
+  const days = Math.floor(
+    (getNepalSchoolDay(now).startUtc.getTime() -
+      getNepalSchoolDay(new Date(from)).startUtc.getTime()) /
+      86_400_000,
+  );
+  if (days <= 0) return 'since today';
+  return days === 1 ? 'oldest 1 day' : `oldest ${days} days`;
 }

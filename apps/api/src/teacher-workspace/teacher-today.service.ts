@@ -6,6 +6,7 @@ import { AttendanceService } from '../attendance/attendance.service';
 import { HomeworkService } from '../homework/homework.service';
 import { TimetableService } from '../timetable/timetable.service';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { TeacherWorkspaceModuleResolver } from './teacher-workspace-modules';
 
 interface TodayPeriod {
@@ -103,7 +104,15 @@ export class TeacherTodayService {
           )
         : Promise.resolve<Settled<null>>({ ok: true, value: null }),
     ]);
+    const [marksToComplete, corrections] = await Promise.all([
+      examsEnabled
+        ? this.settle('marksToComplete', () => this.getMarksToComplete(actor))
+        : Promise.resolve<Settled<null>>({ ok: true, value: null }),
+      this.settle('corrections', () => this.getMyCorrections(actor, now)),
+    ]);
     const unavailablePanels = [
+      ...(marksToComplete.ok ? [] : ['marksToComplete']),
+      ...(corrections.ok ? [] : ['corrections']),
       ...(attendance.ok ? [] : ['attendance']),
       ...(homework.ok ? [] : ['homework']),
       ...(timetable.ok ? [] : ['timetable']),
@@ -153,6 +162,8 @@ export class TeacherTodayService {
         : null,
       substitutions: timetableToday?.substitutions ?? null,
       marksDeadlines: marks.ok ? marks.value : null,
+      marksToComplete: marksToComplete.ok ? marksToComplete.value : null,
+      corrections: corrections.ok ? corrections.value : null,
       unavailableModules,
       unavailablePanels,
     };
@@ -170,6 +181,110 @@ export class TeacherTodayService {
       );
       return { ok: false };
     }
+  }
+
+  /**
+   * Assessment components in open (unlocked) terms of the current year for
+   * which this teacher still has marks to enter. Scope comes from the same
+   * MARKS_ENTER capability assignments the marks-entry API enforces, and the
+   * expected roster is the assignment's own class/section, so a
+   * section-scoped teacher is never shown another section's gaps.
+   */
+  private async getMarksToComplete(actor: AuthContext) {
+    const currentYear = await this.prisma.academicYear.findFirst({
+      where: { tenantId: actor.tenantId, isCurrent: true },
+      select: { id: true },
+    });
+    if (!currentYear) return [];
+    const assignments = (
+      await this.teacherScopeService.listActiveAssignmentsForCapability(
+        actor,
+        TeacherCapability.MARKS_ENTER,
+        { academicYearId: currentYear.id },
+      )
+    ).filter((assignment) => Boolean(assignment.subjectId));
+    const results: Array<{
+      assessmentComponentId: string;
+      componentName: string;
+      examTermName: string;
+      classId: string;
+      sectionId: string | null;
+      missingCount: number;
+      expectedCount: number;
+    }> = [];
+    for (const assignment of assignments.slice(0, 10)) {
+      const components = await this.prisma.assessmentComponent.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          subjectId: assignment.subjectId as string,
+          subject: { classId: assignment.classId },
+          examTerm: { academicYearId: currentYear.id, isLocked: false },
+        },
+        select: { id: true, name: true, examTerm: { select: { name: true } } },
+        take: 5,
+      });
+      if (components.length === 0) continue;
+      const rosterWhere = {
+        tenantId: actor.tenantId,
+        classId: assignment.classId,
+        lifecycleStatus: 'ACTIVE' as const,
+        ...(assignment.sectionId ? { sectionId: assignment.sectionId } : {}),
+      };
+      const expectedCount = await this.prisma.student.count({
+        where: rosterWhere,
+      });
+      if (expectedCount === 0) continue;
+      for (const component of components) {
+        const entered = await this.prisma.markEntry.count({
+          where: {
+            tenantId: actor.tenantId,
+            assessmentComponentId: component.id,
+            student: rosterWhere,
+          },
+        });
+        const missingCount = Math.max(0, expectedCount - entered);
+        if (missingCount > 0) {
+          results.push({
+            assessmentComponentId: component.id,
+            componentName: component.name,
+            examTermName: component.examTerm.name,
+            classId: assignment.classId,
+            sectionId: assignment.sectionId ?? null,
+            missingCount,
+            expectedCount,
+          });
+        }
+      }
+    }
+    return results
+      .sort((left, right) => right.missingCount - left.missingCount)
+      .slice(0, 10);
+  }
+
+  /**
+   * The teacher's own attendance corrections: still awaiting review, or
+   * rejected in the last 7 days (the register may need re-marking).
+   */
+  private async getMyCorrections(actor: AuthContext, now: Date) {
+    const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const [pending, rejected] = await Promise.all([
+      this.prisma.attendanceCorrectionRequest.count({
+        where: {
+          tenantId: actor.tenantId,
+          requestedById: actor.userId,
+          status: 'PENDING',
+        },
+      }),
+      this.prisma.attendanceCorrectionRequest.count({
+        where: {
+          tenantId: actor.tenantId,
+          requestedById: actor.userId,
+          status: 'REJECTED',
+          reviewedAt: { gte: since },
+        },
+      }),
+    ]);
+    return { pending, rejectedRecently: rejected };
   }
 
   private async getUpcomingMarksDeadlines(actor: AuthContext, now: Date) {

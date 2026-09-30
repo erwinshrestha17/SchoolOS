@@ -31,6 +31,8 @@ export interface OperationalAttentionItem {
   count: number;
   severity: 'info' | 'warning' | 'critical';
   action: string;
+  /** Creation time of the oldest open record behind this item, if known. */
+  oldestAt?: string;
 }
 
 export interface OperationalRecentItem {

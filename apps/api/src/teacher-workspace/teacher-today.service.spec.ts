@@ -40,6 +40,13 @@ describe('TeacherTodayService', () => {
       subjectAssignments?: { subjectId: string }[];
       examTerms?: { id: string; name: string; endsOn: Date }[];
       enabledModules?: string[];
+      components?: Array<{
+        id: string;
+        name: string;
+        examTerm: { name: string };
+      }>;
+      rosterSize?: number;
+      entered?: number;
     } = {},
   ) {
     const enabledModules = overrides.enabledModules ?? [
@@ -76,8 +83,27 @@ describe('TeacherTodayService', () => {
       examTerm: {
         findMany: jest.fn().mockResolvedValue(overrides.examTerms ?? []),
       },
+      assessmentComponent: {
+        findMany: jest.fn().mockResolvedValue(overrides.components ?? []),
+      },
+      student: {
+        count: jest.fn().mockResolvedValue(overrides.rosterSize ?? 0),
+      },
+      markEntry: { count: jest.fn().mockResolvedValue(overrides.entered ?? 0) },
+      attendanceCorrectionRequest: {
+        count: jest.fn().mockResolvedValue(0),
+      },
     };
     const teacherScopeService = {
+      listActiveAssignmentsForCapability: jest.fn().mockResolvedValue([
+        {
+          assignmentId: 'assignment-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'subject-1',
+        },
+      ]),
       listActiveAssignments: jest.fn().mockResolvedValue(
         (overrides.subjectAssignments ?? [{ subjectId: 'subject-1' }]).map(
           (assignment, index) => ({
@@ -111,6 +137,7 @@ describe('TeacherTodayService', () => {
       attendanceService,
       homeworkService,
       timetableService,
+      teacherScopeService,
       moduleResolver,
     };
   }
@@ -303,6 +330,82 @@ describe('TeacherTodayService', () => {
       expect(result.marksDeadlines).toBeNull();
       expect(result.unavailableModules).toContain('exams');
       expect(prisma.examTerm.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('marks to complete and own corrections (Phase 4C)', () => {
+    it("lists only the teacher's open components that still miss marks", async () => {
+      const { service, prisma } = makeService({
+        components: [
+          {
+            id: 'comp-1',
+            name: 'Unit test 1',
+            examTerm: { name: 'First term' },
+          },
+        ],
+        rosterSize: 30,
+        entered: 26,
+      });
+
+      const result = await service.getToday(actor, undefined, NOW_NPT_09_15);
+
+      expect(result.marksToComplete).toEqual([
+        expect.objectContaining({
+          assessmentComponentId: 'comp-1',
+          missingCount: 4,
+          expectedCount: 30,
+          sectionId: 'section-1',
+        }),
+      ]);
+      // The expected roster is the assignment's own section.
+      expect(prisma.student.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          classId: 'class-1',
+          sectionId: 'section-1',
+          lifecycleStatus: 'ACTIVE',
+        }),
+      });
+      expect(prisma.assessmentComponent.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            examTerm: { academicYearId: 'year-1', isLocked: false },
+          }),
+        }),
+      );
+    });
+
+    it('omits components whose marks are complete', async () => {
+      const { service } = makeService({
+        components: [
+          {
+            id: 'comp-1',
+            name: 'Unit test 1',
+            examTerm: { name: 'First term' },
+          },
+        ],
+        rosterSize: 30,
+        entered: 30,
+      });
+      const result = await service.getToday(actor, undefined, NOW_NPT_09_15);
+      expect(result.marksToComplete).toEqual([]);
+    });
+
+    it("counts only the teacher's own corrections", async () => {
+      const { service, prisma } = makeService();
+      prisma.attendanceCorrectionRequest.count
+        .mockResolvedValueOnce(2)
+        .mockResolvedValueOnce(1);
+
+      const result = await service.getToday(actor, undefined, NOW_NPT_09_15);
+
+      expect(result.corrections).toEqual({ pending: 2, rejectedRecently: 1 });
+      for (const [args] of prisma.attendanceCorrectionRequest.count.mock
+        .calls as Array<[{ where: Record<string, unknown> }]>) {
+        expect(args.where).toMatchObject({
+          tenantId: 'tenant-1',
+          requestedById: 'user-1',
+        });
+      }
     });
   });
 });

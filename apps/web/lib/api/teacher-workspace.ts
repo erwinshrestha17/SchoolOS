@@ -70,6 +70,18 @@ export interface TeacherTodaySummary {
   substitutions: TeacherTodaySubstitution[] | null;
   marksDeadlines: TeacherTodayMarksDeadline[] | null;
   unavailableModules?: string[];
+  /** Open components in the teacher's scope that still miss marks. */
+  marksToComplete?: Array<{
+    assessmentComponentId: string;
+    componentName: string;
+    examTermName: string;
+    classId: string;
+    sectionId: string | null;
+    missingCount: number;
+    expectedCount: number;
+  }> | null;
+  /** The teacher's own attendance corrections. */
+  corrections?: { pending: number; rejectedRecently: number } | null;
   /** Panels whose source failed to load (null field ≠ empty). */
   unavailablePanels?: string[];
 }

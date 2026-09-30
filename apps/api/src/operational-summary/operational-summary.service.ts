@@ -1424,6 +1424,12 @@ export class OperationalSummaryService {
 
   private async countMetric(definition: MetricDefinition): Promise<Metric> {
     const result = await this.safeCount(definition.model, definition.where);
+    const oldestAt =
+      definition.attention &&
+      typeof result.value === 'number' &&
+      result.value > 0
+        ? await this.oldestCreatedAt(definition.model, definition.where)
+        : undefined;
     return {
       key: definition.key,
       value: result.value,
@@ -1438,9 +1444,32 @@ export class OperationalSummaryService {
               count: result.value,
               severity: definition.attention.severity ?? 'warning',
               action: definition.attention.action,
+              ...(oldestAt ? { oldestAt } : {}),
             }
           : undefined,
     };
+  }
+
+  /** Age signal for an attention item; absent (not guessed) on failure. */
+  private async oldestCreatedAt(
+    model: string,
+    where: Record<string, unknown>,
+  ): Promise<string | undefined> {
+    const delegate = this.delegate(model);
+    if (!delegate?.findMany) return undefined;
+    try {
+      const [oldest] = await delegate.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, createdAt: true },
+        take: 1,
+      });
+      return oldest?.createdAt instanceof Date
+        ? oldest.createdAt.toISOString()
+        : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   private async decimalMetric(

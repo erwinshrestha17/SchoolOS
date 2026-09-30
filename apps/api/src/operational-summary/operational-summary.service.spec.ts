@@ -176,6 +176,42 @@ describe('OperationalSummaryService', () => {
     expect(summary.summary).toHaveProperty('cashierVarianceRisks', 0);
   });
 
+  it('adds the oldest record age to an attention item (Phase 4)', async () => {
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['fees'],
+    } as never);
+    const invoice = (
+      prisma as unknown as {
+        invoice: { count: jest.Mock; findMany?: jest.Mock };
+      }
+    ).invoice;
+    invoice.count.mockResolvedValue(3);
+    invoice.findMany = jest
+      .fn()
+      .mockResolvedValue([
+        { id: 'inv-1', createdAt: new Date('2026-09-20T00:00:00Z') },
+      ]);
+
+    const summary = await service.getModuleSummary('m3_fees', actor);
+    const overdue = summary.attentionItems.find(
+      (item) => item.key === 'overdueInvoices',
+    );
+
+    expect(overdue).toMatchObject({
+      count: 3,
+      oldestAt: '2026-09-20T00:00:00.000Z',
+    });
+    expect(invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tenantId: 'tenant-a' }),
+        orderBy: { createdAt: 'asc' },
+        take: 1,
+      }),
+    );
+    invoice.count.mockResolvedValue(0);
+    delete invoice.findMany;
+  });
+
   it('omits the module next-action when nothing needs attention', async () => {
     entitlements.getEntitlements.mockResolvedValue({
       modules: ['fees'],

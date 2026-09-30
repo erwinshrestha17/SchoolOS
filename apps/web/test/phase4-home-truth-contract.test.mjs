@@ -110,3 +110,24 @@ test('readiness panels treat modules outside the home as out of scope, not faile
     /sourceModules\.some\(\(module\) => !moduleMap\.has\(module\)\)/,
   );
 });
+
+test('attention items show the age of their oldest open record', () => {
+  const panel = read('components/dashboard/dashboard-attention-panel.tsx');
+  const service = read(
+    '../api/src/operational-summary/operational-summary.service.ts',
+  );
+  assert.match(
+    panel,
+    /item\.oldestAt \? ` · \$\{oldestAgeLabel\(item\.oldestAt\)\}`/,
+  );
+  assert.match(service, /orderBy: \{ createdAt: 'asc' \}/);
+});
+
+test('Teacher Today shows marks still to enter and own corrections', () => {
+  const workspace = read('components/dashboard/teacher-today-workspace.tsx');
+  const service = read('../api/src/teacher-workspace/teacher-today.service.ts');
+  assert.match(workspace, /<TeacherTodoCard/);
+  assert.match(workspace, /marks missing/);
+  assert.match(service, /TeacherCapability\.MARKS_ENTER/);
+  assert.match(service, /requestedById: actor\.userId/);
+});
