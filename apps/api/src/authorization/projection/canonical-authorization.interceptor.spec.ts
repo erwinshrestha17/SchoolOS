@@ -71,7 +71,7 @@ describe('canonical authorization bridge (Phase 3A)', () => {
     expect(projected.authorization).toBe(existing);
   });
 
-  it('ignores string-array action lists and leaves non-plain values intact', () => {
+  it('projects string-array action lists and leaves non-plain values intact', () => {
     const when = new Date('2026-09-30T00:00:00.000Z');
     class Money {
       constructor(readonly value: string) {}
@@ -83,7 +83,11 @@ describe('canonical authorization bridge (Phase 3A)', () => {
       ENABLED,
     ) as Record<string, unknown>;
 
-    expect(projected).not.toHaveProperty('authorization');
+    // Listed codes are allowed; unlisted codes are absent (= denied).
+    expect(projected.authorization).toMatchObject({
+      capabilities: { CLOSE: true },
+      allowedActions: ['CLOSE'],
+    });
     expect(projected.when).toBe(when);
     expect(projected.amount).toBe(amount);
   });
@@ -96,5 +100,41 @@ describe('canonical authorization bridge (Phase 3A)', () => {
     ) as { authorization: unknown };
 
     expect(isActionAllowed(projected.authorization, 'REVIEW')).toBe(false);
+  });
+
+  it('projects opt-in top-level action flags only', () => {
+    const projected = attachCanonicalAuthorization(
+      [
+        {
+          status: 'PENDING',
+          canCancel: true,
+          canResubmit: false,
+          canBorrow: true,
+        },
+      ],
+      { module: 'attendance', actionFlags: ['canCancel', 'canResubmit'] },
+      ENABLED,
+    ) as Record<string, unknown>[];
+
+    expect(projected[0].authorization).toMatchObject({
+      capabilities: { CANCEL: true, RESUBMIT: false },
+      allowedActions: ['CANCEL'],
+      lifecycleState: 'PENDING',
+    });
+    // Domain eligibility flags are never treated as authorization.
+    expect(
+      (projected[0].authorization as { capabilities: Record<string, boolean> })
+        .capabilities,
+    ).not.toHaveProperty('BORROW');
+    expect(projected[0].canCancel).toBe(true);
+  });
+
+  it('does not project flags that were not opted in', () => {
+    const projected = attachCanonicalAuthorization(
+      { canCancel: true },
+      { module: 'attendance' },
+      ENABLED,
+    ) as Record<string, unknown>;
+    expect(projected).not.toHaveProperty('authorization');
   });
 });

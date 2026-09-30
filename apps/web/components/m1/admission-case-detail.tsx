@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { api } from '../../lib/api';
+import { resourceAccess } from '../../lib/resource-authorization';
 import { admissionCasesApi } from '../../lib/api/admission-cases';
 import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
 import { Button } from '../ui/button';
@@ -111,9 +112,13 @@ export function AdmissionCaseDetail({
 
   const admissionCase = caseQuery.data;
   // Server-decided (status + finalize permissions); absent means not allowed.
-  const canFinalize = admissionCase.canFinalize === true;
+  // Phase 3A: actions come from the canonical, fail-closed projection.
+  const caseAccess = resourceAccess(admissionCase.authorization);
+  const canFinalize = caseAccess.can('FINALIZE');
+  const canAdmitDirectly = caseAccess.can('ADMIT_DIRECTLY');
+  const canOverrideDuplicate = caseAccess.can('OVERRIDE_DUPLICATE');
   const canDirectAdmit =
-    (admissionCase.canAdmitDirectly || admissionCase.canOverrideDuplicate) &&
+    (canAdmitDirectly || canOverrideDuplicate) &&
     admissionCase.displayStatus !== 'ADMITTED';
   const availableReviewActions = new Set(admissionCase.review.availableActions);
   const mutationError =
@@ -364,7 +369,7 @@ export function AdmissionCaseDetail({
         </SectionCard>
       ) : null}
 
-      {admissionCase.canOverrideDuplicate ? (
+      {canOverrideDuplicate ? (
         <SectionCard
           title="Duplicate override"
           description="Your permission allows direct admission only after recording why this is a different student. No records will be merged."
@@ -532,7 +537,7 @@ export function AdmissionCaseDetail({
               type="button"
               disabled={
                 directAdmitMutation.isPending ||
-                (admissionCase.canOverrideDuplicate &&
+                (canOverrideDuplicate &&
                   (!confirmDuplicateOverride || !reason.trim()))
               }
               onClick={() => directAdmitMutation.mutate()}
@@ -542,9 +547,7 @@ export function AdmissionCaseDetail({
               ) : (
                 <UserRoundCheck className="h-4 w-4" />
               )}
-              {admissionCase.canOverrideDuplicate
-                ? 'Admit with override'
-                : 'Admit student'}
+              {canOverrideDuplicate ? 'Admit with override' : 'Admit student'}
             </Button>
           ) : null}
           {admissionCase.displayStatus === 'ADMITTED' &&

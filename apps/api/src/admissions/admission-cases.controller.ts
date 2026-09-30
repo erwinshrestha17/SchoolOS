@@ -32,10 +32,15 @@ import {
   UpdateAdmissionCaseDto,
   WaiveCaseDocumentDto,
 } from './dto/admission-case.dto';
+import { ProjectCanonicalAuthorization } from '../authorization/projection/canonical-authorization.interceptor';
 
 @Controller('admissions')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.students')
+@ProjectCanonicalAuthorization({
+  module: 'students',
+  actionFlags: ['canAdmitDirectly', 'canOverrideDuplicate', 'canFinalize'],
+})
 export class AdmissionCasesController {
   constructor(
     private readonly admissionCasesService: AdmissionCasesService,

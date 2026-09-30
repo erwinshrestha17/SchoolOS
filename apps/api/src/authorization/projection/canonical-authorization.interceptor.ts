@@ -40,6 +40,12 @@ export interface CanonicalAuthorizationOptions {
   module: string;
   /** Property holding the resource lifecycle (defaults to `status`). */
   lifecycleKey?: string;
+  /**
+   * Top-level boolean action flags on the resource itself (e.g.
+   * `canCancel`, `canFinalize`). Opt-in by name, because many `canXxx`
+   * properties are domain data (eligibility, capacity), not authorization.
+   */
+  actionFlags?: readonly string[];
 }
 
 const MAX_DEPTH = 5;
@@ -59,9 +65,19 @@ export function legacyActionCode(key: string): string | null {
 }
 
 function canonicalActions(
-  legacy: Record<string, unknown>,
+  legacy: Record<string, unknown> | readonly unknown[],
 ): Record<string, boolean> | null {
   const actions: Record<string, boolean> = {};
+  // Array form: the listed codes are allowed; anything unlisted is simply
+  // absent, which the fail-closed readers treat as denied.
+  if (Array.isArray(legacy)) {
+    for (const item of legacy) {
+      if (typeof item !== 'string') continue;
+      const code = legacyActionCode(item) ?? item.toUpperCase();
+      if (/^[A-Z][A-Z0-9_]*$/.test(code)) actions[code] = true;
+    }
+    return Object.keys(actions).length > 0 ? actions : null;
+  }
   for (const [key, value] of Object.entries(legacy)) {
     if (typeof value !== 'boolean') continue;
     const code = legacyActionCode(key);
@@ -97,8 +113,18 @@ export function attachCanonicalAuthorization(
             depth + 1,
           );
   }
-  const legacy = value.allowedActions;
-  if (isPlainObject(legacy) && !('authorization' in value)) {
+  const legacyMap = value.allowedActions;
+  const flags: Record<string, unknown> = {};
+  for (const flag of options.actionFlags ?? []) {
+    if (typeof value[flag] === 'boolean') flags[flag] = value[flag];
+  }
+  const legacy =
+    isPlainObject(legacyMap) || Array.isArray(legacyMap)
+      ? legacyMap
+      : Object.keys(flags).length > 0
+        ? flags
+        : null;
+  if (legacy && !('authorization' in value)) {
     const actions = canonicalActions(legacy);
     if (actions) {
       const lifecycle = value[options.lifecycleKey ?? 'status'];

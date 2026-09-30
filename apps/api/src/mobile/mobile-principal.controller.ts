@@ -59,6 +59,7 @@ import {
   UpdateTeacherObservationDto,
 } from '../institutional-improvement/dto/institutional-improvement.dto';
 import { InstitutionalImprovementService } from '../institutional-improvement/institutional-improvement.service';
+import { ProjectCanonicalAuthorization } from '../authorization/projection/canonical-authorization.interceptor';
 
 enum BoardReadinessTrackParam {
   GRADE_8 = 'GRADE_8',
@@ -483,6 +484,10 @@ export class MobilePrincipalController {
   @Post('emergency-notices/recipient-preview')
   @Permissions('notices:create', 'advanced:approvals:manage')
   @RequiredModule('notices')
+  @ProjectCanonicalAuthorization({
+    module: 'notices',
+    actionFlags: ['canSubmit'],
+  })
   @RequiredFeature(FEATURE_KEYS.NOTICES_FULL)
   previewEmergencyNoticeRecipients(
     @CurrentAuth() auth: AuthContext,

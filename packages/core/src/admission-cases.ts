@@ -1,3 +1,4 @@
+import type { ResourceAuthorization } from "./authorization-contract.js";
 import type {
   AdmissionDocumentTiming,
   AdmissionPolicyResolution,
@@ -395,6 +396,12 @@ export type AdmissionCaseEligibility = {
    * Optional only for older servers; absence means not allowed.
    */
   canFinalize?: boolean;
+  /**
+   * Canonical projection of the three actor-aware flags above
+   * (ADMIT_DIRECTLY, OVERRIDE_DUPLICATE, FINALIZE). Clients read this; the
+   * flags stay for older clients.
+   */
+  authorization?: ResourceAuthorization;
   requiresReview: boolean;
   requiresApproval: boolean;
   classSection: {

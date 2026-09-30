@@ -1,3 +1,5 @@
+import '../../../core/authorization/resource_authorization.dart';
+
 /// Mirrors the backend `AttendanceStatus` enum.
 ///
 /// Every backend value must map to something here. The parser used to fall
@@ -172,8 +174,12 @@ class ParentAttendanceCorrection {
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
       reviewedAt: DateTime.tryParse(json['reviewedAt'] as String? ?? ''),
       reviewReason: json['reviewReason'] as String?,
-      canCancel: json['canCancel'] as bool? ?? false,
-      canResubmit: json['canResubmit'] as bool? ?? false,
+      canCancel:
+          canonicalActionAllowed(json, 'CANCEL') ??
+          (json['canCancel'] as bool? ?? false),
+      canResubmit:
+          canonicalActionAllowed(json, 'RESUBMIT') ??
+          (json['canResubmit'] as bool? ?? false),
     );
   }
 }

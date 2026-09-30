@@ -35,6 +35,7 @@ import {
   UploadSchoolServiceRequestAttachmentDto,
 } from '../service-requests/dto/service-request.dto';
 import { LearningImprovementService } from '../learning-improvement/learning-improvement.service';
+import { ProjectCanonicalAuthorization } from '../authorization/projection/canonical-authorization.interceptor';
 
 @Controller('mobile')
 @UseGuards(JwtAuthGuard, EntitlementGuard)
@@ -178,6 +179,10 @@ export class MobileController {
 
   @Get('students/:id/attendance-corrections')
   @RequiredModule('attendance')
+  @ProjectCanonicalAuthorization({
+    module: 'attendance',
+    actionFlags: ['canCancel', 'canResubmit'],
+  })
   listStudentAttendanceCorrections(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,

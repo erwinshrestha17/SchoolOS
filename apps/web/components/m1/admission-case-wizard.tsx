@@ -1,5 +1,6 @@
 'use client';
 
+import { resourceAccess } from '../../lib/resource-authorization';
 import {
   formatBsDateForInput,
   getNepalSchoolDay,
@@ -434,7 +435,9 @@ export function AdmissionCaseWizard({
     readError(directAdmitMutation.error);
   const requiresReview =
     caseData?.requiresReview && caseData.displayStatus !== 'APPROVED';
-  const canAdmit = caseData?.canAdmitDirectly && !requiresReview;
+  const canAdmit =
+    resourceAccess(caseData?.authorization).can('ADMIT_DIRECTLY') &&
+    !requiresReview;
 
   return (
     <form
