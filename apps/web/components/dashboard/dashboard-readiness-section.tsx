@@ -242,11 +242,13 @@ function ReadinessPanel({
       persona !== 'principal' || PRINCIPAL_READINESS_MODULES.has(row.module),
   );
   const sourceModules = [...new Set(panelRows.map((row) => row.module))];
+  // A module absent from the map is not part of this home (or not visible to
+  // this person): it is out of scope, NOT a failed source.
   const sourceIsHidden = (summary: OperationalModuleSummary | undefined) =>
-    summary !== undefined &&
-    (summary.status === 'locked' ||
-      summary.status === 'permissionDenied' ||
-      !summary.permissions.canView);
+    summary === undefined ||
+    summary.status === 'locked' ||
+    summary.status === 'permissionDenied' ||
+    !summary.permissions.canView;
   if (sourceModules.every((module) => sourceIsHidden(moduleMap.get(module))))
     return null;
   const visibleModules = sourceModules
@@ -255,9 +257,9 @@ function ReadinessPanel({
       (summary): summary is OperationalModuleSummary =>
         summary !== undefined && !sourceIsHidden(summary),
     );
-  const hasPartialSource =
-    sourceModules.some((module) => !moduleMap.has(module)) ||
-    visibleModules.some((summary) => summary.status === 'partial');
+  const hasPartialSource = visibleModules.some(
+    (summary) => summary.status === 'partial',
+  );
   // A row whose metric the server withheld (outside the actor's drill-down
   // scope) was not evaluated, so the panel must not claim a clean bill.
   const hasWithheldSource = panelRows.some((row) =>

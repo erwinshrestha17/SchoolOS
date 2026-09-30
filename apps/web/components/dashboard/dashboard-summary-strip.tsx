@@ -227,6 +227,10 @@ function buildSummaryCards(
   if (hr && includeStaff) {
     const present = metricNumber(hr, 'staffPresentToday');
     const onLeave = metricNumber(hr, 'staffOnApprovedLeaveToday');
+    const anomalies = metricNumber(hr, 'staffAttendanceAnomalies');
+    // No staff attendance row at all today means "not recorded yet", not
+    // "nobody is present".
+    const notRecorded = present === 0 && anomalies === 0;
     cards.push({
       key: 'staff',
       label: 'Staff availability',
@@ -236,10 +240,14 @@ function buildSummaryCards(
         persona === 'principal'
           ? '/dashboard/hr/overview'
           : moduleWorkspaceRoute('m7_hr_payroll'),
-      value:
-        present !== null ? `${formatNumber(present)} present` : 'Unavailable',
-      description:
-        present === null
+      value: notRecorded
+        ? 'Not recorded'
+        : present !== null
+          ? `${formatNumber(present)} present`
+          : 'Unavailable',
+      description: notRecorded
+        ? 'Staff attendance has not been taken yet today.'
+        : present === null
           ? 'Information is not available yet.'
           : onLeave === null
             ? 'Staff attendance recorded today.'

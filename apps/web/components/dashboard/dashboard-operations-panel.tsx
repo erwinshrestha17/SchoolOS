@@ -280,6 +280,66 @@ function operationsRowState(
       }
       return { text: 'No homework due today', tone: 'ok' };
     }
+    case 'm1_students': {
+      const review = metricNumber(summary, 'applicationsNeedingReview');
+      const admitted = metricNumber(summary, 'admissionsToday');
+      if (review !== null && review > 0) {
+        return {
+          text: `${formatNumber(review)} application${review === 1 ? '' : 's'} to review`,
+          tone: 'warn',
+        };
+      }
+      if (review === null && admitted === null) {
+        return unavailableState(summary, [
+          'applicationsNeedingReview',
+          'admissionsToday',
+        ]);
+      }
+      if (review === null) {
+        return { text: 'Partial information only', tone: 'muted' };
+      }
+      return {
+        text:
+          admitted !== null && admitted > 0
+            ? `No applications waiting · ${formatNumber(admitted)} admitted today`
+            : 'No applications waiting',
+        tone: 'ok',
+      };
+    }
+    case 'm11_accounting': {
+      const failed = metricNumber(summary, 'failedPostingBatches');
+      const unreconciled = metricNumber(summary, 'unreconciledStatements');
+      const unposted = metricNumber(summary, 'unpostedJournals');
+      if (failed !== null && failed > 0) {
+        return {
+          text: `${formatNumber(failed)} accounting posting${failed === 1 ? '' : 's'} failed`,
+          tone: 'warn',
+        };
+      }
+      if (unreconciled !== null && unreconciled > 0) {
+        return {
+          text: `${formatNumber(unreconciled)} bank statement${unreconciled === 1 ? '' : 's'} to reconcile`,
+          tone: 'warn',
+        };
+      }
+      if (unposted !== null && unposted > 0) {
+        return {
+          text: `${formatNumber(unposted)} journal${unposted === 1 ? '' : 's'} awaiting posting`,
+          tone: 'warn',
+        };
+      }
+      if (failed === null && unreconciled === null && unposted === null) {
+        return unavailableState(summary, [
+          'failedPostingBatches',
+          'unreconciledStatements',
+          'unpostedJournals',
+        ]);
+      }
+      if (failed === null || unreconciled === null || unposted === null) {
+        return { text: 'Partial information only', tone: 'muted' };
+      }
+      return { text: 'No open accounting issue', tone: 'ok' };
+    }
     case 'm7_hr_payroll': {
       const leaveRequests = metricNumber(summary, 'pendingLeaveRequests');
       const anomalies = metricNumber(summary, 'staffAttendanceAnomalies');
@@ -296,7 +356,10 @@ function operationsRowState(
         };
       }
       if (leaveRequests === null && anomalies === null) {
-        return { text: 'Information is not available yet.', tone: 'muted' };
+        return unavailableState(summary, [
+          'pendingLeaveRequests',
+          'staffAttendanceAnomalies',
+        ]);
       }
       if (leaveRequests === null || anomalies === null) {
         return { text: 'Partial information only', tone: 'muted' };
@@ -306,4 +369,18 @@ function operationsRowState(
     default:
       return { text: 'Information is not available yet.', tone: 'muted' };
   }
+}
+
+/**
+ * Metrics the server withheld are outside this person's drill-down scope —
+ * say so instead of implying the data is broken or still loading.
+ */
+function unavailableState(
+  summary: OperationalModuleSummary,
+  keys: string[],
+): OperationsRowState {
+  const withheld = new Set(summary.withheldMetrics ?? []);
+  return keys.every((key) => withheld.has(key))
+    ? { text: 'Not part of your role', tone: 'muted' }
+    : { text: 'Information is not available yet.', tone: 'muted' };
 }

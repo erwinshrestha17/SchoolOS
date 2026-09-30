@@ -27,10 +27,14 @@ test('summary strip only says "All clear" when every contributing count is known
 test('operations rows never report "no open issue" when a metric is missing', () => {
   const panel = read('components/dashboard/dashboard-operations-panel.tsx');
   const allClear = [
-    ...panel.matchAll(/text: 'No open (notice|transport|staff) issue'/g),
+    ...panel.matchAll(
+      /text: 'No open (notice|transport|staff|accounting) issue'/g,
+    ),
   ];
-  assert.equal(allClear.length, 3);
-  assert.equal(panel.match(/'Partial information only'/g)?.length, 4);
+  assert.equal(allClear.length, 4);
+  assert.equal(panel.match(/'Partial information only'/g)?.length, 6);
+  // Withheld metrics read as out of scope, never as broken.
+  assert.match(panel, /'Not part of your role'/);
 });
 
 test('homes come from the core resolver shared with the API and switching drops other homes cache', () => {
@@ -89,5 +93,20 @@ test('principal and admin homes carry decisions and setup blockers', () => {
   assert.match(
     read('../api/src/advanced-operations/principal-approval-queue.service.ts'),
     /requestedById: \{ not: actor\.userId \}/,
+  );
+});
+
+test('staff card says "Not recorded" before any staff attendance is taken', () => {
+  const strip = read('components/dashboard/dashboard-summary-strip.tsx');
+  assert.match(strip, /present === 0 && anomalies === 0/);
+  assert.match(strip, /'Not recorded'/);
+});
+
+test('readiness panels treat modules outside the home as out of scope, not failed', () => {
+  const panel = read('components/dashboard/dashboard-readiness-section.tsx');
+  assert.match(panel, /summary === undefined \|\|/);
+  assert.doesNotMatch(
+    panel,
+    /sourceModules\.some\(\(module\) => !moduleMap\.has\(module\)\)/,
   );
 });
