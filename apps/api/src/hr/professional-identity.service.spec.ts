@@ -59,6 +59,15 @@ function setup(
       findFirst: jest.fn(() => state.evidence ?? null),
       update: jest.fn(({ data }) => ({ ...state.evidence, ...data })),
     },
+    staffDocument: {
+      findFirst: jest.fn(({ where }) =>
+        where.fileId === 'f1' &&
+        where.staffId === 's1' &&
+        where.tenantId === 't1'
+          ? { id: 'sd1' }
+          : null,
+      ),
+    },
     teachingLicenceEvidence: {
       create: jest.fn(({ data }) => ({ id: 'l-new', ...data })),
       findFirst: jest.fn(() => state.evidence ?? null),
@@ -337,6 +346,51 @@ describe('ProfessionalIdentityService (Phase 5J–5L)', () => {
         documentId: 'f1',
       });
       expect(data.verifiedById).toBeUndefined();
+    });
+
+    it("refuses a document that is not one of this staff member's current documents", async () => {
+      const { service, tx } = setup({ profile: { id: 'p1' } });
+      await expect(
+        service.addQualification(
+          's1',
+          {
+            qualification: 'B.Ed',
+            validFrom: '2025-01-01',
+            documentId: 'student-file-9',
+          } as any,
+          HR_A,
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: 'EVIDENCE_DOCUMENT_NOT_STAFF_RECORD',
+        }),
+      });
+      expect(tx.teacherQualificationEvidence.create).not.toHaveBeenCalled();
+      expect(tx.staffDocument.findFirst).toHaveBeenCalledWith({
+        where: {
+          tenantId: 't1',
+          staffId: 's1',
+          fileId: 'student-file-9',
+          status: { in: ['ACTIVE', 'VERIFIED'] },
+        },
+        select: { id: true },
+      });
+    });
+
+    it('accepts evidence without a document (source reference only)', async () => {
+      const { service, tx } = setup({ profile: { id: 'p1' } });
+      await service.addLicence(
+        's1',
+        {
+          authorityCode: 'TSC',
+          externalReference: 'L-9',
+          validFrom: '2025-01-01',
+          sourceUri: 'https://tsc.gov.np/x',
+        } as any,
+        HR_A,
+      );
+      expect(tx.staffDocument.findFirst).not.toHaveBeenCalled();
+      expect(tx.teachingLicenceEvidence.create).toHaveBeenCalled();
     });
 
     it('cannot verify evidence with no document or source', async () => {

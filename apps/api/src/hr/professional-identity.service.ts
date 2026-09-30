@@ -402,6 +402,12 @@ export class ProfessionalIdentityService {
     const window = evidenceWindow(dto);
     return this.write(async (tx) => {
       const profile = await this.requireProfile(tx, staffId, actor);
+      await this.assertStaffEvidenceDocument(
+        tx,
+        staffId,
+        dto.documentId,
+        actor,
+      );
       const row = await tx.teacherQualificationEvidence.create({
         data: {
           tenantId: actor.tenantId,
@@ -433,6 +439,12 @@ export class ProfessionalIdentityService {
     const window = evidenceWindow(dto);
     return this.write(async (tx) => {
       const profile = await this.requireProfile(tx, staffId, actor);
+      await this.assertStaffEvidenceDocument(
+        tx,
+        staffId,
+        dto.documentId,
+        actor,
+      );
       const row = await tx.teachingLicenceEvidence.create({
         data: {
           tenantId: actor.tenantId,
@@ -702,6 +714,35 @@ export class ProfessionalIdentityService {
       );
     }
     return profile;
+  }
+
+  /**
+   * Evidence documents must be this staff member's own protected staff
+   * documents (never another record's file in the same school).
+   */
+  private async assertStaffEvidenceDocument(
+    tx: Tx,
+    staffId: string,
+    documentId: string | undefined,
+    actor: AuthContext,
+  ) {
+    if (!documentId) return;
+    const document = await tx.staffDocument.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        staffId,
+        fileId: documentId,
+        // Archived, replaced or rejected staff documents are not evidence.
+        status: { in: ['ACTIVE', 'VERIFIED'] },
+      },
+      select: { id: true },
+    });
+    if (!document) {
+      throw conflict(
+        'EVIDENCE_DOCUMENT_NOT_STAFF_RECORD',
+        "The evidence document must be one of this staff member's current documents",
+      );
+    }
   }
 
   private async findEvidence(

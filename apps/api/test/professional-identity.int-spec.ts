@@ -292,6 +292,87 @@ describeDatabase('Professional identity (real PostgreSQL)', () => {
     expect(audits.map((a) => a.action)).toEqual(['submit', 'verify', 'revoke']);
   });
 
+  it("evidence documents must be this staff member's own staff documents", async () => {
+    await scoped(() =>
+      service.createTeacherProfile(
+        staffId,
+        { effectiveFrom: '2025-04-14' },
+        hrA,
+      ),
+    );
+    const file = (key: string) =>
+      scoped(() =>
+        prisma.fileAsset.create({
+          data: {
+            tenantId,
+            originalFilename: `${key}.pdf`,
+            objectKey: `${tenantId}/staff_documents/${randomUUID()}.pdf`,
+            mimeType: 'application/pdf',
+            sizeBytes: BigInt(1024),
+          },
+        }),
+      );
+    const certificate = await file('certificate');
+    const unrelated = await file('unrelated-student-file');
+    await scoped(() =>
+      prisma.staffDocument.create({
+        data: {
+          tenantId,
+          staffId,
+          kind: 'ACADEMIC_CERTIFICATE',
+          fileId: certificate.id,
+          name: 'B.Ed certificate',
+        },
+      }),
+    );
+
+    const accepted = await scoped(() =>
+      service.addQualification(
+        staffId,
+        {
+          qualification: 'B.Ed',
+          validFrom: '2025-01-01',
+          documentId: certificate.id,
+        } as never,
+        hrA,
+      ),
+    );
+    expect(accepted).toMatchObject({
+      status: 'PENDING',
+      documentId: certificate.id,
+    });
+    // A document makes it verifiable by an independent reviewer.
+    await expect(
+      scoped(() =>
+        service.reviewEvidence(
+          'qualification',
+          staffId,
+          accepted.id,
+          { decision: 'VERIFY' },
+          hrB,
+        ),
+      ),
+    ).resolves.toMatchObject({ status: 'VERIFIED' });
+
+    await expect(
+      scoped(() =>
+        service.addQualification(
+          staffId,
+          {
+            qualification: 'M.Ed',
+            validFrom: '2025-01-01',
+            documentId: unrelated.id,
+          } as never,
+          hrA,
+        ),
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'EVIDENCE_DOCUMENT_NOT_STAFF_RECORD',
+      }),
+    });
+  });
+
   it("never reveals another tenant's staff", async () => {
     await expect(
       scoped(

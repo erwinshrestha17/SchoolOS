@@ -15,6 +15,7 @@ import { Badge, type BadgeProps } from '../ui/badge';
 import { Button } from '../ui/button';
 import { FormField, Input, Select } from '../ui/form-field';
 import { ProtectedFileButton } from '../ui/protected-file';
+import { FileUploader } from '../ui/file-uploader';
 import { useSession } from '../session-provider';
 
 /**
@@ -51,6 +52,7 @@ export function ProfessionalIdentityPanel({ staffId }: { staffId: string }) {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
   const canManage = hasPermissions(['hr:manage']);
+  const canUploadDocuments = hasPermissions(['hr:documents:manage']);
   const [error, setError] = useState<string | null>(null);
 
   const overview = useQuery({
@@ -207,8 +209,10 @@ export function ProfessionalIdentityPanel({ staffId }: { staffId: string }) {
             action={
               canManage && (
                 <EvidenceForm
+                  staffId={staffId}
                   kind={kind}
                   documents={docOptions}
+                  canUploadDocuments={canUploadDocuments}
                   busy={run.isPending}
                   onSubmit={(body) =>
                     run.mutate(() =>
@@ -681,21 +685,78 @@ function EmploymentForm({
 }
 
 function EvidenceForm({
+  staffId,
   kind,
   documents,
+  canUploadDocuments,
   busy,
   onSubmit,
 }: {
+  staffId: string;
   kind: EvidenceKind;
   documents: Array<{ fileId?: string; name?: string }>;
+  canUploadDocuments: boolean;
   busy: boolean;
   onSubmit: (body: Record<string, unknown>) => void;
 }) {
+  const queryClient = useQueryClient();
+  const [documentId, setDocumentId] = useState('');
+  const [uploaded, setUploaded] = useState<
+    Array<{ fileId: string; name: string }>
+  >([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Phase 5L: an uploaded evidence file is first registered as a protected
+  // staff document (same storage, permission and audit as the Documents
+  // tab), then attached to this evidence. Evidence still starts PENDING.
+  const registerDocument = useMutation({
+    mutationFn: (file: { fileId: string; fileName: string }) =>
+      api.addStaffDocument(staffId, {
+        kind: kind === 'qualifications' ? 'ACADEMIC_CERTIFICATE' : 'OTHER',
+        fileId: file.fileId,
+        name:
+          (kind === 'qualifications'
+            ? 'Qualification evidence: '
+            : 'Teaching licence evidence: ') +
+          file.fileName.replace(/\.[^/.]+$/, ''),
+      }),
+    onSuccess: (_result, file) => {
+      setUploadError(null);
+      const name = file.fileName.replace(/\.[^/.]+$/, '');
+      setUploaded((current) => [...current, { fileId: file.fileId, name }]);
+      setDocumentId(file.fileId);
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-documents', staffId],
+      });
+    },
+    onError: (error) =>
+      setUploadError(
+        schoolFacingErrorMessage(error, {
+          fallback: 'The document could not be attached. Try again.',
+          forbidden: 'You do not have permission to add staff documents.',
+        }),
+      ),
+  });
+
+  const options = [
+    ...uploaded,
+    ...documents
+      .filter(
+        (doc): doc is { fileId: string; name?: string } =>
+          Boolean(doc.fileId) &&
+          !uploaded.some((item) => item.fileId === doc.fileId),
+      )
+      .map((doc) => ({ fileId: doc.fileId, name: doc.name ?? doc.fileId })),
+  ];
+
   return (
     <ToggleForm
       label={kind === 'qualifications' ? 'Add qualification' : 'Add licence'}
-      busy={busy}
-      onSubmit={onSubmit}
+      busy={busy || registerDocument.isPending}
+      onSubmit={(body) => {
+        onSubmit(body);
+        setDocumentId('');
+      }}
     >
       {kind === 'qualifications' ? (
         <>
@@ -720,16 +781,44 @@ function EvidenceForm({
       <Field name="subjectCode" label="Subject code (blank = any)" />
       <Field name="validFrom" label="Valid from" type="date" required />
       <Field name="validUntil" label="Valid until" type="date" />
-      <FormField label="Evidence document" htmlFor="pi-documentId">
-        <Select id="pi-documentId" name="documentId" defaultValue="">
+      <FormField label="Evidence document" htmlFor={`pi-documentId-${kind}`}>
+        <Select
+          id={`pi-documentId-${kind}`}
+          name="documentId"
+          value={documentId}
+          onChange={(event) => setDocumentId(event.target.value)}
+        >
           <option value="">None (use source reference)</option>
-          {documents.map((doc) => (
+          {options.map((doc) => (
             <option key={doc.fileId} value={doc.fileId}>
-              {doc.name ?? doc.fileId}
+              {doc.name}
             </option>
           ))}
         </Select>
       </FormField>
+      {canUploadDocuments ? (
+        <FormField label="Or upload the document now">
+          <FileUploader
+            module="staff_documents"
+            maxFiles={1}
+            accept=".pdf,.png,.jpg,.jpeg"
+            onUploadComplete={(fileId, fileName) =>
+              registerDocument.mutate({ fileId, fileName })
+            }
+            onRemove={(fileId) => {
+              if (documentId === fileId) setDocumentId('');
+            }}
+          />
+          {registerDocument.isPending ? (
+            <p className="mt-1 text-xs text-slate-500">Attaching document…</p>
+          ) : null}
+          {uploadError ? (
+            <p role="alert" className="mt-1 text-xs text-red-700">
+              {uploadError}
+            </p>
+          ) : null}
+        </FormField>
+      ) : null}
       <Field name="sourceUri" label="Source reference (https)" type="url" />
       <p className="text-xs text-slate-500 sm:col-span-2">
         Submitted evidence stays PENDING until a different HR reviewer verifies
