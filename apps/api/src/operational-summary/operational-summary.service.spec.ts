@@ -212,6 +212,30 @@ describe('OperationalSummaryService', () => {
     delete invoice.findMany;
   });
 
+  it('flags only ended, unclosed fiscal periods (not every open period)', async () => {
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['accounting'],
+    } as never);
+    const fiscalCount = jest.fn().mockResolvedValue(0);
+    (prisma as unknown as Record<string, unknown>).fiscalPeriod = {
+      count: fiscalCount,
+    };
+
+    await service.getModuleSummary('m11_accounting', {
+      ...actor,
+      permissions: ['accounting:read', 'accounting:reports:read'],
+    });
+
+    const blockerCall = (
+      fiscalCount.mock.calls as [{ where: Record<string, unknown> }][]
+    ).find(([args]) => 'endDate' in args.where);
+    expect(blockerCall?.[0].where).toMatchObject({
+      status: { in: ['OPEN', 'LOCKED'] },
+      endDate: { lt: expect.any(Date) },
+    });
+    delete (prisma as unknown as Record<string, unknown>).fiscalPeriod;
+  });
+
   it('omits the module next-action when nothing needs attention', async () => {
     entitlements.getEntitlements.mockResolvedValue({
       modules: ['fees'],

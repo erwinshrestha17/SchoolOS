@@ -569,6 +569,18 @@ export class OperationalSummaryService {
           'Review overdue fee follow-up',
           '/dashboard/fees/invoices',
         ),
+        // Receivables ageing: invoices more than 90 days past due.
+        this.def(
+          'invoicesOverdue90Plus',
+          'invoice',
+          {
+            tenantId,
+            status: { in: ['ISSUED', 'PARTIAL'] },
+            dueDate: { lt: new Date(day.startUtc.getTime() - 90 * 86_400_000) },
+          },
+          'Escalate receivables over 90 days',
+          '/dashboard/fees/invoices',
+        ),
         this.def('invoicesDueToday', 'invoice', {
           tenantId,
           status: { in: ['ISSUED', 'PARTIAL'] },
@@ -969,11 +981,17 @@ export class OperationalSummaryService {
           'Resolve failed accounting postings',
           '/dashboard/accounting/payroll-handoff',
         ),
+        // Only periods that have already ended and are still not closed are
+        // a warning; every current/future open period is normal.
         this.def(
           'periodCloseBlockers',
           'fiscalPeriod',
-          { tenantId, status: { in: ['OPEN', 'LOCKED'] } },
-          'Review period close status',
+          {
+            tenantId,
+            status: { in: ['OPEN', 'LOCKED'] },
+            endDate: { lt: day.startUtc },
+          },
+          'Close ended accounting periods',
           '/dashboard/accounting/fiscal-periods',
         ),
       ],

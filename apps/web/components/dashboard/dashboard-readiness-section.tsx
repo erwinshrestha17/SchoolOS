@@ -133,6 +133,20 @@ const READINESS_PANELS: ReadinessPanelDefinition[] = [
         route: '/dashboard/accounting/reconciliation',
       },
       {
+        module: 'm3_fees',
+        metricKey: 'invoicesOverdue90Plus',
+        label: (count) =>
+          `${formatNumber(count)} invoice${count === 1 ? '' : 's'} over 90 days past due`,
+        route: '/dashboard/fees/invoices',
+      },
+      {
+        module: 'm11_accounting',
+        metricKey: 'periodCloseBlockers',
+        label: (count) =>
+          `${formatNumber(count)} ended period${count === 1 ? '' : 's'} not yet closed`,
+        route: '/dashboard/accounting/fiscal-periods',
+      },
+      {
         module: 'm11_accounting',
         metricKey: 'failedPostingBatches',
         label: (count) =>
