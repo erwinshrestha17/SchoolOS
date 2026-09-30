@@ -7,6 +7,9 @@ import {
   getNepalSchoolDay,
   LEGACY_ADMISSION_APPLICATION_STATUSES,
   type AdmissionApplication,
+  type AdmissionApplicationDocumentFilter,
+  type AdmissionApplicationListItem,
+  type AdmissionApplicationReviewerFilter,
   type AdmissionApplicationStatus,
   type LegacyAdmissionApplicationStatus,
 } from '@schoolos/core';
@@ -79,7 +82,17 @@ export function AdmissionsPipeline() {
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
   const [classId, setClassId] = useState('');
+  const [academicYearId, setAcademicYearId] = useState('');
   const [status, setStatus] = useState<AdmissionApplicationStatus | ''>('');
+  const [documentState, setDocumentState] = useState<
+    AdmissionApplicationDocumentFilter | ''
+  >('');
+  const [reviewer, setReviewer] = useState<
+    AdmissionApplicationReviewerFilter | ''
+  >('');
+  const hasActiveFilters = Boolean(
+    search || classId || academicYearId || status || documentState || reviewer,
+  );
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -94,12 +107,24 @@ export function AdmissionsPipeline() {
     queryFn: api.listAcademicYears,
   });
   const applicationsQuery = useQuery({
-    queryKey: ['admission-applications', deferredSearch, classId, status, page],
+    queryKey: [
+      'admission-applications',
+      deferredSearch,
+      classId,
+      academicYearId,
+      status,
+      documentState,
+      reviewer,
+      page,
+    ],
     queryFn: () =>
       api.listAdmissionApplications({
         search: deferredSearch || undefined,
         classId: classId || undefined,
+        academicYearId: academicYearId || undefined,
         status: status || undefined,
+        documentState: documentState || undefined,
+        reviewer: reviewer || undefined,
         page,
         limit: PAGE_SIZE,
       }),
@@ -171,8 +196,10 @@ export function AdmissionsPipeline() {
       <div className="grid min-h-[580px] gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="space-y-4 border-b border-slate-100 bg-slate-50/70 p-4">
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_190px_190px]">
-              <label className="relative">
+            {/* Phase 5B: spec filters — academic year, applying class,
+                stage, document state, assigned reviewer (all server-side). */}
+            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+              <label className="relative md:col-span-3 xl:col-span-1">
                 <span className="sr-only">Search applications</span>
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
@@ -181,19 +208,34 @@ export function AdmissionsPipeline() {
                     setSearch(event.target.value);
                     setPage(1);
                   }}
-                  placeholder="Student, guardian, or phone"
+                  placeholder="Name, guardian, phone or APP-ID"
                   className="pl-9"
                 />
               </label>
+              <select
+                value={academicYearId}
+                onChange={(event) => {
+                  setAcademicYearId(event.target.value);
+                  setPage(1);
+                }}
+                aria-label="Filter by academic year"
+              >
+                <option value="">All academic years</option>
+                {(academicYearsQuery.data ?? []).map((year) => (
+                  <option key={year.id} value={year.id}>
+                    {year.name}
+                  </option>
+                ))}
+              </select>
               <select
                 value={classId}
                 onChange={(event) => {
                   setClassId(event.target.value);
                   setPage(1);
                 }}
-                aria-label="Filter by requested class"
+                aria-label="Filter by applying class"
               >
-                <option value="">All requested classes</option>
+                <option value="">All applying classes</option>
                 {(classesQuery.data ?? []).map((schoolClass) => (
                   <option key={schoolClass.id} value={schoolClass.id}>
                     {schoolClass.name}
@@ -217,6 +259,38 @@ export function AdmissionsPipeline() {
                   </option>
                 ))}
               </select>
+              <select
+                value={documentState}
+                onChange={(event) => {
+                  setDocumentState(
+                    event.target.value as
+                      | AdmissionApplicationDocumentFilter
+                      | '',
+                  );
+                  setPage(1);
+                }}
+                aria-label="Filter by document state"
+              >
+                <option value="">Any document state</option>
+                <option value="PENDING">Documents pending</option>
+                <option value="NOT_PENDING">No documents pending</option>
+              </select>
+              <select
+                value={reviewer}
+                onChange={(event) => {
+                  setReviewer(
+                    event.target.value as
+                      | AdmissionApplicationReviewerFilter
+                      | '',
+                  );
+                  setPage(1);
+                }}
+                aria-label="Filter by assigned reviewer"
+              >
+                <option value="">Any reviewer</option>
+                <option value="ME">Assigned to me</option>
+                <option value="UNASSIGNED">Unassigned</option>
+              </select>
             </div>
           </div>
 
@@ -235,7 +309,7 @@ export function AdmissionsPipeline() {
             <EmptyState
               title="No applications found"
               description={
-                search || classId || status
+                hasActiveFilters
                   ? 'No application matches the current filters.'
                   : 'Create the first inquiry/application to start the review pipeline.'
               }
@@ -250,15 +324,18 @@ export function AdmissionsPipeline() {
             />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left text-sm">
+              <table className="w-full min-w-[960px] text-left text-sm">
+                <caption className="sr-only">Admission applications</caption>
                 <thead className="bg-slate-50 text-[0.68rem] font-black uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-4 py-3">Applicant</th>
-                    <th className="px-4 py-3">Guardian</th>
-                    <th className="px-4 py-3">Requested class</th>
+                    <th className="px-4 py-3">Application ID</th>
+                    <th className="px-4 py-3">Applying for</th>
                     <th className="px-4 py-3">Stage</th>
-                    <th className="px-4 py-3">Duplicate review</th>
-                    <th className="px-4 py-3">Updated</th>
+                    <th className="px-4 py-3">Documents</th>
+                    <th className="px-4 py-3">Assessment</th>
+                    <th className="px-4 py-3">Submitted</th>
+                    <th className="px-4 py-3">Owner</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -292,41 +369,51 @@ export function AdmissionsPipeline() {
                                 aria-hidden="true"
                               />
                             </strong>
-                            <span className="text-xs text-slate-500">
-                              {applicationSourceLabel(application.source)}
+                            <span className="block text-xs text-slate-500">
+                              {application.guardianFullName ||
+                                'Guardian not recorded'}
                             </span>
                           </button>
+                          {duplicateCount ? (
+                            <StatusBadge
+                              status={`${duplicateCount} possible duplicate${duplicateCount === 1 ? '' : 's'}`}
+                              tone="pending"
+                            />
+                          ) : null}
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="block font-semibold text-slate-700">
-                            {application.guardianFullName ||
-                              'Guardian not recorded'}
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            {application.guardianPhone || 'Phone not recorded'}
-                          </span>
+                        <td className="px-4 py-3 text-xs font-medium tabular-nums text-slate-600">
+                          {application.reference}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
-                          {classNameFor(
-                            application.classId,
-                            classesQuery.data ?? [],
-                          )}
+                          <span className="block">
+                            {classNameFor(
+                              application.classId,
+                              classesQuery.data ?? [],
+                            )}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {academicYearNameFor(
+                              application.academicYearId,
+                              academicYearsQuery.data ?? [],
+                            )}
+                          </span>
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge status={application.status} />
                         </td>
                         <td className="px-4 py-3">
-                          {duplicateCount ? (
-                            <StatusBadge
-                              status={`${duplicateCount} TO REVIEW`}
-                              tone="pending"
-                            />
-                          ) : (
-                            <StatusBadge status="NO WARNING" tone="approved" />
-                          )}
+                          <DocumentStateBadge
+                            state={application.documentState}
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          {assessmentLabel(application.assessment)}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-500">
-                          {formatBsDateTime(application.updatedAt)}
+                          {formatBsDate(application.createdAt)}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          {ownerLabel(application.reviewer)}
                         </td>
                       </tr>
                     );
@@ -436,7 +523,7 @@ function ApplicationInspector({
   onTransition,
   onEnrolled,
 }: {
-  application: AdmissionApplication;
+  application: AdmissionApplicationListItem;
   classes: Array<{ id: string; name: string }>;
   academicYears: Array<{ id: string; name: string }>;
   rejectionReason: string;
@@ -467,6 +554,7 @@ function ApplicationInspector({
       </div>
 
       <dl className="grid gap-3 rounded-xl bg-slate-50 p-4 text-xs">
+        <InspectorRow label="Application ID" value={application.reference} />
         <InspectorRow
           label="Academic year"
           value={academicYearNameFor(application.academicYearId, academicYears)}
@@ -1019,7 +1107,36 @@ function replaceApplication(
   return {
     ...result,
     items: result.items.map((item) =>
-      item.id === updated.id ? updated : item,
+      // Keep list-only fields (reference, documents, assessment, owner).
+      item.id === updated.id ? { ...item, ...updated } : item,
     ),
   };
+}
+
+function DocumentStateBadge({
+  state,
+}: {
+  state: AdmissionApplicationListItem['documentState'];
+}) {
+  if (state === 'PENDING') {
+    return <StatusBadge status="Pending" tone="pending" />;
+  }
+  if (state === 'ON_FILE') {
+    return <StatusBadge status="On file" tone="approved" />;
+  }
+  return <span className="text-xs text-slate-500">None recorded</span>;
+}
+
+function assessmentLabel(
+  assessment: AdmissionApplicationListItem['assessment'],
+) {
+  if (!assessment) return 'Not scheduled';
+  if (assessment.result) return `Result: ${assessment.result.toLowerCase()}`;
+  return `${assessment.status.toLowerCase().replaceAll('_', ' ')} · ${formatBsDate(assessment.scheduledAt)}`;
+}
+
+function ownerLabel(reviewer: AdmissionApplicationListItem['reviewer']) {
+  if (!reviewer) return 'Unassigned';
+  if (reviewer.assignedToMe) return 'You';
+  return reviewer.name ?? 'Assigned reviewer';
 }

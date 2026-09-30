@@ -191,6 +191,42 @@ export type AdmissionApplication = {
   updatedAt: string;
 };
 
+/** Phase 5B applications workspace filters (server-applied). */
+export const ADMISSION_APPLICATION_DOCUMENT_FILTERS = [
+  "PENDING",
+  "NOT_PENDING",
+] as const;
+export type AdmissionApplicationDocumentFilter =
+  (typeof ADMISSION_APPLICATION_DOCUMENT_FILTERS)[number];
+
+export const ADMISSION_APPLICATION_REVIEWER_FILTERS = [
+  "ME",
+  "UNASSIGNED",
+] as const;
+export type AdmissionApplicationReviewerFilter =
+  (typeof ADMISSION_APPLICATION_REVIEWER_FILTERS)[number];
+
+/**
+ * One row of the applications workspace. Built on the server from the
+ * application; never carries raw case metadata (health, emergency contact,
+ * identity numbers, review notes).
+ */
+export type AdmissionApplicationListItem = AdmissionApplication & {
+  /** Short reference derived from the record id, e.g. APP-3F9A12C0. */
+  reference: string;
+  /** From the last policy evaluation: pending required documents or not. */
+  documentState: "PENDING" | "ON_FILE" | "NOT_RECORDED";
+  assessment: {
+    status: string;
+    result: string | null;
+    scheduledAt: string;
+  } | null;
+  reviewer: {
+    assignedToMe: boolean;
+    name: string | null;
+  } | null;
+};
+
 export type CreateAdmissionApplicationPayload = {
   firstNameEn: string;
   lastNameEn: string;

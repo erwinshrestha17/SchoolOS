@@ -553,22 +553,77 @@ export class AdmissionsService {
     query: ListAdmissionApplicationsDto,
     actor: AuthContext,
   ) {
-    const { page = 1, limit = 25, search, status, classId } = query;
+    const {
+      page = 1,
+      limit = 25,
+      search,
+      status,
+      classId,
+      academicYearId,
+      documentState,
+      reviewer,
+    } = query;
     const skip = (page - 1) * limit;
+    const trimmedSearch = search?.trim();
+    const referencePrefix = trimmedSearch
+      ?.match(/^APP-?([0-9a-f]{4,8})$/i)?.[1]
+      ?.toLowerCase();
+    const filters: Prisma.AdmissionApplicationWhereInput[] = [];
+    if (documentState === 'PENDING') filters.push(DOCUMENTS_PENDING_FILTER);
+    if (documentState === 'NOT_PENDING') {
+      // A plain NOT drops rows whose metadata lacks followUps (SQL NULL), so
+      // those are matched explicitly.
+      filters.push({
+        OR: [
+          {
+            duplicateReview: { path: ['followUps'], equals: Prisma.AnyNull },
+          },
+          { NOT: DOCUMENTS_PENDING_FILTER },
+        ],
+      });
+    }
+    if (reviewer === 'ME') {
+      filters.push({
+        duplicateReview: {
+          path: ['review', 'reviewerUserId'],
+          equals: actor.userId,
+        },
+      });
+    }
+    if (reviewer === 'UNASSIGNED') {
+      filters.push({
+        duplicateReview: {
+          path: ['review', 'reviewerUserId'],
+          equals: Prisma.AnyNull,
+        },
+      });
+    }
     const where: Prisma.AdmissionApplicationWhereInput = {
       tenantId: actor.tenantId,
       ...(status ? { status } : {}),
       ...(classId ? { classId } : {}),
-      ...(search
+      ...(academicYearId ? { academicYearId } : {}),
+      ...(trimmedSearch
         ? {
             OR: [
-              { firstNameEn: { contains: search, mode: 'insensitive' } },
-              { lastNameEn: { contains: search, mode: 'insensitive' } },
-              { guardianFullName: { contains: search, mode: 'insensitive' } },
-              { guardianPhone: { contains: search, mode: 'insensitive' } },
+              { firstNameEn: { contains: trimmedSearch, mode: 'insensitive' } },
+              { lastNameEn: { contains: trimmedSearch, mode: 'insensitive' } },
+              {
+                guardianFullName: {
+                  contains: trimmedSearch,
+                  mode: 'insensitive',
+                },
+              },
+              {
+                guardianPhone: { contains: trimmedSearch, mode: 'insensitive' },
+              },
+              ...(referencePrefix
+                ? [{ id: { startsWith: referencePrefix } }]
+                : []),
             ],
           }
         : {}),
+      ...(filters.length > 0 ? { AND: filters } : {}),
     };
 
     const [total, items] = await Promise.all([
@@ -578,11 +633,60 @@ export class AdmissionsService {
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip,
         take: limit,
+        include: {
+          assessmentSessions: {
+            where: { tenantId: actor.tenantId },
+            select: { status: true, result: true, scheduledAt: true },
+            take: 1,
+          },
+        },
       }),
     ]);
 
+    const reviewerIds = [
+      ...new Set(
+        items
+          .map((item) => applicationReviewerId(item.duplicateReview))
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    const reviewerStaff =
+      reviewerIds.length === 0
+        ? []
+        : await this.prisma.staff.findMany({
+            where: { tenantId: actor.tenantId, userId: { in: reviewerIds } },
+            select: { userId: true, firstName: true, lastName: true },
+          });
+    const reviewerNames = new Map(
+      reviewerStaff.map((staff) => [
+        staff.userId,
+        `${staff.firstName} ${staff.lastName}`.trim(),
+      ]),
+    );
+
     return {
-      items: items.map(formatAdmissionApplication),
+      items: items.map(({ assessmentSessions, ...application }) => {
+        const reviewerId = applicationReviewerId(application.duplicateReview);
+        const session = assessmentSessions[0] ?? null;
+        return {
+          ...formatAdmissionApplication(application),
+          reference: admissionApplicationReference(application.id),
+          documentState: applicationDocumentState(application.duplicateReview),
+          assessment: session
+            ? {
+                status: session.status,
+                result: session.result,
+                scheduledAt: session.scheduledAt.toISOString(),
+              }
+            : null,
+          reviewer: reviewerId
+            ? {
+                assignedToMe: reviewerId === actor.userId,
+                name: reviewerNames.get(reviewerId) ?? null,
+              }
+            : null,
+        };
+      }),
       total,
       page,
       limit,
@@ -2384,6 +2488,92 @@ function canonicalizeFingerprintValue(value: unknown): unknown {
   return value;
 }
 
+/** Short display reference derived from the record id (APP-XXXXXXXX). */
+export function admissionApplicationReference(id: string) {
+  return `APP-${id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+}
+
+function jsonRecord(value: Prisma.JsonValue | null): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value
+    : {};
+}
+
+/**
+ * Public duplicate-review shape: legacy `matches` or case `duplicateCandidates`
+ * reduced to identifying fields. Everything else in the JSON stays server-side.
+ */
+export function publicDuplicateReview(value: Prisma.JsonValue | null) {
+  const metadata = jsonRecord(value);
+  const legacy = Array.isArray(metadata.matches) ? metadata.matches : null;
+  const candidates = Array.isArray(metadata.duplicateCandidates)
+    ? metadata.duplicateCandidates
+    : null;
+  const source = legacy ?? candidates;
+  if (
+    !source &&
+    metadata.hasWarnings === undefined &&
+    metadata.duplicateRisk === undefined
+  ) {
+    return null;
+  }
+  const matches = (source ?? [])
+    .map((item) => jsonRecord(item as Prisma.JsonValue))
+    .filter((item) => typeof item.studentId === 'string')
+    .map((item) => ({
+      studentId: String(item.studentId),
+      studentSystemId:
+        typeof item.studentSystemId === 'string' ? item.studentSystemId : '',
+      fullNameEn: typeof item.fullNameEn === 'string' ? item.fullNameEn : '',
+      matchTypes: Array.isArray(item.matchTypes)
+        ? item.matchTypes.filter(
+            (type): type is string => typeof type === 'string',
+          )
+        : [],
+    }));
+  return {
+    hasWarnings:
+      metadata.hasWarnings === true ||
+      metadata.duplicateRisk === true ||
+      matches.length > 0,
+    matches,
+  };
+}
+
+function applicationDocumentState(
+  value: Prisma.JsonValue | null,
+): 'PENDING' | 'ON_FILE' | 'NOT_RECORDED' {
+  const metadata = jsonRecord(value);
+  const followUps = Array.isArray(metadata.followUps) ? metadata.followUps : [];
+  if (
+    followUps.some(
+      (item) =>
+        jsonRecord(item as Prisma.JsonValue).code === 'DOCUMENTS_PENDING',
+    )
+  ) {
+    return 'PENDING';
+  }
+  return Array.isArray(metadata.documents) && metadata.documents.length > 0
+    ? 'ON_FILE'
+    : 'NOT_RECORDED';
+}
+
+function applicationReviewerId(value: Prisma.JsonValue | null): string | null {
+  const reviewerUserId = jsonRecord(
+    jsonRecord(value).review as Prisma.JsonValue,
+  ).reviewerUserId;
+  return typeof reviewerUserId === 'string' && reviewerUserId
+    ? reviewerUserId
+    : null;
+}
+
+const DOCUMENTS_PENDING_FILTER: Prisma.AdmissionApplicationWhereInput = {
+  duplicateReview: {
+    path: ['followUps'],
+    array_contains: [{ code: 'DOCUMENTS_PENDING' }],
+  },
+};
+
 function formatAdmissionApplication(application: {
   id: string;
   status: string;
@@ -2416,6 +2606,9 @@ function formatAdmissionApplication(application: {
     application;
   return {
     ...publicFields,
+    // The column also stores admission-case metadata (health, emergency
+    // contact, identity numbers, review notes); only duplicate matches leave.
+    duplicateReview: publicDuplicateReview(application.duplicateReview),
     fullNameEn: `${application.firstNameEn} ${application.lastNameEn}`.trim(),
     dateOfBirth: application.dateOfBirth?.toISOString() ?? null,
     createdAt: application.createdAt.toISOString(),

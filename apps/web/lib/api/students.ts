@@ -1,6 +1,9 @@
 import type {
   AdmissionCreationResult,
   AdmissionApplication,
+  AdmissionApplicationDocumentFilter,
+  AdmissionApplicationListItem,
+  AdmissionApplicationReviewerFilter,
   AdmissionApplicationStatus,
   LegacyAdmissionApplicationStatus,
   AdmissionDuplicateCheckResult,
@@ -311,8 +314,11 @@ export const studentsApi = {
     search?: string;
     status?: AdmissionApplicationStatus;
     classId?: string;
+    academicYearId?: string;
+    documentState?: AdmissionApplicationDocumentFilter;
+    reviewer?: AdmissionApplicationReviewerFilter;
   }) =>
-    request<PaginatedResponse<AdmissionApplication>>(
+    request<PaginatedResponse<AdmissionApplicationListItem>>(
       withQuery('/admissions/applications', params ?? {}),
     ),
   createAdmissionApplication: (body: CreateAdmissionApplicationPayload) =>

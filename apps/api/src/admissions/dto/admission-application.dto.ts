@@ -52,6 +52,20 @@ export const ADMISSION_APPLICATION_FILTER_STATUSES = [
 export type AdmissionApplicationFilterStatus =
   (typeof ADMISSION_APPLICATION_FILTER_STATUSES)[number];
 
+export const ADMISSION_APPLICATION_DOCUMENT_FILTERS = [
+  'PENDING',
+  'NOT_PENDING',
+] as const;
+export type AdmissionApplicationDocumentFilter =
+  (typeof ADMISSION_APPLICATION_DOCUMENT_FILTERS)[number];
+
+export const ADMISSION_APPLICATION_REVIEWER_FILTERS = [
+  'ME',
+  'UNASSIGNED',
+] as const;
+export type AdmissionApplicationReviewerFilter =
+  (typeof ADMISSION_APPLICATION_REVIEWER_FILTERS)[number];
+
 export class ListAdmissionApplicationsDto {
   @IsOptional()
   @IsInt()
@@ -77,6 +91,18 @@ export class ListAdmissionApplicationsDto {
   @IsOptional()
   @IsString()
   classId?: string;
+
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
+
+  @IsOptional()
+  @IsIn(ADMISSION_APPLICATION_DOCUMENT_FILTERS)
+  documentState?: AdmissionApplicationDocumentFilter;
+
+  @IsOptional()
+  @IsIn(ADMISSION_APPLICATION_REVIEWER_FILTERS)
+  reviewer?: AdmissionApplicationReviewerFilter;
 }
 
 export class CreateAdmissionApplicationDto {

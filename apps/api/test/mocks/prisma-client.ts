@@ -138,6 +138,7 @@ export const Prisma = {
   PrismaClientKnownRequestError,
   Decimal,
   TransactionIsolationLevel,
+  AnyNull: { prismaNullSentinel: 'AnyNull' },
   empty: { strings: [''], values: [] },
   sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
     strings,
