@@ -7,6 +7,7 @@ import type {
   PrepareBankReconciliation,
 } from '@schoolos/core';
 import { api } from '@/lib/api';
+import { resourceAccess } from '@/lib/resource-authorization';
 import { useSession } from '../session-provider';
 import { SectionCard } from '../ui/section-card';
 import { Button } from '../ui/button';
@@ -70,6 +71,8 @@ export function ReconciliationSessionsPanel({
     ) ??
     sessions.data?.[0] ??
     null;
+  // Phase 3A: session duties come from the canonical server projection.
+  const activeAccess = resourceAccess(active?.authorization);
   const [form, setForm] = useState<
     Omit<PrepareBankReconciliation, 'accountId'>
   >({
@@ -282,7 +285,7 @@ export function ReconciliationSessionsPanel({
             )}
             <div className="flex flex-wrap gap-2">
               {(['submit', 'review', 'return', 'finalize', 'cancel'] as const)
-                .filter((duty) => active.allowedActions[duty])
+                .filter((duty) => activeAccess.can(duty.toUpperCase()))
                 .map((duty) => (
                   <Button
                     key={duty}
@@ -294,7 +297,7 @@ export function ReconciliationSessionsPanel({
                     {labels[duty]}
                   </Button>
                 ))}
-              {active.allowedActions.manage && (
+              {activeAccess.can('MANAGE') && (
                 <Button
                   type="button"
                   variant="outline"
@@ -318,7 +321,7 @@ export function ReconciliationSessionsPanel({
                         Statement {match.statementId} ·{' '}
                         {currency(match.bankAmount)}
                       </span>
-                      {active.allowedActions.manage && (
+                      {activeAccess.can('MANAGE') && (
                         <Button
                           type="button"
                           size="sm"

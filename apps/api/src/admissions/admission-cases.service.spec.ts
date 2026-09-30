@@ -25,7 +25,12 @@ const actor = {
   tenantId: 'tenant-a',
   userId: 'user-a',
   roles: ['admin'],
-  permissions: ['students:manage_lifecycle'],
+  permissions: [
+    'students:manage_lifecycle',
+    'enrollments:create',
+    'students:create',
+    'guardians:create',
+  ],
 } as any;
 
 const admissionCase = {
@@ -899,6 +904,23 @@ describe('AdmissionCasesService', () => {
         }),
       }),
     );
+  });
+
+  it('never offers admit or finalize to an actor who cannot call those routes', async () => {
+    const prisma = buildPrisma();
+    prisma.student.findMany.mockResolvedValue([]);
+    const service = buildService(prisma);
+    const reviewer = {
+      ...actor,
+      roles: ['admissions_officer'],
+      permissions: ['students:read', 'students:manage_lifecycle'],
+    };
+
+    const result = await service.getCase('case-a', reviewer);
+
+    expect(result.canAdmitDirectly).toBe(false);
+    expect(result.canOverrideDuplicate).toBe(false);
+    expect(result.canFinalize).toBe(false);
   });
 
   it('surfaces guardian-linked sibling candidates without blocking direct admission', async () => {

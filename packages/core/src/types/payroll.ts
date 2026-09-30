@@ -1,3 +1,4 @@
+import type { ResourceAuthorization } from "../authorization-contract.js";
 import type { StaffSummary } from "./staff.js";
 
 export type PayrollMoneyAmount = string | number;
@@ -61,6 +62,8 @@ export type PayrollRunSummary = {
   disbursementJournalEntryId?: string | null;
   allowedActions: PayrollRunAllowedActions;
   lines?: PayrollLineSummary[];
+  /** Canonical Phase 3A projection; read it instead of allowedActions. */
+  authorization?: ResourceAuthorization;
 };
 
 export type PayrollLineSummary = {

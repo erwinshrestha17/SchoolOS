@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { resourceAccess } from '../../lib/resource-authorization';
 import { ReconciliationSessionsPanel } from './reconciliation-sessions-panel';
 import { useSession } from '../session-provider';
 import { SectionCard } from '../ui/section-card';
@@ -38,7 +39,7 @@ export function BankReconciliationWorkspace() {
   const canImport = hasPermissions(['accounting:reconciliation:manage']);
   const [activeSession, setActiveSession] =
     useState<BankReconciliationSessionView | null>(null);
-  const canMatch = activeSession?.allowedActions.manage === true;
+  const canMatch = resourceAccess(activeSession?.authorization).can('MANAGE');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [importing, setImporting] = useState(false);

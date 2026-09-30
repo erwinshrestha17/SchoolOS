@@ -27,6 +27,7 @@ import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Toast, type ToastTone } from '../ui/toast';
 import { useSession } from '../session-provider';
+import { resourceAccess } from '../../lib/resource-authorization';
 
 interface JournalDetailDialogProps {
   isOpen: boolean;
@@ -41,10 +42,12 @@ export function JournalDetailDialog({
 }: JournalDetailDialogProps) {
   const queryClient = useQueryClient();
   const { hasPermissions } = useSession();
-  const canSubmit = entry?.allowedActions?.submit === true;
-  const canReview = entry?.allowedActions?.review === true;
-  const canApprove = entry?.allowedActions?.approve === true;
-  const canPost = entry?.allowedActions?.post === true;
+  // Phase 3A: journal decisions come from the canonical server projection.
+  const access = resourceAccess(entry?.authorization);
+  const canSubmit = access.can('SUBMIT');
+  const canReview = access.can('REVIEW');
+  const canApprove = access.can('APPROVE');
+  const canPost = access.can('POST');
   const canReverse = hasPermissions(['accounting:journals:reverse']);
   const [isReversing, setIsReversing] = useState(false);
   const [isCorrecting, setIsCorrecting] = useState(false);

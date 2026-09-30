@@ -46,6 +46,7 @@ import { UpdateSalaryStructureDto } from './dto/update-salary-structure.dto';
 import { PayrollReadinessService } from './payroll-readiness.service';
 import { PayrollSalarySlipService } from './payroll-salary-slip.service';
 import { PayrollService } from './payroll.service';
+import { ProjectCanonicalAuthorization } from '../authorization/projection/canonical-authorization.interceptor';
 
 @ApiTags('Payroll')
 @ApiBearerAuth()
@@ -53,6 +54,7 @@ import { PayrollService } from './payroll.service';
 @Controller('payroll')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.payroll')
+@ProjectCanonicalAuthorization({ module: 'payroll' })
 export class PayrollController {
   constructor(
     private readonly payrollService: PayrollService,

@@ -110,7 +110,8 @@ export function AdmissionCaseDetail({
   }
 
   const admissionCase = caseQuery.data;
-  const canFinalize = admissionCase.displayStatus === 'APPROVED';
+  // Server-decided (status + finalize permissions); absent means not allowed.
+  const canFinalize = admissionCase.canFinalize === true;
   const canDirectAdmit =
     (admissionCase.canAdmitDirectly || admissionCase.canOverrideDuplicate) &&
     admissionCase.displayStatus !== 'ADMITTED';

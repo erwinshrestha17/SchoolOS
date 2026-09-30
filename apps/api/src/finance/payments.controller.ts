@@ -43,10 +43,12 @@ import {
   ListCashDepositsDto,
   PrepareCashDepositDto,
 } from './dto/cash-deposit.dto';
+import { ProjectCanonicalAuthorization } from '../authorization/projection/canonical-authorization.interceptor';
 
 @Controller('payments')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.fees')
+@ProjectCanonicalAuthorization({ module: 'fees' })
 export class PaymentsController {
   constructor(private readonly financeService: FinanceService) {}
 

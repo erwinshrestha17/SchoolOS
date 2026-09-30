@@ -63,10 +63,12 @@ import {
   ListAccountingSourceMappingsQueryDto,
 } from './dto/accounting-source-mapping.dto';
 import { ListPostingBatchesQueryDto } from './dto/list-posting-batches.query.dto';
+import { ProjectCanonicalAuthorization } from '../authorization/projection/canonical-authorization.interceptor';
 
 @Controller('accounting')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.accounting')
+@ProjectCanonicalAuthorization({ module: 'accounting' })
 export class AccountingController {
   constructor(
     private readonly accountingService: AccountingService,

@@ -35,6 +35,14 @@ import {
   type EducationProgram,
 } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
+import { hasDomainPermission } from '../authorization/policies/domain-permission';
+
+/** Mirrors @Permissions on POST direct-admit and finalize. */
+const ADMIT_PERMISSIONS = [
+  'enrollments:create',
+  'students:create',
+  'guardians:create',
+] as const;
 import { ApprovalWorkflowService } from '../advanced-operations/approval-workflow.service';
 import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '../config/config.service';
@@ -2168,6 +2176,11 @@ export class AdmissionCasesService implements OnModuleInit {
     const displayStatus = this.displayStatus(record.status);
     const reviewComplete =
       displayStatus === 'APPROVED' || displayStatus === 'ADMITTED';
+    // Actor-facing admit/finalize flags must match the permissions the
+    // direct-admit and finalize routes enforce, not just case readiness.
+    const actorCanEnroll = ADMIT_PERMISSIONS.every((permission) =>
+      hasDomainPermission(actor, permission),
+    );
     return {
       id: record.id,
       source: this.admissionSource(record.source),
@@ -2215,8 +2228,11 @@ export class AdmissionCasesService implements OnModuleInit {
       relatedStudentCandidates: evaluation.relatedStudentCandidates,
       policyRequirements: evaluation.policyRequirements,
       policy: evaluation.policy,
-      canAdmitDirectly: evaluation.canAdmitDirectly && !reviewComplete,
-      canOverrideDuplicate: evaluation.canOverrideDuplicate && !reviewComplete,
+      canAdmitDirectly:
+        evaluation.canAdmitDirectly && !reviewComplete && actorCanEnroll,
+      canOverrideDuplicate:
+        evaluation.canOverrideDuplicate && !reviewComplete && actorCanEnroll,
+      canFinalize: displayStatus === 'APPROVED' && actorCanEnroll,
       requiresReview: evaluation.requiresReview && !reviewComplete,
       requiresApproval: evaluation.requiresApproval && !reviewComplete,
       assessmentSession: evaluation.assessmentSession,

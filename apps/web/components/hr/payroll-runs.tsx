@@ -26,6 +26,7 @@ import { useSession } from '../session-provider';
 import { api } from '../../lib/api';
 import { JournalEntryDialog } from '../accounting/journal-entry-dialog';
 import { cn } from '@/lib/utils';
+import { resourceAccess } from '@/lib/resource-authorization';
 import {
   PayrollActionDialog,
   PayrollActionType,
@@ -206,7 +207,25 @@ export function PayrollRuns() {
   const selectedRun = selectedRunQuery.data
     ? normalizeRun(selectedRunQuery.data)
     : (runs.find((run) => run.id === selectedRunKey) ?? null);
-  const selectedRunActions = selectedRun?.allowedActions;
+  // Phase 3A: every run action comes from the canonical server projection
+  // (fail-closed reader); the legacy allowedActions map is not consulted.
+  const selectedRunAccess = resourceAccess(selectedRun?.authorization);
+  const selectedRunActions = selectedRun
+    ? {
+        canEdit: selectedRunAccess.can('EDIT'),
+        canValidate: selectedRunAccess.can('VALIDATE'),
+        canReview: selectedRunAccess.can('REVIEW'),
+        canSubmitReview: selectedRunAccess.can('SUBMIT_REVIEW'),
+        canCompleteReview: selectedRunAccess.can('COMPLETE_REVIEW'),
+        canApprove: selectedRunAccess.can('APPROVE'),
+        canFinalize: selectedRunAccess.can('FINALIZE'),
+        canCancelFinalized: selectedRunAccess.can('CANCEL_FINALIZED'),
+        canReject: selectedRunAccess.can('REJECT'),
+        canPost: selectedRunAccess.can('POST'),
+        canPay: selectedRunAccess.can('PAY'),
+        canReverse: selectedRunAccess.can('REVERSE'),
+      }
+    : undefined;
   const totalItems = runsQuery.data?.total ?? 0;
 
   const createDraftMutation = useMutation({

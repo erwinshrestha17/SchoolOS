@@ -2621,10 +2621,15 @@ function CanteenQrStudentCard({
           <p
             className={cn(
               'mt-1 text-base',
-              student.canPurchase === false ? 'text-red-600' : 'text-slate-900',
+              student.canPurchase === true ? 'text-slate-900' : 'text-red-600',
             )}
           >
-            {student.canPurchase === false ? 'Blocked' : 'Allowed'}
+            {/* Fail closed: an absent server decision is never "Allowed". */}
+            {student.canPurchase === true
+              ? 'Allowed'
+              : student.canPurchase === false
+                ? 'Blocked'
+                : 'Not confirmed'}
           </p>
         </div>
       </div>

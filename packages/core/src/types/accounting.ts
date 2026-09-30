@@ -1,3 +1,4 @@
+import type { ResourceAuthorization } from "../authorization-contract.js";
 export type JournalEntryView = {
   id: string;
   entryNumber: string;
@@ -12,6 +13,8 @@ export type JournalEntryView = {
     reject: boolean;
     cancel: boolean;
   };
+  /** Canonical Phase 3A projection; read it instead of allowedActions. */
+  authorization?: ResourceAuthorization;
   sourceModule?: string | null;
   sourceType: string;
   sourceId?: string | null;
@@ -663,6 +666,8 @@ export type BankReconciliationSessionView = {
     "manage" | "submit" | "review" | "return" | "finalize" | "cancel",
     boolean
   >;
+  /** Canonical Phase 3A projection; read it instead of allowedActions. */
+  authorization?: ResourceAuthorization;
 };
 export type PrepareBankReconciliation = {
   accountId: string;

@@ -2714,7 +2714,8 @@ function LibraryCopyScanner({
 function QrBorrowerSummary({ borrower }: { borrower: LibraryQrBorrower }) {
   const activeIssues = borrower.activeIssues ?? 0;
   const overdueBooks = borrower.overdueBooks ?? 0;
-  const canBorrow = borrower.canBorrow ?? true;
+  // Fail closed: an absent server decision is not permission to borrow.
+  const canBorrow = borrower.canBorrow === true;
 
   return (
     <div className="mt-4 rounded-2xl border border-[var(--color-mod-library-border)] bg-white p-4 shadow-sm">
@@ -2733,8 +2734,20 @@ function QrBorrowerSummary({ borrower }: { borrower: LibraryQrBorrower }) {
           </p>
         </div>
         <StatusBadge
-          status={canBorrow ? 'CAN_BORROW' : 'LIMIT_REACHED'}
-          label={canBorrow ? 'Can borrow' : 'Limit reached'}
+          status={
+            canBorrow
+              ? 'CAN_BORROW'
+              : borrower.canBorrow === false
+                ? 'LIMIT_REACHED'
+                : 'UNKNOWN'
+          }
+          label={
+            canBorrow
+              ? 'Can borrow'
+              : borrower.canBorrow === false
+                ? 'Limit reached'
+                : 'Not confirmed'
+          }
           tone={canBorrow ? 'approved' : 'conflict'}
         />
       </div>

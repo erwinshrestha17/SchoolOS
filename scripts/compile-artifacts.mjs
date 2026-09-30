@@ -194,7 +194,10 @@ if (fs.existsSync(typesDir)) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { PermissionKey } from './permissions.js';
-import type { StudentProfileAuthorization } from './authorization-contract.js';
+import type {
+  ResourceAuthorization,
+  StudentProfileAuthorization,
+} from './authorization-contract.js';
 
 `;
 

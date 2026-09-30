@@ -4,7 +4,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { PermissionKey } from "./permissions.js";
-import type { StudentProfileAuthorization } from "./authorization-contract.js";
+import type {
+  ResourceAuthorization,
+  StudentProfileAuthorization,
+} from "./authorization-contract.js";
 
 // ─── Compiled from types/common.ts ───
 
@@ -1200,6 +1203,8 @@ export type JournalEntryView = {
     reject: boolean;
     cancel: boolean;
   };
+  /** Canonical Phase 3A projection; read it instead of allowedActions. */
+  authorization?: ResourceAuthorization;
   sourceModule?: string | null;
   sourceType: string;
   sourceId?: string | null;
@@ -1851,6 +1856,8 @@ export type BankReconciliationSessionView = {
     "manage" | "submit" | "review" | "return" | "finalize" | "cancel",
     boolean
   >;
+  /** Canonical Phase 3A projection; read it instead of allowedActions. */
+  authorization?: ResourceAuthorization;
 };
 export type PrepareBankReconciliation = {
   accountId: string;
@@ -3335,6 +3342,8 @@ export type FinanceApprovalRequestView = {
     reject: boolean;
     execute: boolean;
   };
+  /** Canonical Phase 3A projection; read it instead of allowedActions. */
+  authorization?: ResourceAuthorization;
   requiredApprovalCount: number;
   approvalCount: number;
   amount: FinanceMoneyAmount | null;
@@ -5271,6 +5280,8 @@ export type PayrollRunSummary = {
   disbursementJournalEntryId?: string | null;
   allowedActions: PayrollRunAllowedActions;
   lines?: PayrollLineSummary[];
+  /** Canonical Phase 3A projection; read it instead of allowedActions. */
+  authorization?: ResourceAuthorization;
 };
 
 export type PayrollLineSummary = {

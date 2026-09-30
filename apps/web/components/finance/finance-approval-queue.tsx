@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
+import { resourceAccess } from '@/lib/resource-authorization';
 
 type PendingDecision =
   | {
@@ -523,6 +524,9 @@ function ApprovalRequestCard({
     status: 'REVIEWED' | 'APPROVED' | 'REJECTED' | 'EXECUTED',
   ) => void;
 }) {
+  // Phase 3A: actions come only from the canonical server projection; a
+  // missing/old/non-ENABLED projection offers no decision controls.
+  const access = resourceAccess(request.authorization);
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -562,7 +566,10 @@ function ApprovalRequestCard({
           </div>
         ))}
       </div>
-      {Object.values(request.allowedActions ?? {}).some(Boolean) ? (
+      {access.can('REVIEW') ||
+      access.can('APPROVE') ||
+      access.can('EXECUTE') ||
+      access.can('REJECT') ? (
         <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
           <textarea
             value={reviewNote}
@@ -572,23 +579,23 @@ function ApprovalRequestCard({
             className="min-h-20 w-full rounded-xl border border-slate-200 p-3 text-sm"
           />
           <div className="flex flex-wrap gap-2">
-            {request.allowedActions.review ? (
+            {access.can('REVIEW') ? (
               <Button type="button" onClick={() => onDecision('REVIEWED')}>
                 Complete review
               </Button>
             ) : null}
-            {request.allowedActions.approve ? (
+            {access.can('APPROVE') ? (
               <Button type="button" onClick={() => onDecision('APPROVED')}>
                 Approve ({request.approvalCount}/{request.requiredApprovalCount}
                 )
               </Button>
             ) : null}
-            {request.allowedActions.execute && request.status === 'APPROVED' ? (
+            {access.can('EXECUTE') && request.status === 'APPROVED' ? (
               <Button type="button" onClick={() => onDecision('EXECUTED')}>
                 Execute correction
               </Button>
             ) : null}
-            {request.allowedActions.reject ? (
+            {access.can('REJECT') ? (
               <Button
                 type="button"
                 variant="destructive"

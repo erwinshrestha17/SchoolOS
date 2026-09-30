@@ -387,8 +387,14 @@ export type AdmissionCaseEligibility = {
     capacityOverride: number | null;
   };
   policy: AdmissionPolicyResolution;
+  /** Actor-aware: false unless this actor may call direct-admit. */
   canAdmitDirectly: boolean;
   canOverrideDuplicate: boolean;
+  /**
+   * Actor-aware: APPROVED and this actor holds the finalize permissions.
+   * Optional only for older servers; absence means not allowed.
+   */
+  canFinalize?: boolean;
   requiresReview: boolean;
   requiresApproval: boolean;
   classSection: {

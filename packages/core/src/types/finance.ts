@@ -1,3 +1,4 @@
+import type { ResourceAuthorization } from "../authorization-contract.js";
 import type { PaginatedResponse } from "./common.js";
 import type {
   FinancialReportDrilldown,
@@ -909,6 +910,8 @@ export type FinanceApprovalRequestView = {
     reject: boolean;
     execute: boolean;
   };
+  /** Canonical Phase 3A projection; read it instead of allowedActions. */
+  authorization?: ResourceAuthorization;
   requiredApprovalCount: number;
   approvalCount: number;
   amount: FinanceMoneyAmount | null;
