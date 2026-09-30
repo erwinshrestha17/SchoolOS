@@ -6,6 +6,7 @@ import {
   StorageProvider,
 } from '@prisma/client';
 import { FileRegistryService } from './file-registry.service';
+import { MAX_SIGNED_URL_TTL_SECONDS } from '../storage/storage.types';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { TEACHER_SCOPE_DENIED_CODE } from '../teacher-scope/teacher-scope.service';
 
@@ -276,6 +277,53 @@ describe('FileRegistryService tenant scoping', () => {
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(storageService.createSignedReadUrl).not.toHaveBeenCalled();
+  });
+
+  it('Phase 5: caps signed read URLs at the maximum TTL even when configured longer', async () => {
+    prisma.fileAsset.findUnique.mockResolvedValue(asset);
+    (
+      service as unknown as {
+        configService: { storageConfig: { signedReadUrlTtlSeconds: number } };
+      }
+    ).configService.storageConfig.signedReadUrlTtlSeconds = 86_400;
+    jest
+      .spyOn(service, 'assertFileAccessForAuth')
+      .mockResolvedValue(undefined as never);
+    const actor = {
+      tenantId: 'tenant-1',
+      userId: 'user-1',
+      roles: ['admin'],
+      permissions: ['students:read'],
+    } as never;
+
+    const issued = await service.createSignedDownloadUrl(actor, 'file-1');
+
+    expect(storageService.createSignedReadUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ expiresInSeconds: MAX_SIGNED_URL_TTL_SECONDS }),
+    );
+    expect(issued.expiresInSeconds).toBe(MAX_SIGNED_URL_TTL_SECONDS);
+    expect(MAX_SIGNED_URL_TTL_SECONDS).toBeLessThanOrEqual(900);
+  });
+
+  it('Phase 5: re-authorizes on every issuance, so revoked access gets no new URL', async () => {
+    prisma.fileAsset.findUnique.mockResolvedValue(asset);
+    const access = jest
+      .spyOn(service, 'assertFileAccessForAuth')
+      .mockResolvedValueOnce(undefined as never)
+      .mockRejectedValueOnce(new ForbiddenException('revoked'));
+    const actor = {
+      tenantId: 'tenant-1',
+      userId: 'user-1',
+      roles: ['parent'],
+      permissions: [],
+    } as never;
+
+    await service.createSignedPreviewUrl(actor, 'file-1');
+    await expect(
+      service.createSignedPreviewUrl(actor, 'file-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(access).toHaveBeenCalledTimes(2);
+    expect(storageService.createSignedReadUrl).toHaveBeenCalledTimes(1);
   });
 
   it('treats missing and soft-deleted files as not found', async () => {
