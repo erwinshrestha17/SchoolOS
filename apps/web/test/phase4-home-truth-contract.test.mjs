@@ -32,3 +32,39 @@ test('operations rows never report "no open issue" when a metric is missing', ()
   assert.equal(allClear.length, 3);
   assert.equal(panel.match(/'Partial information only'/g)?.length, 4);
 });
+
+test('homes come from the core resolver shared with the API and switching drops other homes cache', () => {
+  const hook = read('lib/home-persona.ts');
+  const page = read('app/dashboard/page.tsx');
+  const service = read(
+    '../api/src/operational-summary/operational-summary.service.ts',
+  );
+  assert.match(hook, /availableHomePersonas/);
+  assert.match(hook, /resolveHomePersona/);
+  assert.match(hook, /removeQueries/);
+  assert.match(page, /<HomePersonaSwitcher/);
+  assert.match(page, /api\.getDashboardSummary\(expectedPersona/);
+  // The API refuses a home the session does not hold (never substitutes).
+  assert.match(service, /availableHomePersonas/);
+  assert.match(service, /This home is not available for your account\./);
+});
+
+test('recents are scoped to school + person and revalidated before display', () => {
+  const recents = read('lib/recently-viewed.ts');
+  const session = read('lib/session.ts');
+  const palette = read('components/layout/command-palette.tsx');
+  assert.match(recents, /entry\.scope === scope/);
+  assert.match(
+    session,
+    /recentlyViewedScope\(session\?\.tenant\?\.id, session\?\.user\?\.id\)/,
+  );
+  assert.match(palette, /RECENT_KIND_ACCESS/);
+  assert.match(palette, /allowedRecents/);
+});
+
+test('entitlements refresh on focus, interval and school switch', () => {
+  const provider = read('components/entitlements-provider.tsx');
+  assert.match(provider, /visibilitychange/);
+  assert.match(provider, /ENTITLEMENTS_REFRESH_MS/);
+  assert.match(provider, /\[status, tenantId, refreshTick\]/);
+});

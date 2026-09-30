@@ -13,13 +13,10 @@ import { PrincipalDashboard } from '../../components/dashboard/principal-dashboa
 import { HrDashboard } from '../../components/dashboard/hr-dashboard';
 import { AccountantDashboard } from '../../components/dashboard/accountant-dashboard';
 import { TeacherTodayWorkspace } from '../../components/dashboard/teacher-today-workspace';
-import { useTeacherAccess } from '../../lib/teacher-access';
-import { useSchoolWebPersona } from '../../lib/school-web-persona';
-import {
-  assertServerDashboardProjection,
-  isSupportedDashboardPersona,
-  resolveDashboardCompositionPersona,
-} from '../../lib/dashboard-persona';
+import { compositionForHome } from '@schoolos/core';
+import { useHomePersona } from '../../lib/home-persona';
+import { HomePersonaSwitcher } from '../../components/dashboard/home-persona-switcher';
+import { assertServerDashboardProjection } from '../../lib/dashboard-persona';
 import { ModuleHeader } from '../../components/ui/module-header';
 import {
   OperationalSummaryError,
@@ -39,23 +36,35 @@ import { formatSchoolDate } from '../../lib/date-utils';
 export default function DashboardPage() {
   const router = useRouter();
   const { session } = useSession();
-  const { isTeacherPersona } = useTeacherAccess();
-  const schoolWebPersona = useSchoolWebPersona();
+  const {
+    available: homes,
+    active: home,
+    setActive: setHome,
+  } = useHomePersona();
   const { resolution: permissionResolution } = usePermissionAccess();
-  const expectedPersona = resolveDashboardCompositionPersona(schoolWebPersona);
-  const canFetchDashboard = isSupportedDashboardPersona(schoolWebPersona);
+  // One core resolver decides the homes for both Web and API (Phase 4).
+  const expectedPersona = compositionForHome(home);
+  const showTeachingHome = home === 'teacher';
+  const canFetchDashboard = expectedPersona !== null;
   const tenantId = session?.tenant.id;
+  const userId = session?.user.id;
 
   const dashboardQuery = useQuery({
-    queryKey: ['operational-dashboard-summary', tenantId],
-    queryFn: api.getDashboardSummary,
+    // Partitioned by school, person and home so no home ever renders
+    // another's cached data.
+    queryKey: ['operational-dashboard-summary', tenantId, userId, home],
+    queryFn: () => api.getDashboardSummary(expectedPersona ?? undefined),
     staleTime: 30_000,
     enabled:
       canFetchDashboard &&
-      !isTeacherPersona &&
-      permissionResolution === 'granted' &&
-      expectedPersona !== null,
+      !showTeachingHome &&
+      permissionResolution === 'granted',
   });
+
+  const homeSwitcher =
+    homes.length > 1 && home ? (
+      <HomePersonaSwitcher homes={homes} active={home} onChange={setHome} />
+    ) : null;
 
   const projectedDashboard = useMemo(
     () =>
@@ -140,9 +149,10 @@ export default function DashboardPage() {
                   'Use the sidebar to open your assigned modules. This account does not receive a school-wide dashboard summary.',
               };
 
-  if (isTeacherPersona) {
+  if (showTeachingHome) {
     return (
       <div className="space-y-6">
+        {homeSwitcher}
         <ModuleHeader
           eyebrow="My Teaching"
           title="Today"
@@ -189,6 +199,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {homeSwitcher}
       <ModuleHeader
         eyebrow={headerCopy.eyebrow}
         title={headerCopy.title}

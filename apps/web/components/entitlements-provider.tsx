@@ -29,8 +29,31 @@ const EntitlementsContext = createContext<EntitlementsContextValue | null>(
   null,
 );
 
+/** Plan changes must reach open tabs: re-read on focus and periodically. */
+const ENTITLEMENTS_REFRESH_MS = 5 * 60_000;
+
 export function EntitlementsProvider({ children }: PropsWithChildren) {
-  const { status } = useSession();
+  const { status, session } = useSession();
+  const tenantId = session?.tenant.id;
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Entitlements are UX hints only (the API enforces them), but a module
+  // disabled mid-session should disappear from navigation without a reload.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') {
+        setRefreshTick((tick) => tick + 1);
+      }
+    };
+    const timer = window.setInterval(refresh, ENTITLEMENTS_REFRESH_MS);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [status]);
+
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
@@ -43,7 +66,9 @@ export function EntitlementsProvider({ children }: PropsWithChildren) {
     }
 
     let cancelled = false;
-    setLoading(true);
+    // Only the first load (or a school switch) shows a loading state; a
+    // background refresh keeps the last known entitlements meanwhile.
+    if (refreshTick === 0) setLoading(true);
 
     async function fetchEntitlements() {
       try {
@@ -66,7 +91,7 @@ export function EntitlementsProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [status]);
+  }, [status, tenantId, refreshTick]);
 
   const hasModule = (moduleName: string) => {
     if (!entitlements) return false;

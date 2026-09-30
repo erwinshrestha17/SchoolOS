@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSession } from '../../components/session-provider';
 import type { RecentlyViewedEntry } from '../recently-viewed';
 import {
   clearRecentlyViewed,
@@ -10,11 +11,16 @@ import {
 } from '../session';
 
 export function useRecentlyViewed() {
+  const { session } = useSession();
+  const tenantId = session?.tenant.id;
+  const userId = session?.user.id;
   const [entries, setEntries] = useState<RecentlyViewedEntry[]>([]);
 
+  // Re-read whenever the school or person changes: recents are scoped to
+  // `${tenantId}:${userId}` and must never carry across contexts.
   const reload = useCallback(() => {
-    setEntries(readRecentlyViewed());
-  }, []);
+    setEntries(tenantId && userId ? readRecentlyViewed() : []);
+  }, [tenantId, userId]);
 
   useEffect(() => {
     reload();

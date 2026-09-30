@@ -13,7 +13,10 @@ describe('admin and principal dashboard separation', () => {
     const admin = read('components/dashboard/admin-dashboard.tsx');
     const principal = read('components/dashboard/principal-dashboard.tsx');
 
-    assert.match(page, /resolveDashboardCompositionPersona/);
+    // Phase 4: the home (and its composition) comes from the core resolver
+    // shared with the API; the server still returns and we still assert the
+    // composition it actually built.
+    assert.match(page, /compositionForHome\(home\)/);
     assert.match(page, /assertServerDashboardProjection/);
     assert.match(page, /compositionPersona === ['"]admin['"]/);
     assert.match(page, /<AdminDashboard dashboard=\{projectedDashboard\} \/>/);

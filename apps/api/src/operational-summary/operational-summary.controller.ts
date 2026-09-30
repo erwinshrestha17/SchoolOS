@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Get,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -30,6 +31,9 @@ import {
 import { OperationalSummaryService } from './operational-summary.service';
 import { OperationalDashboardSummaryResponseDto } from './dto/operational-dashboard-summary.dto';
 
+/** Optional ?persona= home selector; authorization is decided by the service. */
+const HOME_PERSONA_PATTERN = /^(admin|principal|hr|accountant|teacher)$/;
+
 const MODULE_ROUTE_ALIASES: Record<string, OperationalSummaryModule> = {
   students: 'm1_students',
   attendance: 'm2_attendance',
@@ -55,6 +59,8 @@ const MODULE_ROUTE_ALIASES: Record<string, OperationalSummaryModule> = {
   'principal',
   'admin',
   'school_admin',
+  // Receives the permission-filtered operations home (was a 403 home).
+  'school_config_owner',
   'accountant',
   'cashier',
   'admission_officer',
@@ -82,8 +88,14 @@ export class OperationalDashboardSummaryController {
     description:
       'Teacher and unsupported operational personas do not receive a school dashboard summary.',
   })
-  getDashboardSummary(@CurrentAuth() auth: AuthContext) {
-    return this.service.getDashboardSummary(auth);
+  getDashboardSummary(
+    @CurrentAuth() auth: AuthContext,
+    @Query('persona') persona?: string,
+  ) {
+    if (persona !== undefined && !HOME_PERSONA_PATTERN.test(persona)) {
+      throw new BadRequestException('Unknown dashboard home.');
+    }
+    return this.service.getDashboardSummary(auth, persona);
   }
 
   @Get(':module/summary')

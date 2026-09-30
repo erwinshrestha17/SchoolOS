@@ -13,9 +13,12 @@ describe('Slice 3 server-side dashboard projection client contract', () => {
 
     assert.match(page, /assertServerDashboardProjection/);
     assert.match(page, /compositionPersona/);
+    // Phase 4: partitioned by school, person and selected home (switching
+    // homes must never render another home's cached data). The server
+    // re-validates the requested home and returns the composition it built.
     assert.match(
       page,
-      /queryKey: \[['"]operational-dashboard-summary['"], tenantId\]/,
+      /queryKey: \[['"]operational-dashboard-summary['"], tenantId, userId, home\]/,
     );
     assert.doesNotMatch(
       page,

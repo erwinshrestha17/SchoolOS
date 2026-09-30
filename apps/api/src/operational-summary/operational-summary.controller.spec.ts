@@ -46,7 +46,17 @@ describe('Operational summary controllers', () => {
     await expect(dashboard.getDashboardSummary(actor)).resolves.toEqual({
       status: 'ready',
     });
-    expect(service.getDashboardSummary).toHaveBeenCalledWith(actor);
+    expect(service.getDashboardSummary).toHaveBeenCalledWith(actor, undefined);
+  });
+
+  it('passes a well-formed home selector and rejects unknown ones', async () => {
+    service.getDashboardSummary.mockResolvedValue({ status: 'ready' } as never);
+
+    await dashboard.getDashboardSummary(actor, 'teacher');
+    expect(service.getDashboardSummary).toHaveBeenCalledWith(actor, 'teacher');
+    expect(() => dashboard.getDashboardSummary(actor, 'platform')).toThrow(
+      'Unknown dashboard home.',
+    );
   });
 
   it('maps route-aligned summary paths to their internal module summary keys', async () => {

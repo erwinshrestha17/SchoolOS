@@ -273,4 +273,73 @@ describe('OperationalSummaryService dashboard persona projection', () => {
       ),
     ).toBe(true);
   });
+
+  describe('home selection (Phase 4)', () => {
+    const base = {
+      tenantId: 'tenant-a',
+      tenantSlug: 'tenant-a-school',
+      authMethod: AuthMethod.PASSWORD,
+    };
+
+    it('gives the school config owner a permission-filtered operations home', async () => {
+      const owner: AuthContext = {
+        ...base,
+        userId: 'owner-1',
+        email: 'owner@school.test',
+        roles: ['school_config_owner'],
+        permissions: ['settings:read', 'settings:manage', 'users:read'],
+      };
+
+      const summary = await service.getDashboardSummary(owner);
+
+      expect(summary.compositionPersona).toBe('admin');
+      // No operational read permission → no module is exposed.
+      expect(summary.modules).toEqual([]);
+    });
+
+    it('lets an admin who is also the accountant open the finance home', async () => {
+      const adminAccountant: AuthContext = {
+        ...base,
+        userId: 'aa-1',
+        email: 'aa@school.test',
+        roles: ['admin', 'accountant'],
+        permissions: ['fees:read', 'accounting:read'],
+      };
+
+      const summary = await service.getDashboardSummary(
+        adminAccountant,
+        'accountant',
+      );
+
+      expect(summary.compositionPersona).toBe('accountant');
+    });
+
+    it('refuses a home the session does not hold instead of substituting', async () => {
+      const principal: AuthContext = {
+        ...base,
+        userId: 'p-1',
+        email: 'p@school.test',
+        roles: ['principal'],
+        permissions: ['attendance:read'],
+      };
+
+      await expect(
+        service.getDashboardSummary(principal, 'accountant'),
+      ).rejects.toThrow('This home is not available for your account.');
+    });
+
+    it('never composes a school home for a platform identity', async () => {
+      const platform: AuthContext = {
+        ...base,
+        userId: 'pl-1',
+        email: 'pl@platform.test',
+        roles: ['platform_super_admin'],
+        permissions: ['students:read'],
+      };
+
+      await expect(
+        service.getDashboardSummary(platform),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
 });

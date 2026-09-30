@@ -32,6 +32,17 @@ const RECENT_KIND_ICON: Record<RecentlyViewedKind, LucideIcon> = {
   notice: Megaphone,
 };
 
+/** What a recent record needs to still be offered (module + any-of read). */
+const RECENT_KIND_ACCESS: Record<
+  RecentlyViewedKind,
+  { module: string; permissions: readonly string[] }
+> = {
+  student: { module: 'students', permissions: ['students:read'] },
+  // Mirrors GET /invoices/:id.
+  invoice: { module: 'fees', permissions: ['payments:collect'] },
+  notice: { module: 'notices', permissions: ['notices:read'] },
+};
+
 type PaletteRow = {
   key: string;
   section: 'recent' | 'workspace';
@@ -105,14 +116,26 @@ export function CommandPalette() {
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
+    // Revalidate recents against current access: a record whose module was
+    // disabled or whose read permission was revoked is not offered (the
+    // detail route still re-authorizes on the server regardless).
+    const permissions: readonly string[] = session?.user.permissions ?? [];
+    const stillAllowed = (entry: (typeof recentlyViewed)[number]) => {
+      const rule = RECENT_KIND_ACCESS[entry.kind];
+      return (
+        hasModule(rule.module) &&
+        rule.permissions.some((permission) => permissions.includes(permission))
+      );
+    };
+    const allowedRecents = recentlyViewed.filter(stillAllowed);
     const recentRows: PaletteRow[] = (
       isSupportOverride
         ? []
         : normalized
-          ? recentlyViewed.filter((entry) =>
+          ? allowedRecents.filter((entry) =>
               entry.label.toLowerCase().includes(normalized),
             )
-          : recentlyViewed
+          : allowedRecents
     )
       .slice(0, MAX_RECENT_ROWS)
       .map((entry) => ({
@@ -138,7 +161,7 @@ export function CommandPalette() {
     }));
 
     return [...recentRows, ...workspaceRows];
-  }, [isSupportOverride, navItems, recentlyViewed, query]);
+  }, [hasModule, isSupportOverride, navItems, recentlyViewed, query, session]);
 
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {

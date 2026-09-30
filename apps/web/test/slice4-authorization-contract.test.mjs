@@ -115,8 +115,7 @@ describe('Slice 4 dashboard persona routing', () => {
     const accountant = read('components/dashboard/accountant-dashboard.tsx');
     const personaCore = read('../../packages/core/src/dashboard-persona.ts');
 
-    assert.match(page, /isSupportedDashboardPersona/);
-    assert.match(page, /canFetchDashboard/);
+    assert.match(page, /const canFetchDashboard = expectedPersona !== null/);
     assert.match(page, /compositionPersona === ['"]hr['"]/);
     assert.match(page, /compositionPersona === ['"]accountant['"]/);
     assert.match(page, /<HrDashboard dashboard=\{projectedDashboard\} \/>/);

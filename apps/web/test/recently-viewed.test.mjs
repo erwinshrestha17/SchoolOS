@@ -136,3 +136,39 @@ describe('recently-viewed trail', () => {
     assert.deepEqual(readRecentlyViewed(storage), []);
   });
 });
+
+describe('recently-viewed scoping (Phase 4)', () => {
+  it('never returns another school or person’s recents', () => {
+    const storage = fakeStorage();
+    recordRecentlyViewed(
+      storage,
+      { kind: 'student', id: 's1', label: 'A', href: '/a' },
+      'tenant-a:user-1',
+    );
+    recordRecentlyViewed(
+      storage,
+      { kind: 'student', id: 's2', label: 'B', href: '/b' },
+      'tenant-b:user-1',
+    );
+    assert.deepEqual(
+      readRecentlyViewed(storage, 'tenant-a:user-1').map((e) => e.id),
+      ['s1'],
+    );
+    assert.deepEqual(
+      readRecentlyViewed(storage, 'tenant-b:user-1').map((e) => e.id),
+      ['s2'],
+    );
+    assert.deepEqual(readRecentlyViewed(storage, 'tenant-a:user-2'), []);
+  });
+
+  it('drops unscoped legacy entries from scoped reads', () => {
+    const storage = fakeStorage();
+    recordRecentlyViewed(storage, {
+      kind: 'student',
+      id: 'legacy',
+      label: 'L',
+      href: '/l',
+    });
+    assert.deepEqual(readRecentlyViewed(storage, 'tenant-a:user-1'), []);
+  });
+});

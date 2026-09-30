@@ -16,6 +16,12 @@ export type RecentlyViewedEntry = {
   label: string;
   href: string;
   viewedAt: string;
+  /**
+   * `${tenantId}:${userId}` that recorded the view. Entries are only ever
+   * read back for the same school and person, so a multi-school account or a
+   * shared computer never surfaces another context's records.
+   */
+  scope?: string;
 };
 
 export const RECENTLY_VIEWED_STORAGE_KEY = 'schoolos.recently-viewed';
@@ -24,7 +30,7 @@ export const RECENTLY_VIEWED_MAX_ENTRIES = 8;
 type ReadableStorage = Pick<Storage, 'getItem'>;
 type WritableStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
-export function readRecentlyViewed(
+function readAllRecentlyViewed(
   storage: ReadableStorage,
 ): RecentlyViewedEntry[] {
   const raw = storage.getItem(RECENTLY_VIEWED_STORAGE_KEY);
@@ -38,21 +44,53 @@ export function readRecentlyViewed(
   }
 }
 
+/**
+ * Entries for `scope` only (unscoped legacy entries are not attributable to
+ * anyone and are never returned for a scoped read).
+ */
+export function readRecentlyViewed(
+  storage: ReadableStorage,
+  scope?: string,
+): RecentlyViewedEntry[] {
+  const entries = readAllRecentlyViewed(storage);
+  return scope === undefined
+    ? entries
+    : entries.filter((entry) => entry.scope === scope);
+}
+
+export function recentlyViewedScope(
+  tenantId: string | null | undefined,
+  userId: string | null | undefined,
+): string | null {
+  return tenantId && userId ? `${tenantId}:${userId}` : null;
+}
+
 /** Records a view, moving it to the front and dropping the oldest beyond the cap. */
 export function recordRecentlyViewed(
   storage: WritableStorage,
-  entry: Omit<RecentlyViewedEntry, 'viewedAt'>,
+  entry: Omit<RecentlyViewedEntry, 'viewedAt' | 'scope'>,
+  scope?: string,
 ): RecentlyViewedEntry[] {
-  const current = readRecentlyViewed(storage);
-  const deduped = current.filter(
+  const all = readAllRecentlyViewed(storage);
+  const mine = all.filter((item) => item.scope === scope);
+  const others = all.filter((item) => item.scope !== scope);
+  const deduped = mine.filter(
     (item) => !(item.kind === entry.kind && item.id === entry.id),
   );
   const next = [
-    { ...entry, viewedAt: new Date().toISOString() },
+    {
+      ...entry,
+      viewedAt: new Date().toISOString(),
+      ...(scope === undefined ? {} : { scope }),
+    },
     ...deduped,
   ].slice(0, RECENTLY_VIEWED_MAX_ENTRIES);
 
-  storage.setItem(RECENTLY_VIEWED_STORAGE_KEY, JSON.stringify(next));
+  // Other contexts keep their own capped trail; only `scope`'s is changed.
+  storage.setItem(
+    RECENTLY_VIEWED_STORAGE_KEY,
+    JSON.stringify([...next, ...others]),
+  );
   return next;
 }
 
@@ -70,6 +108,7 @@ function isRecentlyViewedEntry(value: unknown): value is RecentlyViewedEntry {
     typeof candidate.id === 'string' &&
     typeof candidate.label === 'string' &&
     typeof candidate.href === 'string' &&
-    typeof candidate.viewedAt === 'string'
+    typeof candidate.viewedAt === 'string' &&
+    (candidate.scope === undefined || typeof candidate.scope === 'string')
   );
 }

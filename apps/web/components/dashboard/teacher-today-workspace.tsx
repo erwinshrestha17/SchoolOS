@@ -76,7 +76,7 @@ function PanelUnavailableNotice({
 export function TeacherTodayWorkspace() {
   const { session } = useSession();
   const todayQuery = useQuery({
-    queryKey: ['teacher-today'],
+    queryKey: ['teacher-today', session?.tenant.id, session?.user.id],
     queryFn: () =>
       withOfflineReadCache(
         `teacher-today:${session?.tenant.id ?? ''}:${session?.user.id ?? ''}`,

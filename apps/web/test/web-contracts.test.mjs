@@ -1013,7 +1013,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(dashboard, /api\.getDashboardSummary/);
     assert.match(
       dashboard,
-      /request<OperationalDashboardSummary>\(['"]\/dashboard\/summary['"]\)/,
+      /request<OperationalDashboardSummary>\(\s*withQuery\(['"]\/dashboard\/summary['"]/,
     );
     assert.match(dashboard, /AdminDashboard/);
     assert.match(dashboard, /PrincipalDashboard/);

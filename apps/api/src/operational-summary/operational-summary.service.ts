@@ -1,12 +1,12 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { GuardianCapability } from '@prisma/client';
 import {
+  availableHomePersonas,
+  compositionForHome,
   getNepalSchoolDay,
   dashboardModulesForComposition,
-  isSupportedDashboardPersona,
   projectDashboardForPersona,
-  resolveDashboardCompositionPersonaFromAuth,
-  resolveSchoolWebPersona,
+  type HomePersona,
 } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
 import { hasDomainPermission } from '../authorization/policies/domain-permission';
@@ -197,26 +197,26 @@ export class OperationalSummaryService {
     private readonly teacherScopeService: TeacherScopeService,
   ) {}
 
-  async getDashboardSummary(actor: AuthContext) {
-    const schoolWebPersona = resolveSchoolWebPersona({
+  async getDashboardSummary(actor: AuthContext, requestedHome?: string) {
+    // Phase 4: one resolver (core `availableHomePersonas`) decides which homes
+    // a session may open, for the Web switcher and for this composition. A
+    // requested home the session does not hold is refused, never substituted.
+    const homes = availableHomePersonas({
       roles: actor.roles,
       permissions: actor.permissions,
     });
-    if (schoolWebPersona === 'teacher') {
+    if (requestedHome && !homes.includes(requestedHome as HomePersona)) {
+      throw new ForbiddenException(
+        'This home is not available for your account.',
+      );
+    }
+    const home = (requestedHome as HomePersona | undefined) ?? homes[0];
+    if (home === 'teacher') {
       throw new ForbiddenException(
         'Teacher dashboard summaries use assigned-scope mobile and teaching workspaces.',
       );
     }
-    if (!isSupportedDashboardPersona(schoolWebPersona)) {
-      throw new ForbiddenException(
-        'This persona does not receive a school dashboard summary.',
-      );
-    }
-
-    const compositionPersona = resolveDashboardCompositionPersonaFromAuth({
-      roles: actor.roles,
-      permissions: actor.permissions,
-    });
+    const compositionPersona = compositionForHome(home ?? null);
     if (!compositionPersona) {
       throw new ForbiddenException(
         'This persona does not receive a school dashboard summary.',

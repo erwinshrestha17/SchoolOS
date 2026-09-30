@@ -8,6 +8,7 @@ import {
   clearRecentlyViewed as clearRecentlyViewedEntries,
   readRecentlyViewed as readRecentlyViewedEntries,
   recordRecentlyViewed as recordRecentlyViewedEntry,
+  recentlyViewedScope,
   type RecentlyViewedEntry,
 } from './recently-viewed';
 import { canStorePendingAttendanceDraft } from './offline-policy';
@@ -180,16 +181,67 @@ export function isSessionStorageEvent(event: StorageEvent) {
   return event.key === SESSION_STORAGE_KEY || event.key === null;
 }
 
+function currentRecentlyViewedScope(): string | null {
+  const session = readStoredSession();
+  return recentlyViewedScope(session?.tenant?.id, session?.user?.id);
+}
+
+const HOME_PERSONA_PREFIX = 'schoolos.home-persona:';
+
+/** Remembered home (per school + person); a per-viewer convenience only. */
+export function readHomePersonaPreference(
+  tenantId: string,
+  userId: string,
+): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem(
+      `${HOME_PERSONA_PREFIX}${tenantId}:${userId}`,
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function writeHomePersonaPreference(
+  tenantId: string,
+  userId: string,
+  home: string,
+): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      `${HOME_PERSONA_PREFIX}${tenantId}:${userId}`,
+      home,
+    );
+  } catch {
+    // Ignore: the default home is used when the preference cannot be kept.
+  }
+}
+
+/** Recents for the signed-in school + person only; none without a session. */
 export function readRecentlyViewed(): RecentlyViewedEntry[] {
   if (typeof window === 'undefined') return [];
-  return readRecentlyViewedEntries(window.localStorage);
+  const scope = currentRecentlyViewedScope();
+  if (!scope) return [];
+  try {
+    return readRecentlyViewedEntries(window.localStorage, scope);
+  } catch {
+    return [];
+  }
 }
 
 export function recordRecentlyViewed(
-  entry: Omit<RecentlyViewedEntry, 'viewedAt'>,
+  entry: Omit<RecentlyViewedEntry, 'viewedAt' | 'scope'>,
 ): RecentlyViewedEntry[] {
   if (typeof window === 'undefined') return [];
-  return recordRecentlyViewedEntry(window.localStorage, entry);
+  const scope = currentRecentlyViewedScope();
+  if (!scope) return [];
+  try {
+    return recordRecentlyViewedEntry(window.localStorage, entry, scope);
+  } catch {
+    return [];
+  }
 }
 
 export function clearRecentlyViewed(): void {

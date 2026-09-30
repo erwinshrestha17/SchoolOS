@@ -13,22 +13,25 @@ import {
   SummaryStatusBadge,
 } from '../../../components/ui/operational-summary';
 import { PermissionDenied } from '../../../components/ui/permission-denied';
-import { useSchoolWebPersona } from '../../../lib/school-web-persona';
-import {
-  assertServerDashboardProjection,
-  resolveDashboardCompositionPersona,
-} from '../../../lib/dashboard-persona';
+import { useHomePersona } from '../../../lib/home-persona';
+import { useSession } from '../../../components/session-provider';
+import { assertServerDashboardProjection } from '../../../lib/dashboard-persona';
 import { api } from '../../../lib/api';
 import { formatSchoolDate } from '../../../lib/date-utils';
 import { formatBsDateTime } from '@schoolos/core';
 
 export default function PrincipalAttentionPage() {
-  const schoolWebPersona = useSchoolWebPersona();
-  const expectedPersona = resolveDashboardCompositionPersona(schoolWebPersona);
-  const isPrincipal = expectedPersona === 'principal';
+  const { session } = useSession();
+  const { available } = useHomePersona();
+  // Available to anyone who holds the Principal home, whichever home is active.
+  const isPrincipal = available.includes('principal');
   const dashboardQuery = useQuery({
-    queryKey: ['principal-attention-centre'],
-    queryFn: api.getDashboardSummary,
+    queryKey: [
+      'principal-attention-centre',
+      session?.tenant.id,
+      session?.user.id,
+    ],
+    queryFn: () => api.getDashboardSummary('principal'),
     enabled: isPrincipal,
     staleTime: 30_000,
   });
