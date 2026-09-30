@@ -276,6 +276,7 @@ class ParentDashboardSummary {
     this.canteenEnabled = true,
     this.libraryEnabled = true,
     this.fromCache = false,
+    this.feesKnown = true,
   });
 
   final GuardianChild child;
@@ -311,6 +312,10 @@ class ParentDashboardSummary {
   final bool canteenEnabled;
   final bool libraryEnabled;
   final bool fromCache;
+
+  /// False when the server sent no usable outstanding balance. A missing
+  /// figure must never be read as zero ("paid" / "clear").
+  final bool feesKnown;
 
   factory ParentDashboardSummary.fromMobileDashboard(
     Map<String, dynamic> json,
@@ -374,14 +379,16 @@ class ParentDashboardSummary {
       lastUpdated:
           DateTime.tryParse(json['_mobileLastUpdated'] as String? ?? '') ??
           DateTime.now(),
-      attendanceEnabled: modules?['attendance'] as bool? ?? true,
-      feesEnabled: modules?['fees'] as bool? ?? true,
-      homeworkEnabled: modules?['homework'] as bool? ?? true,
-      activityEnabled: modules?['activity'] as bool? ?? true,
-      transportEnabled: modules?['transport'] as bool? ?? true,
-      canteenEnabled: modules?['canteen'] as bool? ?? true,
-      libraryEnabled: modules?['library'] as bool? ?? true,
+      // Fail closed: a module the server did not confirm is not shown.
+      attendanceEnabled: modules?['attendance'] as bool? ?? false,
+      feesEnabled: modules?['fees'] as bool? ?? false,
+      homeworkEnabled: modules?['homework'] as bool? ?? false,
+      activityEnabled: modules?['activity'] as bool? ?? false,
+      transportEnabled: modules?['transport'] as bool? ?? false,
+      canteenEnabled: modules?['canteen'] as bool? ?? false,
+      libraryEnabled: modules?['library'] as bool? ?? false,
       fromCache: json['_mobileFromCache'] as bool? ?? false,
+      feesKnown: _isNumeric(fees?['totalOutstanding']),
     );
   }
 }
@@ -1589,6 +1596,9 @@ int? _asNullableInt(Object? value) {
   return _asInt(value);
 }
 
+bool _isNumeric(Object? value) =>
+    value is num || (value is String && num.tryParse(value) != null);
+
 num _asNum(Object? value) {
   if (value is num) {
     return value;
@@ -1616,6 +1626,9 @@ DateTime? _asDateTime(Object? value) {
 String _feeStatus(Map<String, dynamic>? fees) {
   if (fees == null) {
     return 'LOCKED';
+  }
+  if (!_isNumeric(fees['totalOutstanding'])) {
+    return 'UNKNOWN';
   }
   final outstanding = _asNum(fees['totalOutstanding']);
   final paid = _asNum(fees['paidAmount']);

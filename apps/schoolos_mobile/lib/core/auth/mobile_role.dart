@@ -9,12 +9,18 @@ class MobileRole {
   static const student = 'STUDENT';
   static const driver = 'DRIVER';
 
+  /// Not a school mobile persona: the auth gate rejects it (fail closed).
+  static const unsupported = 'UNSUPPORTED';
+
   static String normalize(String? role, {List<String> roles = const []}) {
     final candidates = <String>[
       ?role,
       ...roles,
     ].map(_clean).where((value) => value.isNotEmpty).toList();
 
+    // Platform identities never enter a school app (Platform/School
+    // separation), and a session with no role gets no persona at all.
+    if (candidates.isEmpty || candidates.any(_isPlatform)) return unsupported;
     if (candidates.any(_isAdmin)) return admin;
     if (candidates.any(_isPrincipal)) return principal;
     if (candidates.any(_isTeacher)) return teacher;
@@ -27,7 +33,7 @@ class MobileRole {
     }
     if (candidates.any((value) => value == 'STUDENT')) return student;
 
-    return candidates.isNotEmpty ? candidates.first : student;
+    return candidates.first;
   }
 
   static bool isParent(String? role) => normalize(role) == parent;
@@ -42,10 +48,11 @@ class MobileRole {
       value.trim().replaceAll('-', '_').toUpperCase();
 
   static bool _isAdmin(String value) {
-    return value == 'ADMIN' ||
-        value == 'SUPER_ADMIN' ||
-        value == 'PLATFORM_SUPER_ADMIN';
+    return value == 'ADMIN' || value == 'SCHOOL_ADMIN';
   }
+
+  static bool _isPlatform(String value) =>
+      value.startsWith('PLATFORM_') || value == 'SUPER_ADMIN';
 
   static bool _isPrincipal(String value) {
     return value == 'PRINCIPAL' || value == 'HEAD_TEACHER';

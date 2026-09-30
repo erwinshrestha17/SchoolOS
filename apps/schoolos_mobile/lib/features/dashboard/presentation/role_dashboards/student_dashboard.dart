@@ -57,7 +57,11 @@ class _StudentDashboardContent extends StatelessWidget {
     final homeworkLabel = summary.homeworkPending == 0
         ? 'Clear'
         : '${summary.homeworkPending} pending';
-    final feesLabel = summary.feesDue == 0 ? 'Clear' : _money(summary.feesDue);
+    final feesLabel = !summary.feesKnown
+        ? 'Unavailable'
+        : summary.feesDue == 0
+        ? 'Clear'
+        : _money(summary.feesDue);
     final canteenLabel = summary.canteenBalance == 0
         ? 'No balance'
         : _money(summary.canteenBalance);
@@ -179,7 +183,7 @@ class _StudentDashboardContent extends StatelessWidget {
             title: 'Fees',
             value: feesLabel,
             icon: Icons.account_balance_wallet_rounded,
-            iconColor: summary.feesDue == 0
+            iconColor: summary.feesKnown && summary.feesDue == 0
                 ? AppColors.success
                 : AppColors.warning,
             subtitle: summary.overdueFeesCount == 0

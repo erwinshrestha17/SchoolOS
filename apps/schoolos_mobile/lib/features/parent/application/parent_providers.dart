@@ -323,10 +323,13 @@ class ParentState {
     if (children.isEmpty) {
       return null;
     }
-    return children.firstWhere(
-      (child) => child.id == selectedChildId,
-      orElse: () => children.first,
-    );
+    // Never substitute another child for the one that was selected: showing
+    // the first linked child under a deep link for a different child is a
+    // wrong-context disclosure. No match means no selection.
+    for (final child in children) {
+      if (child.id == selectedChildId) return child;
+    }
+    return null;
   }
 
   ParentState copyWith({
@@ -432,6 +435,20 @@ class ParentController extends StateNotifier<ParentState> {
               ).hasMatch(resourceKey);
         });
       });
+
+      // An explicitly requested child (deep link, notification) that is not
+      // linked to this guardian fails closed instead of silently opening
+      // another child's records.
+      if (childId != null && !children.any((child) => child.id == childId)) {
+        state = ParentState(
+          status: ParentDataStatus.forbidden,
+          children: children,
+          isOffline: !_isOnline,
+          message:
+              'That child is not linked to your account. Choose one of your children to continue.',
+        );
+        return;
+      }
 
       final savedChildId = childId ?? _preferences.getSelectedChildId();
       final selectedChildId = children.any((child) => child.id == savedChildId)

@@ -438,7 +438,8 @@ class _FeesSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasDues = summary.feesDue > 0;
-    final nothingBilled = !hasDues && summary.feesTotalAmount <= 0;
+    final nothingBilled =
+        summary.feesKnown && !hasDues && summary.feesTotalAmount <= 0;
     return PortalCard(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -450,7 +451,7 @@ class _FeesSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            _money(summary.feesDue),
+            summary.feesKnown ? _money(summary.feesDue) : '—',
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w900,
@@ -464,13 +465,13 @@ class _FeesSummaryCard extends StatelessWidget {
               Icon(
                 hasDues
                     ? Icons.info_outline_rounded
-                    : nothingBilled
+                    : nothingBilled || !summary.feesKnown
                     ? Icons.receipt_long_outlined
                     : Icons.check_circle_rounded,
                 size: 18,
                 color: hasDues
                     ? ParentPortalColors.of(context).orange
-                    : nothingBilled
+                    : nothingBilled || !summary.feesKnown
                     ? ParentPortalColors.of(context).muted
                     : ParentPortalColors.of(context).green,
               ),
@@ -481,6 +482,8 @@ class _FeesSummaryCard extends StatelessWidget {
                       ? summary.feesStatus == 'PARTIAL'
                             ? '${_money(summary.feesPaidAmount)} paid so far.'
                             : '${summary.overdueFeesCount > 0 ? '${summary.overdueFeesCount} overdue. ' : ''}Payment is still due.'
+                      : !summary.feesKnown
+                      ? 'Balance is unavailable right now. Pull to refresh.'
                       : nothingBilled
                       ? 'No fee invoice has been issued.'
                       : 'All fees are paid.',
