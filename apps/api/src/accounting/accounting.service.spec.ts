@@ -96,6 +96,46 @@ describe('accounting reversals', () => {
     // Removed update assertion because it is mocked now
   });
 
+  it('requires an independent actor: the journal creator cannot reverse it', async () => {
+    const original = { ...buildOriginalJournal(), createdById: actor.userId };
+    const { service, postingService } = buildService({
+      original,
+      existingReversal: null,
+      closedPeriod: null,
+      createdReversal: null,
+      journalCount: 1,
+    });
+
+    await expect(
+      service.reverseJournalEntry(
+        original.id,
+        { reversalDate: '2026-04-27', reason: 'Self reversal attempt' },
+        actor,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(postingService.postReversal).not.toHaveBeenCalled();
+  });
+
+  it('requires the reverse duty on the server, not only on the route', async () => {
+    const original = buildOriginalJournal();
+    const { service, postingService } = buildService({
+      original,
+      existingReversal: null,
+      closedPeriod: null,
+      createdReversal: null,
+      journalCount: 1,
+    });
+
+    await expect(
+      service.reverseJournalEntry(
+        original.id,
+        { reversalDate: '2026-04-27', reason: 'No duty' },
+        { ...actor, permissions: ['accounting:journals:post'] },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(postingService.postReversal).not.toHaveBeenCalled();
+  });
+
   it('blocks reversals posted into a closed accounting period', async () => {
     const original = buildOriginalJournal();
     const { service } = buildService({

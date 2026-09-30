@@ -63,6 +63,7 @@ import { withSchoolAuthorizationTransaction } from '../auth/school-authorization
 import {
   hasDomainPermission,
   requireDomainPermission,
+  requireIndependentActor,
 } from '../authorization/policies/domain-permission';
 import { isFinancialTransactionConflict } from '../authorization/policies/financial-transaction-conflict';
 import {
@@ -1219,6 +1220,9 @@ export class AccountingService implements OnModuleInit {
       throw new NotFoundException('Journal entry not found in this tenant');
     }
 
+    // Server-side duty: roles cannot bypass it.
+    requireDomainPermission(actor, 'accounting:journals:reverse');
+
     await this.ensureJournalIsMutable(original.id, actor.tenantId);
 
     if (original.status === JournalEntryStatus.REVERSED) {
@@ -1253,6 +1257,11 @@ export class AccountingService implements OnModuleInit {
       actor.tenantId,
       reversalDate,
     );
+
+    // Maker-checker: the person who created (made) a journal may not reverse
+    // it on their own. Checked after the state rules so an impossible
+    // reversal still reports why it is impossible.
+    requireIndependentActor(actor, [original.createdById]);
 
     const reversal = await this.postingService.postReversal(
       {
@@ -2109,6 +2118,9 @@ export class AccountingService implements OnModuleInit {
       throw new NotFoundException('Journal entry not found');
     }
 
+    // A correction reverses the original: same duty.
+    requireDomainPermission(actor, 'accounting:journals:reverse');
+
     await this.ensureJournalIsMutable(original.id, actor.tenantId);
 
     if (original.status === JournalEntryStatus.REVERSED) {
@@ -2120,6 +2132,9 @@ export class AccountingService implements OnModuleInit {
     const correctionDate = dto.reversalDate
       ? new Date(dto.reversalDate)
       : new Date();
+
+    // Same maker-checker rule as a reversal.
+    requireIndependentActor(actor, [original.createdById]);
 
     const result = await this.postingService.postCorrection(
       {

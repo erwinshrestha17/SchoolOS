@@ -36,9 +36,11 @@ describe('Accounting Module Hardening (E2E)', () => {
 
   const tenantA = 'tenant-a';
   const tenantB = 'tenant-b';
+  // Reversal tests call the service directly, so the actor carries the
+  // reverse duty the route would require (the service re-checks it).
   const actorA = createAuthContextMock({
     tenantId: tenantA,
-    permissions: ['accounting:journals:create'],
+    permissions: ['accounting:journals:create', 'accounting:journals:reverse'],
   });
   const actorB = createAuthContextMock({
     tenantId: tenantB,
