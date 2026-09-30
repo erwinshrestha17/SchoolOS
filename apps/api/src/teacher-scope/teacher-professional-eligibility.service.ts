@@ -20,6 +20,39 @@ interface AssignmentContext {
 const PRECONDITION_MESSAGE =
   'Current verified employment and professional eligibility are required for this teaching assignment';
 
+export interface TeacherEligibilityProjection {
+  outcome: TeacherEligibilityOutcome;
+  reasonCode: string;
+  policyVersionId: string | null;
+  employmentId: string | null;
+  qualificationId: string | null;
+  licenceId: string | null;
+  validUntil: Date | null;
+  evaluatedAt: Date;
+  /** Always false: projections are never authority. */
+  persisted: false;
+}
+
+interface EligibilityEvaluation {
+  profileId: string;
+  employmentId: string;
+  policyVersionId: string;
+  qualificationId: string | null;
+  licenceId: string | null;
+  outcome: TeacherEligibilityOutcome;
+  reasonCode: string;
+  validUntil: Date | null;
+}
+
+function eligibilityRejectionReason(error: unknown): string | null {
+  if (!(error instanceof ConflictException)) return null;
+  const body = error.getResponse() as { code?: unknown; reason?: unknown };
+  return body?.code === 'TEACHER_PROFESSIONAL_ELIGIBILITY_REQUIRED' &&
+    typeof body.reason === 'string'
+    ? body.reason
+    : null;
+}
+
 function reject(reason: string): never {
   throw new ConflictException({
     code: 'TEACHER_PROFESSIONAL_ELIGIBILITY_REQUIRED',
@@ -42,6 +75,74 @@ export class TeacherProfessionalEligibilityService {
   ): Promise<string> {
     const db = transaction ?? this.prisma;
     const now = new Date();
+    const evaluation = await this.evaluate(input, db, now);
+    const assessment = await db.teacherEligibilityAssessment.create({
+      data: {
+        tenantId: input.tenantId,
+        staffId: input.staffId,
+        profileId: evaluation.profileId,
+        employmentId: evaluation.employmentId,
+        policyVersionId: evaluation.policyVersionId,
+        qualificationId: evaluation.qualificationId,
+        licenceId: evaluation.licenceId,
+        outcome: evaluation.outcome,
+        reasonCode: evaluation.reasonCode,
+        evaluatedAt: now,
+        validUntil: evaluation.validUntil,
+        evaluatedById: input.actorId,
+      },
+      select: { id: true },
+    });
+    if (evaluation.outcome !== TeacherEligibilityOutcome.ELIGIBLE)
+      reject(evaluation.reasonCode);
+    return assessment.id;
+  }
+
+  /**
+   * 5M read projection. Runs the exact preflight evaluation without
+   * persisting a decision snapshot, so UI can show outcome + reason code.
+   * It never grants anything: assignment creation still runs the preflight
+   * and the database guard rechecks live authority.
+   */
+  async projectEligibility(
+    input: Omit<AssignmentContext, 'actorId'>,
+  ): Promise<TeacherEligibilityProjection> {
+    const evaluatedAt = new Date();
+    try {
+      const evaluation = await this.evaluate(input, this.prisma, evaluatedAt);
+      return {
+        outcome: evaluation.outcome,
+        reasonCode: evaluation.reasonCode,
+        policyVersionId: evaluation.policyVersionId,
+        employmentId: evaluation.employmentId,
+        qualificationId: evaluation.qualificationId,
+        licenceId: evaluation.licenceId,
+        validUntil: evaluation.validUntil,
+        evaluatedAt,
+        persisted: false,
+      };
+    } catch (error) {
+      const reason = eligibilityRejectionReason(error);
+      if (!reason) throw error;
+      return {
+        outcome: TeacherEligibilityOutcome.INELIGIBLE,
+        reasonCode: reason,
+        policyVersionId: null,
+        employmentId: null,
+        qualificationId: null,
+        licenceId: null,
+        validUntil: null,
+        evaluatedAt,
+        persisted: false,
+      };
+    }
+  }
+
+  private async evaluate(
+    input: Omit<AssignmentContext, 'actorId'>,
+    db: Prisma.TransactionClient | PrismaService,
+    now: Date,
+  ): Promise<EligibilityEvaluation> {
     const staff = await db.staff.findFirst({
       where: {
         id: input.staffId,
@@ -269,31 +370,22 @@ export class TeacherProfessionalEligibilityService {
       qualification?.validUntil,
       licence?.validUntil,
     ].filter((value): value is Date => value instanceof Date);
-    const assessment = await db.teacherEligibilityAssessment.create({
-      data: {
-        tenantId: input.tenantId,
-        staffId: input.staffId,
-        profileId: profile.id,
-        employmentId: employment.id,
-        policyVersionId: policy.id,
-        qualificationId: qualification?.id,
-        licenceId: licence?.id,
-        outcome:
-          reason === 'POLICY_REQUIREMENTS_SATISFIED'
-            ? TeacherEligibilityOutcome.ELIGIBLE
-            : TeacherEligibilityOutcome.INELIGIBLE,
-        reasonCode: reason,
-        evaluatedAt: now,
-        validUntil:
-          endDates.length > 0
-            ? new Date(Math.min(...endDates.map((value) => +value)))
-            : null,
-        evaluatedById: input.actorId,
-      },
-      select: { id: true },
-    });
-    if (reason !== 'POLICY_REQUIREMENTS_SATISFIED') reject(reason);
-    return assessment.id;
+    return {
+      profileId: profile.id,
+      employmentId: employment.id,
+      policyVersionId: policy.id,
+      qualificationId: qualification?.id ?? null,
+      licenceId: licence?.id ?? null,
+      outcome:
+        reason === 'POLICY_REQUIREMENTS_SATISFIED'
+          ? TeacherEligibilityOutcome.ELIGIBLE
+          : TeacherEligibilityOutcome.INELIGIBLE,
+      reasonCode: reason,
+      validUntil:
+        endDates.length > 0
+          ? new Date(Math.min(...endDates.map((value) => +value)))
+          : null,
+    };
   }
 
   async isLive(input: {

@@ -1485,6 +1485,13 @@ export const TeacherProfileStatus = {
   INACTIVE: 'INACTIVE',
 } as const;
 
+export const ProfessionalEvidenceStatus = {
+  PENDING: 'PENDING',
+  VERIFIED: 'VERIFIED',
+  REJECTED: 'REJECTED',
+  REVOKED: 'REVOKED',
+} as const;
+
 export const TeacherEligibilityOutcome = {
   ELIGIBLE: 'ELIGIBLE',
   INELIGIBLE: 'INELIGIBLE',
