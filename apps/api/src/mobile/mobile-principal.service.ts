@@ -26,6 +26,7 @@ import {
   FEATURE_KEYS,
   getNepalSchoolDay,
   shiftGregorianDateOnly,
+  buildResourceAuthorization,
 } from '@schoolos/core';
 import { hasDomainPermission } from '../authorization/policies/domain-permission';
 import { ApprovalWorkflowService } from '../advanced-operations/approval-workflow.service';
@@ -69,7 +70,24 @@ type PanelResult<T> =
  * Drill-down route permissions (mirrors @Permissions on the controller).
  * A home panel is only computed for actors who could open the detail.
  */
-const FEES_SUMMARY_PERMISSIONS = ['fees:manage', 'payments:close'] as const;
+/**
+ * Owner decision (Phase 3/4 close): Principals read a leadership-safe,
+ * aggregate-only finance snapshot through `finance:principal:read`. It carries
+ * no operational authority (collection, cashier close, posting, reconciliation
+ * or configuration) and no student-identifying rows.
+ */
+const FEES_SUMMARY_PERMISSIONS = ['finance:principal:read'] as const;
+
+/** Every action the snapshot could imply; all are withheld on this surface. */
+const PRINCIPAL_FINANCE_ACTIONS = {
+  COLLECT_PAYMENT: false,
+  CLOSE_CASHIER: false,
+  POST_JOURNAL: false,
+  REVERSE_JOURNAL: false,
+  RECONCILE_BANK: false,
+  CONFIGURE_FINANCE: false,
+  EXPLORE_TRANSACTIONS: false,
+} as const;
 const STAFF_ABSENCE_PERMISSIONS = ['staff:read', 'hr:leave:approve'] as const;
 const APPROVALS_PERMISSIONS = [
   'advanced:approvals:read',
@@ -1546,6 +1564,11 @@ export class MobilePrincipalService implements OnModuleInit {
       pendingFinanceApprovals,
       cashierCloses,
       paidStudents,
+      overdue90Plus,
+      overdue31To90,
+      reconciliationOpen,
+      failedStatementImports,
+      reversalsToday,
     ] = await Promise.all([
       this.prisma.payment.aggregate({
         where: {
@@ -1591,12 +1614,7 @@ export class MobilePrincipalService implements OnModuleInit {
       this.prisma.financeApprovalRequest.findMany({
         where: { tenantId: actor.tenantId, status: 'PENDING' },
         include: {
-          payment: {
-            select: {
-              amount: true,
-              student: { select: { firstNameEn: true, lastNameEn: true } },
-            },
-          },
+          payment: { select: { amount: true } },
         },
         orderBy: { createdAt: 'desc' },
         take: 3,
@@ -1620,6 +1638,39 @@ export class MobilePrincipalService implements OnModuleInit {
           paidAt: { gte: nepalDayFromToday(-6).start, lt: end },
           reversedAt: null,
         },
+      }),
+      // Aging indicators (counts only; exact amounts stay on Finance).
+      this.prisma.invoice.count({
+        where: {
+          ...overdueWhere,
+          dueDate: { lt: nepalDayFromToday(-90).start },
+        },
+      }),
+      this.prisma.invoice.count({
+        where: {
+          ...overdueWhere,
+          dueDate: {
+            gte: nepalDayFromToday(-90).start,
+            lt: nepalDayFromToday(-30).start,
+          },
+        },
+      }),
+      this.prisma.bankReconciliationSession.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: { in: ['OPEN', 'SUBMITTED', 'REOPENED'] },
+        },
+      }),
+      this.prisma.bankStatementImportJob.count({
+        where: { tenantId: actor.tenantId, status: 'FAILED' },
+      }),
+      this.prisma.payment.aggregate({
+        where: {
+          tenantId: actor.tenantId,
+          reversedAt: { gte: start, lt: end },
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
       }),
     ]);
     const collectedToday = decimalToNumber(payments._sum.amount);
@@ -1651,6 +1702,27 @@ export class MobilePrincipalService implements OnModuleInit {
         overdueInvoiceCount: overdueTotals._count._all,
         pendingRefundApprovals: pendingFinanceApprovals,
         cashierCloseStatus,
+        aging: {
+          overdue31To90Count: overdue31To90,
+          overdue90PlusCount: overdue90Plus,
+        },
+        reconciliation: {
+          openSessions: reconciliationOpen,
+          failedStatementImports,
+        },
+        reversalsToday: {
+          count: reversalsToday._count._all,
+          amount: decimalToNumber(reversalsToday._sum.amount),
+          amountFormatted: formatNpr(
+            decimalToNumber(reversalsToday._sum.amount),
+          ),
+        },
+        // No authoritative ledger cash/bank position is published to this
+        // surface yet: report it as unavailable, never as zero.
+        cashBankPosition: {
+          available: false,
+          reason: 'Cash and bank position is shown on the Finance workspace.',
+        },
       },
       watchlist: [
         ...overdueInvoices.map((row) => ({
@@ -1664,7 +1736,7 @@ export class MobilePrincipalService implements OnModuleInit {
         ...financeApprovals.map((row) => ({
           id: row.id,
           type: 'refund_approval',
-          title: `${financeApprovalTitle(row.type)} - ${studentName(row.payment.student)}`,
+          title: financeApprovalTitle(row.type),
           detail: formatNpr(decimalToNumber(row.amount ?? row.payment.amount)),
           status: 'Pending',
           severity: 'medium',
@@ -1696,6 +1768,13 @@ export class MobilePrincipalService implements OnModuleInit {
         }),
       },
       readOnly: true,
+      authorization: buildResourceAuthorization({
+        actions: PRINCIPAL_FINANCE_ACTIONS,
+        sections: { summary: true },
+        lifecycleState: null,
+        // The route requires the fees module, so reaching here means ENABLED.
+        entitlementState: { module: 'fees', state: 'ENABLED' },
+      }),
       lastUpdated: nowIso(),
     };
   }

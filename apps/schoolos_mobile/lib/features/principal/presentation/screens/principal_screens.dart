@@ -2940,6 +2940,7 @@ List<_SnapshotSection> _snapshotSections(
       _SnapshotSection('Coverage', _list(data['coverageItems'])),
     ],
     'fees' => [
+      _SnapshotSection('Finance Indicators', principalFinanceIndicators(data)),
       _SnapshotSection('Watchlist', _list(data['watchlist'])),
       _SnapshotSection(
         'Collection Trend',
@@ -2979,6 +2980,69 @@ List<_SnapshotSection> _snapshotSections(
     ],
     _ => [_SnapshotSection('Items', _list(data['items']))],
   };
+}
+
+/// Leadership-safe finance indicators (read-only, aggregate). A figure the
+/// server did not send reads as "Not available", never as 0.
+@visibleForTesting
+List<Map<String, dynamic>> principalFinanceIndicators(
+  Map<String, dynamic> data,
+) {
+  final metrics = data['metrics'] is Map<String, dynamic>
+      ? data['metrics'] as Map<String, dynamic>
+      : const <String, dynamic>{};
+  Object? at(String path) {
+    Object? value = metrics;
+    for (final part in path.split('.')) {
+      if (value is! Map) return null;
+      value = value[part];
+    }
+    return value;
+  }
+
+  String count(String path) {
+    final value = at(path);
+    return value is num ? '${value.toInt()}' : 'Not available';
+  }
+
+  final cashBank = at('cashBankPosition');
+  final cashBankAvailable = cashBank is Map && cashBank['available'] == true;
+  return [
+    {
+      'id': 'aging-90',
+      'title': 'Invoices overdue 90+ days',
+      'detail': count('aging.overdue90PlusCount'),
+    },
+    {
+      'id': 'aging-31-90',
+      'title': 'Invoices overdue 31–90 days',
+      'detail': count('aging.overdue31To90Count'),
+    },
+    {
+      'id': 'recon-open',
+      'title': 'Open bank reconciliations',
+      'detail': count('reconciliation.openSessions'),
+    },
+    {
+      'id': 'recon-failed',
+      'title': 'Failed bank statement imports',
+      'detail': count('reconciliation.failedStatementImports'),
+    },
+    {
+      'id': 'reversals',
+      'title': 'Payment reversals today',
+      'detail': at('reversalsToday.amountFormatted') is String
+          ? '${count('reversalsToday.count')} · ${at('reversalsToday.amountFormatted')}'
+          : 'Not available',
+    },
+    {
+      'id': 'cash-bank',
+      'title': 'Cash and bank position',
+      'detail': cashBankAvailable
+          ? '${cashBank['amountFormatted'] ?? 'Not available'}'
+          : 'Not available',
+    },
+  ];
 }
 
 class _SnapshotSection {

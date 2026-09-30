@@ -641,6 +641,16 @@ void main() {
                     'available': false,
                     'unavailableReason': 'UNAVAILABLE',
                   },
+                  {
+                    'key': 'attendanceRisk',
+                    'label': 'Attendance Risk',
+                    'detail': 'classes',
+                    'route': '/principal/attendance',
+                    'value': null,
+                    'available': false,
+                    'locked': true,
+                    'unavailableReason': 'NOT_PERMITTED',
+                  },
                 ],
                 'alerts': <Map<String, dynamic>>[],
                 'quickActions': <Map<String, dynamic>>[],
@@ -656,6 +666,7 @@ void main() {
 
       expect(find.text('Not available for your role'), findsOneWidget);
       expect(find.text('Could not load — pull to refresh'), findsOneWidget);
+      expect(find.text('Module not enabled'), findsOneWidget);
       expect(find.text('Attention count unavailable'), findsOneWidget);
       expect(find.text('0'), findsNothing);
       expect(tester.takeException(), isNull);

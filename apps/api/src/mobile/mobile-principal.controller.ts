@@ -231,7 +231,8 @@ export class MobilePrincipalController {
   }
 
   @Get('fees-summary')
-  @Permissions('fees:manage', 'payments:close')
+  @Permissions('finance:principal:read')
+  @RequiredModule('fees')
   feesSummary(@CurrentAuth() auth: AuthContext) {
     return this.service.getFeesSummary(auth);
   }
