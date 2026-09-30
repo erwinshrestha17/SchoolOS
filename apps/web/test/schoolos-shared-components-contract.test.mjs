@@ -141,7 +141,10 @@ describe('QueuedJobState (components/schoolos/jobs)', () => {
 });
 
 describe('StatusBadge job-lifecycle extension (additive only)', () => {
-  const source = read('components/ui/status-badge.tsx');
+  const source =
+    read('components/ui/status-badge.tsx') +
+    // Phase 4G: the status->tone table moved to packages/core (shared with mobile).
+    read('../../packages/core/src/status-tone.ts');
 
   it('adds new lifecycle keys without changing any existing mapping', () => {
     // Original mappings this file shipped with (46 consumers depend on

@@ -96,7 +96,6 @@ export const STATUS_TONE_MAP: Readonly<Record<string, StatusTone>> = {
   UNAVAILABLE: "inactive",
 };
 
-
 /** Tone for a backend status string; unknown statuses read as neutral info. */
 export function resolveStatusTone(status: string): StatusTone {
   return STATUS_TONE_MAP[status.trim().toUpperCase()] ?? "info";

@@ -109,7 +109,10 @@ describe('SchoolOS web production contracts', () => {
       );
     }
 
-    const statusBadge = read('components/ui/status-badge.tsx');
+    const statusBadge =
+      read('components/ui/status-badge.tsx') +
+      // Phase 4G: the status->tone table moved to packages/core (shared with mobile).
+      read('../../packages/core/src/status-tone.ts');
     for (const status of [
       'ACTIVE',
       'PENDING',
@@ -2480,7 +2483,10 @@ describe('SchoolOS web production contracts', () => {
     );
     const milestonesPage = read('app/dashboard/activity/milestones/page.tsx');
     const deliveriesPage = read('app/dashboard/activity/deliveries/page.tsx');
-    const statusBadge = read('components/ui/status-badge.tsx');
+    const statusBadge =
+      read('components/ui/status-badge.tsx') +
+      // Phase 4G: the status->tone table moved to packages/core (shared with mobile).
+      read('../../packages/core/src/status-tone.ts');
     const activityApi = read('lib/api/activity.ts');
 
     assert.match(feedPage, /Activity Feed & Milestones/);
