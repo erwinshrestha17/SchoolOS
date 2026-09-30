@@ -5070,6 +5070,47 @@ describe('students lifecycle hardening', () => {
     expect(profile.attendanceRecords[0].attendanceDate).toBe('2026-04-27');
   });
 
+  it('Phase 5F: one failing section is reported unavailable while the rest of the profile loads', async () => {
+    const student = buildStudent({});
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      reportCardFindManyResult: [],
+    });
+    prisma.homeworkSubmission.findMany.mockRejectedValue(
+      new Error('homework store timeout'),
+    );
+    const { service } = buildService(prisma);
+
+    const profile = await service.getStudentProfile(
+      student.id,
+      {
+        ...actor,
+        permissions: ['students:read', 'results:read', 'homework:read'],
+      },
+      studentsEntitlement,
+    );
+
+    expect(profile.unavailableSections).toEqual(['homework']);
+    expect(profile.homeworkSubmissions).toEqual([]);
+    expect(profile.academicResults).toEqual([]);
+    expect(profile.student.id).toBe(student.id);
+    expect(profile.authorization.authorizedSections).toEqual(
+      expect.arrayContaining(['identity', 'academics', 'homework']),
+    );
+  });
+
+  it('Phase 5F: a healthy profile reports no unavailable sections', async () => {
+    const student = buildStudent({});
+    const prisma = buildPrisma({ studentFindFirstQueue: [student] });
+    const { service } = buildService(prisma);
+    const profile = await service.getStudentProfile(
+      student.id,
+      { ...actor, permissions: ['students:read', 'homework:read'] },
+      studentsEntitlement,
+    );
+    expect(profile.unavailableSections).toEqual([]);
+  });
+
   it('Phase 5F: academics and homework are fetched only when authorized, tenant- and student-scoped', async () => {
     const student = buildStudent({});
     const financeOnly = buildPrisma({ studentFindFirstQueue: [student] });

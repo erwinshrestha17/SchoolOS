@@ -6,7 +6,10 @@ import type {
   StudentDuplicateReviewMetadata,
 } from "./common.js";
 import type { PermissionKey } from "../permissions.js";
-import type { StudentProfileAuthorization } from "../authorization-contract.js";
+import type {
+  StudentProfileAuthorization,
+  StudentProfileSection,
+} from "../authorization-contract.js";
 
 export type GuardianProfile = {
   id: string;
@@ -450,6 +453,8 @@ export type StudentProfileDetail = {
   activityPosts?: ActivityPost[];
   academicResults?: StudentProfileAcademicResult[];
   homeworkSubmissions?: StudentProfileHomeworkSubmission[];
+  /** Authorized sections that failed to load this time (data is empty). */
+  unavailableSections?: StudentProfileSection[];
   authorization?: StudentProfileAuthorization;
 };
 

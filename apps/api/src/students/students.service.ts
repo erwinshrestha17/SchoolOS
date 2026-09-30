@@ -13,6 +13,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -45,6 +46,7 @@ import {
   type GuardianRecoveryVerificationMethod,
   type StudentIemisReadiness,
   type StudentIemisReadinessIssue,
+  type StudentProfileSection,
   StudentAttendanceHistory,
   StudentAttendanceHistorySummary,
   StudentModuleSummary,
@@ -124,6 +126,8 @@ type GuardianAdministrationRelationship = Prisma.StudentGuardianGetPayload<{
 
 @Injectable()
 export class StudentsService {
+  private readonly logger = new Logger(StudentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
@@ -1060,6 +1064,29 @@ export class StudentsService {
     return pairs.filter((pair) => !pair.blockedReason).length;
   }
 
+  /**
+   * Loads one optional Student 360 section. A failure is logged and the
+   * section reported in `unavailableSections` (empty data) instead of failing
+   * the whole profile. Only called for sections the actor is authorized for.
+   */
+  private async optionalProfileSection<T>(
+    section: StudentProfileSection,
+    unavailable: StudentProfileSection[],
+    load: () => Promise<T[]>,
+  ): Promise<T[]> {
+    try {
+      return await load();
+    } catch (error) {
+      unavailable.push(section);
+      this.logger.warn(
+        `Student profile section "${section}" failed to load: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return [];
+    }
+  }
+
   async getStudentProfile(
     studentId: string,
     actor: AuthContext,
@@ -1232,95 +1259,107 @@ export class StudentsService {
       throw new NotFoundException('Student not found in this tenant');
     }
 
+    // Phase 5F: secondary sections degrade independently. Identity and the
+    // sections loaded with the student are all-or-nothing; these are not.
+    const unavailableSections: StudentProfileSection[] = [];
     const activityPosts = !allowed.activity
       ? []
-      : await this.prisma.activityPost.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            OR: [
-              {
-                studentTags: {
-                  some: {
-                    studentId: student.id,
+      : await this.optionalProfileSection('activity', unavailableSections, () =>
+          this.prisma.activityPost.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              OR: [
+                {
+                  studentTags: {
+                    some: {
+                      studentId: student.id,
+                    },
                   },
                 },
-              },
-              {
-                audienceType: AudienceType.CLASS,
-                classId: student.classId,
-              },
-              {
-                audienceType: AudienceType.SECTION,
-                classId: student.classId,
-                sectionId: student.sectionId,
-              },
-            ],
-          },
-          include: {
-            attachments: {
-              orderBy: [{ sortOrder: 'asc' }],
+                {
+                  audienceType: AudienceType.CLASS,
+                  classId: student.classId,
+                },
+                {
+                  audienceType: AudienceType.SECTION,
+                  classId: student.classId,
+                  sectionId: student.sectionId,
+                },
+              ],
             },
-            studentTags: {
-              include: {
-                student: true,
+            include: {
+              attachments: {
+                orderBy: [{ sortOrder: 'asc' }],
               },
+              studentTags: {
+                include: {
+                  student: true,
+                },
+              },
+              reactions: true,
             },
-            reactions: true,
-          },
-          orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
-          take: 12,
-        });
+            orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+            take: 12,
+          }),
+        );
 
     // Phase 5F: denied sections are never queried.
     const academicResults = !allowed.academics
       ? []
-      : await this.prisma.reportCard.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: student.id,
-            isCurrent: true,
-            publishStatus: 'PUBLISHED',
-          },
-          include: {
-            examTerm: { select: { id: true, name: true } },
-            academicYear: { select: { id: true, name: true } },
-            subjectResults: {
-              orderBy: [{ subjectName: 'asc' }],
-            },
-          },
-          orderBy: [{ publishedAt: 'desc' }],
-          take: 6,
-        });
+      : await this.optionalProfileSection(
+          'academics',
+          unavailableSections,
+          () =>
+            this.prisma.reportCard.findMany({
+              where: {
+                tenantId: actor.tenantId,
+                studentId: student.id,
+                isCurrent: true,
+                publishStatus: 'PUBLISHED',
+              },
+              include: {
+                examTerm: { select: { id: true, name: true } },
+                academicYear: { select: { id: true, name: true } },
+                subjectResults: {
+                  orderBy: [{ subjectName: 'asc' }],
+                },
+              },
+              orderBy: [{ publishedAt: 'desc' }],
+              take: 6,
+            }),
+        );
 
     const homeworkSubmissions = !allowed.homework
       ? []
-      : await this.prisma.homeworkSubmission.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            studentId: student.id,
-            homework: {
-              status: {
-                in: [
-                  HomeworkAssignmentStatus.ASSIGNED,
-                  HomeworkAssignmentStatus.CLOSED,
-                ],
+      : await this.optionalProfileSection('homework', unavailableSections, () =>
+          this.prisma.homeworkSubmission.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: student.id,
+              homework: {
+                status: {
+                  in: [
+                    HomeworkAssignmentStatus.ASSIGNED,
+                    HomeworkAssignmentStatus.CLOSED,
+                  ],
+                },
               },
             },
-          },
-          include: {
-            homework: {
-              select: {
-                id: true,
-                title: true,
-                dueDate: true,
-                status: true,
-                subject: { select: { id: true, name: true } },
+            include: {
+              homework: {
+                select: {
+                  id: true,
+                  title: true,
+                  dueDate: true,
+                  status: true,
+                  subject: { select: { id: true, name: true } },
+                },
               },
             },
-          },
-          orderBy: [{ homework: { dueDate: 'desc' } }],
-          take: 20,
-        });
+            orderBy: [{ homework: { dueDate: 'desc' } }],
+            take: 20,
+          }),
+        );
 
     const latestEnrollment = (student.enrollments || [])[0] ?? null;
     const classTeacher = student.sectionRef?.classTeacher
@@ -1507,6 +1546,7 @@ export class StudentsService {
           submittedAt:
             record.attendanceSession.submittedAt?.toISOString() ?? null,
         })),
+        unavailableSections,
         academicResults: academicResults.map((card) => ({
           id: card.id,
           examTerm: card.examTerm,

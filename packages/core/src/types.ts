@@ -7,6 +7,7 @@ import type { PermissionKey } from "./permissions.js";
 import type {
   ResourceAuthorization,
   StudentProfileAuthorization,
+  StudentProfileSection,
 } from "./authorization-contract.js";
 
 // ─── Compiled from types/common.ts ───
@@ -6694,6 +6695,8 @@ export type StudentProfileDetail = {
   activityPosts?: ActivityPost[];
   academicResults?: StudentProfileAcademicResult[];
   homeworkSubmissions?: StudentProfileHomeworkSubmission[];
+  /** Authorized sections that failed to load this time (data is empty). */
+  unavailableSections?: StudentProfileSection[];
   authorization?: StudentProfileAuthorization;
 };
 

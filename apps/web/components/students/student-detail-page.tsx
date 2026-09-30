@@ -71,6 +71,14 @@ const overflowTabs: Array<{ value: DetailTab; label: string }> = [
   { value: 'Health', label: 'Support & safety' },
 ];
 
+const UNAVAILABLE_SECTION_LABELS: Partial<
+  Record<StudentProfileSection, string>
+> = {
+  activity: 'Activity',
+  academics: 'Published results',
+  homework: 'Homework',
+};
+
 const requestedTabAliases: Record<string, DetailTab> = {
   attendance: 'Attendance',
   Profile: 'Profile',
@@ -111,7 +119,15 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     queryKey: profileQueryKey,
     queryFn: () => api.getStudentProfile(studentId),
     enabled: Boolean(studentId),
+    // Phase 5: access can be revoked without the viewer's permissions
+    // changing (e.g. a teacher's assignment removed), so the cache key alone
+    // is not enough. Always re-check with the server on open.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
+  // Never render a copy cached from an earlier visit before the server has
+  // re-authorized this view.
+  const profileVerified = profileQuery.isFetchedAfterMount;
   const access = resourceAccess<StudentProfileAction, StudentProfileSection>(
     profileQuery.data?.authorization,
   );
@@ -307,7 +323,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     }
   }
 
-  if (profileQuery.isLoading)
+  if (profileQuery.isLoading || (!profileVerified && profileQuery.isFetching))
     return <LoadingState variant="page" label="Gathering student profile..." />;
   if (profileQuery.isError || !profileQuery.data) {
     return (
@@ -319,6 +335,9 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   }
 
   const profile = profileQuery.data;
+  const unavailableSectionLabels = (profile.unavailableSections ?? []).map(
+    (section) => UNAVAILABLE_SECTION_LABELS[section] ?? section,
+  );
   const activeOverflowTab = overflowTabs.find(
     (tab) => tab.value === activeDetailTab,
   );
@@ -338,6 +357,16 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
+      {unavailableSectionLabels.length > 0 ? (
+        <div
+          role="status"
+          className="rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800"
+        >
+          Some sections could not be loaded right now:{' '}
+          {unavailableSectionLabels.join(', ')}. Everything else on this page is
+          current. Refresh to try again.
+        </div>
+      ) : null}
       <ProfileHeader
         profile={profile}
         canEdit={canEditStudent}

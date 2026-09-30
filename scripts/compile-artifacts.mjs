@@ -197,6 +197,7 @@ import type { PermissionKey } from './permissions.js';
 import type {
   ResourceAuthorization,
   StudentProfileAuthorization,
+  StudentProfileSection,
 } from './authorization-contract.js';
 
 `;
