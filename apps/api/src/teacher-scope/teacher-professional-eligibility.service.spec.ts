@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ConflictException } from '@nestjs/common';
 import { TeacherProfessionalEligibilityService } from './teacher-professional-eligibility.service';
 

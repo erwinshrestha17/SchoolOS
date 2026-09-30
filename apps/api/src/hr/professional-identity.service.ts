@@ -407,7 +407,7 @@ export class ProfessionalIdentityService {
           tenantId: actor.tenantId,
           profileId: profile.id,
           qualification: dto.qualification.trim(),
-          institution: dto.institution?.trim() || null,
+          institution: blankToNull(dto.institution),
           ...evidenceCommon(dto, window, actor),
         },
         select: { ...EVIDENCE_SELECT, qualification: true, institution: true },
@@ -724,11 +724,11 @@ const EVIDENCE_SELECT = {
   createdAt: true,
 } as const;
 
-type EvidenceRow = {
+interface EvidenceRow {
   status: ProfessionalEvidenceStatus;
   validFrom: Date;
   validUntil: Date | null;
-};
+}
 
 /**
  * Read-side state for UI. `effectiveState` is what eligibility would see:
@@ -776,8 +776,8 @@ function evidenceCommon(
   actor: AuthContext,
 ) {
   return {
-    subjectCode: dto.subjectCode?.trim() || null,
-    levelCode: dto.levelCode?.trim() || null,
+    subjectCode: blankToNull(dto.subjectCode),
+    levelCode: blankToNull(dto.levelCode),
     ...window,
     documentId: dto.documentId ?? null,
     sourceUri: dto.sourceUri ?? null,
@@ -785,6 +785,11 @@ function evidenceCommon(
     status: ProfessionalEvidenceStatus.PENDING,
     submittedById: actor.userId,
   };
+}
+
+function blankToNull(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed === '' ? null : (trimmed ?? null);
 }
 
 function parseDate(value: string, field: string): Date {

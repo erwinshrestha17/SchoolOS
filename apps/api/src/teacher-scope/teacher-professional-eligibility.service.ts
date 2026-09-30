@@ -47,7 +47,7 @@ interface EligibilityEvaluation {
 function eligibilityRejectionReason(error: unknown): string | null {
   if (!(error instanceof ConflictException)) return null;
   const body = error.getResponse() as { code?: unknown; reason?: unknown };
-  return body?.code === 'TEACHER_PROFESSIONAL_ELIGIBILITY_REQUIRED' &&
+  return body.code === 'TEACHER_PROFESSIONAL_ELIGIBILITY_REQUIRED' &&
     typeof body.reason === 'string'
     ? body.reason
     : null;
