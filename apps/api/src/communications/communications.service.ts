@@ -81,6 +81,17 @@ const TEMPLATE_SELECT = {
 
 const DELIVERY_INSERT_BATCH_SIZE = 500;
 
+/**
+ * Delivery intake is one atomic transaction (all rows or none). Prisma's
+ * implicit 5 s interactive-transaction limit aborted large but legitimate
+ * batches (2,000 recipients x 3 channels), so the budget is explicit and
+ * scales with the rows written: 5 s base + 4 ms per row, capped at 60 s.
+ */
+export function deliveryIntakeTimeoutMs(rowCount: number): number {
+  const rows = Math.max(0, Math.floor(rowCount));
+  return Math.min(60_000, 5_000 + rows * 4);
+}
+
 function maskDeliveryDestination(destination: string) {
   if (destination.includes('@')) {
     const [name, domain] = destination.split('@');
@@ -2331,22 +2342,31 @@ export class CommunicationsService {
       }
 
       const [queuedDeliveries, skippedDeliveries] =
-        await this.prisma.$transaction(async (tx) => {
-          const queued = await this.createDeliveryRows(
-            input,
-            allowedRecipients,
-            NotificationStatus.QUEUED,
-            tx,
-          );
-          const skipped = await this.createDeliveryRows(
-            input,
-            skippedRecipients,
-            NotificationStatus.SKIPPED,
-            tx,
-            `Missing required consent: ${input.requiredConsentTypes?.join(', ')}`,
-          );
-          return [queued, skipped];
-        });
+        await this.prisma.$transaction(
+          async (tx) => {
+            const queued = await this.createDeliveryRows(
+              input,
+              allowedRecipients,
+              NotificationStatus.QUEUED,
+              tx,
+            );
+            const skipped = await this.createDeliveryRows(
+              input,
+              skippedRecipients,
+              NotificationStatus.SKIPPED,
+              tx,
+              `Missing required consent: ${input.requiredConsentTypes?.join(', ')}`,
+            );
+            return [queued, skipped];
+          },
+          {
+            timeout: deliveryIntakeTimeoutMs(
+              (allowedRecipients.length + skippedRecipients.length) *
+                input.channels.length,
+            ),
+            maxWait: 10_000,
+          },
+        );
 
       for (const delivery of queuedDeliveries) {
         await this.dispatchDelivery(delivery);

@@ -648,7 +648,10 @@ describe('CommunicationsService', () => {
         ],
       }),
     ).rejects.toThrow('synthetic transaction failure');
-    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+    expect(prisma.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ timeout: expect.any(Number) }),
+    );
     expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
   });
 
@@ -3432,5 +3435,26 @@ describe('CommunicationsService', () => {
 
       expect(preview.recipientCount).toBe(1);
     });
+  });
+});
+
+describe('deliveryIntakeTimeoutMs (atomic delivery intake budget)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { deliveryIntakeTimeoutMs } = require('./communications.service') as {
+    deliveryIntakeTimeoutMs: (rows: number) => number;
+  };
+
+  it('keeps the 5 s default floor for small batches', () => {
+    expect(deliveryIntakeTimeoutMs(0)).toBe(5_000);
+    expect(deliveryIntakeTimeoutMs(10)).toBe(5_040);
+  });
+
+  it('scales for a 2,000-recipient three-channel batch', () => {
+    expect(deliveryIntakeTimeoutMs(6_000)).toBe(29_000);
+  });
+
+  it('is capped so a runaway batch cannot hold locks indefinitely', () => {
+    expect(deliveryIntakeTimeoutMs(1_000_000)).toBe(60_000);
+    expect(deliveryIntakeTimeoutMs(-5)).toBe(5_000);
   });
 });
