@@ -68,3 +68,26 @@ test('entitlements refresh on focus, interval and school switch', () => {
   assert.match(provider, /ENTITLEMENTS_REFRESH_MS/);
   assert.match(provider, /\[status, tenantId, refreshTick\]/);
 });
+
+test('palette quick actions mirror the create routes permissions and modules', () => {
+  const palette = read('components/layout/command-palette.tsx');
+  assert.match(palette, /QUICK_ACTIONS/);
+  assert.match(palette, /action\.permissions\.every/);
+  assert.match(palette, /hasModule\(action\.module\)/);
+  assert.match(palette, /label="Actions"/);
+});
+
+test('principal and admin homes carry decisions and setup blockers', () => {
+  assert.match(
+    read('components/dashboard/principal-dashboard.tsx'),
+    /<PrincipalDecisionsPanel/,
+  );
+  assert.match(
+    read('components/dashboard/admin-dashboard.tsx'),
+    /<SetupBlockersPanel/,
+  );
+  assert.match(
+    read('../api/src/advanced-operations/principal-approval-queue.service.ts'),
+    /requestedById: \{ not: actor\.userId \}/,
+  );
+});

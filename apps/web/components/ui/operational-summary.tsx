@@ -77,6 +77,7 @@ const APPROVED_DASHBOARD_ROUTES = new Set([
   '/dashboard/accounting/journals',
   '/dashboard/accounting/reconciliation',
   '/dashboard/accounting/fiscal-periods',
+  '/dashboard/accounting/payroll-handoff',
   '/dashboard/notices',
   '/dashboard/notifications/deliveries',
   '/dashboard/learning',

@@ -21,6 +21,8 @@ export class PrincipalApprovalQueueService {
       where: {
         tenantId: actor.tenantId,
         status: ApprovalRequestStatus.PENDING,
+        // SoD: a requester never sees their own request as reviewable.
+        requestedById: { not: actor.userId },
         OR: [{ delegatedToId: null }, { delegatedToId: actor.userId }],
       },
       ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),

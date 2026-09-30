@@ -1,8 +1,12 @@
 'use client';
 
 import {
+  BookOpen,
+  ClipboardCheck,
   FileText,
   Megaphone,
+  UserPlus,
+  Wallet,
   Search,
   UserRound,
   type LucideIcon,
@@ -43,9 +47,64 @@ const RECENT_KIND_ACCESS: Record<
   notice: { module: 'notices', permissions: ['notices:read'] },
 };
 
+/**
+ * Persona-aware quick actions (Phase 4A). Each is offered only when the module
+ * is enabled and the session holds ALL of the create route's @Permissions;
+ * the target route still re-authorizes on the server.
+ */
+const QUICK_ACTIONS: Array<{
+  key: string;
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  module: string;
+  permissions: readonly string[];
+}> = [
+  {
+    key: 'take-attendance',
+    label: 'Take attendance',
+    href: '/dashboard/attendance/mark',
+    icon: ClipboardCheck,
+    module: 'attendance',
+    permissions: ['attendance:mark'],
+  },
+  {
+    key: 'create-homework',
+    label: 'Create homework',
+    href: '/dashboard/homework/new',
+    icon: BookOpen,
+    module: 'homework',
+    permissions: ['homework:create'],
+  },
+  {
+    key: 'collect-payment',
+    label: 'Collect payment',
+    href: '/dashboard/fees/collect',
+    icon: Wallet,
+    module: 'fees',
+    permissions: ['payments:collect'],
+  },
+  {
+    key: 'create-notice',
+    label: 'Create notice',
+    href: '/dashboard/notices/new',
+    icon: Megaphone,
+    module: 'notices',
+    permissions: ['notices:create'],
+  },
+  {
+    key: 'new-admission',
+    label: 'New admission',
+    href: '/dashboard/admissions/new',
+    icon: UserPlus,
+    module: 'students',
+    permissions: ['enrollments:create', 'students:create', 'guardians:create'],
+  },
+];
+
 type PaletteRow = {
   key: string;
-  section: 'recent' | 'workspace';
+  section: 'recent' | 'action' | 'workspace';
   label: string;
   href: string;
   icon: LucideIcon;
@@ -146,6 +205,23 @@ export function CommandPalette() {
         icon: RECENT_KIND_ICON[entry.kind],
       }));
 
+    const actionRows: PaletteRow[] = (isSupportOverride ? [] : QUICK_ACTIONS)
+      .filter(
+        (action) =>
+          hasModule(action.module) &&
+          action.permissions.every((permission) =>
+            permissions.includes(permission),
+          ) &&
+          (!normalized || action.label.toLowerCase().includes(normalized)),
+      )
+      .map((action) => ({
+        key: `action-${action.key}`,
+        section: 'action' as const,
+        label: action.label,
+        href: action.href,
+        icon: action.icon,
+      }));
+
     const workspaceRows: PaletteRow[] = (
       normalized
         ? navItems.filter((item) =>
@@ -160,7 +236,7 @@ export function CommandPalette() {
       icon: item.icon,
     }));
 
-    return [...recentRows, ...workspaceRows];
+    return [...recentRows, ...actionRows, ...workspaceRows];
   }, [hasModule, isSupportOverride, navItems, recentlyViewed, query, session]);
 
   useEffect(() => {
@@ -243,6 +319,7 @@ export function CommandPalette() {
   if (!isOpen || typeof document === 'undefined') return null;
 
   const hasRecentRows = results.some((row) => row.section === 'recent');
+  const hasActionRows = results.some((row) => row.section === 'action');
   const hasWorkspaceRows = results.some((row) => row.section === 'workspace');
 
   return createPortal(
@@ -292,6 +369,23 @@ export function CommandPalette() {
                   {results
                     .map((row, index) => ({ row, index }))
                     .filter(({ row }) => row.section === 'recent')
+                    .map(({ row, index }) => (
+                      <PaletteRowButton
+                        key={row.key}
+                        row={row}
+                        active={index === activeIndex}
+                        onHover={() => setActiveIndex(index)}
+                        onSelect={() => goTo(row.href)}
+                      />
+                    ))}
+                </PaletteSection>
+              ) : null}
+
+              {hasActionRows ? (
+                <PaletteSection label="Actions">
+                  {results
+                    .map((row, index) => ({ row, index }))
+                    .filter(({ row }) => row.section === 'action')
                     .map(({ row, index }) => (
                       <PaletteRowButton
                         key={row.key}

@@ -134,6 +134,13 @@ const READINESS_PANELS: ReadinessPanelDefinition[] = [
       },
       {
         module: 'm11_accounting',
+        metricKey: 'failedPostingBatches',
+        label: (count) =>
+          `${formatNumber(count)} accounting posting${count === 1 ? '' : 's'} failed`,
+        route: '/dashboard/accounting/payroll-handoff',
+      },
+      {
+        module: 'm11_accounting',
         metricKey: 'unpostedJournals',
         label: (count) =>
           `${formatNumber(count)} journal${count === 1 ? '' : 's'} awaiting posting`,
@@ -151,6 +158,13 @@ const READINESS_PANELS: ReadinessPanelDefinition[] = [
         metricKey: 'staffAttendanceAnomalies',
         label: (count) => `${formatNumber(count)} staff absent or late today`,
         route: '/dashboard/hr/attendance',
+      },
+      {
+        module: 'm7_hr_payroll',
+        metricKey: 'uncoveredPeriodsToday',
+        label: (count) =>
+          `${formatNumber(count)} period${count === 1 ? '' : 's'} today without cover`,
+        route: '/dashboard/timetable/substitutions',
       },
       {
         module: 'm1_students',
@@ -244,6 +258,11 @@ function ReadinessPanel({
   const hasPartialSource =
     sourceModules.some((module) => !moduleMap.has(module)) ||
     visibleModules.some((summary) => summary.status === 'partial');
+  // A row whose metric the server withheld (outside the actor's drill-down
+  // scope) was not evaluated, so the panel must not claim a clean bill.
+  const hasWithheldSource = panelRows.some((row) =>
+    (moduleMap.get(row.module)?.withheldMetrics ?? []).includes(row.metricKey),
+  );
 
   const rows: ReadinessRow[] = panelRows
     .map((definition) => {
@@ -303,7 +322,9 @@ function ReadinessPanel({
             className="h-4 w-4 shrink-0 text-success-600"
             aria-hidden="true"
           />
-          {panel.emptyMessage}
+          {hasWithheldSource
+            ? 'Nothing open among the items you can review.'
+            : panel.emptyMessage}
         </p>
       )}
 

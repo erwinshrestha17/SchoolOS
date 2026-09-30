@@ -17,22 +17,29 @@ import { PermissionDenied } from '../../../components/ui/permission-denied';
 import { SectionCard } from '../../../components/ui/section-card';
 import { api, type ApprovalDecision } from '../../../lib/api';
 import { usePermissionAccess } from '../../../lib/permissions-ui';
-import { useSchoolWebPersona } from '../../../lib/school-web-persona';
+import { useHomePersona } from '../../../lib/home-persona';
+import { useSession } from '../../../components/session-provider';
 
 export default function PrincipalApprovalCentrePage() {
-  const schoolWebPersona = useSchoolWebPersona();
+  const { session } = useSession();
+  const { available: homes } = useHomePersona();
   const access = usePermissionAccess();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [confirmDecision, setConfirmDecision] =
     useState<ApprovalDecision | null>(null);
-  const isPrincipal = schoolWebPersona === 'principal';
+  // Anyone holding the Principal home (the API re-checks the principal role).
+  const isPrincipal = homes.includes('principal');
   const canRead = access.hasPermission('advanced:approvals:read');
   const canDecide = access.hasPermission('advanced:approvals:decide');
 
   const approvalQuery = useInfiniteQuery({
-    queryKey: ['principal-approval-centre'],
+    queryKey: [
+      'principal-approval-centre',
+      session?.tenant.id,
+      session?.user.id,
+    ],
     queryFn: ({ pageParam }) =>
       api.listPrincipalApprovalQueue({
         cursor: pageParam ?? undefined,
@@ -74,6 +81,9 @@ export default function PrincipalApprovalCentrePage() {
       });
       await queryClient.invalidateQueries({
         queryKey: ['operational-dashboard-summary'],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ['principal-decisions-preview'],
       });
     },
   });

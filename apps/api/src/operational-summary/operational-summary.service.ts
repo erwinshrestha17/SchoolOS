@@ -167,6 +167,9 @@ const METRIC_PERMISSIONS: Record<string, readonly string[]> = {
   draftPayrollRuns: ['payroll:run:read'],
   payslipsNotIssued: ['payroll:read'],
   unpostedJournals: ['accounting:journals:read'],
+  failedPostingBatches: ['accounting:posting-batches:read'],
+  uncoveredPeriodsToday: ['timetable:read'],
+  unassignedSubstitutionsToday: ['timetable:read'],
   unreconciledStatements: ['accounting:reports:read'],
   periodCloseBlockers: ['accounting:reports:read'],
   failedDeliveries: ['notifications:view_delivery_diagnostics'],
@@ -775,6 +778,7 @@ export class OperationalSummaryService {
                 tenantId,
                 date: { gte: day.startUtc, lt: day.endExclusiveUtc },
                 substituteTeacherId: null,
+                status: { not: 'CANCELLED' },
               },
               'Assign substitutes',
               '/dashboard/timetable/substitutions',
@@ -835,6 +839,19 @@ export class OperationalSummaryService {
           tenantId,
           issuedAt: null,
         }),
+        // Staff-absence impact: periods today still without a substitute.
+        this.def(
+          'uncoveredPeriodsToday',
+          'timetableSubstitution',
+          {
+            tenantId,
+            date: { gte: day.startUtc, lt: day.endExclusiveUtc },
+            substituteTeacherId: null,
+            status: { not: 'CANCELLED' },
+          },
+          'Arrange cover for absent staff',
+          '/dashboard/timetable/substitutions',
+        ),
       ],
       m8a_library: [
         this.def('activeLoans', 'libraryIssue', { tenantId, status: 'ISSUED' }),
@@ -944,6 +961,13 @@ export class OperationalSummaryService {
           { tenantId, isReconciled: false },
           'Review reconciliation exceptions',
           '/dashboard/accounting/reconciliation',
+        ),
+        this.def(
+          'failedPostingBatches',
+          'accountingPostingBatch',
+          { tenantId, status: 'FAILED' },
+          'Resolve failed accounting postings',
+          '/dashboard/accounting/payroll-handoff',
         ),
         this.def(
           'periodCloseBlockers',
