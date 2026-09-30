@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -20,7 +21,6 @@ import { ModuleHeader } from '../../../components/ui/module-header';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
 import { SummaryCard, SummaryGrid } from '../../../components/ui/summary-card';
 import { WorkspaceTabs } from '../../../components/ui/module-tabs';
-import { WorkSurface } from '../../../components/ui/work-surface';
 import { LoadingState } from '../../../components/ui/loading-state';
 import { ErrorState } from '../../../components/ui/error-state';
 import { EmptyState } from '../../../components/ui/empty-state';
@@ -166,11 +166,10 @@ export default function PayrollDashboardPage() {
 
       <WorkspaceTabs items={moduleTabs} />
 
-      <WorkSurface
+      <Surface
         title="Payroll Workflow"
         description="Current loaded run statuses for review, approval, and accounting posting."
-        variant="queue"
-        action={
+        actions={
           <Link
             href="/dashboard/payroll/runs"
             className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary-dark)] hover:text-slate-950"
@@ -221,13 +220,12 @@ export default function PayrollDashboardPage() {
             />
           )}
         </div>
-      </WorkSurface>
+      </Surface>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <WorkSurface
+        <Surface
           title="Posting Status"
           description="Posted runs are linked to accounting journals; salary disbursement remains outside this workspace."
-          variant="monitoring"
         >
           <div className="space-y-3">
             {[
@@ -286,12 +284,11 @@ export default function PayrollDashboardPage() {
               </div>
             ))}
           </div>
-        </WorkSurface>
+        </Surface>
 
-        <WorkSurface
+        <Surface
           title="Reports and Protected Files"
           description="Payslip PDFs and exports stay behind authenticated payroll helpers."
-          variant="grid"
         >
           <div className="grid gap-3 sm:grid-cols-2">
             {[
@@ -331,7 +328,7 @@ export default function PayrollDashboardPage() {
               </Link>
             ))}
           </div>
-        </WorkSurface>
+        </Surface>
       </div>
 
       {summaryQuery.isError ? (

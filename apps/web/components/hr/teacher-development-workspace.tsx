@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -22,7 +23,6 @@ import { api } from '@/lib/api';
 import { useSession } from '@/components/session-provider';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
-import { WorkSurface } from '@/components/ui/work-surface';
 import { Button } from '@/components/ui/button';
 import { BsDateField } from '@/components/ui/bs-date-field';
 import { FormField, Input, Select, TextArea } from '@/components/ui/form-field';
@@ -158,7 +158,7 @@ export function TeacherDevelopmentWorkspace() {
             canManage={canManage}
             onChanged={refresh}
           />
-          <WorkSurface
+          <Surface
             title="Training history"
             description="Courses and completed professional learning."
           >
@@ -204,7 +204,7 @@ export function TeacherDevelopmentWorkspace() {
                 ))}
               </div>
             )}
-          </WorkSurface>
+          </Surface>
         </div>
       )}
     </div>
@@ -329,11 +329,10 @@ function TeacherDevelopmentCreateForm({
   );
 
   return (
-    <WorkSurface
-      variant="form"
+    <Surface
       title="Add teacher development record"
       description="Writes are tenant-scoped, idempotent, and audited."
-      action={<Plus className="size-5 text-muted-foreground" />}
+      actions={<Plus className="size-5 text-muted-foreground" />}
     >
       <form
         className="grid gap-4 lg:grid-cols-3"
@@ -482,7 +481,7 @@ function TeacherDevelopmentCreateForm({
           </p>
         ) : null}
       </form>
-    </WorkSurface>
+    </Surface>
   );
 }
 
@@ -514,7 +513,7 @@ function ObservationList({
     },
   });
   return (
-    <WorkSurface
+    <Surface
       title="Classroom observations"
       description="Strengths, agreed feedback, and follow-up."
     >
@@ -576,7 +575,7 @@ function ObservationList({
           ))}
         </div>
       )}
-    </WorkSurface>
+    </Surface>
   );
 }
 
@@ -606,7 +605,7 @@ function GoalList({
     },
   });
   return (
-    <WorkSurface
+    <Surface
       title="Development goals"
       description="Baselines, targets, mentors, and due dates."
     >
@@ -670,7 +669,7 @@ function GoalList({
           ))}
         </div>
       )}
-    </WorkSurface>
+    </Surface>
   );
 }
 

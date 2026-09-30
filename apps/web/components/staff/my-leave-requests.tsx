@@ -1,9 +1,9 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { formatBsDate } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -12,7 +12,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/ui/primitives/table';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { api } from '../../lib/api';
@@ -64,62 +64,60 @@ export function MyLeaveRequests({ staffId }: MyLeaveRequestsProps) {
         ) : null}
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
+      <Surface padding="flush">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="pl-6">Type</TableHead>
+              <TableHead>Dates</TableHead>
+              <TableHead>Days</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="pr-6">Reviewer Notes</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {requests.length === 0 ? (
               <TableRow>
-                <TableHead className="pl-6">Type</TableHead>
-                <TableHead>Dates</TableHead>
-                <TableHead>Days</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="pr-6">Reviewer Notes</TableHead>
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-muted-foreground py-8"
+                >
+                  No leave requests found.
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {requests.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-center text-muted-foreground py-8"
-                  >
-                    No leave requests found.
+            ) : (
+              requests.map((request) => (
+                <TableRow key={request.id}>
+                  <TableCell className="pl-6 font-medium">
+                    {formatValue(request.leaveType)}
+                  </TableCell>
+                  <TableCell>
+                    {formatBsDate(request.startsOn)} –{' '}
+                    {formatBsDate(request.endsOn)}
+                  </TableCell>
+                  <TableCell>{String(request.days)}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        request.status === 'APPROVED'
+                          ? 'success'
+                          : request.status === 'REJECTED'
+                            ? 'destructive'
+                            : 'warning'
+                      }
+                    >
+                      {formatValue(request.status)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="pr-6 text-sm text-muted-foreground">
+                    {request.reviewNote || '—'}
                   </TableCell>
                 </TableRow>
-              ) : (
-                requests.map((request) => (
-                  <TableRow key={request.id}>
-                    <TableCell className="pl-6 font-medium">
-                      {formatValue(request.leaveType)}
-                    </TableCell>
-                    <TableCell>
-                      {formatBsDate(request.startsOn)} –{' '}
-                      {formatBsDate(request.endsOn)}
-                    </TableCell>
-                    <TableCell>{String(request.days)}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          request.status === 'APPROVED'
-                            ? 'success'
-                            : request.status === 'REJECTED'
-                              ? 'destructive'
-                              : 'warning'
-                        }
-                      >
-                        {formatValue(request.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="pr-6 text-sm text-muted-foreground">
-                      {request.reviewNote || '—'}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Surface>
 
       {isCreateOpen && canRequestLeave ? (
         <LeaveRequestCreateDialog

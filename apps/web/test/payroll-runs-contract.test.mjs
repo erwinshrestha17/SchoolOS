@@ -172,7 +172,7 @@ describe('Payroll Runs UI contracts', () => {
       payrollDashboard,
       /href: ['"]\/dashboard\/payroll\/readiness['"]/,
     );
-    assert.match(payrollDashboard, /<WorkSurface/);
+    assert.match(payrollDashboard, /<Surface\b/);
     assert.match(client, /throw new ApiRequestError\(/);
     assert.match(adminPayslips, /error instanceof ApiRequestError/);
     assert.match(adminPayslips, /error\.statusCode === 409/);

@@ -54,7 +54,7 @@ function HeadingRow({
   );
 }
 
-export type SurfaceProps = HTMLAttributes<HTMLElement> &
+export type SurfaceProps = Omit<HTMLAttributes<HTMLElement>, 'title'> &
   Heading & {
     /** `flush` removes inner padding for edge-to-edge tables/lists. */
     padding?: 'default' | 'flush';
@@ -112,7 +112,7 @@ export function Surface({
   );
 }
 
-export type SectionProps = HTMLAttributes<HTMLElement> &
+export type SectionProps = Omit<HTMLAttributes<HTMLElement>, 'title'> &
   Heading & {
     /** Adds a top divider to separate sibling sections without cards. */
     divided?: boolean;
@@ -154,7 +154,7 @@ export function Section({
   );
 }
 
-export type PanelProps = HTMLAttributes<HTMLElement> &
+export type PanelProps = Omit<HTMLAttributes<HTMLElement>, 'title'> &
   Heading & { tone?: 'neutral' | 'subtle' };
 
 export function Panel({
@@ -192,7 +192,7 @@ export function Panel({
   );
 }
 
-export type CardProps = HTMLAttributes<HTMLElement> &
+export type CardProps = Omit<HTMLAttributes<HTMLElement>, 'title'> &
   Heading & { interactive?: boolean };
 
 /** Discrete object only. Do not use as a page-section wrapper. */

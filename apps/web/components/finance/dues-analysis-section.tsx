@@ -1,12 +1,11 @@
 'use client';
 
-import { Surface } from '@/components/schoolos';
+import { Surface, PaginatedDataTable } from '@/components/schoolos';
 import type { DuesReportFilters, DuesReportRow } from '@schoolos/core';
 import { formatBsDate } from '@schoolos/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { DataTable } from '@/components/ui/data-table';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -46,6 +45,7 @@ export function DuesAnalysisSection() {
 
   const columns = [
     {
+      id: 'student-information',
       header: 'Student Information',
       cell: (row: DuesReportRow) => (
         <div className="flex flex-col">
@@ -57,6 +57,7 @@ export function DuesAnalysisSection() {
       ),
     },
     {
+      id: 'fee-head',
       header: 'Fee Head',
       cell: (row: DuesReportRow) => (
         <Badge
@@ -68,6 +69,7 @@ export function DuesAnalysisSection() {
       ),
     },
     {
+      id: 'financials',
       header: 'Financials',
       cell: (row: DuesReportRow) => (
         <div className="flex flex-col">
@@ -87,6 +89,7 @@ export function DuesAnalysisSection() {
       ),
     },
     {
+      id: 'outstanding',
       header: 'Outstanding',
       cell: (row: DuesReportRow) => (
         <div className="text-right">
@@ -97,6 +100,7 @@ export function DuesAnalysisSection() {
       ),
     },
     {
+      id: 'status',
       header: 'Status',
       cell: (row: DuesReportRow) => {
         const isOverdue =
@@ -154,7 +158,11 @@ export function DuesAnalysisSection() {
                 className="premium-input bg-white h-12"
                 value={filters.classId ?? ''}
                 onChange={(e) =>
-                  setFilters({ ...filters, classId: e.target.value })
+                  setFilters({
+                    ...filters,
+                    classId: e.target.value,
+                    page: undefined,
+                  })
                 }
               >
                 <option value="">All Classes</option>
@@ -173,7 +181,11 @@ export function DuesAnalysisSection() {
                 className="premium-input bg-white h-12"
                 value={filters.feeHeadId ?? ''}
                 onChange={(e) =>
-                  setFilters({ ...filters, feeHeadId: e.target.value })
+                  setFilters({
+                    ...filters,
+                    feeHeadId: e.target.value,
+                    page: undefined,
+                  })
                 }
               >
                 <option value="">All Fee Heads</option>
@@ -196,11 +208,29 @@ export function DuesAnalysisSection() {
         </div>
 
         <div className="relative rounded-2xl border border-slate-100 overflow-hidden shadow-sm bg-white">
-          <DataTable
+          <PaginatedDataTable
             columns={columns}
-            data={duesQuery.data?.rows || []}
-            isLoading={duesQuery.isLoading}
-            emptyMessage="Excellent! No outstanding dues found for these filters."
+            items={duesQuery.data?.rows || []}
+            emptyDescription="Excellent! No outstanding dues found for these filters."
+            status={
+              duesQuery.error
+                ? 'error'
+                : duesQuery.isLoading
+                  ? 'loading'
+                  : 'ready'
+            }
+            onRetry={() => void duesQuery.refetch()}
+            getRowId={(row) =>
+              `${row.invoiceNumber}:${row.studentId}:${row.feeHeadId}`
+            }
+            // Server-owned paging: the report is paged, so show every page
+            // instead of silently truncating to the first one.
+            page={duesQuery.data?.pagination.page ?? filters.page ?? 1}
+            pageSize={duesQuery.data?.pagination.limit ?? 20}
+            totalItems={duesQuery.data?.pagination.total ?? 0}
+            onPageChange={(page) =>
+              setFilters((current) => ({ ...current, page }))
+            }
           />
         </div>
 

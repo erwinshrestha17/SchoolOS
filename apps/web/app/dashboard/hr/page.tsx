@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { formatBsDate } from '@schoolos/core';
@@ -23,7 +24,6 @@ import { ModuleHeader } from '../../../components/ui/module-header';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
 import { SummaryCard, SummaryGrid } from '../../../components/ui/summary-card';
 import { WorkspaceTabs } from '../../../components/ui/module-tabs';
-import { WorkSurface } from '../../../components/ui/work-surface';
 import { StatusBadge } from '../../../components/ui/status-badge';
 import { LoadingState } from '../../../components/ui/loading-state';
 import { EmptyState } from '../../../components/ui/empty-state';
@@ -184,11 +184,10 @@ export default function HRDashboardPage() {
       <WorkspaceTabs items={moduleTabs} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-        <WorkSurface
+        <Surface
           title="Leave Approval Queue"
           description="Leave requests waiting for review."
-          variant="queue"
-          action={
+          actions={
             <Link
               href="/dashboard/hr/leave"
               className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary-dark)] hover:text-slate-950"
@@ -255,13 +254,12 @@ export default function HRDashboardPage() {
               />
             )}
           </div>
-        </WorkSurface>
+        </Surface>
 
-        <WorkSurface
+        <Surface
           title="Contract Reminders"
           description="Active contract and probation reminders for the next 30 days."
-          variant="monitoring"
-          action={
+          actions={
             <Link
               href="/dashboard/hr/contracts"
               className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary-dark)] hover:text-slate-950"
@@ -340,15 +338,14 @@ export default function HRDashboardPage() {
               />
             )}
           </div>
-        </WorkSurface>
+        </Surface>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]">
-        <WorkSurface
+        <Surface
           title="Payroll Posting Boundary"
           description="Review, approve, and post payroll runs to accounting. Disbursement is not exposed here."
-          variant="monitoring"
-          action={
+          actions={
             <Link
               href="/dashboard/payroll/runs"
               className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--primary-dark)] hover:text-slate-950"
@@ -425,12 +422,11 @@ export default function HRDashboardPage() {
               </>
             )}
           </div>
-        </WorkSurface>
+        </Surface>
 
-        <WorkSurface
+        <Surface
           title="Known Boundary"
           description="Payroll settlement remains separate from the verified accrual-posting workflow."
-          variant="monitoring"
         >
           <div className="space-y-3">
             {remainingIssues.map((issue) => (
@@ -443,17 +439,16 @@ export default function HRDashboardPage() {
               </div>
             ))}
           </div>
-        </WorkSurface>
+        </Surface>
       </div>
 
-      <WorkSurface
+      <Surface
         title="Staffing Coverage"
         description={
           coverage
             ? `As of ${formatBsDate(coverage.asOf)}`
             : 'Staffing gaps that could block payroll or leave a class uncovered.'
         }
-        variant="monitoring"
       >
         {coverageQuery.isLoading ? (
           <LoadingState
@@ -537,7 +532,7 @@ export default function HRDashboardPage() {
             icon={<UserX className="h-7 w-7" />}
           />
         )}
-      </WorkSurface>
+      </Surface>
     </DashboardPageShell>
   );
 }

@@ -2913,7 +2913,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(hrPage, /<ModuleHeader/);
     assert.match(hrPage, /<SummaryGrid/);
     assert.match(hrPage, /<WorkspaceTabs/);
-    assert.match(hrPage, /<WorkSurface/);
+    assert.match(hrPage, /<Surface\b/);
     assert.match(hrPage, /api\.getLeaveQueueDepth/);
     assert.match(hrPage, /api\.listContractExpiryReminders/);
     assert.match(hrPage, /\/dashboard\/payroll\/runs/);
@@ -2925,7 +2925,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(payrollPage, /<ModuleHeader/);
     assert.match(payrollPage, /<SummaryGrid/);
     assert.match(payrollPage, /<WorkspaceTabs/);
-    assert.match(payrollPage, /<WorkSurface/);
+    assert.match(payrollPage, /<Surface\b/);
     assert.match(
       read('app/dashboard/payroll/reports/page.tsx'),
       /api\.getPayrollReportSummary/,

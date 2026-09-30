@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -21,7 +22,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '../../lib/api';
 import { SummaryCard, SummaryGrid } from '../ui/summary-card';
-import { WorkSurface } from '../ui/work-surface';
 import { Badge } from '../ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '../../lib/utils';
@@ -167,7 +167,7 @@ export function AccountingDashboardView() {
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-8">
           {canCreateJournal ? (
-            <WorkSurface
+            <Surface
               title="Operational Quick Actions"
               description="Execute standard financial transactions and vouchers."
             >
@@ -235,10 +235,10 @@ export function AccountingDashboardView() {
                   </Button>
                 ))}
               </div>
-            </WorkSurface>
+            </Surface>
           ) : null}
 
-          <WorkSurface
+          <Surface
             title="Financial Reporting Hub"
             description="Access real-time verified accounting reports."
           >
@@ -319,12 +319,12 @@ export function AccountingDashboardView() {
                 ))}
               </div>
             </div>
-          </WorkSurface>
+          </Surface>
 
-          <WorkSurface
+          <Surface
             title="Recent Ledger Postings"
             description="Latest validated transactions across all journals."
-            action={
+            actions={
               <Button
                 type="button"
                 variant="link"
@@ -371,11 +371,11 @@ export function AccountingDashboardView() {
                 )}
               />
             )}
-          </WorkSurface>
+          </Surface>
         </div>
 
         <div className="space-y-8">
-          <WorkSurface title="Fiscal Status" variant="monitoring">
+          <Surface title="Fiscal Status">
             <div className="space-y-6">
               <div className="rounded-2xl border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)] p-5 text-[var(--color-mod-accounting-text)] shadow-sm">
                 <p className="text-[0.65rem] font-bold uppercase tracking-widest text-[var(--color-mod-accounting-text)]/70">
@@ -452,9 +452,9 @@ export function AccountingDashboardView() {
                 </Button>
               </div>
             </div>
-          </WorkSurface>
+          </Surface>
 
-          <WorkSurface title="Double-Entry Guard" variant="monitoring">
+          <Surface title="Double-Entry Guard">
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
                 <span className="text-xs font-bold text-slate-600">
@@ -492,7 +492,7 @@ export function AccountingDashboardView() {
                 </div>
               </div>
             </div>
-          </WorkSurface>
+          </Surface>
         </div>
       </div>
 

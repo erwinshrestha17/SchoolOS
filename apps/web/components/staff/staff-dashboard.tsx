@@ -1,15 +1,9 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useCallback, useEffect, useState } from 'react';
 import { formatBsDate, type StaffDetail } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -110,56 +104,54 @@ export function StaffDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-6 items-start">
-        <Card className="w-full shrink-0 md:w-80">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-[var(--primary-soft)] bg-[var(--primary-soft)]">
-                {profile.photoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={profile.photoUrl}
-                    alt={`${staffName} profile`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <User className="w-12 h-12 text-[var(--primary)]" />
-                )}
-              </div>
-              <div>
-                <h2 className="text-xl font-bold">{staffName}</h2>
-                <p className="text-sm text-muted-foreground">
-                  Employee ID · {profile.employeeId}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="border-[var(--primary-soft)] bg-[var(--primary-soft)] text-[var(--primary-dark)]"
-                  >
-                    {formatRecordValue(staffRole)}
+        <Surface className="w-full shrink-0 md:w-80">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-[var(--primary-soft)] bg-[var(--primary-soft)]">
+              {profile.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profile.photoUrl}
+                  alt={`${staffName} profile`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <User className="w-12 h-12 text-[var(--primary)]" />
+              )}
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">{staffName}</h2>
+              <p className="text-sm text-muted-foreground">
+                Employee ID · {profile.employeeId}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="border-[var(--primary-soft)] bg-[var(--primary-soft)] text-[var(--primary-dark)]"
+                >
+                  {formatRecordValue(staffRole)}
+                </Badge>
+                {profile.status ? (
+                  <Badge variant="outline">
+                    {formatRecordValue(profile.status)}
                   </Badge>
-                  {profile.status ? (
-                    <Badge variant="outline">
-                      {formatRecordValue(profile.status)}
-                    </Badge>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="w-full pt-4 space-y-3 text-sm text-left border-t">
-                {session?.tenant.name ? (
-                  <div className="flex items-center gap-2">
-                    <School className="h-4 w-4 text-muted-foreground" />
-                    <span>{session.tenant.name}</span>
-                  </div>
                 ) : null}
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <span>Joined {formatBsDate(profile.joiningDate)}</span>
-                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="w-full pt-4 space-y-3 text-sm text-left border-t">
+              {session?.tenant.name ? (
+                <div className="flex items-center gap-2">
+                  <School className="h-4 w-4 text-muted-foreground" />
+                  <span>{session.tenant.name}</span>
+                </div>
+              ) : null}
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span>Joined {formatBsDate(profile.joiningDate)}</span>
+              </div>
+            </div>
+          </div>
+        </Surface>
 
         <div className="flex-1 space-y-6 w-full">
           <Tabs defaultValue="overview" className="w-full">
@@ -192,129 +184,125 @@ export function StaffDashboard() {
                     : 'grid grid-cols-1 gap-4'
                 }
               >
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Briefcase className="w-4 h-4" />
-                      Employment summary
-                    </CardTitle>
-                    <CardDescription>
-                      Your current assignment and contract status.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <dl className="space-y-3">
-                      <DetailRow
-                        label="Current assignment"
-                        value={employment?.designation ?? profile.designation}
-                      />
-                      <DetailRow
-                        label="Department"
-                        value={employment?.department ?? profile.department}
-                      />
-                      <DetailRow
-                        label="Employment type"
-                        value={
-                          employment?.employmentType ?? profile.contractType
-                        }
-                      />
-                      <DetailRow
-                        label="Contract status"
-                        value={employment?.contractStatus}
-                      />
-                    </dl>
-                  </CardContent>
-                </Card>
+                <Surface
+                  title={
+                    <>
+                      <span className="flex items-center gap-2">
+                        <Briefcase className="w-4 h-4" />
+                        Employment summary
+                      </span>
+                    </>
+                  }
+                  description="Your current assignment and contract status."
+                >
+                  <dl className="space-y-3">
+                    <DetailRow
+                      label="Current assignment"
+                      value={employment?.designation ?? profile.designation}
+                    />
+                    <DetailRow
+                      label="Department"
+                      value={employment?.department ?? profile.department}
+                    />
+                    <DetailRow
+                      label="Employment type"
+                      value={employment?.employmentType ?? profile.contractType}
+                    />
+                    <DetailRow
+                      label="Contract status"
+                      value={employment?.contractStatus}
+                    />
+                  </dl>
+                </Surface>
 
                 {hasBankDetails ? (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <CreditCard className="w-4 h-4" />
-                        Payroll details
-                      </CardTitle>
-                      <CardDescription>
-                        Bank information is shown only when your access allows
-                        it.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <dl className="space-y-3">
-                        <DetailRow label="Bank" value={profile.bankName} />
-                        <DetailRow
-                          label="Account (masked)"
-                          value={maskStaffBankAccount(profile.bankAccount)}
-                        />
-                      </dl>
-                    </CardContent>
-                  </Card>
+                  <Surface
+                    title={
+                      <>
+                        <span className="flex items-center gap-2">
+                          <CreditCard className="w-4 h-4" />
+                          Payroll details
+                        </span>
+                      </>
+                    }
+                    description="Bank information is shown only when your access allows
+                        it."
+                  >
+                    <dl className="space-y-3">
+                      <DetailRow label="Bank" value={profile.bankName} />
+                      <DetailRow
+                        label="Account (masked)"
+                        value={maskStaffBankAccount(profile.bankAccount)}
+                      />
+                    </dl>
+                  </Surface>
                 ) : null}
 
-                <Card className={hasBankDetails ? 'lg:col-span-2' : undefined}>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <History className="w-4 h-4" />
-                      Recent employment activity
-                    </CardTitle>
-                    <CardDescription>
-                      Recent contract, leave, payroll, document, and employment
-                      record events.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {timelineQuery.isLoading ? (
-                      <LoadingState label="Loading recent activity..." />
-                    ) : timelineQuery.isError ? (
-                      <div
-                        className="flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
-                        role="status"
-                      >
-                        <p className="text-sm text-slate-600">
-                          Recent activity could not be loaded. Your other
-                          employment information is still available.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => void timelineQuery.refetch()}
-                          className="text-sm font-bold text-[var(--primary)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
-                        >
-                          Try again
-                        </button>
-                      </div>
-                    ) : timelineQuery.data?.items.length ? (
-                      <ol className="divide-y divide-slate-100">
-                        {timelineQuery.data.items.slice(0, 5).map((event) => (
-                          <li
-                            key={`${event.type}-${event.id}`}
-                            className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
-                          >
-                            <div className="min-w-0">
-                              <p className="break-words text-sm font-semibold text-slate-900">
-                                {formatTimelineTitle(event.title)}
-                              </p>
-                              <p className="mt-0.5 text-xs text-slate-500">
-                                {formatRecordValue(event.type)}
-                                {event.reason
-                                  ? ` · ${formatRecordValue(event.reason)}`
-                                  : ''}
-                              </p>
-                            </div>
-                            <time
-                              dateTime={event.occurredAt}
-                              className="shrink-0 text-xs font-medium text-slate-500"
-                            >
-                              {formatBsDate(event.occurredAt)}
-                            </time>
-                          </li>
-                        ))}
-                      </ol>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No recent employment activity is recorded.
+                <Surface
+                  className={hasBankDetails ? 'lg:col-span-2' : undefined}
+                  title={
+                    <>
+                      <span className="flex items-center gap-2">
+                        <History className="w-4 h-4" />
+                        Recent employment activity
+                      </span>
+                    </>
+                  }
+                  description="Recent contract, leave, payroll, document, and employment
+                      record events."
+                >
+                  {timelineQuery.isLoading ? (
+                    <LoadingState label="Loading recent activity..." />
+                  ) : timelineQuery.isError ? (
+                    <div
+                      className="flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
+                      role="status"
+                    >
+                      <p className="text-sm text-slate-600">
+                        Recent activity could not be loaded. Your other
+                        employment information is still available.
                       </p>
-                    )}
-                  </CardContent>
-                </Card>
+                      <button
+                        type="button"
+                        onClick={() => void timelineQuery.refetch()}
+                        className="text-sm font-bold text-[var(--primary)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : timelineQuery.data?.items.length ? (
+                    <ol className="divide-y divide-slate-100">
+                      {timelineQuery.data.items.slice(0, 5).map((event) => (
+                        <li
+                          key={`${event.type}-${event.id}`}
+                          className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+                        >
+                          <div className="min-w-0">
+                            <p className="break-words text-sm font-semibold text-slate-900">
+                              {formatTimelineTitle(event.title)}
+                            </p>
+                            <p className="mt-0.5 text-xs text-slate-500">
+                              {formatRecordValue(event.type)}
+                              {event.reason
+                                ? ` · ${formatRecordValue(event.reason)}`
+                                : ''}
+                            </p>
+                          </div>
+                          <time
+                            dateTime={event.occurredAt}
+                            className="shrink-0 text-xs font-medium text-slate-500"
+                          >
+                            {formatBsDate(event.occurredAt)}
+                          </time>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No recent employment activity is recorded.
+                    </p>
+                  )}
+                </Surface>
               </div>
             </TabsContent>
 

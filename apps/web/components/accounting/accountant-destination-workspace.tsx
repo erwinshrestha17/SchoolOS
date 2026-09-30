@@ -1,9 +1,9 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ArrowRight } from 'lucide-react';
-import { WorkSurface } from '../ui/work-surface';
 import { PageState } from '../ui/page-state';
 
 type DestinationLink = {
@@ -25,7 +25,7 @@ export function AccountantDestinationWorkspace({
 }) {
   return (
     <div className="space-y-6 pb-10">
-      <WorkSurface title={title} description={description}>
+      <Surface title={title} description={description}>
         {(links?.length ?? 0) > 0 ? (
           <div className="grid gap-3 md:grid-cols-2">
             {(links ?? []).map((link) => (
@@ -53,7 +53,7 @@ export function AccountantDestinationWorkspace({
             {children}
           </div>
         ) : null}
-      </WorkSurface>
+      </Surface>
     </div>
   );
 }

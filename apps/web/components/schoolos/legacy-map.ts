@@ -21,7 +21,7 @@ export const LEGACY_PRIMITIVES: readonly LegacyPrimitive[] = [
   {
     module: 'components/ui/card',
     replacement: 'Surface or Card',
-    maxImporters: 18,
+    maxImporters: 13,
   },
   {
     module: 'components/ui/primitives/card',
@@ -36,7 +36,7 @@ export const LEGACY_PRIMITIVES: readonly LegacyPrimitive[] = [
   {
     module: 'components/ui/work-surface',
     replacement: 'DataWorkspace / Surface / Panel',
-    maxImporters: 16,
+    maxImporters: 9,
   },
   { module: 'components/ui/stat-card', replacement: 'Metric', maxImporters: 0 },
   { module: 'components/ui/kpi-card', replacement: 'Metric', maxImporters: 0 },
@@ -48,7 +48,7 @@ export const LEGACY_PRIMITIVES: readonly LegacyPrimitive[] = [
   {
     module: 'components/ui/data-table',
     replacement: 'DataWorkspace',
-    maxImporters: 5,
+    maxImporters: 4,
   },
   {
     module: 'components/ui/table',

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState, ErrorState, Surface } from '@/components/schoolos';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -12,7 +12,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/ui/primitives/table';
 import { ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
 import { ApiRequestError, api } from '../../lib/api';
 import { Toast } from '@/components/ui/toast';
@@ -63,24 +63,24 @@ export function MyPayslips() {
 
   if (payslipQuery.isError)
     return (
-      <Card>
-        <CardContent className="p-8 text-center text-muted-foreground">
-          Payslips could not be loaded. Check your staff access and try again.
-        </CardContent>
-      </Card>
+      <ErrorState
+        title="Payslips unavailable"
+        message="Payslips could not be loaded. Check your staff access and try again."
+        error={payslipQuery.error}
+        onRetry={() => void payslipQuery.refetch()}
+      />
     );
 
   if (payslips.length === 0)
     return (
-      <Card>
-        <CardContent className="p-8 text-center text-muted-foreground">
-          No payslips found.
-        </CardContent>
-      </Card>
+      <EmptyState
+        title="No payslips yet"
+        description="Payslips appear here once payroll for a period is finalised."
+      />
     );
 
   return (
-    <Card>
+    <Surface title="My Payslips">
       {downloadError ? (
         <Toast
           title="Could not download payslip"
@@ -90,101 +90,96 @@ export function MyPayslips() {
           className="m-4"
         />
       ) : null}
-      <CardHeader>
-        <CardTitle className="text-lg">My Payslips</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Period</TableHead>
-              <TableHead>Payslip No</TableHead>
-              <TableHead>Gross</TableHead>
-              <TableHead>Deductions</TableHead>
-              <TableHead>Net Pay</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Action</TableHead>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Period</TableHead>
+            <TableHead>Payslip No</TableHead>
+            <TableHead>Gross</TableHead>
+            <TableHead>Deductions</TableHead>
+            <TableHead>Net Pay</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {payslips.map((slip) => (
+            <TableRow key={slip.id}>
+              <TableCell className="font-medium">
+                {slip.payrollRun
+                  ? `${slip.payrollRun.periodMonth}/${slip.payrollRun.periodYear}`
+                  : `${slip.periodMonth ?? 'Period'}/${slip.periodYear ?? 'Unavailable'}`}
+              </TableCell>
+              <TableCell>{slip.payslipNumber}</TableCell>
+              <TableCell>
+                Rs {Number(slip.grossSalary).toLocaleString()}
+              </TableCell>
+              <TableCell>
+                Rs {Number(slip.deductionAmount).toLocaleString()}
+              </TableCell>
+              <TableCell className="font-bold text-green-600">
+                Rs {Number(slip.netSalary).toLocaleString()}
+              </TableCell>
+              <TableCell>
+                <Badge
+                  variant={
+                    slip.status === 'PAID' ? ('success' as any) : 'secondary'
+                  }
+                >
+                  {slip.status}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={downloadingPayslip === slip.payslipNumber}
+                  onClick={() => downloadPdf(slip.payslipNumber)}
+                >
+                  {downloadingPayslip === slip.payslipNumber ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  Download PDF
+                </Button>
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {payslips.map((slip) => (
-              <TableRow key={slip.id}>
-                <TableCell className="font-medium">
-                  {slip.payrollRun
-                    ? `${slip.payrollRun.periodMonth}/${slip.payrollRun.periodYear}`
-                    : `${slip.periodMonth ?? 'Period'}/${slip.periodYear ?? 'Unavailable'}`}
-                </TableCell>
-                <TableCell>{slip.payslipNumber}</TableCell>
-                <TableCell>
-                  Rs {Number(slip.grossSalary).toLocaleString()}
-                </TableCell>
-                <TableCell>
-                  Rs {Number(slip.deductionAmount).toLocaleString()}
-                </TableCell>
-                <TableCell className="font-bold text-green-600">
-                  Rs {Number(slip.netSalary).toLocaleString()}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      slip.status === 'PAID' ? ('success' as any) : 'secondary'
-                    }
-                  >
-                    {slip.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={downloadingPayslip === slip.payslipNumber}
-                    onClick={() => downloadPdf(slip.payslipNumber)}
-                  >
-                    {downloadingPayslip === slip.payslipNumber ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Download className="w-4 h-4 mr-2" />
-                    )}
-                    Download PDF
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {totalItems > 0 ? (
-          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-            <p className="text-xs font-semibold text-slate-500">
-              Showing {(page - 1) * limit + 1} to{' '}
-              {Math.min(page * limit, totalItems)} of {totalItems} payslips
-            </p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={page === 1}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Previous
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() =>
-                  setPage((current) => Math.min(totalPages, current + 1))
-                }
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+          ))}
+        </TableBody>
+      </Table>
+      {totalItems > 0 ? (
+        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+          <p className="text-xs font-semibold text-slate-500">
+            Showing {(page - 1) * limit + 1} to{' '}
+            {Math.min(page * limit, totalItems)} of {totalItems} payslips
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={page === 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() =>
+                setPage((current) => Math.min(totalPages, current + 1))
+              }
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-        ) : null}
-      </CardContent>
-    </Card>
+        </div>
+      ) : null}
+    </Surface>
   );
 }

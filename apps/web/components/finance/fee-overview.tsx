@@ -23,7 +23,6 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
-import { WorkSurface } from '@/components/ui/work-surface';
 import { api } from '@/lib/api';
 
 const formatCurrency = (amount: string) =>
@@ -172,10 +171,10 @@ export function FeeOverview() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.75fr)]">
         <div className="space-y-6">
-          <WorkSurface
+          <Surface
             title="Today's collection activity"
             description="Confirmed totals for the current Nepal school day."
-            action={
+            actions={
               canCollect ? (
                 <Link
                   href="/dashboard/fees/collect"
@@ -185,8 +184,7 @@ export function FeeOverview() {
                 </Link>
               ) : undefined
             }
-            variant="transaction"
-            flush
+            padding="flush"
           >
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-left text-sm">
@@ -233,7 +231,7 @@ export function FeeOverview() {
                 </tbody>
               </table>
             </div>
-          </WorkSurface>
+          </Surface>
 
           <Surface
             title="Overdue follow-up"

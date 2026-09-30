@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
@@ -10,7 +11,6 @@ import { accountingApi } from '../../lib/api/accounting';
 import { useSession } from '../session-provider';
 import { Button } from '../ui/button';
 import { StatusBadge } from '../ui/status-badge';
-import { WorkSurface } from '../ui/work-surface';
 import {
   ReportTable,
   type ReportTableColumn,
@@ -67,7 +67,7 @@ export function SourcePostingBatchesPanel({
   );
 
   return (
-    <WorkSurface
+    <Surface
       title={
         sourceModule
           ? `${sourceModule} posting history`
@@ -98,7 +98,7 @@ export function SourcePostingBatchesPanel({
           onPageChange: setPage,
         }}
       />
-    </WorkSurface>
+    </Surface>
   );
 }
 
