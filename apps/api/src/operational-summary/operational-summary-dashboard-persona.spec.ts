@@ -73,7 +73,7 @@ describe('OperationalSummaryService dashboard persona projection', () => {
       permissions: [
         'students:read',
         'attendance:read',
-        'fees:read',
+        'fees:manage',
         'notices:read',
         'homework:read',
         'staff:read',
@@ -103,7 +103,7 @@ describe('OperationalSummaryService dashboard persona projection', () => {
       permissions: [
         'students:read',
         'attendance:read',
-        'fees:read',
+        'fees:manage',
         'academics:read',
         'notices:read',
         'staff:read',
@@ -184,7 +184,7 @@ describe('OperationalSummaryService dashboard persona projection', () => {
       authMethod: AuthMethod.PASSWORD,
       roles: ['accountant'],
       permissions: [
-        'fees:read',
+        'fees:manage',
         'accounting:read',
         'payroll:read',
         'notices:read',
@@ -261,7 +261,7 @@ describe('OperationalSummaryService dashboard persona projection', () => {
       email: 'admin@school.test',
       authMethod: AuthMethod.PASSWORD,
       roles: ['admin'],
-      permissions: ['students:read', 'admissions:read'],
+      permissions: ['students:read', 'enrollments:read'],
     };
 
     await service.getDashboardSummary(admin);
@@ -303,7 +303,7 @@ describe('OperationalSummaryService dashboard persona projection', () => {
         userId: 'aa-1',
         email: 'aa@school.test',
         roles: ['admin', 'accountant'],
-        permissions: ['fees:read', 'accounting:read'],
+        permissions: ['fees:manage', 'accounting:read'],
       };
 
       const summary = await service.getDashboardSummary(

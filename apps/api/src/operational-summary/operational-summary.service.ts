@@ -55,13 +55,13 @@ interface TeacherScope {
   classSectionScopes: Array<{ classId: string; sectionId: string | null }>;
 }
 
-const MODULE_CONFIG: Record<
+export const MODULE_CONFIG: Record<
   SummaryModule,
   { entitlement: string; permissions: string[]; route: string; label: string }
 > = {
   m1_students: {
     entitlement: 'students',
-    permissions: ['students:read', 'admissions:read'],
+    permissions: ['students:read', 'enrollments:read'],
     route: '/dashboard/students',
     label: 'Students',
   },
@@ -73,7 +73,7 @@ const MODULE_CONFIG: Record<
   },
   m3_fees: {
     entitlement: 'fees',
-    permissions: ['fees:read', 'fees:manage', 'payments:close'],
+    permissions: ['fees:manage', 'payments:close'],
     route: '/dashboard/fees',
     label: 'Fees',
   },
@@ -115,7 +115,11 @@ const MODULE_CONFIG: Record<
   },
   m8c_canteen: {
     entitlement: 'canteen',
-    permissions: ['canteen:read', 'canteen:manage'],
+    permissions: [
+      'canteen:reports:read',
+      'canteen:pos:read',
+      'canteen:inventory:read',
+    ],
     route: '/dashboard/canteen',
     label: 'Canteen',
   },
@@ -127,7 +131,7 @@ const MODULE_CONFIG: Record<
   },
   m10_communications: {
     entitlement: 'notices',
-    permissions: ['notices:read', 'communications:read'],
+    permissions: ['notices:read', 'communications:read_deliveries'],
     route: '/dashboard/notices',
     label: 'Notices & Announcements',
   },
@@ -146,7 +150,7 @@ const MODULE_CONFIG: Record<
  * computed when the actor holds its drill-down route's permissions (all-of,
  * mirroring @Permissions); otherwise it is withheld — never shown as zero.
  */
-const METRIC_PERMISSIONS: Record<string, readonly string[]> = {
+export const METRIC_PERMISSIONS: Record<string, readonly string[]> = {
   applicationsNeedingReview: ['enrollments:read'],
   unverifiedDocuments: ['student_documents:manage'],
   duplicateCandidates: ['students:manage_lifecycle'],
@@ -177,7 +181,9 @@ const METRIC_PERMISSIONS: Record<string, readonly string[]> = {
 };
 
 /** Recent-activity feeds that expose a narrower domain than the module. */
-const RECENT_PERMISSIONS: Partial<Record<SummaryModule, readonly string[]>> = {
+export const RECENT_PERMISSIONS: Partial<
+  Record<SummaryModule, readonly string[]>
+> = {
   m7_hr_payroll: ['payroll:run:read'],
   m11_accounting: ['accounting:journals:read'],
   m10_communications: ['notifications:view_delivery_diagnostics'],

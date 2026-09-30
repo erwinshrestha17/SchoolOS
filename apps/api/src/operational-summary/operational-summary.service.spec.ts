@@ -13,7 +13,7 @@ describe('OperationalSummaryService', () => {
     email: 'finance@school.test',
     authMethod: AuthMethod.PASSWORD,
     roles: ['accountant'],
-    permissions: ['fees:read'],
+    permissions: ['fees:manage'],
   };
 
   const countResult = jest.fn().mockResolvedValue(0);
