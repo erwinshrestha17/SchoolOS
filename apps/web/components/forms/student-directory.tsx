@@ -15,10 +15,10 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
 import { StudentAvatar } from '../students/student-avatar';
 import { Inspector, useInspectorState } from '../schoolos';
+import { PaginatedDataTable } from '../schoolos';
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
 import { ErrorState } from '../ui/error-state';
-import { TablePagination } from '../ui/table-pagination';
 import { ActionMenu } from '../ui/action-menu';
 import { SummaryCard, SummaryGrid } from '../ui/summary-card';
 import { WorkspaceTabs } from '../ui/module-tabs';
@@ -472,105 +472,124 @@ export function StudentDirectory({
         </div>
 
         {filteredStudents.length > 0 ? (
-          <div
-            className="divide-y divide-border"
-            data-testid="student-directory-results"
-          >
-            {filteredStudents.map((student) => {
-              const admission = admissionBySystemId.get(
-                student.studentSystemId,
-              );
-              const studentName = getStudentName(student, admission);
-              const className =
-                student.className ??
-                student.class?.name ??
-                admission?.className ??
-                'Not assigned';
-              const sectionName =
-                student.sectionName ??
-                student.section ??
-                admission?.sectionName ??
-                'No section';
-              const rollNumber =
-                student.rollNumber ?? admission?.rollNumber ?? null;
-              const primaryGuardian =
-                (student.guardians ?? admission?.guardians ?? []).find(
-                  (g) => g.isPrimary,
-                ) ?? (student.guardians ?? admission?.guardians ?? [])[0];
-
-              return (
-                <div
-                  key={student.id}
-                  className={`group flex flex-col gap-3 p-4 transition hover:bg-muted/30 lg:flex-row lg:items-center lg:justify-between ${selectedStudentId === student.id ? 'bg-accent/50 ring-1 ring-inset ring-border' : ''}`}
-                >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <StudentAvatar
-                      studentId={student.id}
-                      photoVersion={student.photoVersion}
-                      initials={initials(studentName)}
-                      alt={studentName}
-                      size="lg"
-                      className="ring-2 ring-background shadow-sm transition group-hover:ring-border"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+          <div data-testid="student-directory-results">
+            {/* Phase 5E: dense DataWorkspace table, not profile-card rows.
+                Row click opens the inspector; "View profile" opens 360. */}
+            <PaginatedDataTable
+              caption="Student directory"
+              density="compact"
+              items={filteredStudents}
+              getRowId={(student) => student.id}
+              onRowClick={(student) => openInspector(student.id)}
+              getRowActionLabel={(student) =>
+                `Quick view ${getStudentName(student, admissionBySystemId.get(student.studentSystemId))}`
+              }
+              getRowClassName={(student) =>
+                selectedStudentId === student.id ? 'bg-accent/50' : undefined
+              }
+              page={currentPage}
+              pageSize={pageSize}
+              totalItems={totalStudents}
+              onPageChange={(page) =>
+                onFilterChange({
+                  academicYearId,
+                  classId,
+                  sectionId,
+                  status,
+                  search,
+                  page,
+                })
+              }
+              columns={[
+                {
+                  id: 'student',
+                  header: 'Student',
+                  cell: (student) => {
+                    const row = directoryRow(student, admissionBySystemId);
+                    return (
+                      <div className="flex min-w-0 items-center gap-3">
+                        <StudentAvatar
+                          studentId={student.id}
+                          photoVersion={student.photoVersion}
+                          initials={initials(row.name)}
+                          alt={row.name}
+                          size="sm"
+                        />
                         <Link
                           href={`/dashboard/students/${encodeURIComponent(student.id)}`}
                           className="truncate font-semibold text-foreground transition hover:text-primary"
                         >
-                          {studentName}
+                          {row.name}
                         </Link>
-                        <StatusBadge
-                          status={student.lifecycleStatus || 'ACTIVE'}
-                        />
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                        <span className="font-medium text-primary">
-                          {student.studentSystemId}
-                        </span>
-                        <span className="size-1 rounded-full bg-border" />
-                        <span className="text-foreground">
-                          {className}{' '}
-                          {sectionName !== 'No section'
-                            ? `• ${sectionName}`
-                            : ''}
-                        </span>
-                        {rollNumber && (
-                          <>
-                            <span className="size-1 rounded-full bg-border" />
-                            <span>Roll: {rollNumber}</span>
-                          </>
-                        )}
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Guardian:{' '}
-                        <span className="font-medium text-foreground">
-                          {primaryGuardian?.fullName || 'Not recorded'}
-                        </span>{' '}
-                        • {primaryGuardian?.primaryPhone || 'No phone'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
+                    );
+                  },
+                },
+                {
+                  id: 'studentId',
+                  header: 'Student ID',
+                  cell: (student) => (
+                    <span className="font-medium text-primary tabular-nums">
+                      {student.studentSystemId}
+                    </span>
+                  ),
+                },
+                {
+                  id: 'class',
+                  header: 'Class',
+                  cell: (student) =>
+                    directoryRow(student, admissionBySystemId).className,
+                },
+                {
+                  id: 'section',
+                  header: 'Section',
+                  cell: (student) =>
+                    directoryRow(student, admissionBySystemId).sectionName ??
+                    '—',
+                },
+                {
+                  id: 'roll',
+                  header: 'Roll',
+                  align: 'right',
+                  hideBelow: 'sm',
+                  cell: (student) =>
+                    directoryRow(student, admissionBySystemId).rollNumber ??
+                    '—',
+                },
+                {
+                  id: 'guardian',
+                  header: 'Primary guardian',
+                  hideBelow: 'md',
+                  cell: (student) =>
+                    directoryRow(student, admissionBySystemId).primaryGuardian
+                      ?.fullName || 'Not recorded',
+                },
+                {
+                  id: 'status',
+                  header: 'Status',
+                  cell: (student) => (
+                    <StatusBadge status={student.lifecycleStatus || 'ACTIVE'} />
+                  ),
+                },
+              ]}
+              rowActions={(student) => {
+                const studentName = directoryRow(
+                  student,
+                  admissionBySystemId,
+                ).name;
+                return (
+                  <div className="flex items-center justify-end gap-2">
                     <Button
                       type="button"
-                      variant="ghost"
                       size="sm"
-                      onClick={() => openInspector(student.id)}
-                    >
-                      Quick view
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
+                      variant="outline"
                       onClick={() =>
                         router.push(
                           `/dashboard/students/${encodeURIComponent(student.id)}`,
                         )
                       }
                     >
-                      View Profile
+                      View profile
                       <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
                     </Button>
                     {!isSupportOverride && canViewStudentFees ? (
@@ -656,26 +675,9 @@ export function StudentDirectory({
                       />
                     ) : null}
                   </div>
-                </div>
-              );
-            })}
-            {totalStudents > students.length && (
-              <TablePagination
-                page={currentPage}
-                pageSize={pageSize}
-                total={totalStudents}
-                onPageChange={(page) =>
-                  onFilterChange({
-                    academicYearId,
-                    classId,
-                    sectionId,
-                    status,
-                    search,
-                    page,
-                  })
-                }
-              />
-            )}
+                );
+              }}
+            />
           </div>
         ) : (
           <EmptyState
@@ -886,6 +888,27 @@ function StudentInspector({
       )}
     </div>
   );
+}
+
+/** Display values for one directory row (server data + admission fallback). */
+function directoryRow(
+  student: StudentProfile,
+  admissionBySystemId: Map<string, AdmissionSummary>,
+) {
+  const admission = admissionBySystemId.get(student.studentSystemId);
+  const guardians = student.guardians ?? admission?.guardians ?? [];
+  return {
+    name: getStudentName(student, admission),
+    className:
+      student.className ??
+      student.class?.name ??
+      admission?.className ??
+      'Not assigned',
+    sectionName:
+      student.sectionName ?? student.section ?? admission?.sectionName ?? null,
+    rollNumber: student.rollNumber ?? admission?.rollNumber ?? null,
+    primaryGuardian: guardians.find((g) => g.isPrimary) ?? guardians[0],
+  };
 }
 
 function getStudentName(

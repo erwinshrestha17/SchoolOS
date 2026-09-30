@@ -28,6 +28,7 @@ import { api } from '../../lib/api';
 import { useUrlFilters } from '../../lib/hooks/use-url-filters';
 import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
 import { ConfirmDialog } from '../ui/confirm-dialog';
+import { DuplicateComparisonTable } from './duplicate-comparison-table';
 import { EmptyState } from '../ui/empty-state';
 import { ErrorState } from '../ui/error-state';
 import { FilterBar } from '../ui/filter-bar';
@@ -722,6 +723,7 @@ export function DuplicateCandidatesWorkspace() {
               </div>
             ) : (
               <div className="space-y-5">
+                <DuplicateComparisonTable candidate={selected} />
                 <fieldset
                   className="space-y-2"
                   disabled={

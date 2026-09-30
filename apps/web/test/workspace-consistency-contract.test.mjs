@@ -297,7 +297,7 @@ describe('SchoolOS workspace consistency contract', () => {
     const activity = sourceFor('activity');
 
     assert.match(students, /useUrlFilters/);
-    assert.match(students, /TablePagination/);
+    assert.match(students, /TablePagination|<PaginatedDataTable/);
     assert.match(admissions, /useUrlFilters/);
     assert.match(admissions, /TablePagination/);
     assert.match(homework, /useUrlFilters/);

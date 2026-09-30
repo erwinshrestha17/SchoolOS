@@ -538,11 +538,28 @@ test('M1 student roster uses a focused backend summary, safe filters, and pagina
   assert.doesNotMatch(directory, /title=['"]QR Active['"]/);
   assert.match(directory, /value: ['"]ACTIVE['"], label: ['"]Active['"]/);
   assert.match(directory, /value: ['"]EXITED['"], label: ['"]Withdrawn['"]/);
-  // Server pagination footer is the shared TablePagination component (not a
-  // second hand-rolled Previous/Next implementation).
-  assert.match(directory, /from ['"]\.\.\/ui\/table-pagination['"]/);
-  assert.match(directory, /<TablePagination/);
+  // Server pagination runs through the canonical PaginatedDataTable, whose
+  // footer is the shared TablePagination (no hand-rolled Previous/Next) and
+  // whose totals are server-owned.
+  const dataTable = read('components/schoolos/data/paginated-data-table.tsx');
+  assert.match(dataTable, /from ['"]@\/components\/ui\/table-pagination['"]/);
+  assert.match(directory, /<PaginatedDataTable/);
+  assert.match(directory, /totalItems=\{totalStudents\}/);
   assert.match(directory, /onPageChange=\{\(page\) =>/);
+  // Phase 5E: dense table columns, not profile-card rows.
+  for (const header of [
+    'Student',
+    'Student ID',
+    'Class',
+    'Section',
+    'Roll',
+    'Primary guardian',
+    'Status',
+  ]) {
+    assert.match(directory, new RegExp(`header: '${header}'`));
+  }
+  assert.match(directory, /onRowClick=\{\(student\) => openInspector\(student\.id\)\}/);
+  assert.doesNotMatch(directory, /lg:flex-row lg:items-center lg:justify-between/);
   assert.match(directory, /value=['"]ARCHIVED['"]/);
   assert.match(directory, /value=['"]MERGED['"]/);
   assert.doesNotMatch(

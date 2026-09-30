@@ -42,43 +42,69 @@ const ACTIONS_REQUIRING_REASON = new Set<AdmissionCaseReviewAction>([
 
 const ACTION_COPY: Record<
   AdmissionCaseReviewAction,
-  { label: string; confirmation: string }
+  {
+    label: string;
+    confirmation: string;
+    /** What the server does. Shown before the decision is confirmed. */
+    consequence: string;
+    /** The case cannot be reopened or edited afterwards. */
+    final?: boolean;
+  }
 > = {
   REQUEST_INFORMATION: {
     label: 'Request information',
     confirmation: 'Request information',
+    consequence:
+      'The case moves to Needs information and review pauses until the missing details are added. No one is notified automatically.',
   },
   ASSIGN_REVIEWER: {
     label: 'Assign to me',
     confirmation: 'Assign to me',
+    consequence: 'You become the reviewer. The case stage does not change.',
   },
   MARK_READY_FOR_REVIEW: {
     label: 'Send for review',
     confirmation: 'Send for review',
+    consequence:
+      'The case moves to Waiting for review. Class, year or section changes after this are recorded in the review history.',
   },
   APPROVE: {
     label: 'Approve application',
     confirmation: 'Approve application',
+    consequence:
+      'The application is approved for the current class placement. No student record is created until the admission is finalized, and changing the class, year or section afterwards voids this approval.',
   },
   REJECT: {
     label: 'Do not admit',
     confirmation: 'Confirm decision',
+    consequence:
+      'The case is marked Not admitted and closed. It can no longer be edited; reconsidering needs a new application. The family is not notified automatically.',
+    final: true,
   },
   ESCALATE_TO_PRINCIPAL: {
     label: 'Escalate to principal',
     confirmation: 'Escalate case',
+    consequence:
+      'The case returns to Waiting for review for the principal to decide.',
   },
   CLOSE: {
     label: 'Close case',
     confirmation: 'Close case',
+    consequence:
+      'The case is closed without an admission decision and can no longer be edited.',
+    final: true,
   },
   WAITLIST: {
     label: 'Waitlist',
     confirmation: 'Waitlist this applicant',
+    consequence:
+      'The applicant joins the waitlist. The case can be promoted when a seat becomes available.',
   },
   PROMOTE_FROM_WAITLIST: {
     label: 'Promote from waitlist',
     confirmation: 'Promote from waitlist',
+    consequence:
+      'The case returns to review only if a seat is available now; otherwise it stays on the waitlist.',
   },
 };
 
@@ -413,6 +439,18 @@ export function ApplicationReviewWorkspace({
               <h3 className="text-sm font-black text-slate-900">
                 {ACTION_COPY[selectedAction].label}
               </h3>
+              <p
+                className={
+                  ACTION_COPY[selectedAction].final
+                    ? 'mt-2 rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-xs leading-5 text-danger-800'
+                    : 'mt-2 text-xs leading-5 text-slate-600'
+                }
+              >
+                {ACTION_COPY[selectedAction].final ? (
+                  <strong className="font-black">This is final. </strong>
+                ) : null}
+                {ACTION_COPY[selectedAction].consequence}
+              </p>
               {selectedAction === 'ASSIGN_REVIEWER' ? (
                 <p className="mt-2 text-xs leading-5 text-slate-600">
                   This assigns the case to your authenticated school user. A
