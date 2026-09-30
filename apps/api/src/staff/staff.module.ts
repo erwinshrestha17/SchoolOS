@@ -13,6 +13,9 @@ import { HrCoverageService } from '../hr/hr-coverage.service';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { UsageModule } from '../usage/usage.module';
 import { AddressModule } from '../addresses/address.module';
+import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
+import { HrProfessionalIdentityController } from '../hr/hr-professional-identity.controller';
+import { ProfessionalIdentityService } from '../hr/professional-identity.service';
 
 @Module({
   imports: [
@@ -22,6 +25,7 @@ import { AddressModule } from '../addresses/address.module';
     FileRegistryModule,
     UsageModule,
     AddressModule,
+    TeacherScopeModule,
   ],
   providers: [
     StaffService,
@@ -29,8 +33,14 @@ import { AddressModule } from '../addresses/address.module';
     StaffLifecycleService,
     StaffLeaveAccrualService,
     HrCoverageService,
+    ProfessionalIdentityService,
   ],
-  controllers: [StaffController, HrStaffController, HrCoverageController],
+  controllers: [
+    StaffController,
+    HrStaffController,
+    HrCoverageController,
+    HrProfessionalIdentityController,
+  ],
   exports: [
     StaffService,
     StaffDocumentService,

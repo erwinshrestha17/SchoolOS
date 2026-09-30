@@ -36,6 +36,8 @@ model StaffEmployment {
   effectiveFrom      DateTime
   effectiveTo        DateTime?
   status             StaffEmploymentStatus @default(PENDING)
+  // Phase 5J maker-checker: the verifier must differ from the submitter.
+  submittedById      String?
   verifiedById       String?
   verifiedAt         DateTime?
   endedAt            DateTime?
@@ -46,6 +48,7 @@ model StaffEmployment {
 
   tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   staff         Staff                   @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  submittedBy  User?                   @relation("SubmittedStaffEmployments", fields: [submittedById], references: [id], onDelete: Restrict)
   verifiedBy   User?                   @relation("VerifiedStaffEmployments", fields: [verifiedById], references: [id], onDelete: Restrict)
   contract     StaffContract?          @relation(fields: [contractId], references: [id], onDelete: Restrict)
   policy       NepalHrPolicyVersion?   @relation("EmploymentPolicy", fields: [policyVersionId], references: [id], onDelete: Restrict)
@@ -53,6 +56,7 @@ model StaffEmployment {
   assessments  TeacherEligibilityAssessment[]
 
   @@index([tenantId, staffId, status, effectiveFrom])
+  @@index([submittedById])
 }
 
 model TeacherProfile {
@@ -87,6 +91,7 @@ model TeacherQualificationEvidence {
   status         ProfessionalEvidenceStatus @default(PENDING)
   documentId     String?
   sourceUri      String?
+  submittedById  String?
   verifiedById   String?
   verifiedAt     DateTime?
   revokedAt      DateTime?
@@ -96,10 +101,12 @@ model TeacherQualificationEvidence {
   tenant       Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   profile      TeacherProfile               @relation(fields: [profileId], references: [id], onDelete: Restrict)
   document     FileAsset?                   @relation("TeacherQualificationDocument", fields: [documentId], references: [id], onDelete: Restrict)
+  submittedBy  User?                        @relation("SubmittedTeacherQualifications", fields: [submittedById], references: [id], onDelete: Restrict)
   verifiedBy   User?                        @relation("VerifiedTeacherQualifications", fields: [verifiedById], references: [id], onDelete: Restrict)
   assessments  TeacherEligibilityAssessment[]
 
   @@index([tenantId, profileId, status, validFrom])
+  @@index([submittedById])
 }
 
 model TeachingLicenceEvidence {
@@ -116,6 +123,7 @@ model TeachingLicenceEvidence {
   status         ProfessionalEvidenceStatus @default(PENDING)
   documentId     String?
   sourceUri      String?
+  submittedById  String?
   verifiedById   String?
   verifiedAt     DateTime?
   revokedAt      DateTime?
@@ -125,10 +133,12 @@ model TeachingLicenceEvidence {
   tenant       Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   profile      TeacherProfile               @relation(fields: [profileId], references: [id], onDelete: Restrict)
   document     FileAsset?                   @relation("TeachingLicenceDocument", fields: [documentId], references: [id], onDelete: Restrict)
+  submittedBy  User?                        @relation("SubmittedTeachingLicences", fields: [submittedById], references: [id], onDelete: Restrict)
   verifiedBy   User?                        @relation("VerifiedTeachingLicences", fields: [verifiedById], references: [id], onDelete: Restrict)
   assessments  TeacherEligibilityAssessment[]
 
   @@index([tenantId, profileId, status, validFrom])
+  @@index([submittedById])
 }
 
 // Immutable decision snapshot. Live authorization still rechecks employment,
