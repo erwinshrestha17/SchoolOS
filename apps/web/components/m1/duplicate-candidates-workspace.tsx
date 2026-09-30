@@ -36,8 +36,7 @@ import { WorkspaceTabs } from '../ui/module-tabs';
 import { SearchInput } from '../ui/search-input';
 import { TablePagination } from '../ui/table-pagination';
 import { Toast } from '../ui/toast';
-import { WorkSurface } from '../ui/work-surface';
-import { Badge } from '../ui/primitives/badge';
+import { StatusBadge, Surface } from '@/components/schoolos';
 import { Button } from '../ui/primitives/button';
 import {
   Select,
@@ -394,22 +393,22 @@ export function DuplicateCandidatesWorkspace() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">
+          <StatusBadge tone="info">
             <Search aria-hidden />
             {summary?.pending ?? '—'} pending
-          </Badge>
-          <Badge variant={summary?.highConfidence ? 'destructive' : 'outline'}>
+          </StatusBadge>
+          <StatusBadge tone={summary?.highConfidence ? 'rejected' : 'inactive'}>
             <AlertTriangle aria-hidden />
             {summary?.highConfidence ?? '—'} high confidence
-          </Badge>
-          <Badge variant="outline">
+          </StatusBadge>
+          <StatusBadge tone="inactive">
             <CheckCircle2 aria-hidden />
             {summary?.resolvedNotDuplicate ?? '—'} reviewed
-          </Badge>
-          <Badge variant="outline">
+          </StatusBadge>
+          <StatusBadge tone="inactive">
             <GitMerge aria-hidden />
             {summary?.mergedToday ?? '—'} merged today
-          </Badge>
+          </StatusBadge>
         </div>
       </div>
 
@@ -498,7 +497,7 @@ export function DuplicateCandidatesWorkspace() {
       />
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <WorkSurface
+        <Surface
           title={
             status === 'PENDING'
               ? 'Pending duplicate checks'
@@ -509,8 +508,8 @@ export function DuplicateCandidatesWorkspace() {
               ? 'Compare the evidence, then merge the duplicate or record why the students are different.'
               : 'These pairs remain out of the pending queue until a reviewer deliberately reopens them.'
           }
-          action={
-            <Badge variant="secondary">
+          actions={
+            <StatusBadge tone="info">
               {currentQueueData
                 ? currentQueueData.total === 1
                   ? '1 pair'
@@ -523,10 +522,9 @@ export function DuplicateCandidatesWorkspace() {
               !candidatesQuery.isLoading
                 ? ' · updating'
                 : ''}
-            </Badge>
+            </StatusBadge>
           }
-          variant="queue"
-          flush
+          padding="flush"
           className={selected ? 'order-2 xl:order-1' : 'order-1'}
           data-testid="duplicate-review-workspace"
         >
@@ -583,18 +581,18 @@ export function DuplicateCandidatesWorkspace() {
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge
-                          variant={
+                        <StatusBadge
+                          tone={
                             candidate.confidence === 'HIGH'
-                              ? 'destructive'
-                              : 'outline'
+                              ? 'rejected'
+                              : 'inactive'
                           }
                         >
                           {confidenceLabel(candidate.confidence)}
-                        </Badge>
-                        <Badge variant="secondary">
+                        </StatusBadge>
+                        <StatusBadge tone="info">
                           {candidate.score}% match
-                        </Badge>
+                        </StatusBadge>
                       </div>
                     </div>
 
@@ -619,24 +617,24 @@ export function DuplicateCandidatesWorkspace() {
 
                     <div className="mt-3 flex flex-wrap gap-2">
                       {candidate.reasons.map((reason) => (
-                        <Badge key={reason} variant="outline">
+                        <StatusBadge key={reason} tone="inactive">
                           {reason}
-                        </Badge>
+                        </StatusBadge>
                       ))}
                       {candidate.reviewState === 'NOT_DUPLICATE' ? (
-                        <Badge variant="secondary">
+                        <StatusBadge tone="info">
                           <CheckCircle2 aria-hidden />
                           Reviewed{' '}
                           {candidate.review
                             ? formatBsDate(candidate.review.reviewedAt)
                             : ''}
-                        </Badge>
+                        </StatusBadge>
                       ) : null}
                       {candidate.review?.identityChanged ? (
-                        <Badge variant="destructive">
+                        <StatusBadge tone="rejected">
                           <History aria-hidden />
                           Details changed
-                        </Badge>
+                        </StatusBadge>
                       ) : null}
                     </div>
                   </button>
@@ -691,7 +689,7 @@ export function DuplicateCandidatesWorkspace() {
               onPageChange={(page) => setFilters({ page })}
             />
           ) : null}
-        </WorkSurface>
+        </Surface>
 
         <div
           ref={reviewPanelRef}
@@ -702,11 +700,12 @@ export function DuplicateCandidatesWorkspace() {
             selected ? 'order-1' : 'order-2'
           } xl:order-2 xl:sticky xl:top-24`}
         >
-          <WorkSurface
+          <Surface
             title="Review decision"
             description="Select a pair to compare the records and save one auditable decision."
-            action={<ShieldCheck className="size-5 text-primary" aria-hidden />}
-            variant="queue"
+            actions={
+              <ShieldCheck className="size-5 text-primary" aria-hidden />
+            }
           >
             {!selected ? (
               <div className="flex min-h-72 flex-col items-center justify-center text-center">
@@ -912,7 +911,7 @@ export function DuplicateCandidatesWorkspace() {
                 </Button>
               </div>
             )}
-          </WorkSurface>
+          </Surface>
         </div>
       </div>
 

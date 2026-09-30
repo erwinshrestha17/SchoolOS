@@ -27,9 +27,8 @@ import { EmptyState } from '../ui/empty-state';
 import { ErrorState } from '../ui/error-state';
 import { LoadingState } from '../ui/loading-state';
 import { TablePagination } from '../ui/table-pagination';
-import { Badge } from '../ui/primitives/badge';
+import { StatusBadge, Surface } from '@/components/schoolos';
 import { Button } from '@/components/ui/button';
-import { WorkSurface } from '../ui/work-surface';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -277,18 +276,17 @@ export function AdmissionCaseQueues() {
         </DropdownMenu>
       </div>
 
-      <WorkSurface
+      <Surface
         title={activeQueue.label}
         description={activeQueue.description}
-        action={
+        actions={
           query.data ? (
-            <Badge variant="secondary">
+            <StatusBadge tone="info">
               {query.data.total === 1 ? '1 case' : query.data.total + ' cases'}
-            </Badge>
+            </StatusBadge>
           ) : undefined
         }
-        variant="queue"
-        flush
+        padding="flush"
         data-testid="admission-queue-workspace"
       >
         {queue === 'WAITLISTED' && successMessage ? (
@@ -402,18 +400,20 @@ export function AdmissionCaseQueues() {
                           {sourceLabel(item.source)}
                         </TableCell>
                         <TableCell className="px-4 py-3">
-                          <Badge variant="outline">
+                          <StatusBadge tone="inactive">
                             {statusLabel(item.displayStatus)}
-                          </Badge>
+                          </StatusBadge>
                         </TableCell>
                         <TableCell className="hidden px-4 py-3 lg:table-cell">
                           {item.hasDuplicateWarning ? (
-                            <Badge variant="destructive">
+                            <StatusBadge tone="rejected">
                               <AlertTriangle aria-hidden />
                               Possible duplicate
-                            </Badge>
+                            </StatusBadge>
                           ) : item.hasDocumentsPending ? (
-                            <Badge variant="secondary">Documents pending</Badge>
+                            <StatusBadge tone="info">
+                              Documents pending
+                            </StatusBadge>
                           ) : (
                             <span className="text-xs text-muted-foreground">
                               None
@@ -549,7 +549,7 @@ export function AdmissionCaseQueues() {
             onPageChange={(nextPage) => setFilters({ page: nextPage })}
           />
         ) : null}
-      </WorkSurface>
+      </Surface>
 
       <ConfirmDialog
         isOpen={promotionCandidate !== null}
@@ -596,7 +596,7 @@ function WaitlistCapacity({
   if (!capacity || capacity.state === 'NOT_CONFIGURED') {
     return (
       <div className="space-y-1">
-        <Badge variant="outline">Not configured</Badge>
+        <StatusBadge tone="inactive">Not configured</StatusBadge>
         <p className="text-xs text-muted-foreground">
           The latest checks run again before review.
         </p>
@@ -607,9 +607,9 @@ function WaitlistCapacity({
   if (capacity.state === 'FULL') {
     return (
       <div className="space-y-1">
-        <Badge variant={capacity.enforced ? 'destructive' : 'outline'}>
+        <StatusBadge tone={capacity.enforced ? 'rejected' : 'inactive'}>
           {capacity.enforced ? 'Full' : 'Full · advisory'}
-        </Badge>
+        </StatusBadge>
         <p className="text-xs text-muted-foreground">
           {capacity.enrolled} of {capacity.capacity} enrolled
         </p>
@@ -620,11 +620,11 @@ function WaitlistCapacity({
   const seats = capacity.seatsAvailable ?? 0;
   return (
     <div className="space-y-1">
-      <Badge
-        variant={capacity.state === 'NEARLY_FULL' ? 'secondary' : 'outline'}
+      <StatusBadge
+        tone={capacity.state === 'NEARLY_FULL' ? 'info' : 'inactive'}
       >
         {seats === 1 ? '1 seat available' : `${seats} seats available`}
-      </Badge>
+      </StatusBadge>
       <p className="text-xs text-muted-foreground">
         {capacity.enrolled} of {capacity.capacity} enrolled
         {!capacity.enforced ? ' · advisory' : ''}

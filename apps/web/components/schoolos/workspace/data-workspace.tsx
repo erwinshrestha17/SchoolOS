@@ -40,6 +40,14 @@ import {
  *   rows visible with an inline notice instead of blanking the page, and
  *   "unavailable" is never rendered as zero.
  */
+/** Distributive so the server-paged / complete-list union survives. */
+type WorkspaceTableProps<T> =
+  PaginatedDataTableProps<T> extends infer P
+    ? P extends unknown
+      ? Omit<P, 'density' | 'hiddenColumnIds' | 'hasActiveFilters'>
+      : never
+    : never;
+
 export type DataWorkspaceProps<T> = {
   title?: ReactNode;
   description?: ReactNode;
@@ -75,10 +83,7 @@ export type DataWorkspaceProps<T> = {
   /** Server-authorized export control (e.g. a queued export button). */
   exportAction?: ReactNode;
 
-  table: Omit<
-    PaginatedDataTableProps<T>,
-    'density' | 'hiddenColumnIds' | 'hasActiveFilters'
-  >;
+  table: WorkspaceTableProps<T>;
   /** Rendered Inspector for the currently inspected row, if any. */
   inspector?: ReactNode;
   className?: string;

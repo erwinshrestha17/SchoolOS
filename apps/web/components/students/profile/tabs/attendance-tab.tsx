@@ -26,15 +26,8 @@ import {
   AlertDescription,
   AlertTitle,
 } from '@/components/ui/primitives/alert';
-import { Badge } from '@/components/ui/primitives/badge';
+import { StatusBadge, Surface, type StatusTone } from '@/components/schoolos';
 import { Button } from '@/components/ui/primitives/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/primitives/card';
 import {
   Empty,
   EmptyDescription,
@@ -178,48 +171,42 @@ export function AttendanceTab({ profile }: AttendanceTabProps) {
 
   return (
     <TooltipProvider>
-      <Card>
-        <CardHeader className="border-b">
-          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-            <div className="flex flex-col gap-1">
-              <CardTitle>Attendance</CardTitle>
-              <CardDescription>
-                Monthly attendance record for the selected academic year
-              </CardDescription>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <label
-                className="text-sm font-medium"
-                htmlFor="attendance-academic-year"
+      <Surface
+        title="Attendance"
+        description="Monthly attendance record for the selected academic year"
+        actions={
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label
+              className="text-sm font-medium"
+              htmlFor="attendance-academic-year"
+            >
+              Academic year
+            </label>
+            <Select
+              value={data.selectedAcademicYear.id}
+              onValueChange={selectAcademicYear}
+            >
+              <SelectTrigger
+                id="attendance-academic-year"
+                className="w-full sm:w-52"
               >
-                Academic year
-              </label>
-              <Select
-                value={data.selectedAcademicYear.id}
-                onValueChange={selectAcademicYear}
-              >
-                <SelectTrigger
-                  id="attendance-academic-year"
-                  className="w-full sm:w-52"
-                >
-                  <SelectValue placeholder="Select academic year" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {data.academicYears.map((year) => (
-                      <SelectItem key={year.id} value={year.id}>
-                        {year.name}
-                        {year.isCurrent ? ' · Current' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
+                <SelectValue placeholder="Select academic year" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {data.academicYears.map((year) => (
+                    <SelectItem key={year.id} value={year.id}>
+                      {year.name}
+                      {year.isCurrent ? ' · Current' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
-        </CardHeader>
-
-        <CardContent className="flex flex-col gap-6">
+        }
+      >
+        <div className="flex flex-col gap-6">
           <MonthNavigator
             data={data}
             onSelectMonth={selectMonth}
@@ -254,8 +241,8 @@ export function AttendanceTab({ profile }: AttendanceTabProps) {
           <AttendanceLegend />
           <Separator />
           <MonthlyRegister data={data} focusedDate={focusedDate} />
-        </CardContent>
-      </Card>
+        </div>
+      </Surface>
     </TooltipProvider>
   );
 }
@@ -613,7 +600,7 @@ function MonthlyRegister({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={visual.badgeVariant}>{visual.label}</Badge>
+                    <StatusBadge tone={visual.tone}>{visual.label}</StatusBadge>
                   </TableCell>
                   <TableCell>
                     {day.arrivalAt ? formatNepalTime(day.arrivalAt) : '—'}
@@ -634,7 +621,7 @@ function MonthlyRegister({
 type DayVisual = {
   label: string;
   className: string;
-  badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline';
+  tone: StatusTone;
 };
 
 function getDayVisual(day: StudentAttendanceMonthlyRegisterDay): DayVisual {
@@ -642,66 +629,66 @@ function getDayVisual(day: StudentAttendanceMonthlyRegisterDay): DayVisual {
     return {
       label: 'Future',
       className: 'bg-muted/30 text-muted-foreground',
-      badgeVariant: 'secondary',
+      tone: 'inactive',
     };
   if (day.dayType === 'HOLIDAY')
     return {
       label: 'Holiday',
       className: 'bg-secondary text-secondary-foreground',
-      badgeVariant: 'secondary',
+      tone: 'info',
     };
   if (day.dayType === 'WEEKEND')
     return {
       label: 'Weekend',
       className: 'bg-secondary text-secondary-foreground',
-      badgeVariant: 'secondary',
+      tone: 'info',
     };
   if (day.attendanceStatus === 'PRESENT')
     return {
       label: 'Present',
       className: 'bg-success-50 text-success-700',
-      badgeVariant: 'outline',
+      tone: 'active',
     };
   if (day.attendanceStatus === 'ABSENT')
     return {
       label: 'Absent',
       className: 'bg-danger-50 text-danger-700',
-      badgeVariant: 'destructive',
+      tone: 'rejected',
     };
   if (day.attendanceStatus === 'LATE')
     return {
       label: 'Late',
       className: 'bg-warning-50 text-warning-700',
-      badgeVariant: 'outline',
+      tone: 'pending',
     };
   if (isLeaveStatus(day.attendanceStatus))
     return {
       label: 'Leave',
       className: 'bg-info-50 text-info-700',
-      badgeVariant: 'outline',
+      tone: 'info',
     };
   if (day.attendanceStatus === 'HALF_DAY')
     return {
       label: 'Half day',
       className: 'bg-warning-50 text-warning-700',
-      badgeVariant: 'outline',
+      tone: 'partial',
     };
   if (day.attendanceStatus === 'NOT_MARKED')
     return {
       label: 'Not marked',
       className: 'bg-muted text-muted-foreground',
-      badgeVariant: 'outline',
+      tone: 'draft',
     };
   if (day.dayType === 'EXAM_DAY')
     return {
       label: 'Exam day',
       className: 'bg-info-50 text-info-700',
-      badgeVariant: 'outline',
+      tone: 'info',
     };
   return {
     label: 'No record',
     className: 'bg-muted/30 text-muted-foreground',
-    badgeVariant: 'outline',
+    tone: 'inactive',
   };
 }
 
@@ -729,21 +716,25 @@ function MonthStateBadge({
 }: {
   state: NonNullable<StudentAttendanceMonthlyRegister['month']>['state'];
 }) {
-  if (state === 'CURRENT') return <Badge>Current month</Badge>;
-  if (state === 'PARTIAL') return <Badge variant="outline">Partial</Badge>;
-  if (state === 'NO_DATA') return <Badge variant="outline">No register</Badge>;
-  if (state === 'UPCOMING') return <Badge variant="secondary">Upcoming</Badge>;
-  return <Badge variant="secondary">Completed</Badge>;
+  if (state === 'CURRENT')
+    return <StatusBadge tone="published">Current month</StatusBadge>;
+  if (state === 'PARTIAL')
+    return <StatusBadge tone="inactive">Partial</StatusBadge>;
+  if (state === 'NO_DATA')
+    return <StatusBadge tone="inactive">No register</StatusBadge>;
+  if (state === 'UPCOMING')
+    return <StatusBadge tone="info">Upcoming</StatusBadge>;
+  return <StatusBadge tone="info">Completed</StatusBadge>;
 }
 
 function AttendanceLoading() {
   return (
-    <Card aria-busy="true" aria-label="Loading attendance month">
-      <CardHeader className="border-b">
+    <Surface aria-busy="true" aria-label="Loading attendance month">
+      <div className="mb-4 flex flex-col gap-2">
         <Skeleton className="h-6 w-36" />
         <Skeleton className="h-4 w-72 max-w-full" />
-      </CardHeader>
-      <CardContent className="flex flex-col gap-6">
+      </div>
+      <div className="flex flex-col gap-6">
         <Skeleton className="h-14 w-full" />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           {Array.from({ length: 6 }, (_, index) => (
@@ -752,8 +743,8 @@ function AttendanceLoading() {
         </div>
         <Skeleton className="h-[430px] w-full" />
         <Skeleton className="h-64 w-full" />
-      </CardContent>
-    </Card>
+      </div>
+    </Surface>
   );
 }
 
@@ -797,22 +788,20 @@ function AttendanceRequestError({
     );
   }
   return (
-    <Card>
-      <CardContent>
-        <Alert variant="destructive">
-          <AlertCircle />
-          <AlertTitle>Selected month could not be loaded</AlertTitle>
-          <AlertDescription className="gap-3">
-            Attendance is temporarily unavailable. No previous-month data is
-            being shown in its place.
-            <Button type="button" size="sm" variant="outline" onClick={onRetry}>
-              <RefreshCcw />
-              Try again
-            </Button>
-          </AlertDescription>
-        </Alert>
-      </CardContent>
-    </Card>
+    <Surface>
+      <Alert variant="destructive">
+        <AlertCircle />
+        <AlertTitle>Selected month could not be loaded</AlertTitle>
+        <AlertDescription className="gap-3">
+          Attendance is temporarily unavailable. No previous-month data is being
+          shown in its place.
+          <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+            <RefreshCcw />
+            Try again
+          </Button>
+        </AlertDescription>
+      </Alert>
+    </Surface>
   );
 }
 
@@ -826,36 +815,32 @@ function StateAlert({
   description: string;
 }) {
   return (
-    <Card>
-      <CardContent>
-        <Alert>
-          <Icon />
-          <AlertTitle>{title}</AlertTitle>
-          <AlertDescription>{description}</AlertDescription>
-        </Alert>
-      </CardContent>
-    </Card>
+    <Surface>
+      <Alert>
+        <Icon />
+        <AlertTitle>{title}</AlertTitle>
+        <AlertDescription>{description}</AlertDescription>
+      </Alert>
+    </Surface>
   );
 }
 
 function AcademicCalendarUnavailable() {
   return (
-    <Card>
-      <CardContent>
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <CalendarDays />
-            </EmptyMedia>
-            <EmptyTitle>Academic calendar unavailable</EmptyTitle>
-            <EmptyDescription>
-              No enrolled academic year and calendar boundary is available for
-              this student.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      </CardContent>
-    </Card>
+    <Surface>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <CalendarDays />
+          </EmptyMedia>
+          <EmptyTitle>Academic calendar unavailable</EmptyTitle>
+          <EmptyDescription>
+            No enrolled academic year and calendar boundary is available for
+            this student.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    </Surface>
   );
 }
 

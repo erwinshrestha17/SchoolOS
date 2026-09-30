@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type {
   AcademicYearSummary,
   AdmissionSummary,
@@ -39,7 +40,6 @@ import {
 } from 'lucide-react';
 import { StatusBadge } from '../ui/status-badge';
 import { Button } from '@/components/ui/button';
-import { WorkSurface } from '../ui/work-surface';
 import {
   InputGroup,
   InputGroupAddon,
@@ -273,15 +273,14 @@ export function StudentDirectory({
         ]}
       />
 
-      <WorkSurface
+      <Surface
         title="Student Roster"
         description={
           hasActiveFilters
             ? `${totalStudents} students matching the selected filters`
             : `${totalStudents} students`
         }
-        variant="table"
-        flush
+        padding="flush"
         data-testid="student-roster-workspace"
       >
         <div
@@ -705,7 +704,7 @@ export function StudentDirectory({
             }
           />
         )}
-      </WorkSurface>
+      </Surface>
 
       {pdfError && (
         <div className="animate-in fade-in slide-in-from-top-2 rounded-xl border border-danger-100 bg-danger-50 p-4 text-sm font-medium text-danger-600">

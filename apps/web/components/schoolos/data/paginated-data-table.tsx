@@ -58,17 +58,32 @@ export type PaginatedDataTableStatus =
   | 'module-locked'
   | 'ready';
 
-export type PaginatedDataTableProps<T> = {
+/**
+ * Server-owned pagination metadata — never inferred from loaded rows. A list
+ * the server returns whole (a bounded configuration list, one homework's
+ * submissions) declares `completeList` instead and shows no pager.
+ */
+type PaginationProps =
+  | {
+      page: number;
+      pageSize: number;
+      totalItems: number;
+      onPageChange: (page: number) => void;
+      completeList?: never;
+    }
+  | {
+      completeList: true;
+      page?: never;
+      pageSize?: never;
+      totalItems?: never;
+      onPageChange?: never;
+    };
+
+export type PaginatedDataTableProps<T> = PaginationProps & {
   columns: PaginatedDataTableColumn<T>[];
   items: T[];
   getRowId: (row: T) => string;
   status?: PaginatedDataTableStatus;
-
-  /** Server-owned pagination metadata — never inferred from loaded rows. */
-  page: number;
-  pageSize: number;
-  totalItems: number;
-  onPageChange: (page: number) => void;
 
   sort?: PaginatedDataTableSort | null;
   onSortChange?: (sort: PaginatedDataTableSort | null) => void;
@@ -154,10 +169,11 @@ export function PaginatedDataTable<T>({
   items,
   getRowId,
   status = 'ready',
-  page,
+  page = 1,
   pageSize,
-  totalItems,
+  totalItems: totalItemsProp,
   onPageChange,
+  completeList,
   sort,
   onSortChange,
   selection,
@@ -182,6 +198,7 @@ export function PaginatedDataTable<T>({
   density = 'standard',
   hiddenColumnIds,
 }: PaginatedDataTableProps<T>) {
+  const totalItems = totalItemsProp ?? items.length;
   const visibleColumns = hiddenColumnIds
     ? columns.filter((column) => !hiddenColumnIds.has(column.id))
     : columns;
@@ -510,7 +527,11 @@ export function PaginatedDataTable<T>({
         />
       ) : null}
 
-      {status === 'ready' && items.length > 0 ? (
+      {status === 'ready' &&
+      items.length > 0 &&
+      !completeList &&
+      pageSize &&
+      onPageChange ? (
         <TablePagination
           page={page}
           pageSize={pageSize}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Metric, MetricGroup } from '@/components/schoolos';
+import { Metric, MetricGroup, PaginatedDataTable } from '@/components/schoolos';
 import type {
   AdmissionPolicySummary,
   AdmissionPolicyStatus,
@@ -15,7 +15,6 @@ import { formatSchoolDate } from '../../lib/date-utils';
 import { useSession } from '../session-provider';
 import { ActionMenu } from '../ui/action-menu';
 import { Button } from '../ui/button';
-import { DataTable } from '../ui/data-table';
 import { ErrorState } from '../ui/error-state';
 import type { StatusTone } from '../ui/status-badge';
 import { StatusBadge } from '../ui/status-badge';
@@ -128,17 +127,17 @@ export function AdmissionPolicyList() {
         />
       </MetricGroup>
 
-      <DataTable<AdmissionPolicySummary>
-        isLoading={policiesQuery.isLoading}
-        data={policiesQuery.data?.policies ?? []}
-        getRowKey={(policy) => policy.id}
+      <PaginatedDataTable<AdmissionPolicySummary>
+        items={policiesQuery.data?.policies ?? []}
+        getRowId={(policy) => policy.id}
         onRowClick={(policy) =>
           router.push(`/dashboard/settings/admissions/${policy.id}`)
         }
         emptyTitle="No admission policies yet"
-        emptyMessage="Create your first admission policy to control what staff see when they start a new admission."
+        emptyDescription="Create your first admission policy to control what staff see when they start a new admission."
         columns={[
           {
+            id: 'policy',
             header: 'Policy',
             cell: (policy) => (
               <Link
@@ -156,6 +155,7 @@ export function AdmissionPolicyList() {
             ),
           },
           {
+            id: 'applies-to',
             header: 'Applies to',
             cell: (policy) => (
               <span className="text-slate-600">
@@ -179,11 +179,17 @@ export function AdmissionPolicyList() {
             ),
           },
           {
+            id: 'documents',
             header: 'Documents',
             cell: (policy) => `${policy.requiredDocumentCount} required`,
           },
-          { header: 'Assessment', cell: (policy) => policy.assessment },
           {
+            id: 'assessment',
+            header: 'Assessment',
+            cell: (policy) => policy.assessment,
+          },
+          {
+            id: 'approval',
             header: 'Approval',
             cell: (policy) =>
               policy.approvalChainSummary
@@ -191,6 +197,7 @@ export function AdmissionPolicyList() {
                 : 'Front-desk',
           },
           {
+            id: 'status',
             header: 'Status',
             cell: (policy) => (
               <StatusBadge
@@ -200,10 +207,12 @@ export function AdmissionPolicyList() {
             ),
           },
           {
+            id: 'last-updated',
             header: 'Last updated',
             cell: (policy) => formatSchoolDate(policy.updatedAt),
           },
           {
+            id: 'actions',
             header: '',
             cell: (policy) => (
               <div onClick={(event) => event.stopPropagation()}>
@@ -242,6 +251,8 @@ export function AdmissionPolicyList() {
             ),
           },
         ]}
+        status={policiesQuery.isLoading ? 'loading' : 'ready'}
+        completeList
       />
     </div>
   );

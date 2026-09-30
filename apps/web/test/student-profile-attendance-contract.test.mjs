@@ -109,15 +109,18 @@ test('loading, empty, partial, error, permission, locked, and expired-session st
   ]) {
     assert.match(attendanceTab, new RegExp(copy));
   }
-  assert.match(attendanceTab, /No previous-month data is[\s\S]*being shown/);
+  assert.match(attendanceTab, /No previous-month data is[\s\S]*being\s+shown/);
 });
 
 test('attendance uses installed shadcn composition, semantic tokens, and contained responsive surfaces', () => {
+  // Phase 3C: containers and status chips come from the canonical layer.
+  assert.match(attendanceTab, /from '@\/components\/schoolos'/);
+  assert.match(attendanceTab, /<Surface/);
+  assert.match(attendanceTab, /<StatusBadge/);
+  assert.doesNotMatch(attendanceTab, /primitives\/(card|badge)/);
   for (const primitive of [
-    'primitives/card',
     'primitives/button',
     'primitives/select',
-    'primitives/badge',
     'primitives/tooltip',
     'primitives/separator',
     'primitives/skeleton',

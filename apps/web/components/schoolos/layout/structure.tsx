@@ -81,6 +81,8 @@ export function Surface({
       className={cn(
         'rounded-surface border border-[var(--line)] bg-white',
         padding === 'default' && 'p-gutter-compact md:p-gutter',
+        // Edge-to-edge tables/lists stay inside the rounded border.
+        padding === 'flush' && 'overflow-hidden',
         className,
       )}
       {...rest}

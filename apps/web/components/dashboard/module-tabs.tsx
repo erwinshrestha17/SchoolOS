@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Badge } from '@/components/ui/primitives/badge';
+import { StatusBadge } from '@/components/schoolos';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -143,15 +143,15 @@ export function WorkspaceTabs({
             {Icon ? <Icon aria-hidden /> : null}
             <span>{item.label}</span>
             {typeof item.count === 'number' && item.count > 0 ? (
-              <Badge
-                variant={active ? 'default' : 'secondary'}
+              <StatusBadge
+                tone={active ? 'published' : 'info'}
                 className={cn(
                   'ml-1 min-w-5 justify-center px-1.5',
                   active && 'bg-[var(--mod-accent,var(--primary))] text-white',
                 )}
               >
                 {item.count}
-              </Badge>
+              </StatusBadge>
             ) : null}
           </>
         );

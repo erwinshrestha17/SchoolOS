@@ -108,7 +108,12 @@ describe('SchoolOS workspace consistency contract', () => {
         assert.match(source, /SummaryCard/, `${route} must use SummaryCard`);
       }
       assert.match(source, /WorkspaceTabs/, `${route} must use WorkspaceTabs`);
-      assert.match(source, /WorkSurface/, `${route} must use WorkSurface`);
+      // Phase 3C: the canonical work surface (legacy WorkSurface is ratcheted).
+      assert.match(
+        source,
+        /<Surface\b|<DataWorkspace\b|<Panel\b|WorkSurface/,
+        `${route} must use a canonical work surface`,
+      );
       assert.doesNotMatch(
         source,
         /function\s+SummaryCard|const\s+SummaryCard\s*=/,

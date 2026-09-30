@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { resolveStatusTone, type StatusTone } from '@schoolos/core';
 import { cn } from '../../lib/utils';
 
@@ -25,11 +26,17 @@ const toneClasses: Record<StatusTone, string> = {
   info: 'border-info-100 bg-info-50 text-info-700',
 };
 
+/**
+ * Either a lifecycle `status` (tone and label derived from the shared table)
+ * or an explicit `tone` with content, for semantic chips that are not a
+ * lifecycle state (counts, match reasons, "Documents pending").
+ */
 type StatusBadgeProps = {
-  status: string;
+  status?: string;
   label?: string;
   tone?: StatusTone;
   className?: string;
+  children?: ReactNode;
 };
 
 export function StatusBadge({
@@ -37,15 +44,17 @@ export function StatusBadge({
   label,
   tone,
   className,
+  children,
 }: StatusBadgeProps) {
-  const normalized = status.trim().toUpperCase();
-  const resolvedTone = tone ?? resolveStatusTone(normalized);
-  const displayLabel = label ?? normalized.replace(/_/g, ' ');
+  const normalized = (status ?? '').trim().toUpperCase();
+  const resolvedTone =
+    tone ?? (normalized ? resolveStatusTone(normalized) : 'info');
+  const displayLabel = children ?? label ?? normalized.replace(/_/g, ' ');
 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold leading-5',
+        'inline-flex w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold leading-5 [&>svg]:pointer-events-none [&>svg]:size-3',
         toneClasses[resolvedTone],
         className,
       )}
