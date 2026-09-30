@@ -1,7 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import type { ComponentProps, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  type ComponentProps,
+  type ReactNode,
+} from 'react';
 import { Badge } from '@/components/ui/primitives/badge';
 import {
   Card,
@@ -20,6 +25,16 @@ export type SummaryTone =
   | 'warning'
   | 'danger'
   | 'module';
+
+/**
+ * `grid` (default) is the card grid. `strip` is the compact stage strip the
+ * ASTRA spec asks for on queue-driven homes (e.g. Admissions): one bordered
+ * row of label/count segments, no icon cards, so four or more stages never
+ * become a decorative KPI grid.
+ */
+export type SummaryGridVariant = 'grid' | 'strip';
+
+const SummaryVariantContext = createContext<SummaryGridVariant>('grid');
 
 export type SummaryCardProps = {
   label: string;
@@ -61,6 +76,56 @@ export function SummaryCard({
   tone = 'neutral',
   className,
 }: SummaryCardProps) {
+  const variant = useContext(SummaryVariantContext);
+  if (variant === 'strip') {
+    const segment = (
+      <div
+        className={cn(
+          'flex min-h-11 items-baseline gap-2 px-4 py-2',
+          href && 'transition-colors hover:bg-accent/25',
+          className,
+        )}
+        data-schoolos-ui="summary-strip-item"
+        title={description}
+      >
+        <span className="text-xs font-medium text-muted-foreground">
+          {label}
+        </span>
+        {loading ? (
+          <Skeleton className="h-5 w-8" aria-label={`Loading ${label}`} />
+        ) : (
+          <span
+            className={cn(
+              'text-base font-semibold tabular-nums',
+              value === 'Unavailable'
+                ? 'text-muted-foreground'
+                : 'text-foreground',
+              tone === 'warning' && value !== 0 && 'text-warning-700',
+              tone === 'danger' && value !== 0 && 'text-danger-700',
+            )}
+          >
+            {value === 'Unavailable' ? '—' : value}
+          </span>
+        )}
+      </div>
+    );
+    return (
+      <li className="flex">
+        {href ? (
+          <Link
+            href={href}
+            className="flex outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            aria-label={`${label}: ${loading ? 'Loading' : value}${description ? `. ${description}` : ''}`}
+          >
+            {segment}
+          </Link>
+        ) : (
+          segment
+        )}
+      </li>
+    );
+  }
+
   const content = (
     <Card
       className={cn(
@@ -124,8 +189,22 @@ export function SummaryCard({
 export function SummaryGrid({
   children,
   className,
+  variant = 'grid',
   ...props
-}: ComponentProps<'div'>) {
+}: ComponentProps<'div'> & { variant?: SummaryGridVariant }) {
+  if (variant === 'strip') {
+    return (
+      <SummaryVariantContext.Provider value="strip">
+        <div
+          className={cn('overflow-x-auto rounded-lg border bg-card', className)}
+          data-schoolos-ui="summary-strip"
+          {...props}
+        >
+          <ul className="flex min-w-max divide-x">{children}</ul>
+        </div>
+      </SummaryVariantContext.Provider>
+    );
+  }
   return (
     <div
       className={cn(className, 'grid gap-4 sm:grid-cols-2 xl:grid-cols-4')}

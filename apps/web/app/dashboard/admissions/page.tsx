@@ -24,12 +24,54 @@ import {
   type AdmissionCaseQueue,
 } from '../../../lib/api/admission-cases';
 
-const ADMISSION_SUMMARY_QUEUES = [
-  'NEEDS_INFORMATION',
-  'WAITING_FOR_REVIEW',
-  'READY_TO_ADMIT',
-  'DUPLICATE_WARNINGS',
-] as const satisfies readonly AdmissionCaseQueue[];
+// Phase 5A: compact stage strip in pipeline order (ASTRA M1-A), plus the
+// duplicate-warning attention count. Counts are server totals per queue.
+const ADMISSION_STAGE_STRIP: ReadonlyArray<{
+  queue: AdmissionCaseQueue;
+  label: string;
+  description: string;
+  tone?: 'warning';
+}> = [
+  {
+    queue: 'NEEDS_INFORMATION',
+    label: 'Needs information',
+    description: 'New cases and cases missing details or documents.',
+  },
+  {
+    queue: 'WAITING_FOR_REVIEW',
+    label: 'In review',
+    description: 'Cases waiting for staff review or interview.',
+  },
+  {
+    queue: 'APPROVED',
+    label: 'Approved',
+    description: 'Approved cases not yet finalized.',
+  },
+  {
+    queue: 'READY_TO_ADMIT',
+    label: 'Ready to admit',
+    description: 'Cases ready for final admission.',
+  },
+  {
+    queue: 'WAITLISTED',
+    label: 'Waitlisted',
+    description: 'Cases waiting for a seat.',
+  },
+  {
+    queue: 'COMPLETED',
+    label: 'Completed',
+    description: 'Finalized admissions.',
+  },
+  {
+    queue: 'DUPLICATE_WARNINGS',
+    label: 'Duplicate warnings',
+    description: 'Open cases that may match an existing student.',
+    tone: 'warning',
+  },
+];
+const ADMISSION_SUMMARY_QUEUES = ADMISSION_STAGE_STRIP.map(
+  (stage) => stage.queue,
+);
 
 export default function AdmissionsPage() {
   const router = useRouter();
@@ -49,11 +91,7 @@ export default function AdmissionsPage() {
     })),
   });
   const summaryQuery = (queue: AdmissionCaseQueue) =>
-    summaryQueries[
-      ADMISSION_SUMMARY_QUEUES.indexOf(
-        queue as (typeof ADMISSION_SUMMARY_QUEUES)[number],
-      )
-    ];
+    summaryQueries[ADMISSION_SUMMARY_QUEUES.indexOf(queue)];
 
   return (
     <DashboardPageShell className="gap-5">
@@ -123,45 +161,18 @@ export default function AdmissionsPage() {
         ]}
       />
 
-      <SummaryGrid>
-        <SummaryCard
-          label="Needs Information"
-          value={
-            summaryQuery('NEEDS_INFORMATION')?.data?.total ?? 'Unavailable'
-          }
-          loading={summaryQuery('NEEDS_INFORMATION')?.isLoading}
-          icon={<FileWarning aria-hidden />}
-          href="/dashboard/admissions?queue=NEEDS_INFORMATION"
-          description="Cases missing details or documents."
-        />
-        <SummaryCard
-          label="Waiting for Review"
-          value={
-            summaryQuery('WAITING_FOR_REVIEW')?.data?.total ?? 'Unavailable'
-          }
-          loading={summaryQuery('WAITING_FOR_REVIEW')?.isLoading}
-          icon={<ClipboardList aria-hidden />}
-          href="/dashboard/admissions?queue=WAITING_FOR_REVIEW"
-          description="Cases waiting for staff review."
-        />
-        <SummaryCard
-          label="Ready to Admit"
-          value={summaryQuery('READY_TO_ADMIT')?.data?.total ?? 'Unavailable'}
-          loading={summaryQuery('READY_TO_ADMIT')?.isLoading}
-          icon={<UserRoundCheck aria-hidden />}
-          href="/dashboard/admissions?queue=READY_TO_ADMIT"
-          description="Cases ready for final admission."
-        />
-        <SummaryCard
-          label="Duplicate Warnings"
-          value={
-            summaryQuery('DUPLICATE_WARNINGS')?.data?.total ?? 'Unavailable'
-          }
-          loading={summaryQuery('DUPLICATE_WARNINGS')?.isLoading}
-          icon={<ScanSearch aria-hidden />}
-          href="/dashboard/admissions?queue=DUPLICATE_WARNINGS"
-          description="Possible matches with existing students."
-        />
+      <SummaryGrid variant="strip" aria-label="Admission stages">
+        {ADMISSION_STAGE_STRIP.map((stage) => (
+          <SummaryCard
+            key={stage.queue}
+            label={stage.label}
+            value={summaryQuery(stage.queue)?.data?.total ?? 'Unavailable'}
+            loading={summaryQuery(stage.queue)?.isLoading}
+            href={`/dashboard/admissions?queue=${stage.queue}`}
+            description={stage.description}
+            tone={stage.tone}
+          />
+        ))}
       </SummaryGrid>
       <AdmissionCaseQueues />
     </DashboardPageShell>

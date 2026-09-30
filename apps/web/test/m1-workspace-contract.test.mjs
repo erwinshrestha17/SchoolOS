@@ -576,17 +576,35 @@ test('M1 application queue keeps page-derived and decorative metrics out of the 
   assert.match(pipeline, /matching applications/);
 });
 
-test('M1 Admissions overview shows a real, actionable, honest KPI grid', () => {
+test('M1 Admissions overview shows a real, actionable, honest stage strip', () => {
   const page = read('app/dashboard/admissions/page.tsx');
+  const summaryCards = read('components/ui/summary-card.tsx');
 
   // Counts come from each backend-filtered queue total, not from loaded rows.
   assert.match(page, /admissionCasesApi\.listQueues/);
   assert.match(page, /ADMISSION_SUMMARY_QUEUES/);
   assert.match(page, /\/dashboard\/admissions\/assessments/);
-  assert.match(page, /Needs Information/);
-  assert.match(page, /Waiting for Review/);
-  assert.match(page, /Ready to Admit/);
-  assert.match(page, /Duplicate Warnings/);
+
+  // Phase 5A (ASTRA M1-A): compact stage strip in pipeline order through the
+  // canonical SummaryGrid, not a four-card KPI grid.
+  assert.match(page, /<SummaryGrid variant="strip"/);
+  assert.match(summaryCards, /data-schoolos-ui="summary-strip"/);
+  const stages = [
+    ['NEEDS_INFORMATION', 'Needs information'],
+    ['WAITING_FOR_REVIEW', 'In review'],
+    ['APPROVED', 'Approved'],
+    ['READY_TO_ADMIT', 'Ready to admit'],
+    ['WAITLISTED', 'Waitlisted'],
+    ['COMPLETED', 'Completed'],
+    ['DUPLICATE_WARNINGS', 'Duplicate warnings'],
+  ];
+  let lastIndex = -1;
+  for (const [queue, label] of stages) {
+    const index = page.indexOf(`queue: '${queue}'`);
+    assert.ok(index > lastIndex, `${queue} must follow the pipeline order`);
+    lastIndex = index;
+    assert.match(page, new RegExp(`label: '${label}'`));
+  }
 
   // Honest states: real backend zero remains 0 while a missing/failed response
   // stays unavailable and loading uses the shared shadcn Skeleton.
@@ -594,19 +612,10 @@ test('M1 Admissions overview shows a real, actionable, honest KPI grid', () => {
   assert.match(page, /loading=\{summaryQuery/);
   assert.doesNotMatch(page, /\.items\.length/);
 
-  // Every card opens its real server-filtered queue.
-  for (const queue of [
-    'NEEDS_INFORMATION',
-    'WAITING_FOR_REVIEW',
-    'READY_TO_ADMIT',
-    'DUPLICATE_WARNINGS',
-  ]) {
-    assert.match(
-      page,
-      new RegExp(`href="/dashboard/admissions\\?queue=${queue}"`),
-    );
-  }
+  // Every stage opens its real server-filtered queue.
+  assert.match(page, /href=\{`\/dashboard\/admissions\?queue=\$\{stage\.queue\}`\}/);
 });
+
 
 test('student directory row actions use the shared keyboard-accessible ActionMenu, not a hover-only menu', () => {
   const directory = read('components/forms/student-directory.tsx');

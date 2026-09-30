@@ -52,6 +52,7 @@ import {
 } from '../ui/primitives/table';
 import { WorkspaceTabs } from '../ui/module-tabs';
 import { useUrlFilters } from '../../lib/hooks/use-url-filters';
+import { queueAge } from '../../lib/queue-age';
 
 const QUEUES: Array<{
   id: AdmissionCaseQueue;
@@ -141,6 +142,38 @@ const STATUS_LABELS: Record<string, string> = {
   NOT_ADMITTED: 'Not Admitted',
   CLOSED: 'Closed',
 };
+
+/** Queues of finished work: age is shown but never flagged as aging. */
+const CLOSED_QUEUES = new Set<AdmissionCaseQueue>([
+  'COMPLETED',
+  'NOT_ADMITTED',
+]);
+
+function QueueAgeCell({
+  submittedAt,
+  open,
+}: {
+  submittedAt: string;
+  open: boolean;
+}) {
+  const age = queueAge(submittedAt);
+  const title = `Submitted ${formatBsDate(submittedAt)}`;
+  if (open && age.tone !== 'none') {
+    return (
+      <span title={title}>
+        <StatusBadge tone={age.tone}>
+          <span className="sr-only">Waiting </span>
+          {age.label}
+        </StatusBadge>
+      </span>
+    );
+  }
+  return (
+    <span className="text-xs tabular-nums text-muted-foreground" title={title}>
+      {age.label}
+    </span>
+  );
+}
 
 export function AdmissionCaseQueues() {
   const router = useRouter();
@@ -334,6 +367,7 @@ export function AdmissionCaseQueues() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="px-4">Student</TableHead>
+                  <TableHead className="px-4">Age</TableHead>
                   <TableHead className="px-4">Guardian</TableHead>
                   {queue === 'WAITLISTED' ? (
                     <>
@@ -369,6 +403,12 @@ export function AdmissionCaseQueues() {
                             : item.updatedAt,
                         )}
                       </p>
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <QueueAgeCell
+                        submittedAt={item.createdAt}
+                        open={!CLOSED_QUEUES.has(queue)}
+                      />
                     </TableCell>
                     <TableCell className="px-4 py-3 whitespace-normal">
                       <p className="font-medium text-foreground">
