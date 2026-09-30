@@ -1,16 +1,10 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { Lock, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -106,17 +100,16 @@ export function TenantModules() {
         </div>
       ) : null}
 
-      <Card className="rounded-3xl border-slate-100 shadow-sm">
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardTitle className="text-xl font-black">Module access</CardTitle>
-            <CardDescription>
-              Backend entitlement checks remain authoritative.
-            </CardDescription>
-          </div>
-          <Badge variant="neutral">Plan: {tenant.plan}</Badge>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <Surface
+        title="Module access"
+        description="Backend entitlement checks remain authoritative."
+        actions={
+          <>
+            <Badge variant="neutral">Plan: {tenant.plan}</Badge>
+          </>
+        }
+      >
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {PLATFORM_MODULE_ENTITLEMENTS.map(({ key, label }) => {
             const enabled = (tenant.enabledFeatures ?? []).includes(key);
             const override = (tenant.overrides ?? []).find(
@@ -156,19 +149,21 @@ export function TenantModules() {
               </div>
             );
           })}
-        </CardContent>
-      </Card>
+        </div>
+      </Surface>
 
-      <Card className="rounded-3xl border-rose-100 bg-rose-50/30 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl font-black text-rose-950">
-            <Lock size={20} /> Active overrides
-          </CardTitle>
-          <CardDescription className="text-rose-800/70">
-            Manual access decisions reported by the backend.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Surface
+        className="-rose-100 bg-rose-50/30"
+        title={
+          <>
+            <span className="flex items-center gap-2">
+              <Lock size={20} /> Active overrides
+            </span>
+          </>
+        }
+        description="Manual access decisions reported by the backend."
+      >
+        <div className="space-y-3">
           {(tenant.overrides ?? []).length ? (
             tenant.overrides?.map((override) => (
               <div
@@ -193,8 +188,8 @@ export function TenantModules() {
               No active overrides.
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Surface>
 
       {canManageModules ? (
         <Dialog

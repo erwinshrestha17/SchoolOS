@@ -25,7 +25,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/ui/primitives/table';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { Select } from '@/components/ui/select';
 

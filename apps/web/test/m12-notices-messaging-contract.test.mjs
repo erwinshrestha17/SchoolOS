@@ -13,7 +13,7 @@ describe('M12 notifications and M15 notices boundary', () => {
     assert.equal((workspace.match(/<SummaryCard/g) ?? []).length, 4);
     assert.match(workspace, /<SummaryGrid/);
     assert.match(workspace, /<WorkspaceTabs/);
-    assert.match(workspace, /<WorkSurface/);
+    assert.match(workspace, /<Surface\b/);
     assert.doesNotMatch(workspace, /title=['"]Escalated Chats['"]/);
     assert.doesNotMatch(workspace, /title=['"]Provider Status['"]/);
     assert.doesNotMatch(workspace, /label: ['"]Recipient Preview['"]/);

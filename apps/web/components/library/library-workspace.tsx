@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -45,7 +46,6 @@ import {
   type ReturnLibraryIssuePayload,
 } from '../../lib/library-api';
 import { SummaryCard, SummaryGrid } from '../ui/summary-card';
-import { WorkSurface } from '../ui/work-surface';
 import { EmptyState } from '../ui/empty-state';
 import { ErrorState } from '../ui/error-state';
 import { LoadingState } from '../ui/loading-state';
@@ -1114,11 +1114,10 @@ function OverviewPanel({
         />
       </SummaryGrid>
 
-      <WorkSurface
+      <Surface
         title="Operational attention"
         description="Overdue copies that may need reminders or follow-up."
-        variant="queue"
-        action={
+        actions={
           <Link
             href="/dashboard/library/overdue"
             className="text-sm font-semibold text-[var(--primary)] hover:text-[var(--primary-dark)]"
@@ -1138,12 +1137,11 @@ function OverviewPanel({
             />
           )}
         </div>
-      </WorkSurface>
+      </Surface>
 
-      <WorkSurface
+      <Surface
         title="Library operations"
         description="Access detailed borrower history, fine records, and health reports."
-        variant="grid"
       >
         <div className="grid gap-4 lg:grid-cols-3">
           <Link
@@ -1180,7 +1178,7 @@ function OverviewPanel({
             </p>
           </Link>
         </div>
-      </WorkSurface>
+      </Surface>
     </div>
   );
 }

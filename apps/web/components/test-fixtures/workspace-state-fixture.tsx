@@ -1,5 +1,6 @@
 'use client';
 
+import { PaginatedDataTable, Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import {
   AlertTriangle,
@@ -19,12 +20,9 @@ import { LoadingState } from '@/components/ui/loading-state';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { ModuleLockedState } from '@/components/ui/module-locked-state';
 import { PermissionDenied } from '@/components/ui/permission-denied';
-import { WorkSurface } from '@/components/ui/work-surface';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { FormField, Input } from '@/components/ui/form-field';
-import { DataTable } from '@/components/ui/data-table';
-import { PaginatedDataTable } from '@/components/schoolos/data/paginated-data-table';
 import {
   FileUnavailableState,
   NoResultsState,
@@ -65,12 +63,12 @@ export function WorkspaceStateFixture() {
         activeValue={state}
         onValueChange={(value) => setState(value as FixtureState)}
       />
-      <WorkSurface
+      <Surface
         title={
           fixtureStates.find((item) => item.value === state)?.label ?? 'State'
         }
         description="Deterministic visual evidence for the shared state contract."
-        action={
+        actions={
           <span className="text-xs font-medium text-slate-500">
             {lastAction}
           </span>
@@ -80,8 +78,8 @@ export function WorkspaceStateFixture() {
           state={state}
           onAction={(message) => setLastAction(message)}
         />
-      </WorkSurface>
-      <WorkSurface
+      </Surface>
+      <Surface
         title="Shared interaction fixtures"
         description="Local UI state only; these controls do not submit school records."
       >
@@ -97,11 +95,19 @@ export function WorkspaceStateFixture() {
           <p role="status" aria-label="Fixture result">
             {lastAction}
           </p>
-          <DataTable
-            columns={[{ header: 'Fixture record', accessorKey: 'name' }]}
-            data={[{ id: 'alpha', name: 'Fixture Alpha' }]}
+          <PaginatedDataTable
+            columns={[
+              {
+                id: 'name',
+                header: 'Fixture record',
+                cell: (row: { id: string; name: string }) => row.name,
+              },
+            ]}
+            items={[{ id: 'alpha', name: 'Fixture Alpha' }]}
             getRowActionLabel={(row) => `Open ${row.name}`}
             onRowClick={() => setLastAction('Alpha opened by row action.')}
+            getRowId={(row) => row.id}
+            completeList
           />
           <PaginatedDataTable
             columns={[
@@ -121,7 +127,7 @@ export function WorkspaceStateFixture() {
             onRowClick={() => setLastAction('Beta opened by row action.')}
           />
         </div>
-      </WorkSurface>
+      </Surface>
       <ConfirmDialog
         isOpen={dialogOpen}
         title="Confirm fixture action"

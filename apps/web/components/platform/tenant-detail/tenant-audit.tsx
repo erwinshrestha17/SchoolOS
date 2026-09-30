@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type { PaginatedResult, PlatformAuditLog } from '@schoolos/core';
 import { Download, History, RefreshCw, Search } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -8,13 +9,6 @@ import {
   PlatformSectionSkeleton,
 } from '@/app/platform/_components/platform-operator-states';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -141,73 +135,73 @@ export function TenantAudit() {
         </div>
       </div>
 
-      <Card className="rounded-3xl border-slate-100 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl font-black">
-            <History size={20} />
-            Platform audit trail
-          </CardTitle>
-          <CardDescription>
-            Tenant audit history is loaded in pages. Export includes the current
-            page and filters.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-6">
-              <PlatformSectionSkeleton rows={6} />
-            </div>
-          ) : error ? (
-            <div className="p-6">
-              <PlatformInlineError
-                message={error}
-                onRetry={() => void loadLogs()}
-              />
-            </div>
-          ) : logs.length ? (
-            <div className="divide-y divide-slate-50 border-t border-slate-100">
-              {logs.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between"
-                >
-                  <div>
-                    <p className="font-black text-slate-900">
-                      {log.action.replaceAll('_', ' ')}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {log.resource} · {log.resourceId || 'No resource ID'}
-                    </p>
-                  </div>
-                  <div className="text-left sm:text-right">
-                    <p className="text-sm font-bold text-slate-900">
-                      {log.user?.email ?? 'System'}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {formatDateTime(log.createdAt)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-14 text-center">
-              <History className="mx-auto text-slate-200" size={42} />
-              <p className="mt-4 text-sm font-semibold text-slate-500">
-                No audit logs match the current filters.
-              </p>
-            </div>
-          )}
-          {!loading && !error && data.total > 0 ? (
-            <TablePagination
-              page={data.page}
-              pageSize={data.limit}
-              total={data.total}
-              onPageChange={setPage}
+      <Surface
+        title={
+          <>
+            <span className="flex items-center gap-2">
+              <History size={20} />
+              Platform audit trail
+            </span>
+          </>
+        }
+        description="Tenant audit history is loaded in pages. Export includes the current
+            page and filters."
+        padding="flush"
+      >
+        {loading ? (
+          <div className="p-6">
+            <PlatformSectionSkeleton rows={6} />
+          </div>
+        ) : error ? (
+          <div className="p-6">
+            <PlatformInlineError
+              message={error}
+              onRetry={() => void loadLogs()}
             />
-          ) : null}
-        </CardContent>
-      </Card>
+          </div>
+        ) : logs.length ? (
+          <div className="divide-y divide-slate-50 border-t border-slate-100">
+            {logs.map((log) => (
+              <div
+                key={log.id}
+                className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between"
+              >
+                <div>
+                  <p className="font-black text-slate-900">
+                    {log.action.replaceAll('_', ' ')}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {log.resource} · {log.resourceId || 'No resource ID'}
+                  </p>
+                </div>
+                <div className="text-left sm:text-right">
+                  <p className="text-sm font-bold text-slate-900">
+                    {log.user?.email ?? 'System'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {formatDateTime(log.createdAt)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-14 text-center">
+            <History className="mx-auto text-slate-200" size={42} />
+            <p className="mt-4 text-sm font-semibold text-slate-500">
+              No audit logs match the current filters.
+            </p>
+          </div>
+        )}
+        {!loading && !error && data.total > 0 ? (
+          <TablePagination
+            page={data.page}
+            pageSize={data.limit}
+            total={data.total}
+            onPageChange={setPage}
+          />
+        ) : null}
+      </Surface>
 
       <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
         <DialogContent className="rounded-3xl sm:max-w-2xl">

@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -35,7 +36,6 @@ import {
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
 import { SummaryCard, SummaryGrid } from '../ui/summary-card';
-import { WorkSurface } from '../ui/work-surface';
 import { StatusBadge, type StatusTone } from '../ui/status-badge';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { RemoteStaffSelector } from '../staff/remote-staff-selector';
@@ -2380,9 +2380,9 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <WorkSurface title={title} description={description} variant="monitoring">
+    <Surface title={title} description={description}>
       {children}
-    </WorkSurface>
+    </Surface>
   );
 }
 

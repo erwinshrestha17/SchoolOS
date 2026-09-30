@@ -1,5 +1,6 @@
 'use client';
 
+import { Card } from '@/components/schoolos';
 import * as React from 'react';
 import Link from 'next/link';
 import {
@@ -31,7 +32,6 @@ import {
   FileText,
 } from 'lucide-react';
 
-import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import {
   Tabs,
@@ -1546,8 +1546,8 @@ export default function RedesignedLandingPage() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 relative">
             {onboardingSteps.map((step, idx) => (
               <BlurFade key={idx} delay={0.1 * idx} className="h-full">
-                <Card className="relative rounded-2xl border border-slate-200/60 bg-white p-6 shadow-sm space-y-3 flex flex-col justify-between h-full">
-                  <CardContent className="p-0 space-y-3">
+                <Card className="relative flex h-full flex-col justify-between space-y-3 p-6">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-3xl font-black text-primary-500/25 block">
                         {step.step}
@@ -1562,7 +1562,7 @@ export default function RedesignedLandingPage() {
                     <p className="text-xs text-slate-500 leading-relaxed">
                       {step.desc}
                     </p>
-                  </CardContent>
+                  </div>
                 </Card>
               </BlurFade>
             ))}

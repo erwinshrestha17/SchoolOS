@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { formatBsDate } from '@schoolos/core';
 import { AlertTriangle, CreditCard, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
@@ -7,13 +8,6 @@ import { useState } from 'react';
 import { PlatformBoundaryNote } from '@/app/platform/_components/platform-operator-states';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -112,28 +106,31 @@ export function TenantSubscription() {
         </div>
       ) : null}
 
-      <Card className="rounded-3xl border-slate-100 shadow-sm">
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-xl font-black">
+      <Surface
+        title={
+          <>
+            <span className="flex items-center gap-2">
               <CreditCard size={20} /> Current plan
-            </CardTitle>
-            <CardDescription>
-              Backend subscription record for this tenant.
-            </CardDescription>
-          </div>
-          <Badge
-            variant={
-              subscription?.status === 'ACTIVE' ||
-              subscription?.status === 'TRIAL'
-                ? 'success'
-                : 'warning'
-            }
-          >
-            {subscription?.status ?? 'UNASSIGNED'}
-          </Badge>
-        </CardHeader>
-        <CardContent className="space-y-6">
+            </span>
+          </>
+        }
+        description="Backend subscription record for this tenant."
+        actions={
+          <>
+            <Badge
+              variant={
+                subscription?.status === 'ACTIVE' ||
+                subscription?.status === 'TRIAL'
+                  ? 'success'
+                  : 'warning'
+              }
+            >
+              {subscription?.status ?? 'UNASSIGNED'}
+            </Badge>
+          </>
+        }
+      >
+        <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <RecordValue
               label="Plan"
@@ -166,64 +163,55 @@ export function TenantSubscription() {
               </Button>
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </Surface>
 
       {canReadUsage ? (
-        <Card className="rounded-3xl border-slate-100 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl font-black">
-              Usage and limits
-            </CardTitle>
-            <CardDescription>
-              Values and limits returned by the platform backend.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {(tenant.usageCounters ?? []).length ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {tenant.usageCounters?.map((counter) => {
-                  const ratio = counter.limit
-                    ? counter.value / counter.limit
-                    : 0;
-                  return (
-                    <div
-                      key={`${counter.usageKey}-${counter.period}`}
-                      className={`rounded-2xl border p-4 ${ratio >= 0.9 ? 'border-amber-200 bg-amber-50' : 'border-slate-100 bg-slate-50'}`}
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <p className="font-mono text-sm font-bold text-slate-900">
-                          {counter.usageKey}
-                        </p>
-                        {ratio >= 0.9 ? (
-                          <AlertTriangle className="text-amber-600" size={18} />
-                        ) : null}
-                      </div>
-                      <p className="mt-2 text-2xl font-black text-slate-900">
-                        {counter.value.toLocaleString()}
+        <Surface
+          title="Usage and limits"
+          description="Values and limits returned by the platform backend."
+        >
+          {(tenant.usageCounters ?? []).length ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {tenant.usageCounters?.map((counter) => {
+                const ratio = counter.limit ? counter.value / counter.limit : 0;
+                return (
+                  <div
+                    key={`${counter.usageKey}-${counter.period}`}
+                    className={`rounded-2xl border p-4 ${ratio >= 0.9 ? 'border-amber-200 bg-amber-50' : 'border-slate-100 bg-slate-50'}`}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <p className="font-mono text-sm font-bold text-slate-900">
+                        {counter.usageKey}
                       </p>
-                      <p className="mt-1 text-xs font-semibold text-slate-500">
-                        Limit{' '}
-                        {counter.limit?.toLocaleString() ?? 'not configured'} ·{' '}
-                        {counter.period}
-                      </p>
+                      {ratio >= 0.9 ? (
+                        <AlertTriangle className="text-amber-600" size={18} />
+                      ) : null}
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-500">
-                No usage counters are available for this subscription.
-              </p>
-            )}
-            {warnings.length ? (
-              <p className="mt-4 text-sm font-bold text-amber-800">
-                {warnings.length} counter{warnings.length === 1 ? '' : 's'} at
-                or above 90% of the configured limit.
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
+                    <p className="mt-2 text-2xl font-black text-slate-900">
+                      {counter.value.toLocaleString()}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      Limit{' '}
+                      {counter.limit?.toLocaleString() ?? 'not configured'} ·{' '}
+                      {counter.period}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-500">
+              No usage counters are available for this subscription.
+            </p>
+          )}
+          {warnings.length ? (
+            <p className="mt-4 text-sm font-bold text-amber-800">
+              {warnings.length} counter{warnings.length === 1 ? '' : 's'} at or
+              above 90% of the configured limit.
+            </p>
+          ) : null}
+        </Surface>
       ) : null}
 
       {canReadBilling ? (

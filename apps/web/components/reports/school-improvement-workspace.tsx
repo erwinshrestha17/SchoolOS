@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -26,7 +27,6 @@ import { useSession } from '@/components/session-provider';
 import { api, type SchoolUserSummary } from '@/lib/api';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
-import { WorkSurface } from '@/components/ui/work-surface';
 import { Button } from '@/components/ui/button';
 import { BsDateField } from '@/components/ui/bs-date-field';
 import { FormField, Input, Select, TextArea } from '@/components/ui/form-field';
@@ -201,7 +201,7 @@ export function SchoolImprovementWorkspace() {
               }
             />
           ) : (
-            <WorkSurface
+            <Surface
               title="Plans"
               description="Results are paginated by the server. Open a plan to review its indicators, actions, evidence, and monthly reviews."
             >
@@ -253,7 +253,7 @@ export function SchoolImprovementWorkspace() {
                   </Button>
                 </div>
               ) : null}
-            </WorkSurface>
+            </Surface>
           )}
         </>
       )}
@@ -296,10 +296,10 @@ function PlanDetail({
         <ArrowLeft className="size-4" />
         Back to plans
       </Button>
-      <WorkSurface
+      <Surface
         title={plan.title}
         description={`${formatBsDate(plan.startsOn)} – ${formatBsDate(plan.endsOn)}`}
-        action={<StatusBadge status={plan.status} />}
+        actions={<StatusBadge status={plan.status} />}
       >
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-xl bg-slate-50 p-4">
@@ -320,12 +320,12 @@ function PlanDetail({
         {canManage ? (
           <PlanTransitionForm plan={plan} onChanged={onChanged} />
         ) : null}
-      </WorkSurface>
+      </Surface>
 
-      <WorkSurface
+      <Surface
         title="Indicators"
         description="Latest values change only through a recorded plan review."
-        action={<BarChart3 className="size-5 text-slate-500" />}
+        actions={<BarChart3 className="size-5 text-slate-500" />}
       >
         <div className="grid gap-3 md:grid-cols-2">
           {plan.kpis.map((kpi) => (
@@ -347,9 +347,9 @@ function PlanDetail({
             </div>
           ))}
         </div>
-      </WorkSurface>
+      </Surface>
 
-      <WorkSurface
+      <Surface
         title="Owned actions"
         description="Every status change requires a reason. Evidence remains protected by authenticated file access."
       >
@@ -363,13 +363,13 @@ function PlanDetail({
             />
           ))}
         </div>
-      </WorkSurface>
+      </Surface>
 
       {canManage && plan.status !== 'ARCHIVED' ? (
         <ReviewForm plan={plan} onChanged={onChanged} />
       ) : null}
 
-      <WorkSurface
+      <Surface
         title="Monthly reviews"
         description="Reviews preserve the dated narrative and indicator snapshot used for the next decision."
       >
@@ -393,7 +393,7 @@ function PlanDetail({
             ))}
           </div>
         )}
-      </WorkSurface>
+      </Surface>
     </div>
   );
 }
@@ -478,8 +478,7 @@ function CreatePlanForm({
       ),
   });
   return (
-    <WorkSurface
-      variant="form"
+    <Surface
       title="Create school improvement plan"
       description="Start with one measurable indicator and one owned action. More can be added through a later reviewed plan amendment."
     >
@@ -632,7 +631,7 @@ function CreatePlanForm({
           </Button>
         </div>
       </form>
-    </WorkSurface>
+    </Surface>
   );
 }
 
@@ -888,8 +887,7 @@ function ReviewForm({
       ),
   });
   return (
-    <WorkSurface
-      variant="form"
+    <Surface
       title="Record monthly review"
       description="The review updates the latest indicator values in one audited transaction."
     >
@@ -951,7 +949,7 @@ function ReviewForm({
           </Button>
         </div>
       </form>
-    </WorkSurface>
+    </Surface>
   );
 }
 

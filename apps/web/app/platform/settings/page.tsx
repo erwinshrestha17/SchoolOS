@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface, Card } from '@/components/schoolos';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -43,13 +44,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -652,54 +646,44 @@ export default function PlatformSettings() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {Object.entries(health?.checks ?? {}).map(
               ([key, check]: [string, any]) => (
-                <Card
-                  key={key}
-                  className="rounded-3xl border-slate-100 shadow-sm overflow-hidden group"
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-platform-bg)] text-[var(--color-mod-platform-accent)] group-hover:bg-[var(--color-mod-platform-accent)] group-hover:text-white transition-all">
-                        {key === 'database' ? (
-                          <Database size={24} />
-                        ) : key === 'redis' ? (
-                          <Zap size={24} />
-                        ) : key === 'queue' ? (
-                          <Clock size={24} />
-                        ) : (
-                          <Globe size={24} />
-                        )}
-                      </div>
-                      {check.status === 'ok' ? (
-                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100">
-                          HEALTHY
-                        </Badge>
+                <Surface key={key} className="group">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-mod-platform-bg)] text-[var(--color-mod-platform-accent)] group-hover:bg-[var(--color-mod-platform-accent)] group-hover:text-white transition-all">
+                      {key === 'database' ? (
+                        <Database size={24} />
+                      ) : key === 'redis' ? (
+                        <Zap size={24} />
+                      ) : key === 'queue' ? (
+                        <Clock size={24} />
                       ) : (
-                        <Badge variant="destructive">CRITICAL</Badge>
+                        <Globe size={24} />
                       )}
                     </div>
-                    <h3 className="text-lg font-black text-slate-900 capitalize">
-                      {key}
-                    </h3>
-                    <p className="mt-1 text-xs font-bold text-slate-400 uppercase tracking-tighter">
-                      {check.message ?? 'Operational'}
-                    </p>
-                  </CardContent>
-                </Card>
+                    {check.status === 'ok' ? (
+                      <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100">
+                        HEALTHY
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive">CRITICAL</Badge>
+                    )}
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900 capitalize">
+                    {key}
+                  </h3>
+                  <p className="mt-1 text-xs font-bold text-slate-400 uppercase tracking-tighter">
+                    {check.message ?? 'Operational'}
+                  </p>
+                </Surface>
               ),
             )}
           </div>
 
-          <Card className="rounded-2xl border-slate-100 shadow-sm overflow-hidden">
-            <CardHeader className="bg-slate-50/50 p-8">
-              <CardTitle className="text-2xl font-black">
-                Environmental Metrics
-              </CardTitle>
-              <CardDescription>
-                Cluster telemetry is shown only when backed by platform health
-                APIs.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-8">
+          <Surface
+            title="Environmental Metrics"
+            description="Cluster telemetry is shown only when backed by platform health
+                APIs."
+          >
+            <div className="p-8">
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6">
                 <p className="text-sm font-bold text-slate-700">
                   CPU, memory, DB pool, and API latency telemetry are not
@@ -711,8 +695,8 @@ export default function PlatformSettings() {
                   section.
                 </p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Surface>
         </TabsContent>
 
         <TabsContent
@@ -720,18 +704,19 @@ export default function PlatformSettings() {
           className="space-y-8 animate-in fade-in slide-in-from-bottom-2"
         >
           {providersReadiness.length > 0 && (
-            <Card className="rounded-2xl border-slate-100 shadow-sm overflow-hidden">
-              <CardHeader className="bg-slate-50/50 p-8">
-                <CardTitle className="text-2xl font-black flex items-center gap-2">
-                  <ShieldCheck className="text-emerald-500" size={24} />
-                  Operational Dependency Readiness
-                </CardTitle>
-                <CardDescription className="text-base font-medium text-slate-500">
-                  Real-time status check for database, SMS, email, FCM, object
-                  storage, and PDF generators.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-8">
+            <Surface
+              title={
+                <>
+                  <span className="flex items-center gap-2">
+                    <ShieldCheck className="text-emerald-500" size={24} />
+                    Operational Dependency Readiness
+                  </span>
+                </>
+              }
+              description="Real-time status check for database, SMS, email, FCM, object
+                  storage, and PDF generators."
+            >
+              <div className="p-8">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                   {providersReadiness.map((pr) => (
                     <div
@@ -768,17 +753,17 @@ export default function PlatformSettings() {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </Surface>
           )}
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {safeProviders.map((provider) => (
               <Card
                 key={provider.id}
-                className="rounded-2xl border-slate-100 shadow-sm transition-all hover:border-[var(--color-mod-platform-border)] group"
+                className="transition-all hover:-[var(--color-mod-platform-)] group"
               >
-                <CardHeader className="pb-4">
+                <div className="pb-4">
                   <div className="flex items-center justify-between mb-4">
                     <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-[var(--color-mod-platform-accent)] text-white">
                       {provider.type === 'SMS' ? (
@@ -798,12 +783,12 @@ export default function PlatformSettings() {
                       {provider.enabled ? 'ACTIVE' : 'DISABLED'}
                     </Badge>
                   </div>
-                  <CardTitle className="text-xl font-black text-slate-900">
+                  <h3 className="text-card-title text-[var(--ink)] text-xl font-black text-slate-900">
                     {provider.name}
-                  </CardTitle>
-                  <CardDescription className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">
+                  </h3>
+                  <p className="text-helper text-[var(--muted)] font-bold text-slate-400 uppercase tracking-widest text-[10px]">
                     {provider.type} · {provider.environment}
-                  </CardDescription>
+                  </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge
                       variant={
@@ -826,8 +811,8 @@ export default function PlatformSettings() {
                         : 'No readiness check yet'}
                     </span>
                   </div>
-                </CardHeader>
-                <CardContent>
+                </div>
+                <div>
                   <div className="rounded-2xl bg-slate-50 p-4 border border-slate-100 relative overflow-hidden">
                     <div className="absolute right-3 top-3 opacity-20">
                       <Lock size={14} />
@@ -892,7 +877,7 @@ export default function PlatformSettings() {
                       </Button>
                     </div>
                   </div>
-                </CardContent>
+                </div>
               </Card>
             ))}
           </div>
@@ -903,137 +888,139 @@ export default function PlatformSettings() {
           className="space-y-8 animate-in fade-in slide-in-from-bottom-2"
         >
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-            <Card className="rounded-3xl border-slate-100 shadow-sm">
-              <CardHeader className="flex flex-row items-start justify-between gap-4">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-2xl font-black">
+            <Surface
+              title={
+                <>
+                  <span className="flex items-center gap-2">
                     <Webhook className="text-cyan-600" size={24} />
                     Endpoint Registry
-                  </CardTitle>
-                  <CardDescription className="text-base font-medium text-slate-500">
-                    Signed outbound webhooks for platform or tenant
-                    integrations.
-                  </CardDescription>
-                </div>
-                <Button
-                  className="rounded-2xl bg-[var(--color-mod-platform-accent)] font-bold text-white hover:bg-[var(--color-mod-platform-text)]"
-                  onClick={() => setWebhookDialogOpen(true)}
-                  data-testid="platform-webhook-create-button"
-                >
-                  <Plus size={18} className="mr-2" /> New Endpoint
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto rounded-2xl border border-slate-100">
-                  <table className="w-full min-w-[780px] text-left text-sm">
-                    <thead className="border-b border-slate-100 bg-slate-50">
+                  </span>
+                </>
+              }
+              description="Signed outbound webhooks for platform or tenant
+                    integrations."
+              actions={
+                <>
+                  <Button
+                    className="rounded-2xl bg-[var(--color-mod-platform-accent)] font-bold text-white hover:bg-[var(--color-mod-platform-text)]"
+                    onClick={() => setWebhookDialogOpen(true)}
+                    data-testid="platform-webhook-create-button"
+                  >
+                    <Plus size={18} className="mr-2" /> New Endpoint
+                  </Button>
+                </>
+              }
+            >
+              <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                <table className="w-full min-w-[780px] text-left text-sm">
+                  <thead className="border-b border-slate-100 bg-slate-50">
+                    <tr>
+                      <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        Owner
+                      </th>
+                      <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        Endpoint
+                      </th>
+                      <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        Events
+                      </th>
+                      <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        Status
+                      </th>
+                      <th className="px-5 py-4 text-right"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {safeWebhookEndpoints.length === 0 ? (
                       <tr>
-                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                          Owner
-                        </th>
-                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                          Endpoint
-                        </th>
-                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                          Events
-                        </th>
-                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                          Status
-                        </th>
-                        <th className="px-5 py-4 text-right"></th>
+                        <td
+                          colSpan={5}
+                          className="px-6 py-16 text-center text-sm font-bold text-slate-400"
+                        >
+                          No webhook endpoints registered.
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {safeWebhookEndpoints.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={5}
-                            className="px-6 py-16 text-center text-sm font-bold text-slate-400"
-                          >
-                            No webhook endpoints registered.
+                    ) : (
+                      safeWebhookEndpoints.map((endpoint) => (
+                        <tr
+                          key={endpoint.id}
+                          className="transition-colors hover:bg-slate-50/60"
+                        >
+                          <td className="px-5 py-4">
+                            <p className="font-black text-slate-900">
+                              {endpoint.ownerType}
+                            </p>
+                            <p className="mt-1 font-mono text-[10px] font-bold text-slate-400">
+                              {endpoint.tenantId ?? 'platform'}
+                            </p>
+                          </td>
+                          <td className="px-5 py-4">
+                            <p className="max-w-[300px] truncate font-mono text-xs font-bold text-slate-700">
+                              {endpoint.url}
+                            </p>
+                            <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                              Updated {formatDate(endpoint.updatedAt)}
+                            </p>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div className="flex max-w-xs flex-wrap gap-1.5">
+                              {endpoint.eventTypes.map((event) => (
+                                <Badge
+                                  key={event}
+                                  variant="neutral"
+                                  className="rounded-lg bg-slate-50 font-mono text-[10px]"
+                                >
+                                  {event}
+                                </Badge>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-5 py-4">
+                            <Badge
+                              variant={
+                                endpoint.status === 'ACTIVE'
+                                  ? 'success'
+                                  : 'neutral'
+                              }
+                              className="rounded-lg"
+                            >
+                              {endpoint.status}
+                            </Badge>
+                          </td>
+                          <td className="px-5 py-4 text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="rounded-xl font-bold"
+                              disabled={webhookSaving}
+                              onClick={() => toggleWebhookEndpoint(endpoint)}
+                            >
+                              {endpoint.status === 'ACTIVE'
+                                ? 'Disable'
+                                : 'Enable'}
+                            </Button>
                           </td>
                         </tr>
-                      ) : (
-                        safeWebhookEndpoints.map((endpoint) => (
-                          <tr
-                            key={endpoint.id}
-                            className="transition-colors hover:bg-slate-50/60"
-                          >
-                            <td className="px-5 py-4">
-                              <p className="font-black text-slate-900">
-                                {endpoint.ownerType}
-                              </p>
-                              <p className="mt-1 font-mono text-[10px] font-bold text-slate-400">
-                                {endpoint.tenantId ?? 'platform'}
-                              </p>
-                            </td>
-                            <td className="px-5 py-4">
-                              <p className="max-w-[300px] truncate font-mono text-xs font-bold text-slate-700">
-                                {endpoint.url}
-                              </p>
-                              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                Updated {formatDate(endpoint.updatedAt)}
-                              </p>
-                            </td>
-                            <td className="px-5 py-4">
-                              <div className="flex max-w-xs flex-wrap gap-1.5">
-                                {endpoint.eventTypes.map((event) => (
-                                  <Badge
-                                    key={event}
-                                    variant="neutral"
-                                    className="rounded-lg bg-slate-50 font-mono text-[10px]"
-                                  >
-                                    {event}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </td>
-                            <td className="px-5 py-4">
-                              <Badge
-                                variant={
-                                  endpoint.status === 'ACTIVE'
-                                    ? 'success'
-                                    : 'neutral'
-                                }
-                                className="rounded-lg"
-                              >
-                                {endpoint.status}
-                              </Badge>
-                            </td>
-                            <td className="px-5 py-4 text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="rounded-xl font-bold"
-                                disabled={webhookSaving}
-                                onClick={() => toggleWebhookEndpoint(endpoint)}
-                              >
-                                {endpoint.status === 'ACTIVE'
-                                  ? 'Disable'
-                                  : 'Enable'}
-                              </Button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Surface>
 
-            <Card className="rounded-3xl border-slate-100 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-2xl font-black">
-                  <History className="text-slate-400" size={24} />
-                  Delivery History
-                </CardTitle>
-                <CardDescription>
-                  Payloads are represented by checksums and safe response
-                  summaries only.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <Surface
+              title={
+                <>
+                  <span className="flex items-center gap-2">
+                    <History className="text-slate-400" size={24} />
+                    Delivery History
+                  </span>
+                </>
+              }
+              description="Payloads are represented by checksums and safe response
+                  summaries only."
+            >
+              <div className="space-y-3">
                 {safeWebhookDeliveries.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm font-bold text-slate-400">
                     No delivery records yet.
@@ -1083,8 +1070,8 @@ export default function PlatformSettings() {
                     </div>
                   ))
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </Surface>
           </div>
         </TabsContent>
 
@@ -1094,23 +1081,20 @@ export default function PlatformSettings() {
         >
           <div className="grid gap-6 md:grid-cols-2">
             {safeQueues.map((queue) => (
-              <Card
-                key={queue.name}
-                className="rounded-3xl border-slate-100 shadow-sm overflow-hidden"
-              >
-                <CardHeader className="bg-slate-50/50">
+              <Card key={queue.name} className="overflow-hidden">
+                <div className="bg-slate-50/50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-[var(--color-mod-platform-accent)] text-white shadow-sm">
                         <Server size={20} />
                       </div>
                       <div>
-                        <CardTitle className="text-lg font-black">
+                        <h3 className="text-card-title text-[var(--ink)] text-lg font-black">
                           {queue.name}
-                        </CardTitle>
-                        <CardDescription className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        </h3>
+                        <p className="text-helper text-[var(--muted)] text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                           BullMQ Queue
-                        </CardDescription>
+                        </p>
                       </div>
                     </div>
                     <Badge
@@ -1124,8 +1108,8 @@ export default function PlatformSettings() {
                       {queue.workerHealth.toUpperCase()}
                     </Badge>
                   </div>
-                </CardHeader>
-                <CardContent className="p-6">
+                </div>
+                <div className="p-6">
                   <div className="grid grid-cols-4 gap-4 text-center">
                     <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
                       <p className="text-lg font-black text-slate-900">
@@ -1176,7 +1160,7 @@ export default function PlatformSettings() {
                       history, and audit reason before retry.
                     </div>
                   </div>
-                </CardContent>
+                </div>
               </Card>
             ))}
           </div>
@@ -1277,14 +1261,11 @@ export default function PlatformSettings() {
         >
           <div className="grid gap-8 lg:grid-cols-3">
             {safePlans.map((plan) => (
-              <Card
-                key={plan.id}
-                className="rounded-3xl border-slate-100 shadow-sm relative overflow-hidden group"
-              >
+              <Card key={plan.id} className="relative overflow-hidden group">
                 {plan.key === 'premium' && (
                   <div className="absolute top-0 right-0 h-24 w-24 translate-x-12 -translate-y-12 rotate-45 bg-[var(--color-mod-platform-accent)] shadow-sm" />
                 )}
-                <CardHeader className="p-8">
+                <div className="p-8">
                   <div className="flex items-center justify-between mb-4">
                     <Badge
                       variant="neutral"
@@ -1298,15 +1279,15 @@ export default function PlatformSettings() {
                       <EyeOff className="text-slate-300" size={20} />
                     )}
                   </div>
-                  <CardTitle className="text-3xl font-black text-slate-900">
+                  <h3 className="text-card-title text-[var(--ink)] text-3xl font-black text-slate-900">
                     {plan.name}
-                  </CardTitle>
-                  <CardDescription className="text-lg font-bold text-slate-500 mt-2">
+                  </h3>
+                  <p className="text-helper text-[var(--muted)] text-lg font-bold text-slate-500 mt-2">
                     NPR {parseFloat(plan.priceNpr).toLocaleString()} /{' '}
                     {plan.billingCycle.toLowerCase()}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-8 pt-0">
+                  </p>
+                </div>
+                <div className="p-8 pt-0">
                   <div className="space-y-4 border-t border-slate-100 pt-6">
                     <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
                       Included Modules
@@ -1350,7 +1331,7 @@ export default function PlatformSettings() {
                   >
                     Edit Plan Details
                   </Button>
-                </CardContent>
+                </div>
               </Card>
             ))}
           </div>
@@ -1467,84 +1448,82 @@ export default function PlatformSettings() {
             </div>
           </div>
 
-          <Card className="rounded-3xl border-slate-100 shadow-sm overflow-hidden">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-50/50 border-b border-slate-100">
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Timestamp
-                      </th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Action
-                      </th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Resource
-                      </th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Context
-                      </th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
-                        Actor
-                      </th>
+          <Surface padding="flush">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Timestamp
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Action
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Resource
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Context
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
+                      Actor
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {safeAuditLogs.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-6 py-20 text-center text-slate-400 font-bold"
+                      >
+                        No audit logs match the current filters.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {safeAuditLogs.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="px-6 py-20 text-center text-slate-400 font-bold"
-                        >
-                          No audit logs match the current filters.
+                  ) : (
+                    safeAuditLogs.map((log) => (
+                      <tr
+                        key={log.id}
+                        className="group hover:bg-slate-50/50 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <p className="text-xs font-bold text-slate-900">
+                            {formatDate(log.createdAt)}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <Badge className="rounded-lg font-black text-[10px] bg-indigo-50 text-indigo-700 border-indigo-100 uppercase">
+                            {log.action}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-slate-400 uppercase">
+                              {log.resource}
+                            </span>
+                            <span className="text-xs font-mono font-bold text-slate-700">
+                              {log.resourceId || 'Resource ID not recorded'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-xs font-medium text-slate-500 truncate max-w-[200px]">
+                            {log.after?.reason ||
+                              JSON.stringify(log.after || {})}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="text-xs font-bold text-slate-900">
+                            {log.user?.email || 'System'}
+                          </span>
                         </td>
                       </tr>
-                    ) : (
-                      safeAuditLogs.map((log) => (
-                        <tr
-                          key={log.id}
-                          className="group hover:bg-slate-50/50 transition-colors"
-                        >
-                          <td className="px-6 py-4">
-                            <p className="text-xs font-bold text-slate-900">
-                              {formatDate(log.createdAt)}
-                            </p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <Badge className="rounded-lg font-black text-[10px] bg-indigo-50 text-indigo-700 border-indigo-100 uppercase">
-                              {log.action}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col">
-                              <span className="text-[10px] font-black text-slate-400 uppercase">
-                                {log.resource}
-                              </span>
-                              <span className="text-xs font-mono font-bold text-slate-700">
-                                {log.resourceId || 'Resource ID not recorded'}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-xs font-medium text-slate-500 truncate max-w-[200px]">
-                              {log.after?.reason ||
-                                JSON.stringify(log.after || {})}
-                            </p>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <span className="text-xs font-bold text-slate-900">
-                              {log.user?.email || 'System'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Surface>
         </TabsContent>
 
         <TabsContent
@@ -1623,133 +1602,131 @@ export default function PlatformSettings() {
             </div>
           </div>
 
-          <Card className="rounded-3xl border-slate-100 shadow-sm overflow-hidden">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-50/50 border-b border-slate-100">
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Timestamp
-                      </th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Tenant ID
-                      </th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Module
-                      </th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Report Details
-                      </th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Status
-                      </th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
-                        Action
-                      </th>
+          <Surface padding="flush">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Timestamp
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Tenant ID
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Module
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Report Details
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Status
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {loadingExports ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-20 text-center">
+                        <Loader2 className="h-6 w-6 animate-spin mx-auto text-slate-400" />
+                        <p className="mt-2 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                          Loading exports...
+                        </p>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {loadingExports ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-20 text-center">
-                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-slate-400" />
-                          <p className="mt-2 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                            Loading exports...
+                  ) : reportExports.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className="px-6 py-20 text-center text-slate-400 font-bold"
+                      >
+                        No generated report exports found.
+                      </td>
+                    </tr>
+                  ) : (
+                    reportExports.map((exp) => (
+                      <tr
+                        key={exp.id}
+                        className="group hover:bg-slate-50/50 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <p className="text-xs font-bold text-slate-900">
+                            {formatDate(exp.createdAt)}
                           </p>
                         </td>
-                      </tr>
-                    ) : reportExports.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="px-6 py-20 text-center text-slate-400 font-bold"
-                        >
-                          No generated report exports found.
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-mono font-bold text-slate-700">
+                            {exp.tenantId || 'platform'}
+                          </span>
                         </td>
-                      </tr>
-                    ) : (
-                      reportExports.map((exp) => (
-                        <tr
-                          key={exp.id}
-                          className="group hover:bg-slate-50/50 transition-colors"
-                        >
-                          <td className="px-6 py-4">
-                            <p className="text-xs font-bold text-slate-900">
-                              {formatDate(exp.createdAt)}
-                            </p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="text-xs font-mono font-bold text-slate-700">
-                              {exp.tenantId || 'platform'}
+                        <td className="px-6 py-4">
+                          <Badge className="rounded-lg font-black text-[10px] bg-slate-100 text-slate-600 border-slate-200 uppercase">
+                            {exp.scope}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-slate-800">
+                              {exp.reportKey} ({exp.format})
                             </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <Badge className="rounded-lg font-black text-[10px] bg-slate-100 text-slate-600 border-slate-200 uppercase">
-                              {exp.scope}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col">
-                              <span className="text-xs font-bold text-slate-800">
-                                {exp.reportKey} ({exp.format})
-                              </span>
-                              {exp.requestedBy && (
-                                <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                                  by {exp.requestedBy}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <Badge
-                              variant={
-                                exp.status === 'COMPLETED'
-                                  ? 'success'
-                                  : exp.status === 'FAILED'
-                                    ? 'destructive'
-                                    : 'neutral'
-                              }
-                              className="rounded-lg font-black text-[10px]"
-                            >
-                              {exp.status}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            {exp.fileAssetId && exp.status === 'COMPLETED' ? (
-                              <button
-                                type="button"
-                                className="text-xs font-black text-[var(--color-mod-platform-accent)] hover:text-[var(--color-mod-platform-text)] uppercase tracking-widest transition-colors"
-                                onClick={() =>
-                                  downloadExport(
-                                    exp.fileAssetId,
-                                    `${exp.reportKey || 'platform-report'}.${exp.format || 'bin'}`,
-                                  )
-                                }
-                              >
-                                Download
-                              </button>
-                            ) : exp.errorSummary ? (
-                              <span
-                                className="text-xs text-rose-500 font-semibold"
-                                title={exp.errorSummary}
-                              >
-                                Error
-                              </span>
-                            ) : (
-                              <span className="text-xs text-slate-400 font-semibold">
-                                Export file unavailable
+                            {exp.requestedBy && (
+                              <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                by {exp.requestedBy}
                               </span>
                             )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <Badge
+                            variant={
+                              exp.status === 'COMPLETED'
+                                ? 'success'
+                                : exp.status === 'FAILED'
+                                  ? 'destructive'
+                                  : 'neutral'
+                            }
+                            className="rounded-lg font-black text-[10px]"
+                          >
+                            {exp.status}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {exp.fileAssetId && exp.status === 'COMPLETED' ? (
+                            <button
+                              type="button"
+                              className="text-xs font-black text-[var(--color-mod-platform-accent)] hover:text-[var(--color-mod-platform-text)] uppercase tracking-widest transition-colors"
+                              onClick={() =>
+                                downloadExport(
+                                  exp.fileAssetId,
+                                  `${exp.reportKey || 'platform-report'}.${exp.format || 'bin'}`,
+                                )
+                              }
+                            >
+                              Download
+                            </button>
+                          ) : exp.errorSummary ? (
+                            <span
+                              className="text-xs text-rose-500 font-semibold"
+                              title={exp.errorSummary}
+                            >
+                              Error
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400 font-semibold">
+                              Export file unavailable
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Surface>
         </TabsContent>
       </Tabs>
 

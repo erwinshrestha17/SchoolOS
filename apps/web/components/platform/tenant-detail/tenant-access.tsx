@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ExternalLink,
@@ -15,13 +16,6 @@ import {
 } from '@schoolos/core';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -138,22 +132,23 @@ export function TenantAccess() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {canChangeStatus ? (
-          <Card className="rounded-3xl border-slate-100 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl font-black">
-                {tenant.isActive ? (
-                  <Shield size={20} />
-                ) : (
-                  <ShieldOff size={20} />
-                )}
-                School access state
-              </CardTitle>
-              <CardDescription>
-                Suspension fails closed for school users. Restoring access is
-                also audited.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
+          <Surface
+            title={
+              <>
+                <span className="flex items-center gap-2">
+                  {tenant.isActive ? (
+                    <Shield size={20} />
+                  ) : (
+                    <ShieldOff size={20} />
+                  )}
+                  School access state
+                </span>
+              </>
+            }
+            description="Suspension fails closed for school users. Restoring access is
+                also audited."
+          >
+            <div className="space-y-5">
               <Badge variant={tenant.isActive ? 'success' : 'destructive'}>
                 {tenant.isActive ? 'ACTIVE' : 'SUSPENDED'}
               </Badge>
@@ -169,121 +164,117 @@ export function TenantAccess() {
                 )}
                 {tenant.isActive ? 'Suspend school' : 'Restore access'}
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </Surface>
         ) : null}
 
         {canEnterSupportMode ? (
-          <Card className="rounded-3xl border-slate-100 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl font-black">
-                <ExternalLink size={20} /> Support override
-              </CardTitle>
-              <CardDescription>
-                Enter the school workspace only through a reasoned, expiring
-                backend override.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                variant="outline"
-                className="w-full rounded-2xl border-slate-200 font-bold"
-                onClick={() => setSupportDialogOpen(true)}
-                data-testid="support-mode-button"
-              >
-                Enter support mode
-              </Button>
-            </CardContent>
-          </Card>
+          <Surface
+            title={
+              <>
+                <span className="flex items-center gap-2">
+                  <ExternalLink size={20} /> Support override
+                </span>
+              </>
+            }
+            description="Enter the school workspace only through a reasoned, expiring
+                backend override."
+          >
+            <Button
+              variant="outline"
+              className="w-full rounded-2xl border-slate-200 font-bold"
+              onClick={() => setSupportDialogOpen(true)}
+              data-testid="support-mode-button"
+            >
+              Enter support mode
+            </Button>
+          </Surface>
         ) : null}
       </div>
 
       {canReadAudit ? (
-        <Card className="rounded-3xl border-slate-100 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl font-black">
-              <History size={20} /> Support override history
-            </CardTitle>
-            <CardDescription>
-              Backend-reported sessions, including expiry and current state.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto rounded-2xl border border-slate-100">
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="border-b border-slate-100 bg-slate-50">
-                  <tr>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Operator
-                    </th>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Reason
-                    </th>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Access
-                    </th>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Expires
-                    </th>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {(tenant.supportOverrideHistory ?? []).length ? (
-                    tenant.supportOverrideHistory?.map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-5 py-4 text-xs font-bold text-slate-900">
-                          {item.platformUserEmail ?? item.platformUserId}
-                        </td>
-                        <td className="px-5 py-4 text-slate-600">
-                          {item.reason}
-                        </td>
-                        <td className="px-5 py-4 text-slate-600">
-                          <span className="font-semibold">Read only</span>
-                          <span className="mt-1 block text-xs text-slate-500">
-                            {item.permissionScopes
-                              .map(
-                                (scope) =>
-                                  SUPPORT_OVERRIDE_SCOPE_DEFINITIONS.find(
-                                    ({ key }) => key === scope,
-                                  )?.label ?? scope,
-                              )
-                              .join(', ') || 'Legacy unscoped session'}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-slate-600">
-                          {formatDateTime(item.expiresAt)}
-                        </td>
-                        <td className="px-5 py-4">
-                          <Badge
-                            variant={item.isActive ? 'success' : 'neutral'}
-                          >
-                            {item.isActive
-                              ? 'ACTIVE'
-                              : new Date(item.expiresAt).getTime() <= Date.now()
-                                ? 'EXPIRED'
-                                : 'ENDED'}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-5 py-12 text-center font-semibold text-slate-400"
-                      >
-                        No support overrides recorded.
+        <Surface
+          title={
+            <>
+              <span className="flex items-center gap-2">
+                <History size={20} /> Support override history
+              </span>
+            </>
+          }
+          description="Backend-reported sessions, including expiry and current state."
+        >
+          <div className="overflow-x-auto rounded-2xl border border-slate-100">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="border-b border-slate-100 bg-slate-50">
+                <tr>
+                  <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Operator
+                  </th>
+                  <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Reason
+                  </th>
+                  <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Access
+                  </th>
+                  <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Expires
+                  </th>
+                  <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {(tenant.supportOverrideHistory ?? []).length ? (
+                  tenant.supportOverrideHistory?.map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-5 py-4 text-xs font-bold text-slate-900">
+                        {item.platformUserEmail ?? item.platformUserId}
+                      </td>
+                      <td className="px-5 py-4 text-slate-600">
+                        {item.reason}
+                      </td>
+                      <td className="px-5 py-4 text-slate-600">
+                        <span className="font-semibold">Read only</span>
+                        <span className="mt-1 block text-xs text-slate-500">
+                          {item.permissionScopes
+                            .map(
+                              (scope) =>
+                                SUPPORT_OVERRIDE_SCOPE_DEFINITIONS.find(
+                                  ({ key }) => key === scope,
+                                )?.label ?? scope,
+                            )
+                            .join(', ') || 'Legacy unscoped session'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-slate-600">
+                        {formatDateTime(item.expiresAt)}
+                      </td>
+                      <td className="px-5 py-4">
+                        <Badge variant={item.isActive ? 'success' : 'neutral'}>
+                          {item.isActive
+                            ? 'ACTIVE'
+                            : new Date(item.expiresAt).getTime() <= Date.now()
+                              ? 'EXPIRED'
+                              : 'ENDED'}
+                        </Badge>
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-5 py-12 text-center font-semibold text-slate-400"
+                    >
+                      No support overrides recorded.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Surface>
       ) : null}
 
       {canChangeStatus ? (

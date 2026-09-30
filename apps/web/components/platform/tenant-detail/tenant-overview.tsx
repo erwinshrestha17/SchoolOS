@@ -1,17 +1,11 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { formatBsDate } from '@schoolos/core';
 import { AlertTriangle, ArrowRight, Database, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from '@/components/session-provider';
 import { Badge } from '@/components/ui/badge';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { hasAllPermissions, hasPermission } from '@/lib/session';
 import { useTenantDetail } from './tenant-detail-page';
 import { tenantSectionHref } from './tenant-detail-routes';
@@ -138,14 +132,11 @@ export function TenantOverview() {
         ) : null}
       </div>
 
-      <Card className="rounded-3xl border-slate-100 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-xl font-black">Tenant record</CardTitle>
-          <CardDescription>
-            Stable identifiers and registration context.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
+      <Surface
+        title="Tenant record"
+        description="Stable identifiers and registration context."
+      >
+        <div className="grid gap-4 sm:grid-cols-3">
           <RecordValue label="Plan key" value={tenant.plan || 'Not assigned'} />
           {canReadBilling ? (
             <RecordValue
@@ -157,8 +148,8 @@ export function TenantOverview() {
             label="Registered"
             value={formatDate(tenant.createdAt)}
           />
-        </CardContent>
-      </Card>
+        </div>
+      </Surface>
     </div>
   );
 }
@@ -199,10 +190,10 @@ function AttentionCard({
   needsAttention: boolean;
 }) {
   return (
-    <Card
+    <Surface
       className={`rounded-3xl shadow-sm ${needsAttention ? 'border-amber-200' : 'border-slate-100'}`}
     >
-      <CardContent className="flex items-start justify-between gap-5 p-6">
+      <div className="flex items-start justify-between gap-5">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-black text-slate-900">{title}</h3>
@@ -223,8 +214,8 @@ function AttentionCard({
             <ArrowRight size={18} />
           )}
         </Link>
-      </CardContent>
-    </Card>
+      </div>
+    </Surface>
   );
 }
 

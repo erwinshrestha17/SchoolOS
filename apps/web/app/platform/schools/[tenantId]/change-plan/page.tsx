@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import {
   getNepalSchoolDay,
   type PlatformPlanSummary,
@@ -20,13 +21,6 @@ import { PermissionDenied } from '@/components/platform/PermissionDenied';
 import { useSession } from '@/components/session-provider';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -208,8 +202,8 @@ export default function PlatformChangePlanPage() {
             SaaS billing only and does not affect school fee collection.
           </p>
         </div>
-        <Card className="min-w-[260px] rounded-3xl border-slate-100 shadow-sm">
-          <CardContent className="p-5">
+        <Surface className="min-w-[260px]">
+          <div className="p-5">
             <p className="text-xs font-black uppercase tracking-widest text-slate-400">
               Current plan
             </p>
@@ -237,8 +231,8 @@ export default function PlatformChangePlanPage() {
                 </dd>
               </div>
             </dl>
-          </CardContent>
-        </Card>
+          </div>
+        </Surface>
       </header>
 
       {error && (
@@ -254,17 +248,18 @@ export default function PlatformChangePlanPage() {
       )}
 
       <div className="grid gap-8 lg:grid-cols-[1.4fr_0.9fr]">
-        <Card className="rounded-3xl border-slate-100 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl font-black">
-              <CreditCard className="text-slate-400" size={22} />
-              New subscription
-            </CardTitle>
-            <CardDescription>
-              Choose the new plan and effective subscription dates.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <Surface
+          title={
+            <>
+              <span className="flex items-center gap-2">
+                <CreditCard className="text-slate-400" size={22} />
+                New subscription
+              </span>
+            </>
+          }
+          description="Choose the new plan and effective subscription dates."
+        >
+          <div className="space-y-6">
             <div className="space-y-2">
               <Label className="font-bold text-slate-700">Plan</Label>
               <select
@@ -361,19 +356,14 @@ export default function PlatformChangePlanPage() {
                 Change Plan
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Surface>
 
-        <Card className="rounded-3xl border-slate-100 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg font-black">
-              Selected plan preview
-            </CardTitle>
-            <CardDescription>
-              Plan features and usage limits come from platform settings.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
+        <Surface
+          title="Selected plan preview"
+          description="Plan features and usage limits come from platform settings."
+        >
+          <div className="space-y-5">
             {selectedPlan ? (
               <>
                 <div className="grid gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm sm:grid-cols-2">
@@ -457,8 +447,8 @@ export default function PlatformChangePlanPage() {
                   : 'Select a plan to preview details.'}
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </Surface>
       </div>
     </div>
   );

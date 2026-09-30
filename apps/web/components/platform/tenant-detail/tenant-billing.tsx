@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import {
   formatBsDate,
   getNepalSchoolDay,
@@ -15,13 +16,6 @@ import {
 } from '@/app/platform/_components/platform-operator-states';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -260,150 +254,144 @@ export function TenantBilling() {
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-        <Card className="rounded-3xl border-slate-100 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl font-black">
-              <CreditCard size={20} /> Subscription invoices
-            </CardTitle>
-            <CardDescription>
-              Real platform billing records returned for this tenant.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <PlatformSectionSkeleton rows={5} />
-            ) : loadError ? (
-              <PlatformInlineError
-                title="SaaS invoices unavailable"
-                message={loadError}
-                onRetry={() => void loadInvoices()}
-              />
-            ) : invoices.length === 0 ? (
-              <PlatformEmptyState
-                icon={FileClock}
-                title="No SaaS invoices yet"
-                description="Create the first SchoolOS subscription invoice when billing is approved."
-              />
-            ) : (
-              <div className="overflow-x-auto rounded-2xl border border-slate-100">
-                <table className="w-full min-w-[780px] text-left text-sm">
-                  <thead className="border-b border-slate-100 bg-slate-50">
-                    <tr>
-                      <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        Invoice
-                      </th>
-                      <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        Issued
-                      </th>
-                      <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        Amount
-                      </th>
-                      <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        Balance
-                      </th>
-                      <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        Status
-                      </th>
-                      <th className="px-5 py-4">
-                        <span className="sr-only">Actions</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {invoices.map((invoice) => (
-                      <tr key={invoice.id}>
-                        <td className="px-5 py-4 font-mono text-xs font-black text-slate-900">
-                          {invoice.invoiceNumber}
-                        </td>
-                        <td className="px-5 py-4 text-slate-600">
-                          {formatDate(invoice.issueDate)}
-                        </td>
-                        <td className="px-5 py-4 font-black text-slate-900">
-                          {formatMoney(invoice.currency, invoice.amount)}
-                        </td>
-                        <td className="px-5 py-4 font-black text-slate-900">
-                          {formatMoney(invoice.currency, invoice.balanceAmount)}
-                        </td>
-                        <td className="px-5 py-4">
-                          <Badge
-                            variant={
-                              invoice.status === 'PAID'
-                                ? 'success'
-                                : invoice.status === 'OVERDUE'
-                                  ? 'destructive'
-                                  : 'neutral'
+        <Surface
+          title={
+            <>
+              <span className="flex items-center gap-2">
+                <CreditCard size={20} /> Subscription invoices
+              </span>
+            </>
+          }
+          description="Real platform billing records returned for this tenant."
+        >
+          {loading ? (
+            <PlatformSectionSkeleton rows={5} />
+          ) : loadError ? (
+            <PlatformInlineError
+              title="SaaS invoices unavailable"
+              message={loadError}
+              onRetry={() => void loadInvoices()}
+            />
+          ) : invoices.length === 0 ? (
+            <PlatformEmptyState
+              icon={FileClock}
+              title="No SaaS invoices yet"
+              description="Create the first SchoolOS subscription invoice when billing is approved."
+            />
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-slate-100">
+              <table className="w-full min-w-[780px] text-left text-sm">
+                <thead className="border-b border-slate-100 bg-slate-50">
+                  <tr>
+                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Invoice
+                    </th>
+                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Issued
+                    </th>
+                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Amount
+                    </th>
+                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Balance
+                    </th>
+                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Status
+                    </th>
+                    <th className="px-5 py-4">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {invoices.map((invoice) => (
+                    <tr key={invoice.id}>
+                      <td className="px-5 py-4 font-mono text-xs font-black text-slate-900">
+                        {invoice.invoiceNumber}
+                      </td>
+                      <td className="px-5 py-4 text-slate-600">
+                        {formatDate(invoice.issueDate)}
+                      </td>
+                      <td className="px-5 py-4 font-black text-slate-900">
+                        {formatMoney(invoice.currency, invoice.amount)}
+                      </td>
+                      <td className="px-5 py-4 font-black text-slate-900">
+                        {formatMoney(invoice.currency, invoice.balanceAmount)}
+                      </td>
+                      <td className="px-5 py-4">
+                        <Badge
+                          variant={
+                            invoice.status === 'PAID'
+                              ? 'success'
+                              : invoice.status === 'OVERDUE'
+                                ? 'destructive'
+                                : 'neutral'
+                          }
+                        >
+                          {invoice.status}
+                        </Badge>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setInvoiceAction({ mode: 'view', invoice })
                             }
                           >
-                            {invoice.status}
-                          </Badge>
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex justify-end gap-2">
+                            View
+                          </Button>
+                          {canManageBilling ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={
+                                invoice.status === 'PAID' ||
+                                invoice.status === 'CANCELLED'
+                              }
+                              onClick={() => {
+                                setPaymentForm({
+                                  ...makeDefaultPaymentForm(),
+                                  amount: invoice.balanceAmount,
+                                });
+                                setInvoiceAction({
+                                  mode: 'payment',
+                                  invoice,
+                                });
+                              }}
+                            >
+                              Payment
+                            </Button>
+                          ) : null}
+                          {canManageBilling ? (
                             <Button
                               variant="ghost"
                               size="sm"
+                              className="text-rose-700"
+                              disabled={
+                                invoice.status === 'PAID' ||
+                                invoice.status === 'CANCELLED'
+                              }
                               onClick={() =>
-                                setInvoiceAction({ mode: 'view', invoice })
+                                setInvoiceAction({ mode: 'cancel', invoice })
                               }
                             >
-                              View
+                              Cancel
                             </Button>
-                            {canManageBilling ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={
-                                  invoice.status === 'PAID' ||
-                                  invoice.status === 'CANCELLED'
-                                }
-                                onClick={() => {
-                                  setPaymentForm({
-                                    ...makeDefaultPaymentForm(),
-                                    amount: invoice.balanceAmount,
-                                  });
-                                  setInvoiceAction({
-                                    mode: 'payment',
-                                    invoice,
-                                  });
-                                }}
-                              >
-                                Payment
-                              </Button>
-                            ) : null}
-                            {canManageBilling ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-rose-700"
-                                disabled={
-                                  invoice.status === 'PAID' ||
-                                  invoice.status === 'CANCELLED'
-                                }
-                                onClick={() =>
-                                  setInvoiceAction({ mode: 'cancel', invoice })
-                                }
-                              >
-                                Cancel
-                              </Button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Surface>
 
-        <Card className="h-fit rounded-3xl border-slate-100 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl font-black">
-              Billing profile
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
+        <Surface className="h-fit" title="Billing profile">
+          <div className="space-y-5">
             <ProfileValue
               label="Billing email"
               value={
@@ -430,8 +418,8 @@ export function TenantBilling() {
                 Update profile
               </Button>
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </Surface>
       </div>
 
       {canManageBilling ? (

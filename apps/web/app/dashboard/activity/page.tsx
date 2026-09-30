@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface, PaginatedDataTable } from '@/components/schoolos';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -13,6 +14,7 @@ import {
   MessageSquare,
   Plus,
   RotateCcw,
+  SearchX,
   ShieldAlert,
   Smile,
   Target,
@@ -29,7 +31,6 @@ import { DashboardPageShell } from '../../../components/dashboard/dashboard-page
 import { ModuleHeader } from '../../../components/ui/module-header';
 import { WorkspaceTabs } from '../../../components/ui/module-tabs';
 import { FilterBar } from '../../../components/ui/filter-bar';
-import { DataTable } from '../../../components/ui/data-table';
 import { StatusBadge } from '../../../components/ui/status-badge';
 import { Select } from '../../../components/ui/form-field';
 import { Button } from '../../../components/ui/button';
@@ -38,8 +39,6 @@ import { ErrorState } from '../../../components/ui/error-state';
 import { LoadingState } from '../../../components/ui/loading-state';
 import { OperationalSummaryGrid } from '../../../components/ui/operational-summary-grid';
 import { OffsetPagination } from '../../../components/ui/table-pagination';
-import { WorkSurface } from '../../../components/ui/work-surface';
-import { NoResultsState } from '../../../components/ui/workspace-states';
 
 const activityCategories = activityCategoryValues;
 const pageSize = 20;
@@ -343,11 +342,10 @@ export default function ActivityPage() {
         />
       </FilterBar>
 
-      <WorkSurface
+      <Surface
         title="Activity monitoring"
         description="Consent-aware activity records returned by the server, most recent first."
-        variant="table"
-        flush
+        padding="flush"
         footer={
           posts.length > 0 ? (
             <OffsetPagination
@@ -371,9 +369,16 @@ export default function ActivityPage() {
             onRetry={() => void postsQuery.refetch()}
           />
         ) : posts.length === 0 && hasActiveFilters ? (
-          <NoResultsState
+          <EmptyState
+            title="No results found"
             description="No activity posts match the selected server filters."
-            onReset={resetFilters}
+            icon={<SearchX className="h-7 w-7" aria-hidden />}
+            action={
+              <Button type="button" variant="outline" onClick={resetFilters}>
+                <RotateCcw className="h-4 w-4" aria-hidden />
+                Reset filters
+              </Button>
+            }
           />
         ) : posts.length === 0 ? (
           <EmptyState
@@ -381,10 +386,11 @@ export default function ActivityPage() {
             description="Create the first classroom activity with consent-aware media to begin the feed."
           />
         ) : (
-          <DataTable
+          <PaginatedDataTable
             className="rounded-none border-0"
             columns={[
               {
+                id: 'title',
                 header: 'Title',
                 cell: (post) => (
                   <Link
@@ -396,6 +402,7 @@ export default function ActivityPage() {
                 ),
               },
               {
+                id: 'class-section',
                 header: 'Class / Section',
                 cell: (post) =>
                   `${classNameById.get(post.classId ?? '') ?? 'Class not recorded'}${
@@ -405,14 +412,17 @@ export default function ActivityPage() {
                   }`,
               },
               {
+                id: 'category',
                 header: 'Category',
                 cell: (post) => formatEnumLabel(post.category),
               },
               {
+                id: 'status',
                 header: 'Status',
                 cell: (post) => <StatusBadge status={post.status ?? 'DRAFT'} />,
               },
               {
+                id: 'visibility',
                 header: 'Visibility',
                 cell: (post) =>
                   post.parentVisible === false ? (
@@ -430,6 +440,7 @@ export default function ActivityPage() {
                   ),
               },
               {
+                id: 'published',
                 header: 'Published',
                 cell: (post) =>
                   post.publishedAt
@@ -437,11 +448,12 @@ export default function ActivityPage() {
                     : 'Draft',
               },
             ]}
-            data={posts}
-            getRowKey={(post) => post.id}
+            items={posts}
+            getRowId={(post) => post.id}
+            completeList
           />
         )}
-      </WorkSurface>
+      </Surface>
     </DashboardPageShell>
   );
 }

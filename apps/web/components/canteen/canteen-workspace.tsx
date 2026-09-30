@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -28,7 +29,6 @@ import {
 } from '../../lib/canteen-api';
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
-import { WorkSurface } from '../ui/work-surface';
 import { StatusBadge, type StatusTone } from '../ui/status-badge';
 import { cn } from '../../lib/utils';
 import { RemoteStudentSelector } from '../students/remote-student-selector';
@@ -670,16 +670,15 @@ export function CanteenWorkspace({ activeTab }: CanteenWorkspaceProps) {
             <LowBalanceList wallets={lowBalanceWallets.slice(0, 5)} />
           ) : null}
           {canReadPos ? (
-            <WorkSurface
+            <Surface
               title="Recent POS sales"
               description="Review the most recently recorded sales, wallet payments, and receipt totals."
-              variant="transaction"
             >
               <SaleList
                 sales={sales.slice(0, 5)}
                 emptyTitle="No recent POS sales"
               />
-            </WorkSurface>
+            </Surface>
           ) : null}
         </div>
       )}
@@ -2274,9 +2273,9 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <WorkSurface title={title} description={description} variant="transaction">
+    <Surface title={title} description={description}>
       {children}
-    </WorkSurface>
+    </Surface>
   );
 }
 function Notice({

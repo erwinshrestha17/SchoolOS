@@ -1,5 +1,6 @@
 'use client';
 
+import { PaginatedDataTable } from '@/components/schoolos';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatBsDateTime, type ActivityPost } from '@schoolos/core';
@@ -7,7 +8,6 @@ import { api } from '../../../../lib/api';
 import { DashboardPageShell } from '../../../../components/dashboard/dashboard-page-shell';
 import { PageHeader } from '../../../../components/ui/page-header';
 import { FilterBar } from '../../../../components/ui/filter-bar';
-import { DataTable } from '../../../../components/ui/data-table';
 import { StatusBadge } from '../../../../components/ui/status-badge';
 import { Select } from '../../../../components/ui/form-field';
 import { Drawer } from '../../../../components/ui/drawer';
@@ -146,34 +146,50 @@ export default function ActivityModerationPage() {
         />
       </FilterBar>
 
-      <DataTable
+      <PaginatedDataTable
         columns={[
-          { header: 'Title', accessorKey: 'title' },
           {
+            id: 'title',
+            header: 'Title',
+            cell: (row) => row.title ?? '',
+          },
+          {
+            id: 'category',
             header: 'Category',
             cell: (post) => formatEnumLabel(post.category),
           },
           {
+            id: 'status',
             header: 'Status',
             cell: (post) => <StatusBadge status={post.status ?? 'DRAFT'} />,
           },
           {
+            id: 'published',
             header: 'Published',
             cell: (post) =>
               post.publishedAt ? formatBsDateTime(post.publishedAt) : 'Not yet',
           },
           {
+            id: 'tagged-students',
             header: 'Tagged students',
             cell: (post) => post.studentTags.length,
           },
         ]}
-        data={posts}
-        isLoading={postsQuery.isLoading}
-        error={postsQuery.isError ? postsQuery.error : null}
+        items={posts}
         emptyTitle="Nothing in this queue"
-        emptyMessage="No activity posts match the selected status and filters."
+        emptyDescription="No activity posts match the selected status and filters."
         onRowClick={(post) => setSelectedPostId(post.id)}
-        getRowKey={(post) => post.id}
+        getRowId={(post) => post.id}
+        status={
+          postsQuery.isError
+            ? 'error'
+            : postsQuery.isLoading
+              ? 'loading'
+              : 'ready'
+        }
+        errorMessage={postsQuery.error?.message}
+        onRetry={() => void postsQuery.refetch()}
+        completeList
       />
 
       {selectedPost ? (

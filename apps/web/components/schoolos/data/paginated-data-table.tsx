@@ -61,7 +61,8 @@ export type PaginatedDataTableStatus =
 /**
  * Server-owned pagination metadata — never inferred from loaded rows. A list
  * the server returns whole (a bounded configuration list, one homework's
- * submissions) declares `completeList` instead and shows no pager.
+ * submissions), or one page of an offset feed whose caller renders the
+ * pager (no server total), declares `completeList` and shows no pager.
  */
 type PaginationProps =
   | {

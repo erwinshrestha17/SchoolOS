@@ -140,7 +140,7 @@ describe('Phase 3B Library frontend contracts', () => {
 
     assert.match(workspace, /<SummaryGrid/);
     assert.match(workspace, /<SummaryCard/);
-    assert.match(workspace, /<WorkSurface/);
+    assert.match(workspace, /<Surface\b/);
     assert.match(workspace, /status: ['"]ISSUED['"]/);
     assert.match(workspace, /activeLoansQuery\.data\?\.meta\.total/);
     assert.match(workspace, /reservationsQuery\.data\?\.meta\.total/);

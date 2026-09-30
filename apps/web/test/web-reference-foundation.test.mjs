@@ -123,7 +123,7 @@ describe('reference dashboard foundation', () => {
     );
     assert.equal((noticesWorkspace.match(/<SummaryCard/g) ?? []).length, 4);
     assert.match(noticesWorkspace, /<WorkspaceTabs/);
-    assert.match(noticesWorkspace, /<WorkSurface/);
+    assert.match(noticesWorkspace, /<Surface\b/);
     assert.doesNotMatch(noticesWorkspace, /provider-diagnostics/);
     assert.doesNotMatch(noticesWorkspace, /title=['"]Provider Status['"]/);
     assert.doesNotMatch(noticesWorkspace, /setTimeout|setInterval/);

@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -9,7 +10,6 @@ import { DashboardPageShell } from '../dashboard/dashboard-page-shell';
 import { CommunicationsForm } from '../forms/communications-form';
 import { NoticeDetailLinksPanel } from '../forms/notice-detail-links-panel';
 import { SummaryCard, SummaryGrid } from '../ui/summary-card';
-import { WorkSurface } from '../ui/work-surface';
 import { ModuleHeader } from '../ui/module-header';
 import { WorkspaceTabs } from '../ui/module-tabs';
 import {
@@ -187,15 +187,14 @@ function SchoolNoticesWorkspace({
       />
 
       <div className="space-y-6">
-        <WorkSurface
+        <Surface
           title={variant === 'composer' ? 'Notice composer' : initialSection}
           description={
             variant === 'composer'
               ? 'Build the audience, preview recipients, and save the reviewed draft.'
               : 'Create and review official school notices from one workspace.'
           }
-          variant={variant === 'composer' ? 'builder' : 'queue'}
-          flush
+          padding="flush"
         >
           {variant === 'composer' ? (
             <NoticeComposerWorkspace />
@@ -207,7 +206,7 @@ function SchoolNoticesWorkspace({
           ) : (
             <NoticeListWorkspace />
           )}
-        </WorkSurface>
+        </Surface>
         {variant === 'overview' ? (
           <>
             <NoticeDetailLinksPanel />

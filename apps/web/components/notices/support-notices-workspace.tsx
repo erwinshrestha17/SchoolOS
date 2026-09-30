@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Send, Settings } from 'lucide-react';
 
@@ -8,7 +9,6 @@ import { DashboardPageShell } from '../dashboard/dashboard-page-shell';
 import { ModuleHeader } from '../ui/module-header';
 import { WorkspaceTabs } from '../ui/module-tabs';
 import { SummaryCard, SummaryGrid } from '../ui/summary-card';
-import { WorkSurface } from '../ui/work-surface';
 import { NoticeListWorkspace } from './notice-list-workspace';
 
 export function SupportNoticesWorkspace() {
@@ -69,14 +69,13 @@ export function SupportNoticesWorkspace() {
         ]}
       />
 
-      <WorkSurface
+      <Surface
         title="Published notices"
         description="Published notice content and masked delivery evidence only."
-        variant="queue"
-        flush
+        padding="flush"
       >
         <NoticeListWorkspace />
-      </WorkSurface>
+      </Surface>
     </DashboardPageShell>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Download, Package } from 'lucide-react';
@@ -8,7 +9,6 @@ import { canteenApi } from '../../lib/canteen-api';
 import { EmptyState } from '../ui/empty-state';
 import { ErrorState } from '../ui/error-state';
 import { LoadingState } from '../ui/loading-state';
-import { WorkSurface } from '../ui/work-surface';
 
 const today = getNepalSchoolDay().gregorianDate;
 const moneyFormatter = new Intl.NumberFormat('en-NP', {
@@ -111,10 +111,9 @@ export function CanteenReportsWorkspace() {
         />
       ) : null}
 
-      <WorkSurface
+      <Surface
         title="Report filters"
         description="Review recorded totals and download CSV exports for the selected dates."
-        variant="form"
       >
         <div className="grid gap-4 lg:grid-cols-3">
           <DateInput
@@ -165,7 +164,7 @@ export function CanteenReportsWorkspace() {
         {itemSalesCsvMutation.error ? (
           <InlineError message={itemSalesCsvMutation.error.message} />
         ) : null}
-      </WorkSurface>
+      </Surface>
 
       <div className="grid gap-6 xl:grid-cols-3">
         <ReportPanel
@@ -193,10 +192,9 @@ export function CanteenReportsWorkspace() {
         />
       </div>
 
-      <WorkSurface
+      <Surface
         title="Low-balance wallets"
         description="Students whose wallet balance is at or below their alert threshold."
-        variant="queue"
       >
         {lowBalanceQuery.isLoading ? (
           <LoadingState label="Loading low-balance wallets..." />
@@ -223,12 +221,11 @@ export function CanteenReportsWorkspace() {
             description="No student wallet is currently at or below its alert threshold."
           />
         )}
-      </WorkSurface>
+      </Surface>
 
-      <WorkSurface
+      <Surface
         title="Stock ledger"
         description="Review recent stock movements for the selected dates."
-        variant="table"
       >
         {stockLedgerQuery.isLoading ? (
           <LoadingState label="Loading stock ledger..." />
@@ -277,7 +274,7 @@ export function CanteenReportsWorkspace() {
             ))}
           </div>
         )}
-      </WorkSurface>
+      </Surface>
     </div>
   );
 }
@@ -292,10 +289,9 @@ function ReportPanel({
   rows: string[];
 }) {
   return (
-    <WorkSurface
+    <Surface
       title={title}
       description="School records for the selected filters."
-      variant="monitoring"
     >
       {loading ? (
         <LoadingState label="Loading report..." />
@@ -313,7 +309,7 @@ function ReportPanel({
       ) : (
         <EmptyState title="No data" description="No report rows returned." />
       )}
-    </WorkSurface>
+    </Surface>
   );
 }
 

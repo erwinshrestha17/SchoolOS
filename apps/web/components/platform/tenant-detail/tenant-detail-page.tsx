@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type { PlatformTenantDetail } from '@schoolos/core';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';

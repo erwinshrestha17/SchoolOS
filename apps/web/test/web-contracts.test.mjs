@@ -2317,7 +2317,7 @@ describe('SchoolOS web production contracts', () => {
       assert.ok(transportLayout.includes(marker), `Missing marker: ${marker}`);
     }
 
-    for (const marker of ['SummaryGrid', 'SummaryCard', 'WorkSurface']) {
+    for (const marker of ['SummaryGrid', 'SummaryCard', '<Surface']) {
       assert.ok(
         transportWorkspace.includes(marker),
         `Missing marker: ${marker}`,
@@ -2632,7 +2632,7 @@ describe('SchoolOS web production contracts', () => {
       'OperationalSummaryGrid',
       'WorkspaceTabs',
       'FilterBar',
-      'WorkSurface',
+      '<Surface',
     ]) {
       assert.match(landing, new RegExp(sharedPrimitive));
     }
@@ -2824,7 +2824,7 @@ describe('SchoolOS web production contracts', () => {
       '<SummaryGrid',
       '<SummaryCard',
       '<WorkspaceTabs',
-      '<WorkSurface',
+      '<Surface',
       'New notice',
       'moreActionItems',
       'communicationsApi.getCommunicationsSummary',

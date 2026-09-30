@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import {
   formatBsDate,
   type PlatformApiKeyCreated,
@@ -13,13 +14,6 @@ import {
 } from '@/app/platform/_components/platform-operator-states';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -168,138 +162,133 @@ export function TenantApiKeys() {
       ) : null}
 
       {canManageApiKeys && createdKey ? (
-        <Card className="rounded-3xl border-emerald-200 bg-emerald-50 shadow-sm">
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-xl font-black text-emerald-950">
+        <Surface
+          className="-emerald-200 bg-emerald-50"
+          title={
+            <>
+              <span className="flex items-center gap-2">
                 <KeyRound size={20} />
                 One-time API key secret
-              </CardTitle>
-              <CardDescription className="text-emerald-800">
-                Store this secret now. SchoolOS retains only the hashed key and
-                cannot reveal it again.
-              </CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              className="bg-white font-bold text-emerald-800"
-              onClick={() => void copySecret()}
-            >
-              <Copy className="mr-2" size={16} />
-              Copy secret
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="break-all rounded-2xl border border-emerald-200 bg-white p-4 font-mono text-sm font-bold text-slate-900">
-              {createdKey.secret}
-            </div>
-            <p className="mt-3 text-xs font-bold text-emerald-900">
-              {createdKey.name} · {createdKey.keyPreview} ·{' '}
-              {createdKey.scopes.join(', ') || 'default scopes'}
-            </p>
-          </CardContent>
-        </Card>
+              </span>
+            </>
+          }
+          description="Store this secret now. SchoolOS retains only the hashed key and
+                cannot reveal it again."
+          actions={
+            <>
+              <Button
+                variant="outline"
+                className="bg-white font-bold text-emerald-800"
+                onClick={() => void copySecret()}
+              >
+                <Copy className="mr-2" size={16} />
+                Copy secret
+              </Button>
+            </>
+          }
+        >
+          <div className="break-all rounded-2xl border border-emerald-200 bg-white p-4 font-mono text-sm font-bold text-slate-900">
+            {createdKey.secret}
+          </div>
+          <p className="mt-3 text-xs font-bold text-emerald-900">
+            {createdKey.name} · {createdKey.keyPreview} ·{' '}
+            {createdKey.scopes.join(', ') || 'default scopes'}
+          </p>
+        </Surface>
       ) : null}
 
-      <Card className="rounded-3xl border-slate-100 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-xl font-black">Issued keys</CardTitle>
-          <CardDescription>
-            Full secrets are shown only once, immediately after creation.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <PlatformSectionSkeleton rows={5} />
-          ) : loadError ? (
-            <PlatformInlineError
-              title="API keys unavailable"
-              message={loadError}
-              onRetry={() => void loadKeys()}
-            />
-          ) : (
-            <div className="overflow-x-auto rounded-2xl border border-slate-100">
-              <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="border-b border-slate-100 bg-slate-50">
-                  <tr>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Name
+      <Surface
+        title="Issued keys"
+        description="Full secrets are shown only once, immediately after creation."
+      >
+        {loading ? (
+          <PlatformSectionSkeleton rows={5} />
+        ) : loadError ? (
+          <PlatformInlineError
+            title="API keys unavailable"
+            message={loadError}
+            onRetry={() => void loadKeys()}
+          />
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-slate-100">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="border-b border-slate-100 bg-slate-50">
+                <tr>
+                  <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Name
+                  </th>
+                  <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Preview
+                  </th>
+                  <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Scopes
+                  </th>
+                  <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Status
+                  </th>
+                  {canManageApiKeys ? (
+                    <th className="px-5 py-4">
+                      <span className="sr-only">Actions</span>
                     </th>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Preview
-                    </th>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Scopes
-                    </th>
-                    <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Status
-                    </th>
-                    {canManageApiKeys ? (
-                      <th className="px-5 py-4">
-                        <span className="sr-only">Actions</span>
-                      </th>
-                    ) : null}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {keys.length ? (
-                    keys.map((key) => (
-                      <tr key={key.id}>
-                        <td className="px-5 py-4">
-                          <p className="font-black text-slate-900">
-                            {key.name}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            Created {formatDate(key.createdAt)}
-                          </p>
-                        </td>
-                        <td className="px-5 py-4 font-mono text-xs font-bold text-slate-700">
-                          {key.keyPreview}
-                        </td>
-                        <td className="px-5 py-4 text-xs text-slate-600">
-                          {key.scopes.join(', ') || 'default'}
-                        </td>
-                        <td className="px-5 py-4">
-                          <Badge
-                            variant={
-                              key.status === 'ACTIVE' ? 'success' : 'neutral'
-                            }
-                          >
-                            {key.status}
-                          </Badge>
-                        </td>
-                        {canManageApiKeys ? (
-                          <td className="px-5 py-4 text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-rose-700"
-                              disabled={key.status === 'REVOKED'}
-                              onClick={() => setRevokeTarget(key)}
-                            >
-                              <Trash2 className="mr-2" size={15} />
-                              Revoke
-                            </Button>
-                          </td>
-                        ) : null}
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={canManageApiKeys ? 5 : 4}
-                        className="px-5 py-14 text-center font-semibold text-slate-400"
-                      >
-                        No tenant API keys have been created.
+                  ) : null}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {keys.length ? (
+                  keys.map((key) => (
+                    <tr key={key.id}>
+                      <td className="px-5 py-4">
+                        <p className="font-black text-slate-900">{key.name}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Created {formatDate(key.createdAt)}
+                        </p>
                       </td>
+                      <td className="px-5 py-4 font-mono text-xs font-bold text-slate-700">
+                        {key.keyPreview}
+                      </td>
+                      <td className="px-5 py-4 text-xs text-slate-600">
+                        {key.scopes.join(', ') || 'default'}
+                      </td>
+                      <td className="px-5 py-4">
+                        <Badge
+                          variant={
+                            key.status === 'ACTIVE' ? 'success' : 'neutral'
+                          }
+                        >
+                          {key.status}
+                        </Badge>
+                      </td>
+                      {canManageApiKeys ? (
+                        <td className="px-5 py-4 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-rose-700"
+                            disabled={key.status === 'REVOKED'}
+                            onClick={() => setRevokeTarget(key)}
+                          >
+                            <Trash2 className="mr-2" size={15} />
+                            Revoke
+                          </Button>
+                        </td>
+                      ) : null}
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={canManageApiKeys ? 5 : 4}
+                      className="px-5 py-14 text-center font-semibold text-slate-400"
+                    >
+                      No tenant API keys have been created.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Surface>
 
       {canManageApiKeys ? (
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>

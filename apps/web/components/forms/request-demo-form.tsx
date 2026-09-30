@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import * as React from 'react';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -19,13 +20,6 @@ import {
 } from 'lucide-react';
 
 import { Button } from '../ui/button';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from '../ui/card';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { Textarea } from '../ui/textarea';
@@ -182,7 +176,7 @@ export function RequestDemoForm() {
 
   if (isSubmitted) {
     return (
-      <Card className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center space-y-6 relative z-10 max-w-xl mx-auto">
+      <Surface className="p-8 text-center space-y-6 relative z-10 max-w-xl mx-auto">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600 border border-blue-100">
           <CheckCircle2 size={28} />
         </div>
@@ -255,22 +249,22 @@ export function RequestDemoForm() {
             Sign in
           </Link>
         </div>
-      </Card>
+      </Surface>
     );
   }
 
   return (
-    <Card className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-      <CardHeader className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
-        <CardTitle className="text-base font-bold text-slate-950">
+    <Surface className="overflow-hidden">
+      <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+        <h3 className="text-card-title text-[var(--ink)] text-base font-bold text-slate-950">
           School details
-        </CardTitle>
-        <CardDescription className="text-xs text-slate-500">
+        </h3>
+        <p className="text-helper text-[var(--muted)] text-xs text-slate-500">
           Required fields are marked with *
-        </CardDescription>
-      </CardHeader>
+        </p>
+      </div>
 
-      <CardContent className="p-6 space-y-6">
+      <div className="p-6 space-y-6">
         {/* Form Progress */}
         <div className="space-y-1.5">
           <div className="flex justify-between items-center text-[10px] text-slate-500 font-semibold">
@@ -693,7 +687,7 @@ export function RequestDemoForm() {
             </p>
           </div>
         </form>
-      </CardContent>
-    </Card>
+      </div>
+    </Surface>
   );
 }

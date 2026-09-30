@@ -1,11 +1,11 @@
 'use client';
 
+import { PaginatedDataTable } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { formatBsDateTime } from '@schoolos/core';
 import { api } from '../../../../lib/api';
 import { DashboardPageShell } from '../../../../components/dashboard/dashboard-page-shell';
 import { PageHeader } from '../../../../components/ui/page-header';
-import { DataTable } from '../../../../components/ui/data-table';
 import { StatusBadge } from '../../../../components/ui/status-badge';
 
 export default function ActivityDeliveriesPage() {
@@ -24,34 +24,54 @@ export default function ActivityDeliveriesPage() {
         description="Guardian notification delivery state for published activity posts — channel, destination, timestamps, and failures."
       />
 
-      <DataTable
+      <PaginatedDataTable
         columns={[
-          { header: 'Notification', accessorKey: 'title' },
-          { header: 'Channel', accessorKey: 'channel' },
           {
+            id: 'title',
+            header: 'Notification',
+            cell: (row) => row.title ?? '',
+          },
+          {
+            id: 'channel',
+            header: 'Channel',
+            cell: (row) => row.channel ?? '',
+          },
+          {
+            id: 'destination',
             header: 'Destination',
             cell: (delivery) => delivery.destination || 'Direct',
           },
           {
+            id: 'status',
             header: 'Status',
             cell: (delivery) => <StatusBadge status={delivery.status} />,
           },
           {
+            id: 'sent',
             header: 'Sent',
             cell: (delivery) =>
               delivery.sentAt ? formatBsDateTime(delivery.sentAt) : 'Not yet',
           },
           {
+            id: 'created',
             header: 'Created',
             cell: (delivery) => formatBsDateTime(delivery.createdAt),
           },
         ]}
-        data={deliveries}
-        isLoading={deliveriesQuery.isLoading}
-        error={deliveriesQuery.isError ? deliveriesQuery.error : null}
+        items={deliveries}
         emptyTitle="No delivery records"
-        emptyMessage="Notification history will appear here once activities are published."
-        getRowKey={(delivery) => delivery.id}
+        emptyDescription="Notification history will appear here once activities are published."
+        getRowId={(delivery) => delivery.id}
+        status={
+          deliveriesQuery.isError
+            ? 'error'
+            : deliveriesQuery.isLoading
+              ? 'loading'
+              : 'ready'
+        }
+        errorMessage={deliveriesQuery.error?.message}
+        onRetry={() => void deliveriesQuery.refetch()}
+        completeList
       />
     </DashboardPageShell>
   );
