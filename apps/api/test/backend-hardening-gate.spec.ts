@@ -395,6 +395,9 @@ describe('backend hardening gate', () => {
       '/communications/notice-unread-recipients.service.ts': 2,
       '/communications/notification-center.service.ts': 7,
       '/finance/finance.service.ts': 16,
+      // Phase 5J: parameterized Staff row lock (FOR UPDATE) anchored on
+      // "tenantId" = actor tenant; serializes employment verification.
+      '/hr/professional-identity.service.ts': 1,
       '/messaging/messaging-hardening.service.ts': 1,
       '/mobile/mobile-principal.service.ts': 1,
       '/platform/platform.service.ts': 1,
