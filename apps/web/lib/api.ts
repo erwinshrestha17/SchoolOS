@@ -26,6 +26,7 @@ export * from './api/learning-improvement';
 export * from './api/institutional-improvement';
 export * from './api/advanced-operations';
 export * from './api/service-requests';
+export * from './api/professional-identity';
 
 import { authApi } from './api/auth';
 import {
@@ -37,6 +38,7 @@ import { attendanceApi } from './api/attendance';
 import { financeApi } from './api/finance';
 import { accountingApi } from './api/accounting';
 import { payrollApi } from './api/payroll';
+import { professionalIdentityApi } from './api/professional-identity';
 import { communicationsApi } from './api/communications';
 import { messagingApi } from './api/messaging';
 import { activityApi } from './api/activity';
@@ -91,6 +93,7 @@ export const api = {
   ...financeApi,
   ...accountingApi,
   ...payrollApi,
+  ...professionalIdentityApi,
   ...communicationsApi,
   ...messagingApi,
   ...activityApi,

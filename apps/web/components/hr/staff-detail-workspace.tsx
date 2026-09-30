@@ -41,6 +41,7 @@ import { LeaveRequestCreateDialog } from './leave-request-create-dialog';
 import { LeaveReviewDialog } from './leave-review-dialog';
 import { LeaveBalanceAdjustDialog } from './leave-balance-adjust-dialog';
 import { SalaryStructureDialog } from './salary-structure-dialog';
+import { ProfessionalIdentityPanel } from './professional-identity-panel';
 
 // The backend nulls out salary/payroll figures (with a `masked: true` flag)
 // for viewers without sensitive-HR access — never call .toLocaleString() on
@@ -367,6 +368,12 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
             <Briefcase size={14} />
             Employment
           </TabsTrigger>
+          {hasPermissions(['hr:read']) && (
+            <TabsTrigger value="professional" className="gap-2">
+              <ShieldCheck size={14} />
+              Professional
+            </TabsTrigger>
+          )}
           {fields?.documentsRead && (
             <TabsTrigger value="documents" className="gap-2">
               <FileText size={14} />
@@ -629,6 +636,13 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                   </FormField>
                 </div>
               </section>
+            </TabsContent>
+
+            {/* Tab: Professional identity (Phase 5J–5L) */}
+            <TabsContent value="professional" className="m-0 outline-none">
+              {hasPermissions(['hr:read']) && (
+                <ProfessionalIdentityPanel staffId={staffId} />
+              )}
             </TabsContent>
 
             {/* Tab: Documents */}
