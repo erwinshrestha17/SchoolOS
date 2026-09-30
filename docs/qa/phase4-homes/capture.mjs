@@ -14,7 +14,7 @@ const personas = [
 const browser = await chromium.launch({ executablePath: 'process.env.CHROMIUM_PATH' });
 const report = [];
 for (const [name, email, home] of personas) {
-  execSync('redis-cli FLUSHALL');
+  execSync('redis-cli FLUSHALL'); await new Promise((r) => setTimeout(r, 8000));
   const login = await browser.newContext();
   const lp = await login.newPage();
   await lp.goto('http://localhost:3000/login');
