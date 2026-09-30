@@ -40,17 +40,20 @@ test.describe('Phase 1B navigation smoke', () => {
     // Attendance & Register
     await page.goto('/dashboard/attendance');
     await expect(
-      page.getByRole('heading', { name: /Attendance/i }),
+      page.getByRole('heading', { level: 1, name: /Attendance/i }),
     ).toBeVisible();
-    await page.goto('/dashboard/attendance/register');
+    await page.goto('/dashboard/attendance/register/monthly');
     await expect(
-      page.getByRole('heading', { name: /Monthly Register/i }),
+      page.getByRole('heading', {
+        level: 1,
+        name: /Monthly Attendance Register/i,
+      }),
     ).toBeVisible();
 
     // Academics
     await page.goto('/dashboard/academics');
     await expect(
-      page.getByRole('heading', { name: /Academics/i }),
+      page.getByRole('heading', { level: 1, name: /Academics/i }),
     ).toBeVisible();
 
     // Finance
