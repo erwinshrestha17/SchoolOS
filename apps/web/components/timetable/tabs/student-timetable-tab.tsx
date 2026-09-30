@@ -1,8 +1,8 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
-import { SectionCard } from '../../ui/section-card';
 import { Badge } from '../../ui/badge';
 import { EmptyState } from '../../ui/empty-state';
 import { LoadingState } from '../../ui/loading-state';
@@ -41,10 +41,10 @@ export function StudentTimetableTab() {
 
   return (
     <div className="space-y-8">
-      <SectionCard
+      <Surface
         title="My Weekly Schedule"
         description="View your classes, subjects, and teachers for the current academic session."
-        headerAction={
+        actions={
           <Badge
             variant="outline"
             className="border-[var(--color-mod-homework-border)] py-1 text-[10px] font-black uppercase tracking-widest text-[var(--color-mod-homework-text)]"
@@ -140,7 +140,7 @@ export function StudentTimetableTab() {
             })}
           </div>
         )}
-      </SectionCard>
+      </Surface>
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="flex items-center gap-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">

@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -15,7 +16,6 @@ import { useEntitlements } from '@/components/entitlements-provider';
 import { useSettingsCapabilities } from '@/lib/permissions-ui';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LoadingState } from '@/components/ui/loading-state';
-import { SectionCard } from '@/components/ui/section-card';
 import {
   SettingsPageHeader,
   SettingsPermissionNotice,
@@ -86,7 +86,7 @@ export function PersonalProfileWorkspace() {
         </p>
       ) : null}
 
-      <SectionCard
+      <Surface
         title="Account identity"
         description="These details come from your authenticated account and current school workspace."
       >
@@ -125,7 +125,7 @@ export function PersonalProfileWorkspace() {
             }
           />
         </dl>
-      </SectionCard>
+      </Surface>
 
       <div className="flex flex-wrap gap-3">
         <Link

@@ -1,12 +1,12 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { Link2, ServerCog, ShieldCheck, Users } from 'lucide-react';
 import { ErrorState } from '../../../components/ui/error-state';
 import { LoadingState } from '../../../components/ui/loading-state';
 import { ModuleHeader } from '../../../components/ui/module-header';
 import { RefreshSummaryButton } from '../../../components/ui/operational-summary';
-import { SectionCard } from '../../../components/ui/section-card';
 import { api } from '../../../lib/api';
 
 export default function PlatformDashboard() {
@@ -64,7 +64,7 @@ export default function PlatformDashboard() {
         {cards.map((card) => {
           const Icon = card.icon;
           return (
-            <SectionCard key={card.key} className="min-h-[144px]" noPadding>
+            <Surface key={card.key} className="min-h-[144px]" padding="flush">
               <div className="flex h-full items-start justify-between p-5">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -76,12 +76,12 @@ export default function PlatformDashboard() {
                 </div>
                 <Icon className="h-5 w-5 text-slate-500" />
               </div>
-            </SectionCard>
+            </Surface>
           );
         })}
       </div>
 
-      <SectionCard
+      <Surface
         title="Attention queue"
         description="Prioritized operator follow-up across tenant lifecycle, provider issues, queue health, and the SaaS billing boundary."
       >
@@ -101,10 +101,10 @@ export default function PlatformDashboard() {
             detail="Provider readiness is reviewed without exposing credentials, callback secrets, or tenant-private records."
           />
         </div>
-      </SectionCard>
+      </Surface>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <SectionCard
+        <Surface
           title="Usage and readiness follow-up"
           description="Provider and plan warnings are presented without credentials or private tenant payloads."
         >
@@ -124,9 +124,9 @@ export default function PlatformDashboard() {
               No usage warnings need attention right now.
             </p>
           )}
-        </SectionCard>
+        </Surface>
 
-        <SectionCard
+        <Surface
           title="Recent platform activity"
           description="Bounded audit activity without secret values, raw provider payloads, or tenant-private records."
         >
@@ -146,10 +146,10 @@ export default function PlatformDashboard() {
               No recent platform activity is available.
             </p>
           )}
-        </SectionCard>
+        </Surface>
       </div>
 
-      <SectionCard
+      <Surface
         title="SaaS billing boundary"
         description="Platform operators manage SchoolOS subscriptions, provider readiness, and tenant lifecycle here. M3 student fee collection and M11 school accounting remain separate school-owned workflows."
       >
@@ -157,7 +157,7 @@ export default function PlatformDashboard() {
           Use this page for operator attention only; do not inspect or reconcile
           school-private fee, payroll, or journal data from the platform plane.
         </p>
-      </SectionCard>
+      </Surface>
     </div>
   );
 }

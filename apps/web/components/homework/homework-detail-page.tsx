@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -24,7 +25,6 @@ import { api, type HomeworkRegisterRow } from '@/lib/api';
 import { useSession } from '@/components/session-provider';
 import { LoadingState } from '@/components/ui/loading-state';
 import { EmptyState } from '@/components/ui/empty-state';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -458,9 +458,9 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <SectionCard
+          <Surface
             title={homework.title}
-            headerAction={<StatusBadge status={homework.status || 'DRAFT'} />}
+            actions={<StatusBadge status={homework.status || 'DRAFT'} />}
           >
             <div className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-3">
@@ -561,7 +561,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                 </div>
               )}
             </div>
-          </SectionCard>
+          </Surface>
 
           <Tabs
             defaultValue={activeTab}
@@ -653,7 +653,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
             )}
 
             <TabsContent value="reminders" className="mt-6">
-              <SectionCard
+              <Surface
                 title="Homework Reminders"
                 description="Send nudge notifications to students who haven't submitted yet."
               >
@@ -728,13 +728,13 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                     </Button>
                   </div>
                 </div>
-              </SectionCard>
+              </Surface>
             </TabsContent>
           </Tabs>
         </div>
 
         <div className="space-y-6">
-          <SectionCard title="Assignment Summary">
+          <Surface title="Assignment Summary">
             <div className="space-y-4">
               <div className="flex items-center justify-between py-2 border-b border-slate-50">
                 <span className="text-sm font-medium text-slate-500">
@@ -780,9 +780,9 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                 </span>
               </div>
             </div>
-          </SectionCard>
+          </Surface>
 
-          <SectionCard title="Activity & Audit">
+          <Surface title="Activity & Audit">
             <div className="space-y-4">
               <div className="flex gap-3">
                 <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
@@ -803,7 +803,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                 Audit/activity log will be expanded in future updates.
               </p>
             </div>
-          </SectionCard>
+          </Surface>
         </div>
       </div>
 
@@ -920,7 +920,7 @@ function StudentHomeworkSubmissionView({
         </Button>
       </Link>
 
-      <SectionCard title={homework?.title?.trim() || 'Homework'}>
+      <Surface title={homework?.title?.trim() || 'Homework'}>
         <div className="space-y-4">
           <p className="whitespace-pre-wrap rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-relaxed text-slate-600">
             {homework?.instructions?.trim() || 'Instructions not set'}
@@ -940,12 +940,12 @@ function StudentHomeworkSubmissionView({
             {mySubmission ? <StatusBadge status={mySubmission.status} /> : null}
           </div>
         </div>
-      </SectionCard>
+      </Surface>
 
       {submissionsQuery.isLoading ? (
         <LoadingState label="Loading your submission..." />
       ) : canSubmitOnline ? (
-        <SectionCard
+        <Surface
           title="Your Work"
           description="Provide your answer and attach necessary files below."
         >
@@ -957,9 +957,9 @@ function StudentHomeworkSubmissionView({
               })
             }
           />
-        </SectionCard>
+        </Surface>
       ) : mySubmission ? (
-        <SectionCard title="My Submission">
+        <Surface title="My Submission">
           <div className="space-y-4">
             <p className="whitespace-pre-wrap rounded-2xl border border-slate-100 bg-white p-4 text-sm text-slate-700">
               {mySubmission.submissionContent || 'No text content provided.'}
@@ -1005,7 +1005,7 @@ function StudentHomeworkSubmissionView({
               </div>
             ) : null}
           </div>
-        </SectionCard>
+        </Surface>
       ) : null}
     </div>
   );

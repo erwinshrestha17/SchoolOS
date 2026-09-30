@@ -1,11 +1,11 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { SectionCard } from '@/components/ui/section-card';
 import { Loader2, Plus, Info, Check, AlertCircle } from 'lucide-react';
 import type { FeeHeadSummary, FeePlanSummary } from '@schoolos/core';
 
@@ -133,7 +133,7 @@ export function FeeSetupTab() {
       {/* Creation Forms */}
       <div className="space-y-8">
         {/* Fee Head Form */}
-        <SectionCard
+        <Surface
           title="Create Fee Head"
           description="Define reusable heads of account like Tuition, Library, Exam, or Transportation fees."
         >
@@ -269,10 +269,10 @@ export function FeeSetupTab() {
               )}
             </Button>
           </form>
-        </SectionCard>
+        </Surface>
 
         {/* Fee Plan Form */}
-        <SectionCard
+        <Surface
           title="Create Fee Plan"
           description="Map fee heads to specific academic years and classes with custom rates."
         >
@@ -439,13 +439,13 @@ export function FeeSetupTab() {
               )}
             </Button>
           </form>
-        </SectionCard>
+        </Surface>
       </div>
 
       {/* Listing Overview */}
       <div className="space-y-8">
         {/* Fee Heads List */}
-        <SectionCard title="Active Fee Heads">
+        <Surface title="Active Fee Heads">
           {feeHeadsQuery.isLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
@@ -496,10 +496,10 @@ export function FeeSetupTab() {
               </div>
             </div>
           )}
-        </SectionCard>
+        </Surface>
 
         {/* Fee Plans List */}
-        <SectionCard title="Active Fee Plans">
+        <Surface title="Active Fee Plans">
           {feePlansQuery.isLoading ? (
             <div className="flex justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
@@ -560,7 +560,7 @@ export function FeeSetupTab() {
               </div>
             </div>
           )}
-        </SectionCard>
+        </Surface>
       </div>
     </div>
   );

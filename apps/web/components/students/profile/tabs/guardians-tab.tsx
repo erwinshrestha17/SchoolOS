@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -41,7 +42,6 @@ import {
 import { api } from '@/lib/api';
 import { useSession } from '@/components/session-provider';
 import { Badge } from '@/components/ui/badge';
-import { SectionCard } from '@/components/ui/section-card';
 import { schoolFacingErrorMessage } from '@/lib/school-facing-error';
 
 const inputClass =
@@ -174,7 +174,7 @@ export function GuardiansTab({
       </div>
 
       {isAddingGuardian ? (
-        <SectionCard
+        <Surface
           title="Link guardian"
           description="New relationships begin without parent-app access until verification, approval, and capabilities are recorded."
         >
@@ -187,7 +187,7 @@ export function GuardiansTab({
             onCancel={onCancelAdd}
             onSave={(body) => onCreateGuardian(body)}
           />
-        </SectionCard>
+        </Surface>
       ) : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -196,7 +196,7 @@ export function GuardiansTab({
             const isEditing = editingGuardianId === guardian.id;
 
             return (
-              <SectionCard
+              <Surface
                 key={guardian.id}
                 title={
                   isEditing ? 'Edit guardian relationship' : guardian.fullName
@@ -206,7 +206,7 @@ export function GuardiansTab({
                     ? 'Contact information and this child’s access authority are stored separately.'
                     : formatGuardianRelation(guardian.relation)
                 }
-                headerAction={
+                actions={
                   isEditing ? null : (
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       {guardian.isPrimary ? (
@@ -254,7 +254,7 @@ export function GuardiansTab({
                     ) : null}
                   </div>
                 )}
-              </SectionCard>
+              </Surface>
             );
           })
         ) : (

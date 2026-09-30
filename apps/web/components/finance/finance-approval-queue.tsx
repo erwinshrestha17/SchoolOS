@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FinanceApprovalRequestView } from '@schoolos/core';
 import { formatBsDate } from '@schoolos/core';
@@ -10,7 +11,6 @@ import { useSession } from '@/components/session-provider';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
   Dialog,
@@ -190,7 +190,7 @@ export function FinanceApprovalQueue() {
   return (
     <div className="space-y-8">
       {canRequest ? (
-        <SectionCard
+        <Surface
           title="Request a Refund or Reversal"
           description="Requests are reviewed by a different authorized user. Confirmed payments are never edited in place."
         >
@@ -284,10 +284,10 @@ export function FinanceApprovalQueue() {
               </Button>
             </div>
           </div>
-        </SectionCard>
+        </Surface>
       ) : null}
 
-      <SectionCard
+      <Surface
         title="Refund and Reversal Approval Queue"
         description="Tenant-scoped request, review, execution, and status history."
       >
@@ -404,7 +404,7 @@ export function FinanceApprovalQueue() {
             Correction request access is unavailable for this account.
           </div>
         )}
-      </SectionCard>
+      </Surface>
 
       {decisionMutation.isError ? (
         <div

@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import {
   formatBsDateTime,
   type OperationalModuleSummary,
@@ -14,7 +15,6 @@ import { useMemo } from 'react';
 import { ErrorState } from './error-state';
 import { LoadingState } from './loading-state';
 import { ModuleLockedState } from './module-locked-state';
-import { SectionCard } from './section-card';
 import { StatusBadge, type StatusTone } from './status-badge';
 
 const moduleLabels: Record<OperationalSummaryRouteModule, string> = {
@@ -148,7 +148,7 @@ export function OperationalSummaryPanel({
 
   if (summary.status === 'permissionDenied') {
     return (
-      <SectionCard
+      <Surface
         title="Operational summary"
         description="A safe overview of this workspace."
       >
@@ -156,21 +156,21 @@ export function OperationalSummaryPanel({
           You do not have permission to view this operational summary. No module
           data is shown.
         </div>
-      </SectionCard>
+      </Surface>
     );
   }
 
   const metrics = Object.entries(summary.summary).slice(0, compact ? 3 : 6);
 
   return (
-    <SectionCard
+    <Surface
       title="Operational summary"
       description={
         summary.status === 'partial'
           ? 'Available information is shown below. Some information is temporarily unavailable.'
           : 'A lightweight view of the work that needs attention.'
       }
-      headerAction={<SummaryStatusBadge status={summary.status} />}
+      actions={<SummaryStatusBadge status={summary.status} />}
       footer={
         allowedActions.length ? (
           <div className="flex flex-wrap gap-2">
@@ -211,7 +211,7 @@ export function OperationalSummaryPanel({
       {!compact && summary.recentItems.length ? (
         <RecentSummaryItems items={summary.recentItems} />
       ) : null}
-    </SectionCard>
+    </Surface>
   );
 }
 

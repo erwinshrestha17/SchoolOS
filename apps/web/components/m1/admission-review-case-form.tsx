@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type { CreateAdmissionCasePayload } from '@schoolos/core';
 import {
   formatBsDateForInput,
@@ -23,7 +24,6 @@ import { classOptionLabel } from '../../lib/education-program';
 import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
 import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
-import { SectionCard } from '../ui/section-card';
 
 const emptyForm: CreateAdmissionCasePayload = {
   firstNameEn: '',
@@ -180,7 +180,7 @@ export function AdmissionReviewCaseForm() {
         submit.mutate();
       }}
     >
-      <SectionCard
+      <Surface
         title="Admission review"
         description="For online applications, interviews, scholarships, transfer review, or any admission needing a school decision."
       >
@@ -291,8 +291,8 @@ export function AdmissionReviewCaseForm() {
             </Field>
           </div>
         </details>
-      </SectionCard>
-      <SectionCard
+      </Surface>
+      <Surface
         title="Requested placement"
         description="The school saves these details once and reviewers only resolve missing or policy-required items."
       >
@@ -384,7 +384,7 @@ export function AdmissionReviewCaseForm() {
             />
           </Field>
         </div>
-      </SectionCard>
+      </Surface>
       {error ? (
         <p className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-800">
           {error}

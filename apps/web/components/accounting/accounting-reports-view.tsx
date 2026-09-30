@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   BarChart3,
@@ -12,7 +13,6 @@ import {
   FileDown,
 } from 'lucide-react';
 import { api } from '../../lib/api';
-import { SectionCard } from '../ui/section-card';
 import { PageState } from '../ui/page-state';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '../ui/loading-state';
@@ -944,10 +944,10 @@ export function AccountingReportsView({
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-10">
-      <SectionCard
+      <Surface
         title="Accounting Reports"
         description="Comprehensive financial statements and ledger reports generated from real-time accounting data."
-        headerAction={
+        actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
@@ -981,11 +981,11 @@ export function AccountingReportsView({
           Financial truth comes from the official ledger. Posted journals are
           immutable; use reversal or correction workflows for any adjustments.
         </AuditInfo>
-      </SectionCard>
+      </Surface>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         <div className="xl:col-span-1 space-y-4">
-          <SectionCard title="Select Report" className="h-full">
+          <Surface title="Select Report" className="h-full">
             <div className="flex flex-col gap-2">
               {[
                 {
@@ -1090,11 +1090,11 @@ export function AccountingReportsView({
                 </Button>
               ))}
             </div>
-          </SectionCard>
+          </Surface>
         </div>
 
         <div className="xl:col-span-3 space-y-6">
-          <SectionCard>
+          <Surface>
             {activeReport !== 'failed-unposted' && (
               <ReportFilters
                 onFilterChange={(f) =>
@@ -1119,12 +1119,12 @@ export function AccountingReportsView({
                 </Select>
               </div>
             )}
-          </SectionCard>
+          </Surface>
 
-          <SectionCard
+          <Surface
             title={activeReport.replace(/-/g, ' ')}
             description="Ledger-backed preview"
-            headerAction={
+            actions={
               <div className="flex items-center gap-2 rounded-lg bg-[var(--color-mod-accounting-bg)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--color-mod-accounting-text)]">
                 <History size={12} />
                 Current ledger data
@@ -1135,9 +1135,9 @@ export function AccountingReportsView({
             <div className="animate-in fade-in duration-700">
               {renderReportContent()}
             </div>
-          </SectionCard>
+          </Surface>
 
-          <SectionCard
+          <Surface
             title="Saved Snapshots"
             description="Protected report files generated through File Registry."
           >
@@ -1175,7 +1175,7 @@ export function AccountingReportsView({
                 </p>
               )}
             </div>
-          </SectionCard>
+          </Surface>
         </div>
       </div>
 

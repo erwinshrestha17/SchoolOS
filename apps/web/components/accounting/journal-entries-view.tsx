@@ -1,10 +1,10 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Eye } from 'lucide-react';
 import { api } from '../../lib/api';
-import { SectionCard } from '../ui/section-card';
 import { PageState } from '../ui/page-state';
 import { Button } from '@/components/ui/button';
 import { ReportTable } from './report-table';
@@ -97,7 +97,7 @@ export function JournalEntriesView() {
         </div>
       ) : null}
 
-      <SectionCard
+      <Surface
         title="All Journal Entries"
         description="Complete list of all financial postings in chronological order."
       >
@@ -164,7 +164,7 @@ export function JournalEntriesView() {
             }))}
           />
         )}
-      </SectionCard>
+      </Surface>
 
       <VoucherDialog
         isOpen={voucherOpen}

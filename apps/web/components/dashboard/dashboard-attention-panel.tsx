@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import {
   getNepalSchoolDay,
   type OperationalAttentionItem,
@@ -10,7 +11,6 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { scrollToNavHash } from '../../lib/nav-hash';
 import { cn } from '../../lib/utils';
-import { SectionCard } from '../ui/section-card';
 import {
   attentionKind,
   formatNumber,
@@ -56,7 +56,7 @@ export function DashboardAttentionPanel({
       className="scroll-mt-6"
       aria-label="Needs your attention"
     >
-      <SectionCard
+      <Surface
         title="Needs your attention"
         description={
           openItems.length
@@ -65,7 +65,7 @@ export function DashboardAttentionPanel({
               ? 'Some sources could not be loaded, so this list may be incomplete.'
               : 'Nothing needs your attention right now.'
         }
-        headerAction={
+        actions={
           openItems.length ? (
             <span className="inline-flex items-center rounded-full border border-warning-100 bg-warning-50 px-2.5 py-1 text-xs font-bold text-warning-700">
               {formatNumber(openItems.length)}
@@ -110,7 +110,7 @@ export function DashboardAttentionPanel({
             </p>
           </div>
         )}
-      </SectionCard>
+      </Surface>
     </section>
   );
 }

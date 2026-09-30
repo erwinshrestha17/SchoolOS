@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -66,7 +67,6 @@ import {
 } from '@/components/settings/settings-page-header';
 import { ModuleTabs, WorkspaceTabs } from '@/components/ui/module-tabs';
 import { ProtectedFileButton } from '@/components/ui/protected-file';
-import { SectionCard } from '@/components/ui/section-card';
 import { WorkSurface } from '@/components/ui/work-surface';
 import {
   Table,
@@ -852,10 +852,10 @@ export function AttendanceCorrectionsQueueWorkspace() {
         </TabsList>
       </Tabs>
       {showAuditLog ? (
-        <SectionCard
+        <Surface
           title="Correction Audit Log"
           description="Reviewed correction requests from the audit trail for the last 30 days."
-          headerAction={
+          actions={
             <Badge variant="info">{auditQuery.data?.total ?? 0} rows</Badge>
           }
         >
@@ -927,7 +927,7 @@ export function AttendanceCorrectionsQueueWorkspace() {
               </TableBody>
             </Table>
           )}
-        </SectionCard>
+        </Surface>
       ) : status === 'PENDING' ? (
         <div className="space-y-3">
           <AttendanceCorrectionReview
@@ -949,14 +949,14 @@ export function AttendanceCorrectionsQueueWorkspace() {
           ) : null}
         </div>
       ) : (
-        <SectionCard
+        <Surface
           title={
             status === 'APPROVED'
               ? 'Reviewed Corrections'
               : 'Escalated Corrections'
           }
           description="Correction requests available to your role and school."
-          headerAction={
+          actions={
             <Badge variant="neutral">
               {correctionsQuery.data?.total ?? 0} requests
             </Badge>
@@ -982,7 +982,7 @@ export function AttendanceCorrectionsQueueWorkspace() {
             emptyTitle="No corrections in this queue"
             emptyDescription="Requests matching this status will appear here."
           />
-        </SectionCard>
+        </Surface>
       )}
     </DashboardPageShell>
   );
@@ -1081,7 +1081,7 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
             />
           ) : null}
           <div className="space-y-6">
-            <SectionCard
+            <Surface
               title={correctionStudentName(correction)}
               description={`Request ${correction.id}`}
             >
@@ -1107,8 +1107,8 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
                   </Notice>
                 </div>
               ) : null}
-            </SectionCard>
-            <SectionCard title="Attendance Record Comparison">
+            </Surface>
+            <Surface title="Attendance Record Comparison">
               <div className="grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-center">
                 <ComparisonCard
                   tone="danger"
@@ -1124,8 +1124,8 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
                   rows={correction.comparison.requested}
                 />
               </div>
-            </SectionCard>
-            <SectionCard title="Evidence">
+            </Surface>
+            <Surface title="Evidence">
               {correction.evidence.supported ? (
                 <p className="text-sm text-slate-600">
                   {correction.evidence.items.length} protected evidence files.
@@ -1133,10 +1133,10 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
               ) : (
                 <Notice tone="warning">{correction.evidence.message}</Notice>
               )}
-            </SectionCard>
+            </Surface>
           </div>
           <div className="space-y-6">
-            <SectionCard title="Decision Panel">
+            <Surface title="Decision Panel">
               <LockedRecordBanner
                 label="Lock-window policy"
                 reason={correction.lockPolicy.explanation}
@@ -1163,8 +1163,8 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
                   </Notice>
                 </div>
               ) : null}
-            </SectionCard>
-            <SectionCard title="Approval History">
+            </Surface>
+            <Surface title="Approval History">
               <SummaryRows
                 rows={[
                   ['Request submitted', formatDateTime(correction.requestedAt)],
@@ -1175,7 +1175,7 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
                   ['Decision', correction.status],
                 ]}
               />
-            </SectionCard>
+            </Surface>
           </div>
         </div>
       ) : null}
@@ -1267,7 +1267,7 @@ export function AttendanceOfflineDraftsWorkspace() {
         class, academic year, section, and date before retrying.
       </Notice>
       <div className="grid gap-6 xl:grid-cols-3">
-        <SectionCard title="This Browser" className="xl:col-span-3">
+        <Surface title="This Browser" className="xl:col-span-3">
           {localDraftsLoading ? (
             <LoadingState label="Loading browser drafts..." />
           ) : localDraftsError ? (
@@ -1351,8 +1351,8 @@ export function AttendanceOfflineDraftsWorkspace() {
               </TableBody>
             </Table>
           )}
-        </SectionCard>
-        <SectionCard title="Server Drafts">
+        </Surface>
+        <Surface title="Server Drafts">
           {draftsQuery.isLoading ? (
             <LoadingState label="Loading drafts..." />
           ) : draftsQuery.isError ? (
@@ -1386,8 +1386,8 @@ export function AttendanceOfflineDraftsWorkspace() {
               </TableBody>
             </Table>
           )}
-        </SectionCard>
-        <SectionCard title="Sync Queue and Conflicts" className="xl:col-span-2">
+        </Surface>
+        <Surface title="Sync Queue and Conflicts" className="xl:col-span-2">
           {conflictsQuery.isLoading ? (
             <LoadingState label="Loading sync audit..." />
           ) : conflictsQuery.isError ? (
@@ -1427,7 +1427,7 @@ export function AttendanceOfflineDraftsWorkspace() {
               </TableBody>
             </Table>
           )}
-        </SectionCard>
+        </Surface>
       </div>
     </DashboardPageShell>
   );
@@ -1513,7 +1513,7 @@ export function AttendanceAnomaliesWorkspace() {
           onRetry={() => void anomaliesQuery.refetch()}
         />
       ) : (
-        <SectionCard
+        <Surface
           title="Anomaly Queue"
           description="Resolution actions are not available yet, so this queue remains read-only."
         >
@@ -1555,7 +1555,7 @@ export function AttendanceAnomaliesWorkspace() {
               ))}
             </TableBody>
           </Table>
-        </SectionCard>
+        </Surface>
       )}
     </DashboardPageShell>
   );
@@ -1600,14 +1600,14 @@ export function AttendanceFollowUpsWorkspace() {
       />
       <AttendanceModuleTabs />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <SectionCard title="Follow-up Queue">
+        <Surface title="Follow-up Queue">
           <FollowUpTable
             queue={queueQuery.data}
             isLoading={queueQuery.isLoading}
           />
-        </SectionCard>
+        </Surface>
         {canManageAll ? (
-          <SectionCard title="Dispatch Controls">
+          <Surface title="Dispatch Controls">
             <Notice tone="warning">
               Delivery follows provider settings, guardian consent, quiet hours,
               retry rules, and duplicate protection managed by M12.
@@ -1636,14 +1636,14 @@ export function AttendanceFollowUpsWorkspace() {
                 Dispatch selected queue
               </Button>
             </div>
-          </SectionCard>
+          </Surface>
         ) : (
-          <SectionCard title="Read-only follow-up evidence">
+          <Surface title="Read-only follow-up evidence">
             <Notice tone="info">
               This session can inspect the queue. Previewing or dispatching
               follow-ups requires attendance management authority.
             </Notice>
-          </SectionCard>
+          </Surface>
         )}
       </div>
     </DashboardPageShell>
@@ -1709,7 +1709,7 @@ export function AttendanceStudentProfileWorkspace({
           tone="warning"
         />
       </KpiGrid>
-      <SectionCard title="Recent Attendance History">
+      <Surface title="Recent Attendance History">
         {historyQuery.isLoading ? (
           <LoadingState label="Loading student attendance..." />
         ) : (
@@ -1736,7 +1736,7 @@ export function AttendanceStudentProfileWorkspace({
             </TableBody>
           </Table>
         )}
-      </SectionCard>
+      </Surface>
     </DashboardPageShell>
   );
 }
@@ -1813,7 +1813,7 @@ export function AttendanceReportsWorkspace() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
           <TrendPanel analytics={analytics} />
-          <SectionCard
+          <Surface
             title="Report Results"
             description="Official analytics results. PDF and CSV snapshots are retained as protected files."
           >
@@ -1847,8 +1847,8 @@ export function AttendanceReportsWorkspace() {
                 })}
               </TableBody>
             </Table>
-          </SectionCard>
-          <SectionCard
+          </Surface>
+          <Surface
             title="Retained Register Exports"
             description="Monthly register export jobs retained by the attendance module. Downloads stay behind authenticated protected-file access."
           >
@@ -1917,9 +1917,9 @@ export function AttendanceReportsWorkspace() {
                 </TableBody>
               </Table>
             )}
-          </SectionCard>
+          </Surface>
         </div>
-        <SectionCard title="Report Summary">
+        <Surface title="Report Summary">
           <SummaryRows
             rows={[
               [
@@ -1930,7 +1930,7 @@ export function AttendanceReportsWorkspace() {
               ['Retained exports', String(exportHistoryQuery.data?.total ?? 0)],
             ]}
           />
-        </SectionCard>
+        </Surface>
       </div>
     </DashboardPageShell>
   );
@@ -1983,7 +1983,7 @@ export function AttendanceSettingsWorkspace() {
       {!canManage ? <SettingsPermissionNotice access="view-only" /> : null}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="grid gap-6 lg:grid-cols-2">
-          <SectionCard title="School Attendance Policy">
+          <Surface title="School Attendance Policy">
             <SummaryRows
               rows={[
                 ['Default mark state', 'Present by daily attendance default'],
@@ -2018,8 +2018,8 @@ export function AttendanceSettingsWorkspace() {
               onChange={(event) => setLateThreshold(event.target.value)}
               placeholder="4"
             />
-          </SectionCard>
-          <SectionCard title="Lock Window Settings">
+          </Surface>
+          <Surface title="Lock Window Settings">
             <SummaryRows
               rows={[
                 [
@@ -2037,8 +2037,8 @@ export function AttendanceSettingsWorkspace() {
                 ['Historical locked dates', 'Recorded session lock time'],
               ]}
             />
-          </SectionCard>
-          <SectionCard title="Notification Policy">
+          </Surface>
+          <Surface title="Notification Policy">
             <SummaryRows
               rows={[
                 [
@@ -2060,8 +2060,8 @@ export function AttendanceSettingsWorkspace() {
                 ],
               ]}
             />
-          </SectionCard>
-          <SectionCard title="Role Permissions Summary">
+          </Surface>
+          <Surface title="Role Permissions Summary">
             <SummaryRows
               rows={[
                 ['Teacher', 'Assigned class/section/subject only'],
@@ -2070,9 +2070,9 @@ export function AttendanceSettingsWorkspace() {
                 ['Student', 'Own/session scoped only'],
               ]}
             />
-          </SectionCard>
+          </Surface>
         </div>
-        <SectionCard title="Policy Summary">
+        <Surface title="Policy Summary">
           <SummaryRows
             rows={[
               [
@@ -2086,7 +2086,7 @@ export function AttendanceSettingsWorkspace() {
               ],
             ]}
           />
-        </SectionCard>
+        </Surface>
       </div>
     </DashboardPageShell>
   );
@@ -2098,10 +2098,10 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
     (_, index) => index + 1,
   );
   return (
-    <SectionCard
+    <Surface
       title={`${register.className}${register.sectionName ? ` / ${register.sectionName}` : ''}`}
       description={`${register.periodLabel} · Compact monthly matrix from the official register.`}
-      noPadding
+      padding="flush"
       className="attendance-register-print"
     >
       {/* The grid is all two-letter codes; without a key it is unreadable,
@@ -2204,7 +2204,7 @@ function MonthlyMatrix({ register }: { register: AttendanceMonthlyRegister }) {
           </tbody>
         </table>
       </div>
-    </SectionCard>
+    </Surface>
   );
 }
 
@@ -2217,7 +2217,7 @@ function RegisterSnapshot({
 }) {
   return (
     <div className="space-y-6">
-      <SectionCard title="Register Snapshot">
+      <Surface title="Register Snapshot">
         <SummaryRows
           rows={[
             [
@@ -2242,8 +2242,8 @@ function RegisterSnapshot({
             ['Leave records', String(summary.totals.leave)],
           ]}
         />
-      </SectionCard>
-      <SectionCard title="Legend">
+      </Surface>
+      <Surface title="Legend">
         <SummaryRows
           rows={[
             ['P', 'Present'],
@@ -2253,7 +2253,7 @@ function RegisterSnapshot({
             ['-', 'Holiday / not marked'],
           ]}
         />
-      </SectionCard>
+      </Surface>
     </div>
   );
 }
@@ -2266,7 +2266,7 @@ function TrendPanel({
     | undefined;
 }) {
   return (
-    <SectionCard
+    <Surface
       title="Weekly Attendance Trend"
       description="Latest server analytics shown as a compact trend list."
     >
@@ -2289,7 +2289,7 @@ function TrendPanel({
           <p className="text-sm text-slate-500">Trend data unavailable.</p>
         ) : null}
       </div>
-    </SectionCard>
+    </Surface>
   );
 }
 
@@ -2303,7 +2303,7 @@ function ActivityPanel({
   correctionsTotal: number;
 }) {
   return (
-    <SectionCard title="Recent Attendance Activity">
+    <Surface title="Recent Attendance Activity">
       <div className="space-y-3">
         {(analytics?.latestSessions ?? []).slice(0, 4).map((session) => (
           <div
@@ -2326,7 +2326,7 @@ function ActivityPanel({
           <p className="text-xs text-slate-500">From the correction queue</p>
         </div>
       </div>
-    </SectionCard>
+    </Surface>
   );
 }
 
@@ -2338,7 +2338,7 @@ function AtRiskPanel({
   isLoading: boolean;
 }) {
   return (
-    <SectionCard title="At-Risk Students Today">
+    <Surface title="At-Risk Students Today">
       {isLoading ? (
         <LoadingState label="Loading follow-up queue..." />
       ) : (
@@ -2366,7 +2366,7 @@ function AtRiskPanel({
           ) : null}
         </div>
       )}
-    </SectionCard>
+    </Surface>
   );
 }
 

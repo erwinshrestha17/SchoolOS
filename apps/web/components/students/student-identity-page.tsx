@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, QrCode } from 'lucide-react';
@@ -7,7 +8,6 @@ import { api } from '@/lib/api';
 import { useBreadcrumbLabel } from '@/components/schoolos/navigation/breadcrumb-label-context';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LoadingState } from '@/components/ui/loading-state';
-import { SectionCard } from '@/components/ui/section-card';
 import { StudentQrCard } from './profile/student-qr-card';
 import { useSession } from '@/components/session-provider';
 import {
@@ -94,7 +94,7 @@ export function StudentIdentityPage({ studentId }: { studentId: string }) {
           qrCredential={profile.student.qrCredential ?? null}
         />
 
-        <SectionCard
+        <Surface
           title="Student record"
           description="Identity context for this credential."
         >
@@ -131,7 +131,7 @@ export function StudentIdentityPage({ studentId }: { studentId: string }) {
               }
             />
           </div>
-        </SectionCard>
+        </Surface>
       </div>
     </div>
   );

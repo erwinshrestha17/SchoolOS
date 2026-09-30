@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { resourceAccess } from '../../lib/resource-authorization';
 import {
   formatBsDateForInput,
@@ -47,7 +48,6 @@ import {
 import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
 import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
-import { SectionCard } from '../ui/section-card';
 
 const EMPTY_FORM: CreateAdmissionCasePayload = {
   firstNameEn: '',
@@ -356,7 +356,7 @@ export function AdmissionCaseWizard({
       .filter(Boolean)
       .join(' / ');
     return (
-      <SectionCard
+      <Surface
         title="Admission completed"
         description={`${admissionResult.student.fullNameEn} now has an active student profile. Fee collection remains a separate workflow.`}
       >
@@ -423,7 +423,7 @@ export function AdmissionCaseWizard({
             Admit another student
           </Button>
         </div>
-      </SectionCard>
+      </Surface>
     );
   }
 
@@ -533,7 +533,7 @@ export function AdmissionCaseWizard({
       ) : null}
 
       {step === 0 ? (
-        <SectionCard
+        <Surface
           title="Student and guardian"
           description="Start with the information the school office needs for a normal admission."
         >
@@ -683,11 +683,11 @@ export function AdmissionCaseWizard({
               </Field>
             </div>
           </details>
-        </SectionCard>
+        </Surface>
       ) : null}
 
       {step === 1 ? (
-        <SectionCard
+        <Surface
           title="Class and documents"
           description="Choose the student’s placement. Documents can be linked now when uploaded through the protected file flow, or added later from the student profile."
         >
@@ -870,12 +870,12 @@ export function AdmissionCaseWizard({
               documents become follow-up work after admission.
             </p>
           </div>
-        </SectionCard>
+        </Surface>
       ) : null}
 
       {step === 2 ? (
         <div className="space-y-5">
-          <SectionCard
+          <Surface
             title="Review and admit"
             description="SchoolOS checks placement, policy requirements, and possible duplicates before it creates a student."
           >
@@ -893,7 +893,7 @@ export function AdmissionCaseWizard({
                 value={`${(academicYearsQuery.data ?? []).find((year) => year.id === form.academicYearId)?.name ?? 'Academic year'} · ${(classesQuery.data ?? []).find((schoolClass) => schoolClass.id === form.classId)?.name ?? 'Class'} · ${educationProgramLabel((classesQuery.data ?? []).find((schoolClass) => schoolClass.id === form.classId)?.program ?? null)}${availableSections.find((section) => section.id === form.sectionId) ? ` · ${availableSections.find((section) => section.id === form.sectionId)?.name}` : ''}`}
               />
             </div>
-          </SectionCard>
+          </Surface>
 
           {caseData ? (
             <EligibilityPanel
@@ -905,7 +905,7 @@ export function AdmissionCaseWizard({
             <RelatedStudentResolution admissionCase={caseData} />
           ) : null}
           {requiresReview ? (
-            <SectionCard
+            <Surface
               title="Admission review required"
               description="This class or admission type needs review before the student can be admitted."
             >
@@ -925,7 +925,7 @@ export function AdmissionCaseWizard({
                   Open admission case
                 </Button>
               </div>
-            </SectionCard>
+            </Surface>
           ) : null}
         </div>
       ) : null}
@@ -1032,7 +1032,7 @@ function EligibilityPanel({
   const blocked =
     admissionCase.missingRequiredFields.length > 0 || documentsBlock;
   return (
-    <SectionCard
+    <Surface
       title="Admission check"
       description={admissionCase.nextActionLabel}
     >
@@ -1097,7 +1097,7 @@ function EligibilityPanel({
           </div>
         ) : null}
       </div>
-    </SectionCard>
+    </Surface>
   );
 }
 
@@ -1265,7 +1265,7 @@ function RelatedStudentResolution({
   admissionCase: AdmissionCase;
 }) {
   return (
-    <SectionCard
+    <Surface
       title="Guardian and sibling resolution"
       description="These existing students share the submitted guardian phone. This is family context only; duplicate review remains separate."
     >
@@ -1305,7 +1305,7 @@ function RelatedStudentResolution({
           </li>
         ))}
       </ul>
-    </SectionCard>
+    </Surface>
   );
 }
 

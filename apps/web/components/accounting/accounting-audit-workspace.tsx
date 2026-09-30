@@ -1,9 +1,9 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { SectionCard } from '../ui/section-card';
 import { ReportTable } from './report-table';
 import { Select } from '../ui/select';
 import { Search, History, Eye, FileSpreadsheet } from 'lucide-react';
@@ -64,10 +64,10 @@ export function AccountingAuditWorkspace() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <SectionCard
+      <Surface
         title="Financial Audit Trail"
         description="Cross-module audit trail for fees, payroll, and accounting actions."
-        headerAction={
+        actions={
           <Button
             type="button"
             onClick={() => exportMutation.mutate()}
@@ -232,7 +232,7 @@ export function AccountingAuditWorkspace() {
             />
           </div>
         )}
-      </SectionCard>
+      </Surface>
 
       <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
         <DialogContent className="max-w-2xl">

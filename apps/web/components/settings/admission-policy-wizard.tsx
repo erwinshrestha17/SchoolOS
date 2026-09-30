@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type {
   AdmissionPolicyApplicantType,
   AdmissionPolicyDetail,
@@ -13,7 +14,6 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { admissionPoliciesApi } from '../../lib/api/admission-policies';
 import { ErrorState } from '../ui/error-state';
-import { SectionCard } from '../ui/section-card';
 import { Button } from '../ui/button';
 import { ApprovalChainBuilder } from './approval-chain-builder';
 import { DocumentChecklistBuilder } from './document-checklist-builder';
@@ -368,7 +368,7 @@ export function AdmissionPolicyWizard({
       {step === 0 ? (
         <div className="space-y-5">
           {!initialPolicyId && !policyId ? (
-            <SectionCard
+            <Surface
               title="Start from a template"
               description="Pick the closest match to pre-fill scope, documents, and decision defaults. Every field stays editable in the steps that follow."
             >
@@ -397,10 +397,10 @@ export function AdmissionPolicyWizard({
                   </p>
                 </button>
               </div>
-            </SectionCard>
+            </Surface>
           ) : null}
 
-          <SectionCard
+          <Surface
             title="Policy name"
             description="Give staff a plain-language name for this policy, e.g. Grade 1 Admission 2083."
           >
@@ -413,12 +413,12 @@ export function AdmissionPolicyWizard({
                 placeholder="Grade 11 Science Admission 2083"
               />
             </label>
-          </SectionCard>
+          </Surface>
         </div>
       ) : null}
 
       {step === 1 ? (
-        <SectionCard
+        <Surface
           title="Who can apply"
           description="Scope this policy to a class, year, or applicant type. Leave a field blank to apply more broadly."
         >
@@ -498,11 +498,11 @@ export function AdmissionPolicyWizard({
               </select>
             </label>
           </div>
-        </SectionCard>
+        </Surface>
       ) : null}
 
       {step === 2 ? (
-        <SectionCard
+        <Surface
           title="Required information"
           description="Choose what additional information staff must collect for this policy."
         >
@@ -535,12 +535,12 @@ export function AdmissionPolicyWizard({
             />
             Require a section when the class has sections
           </label>
-        </SectionCard>
+        </Surface>
       ) : null}
 
       {step === 3 ? (
         policyId && draftVersion ? (
-          <SectionCard
+          <Surface
             title="Required documents"
             description="Build the document checklist for this policy."
           >
@@ -549,7 +549,7 @@ export function AdmissionPolicyWizard({
               versionId={draftVersion.id}
               documentRequirements={documentRequirements}
             />
-          </SectionCard>
+          </Surface>
         ) : (
           <p className="text-sm text-slate-500">
             Save the basic information step first.
@@ -558,7 +558,7 @@ export function AdmissionPolicyWizard({
       ) : null}
 
       {step === 4 ? (
-        <SectionCard
+        <Surface
           title="Assessment, capacity, and decision"
           description="Configure whether applicants need evaluation or approval."
         >
@@ -639,11 +639,11 @@ export function AdmissionPolicyWizard({
               />
             </div>
           ) : null}
-        </SectionCard>
+        </Surface>
       ) : null}
 
       {step === 5 ? (
-        <SectionCard
+        <Surface
           title="Review and activate"
           description="Confirm this policy before it applies to new admissions."
         >
@@ -705,7 +705,7 @@ export function AdmissionPolicyWizard({
               Activate Policy
             </Button>
           </div>
-        </SectionCard>
+        </Surface>
       ) : null}
 
       {step < 5 ? (

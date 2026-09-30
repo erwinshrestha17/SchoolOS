@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import {
   formatBsDate,
   formatBsDateForInput,
@@ -18,7 +19,6 @@ import { BsDateField } from '@/components/ui/bs-date-field';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Button } from '@/components/ui/button';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { api } from '@/lib/api';
 
@@ -225,7 +225,7 @@ function CollectionReportPanel() {
   return (
     <div className="space-y-6">
       <ReportPeriodFilter />
-      <SectionCard
+      <Surface
         title="Collections"
         description={`Official totals generated ${formatBsDateTime(report.generatedAt)}${report.period ? ` · ${formatBsDate(report.period.fromDate)} to ${formatBsDate(report.period.toDate)}` : ' · All recorded time'}`}
       >
@@ -242,7 +242,7 @@ function CollectionReportPanel() {
             </div>
           ))}
         </div>
-      </SectionCard>
+      </Surface>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <BreakdownTable
@@ -289,10 +289,10 @@ function PaymentMethodReportPanel() {
   return (
     <div className="space-y-6">
       <ReportPeriodFilter />
-      <SectionCard
+      <Surface
         title="Payment methods"
         description={`Gross, refund, and net totals by payment method · As of ${formatBsDateTime(reportQuery.data.generatedAt)}`}
-        noPadding
+        padding="flush"
       >
         {reportQuery.data.rows.length ? (
           <div className="overflow-x-auto">
@@ -340,7 +340,7 @@ function PaymentMethodReportPanel() {
             className="m-5 min-h-52"
           />
         )}
-      </SectionCard>
+      </Surface>
     </div>
   );
 }
@@ -374,10 +374,10 @@ function UnallocatedPaymentReportPanel() {
   const report = reportQuery.data;
 
   return (
-    <SectionCard
+    <Surface
       title="Advances and unallocated payments"
       description={`${report.summary.totalPayments} payment balances · Total ${formatCurrency(report.summary.totalUnallocatedAmount)} · Generated ${formatBsDateTime(report.generatedAt)}`}
-      noPadding
+      padding="flush"
     >
       {report.rows.length ? (
         <div>
@@ -444,7 +444,7 @@ function UnallocatedPaymentReportPanel() {
           className="m-5 min-h-52"
         />
       )}
-    </SectionCard>
+    </Surface>
   );
 }
 
@@ -475,10 +475,10 @@ function CashierCloseReportPanel() {
   if (reportQuery.isLoading || !reportQuery.data) return <ReportLoading />;
 
   return (
-    <SectionCard
+    <Surface
       title="Cashier closes"
       description="Finalized, immutable cashier-close records."
-      noPadding
+      padding="flush"
     >
       {reportQuery.data.items.length ? (
         <div>
@@ -535,7 +535,7 @@ function CashierCloseReportPanel() {
           className="m-5 min-h-52"
         />
       )}
-    </SectionCard>
+    </Surface>
   );
 }
 
@@ -566,10 +566,10 @@ function InvoiceRegisterPanel() {
   return (
     <div className="space-y-6">
       <ReportPeriodFilter />
-      <SectionCard
+      <Surface
         title="Invoice register"
         description={`${reportQuery.data.summary.displayedInvoices} of ${reportQuery.data.summary.totalInvoices} invoices · Visible outstanding ${formatCurrency(reportQuery.data.summary.totalBalanceAmount)}`}
-        noPadding
+        padding="flush"
       >
         {reportQuery.data.rows.length ? (
           <div>
@@ -632,7 +632,7 @@ function InvoiceRegisterPanel() {
             className="m-5 min-h-52"
           />
         )}
-      </SectionCard>
+      </Surface>
     </div>
   );
 }
@@ -655,10 +655,10 @@ function ReceiptSequenceExceptionPanel() {
   if (reportQuery.isLoading || !reportQuery.data) return <ReportLoading />;
 
   return (
-    <SectionCard
+    <Surface
       title="Receipt sequence exceptions"
       description="Review missing, duplicate, out-of-sequence, or reversed receipt numbers before close."
-      noPadding
+      padding="flush"
     >
       {reportQuery.data.rows.length ? (
         <div>
@@ -705,7 +705,7 @@ function ReceiptSequenceExceptionPanel() {
           className="m-5 min-h-52"
         />
       )}
-    </SectionCard>
+    </Surface>
   );
 }
 
@@ -736,10 +736,10 @@ function RefundReversalRegisterPanel() {
   return (
     <div className="space-y-6">
       <ReportPeriodFilter />
-      <SectionCard
+      <Surface
         title="Refund and reversal register"
         description={`${reportQuery.data.summary.totalRecords} completed records · ${reportQuery.data.summary.refundCount} refunds · ${reportQuery.data.summary.reversalCount} reversals`}
-        noPadding
+        padding="flush"
       >
         {reportQuery.data.rows.length ? (
           <div>
@@ -794,7 +794,7 @@ function RefundReversalRegisterPanel() {
             className="m-5 min-h-52"
           />
         )}
-      </SectionCard>
+      </Surface>
     </div>
   );
 }
@@ -854,10 +854,10 @@ function AdjustmentReportPanel() {
           </select>
         </label>
       </div>
-      <SectionCard
+      <Surface
         title="Adjustments"
         description="Refund and reversal requests with their current workflow status."
-        noPadding
+        padding="flush"
       >
         {reportQuery.data.items.length ? (
           <div>
@@ -910,7 +910,7 @@ function AdjustmentReportPanel() {
             className="m-5 min-h-52"
           />
         )}
-      </SectionCard>
+      </Surface>
     </div>
   );
 }
@@ -1003,7 +1003,7 @@ function BreakdownTable({
   rows: Array<{ label: string; amount: string }>;
 }) {
   return (
-    <SectionCard title={title} noPadding>
+    <Surface title={title} padding="flush">
       {rows.length ? (
         <div className="divide-y divide-slate-100">
           {rows.map((row) => (
@@ -1025,7 +1025,7 @@ function BreakdownTable({
           className="m-5 min-h-44"
         />
       )}
-    </SectionCard>
+    </Surface>
   );
 }
 

@@ -1,11 +1,11 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { StudentFeeClearance, StudentProfileDetail } from '@schoolos/core';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { StudentAvatar } from '@/components/students/student-avatar';
-import { SectionCard } from '@/components/ui/section-card';
 import { ActionMenu } from '@/components/ui/action-menu';
 import {
   Archive,
@@ -122,7 +122,7 @@ export function ProfileHeader({
     canManageLifecycle;
 
   return (
-    <SectionCard className="overflow-hidden border-[var(--color-mod-admissions-border)] bg-white shadow-sm">
+    <Surface className="overflow-hidden border-[var(--color-mod-admissions-border)] bg-white shadow-sm">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-5">
         <Link
           href="/dashboard/students"
@@ -310,7 +310,7 @@ export function ProfileHeader({
           {pdfError}
         </div>
       ) : null}
-    </SectionCard>
+    </Surface>
   );
 }
 

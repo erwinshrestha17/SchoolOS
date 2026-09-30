@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import {
   formatBsDate,
   formatBsDateForInput,
@@ -20,7 +21,6 @@ import { Button } from '../ui/button';
 import { FormField } from '../ui/form-field';
 import { Input } from '../ui/input';
 import { PageState } from '../ui/page-state';
-import { SectionCard } from '../ui/section-card';
 import { Select } from '../ui/select';
 import {
   PaginatedDataTable,
@@ -287,7 +287,7 @@ export function AccountingSourceMappingsWorkspace() {
           className="min-h-40"
         />
       ) : healthQuery.data ? (
-        <SectionCard
+        <Surface
           title="Finance Posting Health"
           description={`Checked ${formatBsDateTime(healthQuery.data.checkedAt)} against up to ${healthQuery.data.sampleLimit} recent source postings.`}
         >
@@ -338,10 +338,10 @@ export function AccountingSourceMappingsWorkspace() {
             readiness. Source posting, reversal, fiscal-lock, and pilot evidence
             must still pass for each module.
           </p>
-        </SectionCard>
+        </Surface>
       ) : null}
 
-      <SectionCard
+      <Surface
         title="Mapping registry"
         description="Search and review tenant-scoped mapping versions. Archived versions remain visible for audit history."
       >
@@ -434,7 +434,7 @@ export function AccountingSourceMappingsWorkspace() {
             )
           }
         />
-      </SectionCard>
+      </Surface>
 
       {createOpen ? (
         <div

@@ -1,7 +1,7 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { StudentProfileDetail } from '@schoolos/core';
-import { SectionCard } from '@/components/ui/section-card';
 import {
   Heart,
   AlertCircle,
@@ -17,7 +17,7 @@ export function HealthTab({ profile }: { profile: StudentProfileDetail }) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-2 animate-fade-in">
-      <SectionCard title="Medical Records">
+      <Surface title="Medical Records">
         <div className="space-y-6">
           <HealthItem
             icon={<AlertCircle size={18} />}
@@ -44,9 +44,9 @@ export function HealthTab({ profile }: { profile: StudentProfileDetail }) {
             tone={student.specialNeeds ? 'admissions' : 'neutral'}
           />
         </div>
-      </SectionCard>
+      </Surface>
 
-      <SectionCard title="Emergency Contacts">
+      <Surface title="Emergency Contacts">
         <div className="grid gap-6">
           <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-5">
             <p className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 mb-4">
@@ -86,7 +86,7 @@ export function HealthTab({ profile }: { profile: StudentProfileDetail }) {
             </div>
           </div>
         </div>
-      </SectionCard>
+      </Surface>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
@@ -17,7 +18,6 @@ import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell'
 import { ModuleHeader } from '@/components/ui/module-header';
 import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { ModuleTabs } from '@/components/ui/module-tabs';
-import { SectionCard } from '@/components/ui/section-card';
 import { PermissionDenied } from '@/components/ui/permission-denied';
 import { useHasAnyPermission } from '@/lib/permissions-ui';
 import { canteenApi } from '@/lib/api/canteen';
@@ -233,7 +233,7 @@ export default function OperationsPage() {
 
       <div className="mt-6 grid gap-6 xl:grid-cols-3">
         {canUseLibrary ? (
-          <SectionCard
+          <Surface
             title="Library"
             description="Issue, return, overdue, and borrower workflows."
           >
@@ -253,10 +253,10 @@ export default function OperationsPage() {
             >
               Open issue / return
             </Link>
-          </SectionCard>
+          </Surface>
         ) : null}
         {canUseTransport ? (
-          <SectionCard
+          <Surface
             title="Transport"
             description="Trips, route status, and explicit GPS freshness."
           >
@@ -279,10 +279,10 @@ export default function OperationsPage() {
             >
               View trip status
             </Link>
-          </SectionCard>
+          </Surface>
         ) : null}
         {canUseCanteen ? (
-          <SectionCard
+          <Surface
             title="Canteen"
             description="POS, menu, serving, and wallet workflows."
           >
@@ -302,7 +302,7 @@ export default function OperationsPage() {
             >
               Open POS
             </Link>
-          </SectionCard>
+          </Surface>
         ) : null}
       </div>
     </DashboardPageShell>

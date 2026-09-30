@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -9,7 +10,6 @@ import { api } from '@/lib/api';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
-import { SectionCard } from '@/components/ui/section-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ConflictsList } from '@/components/timetable/conflicts-list';
@@ -65,7 +65,7 @@ export default function TimetableConflictsPage() {
         actions={headerActions}
       />
 
-      <SectionCard
+      <Surface
         title="Validation scope"
         description="Choose the academic year and timetable version to validate. Published versions are selected by default when available."
       >
@@ -111,7 +111,7 @@ export default function TimetableConflictsPage() {
             </Select>
           </label>
         </div>
-      </SectionCard>
+      </Surface>
 
       {versionsQuery.isLoading ? (
         <LoadingState label="Loading timetable versions..." />

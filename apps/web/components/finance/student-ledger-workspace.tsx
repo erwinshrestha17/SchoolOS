@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { formatBsDate } from '@schoolos/core';
 import { ArrowLeft, Search } from 'lucide-react';
@@ -10,7 +11,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { FilterChips } from '@/components/ui/filter-chips';
 import { SearchInput } from '@/components/ui/search-input';
-import { SectionCard } from '@/components/ui/section-card';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { api } from '@/lib/api';
@@ -77,7 +77,7 @@ export function StudentLedgerWorkspace() {
 
   if (!studentId) {
     return (
-      <SectionCard
+      <Surface
         title="Find a student ledger"
         description="Use the finance search to find a student, then open their official ledger."
       >
@@ -157,7 +157,7 @@ export function StudentLedgerWorkspace() {
             />
           )}
         </div>
-      </SectionCard>
+      </Surface>
     );
   }
 
@@ -316,10 +316,10 @@ export function StudentLedgerWorkspace() {
         }
       />
 
-      <SectionCard
+      <Surface
         title="Ledger activity"
         description="Chronological debit, credit, and official running balance values."
-        noPadding
+        padding="flush"
       >
         {ledger.rows.length ? (
           <div>
@@ -405,7 +405,7 @@ export function StudentLedgerWorkspace() {
             className="m-5 min-h-52"
           />
         )}
-      </SectionCard>
+      </Surface>
 
       <Link
         href="/dashboard/fees/collect"

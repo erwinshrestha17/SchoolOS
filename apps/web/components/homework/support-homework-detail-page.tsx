@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { formatBsDate, formatBsDateTime } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, BookOpen, ShieldCheck } from 'lucide-react';
@@ -11,7 +12,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ModuleHeader } from '@/components/ui/module-header';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 
 export function SupportHomeworkDetailPage({
@@ -84,7 +84,7 @@ export function SupportHomeworkDetailPage({
         </p>
       </div>
 
-      <SectionCard
+      <Surface
         title="Assignment"
         description="The same published instructions visible in the school homework record."
       >
@@ -116,7 +116,7 @@ export function SupportHomeworkDetailPage({
             <DetailRow label="Due" value={safeDateTime(homework.dueAt)} />
           </dl>
         </div>
-      </SectionCard>
+      </Surface>
     </DashboardPageShell>
   );
 }

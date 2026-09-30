@@ -1,9 +1,9 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { formatBsDateTime, type StudentProfileDetail } from '@schoolos/core';
 import { api } from '@/lib/api';
-import { SectionCard } from '@/components/ui/section-card';
 import { LoadingState } from '@/components/ui/loading-state';
 import {
   History,
@@ -107,7 +107,7 @@ export function HistoryTab({ profile }: { profile: StudentProfileDetail }) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <SectionCard
+      <Surface
         title="Student History Log"
         description="Chronological audit trail of student lifecycle transitions and events"
       >
@@ -178,7 +178,7 @@ export function HistoryTab({ profile }: { profile: StudentProfileDetail }) {
             </p>
           </div>
         )}
-      </SectionCard>
+      </Surface>
     </div>
   );
 }

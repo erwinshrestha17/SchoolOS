@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
@@ -41,7 +42,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ModuleHeader } from '../../../components/ui/module-header';
 import { SummaryCard, SummaryGrid } from '../../../components/ui/summary-card';
 import { WorkspaceTabs } from '../../../components/dashboard/module-tabs';
-import { SectionCard } from '../../../components/ui/section-card';
 import { WorkSurface } from '../../../components/ui/work-surface';
 import { useUrlFilters } from '../../../lib/hooks/use-url-filters';
 import { useTeacherAssignmentScope } from '../../../lib/hooks/use-teacher-assignment-scope';
@@ -844,7 +844,7 @@ function HomeworkWorkspace() {
       ) : null}
 
       {activeTab === 'completion' ? (
-        <SectionCard
+        <Surface
           title="Needs follow-up"
           description="Published homework with unchecked or incomplete student rows. Open an assignment to reach its completion register."
         >
@@ -896,14 +896,14 @@ function HomeworkWorkspace() {
               ))}
             </div>
           )}
-        </SectionCard>
+        </Surface>
       ) : null}
 
       {activeTab === 'templates' ? (
-        <SectionCard
+        <Surface
           title="Template Library"
           description="Browse reusable homework templates that match the current filters."
-          headerAction={
+          actions={
             <div className="relative w-full max-w-xs">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
@@ -959,7 +959,7 @@ function HomeworkWorkspace() {
               ))}
             </div>
           )}
-        </SectionCard>
+        </Surface>
       ) : null}
 
       <HomeworkQuickViewDrawer
@@ -1316,7 +1316,7 @@ function StudentHomeworkView() {
         description={`Homework assigned to ${isParent ? 'your child' : 'you'}${session?.tenant.name ? ` at ${session.tenant.name}` : ''}.`}
       />
 
-      <SectionCard
+      <Surface
         title="Homework"
         description="A read-only list of published homework. Open an assignment to see full instructions."
       >
@@ -1344,7 +1344,7 @@ function StudentHomeworkView() {
             />
           </div>
         )}
-      </SectionCard>
+      </Surface>
     </DashboardPageShell>
   );
 }

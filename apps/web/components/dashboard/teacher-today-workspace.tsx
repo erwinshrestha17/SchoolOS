@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { formatBsDateTime } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -22,7 +23,6 @@ import type {
   TeacherTodaySummary,
 } from '@/lib/api/teacher-workspace';
 import { LoadingState } from '@/components/ui/loading-state';
-import { SectionCard } from '@/components/ui/section-card';
 
 function ModuleUnavailableNotice({ moduleName }: { moduleName: string }) {
   return (
@@ -98,7 +98,7 @@ export function TeacherTodayWorkspace() {
 
   if (todayQuery.isError || !todayQuery.data) {
     return (
-      <SectionCard title="Unable to load your day">
+      <Surface title="Unable to load your day">
         <div className="flex flex-col items-start gap-3">
           <p className="text-sm text-slate-600">
             Something went wrong while loading your Today summary.
@@ -112,7 +112,7 @@ export function TeacherTodayWorkspace() {
             Retry
           </button>
         </div>
-      </SectionCard>
+      </Surface>
     );
   }
 
@@ -157,7 +157,7 @@ export function TeacherTodayWorkspace() {
       </div>
 
       {!hasTeachingWork ? (
-        <SectionCard title="No active teaching assignments">
+        <Surface title="No active teaching assignments">
           <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
             <ClipboardList
               className="mt-0.5 h-4 w-4 shrink-0 text-slate-400"
@@ -169,7 +169,7 @@ export function TeacherTodayWorkspace() {
               if this is unexpected.
             </p>
           </div>
-        </SectionCard>
+        </Surface>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -197,7 +197,7 @@ export function TeacherTodayWorkspace() {
             />
           </div>
 
-          <SectionCard
+          <Surface
             title="Today's schedule"
             description="Your periods for the day, in order."
           >
@@ -217,13 +217,13 @@ export function TeacherTodayWorkspace() {
                 nextId={data.nextPeriod?.id ?? null}
               />
             )}
-          </SectionCard>
+          </Surface>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <SectionCard
+            <Surface
               title="Attendance Classes"
               description="Assigned homeroom sections available for attendance."
-              headerAction={
+              actions={
                 attendanceUnavailable ? null : hasAttendanceClasses &&
                   pendingAttendanceCount > 0 ? (
                   <span className="inline-flex items-center rounded-full border border-warning-100 bg-warning-50 px-2.5 py-1 text-xs font-bold text-warning-700">
@@ -264,12 +264,12 @@ export function TeacherTodayWorkspace() {
                   homeroom attendance class is assigned for this day.
                 </p>
               )}
-            </SectionCard>
+            </Surface>
 
-            <SectionCard
+            <Surface
               title="Homework"
               description="Assigned-subject homework awaiting your review."
-              headerAction={
+              actions={
                 data.homework && data.homework.awaitingReviewCount > 0 ? (
                   <span className="inline-flex items-center rounded-full border border-warning-100 bg-warning-50 px-2.5 py-1 text-xs font-bold text-warning-700">
                     {data.homework.awaitingReviewCount} to review
@@ -311,7 +311,7 @@ export function TeacherTodayWorkspace() {
               ) : (
                 <ModuleUnavailableNotice moduleName="Homework" />
               )}
-            </SectionCard>
+            </Surface>
           </div>
 
           <TeacherTodoCard
@@ -323,7 +323,7 @@ export function TeacherTodayWorkspace() {
           />
 
           {data.substitutions === null ? (
-            <SectionCard
+            <Surface
               title="Substitution Alerts"
               description="Timetable changes affecting you today."
             >
@@ -335,9 +335,9 @@ export function TeacherTodayWorkspace() {
               ) : (
                 <ModuleUnavailableNotice moduleName="Timetable" />
               )}
-            </SectionCard>
+            </Surface>
           ) : data.substitutions.length > 0 ? (
-            <SectionCard
+            <Surface
               title="Substitution Alerts"
               description="Timetable changes affecting you today."
             >
@@ -369,11 +369,11 @@ export function TeacherTodayWorkspace() {
                   </li>
                 ))}
               </ul>
-            </SectionCard>
+            </Surface>
           ) : null}
 
           {data.marksDeadlines === null ? (
-            <SectionCard
+            <Surface
               title="Marks Deadlines"
               description="Upcoming exam terms for your assigned subjects."
             >
@@ -385,9 +385,9 @@ export function TeacherTodayWorkspace() {
               ) : (
                 <ModuleUnavailableNotice moduleName="Exams" />
               )}
-            </SectionCard>
+            </Surface>
           ) : data.marksDeadlines.length > 0 ? (
-            <SectionCard
+            <Surface
               title="Marks Deadlines"
               description="Upcoming exam terms for your assigned subjects."
               footer={
@@ -418,7 +418,7 @@ export function TeacherTodayWorkspace() {
                   </li>
                 ))}
               </ul>
-            </SectionCard>
+            </Surface>
           ) : null}
         </>
       )}
@@ -436,7 +436,7 @@ function PeriodCard({
   emptyText: string;
 }) {
   return (
-    <SectionCard>
+    <Surface>
       <div className="flex items-center gap-3">
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[color:var(--primary-dark)]">
           <Clock className="h-5 w-5" aria-hidden="true" />
@@ -468,7 +468,7 @@ function PeriodCard({
           )}
         </div>
       </div>
-    </SectionCard>
+    </Surface>
   );
 }
 
@@ -493,17 +493,19 @@ function TeacherTodoCard({
   const marksList = marks ?? [];
   const pending = corrections?.pending ?? 0;
   const rejected = corrections?.rejectedRecently ?? 0;
+  // Loaded sources with nothing in them (a disabled Exams module sends
+  // null marks, which is also nothing to do); failures are never "clear".
   const nothingToDo =
     !marksFailed &&
     !correctionsFailed &&
-    marks !== undefined &&
     corrections !== undefined &&
+    corrections !== null &&
     marksList.length === 0 &&
     pending === 0 &&
     rejected === 0;
 
   return (
-    <SectionCard
+    <Surface
       title="To do"
       description="Marks still to enter and your attendance corrections."
     >
@@ -575,7 +577,7 @@ function TeacherTodoCard({
           ) : null}
         </ul>
       )}
-    </SectionCard>
+    </Surface>
   );
 }
 

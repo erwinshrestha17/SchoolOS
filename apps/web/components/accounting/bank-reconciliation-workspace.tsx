@@ -1,12 +1,12 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { resourceAccess } from '../../lib/resource-authorization';
 import { ReconciliationSessionsPanel } from './reconciliation-sessions-panel';
 import { useSession } from '../session-provider';
-import { SectionCard } from '../ui/section-card';
 import { Button } from '@/components/ui/button';
 import { Select } from '../ui/select';
 import {
@@ -371,7 +371,7 @@ export function BankReconciliationWorkspace() {
       )}
 
       {selectedAccountId && importPreview && (
-        <SectionCard
+        <Surface
           title="Statement Import Preview"
           description="Review the validated rows before committing them. Repeating the same import will not create duplicates."
         >
@@ -421,11 +421,11 @@ export function BankReconciliationWorkspace() {
               </Button>
             </div>
           </div>
-        </SectionCard>
+        </Surface>
       )}
 
       {selectedAccountId && (importJobsQuery.data?.length ?? 0) > 0 && (
-        <SectionCard
+        <Surface
           title="Large Import Jobs"
           description="Statement files with more than 500 rows are imported in the background. This list refreshes automatically while a job is queued or running."
         >
@@ -461,11 +461,11 @@ export function BankReconciliationWorkspace() {
               </div>
             ))}
           </div>
-        </SectionCard>
+        </Surface>
       )}
 
       {selectedAccountId && suggestionsQuery.data && (
-        <SectionCard
+        <Surface
           title="Auto-match Suggestions"
           description="Deterministic suggestions. Confirm matches manually before reconciliation."
         >
@@ -526,7 +526,7 @@ export function BankReconciliationWorkspace() {
               </p>
             )}
           </div>
-        </SectionCard>
+        </Surface>
       )}
 
       {selectedAccountId && summaryQuery.data && (
@@ -574,7 +574,7 @@ export function BankReconciliationWorkspace() {
 
       {selectedAccountId && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SectionCard
+          <Surface
             title="Unreconciled Statements"
             description="Bank statement lines waiting for a matching ledger entry."
           >
@@ -638,9 +638,9 @@ export function BankReconciliationWorkspace() {
                 )}
               />
             </div>
-          </SectionCard>
+          </Surface>
 
-          <SectionCard
+          <Surface
             title="General Ledger Matcher"
             description={
               matching
@@ -728,7 +728,7 @@ export function BankReconciliationWorkspace() {
                 />
               </div>
             </div>
-          </SectionCard>
+          </Surface>
         </div>
       )}
 

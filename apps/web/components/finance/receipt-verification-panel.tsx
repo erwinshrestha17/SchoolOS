@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { FormEvent, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
@@ -13,7 +14,6 @@ import {
 import { api } from '@/lib/api';
 import type { ReceiptVerificationResult } from '@/lib/api/finance';
 import { Button } from '@/components/ui/button';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 import { formatBsDateTime } from '@schoolos/core';
@@ -43,7 +43,7 @@ export function ReceiptVerificationPanel() {
   };
 
   return (
-    <SectionCard
+    <Surface
       title="Receipt QR Verification"
       description="Confirm receipt authenticity against tenant-scoped payment records."
     >
@@ -92,7 +92,7 @@ export function ReceiptVerificationPanel() {
 
         <VerificationResult result={verifyMutation.data} />
       </div>
-    </SectionCard>
+    </Surface>
   );
 }
 

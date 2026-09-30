@@ -1,7 +1,7 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { formatBsDate, type ActivityPost } from '@schoolos/core';
-import { SectionCard } from '@/components/ui/section-card';
 import { Images } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -20,7 +20,7 @@ const formatDate = (date: string | Date) => {
 export function ActivityTab({ posts }: ActivityTabProps) {
   return (
     <div className="space-y-6 animate-fade-in">
-      <SectionCard
+      <Surface
         title="School Activity Feed"
         description="Timeline of school updates and student involvement"
       >
@@ -59,7 +59,7 @@ export function ActivityTab({ posts }: ActivityTabProps) {
             </p>
           </div>
         )}
-      </SectionCard>
+      </Surface>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type { CommunicationProviderDiagnosticChannel } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -19,7 +20,6 @@ import { LoadingState } from '@/components/ui/loading-state';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { ModuleTabs } from '@/components/ui/module-tabs';
 import { PermissionDenied } from '@/components/ui/permission-denied';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { communicationsApi } from '@/lib/api/communications';
 
@@ -135,7 +135,7 @@ export default function ProviderDiagnosticsPage() {
           description="You do not have permission to view notification delivery diagnostics."
         />
       ) : (
-        <SectionCard
+        <Surface
           className="mt-6"
           title="Channel Health"
           description="Email, SMS, and push delivery health for this school."
@@ -160,7 +160,7 @@ export default function ProviderDiagnosticsPage() {
               description="No notification provider channels are available for this school."
             />
           )}
-        </SectionCard>
+        </Surface>
       )}
     </DashboardPageShell>
   );

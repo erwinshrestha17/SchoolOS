@@ -1,12 +1,12 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import {
   formatBsDateTime,
   type OperationalRecentItem,
   type OperationalSummaryModule,
 } from '@schoolos/core';
 import { cn } from '../../lib/utils';
-import { SectionCard } from '../ui/section-card';
 import {
   ACTIVITY_EVENT_LABELS,
   MODULE_DEFINITIONS,
@@ -34,10 +34,10 @@ export function LatestSchoolActivityPanel({
   const visibleItems = items.slice(0, MAX_ACTIVITY_ITEMS);
 
   return (
-    <SectionCard
+    <Surface
       title="Latest school activity"
       description="Recent school updates within your scope."
-      noPadding
+      padding="flush"
     >
       {visibleItems.length ? (
         <ul className="divide-y divide-slate-100">
@@ -76,7 +76,7 @@ export function LatestSchoolActivityPanel({
           No recent school activity is available yet.
         </p>
       )}
-    </SectionCard>
+    </Surface>
   );
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import React, { useEffect, useMemo, useState } from 'react';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
   Wallet,
@@ -217,7 +217,7 @@ export function CollectionCounter({
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <SectionCard
+        <Surface
           title={studentContext ? 'Selected Student' : 'Student Discovery'}
           description={
             studentContext
@@ -351,7 +351,7 @@ export function CollectionCounter({
               </div>
             ) : null}
           </div>
-        </SectionCard>
+        </Surface>
 
         <div className="space-y-6">
           {selectedInvoice ? (
@@ -417,10 +417,10 @@ export function CollectionCounter({
                   description="Your current role does not have the finance permission required to record fee payments."
                 />
               ) : (
-                <SectionCard
+                <Surface
                   title="Payment review"
                   description="Review the selected invoice, enter the tender, then confirm one payment."
-                  headerAction={
+                  actions={
                     <div className="flex items-center gap-2 rounded-xl bg-[var(--color-mod-fees-bg)] border border-[var(--color-mod-fees-border)] px-4 py-2 text-[0.65rem] font-black text-[var(--color-mod-fees-text)] uppercase tracking-widest">
                       <Receipt size={14} />
                       Invoice breakdown
@@ -641,7 +641,7 @@ export function CollectionCounter({
                       </div>
                     </div>
                   </div>
-                </SectionCard>
+                </Surface>
               )}
             </div>
           ) : (

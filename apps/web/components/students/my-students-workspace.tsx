@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Search, Users } from 'lucide-react';
@@ -7,7 +8,6 @@ import { api } from '@/lib/api';
 import type { MyStudentsGroupStudent } from '@/lib/api/teacher-students';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/loading-state';
-import { SectionCard } from '@/components/ui/section-card';
 import { Select } from '@/components/ui/form-field';
 import { cn } from '@/lib/utils';
 
@@ -118,7 +118,7 @@ export function MyStudentsWorkspace() {
 
   if (groups.length === 0) {
     return (
-      <SectionCard title="No assigned students">
+      <Surface title="No assigned students">
         <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
           <Users
             className="mt-0.5 h-4 w-4 shrink-0 text-slate-400"
@@ -130,7 +130,7 @@ export function MyStudentsWorkspace() {
             coordinator if you expected one.
           </p>
         </div>
-      </SectionCard>
+      </Surface>
     );
   }
 
@@ -229,18 +229,18 @@ export function MyStudentsWorkspace() {
       </p>
 
       {visibleGroups.length === 0 ? (
-        <SectionCard title="No students match these filters">
+        <Surface title="No students match these filters">
           <p className="text-sm text-slate-600">
             Try clearing the search or the &ldquo;needs attention&rdquo; filter.
           </p>
-        </SectionCard>
+        </Surface>
       ) : (
         visibleGroups.map((group) => (
-          <SectionCard
+          <Surface
             key={`${group.classId}:${group.sectionId}`}
             title={group.className}
             description={group.subject}
-            headerAction={
+            actions={
               <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600">
                 {group.students.length} student
                 {group.students.length === 1 ? '' : 's'}
@@ -334,7 +334,7 @@ export function MyStudentsWorkspace() {
                 </tbody>
               </table>
             </div>
-          </SectionCard>
+          </Surface>
         ))
       )}
     </div>

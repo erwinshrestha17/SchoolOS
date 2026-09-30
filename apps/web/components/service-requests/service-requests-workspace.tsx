@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type { PermissionKey } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -21,7 +22,6 @@ import { Button } from '@/components/ui/primitives/button';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { PermissionDenied } from '@/components/ui/permission-denied';
 import { ReasonDialog } from '@/components/ui/reason-dialog';
-import { SectionCard } from '@/components/ui/section-card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/primitives/tabs';
 import { api } from '@/lib/api';
 import {
@@ -230,10 +230,10 @@ export function ServiceRequestsQueueWorkspace() {
         </TabsList>
       </Tabs>
 
-      <SectionCard
+      <Surface
         title="Request queue"
         description="School service requests matching the current filters."
-        headerAction={
+        actions={
           <Badge variant="neutral">{listQuery.data?.total ?? 0} requests</Badge>
         }
       >
@@ -257,7 +257,7 @@ export function ServiceRequestsQueueWorkspace() {
           emptyTitle="No requests in this queue"
           emptyDescription="Cases matching this status will appear here when parents or staff open structured requests."
         />
-      </SectionCard>
+      </Surface>
     </DashboardPageShell>
   );
 }
@@ -463,21 +463,18 @@ export function ServiceRequestDetailWorkspace({
       </div>
 
       {detailQuery.isLoading ? (
-        <SectionCard
-          title="Loading request"
-          description="Fetching case details."
-        >
+        <Surface title="Loading request" description="Fetching case details.">
           <div className="h-24 animate-pulse rounded-xl bg-slate-100" />
-        </SectionCard>
+        </Surface>
       ) : detailQuery.isError || !request ? (
-        <SectionCard
+        <Surface
           title="Request unavailable"
           description="This case could not be loaded or is outside your tenant scope."
         >
           <Button type="button" onClick={() => void detailQuery.refetch()}>
             Retry
           </Button>
-        </SectionCard>
+        </Surface>
       ) : (
         <>
           <ModuleHeader
@@ -537,7 +534,7 @@ export function ServiceRequestDetailWorkspace({
           ) : null}
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <SectionCard
+            <Surface
               title="Case details"
               description="Parent-visible request context and school response state."
             >
@@ -617,11 +614,11 @@ export function ServiceRequestDetailWorkspace({
                   </p>
                 </div>
               ) : null}
-            </SectionCard>
+            </Surface>
 
             <div className="space-y-6">
               {canManage && isActive ? (
-                <SectionCard
+                <Surface
                   title="Actions"
                   description="Independent review rules apply to resolve and escalate."
                 >
@@ -649,7 +646,7 @@ export function ServiceRequestDetailWorkspace({
                       Escalate & reassign
                     </Button>
                   </div>
-                </SectionCard>
+                </Surface>
               ) : null}
 
               <NotesSection
@@ -663,7 +660,7 @@ export function ServiceRequestDetailWorkspace({
               />
 
               {request.attachments.length > 0 ? (
-                <SectionCard
+                <Surface
                   title="Protected evidence"
                   description="Downloads require your signed-in SchoolOS access."
                 >
@@ -707,7 +704,7 @@ export function ServiceRequestDetailWorkspace({
                       </li>
                     ))}
                   </ul>
-                </SectionCard>
+                </Surface>
               ) : null}
             </div>
           </div>
@@ -832,7 +829,7 @@ function NotesSection({
 }) {
   if (notes.length === 0) {
     return (
-      <SectionCard
+      <Surface
         title={title}
         description={
           internal
@@ -841,12 +838,12 @@ function NotesSection({
         }
       >
         <p className="text-sm text-slate-500">No notes yet.</p>
-      </SectionCard>
+      </Surface>
     );
   }
 
   return (
-    <SectionCard
+    <Surface
       title={title}
       description={
         internal
@@ -864,7 +861,7 @@ function NotesSection({
           </li>
         ))}
       </ul>
-    </SectionCard>
+    </Surface>
   );
 }
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type {
   OperationalModuleSummary,
   OperationalSummaryModule,
@@ -12,7 +13,6 @@ import {
   type DashboardCompositionPersona,
 } from '@/lib/dashboard-persona';
 import { cn } from '../../lib/utils';
-import { SectionCard } from '../ui/section-card';
 import {
   attendanceProgress,
   formatMoneyNpr,
@@ -66,7 +66,7 @@ export function TodayOperationsPanel({
           : 'Where each daily workflow stands right now.';
 
   return (
-    <SectionCard title={title} description={description} noPadding>
+    <Surface title={title} description={description} padding="flush">
       {modules.length ? (
         <ul className="divide-y divide-slate-100">
           {modules.map((summary) => (
@@ -80,7 +80,7 @@ export function TodayOperationsPanel({
           No operations summaries are available for your current access.
         </p>
       )}
-    </SectionCard>
+    </Surface>
   );
 }
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { formatBsDate, getNepalSchoolDay } from '@schoolos/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -17,7 +18,6 @@ import {
   Clock,
   Loader2,
 } from 'lucide-react';
-import { SectionCard } from '@/components/ui/section-card';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';

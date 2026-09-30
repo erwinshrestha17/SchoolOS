@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -9,7 +10,6 @@ import { api } from '@/lib/api';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
-import { SectionCard } from '@/components/ui/section-card';
 import { TimetableVersionsList } from '@/components/timetable/versions-list';
 
 export default function TimetableVersionsPage() {
@@ -48,7 +48,7 @@ export default function TimetableVersionsPage() {
         actions={headerActions}
       />
 
-      <SectionCard
+      <Surface
         title="Academic year scope"
         description="Choose the academic year whose timetable versions you want to manage."
       >
@@ -68,7 +68,7 @@ export default function TimetableVersionsPage() {
             ))}
           </Select>
         </label>
-      </SectionCard>
+      </Surface>
 
       <TimetableVersionsList
         academicYearId={selectedAcademicYearId || undefined}

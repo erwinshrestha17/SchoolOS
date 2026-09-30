@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -10,7 +11,6 @@ import { Button } from '../ui/button';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { ErrorState } from '../ui/error-state';
 import { LoadingState } from '../ui/loading-state';
-import { SectionCard } from '../ui/section-card';
 import { StatusBadge } from '../ui/status-badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 
@@ -150,7 +150,7 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
         </TabsList>
 
         <TabsContent value="overview">
-          <SectionCard title="Policy overview">
+          <Surface title="Policy overview">
             <dl className="grid gap-3 sm:grid-cols-2">
               <Summary
                 label="Applicant type"
@@ -181,11 +181,11 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
                 value={formatSchoolDate(policy.updatedAt)}
               />
             </dl>
-          </SectionCard>
+          </Surface>
         </TabsContent>
 
         <TabsContent value="form-fields">
-          <SectionCard
+          <Surface
             title="Required information"
             description="Additional fields staff must collect for this policy."
           >
@@ -209,11 +209,11 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
             <p className="mt-3 text-sm text-slate-600">
               Section required: {version?.requireSection ? 'Yes' : 'No'}
             </p>
-          </SectionCard>
+          </Surface>
         </TabsContent>
 
         <TabsContent value="documents">
-          <SectionCard
+          <Surface
             title="Required documents"
             description="Documents needed before admission is confirmed."
           >
@@ -241,11 +241,11 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
                 No documents required yet.
               </p>
             )}
-          </SectionCard>
+          </Surface>
         </TabsContent>
 
         <TabsContent value="eligibility">
-          <SectionCard
+          <Surface
             title="Eligibility and capacity"
             description="How this policy checks class capacity."
           >
@@ -263,11 +263,11 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
                 }
               />
             </dl>
-          </SectionCard>
+          </Surface>
         </TabsContent>
 
         <TabsContent value="assessment">
-          <SectionCard
+          <Surface
             title="Assessment"
             description="Evaluation this policy requires before admission."
           >
@@ -287,11 +287,11 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
                   : 'Not required'}
               </li>
             </ul>
-          </SectionCard>
+          </Surface>
         </TabsContent>
 
         <TabsContent value="decisions">
-          <SectionCard
+          <Surface
             title="Decision"
             description="How admissions under this policy are approved."
           >
@@ -348,11 +348,11 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
                 {version.notesForOffice}
               </p>
             ) : null}
-          </SectionCard>
+          </Surface>
         </TabsContent>
 
         <TabsContent value="history">
-          <SectionCard title="Version history">
+          <Surface title="Version history">
             {versionsQuery.data?.length ? (
               <ul className="space-y-2">
                 {versionsQuery.data.map((historyVersion) => (
@@ -374,8 +374,8 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
                   : 'No versions yet.'}
               </p>
             )}
-          </SectionCard>
-          <SectionCard title="Policy audit timeline" className="mt-4">
+          </Surface>
+          <Surface title="Policy audit timeline" className="mt-4">
             {auditQuery.data?.length ? (
               <ul className="space-y-3">
                 {auditQuery.data.map((event) => (
@@ -399,7 +399,7 @@ export function AdmissionPolicyDetail({ policyId }: { policyId: string }) {
                   : 'No changes recorded yet.'}
               </p>
             )}
-          </SectionCard>
+          </Surface>
         </TabsContent>
       </Tabs>
 

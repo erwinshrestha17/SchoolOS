@@ -1,9 +1,9 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Landmark, Plus } from 'lucide-react';
 import { api } from '../../lib/api';
-import { SectionCard } from '../ui/section-card';
 import { PageState } from '../ui/page-state';
 import { Button } from '@/components/ui/button';
 import { ReportTable } from './report-table';
@@ -93,10 +93,10 @@ export function ChartOfAccountsView() {
         </Button>
       </div>
 
-      <SectionCard
+      <Surface
         title="Chart of Accounts"
         description="Manage your school's financial account structure and system defaults."
-        headerAction={
+        actions={
           <Button
             type="button"
             disabled={seedMutation.isPending}
@@ -136,7 +136,7 @@ export function ChartOfAccountsView() {
             },
           }))}
         />
-      </SectionCard>
+      </Surface>
 
       <OpeningBalanceDialog
         isOpen={openingBalOpen}

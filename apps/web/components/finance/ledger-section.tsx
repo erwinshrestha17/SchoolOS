@@ -1,7 +1,7 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import React, { useState } from 'react';
-import { SectionCard } from '@/components/ui/section-card';
 import { FeeLedger } from './fee-ledger';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -166,7 +166,7 @@ export function LedgerSection({
       ) : null}
 
       {mode !== 'receipts' ? (
-        <SectionCard
+        <Surface
           title="Billing History"
           description="Invoices and their current payment status."
         >
@@ -188,12 +188,12 @@ export function LedgerSection({
               })
             }
           />
-        </SectionCard>
+        </Surface>
       ) : null}
 
       {mode !== 'invoices' ? (
         <div id="receipt-history">
-          <SectionCard
+          <Surface
             title="Receipt History"
             description="Protected school receipts with search and paging."
           >
@@ -339,7 +339,7 @@ export function LedgerSection({
                 No receipts match the current filters.
               </p>
             )}
-          </SectionCard>
+          </Surface>
         </div>
       ) : null}
 

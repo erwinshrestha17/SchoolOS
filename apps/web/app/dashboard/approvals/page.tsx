@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { formatBsDateTime } from '@schoolos/core';
 import {
   useInfiniteQuery,
@@ -14,7 +15,6 @@ import { EmptyState } from '../../../components/ui/empty-state';
 import { ErrorState } from '../../../components/ui/error-state';
 import { LoadingState } from '../../../components/ui/loading-state';
 import { PermissionDenied } from '../../../components/ui/permission-denied';
-import { SectionCard } from '../../../components/ui/section-card';
 import { api, type ApprovalDecision } from '../../../lib/api';
 import { usePermissionAccess } from '../../../lib/permissions-ui';
 import { useHomePersona } from '../../../lib/home-persona';
@@ -127,7 +127,7 @@ export default function PrincipalApprovalCentrePage() {
 
       {reviewable.length ? (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <SectionCard
+          <Surface
             title="Waiting for your decision"
             description={`${reviewable.length} loaded request${reviewable.length === 1 ? '' : 's'} assigned to your current role, permission, or delegation.`}
           >
@@ -188,10 +188,10 @@ export default function PrincipalApprovalCentrePage() {
                 </Button>
               </div>
             ) : null}
-          </SectionCard>
+          </Surface>
 
           {selected ? (
-            <SectionCard
+            <Surface
               title="Review decision"
               description="Check the request, its safe context, and the decision impact before confirming."
             >
@@ -356,7 +356,7 @@ export default function PrincipalApprovalCentrePage() {
                   </div>
                 )}
               </div>
-            </SectionCard>
+            </Surface>
           ) : null}
         </div>
       ) : null}

@@ -1,9 +1,9 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { Lock, Unlock } from 'lucide-react';
 import { api } from '../../lib/api';
-import { SectionCard } from '../ui/section-card';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 import { useState } from 'react';
@@ -27,7 +27,7 @@ export function FiscalManagementView() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <SectionCard
+      <Surface
         title="Fiscal Years & Periods"
         description="Manage accounting periods and fiscal year status for financial reporting."
       >
@@ -128,7 +128,7 @@ export function FiscalManagementView() {
             </div>
           ))}
         </div>
-      </SectionCard>
+      </Surface>
 
       <FiscalYearCloseDialog
         isOpen={fyCloseOpen}

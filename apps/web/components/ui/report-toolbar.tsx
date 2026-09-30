@@ -1,7 +1,7 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type { ReactNode } from 'react';
-import { SectionCard } from './section-card';
 
 type ReportToolbarProps = {
   title?: string;
@@ -17,8 +17,8 @@ export function ReportToolbar({
   actions,
 }: ReportToolbarProps) {
   return (
-    <SectionCard title={title} description={description} headerAction={actions}>
+    <Surface title={title} description={description} actions={actions}>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">{filters}</div>
-    </SectionCard>
+    </Surface>
   );
 }

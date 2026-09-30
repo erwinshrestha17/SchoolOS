@@ -1,8 +1,8 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { SectionCard } from '@/components/ui/section-card';
 import { Badge } from '@/components/ui/badge';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ProtectedFileLink } from '@/components/ui/protected-file';
@@ -319,7 +319,7 @@ export function CashierCloseSection() {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
-        <SectionCard
+        <Surface
           title="Daily Collection Summary"
           description={`${formatBsDateTime(openedAt)} to ${formatBsDateTime(closedAt)}`}
         >
@@ -384,9 +384,9 @@ export function CashierCloseSection() {
               </div>
             </div>
           </div>
-        </SectionCard>
+        </Surface>
 
-        <SectionCard
+        <Surface
           title="Counter Handover"
           description="Move the cashier session through count, submission, independent approval, and closure."
         >
@@ -501,10 +501,10 @@ export function CashierCloseSection() {
               ) : null}
             </div>
           )}
-        </SectionCard>
+        </Surface>
       </div>
 
-      <SectionCard
+      <Surface
         title="Finalized Cashier Closes"
         description="Finalized, immutable close sessions for this school."
       >
@@ -586,9 +586,9 @@ export function CashierCloseSection() {
             No finalized cashier closes were found.
           </p>
         )}
-      </SectionCard>
+      </Surface>
 
-      <SectionCard
+      <Surface
         title="Deposit preparation"
         description="Keep cashier closure, physical deposit, M11 posting, and later bank reconciliation as separate recorded states."
       >
@@ -758,7 +758,7 @@ export function CashierCloseSection() {
             ) : null}
           </div>
         )}
-      </SectionCard>
+      </Surface>
 
       <Dialog open={isConfirmingClose} onOpenChange={setIsConfirmingClose}>
         <DialogContent className="max-w-md rounded-2xl">

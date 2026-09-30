@@ -1,7 +1,7 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { StudentProfileDetail } from '@schoolos/core';
-import { SectionCard } from '@/components/ui/section-card';
 import { FileText, Download, Award, Calendar, BookOpen } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/session-provider';
@@ -27,7 +27,7 @@ export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
           canViewReportCards ? 'grid gap-8 lg:grid-cols-2' : 'grid gap-8'
         }
       >
-        <SectionCard
+        <Surface
           title="Enrollment History"
           description="Historic and current academic placements for this student."
         >
@@ -89,10 +89,10 @@ export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
               </p>
             </div>
           )}
-        </SectionCard>
+        </Surface>
 
         {canViewReportCards ? (
-          <SectionCard
+          <Surface
             title="Generated Report Cards"
             description="Download official term results and continuous assessments."
           >
@@ -147,7 +147,7 @@ export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
                 </p>
               </div>
             )}
-          </SectionCard>
+          </Surface>
         ) : null}
       </div>
     </div>

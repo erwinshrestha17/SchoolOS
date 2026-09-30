@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type { AttendanceCorrectionRequest } from '@schoolos/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -12,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LoadingState } from '@/components/ui/loading-state';
 import { PermissionDenied } from '@/components/ui/permission-denied';
-import { SectionCard } from '@/components/ui/section-card';
 import { useAttendanceCapabilities } from '@/lib/permissions-ui';
 
 interface AttendanceCorrectionReviewProps {
@@ -95,10 +95,10 @@ export function AttendanceCorrectionReview({
   };
 
   return (
-    <SectionCard
+    <Surface
       title="Correction Review Queue"
       description="Approve or reject teacher-requested attendance corrections with an audit reason."
-      headerAction={
+      actions={
         <Badge variant={total > 0 ? 'warning' : 'success'}>
           {total} pending
         </Badge>
@@ -232,7 +232,7 @@ export function AttendanceCorrectionReview({
           })}
         </div>
       )}
-    </SectionCard>
+    </Surface>
   );
 }
 

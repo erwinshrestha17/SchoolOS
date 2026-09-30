@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { FormEvent, useEffect, useState } from 'react';
 import {
   StudentArchivePayload,
@@ -8,7 +9,6 @@ import {
   StudentProfileDetail,
   StudentTransferPayload,
 } from '@schoolos/core';
-import { SectionCard } from '@/components/ui/section-card';
 import { Badge } from '@/components/ui/badge';
 import {
   AlertTriangle,
@@ -130,10 +130,10 @@ export function LifecyclePanel({
   }
 
   return (
-    <SectionCard
+    <Surface
       title="Manage student lifecycle"
       description="Review fee clearance and record a reason before changing this student’s lifecycle status. Historical records remain preserved."
-      headerAction={
+      actions={
         <button
           type="button"
           onClick={onClose}
@@ -318,7 +318,7 @@ export function LifecyclePanel({
           )}
         </div>
       </div>
-    </SectionCard>
+    </Surface>
   );
 }
 

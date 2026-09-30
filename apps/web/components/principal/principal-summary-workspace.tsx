@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type {
   OperationalModuleSummary,
   OperationalSummaryMetricValue,
@@ -15,7 +16,6 @@ import { LoadingState } from '../ui/loading-state';
 import { ErrorState } from '../ui/error-state';
 import { PermissionDenied } from '../ui/permission-denied';
 import { ModuleLockedState } from '../ui/module-locked-state';
-import { SectionCard } from '../ui/section-card';
 import { SummaryStatusBadge } from '../ui/operational-summary';
 
 export type PrincipalMetricDefinition = {
@@ -134,10 +134,10 @@ function PrincipalSummarySection({
   const openAttention = summary.attentionItems.filter((item) => item.count > 0);
 
   return (
-    <SectionCard
+    <Surface
       title={definition.title}
       description={definition.description}
-      headerAction={<SummaryStatusBadge status={summary.status} />}
+      actions={<SummaryStatusBadge status={summary.status} />}
       footer={
         attentionHref && openAttention.length ? (
           <Link
@@ -208,7 +208,7 @@ function PrincipalSummarySection({
           No exceptions are reported in this summary.
         </div>
       )}
-    </SectionCard>
+    </Surface>
   );
 }
 

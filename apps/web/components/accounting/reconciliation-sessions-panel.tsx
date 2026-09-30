@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
@@ -9,7 +10,6 @@ import type {
 import { api } from '@/lib/api';
 import { resourceAccess } from '@/lib/resource-authorization';
 import { useSession } from '../session-provider';
-import { SectionCard } from '../ui/section-card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Select } from '../ui/select';
@@ -173,7 +173,7 @@ export function ReconciliationSessionsPanel({
   };
   if (!canRead)
     return (
-      <SectionCard
+      <Surface
         title="Reconciliation sessions"
         description="Reconciliation session access is required for preparing, reviewing or finalizing matches."
       >
@@ -181,10 +181,10 @@ export function ReconciliationSessionsPanel({
           Contact your school access administrator for the appropriate
           reconciliation capability.
         </p>
-      </SectionCard>
+      </Surface>
     );
   return (
-    <SectionCard
+    <Surface
       title="Reconciliation sessions"
       description="Prepare a statement, resolve matching exceptions, obtain independent review, then finalize its evidence."
     >
@@ -529,6 +529,6 @@ export function ReconciliationSessionsPanel({
           )}
         </ConfirmDialog>
       </div>
-    </SectionCard>
+    </Surface>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
@@ -14,7 +15,6 @@ import {
   type TimetableVersionSummary,
 } from '@schoolos/core';
 import { cn } from '../../../lib/utils';
-import { SectionCard } from '../../ui/section-card';
 import { StatCard } from '../../ui/stat-card';
 import { Badge } from '../../ui/badge';
 import { EmptyState } from '../../ui/empty-state';
@@ -348,7 +348,7 @@ export function TimetableBuilderTab({
               loading={roomsQuery.isLoading}
             />
 
-            <SectionCard title="Version Workflow" className="lg:col-span-2">
+            <Surface title="Version Workflow" className="lg:col-span-2">
               <div className="space-y-4">
                 {versionsQuery.isError ? (
                   <PageState
@@ -436,11 +436,11 @@ export function TimetableBuilderTab({
                   </button>
                 </div>
               </div>
-            </SectionCard>
+            </Surface>
           </div>
 
           {activeVersionId && (
-            <SectionCard
+            <Surface
               title="Conflict Validation"
               description="Stays current automatically as you add slots — no manual re-check needed."
               className={cn(
@@ -489,13 +489,13 @@ export function TimetableBuilderTab({
                   )}
                 </div>
               )}
-            </SectionCard>
+            </Surface>
           )}
 
-          <SectionCard
+          <Surface
             title="Absent Teacher Substitution Management"
             description="Manage substitutions for missing teachers."
-            headerAction={
+            actions={
               <Badge
                 variant="secondary"
                 className="text-[10px] font-black uppercase tracking-widest"
@@ -539,10 +539,10 @@ export function TimetableBuilderTab({
                 className="bg-slate-50/50"
               />
             )}
-          </SectionCard>
+          </Surface>
 
           <div className="grid gap-8 lg:grid-cols-3">
-            <SectionCard title="Add Schedule Slot" className="lg:col-span-1">
+            <Surface title="Add Schedule Slot" className="lg:col-span-1">
               <div className="space-y-6">
                 <FormField label="Academic Year">
                   <Select
@@ -702,9 +702,9 @@ export function TimetableBuilderTab({
                   {slotMut.isPending ? 'Saving...' : 'Add Slot to Schedule'}
                 </button>
               </div>
-            </SectionCard>
+            </Surface>
 
-            <SectionCard
+            <Surface
               title="Weekly Grid Visualization"
               className="lg:col-span-2"
             >
@@ -812,7 +812,7 @@ export function TimetableBuilderTab({
                   })}
                 </div>
               )}
-            </SectionCard>
+            </Surface>
           </div>
         </div>
       )}

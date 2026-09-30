@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { BookOpen, BookmarkCheck, Clock3, Search } from 'lucide-react';
@@ -8,7 +9,6 @@ import { ApiRequestError } from '@/lib/api/client';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/loading-state';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
 import { WorkspaceTabs } from '@/components/ui/module-tabs';
@@ -152,7 +152,7 @@ export function TeacherLibraryWorkspace() {
             icon={<BookOpen size={28} aria-hidden="true" />}
           />
         ) : (
-          <SectionCard
+          <Surface
             title="My loans"
             description="Every copy issued to you, most recent first."
           >
@@ -211,10 +211,10 @@ export function TeacherLibraryWorkspace() {
                 </tbody>
               </table>
             </div>
-          </SectionCard>
+          </Surface>
         )
       ) : (
-        <SectionCard
+        <Surface
           title="Search the catalogue"
           description="Find a title to request from the library desk."
         >
@@ -277,7 +277,7 @@ export function TeacherLibraryWorkspace() {
               ))}
             </ul>
           )}
-        </SectionCard>
+        </Surface>
       )}
     </div>
   );

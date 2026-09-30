@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
@@ -19,7 +20,6 @@ import {
 } from '@/lib/school-authority-discovery';
 import type { HomeworkPublishNotifyChoice } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { SectionCard } from '@/components/ui/section-card';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -388,7 +388,7 @@ export function HomeworkCreateForm() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <SectionCard
+      <Surface
         title="Give homework"
         description="Fill in the required details below - everything else is optional."
       >
@@ -551,7 +551,7 @@ export function HomeworkCreateForm() {
             </div>
           )}
         </div>
-      </SectionCard>
+      </Surface>
 
       <details className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <summary className="cursor-pointer list-none px-5 py-4 text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-slate-950">
@@ -794,7 +794,7 @@ export function HomeworkCreateForm() {
         </div>
       </details>
 
-      <SectionCard
+      <Surface
         title="Notify parents"
         description="Applies when you publish immediately below."
       >
@@ -825,7 +825,7 @@ export function HomeworkCreateForm() {
             </label>
           ))}
         </div>
-      </SectionCard>
+      </Surface>
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <Button

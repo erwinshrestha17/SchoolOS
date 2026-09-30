@@ -1,10 +1,10 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ChartAccountSummary, FiscalYearSummary } from '@schoolos/core';
 import { api } from '@/lib/api';
-import { SectionCard } from '@/components/ui/section-card';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { LoadingState } from '@/components/ui/loading-state';
@@ -109,7 +109,7 @@ export default function AccountingBudgetsPage() {
 
   return (
     <div className="space-y-6 pb-10">
-      <SectionCard
+      <Surface
         title="Fiscal Budgets"
         description="Enter and approve an annual account-level budget for budget-vs-actual reporting."
       >
@@ -162,7 +162,7 @@ export default function AccountingBudgetsPage() {
             Create draft budget
           </Button>
         </div>
-      </SectionCard>
+      </Surface>
 
       {budgetsQuery.isLoading ? (
         <LoadingState label="Loading budgets..." />
@@ -173,7 +173,7 @@ export default function AccountingBudgetsPage() {
           description="Create a draft budget for the selected fiscal year."
         />
       ) : (
-        <SectionCard title="Draft budget lines">
+        <Surface title="Draft budget lines">
           <div className="mb-4 grid gap-4 md:grid-cols-2">
             <Select
               value={selectedBudgetId}
@@ -288,7 +288,7 @@ export default function AccountingBudgetsPage() {
                 </Button>
               </div>
             )}
-        </SectionCard>
+        </Surface>
       )}
     </div>
   );

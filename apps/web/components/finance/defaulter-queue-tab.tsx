@@ -1,11 +1,11 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
-import { SectionCard } from '@/components/ui/section-card';
 import { Button } from '@/components/ui/button';
 import { PermissionDenied } from '@/components/ui/permission-denied';
 import { Loader2, Send, Download, Check, AlertCircle } from 'lucide-react';
@@ -146,10 +146,10 @@ export function DefaulterQueueTab() {
   const defaulters = defaultersQuery.data?.items || [];
 
   return (
-    <SectionCard
+    <Surface
       title="Overdue Invoice Follow-up"
       description="Track outstanding bills, filter by class/fees, and dispatch notification reminders."
-      headerAction={
+      actions={
         canManage ? (
           <div className="flex gap-2">
             <Button
@@ -404,6 +404,6 @@ export function DefaulterQueueTab() {
           </>
         )}
       </div>
-    </SectionCard>
+    </Surface>
   );
 }

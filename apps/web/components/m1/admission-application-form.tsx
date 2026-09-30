@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type {
   AdmissionApplication,
   CreateAdmissionApplicationPayload,
@@ -21,7 +22,6 @@ import { api } from '../../lib/api';
 import { schoolFacingErrorMessage } from '../../lib/school-facing-error';
 import { Button } from '../ui/button';
 import { ErrorState } from '../ui/error-state';
-import { SectionCard } from '../ui/section-card';
 import { StatusBadge } from '../ui/status-badge';
 
 const EMPTY_FORM: CreateAdmissionApplicationPayload = {
@@ -217,7 +217,7 @@ export function AdmissionApplicationForm() {
 
   return (
     <form className="space-y-5" onSubmit={submit}>
-      <SectionCard
+      <Surface
         title="Student and application details"
         description="Create an inquiry or application first. Enrollment remains a separate audited step."
       >
@@ -324,9 +324,9 @@ export function AdmissionApplicationForm() {
             />
           </Field>
         </div>
-      </SectionCard>
+      </Surface>
 
-      <SectionCard
+      <Surface
         title="Guardian contact"
         description="Guardian fields support duplicate review and follow-up. Portal access is not created by this form."
       >
@@ -373,7 +373,7 @@ export function AdmissionApplicationForm() {
             />
           </Field>
         </div>
-      </SectionCard>
+      </Surface>
 
       {validationError ? (
         <p

@@ -1,11 +1,11 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type { DuesReportFilters, DuesReportRow } from '@schoolos/core';
 import { formatBsDate } from '@schoolos/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { SectionCard } from '@/components/ui/section-card';
 import { DataTable } from '@/components/ui/data-table';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -118,10 +118,10 @@ export function DuesAnalysisSection() {
   ];
 
   return (
-    <SectionCard
+    <Surface
       title="Dues Analysis"
       description="Micro-level breakdown of outstanding fees for operational follow-up."
-      headerAction={
+      actions={
         <div className="flex items-center gap-2">
           <Button
             type="button"
@@ -224,7 +224,7 @@ export function DuesAnalysisSection() {
           </div>
         )}
       </div>
-    </SectionCard>
+    </Surface>
   );
 }
 

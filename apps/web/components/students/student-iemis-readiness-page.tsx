@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type {
   PermissionKey,
   StudentIemisIssueCategory,
@@ -29,7 +30,6 @@ import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ModuleLockedState } from '@/components/ui/module-locked-state';
 import { PageState } from '@/components/ui/page-state';
-import { SectionCard } from '@/components/ui/section-card';
 
 const CATEGORY_LABELS: Record<StudentIemisIssueCategory, string> = {
   IDENTITY: 'Identity',
@@ -148,7 +148,7 @@ export function StudentIemisReadinessPage({
         </button>
       </header>
 
-      <SectionCard title="Student context">
+      <Surface title="Student context">
         <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <ContextItem label="Student" value={readiness.fullNameEn} />
           <ContextItem label="Student ID" value={readiness.studentSystemId} />
@@ -189,10 +189,10 @@ export function StudentIemisReadinessPage({
             }
           />
         </dl>
-      </SectionCard>
+      </Surface>
 
       <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <SectionCard title="Readiness summary">
+        <Surface title="Readiness summary">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
@@ -225,9 +225,9 @@ export function StudentIemisReadinessPage({
               />
             </div>
           </div>
-        </SectionCard>
+        </Surface>
 
-        <SectionCard title="Validation details">
+        <Surface title="Validation details">
           <div className="space-y-4">
             <ContextRow
               label="Export eligibility"
@@ -242,13 +242,13 @@ export function StudentIemisReadinessPage({
               value={readiness.requirementVersion}
             />
           </div>
-        </SectionCard>
+        </Surface>
       </section>
 
       {issueGroups.length > 0 ? (
         <div className="space-y-5">
           {issueGroups.map((group) => (
-            <SectionCard
+            <Surface
               key={group.category}
               title={CATEGORY_LABELS[group.category]}
             >
@@ -268,7 +268,7 @@ export function StudentIemisReadinessPage({
                   />
                 ))}
               </div>
-            </SectionCard>
+            </Surface>
           ))}
         </div>
       ) : (

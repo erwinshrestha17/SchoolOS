@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -15,7 +16,6 @@ import { DataTable } from '@/components/ui/data-table';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { Select } from '@/components/ui/form-field';
 import { PageState } from '@/components/ui/page-state';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatCard } from '@/components/ui/stat-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 
@@ -238,7 +238,7 @@ export function ResultsPublishingWorkspace() {
 
       {examTermId && classId ? (
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          <SectionCard
+          <Surface
             title="Result Preview"
             description="Calculated from saved academic records. Use this view to find issues before lock."
           >
@@ -251,9 +251,9 @@ export function ResultsPublishingWorkspace() {
               emptyMessage="No students or assessment results were found for this class and term."
               getRowKey={(row) => row.student.id}
             />
-          </SectionCard>
+          </Surface>
 
-          <SectionCard
+          <Surface
             title="Validation Warnings"
             description="Resolve these before report-card generation."
           >
@@ -279,7 +279,7 @@ export function ResultsPublishingWorkspace() {
                 Export Preview
               </Link>
             </div>
-          </SectionCard>
+          </Surface>
         </div>
       ) : (
         <PageState

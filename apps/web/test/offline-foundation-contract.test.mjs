@@ -438,7 +438,7 @@ describe('offline-safe web foundation', () => {
     const scopeControls = sourceBetween(
       attendance,
       '<FilterBar\n          label="Attendance Filters"',
-      '<SectionCard\n        title="Attendance Roster"',
+      '<Surface\n        title="Attendance Roster"',
     );
 
     assert.match(submissionFlow, /const submissionDraftKey = draftKey/);

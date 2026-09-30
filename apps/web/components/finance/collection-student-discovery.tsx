@@ -1,12 +1,12 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type { CollectionStudentSearchResult } from '@schoolos/core';
 import { Search, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SearchInput } from '@/components/ui/search-input';
-import { SectionCard } from '@/components/ui/section-card';
 
 const formatCurrency = (amount: string) =>
   new Intl.NumberFormat('en-NP', {
@@ -34,7 +34,7 @@ export function CollectionStudentDiscovery({
   onSelect: (student: CollectionStudentSearchResult) => void;
 }) {
   return (
-    <SectionCard
+    <Surface
       title="Find a student"
       description="Search active fee accounts by student name, student ID, invoice number, or guardian phone. Results show official outstanding balances."
     >
@@ -123,6 +123,6 @@ export function CollectionStudentDiscovery({
           />
         )}
       </div>
-    </SectionCard>
+    </Surface>
   );
 }

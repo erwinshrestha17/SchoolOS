@@ -31,7 +31,7 @@ export const LEGACY_PRIMITIVES: readonly LegacyPrimitive[] = [
   {
     module: 'components/ui/section-card',
     replacement: 'Section / Surface',
-    maxImporters: 82,
+    maxImporters: 0,
   },
   {
     module: 'components/ui/work-surface',

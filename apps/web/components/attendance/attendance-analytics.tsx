@@ -1,11 +1,11 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import {
   formatBsDate,
   type AttendanceAnalytics as AttendanceAnalyticsData,
 } from '@schoolos/core';
 import type { ReactNode } from 'react';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatCard } from '@/components/ui/stat-card';
 import { Badge } from '@/components/ui/badge';
 import { ErrorState } from '@/components/ui/error-state';
@@ -101,7 +101,7 @@ export function AttendanceAnalytics({
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <SectionCard
+        <Surface
           title="Absence Patterns"
           description="Students with high absence frequency"
         >
@@ -134,9 +134,9 @@ export function AttendanceAnalytics({
               </p>
             )}
           </div>
-        </SectionCard>
+        </Surface>
 
-        <SectionCard
+        <Surface
           title="Attendance Risk Alerts"
           description="Students below 80% attendance threshold"
         >
@@ -171,10 +171,10 @@ export function AttendanceAnalytics({
               </p>
             )}
           </div>
-        </SectionCard>
+        </Surface>
       </div>
 
-      <SectionCard
+      <Surface
         title="Operational Anomaly Dashboard"
         description="Detected absence streaks, repeated late arrivals, roster mismatches, delayed submissions, attendance drops, and unsubmitted working days."
       >
@@ -276,7 +276,7 @@ export function AttendanceAnalytics({
             />
           </div>
         )}
-      </SectionCard>
+      </Surface>
     </div>
   );
 }

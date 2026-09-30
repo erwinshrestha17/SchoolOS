@@ -1,10 +1,10 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { Mail, Phone, Star } from 'lucide-react';
 import type { GuardianContactProfile } from '@schoolos/core';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { SectionCard } from '@/components/ui/section-card';
 
 /**
  * Read-only guardian contacts for actors granted only the `guardianContacts`
@@ -18,7 +18,7 @@ export function GuardianContactsTab({
   guardians: readonly GuardianContactProfile[];
 }) {
   return (
-    <SectionCard
+    <Surface
       title="Guardian contacts"
       description="Active, verified guardians for this student. Relationship administration is managed by authorized school staff."
     >
@@ -84,6 +84,6 @@ export function GuardianContactsTab({
           ))}
         </ul>
       )}
-    </SectionCard>
+    </Surface>
   );
 }

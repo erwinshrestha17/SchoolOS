@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import {
@@ -22,7 +23,6 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/loading-state';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { WorkspaceTabs } from '@/components/ui/module-tabs';
 import { formatLabelledSchoolDate, formatSchoolDate } from '@/lib/date-utils';
@@ -174,7 +174,7 @@ export function TeacherScheduleWorkspace() {
       </div>
 
       {mySubstitutions.length > 0 && (
-        <SectionCard
+        <Surface
           title="Schedule changes for you"
           description="Substitutions where you are covering, or where someone is covering for you."
         >
@@ -204,7 +204,7 @@ export function TeacherScheduleWorkspace() {
               </li>
             ))}
           </ul>
-        </SectionCard>
+        </Surface>
       )}
 
       {slotsByDay.length === 0 ? (
@@ -222,7 +222,7 @@ export function TeacherScheduleWorkspace() {
           {slotsByDay.map(([dateKey, slots]) => {
             const isToday = dateKey === todayKey;
             return (
-              <SectionCard
+              <Surface
                 key={dateKey}
                 title={`${DAY_LABELS[slots[0]?.dayOfWeek ?? 0] ?? ''}${isToday ? ' · Today' : ''}`}
                 // Labelled BS with the AD equivalent: a teacher cross-references this
@@ -286,7 +286,7 @@ export function TeacherScheduleWorkspace() {
                     );
                   })}
                 </ul>
-              </SectionCard>
+              </Surface>
             );
           })}
         </div>

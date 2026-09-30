@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type {
   CommunicationTemplateCategory,
   CommunicationTemplateChannel,
@@ -27,7 +28,6 @@ import { LoadingState } from '@/components/ui/loading-state';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { ModuleTabs } from '@/components/ui/module-tabs';
 import { PermissionDenied } from '@/components/ui/permission-denied';
-import { SectionCard } from '@/components/ui/section-card';
 import { Select } from '@/components/ui/select';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { TablePagination } from '@/components/ui/table-pagination';
@@ -267,7 +267,7 @@ export default function CommunicationTemplatesPage() {
         />
       ) : (
         <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <SectionCard
+          <Surface
             title="Template Library"
             description="Draft, published, and archived template versions for this school."
           >
@@ -349,10 +349,10 @@ export default function CommunicationTemplatesPage() {
                 description="Create a draft template for holiday, emergency, fees, exam, transport delay, event, or general notices."
               />
             )}
-          </SectionCard>
+          </Surface>
 
           <div className="space-y-6">
-            <SectionCard
+            <Surface
               title={editingTemplateId ? 'Edit Draft' : 'New Draft Version'}
               description={
                 selectedTemplate?.status && selectedTemplate.status !== 'DRAFT'
@@ -485,9 +485,9 @@ export default function CommunicationTemplatesPage() {
                   {editingTemplateId ? 'Save Draft' : 'Create Draft'}
                 </Button>
               </div>
-            </SectionCard>
+            </Surface>
 
-            <SectionCard
+            <Surface
               title="Safe Preview"
               description="Review wording before using this template in a notice."
             >
@@ -499,7 +499,7 @@ export default function CommunicationTemplatesPage() {
                   {draft.body.trim() || 'Template body preview'}
                 </p>
               </div>
-            </SectionCard>
+            </Surface>
           </div>
         </div>
       )}

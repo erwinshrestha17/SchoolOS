@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -25,7 +26,6 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { SectionCard } from '@/components/ui/section-card';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { StudentPhotoPreview } from './student-photo-preview';
@@ -235,7 +235,7 @@ export function StudentEditCard({
 
   return (
     <>
-      <SectionCard
+      <Surface
         title="Edit Profile"
         description={`Updating record for ${student.studentSystemId}`}
         className="animate-in fade-in slide-in-from-top-4"
@@ -615,7 +615,7 @@ export function StudentEditCard({
             </button>
           </div>
         </div>
-      </SectionCard>
+      </Surface>
       <ConfirmDialog
         isOpen={removePhotoDialogOpen}
         title="Remove Student Photo"

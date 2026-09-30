@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -9,7 +10,6 @@ import {
 } from '@schoolos/core';
 import { api } from '@/lib/api';
 import type { ReportSnapshot } from '@/lib/api/finance';
-import { SectionCard } from '@/components/ui/section-card';
 import { PageHeader } from '@/components/ui/page-header';
 import { Select, Input } from '@/components/ui/form-field';
 import { Button } from '@/components/ui/button';
@@ -168,7 +168,7 @@ function ReportsWorkspace() {
     <div className="grid gap-6 lg:grid-cols-3">
       {/* Report List */}
       <div className="lg:col-span-1 space-y-4">
-        <SectionCard
+        <Surface
           title="Available Reports"
           description="Select a report to configure and export."
         >
@@ -231,7 +231,7 @@ function ReportsWorkspace() {
               ))
             )}
           </div>
-        </SectionCard>
+        </Surface>
       </div>
 
       {/* Configuration & Actions */}
@@ -247,7 +247,7 @@ function ReportsWorkspace() {
         ) : null}
 
         {selectedReport ? (
-          <SectionCard
+          <Surface
             title={selectedReport.name}
             description={selectedReport.description}
           >
@@ -387,7 +387,7 @@ function ReportsWorkspace() {
                 )}
               </div>
             </div>
-          </SectionCard>
+          </Surface>
         ) : (
           <div className="flex flex-col items-center justify-center py-32 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center">
             <div className="h-20 w-20 rounded-2xl bg-white shadow-sm flex items-center justify-center text-slate-300 mb-6">
@@ -404,10 +404,10 @@ function ReportsWorkspace() {
       </div>
 
       <div className="lg:col-span-3">
-        <SectionCard
+        <Surface
           title="Recent Exports"
           description="Protected File Registry snapshots for completed report exports, plus queued and failed background jobs."
-          headerAction={
+          actions={
             <Button
               type="button"
               variant="outline"
@@ -495,7 +495,7 @@ function ReportsWorkspace() {
               ))
             )}
           </div>
-        </SectionCard>
+        </Surface>
       </div>
     </div>
   );

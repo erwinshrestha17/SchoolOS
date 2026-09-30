@@ -1,7 +1,7 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { formatBsDate, type StudentProfileInvoice } from '@schoolos/core';
-import { SectionCard } from '@/components/ui/section-card';
 import {
   Wallet,
   Receipt,
@@ -44,7 +44,7 @@ export function FeesTab({ studentId, invoices }: FeesTabProps) {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid gap-6 lg:grid-cols-3">
-        <SectionCard title="Fee Status" className="lg:col-span-1">
+        <Surface title="Fee Status" className="lg:col-span-1">
           <div className="space-y-6">
             <div className="flex items-end gap-2">
               <span
@@ -79,13 +79,13 @@ export function FeesTab({ studentId, invoices }: FeesTabProps) {
               </Link>
             </div>
           </div>
-        </SectionCard>
+        </Surface>
 
-        <SectionCard
+        <Surface
           title="Billing History"
           description="Recent invoices and payment status"
           className="lg:col-span-2"
-          noPadding
+          padding="flush"
         >
           {invoices.length > 0 ? (
             <div className="divide-y divide-slate-100">
@@ -162,7 +162,7 @@ export function FeesTab({ studentId, invoices }: FeesTabProps) {
               </p>
             </div>
           )}
-        </SectionCard>
+        </Surface>
       </div>
     </div>
   );

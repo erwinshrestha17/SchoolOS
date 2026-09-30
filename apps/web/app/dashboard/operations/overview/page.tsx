@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { BookOpen, Bus, Utensils } from 'lucide-react';
 import { ModuleHeader } from '../../../../components/ui/module-header';
@@ -7,7 +8,6 @@ import { ErrorState } from '../../../../components/ui/error-state';
 import { LoadingState } from '../../../../components/ui/loading-state';
 import { ModuleLockedState } from '../../../../components/ui/module-locked-state';
 import { PermissionDenied } from '../../../../components/ui/permission-denied';
-import { SectionCard } from '../../../../components/ui/section-card';
 import { request } from '../../../../lib/api/client';
 import { usePermissionAccess } from '../../../../lib/permissions-ui';
 import { useSchoolWebPersona } from '../../../../lib/school-web-persona';
@@ -130,14 +130,14 @@ function OperationsCard({
   }
 
   return (
-    <SectionCard
+    <Surface
       title={name}
       description={
         summary.status === 'partial'
           ? 'Available information is shown. Some metrics are temporarily unavailable.'
           : 'Read-only leadership signals from this school operation.'
       }
-      headerAction={
+      actions={
         <span className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-700">
           <Icon className="h-4 w-4" aria-hidden="true" />
         </span>
@@ -156,7 +156,7 @@ function OperationsCard({
           </div>
         ))}
       </dl>
-    </SectionCard>
+    </Surface>
   );
 }
 

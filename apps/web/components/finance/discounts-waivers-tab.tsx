@@ -1,12 +1,12 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { SectionCard } from '@/components/ui/section-card';
 import { Loader2, Plus, Check, AlertCircle } from 'lucide-react';
 import {
   Dialog,
@@ -221,7 +221,7 @@ export function DiscountsWaiversTab({
       <div className="space-y-8">
         {/* Discount Rule Form */}
         {mode !== 'waivers' ? (
-          <SectionCard
+          <Surface
             title="Create Discount Rule"
             description="Setup automatic discounts (e.g. Sibling or Scholarship rules) to be applied on billing runs."
           >
@@ -449,12 +449,12 @@ export function DiscountsWaiversTab({
                   </p>
                 )}
             </form>
-          </SectionCard>
+          </Surface>
         ) : null}
 
         {/* Waiver Form */}
         {mode !== 'discounts' ? (
-          <SectionCard
+          <Surface
             title="Issue Fee Waiver"
             description="Grant a manual or specific fee waiver to an outstanding invoice."
           >
@@ -609,7 +609,7 @@ export function DiscountsWaiversTab({
                 )}
               </Button>
             </form>
-          </SectionCard>
+          </Surface>
         ) : null}
       </div>
 
@@ -617,7 +617,7 @@ export function DiscountsWaiversTab({
       <div className="space-y-8">
         {/* Discounts List */}
         {mode !== 'waivers' ? (
-          <SectionCard title="Active Discount Rules">
+          <Surface title="Active Discount Rules">
             <input
               value={discountSearch}
               onChange={(event) =>
@@ -690,12 +690,12 @@ export function DiscountsWaiversTab({
                 />
               </div>
             )}
-          </SectionCard>
+          </Surface>
         ) : null}
 
         {/* Waivers List */}
         {mode !== 'discounts' ? (
-          <SectionCard title="Recent Approved Waivers">
+          <Surface title="Recent Approved Waivers">
             <input
               value={waiverSearch}
               onChange={(event) =>
@@ -767,7 +767,7 @@ export function DiscountsWaiversTab({
                 />
               </div>
             )}
-          </SectionCard>
+          </Surface>
         ) : null}
       </div>
 

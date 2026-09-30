@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { LoadingState } from '@/components/ui/loading-state';
@@ -7,7 +8,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, FileWarning, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SectionCard } from '@/components/ui/section-card';
 
 export function ConflictsList({
   activeVersionId,
@@ -66,11 +66,11 @@ export function ConflictsList({
       ) : (
         <div className="grid gap-6">
           {result.errors.map((error, index) => (
-            <SectionCard
+            <Surface
               key={`error-${index}`}
               title={error.type || 'Blocking Conflict'}
               className="border-red-100 bg-red-50/30"
-              headerAction={<Badge variant="destructive">Error</Badge>}
+              actions={<Badge variant="destructive">Error</Badge>}
             >
               <div className="flex items-start gap-4">
                 <AlertCircle className="h-6 w-6 text-red-500 shrink-0 mt-0.5" />
@@ -90,15 +90,15 @@ export function ConflictsList({
                   </div>
                 </div>
               </div>
-            </SectionCard>
+            </Surface>
           ))}
 
           {result.warnings.map((warning, index) => (
-            <SectionCard
+            <Surface
               key={`warning-${index}`}
               title={warning.type || 'Soft Warning'}
               className="border-amber-100 bg-amber-50/30"
-              headerAction={
+              actions={
                 <Badge
                   variant="secondary"
                   className="bg-amber-100 text-amber-700"
@@ -115,7 +115,7 @@ export function ConflictsList({
                   </p>
                 </div>
               </div>
-            </SectionCard>
+            </Surface>
           ))}
         </div>
       )}

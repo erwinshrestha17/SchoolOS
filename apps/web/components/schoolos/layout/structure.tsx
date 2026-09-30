@@ -29,7 +29,7 @@ function HeadingRow({
   headingLevel = 2,
   id,
 }: Heading & { id?: string }) {
-  if (!title && !actions) return null;
+  if (!title && !description && !actions) return null;
   const Tag = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -59,6 +59,8 @@ export type SurfaceProps = HTMLAttributes<HTMLElement> &
     /** `flush` removes inner padding for edge-to-edge tables/lists. */
     padding?: 'default' | 'flush';
     as?: 'section' | 'div';
+    /** Secondary actions/links below the content, separated by a divider. */
+    footer?: ReactNode;
   };
 
 export function Surface({
@@ -68,6 +70,7 @@ export function Surface({
   headingLevel,
   padding = 'default',
   as: Tag = 'section',
+  footer,
   className,
   children,
   ...rest
@@ -82,7 +85,7 @@ export function Surface({
       )}
       {...rest}
     >
-      {title || actions ? (
+      {title || description || actions ? (
         <div className={cn(padding === 'flush' && 'p-gutter-compact', 'mb-4')}>
           <HeadingRow
             title={title}
@@ -93,6 +96,16 @@ export function Surface({
         </div>
       ) : null}
       {children}
+      {footer ? (
+        <div
+          className={cn(
+            'mt-4 border-t border-[var(--line)] pt-4',
+            padding === 'flush' && 'px-gutter-compact pb-4',
+          )}
+        >
+          {footer}
+        </div>
+      ) : null}
     </Tag>
   );
 }

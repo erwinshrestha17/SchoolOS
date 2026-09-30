@@ -1,10 +1,10 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../../../lib/api';
 import type { TeacherWorkloadSummary } from '@schoolos/core';
-import { SectionCard } from '../../ui/section-card';
 import { StatCard } from '../../ui/stat-card';
 import { Badge } from '../../ui/badge';
 import { EmptyState } from '../../ui/empty-state';
@@ -247,7 +247,7 @@ export function TeacherWorkloadTab({
 
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Main Workload Table */}
-        <SectionCard
+        <Surface
           title="Faculty Workload Analysis"
           description="Monitoring teaching capacity and assignment density across staff."
           className="lg:col-span-2"
@@ -272,11 +272,11 @@ export function TeacherWorkloadTab({
                 : undefined
             }
           />
-        </SectionCard>
+        </Surface>
 
         {/* Details Sidebar */}
         <div className="space-y-8 lg:col-span-1">
-          <SectionCard
+          <Surface
             title="Availability Insights"
             description="Detailed constraints and limits for the selected teacher."
           >
@@ -365,9 +365,9 @@ export function TeacherWorkloadTab({
                 </div>
               </div>
             )}
-          </SectionCard>
+          </Surface>
 
-          <SectionCard
+          <Surface
             title="Workload Distribution"
             className="border-[var(--color-mod-homework-border)] bg-[var(--color-mod-homework-bg)]"
           >
@@ -434,7 +434,7 @@ export function TeacherWorkloadTab({
                 </p>
               </div>
             )}
-          </SectionCard>
+          </Surface>
         </div>
       </div>
     </div>

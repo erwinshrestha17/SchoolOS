@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   formatNepalTime,
@@ -49,7 +50,6 @@ import {
   decideAttendanceRosterReplay,
   normalizeAttendanceRosterVersion,
 } from '@/lib/attendance-roster-version';
-import { SectionCard } from '@/components/ui/section-card';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { AttendanceHeader } from '@/components/attendance/attendance-header';
 import { AttendanceRosterItem } from '@/components/attendance/attendance-roster-item';
@@ -2185,10 +2185,10 @@ export function AttendanceForm({
         </FilterBar>
       ) : null}
 
-      <SectionCard
+      <Surface
         title="Attendance Roster"
         description="Mark student attendance states. Present is the default; record exceptions with remarks."
-        headerAction={
+        actions={
           <div className="flex items-center gap-3">
             <div className="mr-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-2">
               <span className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest">
@@ -2417,7 +2417,7 @@ export function AttendanceForm({
             </div>
           </div>
         )}
-      </SectionCard>
+      </Surface>
 
       {/* Summary Floating Bar */}
       {roster.length > 0 && draftScopeHydrated && !rosterDisclosureBlocked && (

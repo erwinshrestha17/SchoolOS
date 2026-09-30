@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
   formatBsDate,
@@ -18,7 +19,6 @@ import { Badge } from '@/components/ui/badge';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ProtectedFileButton } from '@/components/ui/protected-file';
-import { SectionCard } from '@/components/ui/section-card';
 import {
   AlertTriangle,
   CalendarCheck,
@@ -135,7 +135,7 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
   return (
     <div className="space-y-6">
       <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <SectionCard
+        <Surface
           title="Attention needed"
           description="Information that should be completed or reviewed."
         >
@@ -183,7 +183,7 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
               </div>
             </div>
           )}
-        </SectionCard>
+        </Surface>
 
         <QuickSummaryCard
           profile={profile}
@@ -193,7 +193,7 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
       </section>
 
       <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <SectionCard
+        <Surface
           title="At a glance"
           description="Key information from this student's current school record."
         >
@@ -261,14 +261,14 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
               />
             ) : null}
           </div>
-        </SectionCard>
+        </Surface>
 
         {canViewSchoolRecords ? (
           <IemisReadinessCard query={iemisQuery} studentId={studentId} />
         ) : null}
       </section>
 
-      <SectionCard
+      <Surface
         title="Related records"
         description={
           canViewActivity
@@ -343,7 +343,7 @@ export function OverviewTab({ profile, onSelectTab }: OverviewTabProps) {
             </div>
           ) : null}
         </div>
-      </SectionCard>
+      </Surface>
 
       {canViewSchoolRecords || canViewQr ? (
         <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
@@ -372,7 +372,7 @@ function QuickSummaryCard({
     | undefined;
 }) {
   return (
-    <SectionCard title="Quick summary">
+    <Surface title="Quick summary">
       <div className="space-y-3">
         <SummaryRow
           label="Student ID"
@@ -399,7 +399,7 @@ function QuickSummaryCard({
           value={primaryGuardian?.fullName ?? 'Not linked'}
         />
       </div>
-    </SectionCard>
+    </Surface>
   );
 }
 
@@ -419,7 +419,7 @@ function IemisReadinessCard({
     : false;
 
   return (
-    <SectionCard title="iEMIS readiness">
+    <Surface title="iEMIS readiness">
       {query.isLoading ? (
         <p className="text-sm font-semibold text-slate-500">
           Checking iEMIS readiness...
@@ -487,7 +487,7 @@ function IemisReadinessCard({
           iEMIS readiness has not been checked yet.
         </p>
       )}
-    </SectionCard>
+    </Surface>
   );
 }
 
@@ -567,7 +567,7 @@ function RecentTimelineCard({
   onViewTimeline: () => void;
 }) {
   return (
-    <SectionCard
+    <Surface
       title="Recent student timeline"
       description="Latest changes to this student's school record."
     >
@@ -621,7 +621,7 @@ function RecentTimelineCard({
           </p>
         </div>
       )}
-    </SectionCard>
+    </Surface>
   );
 }
 
@@ -636,7 +636,7 @@ function StudentIdentitySummary({
   const manageHref = `/dashboard/students/${encodeURIComponent(profile.student.id)}/identity`;
 
   return (
-    <SectionCard
+    <Surface
       title="Student identity"
       description="QR card status for daily school services."
     >
@@ -690,7 +690,7 @@ function StudentIdentitySummary({
           </Link>
         </div>
       </div>
-    </SectionCard>
+    </Surface>
   );
 }
 

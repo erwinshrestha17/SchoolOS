@@ -1,7 +1,7 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import type { AttendanceConflict } from '@schoolos/core';
-import { SectionCard } from '@/components/ui/section-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PermissionDenied } from '@/components/ui/permission-denied';
@@ -41,7 +41,7 @@ export function AttendanceConflictReview({
   });
 
   return (
-    <SectionCard
+    <Surface
       title="Conflict Review Queue"
       description="Resolve duplicate or flagged attendance submissions"
     >
@@ -107,6 +107,6 @@ export function AttendanceConflictReview({
           </div>
         )}
       </div>
-    </SectionCard>
+    </Surface>
   );
 }

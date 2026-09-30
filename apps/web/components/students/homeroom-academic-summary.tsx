@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { AlertTriangle, BookOpen, Info, Users } from 'lucide-react';
@@ -7,7 +8,6 @@ import { api } from '@/lib/api';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/loading-state';
-import { SectionCard } from '@/components/ui/section-card';
 import { Select } from '@/components/ui/form-field';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
@@ -186,7 +186,7 @@ export function HomeroomAcademicSummary() {
             />
           </SummaryGrid>
 
-          <SectionCard
+          <Surface
             title="Marks reported by subject"
             description="Submitted and published entries only. Draft marks stay private to the subject teacher."
           >
@@ -240,9 +240,9 @@ export function HomeroomAcademicSummary() {
             ) : (
               <ModuleUnavailableNotice moduleName="Exams" />
             )}
-          </SectionCard>
+          </Surface>
 
-          <SectionCard
+          <Surface
             title="Homework across all subjects"
             description="Published homework for this homeroom, newest first."
           >
@@ -283,7 +283,7 @@ export function HomeroomAcademicSummary() {
                 ))}
               </ul>
             )}
-          </SectionCard>
+          </Surface>
         </>
       ) : null}
     </div>

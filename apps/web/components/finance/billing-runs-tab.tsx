@@ -1,11 +1,11 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
-import { SectionCard } from '@/components/ui/section-card';
 import { Button } from '@/components/ui/button';
 import { PermissionDenied } from '@/components/ui/permission-denied';
 import {
@@ -159,7 +159,7 @@ export function BillingRunsTab() {
     <div className="grid gap-8 lg:grid-cols-2">
       {/* Run Invoice Form */}
       <div className="space-y-8">
-        <SectionCard
+        <Surface
           title="Run Monthly Invoices"
           description="Trigger bulk student invoice generation from configured fee plans."
         >
@@ -294,12 +294,12 @@ export function BillingRunsTab() {
               </Button>
             </form>
           )}
-        </SectionCard>
+        </Surface>
       </div>
 
       {/* Billing Runs History */}
       <div className="space-y-8">
-        <SectionCard title="Recent Billing Run Logs">
+        <Surface title="Recent Billing Run Logs">
           <input
             value={billingSearch}
             onChange={(event) =>
@@ -423,7 +423,7 @@ export function BillingRunsTab() {
               </div>
             </div>
           )}
-        </SectionCard>
+        </Surface>
       </div>
 
       {/* Confirmation Dialog */}

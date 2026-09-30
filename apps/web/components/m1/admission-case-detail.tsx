@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import {
   toGregorianDateFromBs,
   type AdmissionCase,
@@ -28,7 +29,6 @@ import { BsDateField } from '../ui/bs-date-field';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { ErrorState } from '../ui/error-state';
 import { ProtectedFileButton } from '../ui/protected-file';
-import { SectionCard } from '../ui/section-card';
 
 export function AdmissionCaseDetail({
   admissionCaseId,
@@ -145,10 +145,7 @@ export function AdmissionCaseDetail({
       </div>
 
       <div className="grid gap-5 lg:grid-cols-3">
-        <SectionCard
-          title="Student"
-          description="Saved admission-case information"
-        >
+        <Surface title="Student" description="Saved admission-case information">
           <Detail
             label="English name"
             value={`${admissionCase.student.firstNameEn} ${admissionCase.student.lastNameEn}`}
@@ -176,8 +173,8 @@ export function AdmissionCaseDetail({
                 : 'Not added'
             }
           />
-        </SectionCard>
-        <SectionCard
+        </Surface>
+        <Surface
           title="Guardian"
           description="Portal access is not created by admission"
         >
@@ -197,8 +194,8 @@ export function AdmissionCaseDetail({
             label="Email"
             value={admissionCase.guardian.email ?? 'Not added'}
           />
-        </SectionCard>
-        <SectionCard title="Placement" description="Saved academic placement">
+        </Surface>
+        <Surface title="Placement" description="Saved academic placement">
           <Detail
             label="Academic year"
             value={admissionCase.classSection.academicYearName ?? 'Not added'}
@@ -215,11 +212,11 @@ export function AdmissionCaseDetail({
             label="Admission date"
             value={admissionCase.academic.admissionDate ?? 'Not added'}
           />
-        </SectionCard>
+        </Surface>
       </div>
 
       {admissionCase.documents.length > 0 ? (
-        <SectionCard
+        <Surface
           title="Admission documents"
           description="Protected files linked to this admission case."
         >
@@ -249,10 +246,10 @@ export function AdmissionCaseDetail({
               </li>
             ))}
           </ul>
-        </SectionCard>
+        </Surface>
       ) : null}
 
-      <SectionCard
+      <Surface
         title="Admission check"
         description="Current validation determines whether this case can be admitted now."
       >
@@ -317,11 +314,11 @@ export function AdmissionCaseDetail({
             </p>
           ) : null}
         </div>
-      </SectionCard>
+      </Surface>
 
       {admissionCase.displayStatus === 'WAITING_FOR_REVIEW' &&
       admissionCase.approvalChain ? (
-        <SectionCard
+        <Surface
           title="Approval chain"
           description="This admission needs sequential sign-off before it can be finalized."
         >
@@ -335,7 +332,7 @@ export function AdmissionCaseDetail({
               admissionCase.approvalChain.currentStagePermission ??
               'principal/admin'}
           </p>
-        </SectionCard>
+        </Surface>
       ) : null}
 
       {admissionCase.missingRequiredFields.length > 0 ? (
@@ -352,7 +349,7 @@ export function AdmissionCaseDetail({
       ) : null}
 
       {admissionCase.followUps.length > 0 ? (
-        <SectionCard
+        <Surface
           title="After admission"
           description="These are follow-up cards, not payment or admission blockers."
         >
@@ -366,11 +363,11 @@ export function AdmissionCaseDetail({
               </li>
             ))}
           </ul>
-        </SectionCard>
+        </Surface>
       ) : null}
 
       {canOverrideDuplicate ? (
-        <SectionCard
+        <Surface
           title="Duplicate override"
           description="Your permission allows direct admission only after recording why this is a different student. No records will be merged."
         >
@@ -393,11 +390,11 @@ export function AdmissionCaseDetail({
               placeholder="Explain why this is not the same student."
             />
           </label>
-        </SectionCard>
+        </Surface>
       ) : null}
 
       {reviewAction ? (
-        <SectionCard
+        <Surface
           title={
             reviewAction === 'REQUEST_INFORMATION'
               ? 'Request information'
@@ -445,7 +442,7 @@ export function AdmissionCaseDetail({
               Confirm
             </Button>
           </div>
-        </SectionCard>
+        </Surface>
       ) : null}
 
       {mutationError ? (
@@ -684,7 +681,7 @@ function AdmissionCaseMissingDetails({
   };
 
   return (
-    <SectionCard
+    <Surface
       title="Complete missing information"
       description="Only the fields still required by school policy are shown. Saved admission details are not repeated."
     >
@@ -959,7 +956,7 @@ function AdmissionCaseMissingDetails({
           Save missing details
         </Button>
       </div>
-    </SectionCard>
+    </Surface>
   );
 }
 
@@ -1016,7 +1013,7 @@ function AdmissionCaseDocumentUpload({
   });
 
   return (
-    <SectionCard
+    <Surface
       title="Add required documents"
       description="Files use the protected File Registry. No storage key or permanent URL is shown."
     >
@@ -1058,7 +1055,7 @@ function AdmissionCaseDocumentUpload({
           {readError(mutation.error)}
         </p>
       ) : null}
-    </SectionCard>
+    </Surface>
   );
 }
 

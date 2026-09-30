@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import {
   AlertTriangle,
   ArrowRight,
@@ -22,7 +23,6 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
-import { SectionCard } from '@/components/ui/section-card';
 import { WorkSurface } from '@/components/ui/work-surface';
 import { api } from '@/lib/api';
 
@@ -235,10 +235,10 @@ export function FeeOverview() {
             </div>
           </WorkSurface>
 
-          <SectionCard
+          <Surface
             title="Overdue follow-up"
             description="Oldest unpaid invoices matching the current queue."
-            headerAction={
+            actions={
               canManage ? (
                 <Link
                   href="/dashboard/fees/reports?agingBucket=all"
@@ -248,7 +248,7 @@ export function FeeOverview() {
                 </Link>
               ) : undefined
             }
-            noPadding
+            padding="flush"
           >
             {!canManage ? (
               <p className="p-6 text-sm text-slate-600">
@@ -312,9 +312,9 @@ export function FeeOverview() {
                 className="m-5 min-h-48"
               />
             )}
-          </SectionCard>
+          </Surface>
 
-          <SectionCard
+          <Surface
             title="Recent receipts"
             description="Confirmed receipts stay in the protected Receipt center, already filtered to today."
           >
@@ -332,11 +332,11 @@ export function FeeOverview() {
                 Receipt details are restricted for this role.
               </p>
             )}
-          </SectionCard>
+          </Surface>
         </div>
 
         <div className="space-y-6">
-          <SectionCard
+          <Surface
             title="Attention required"
             description="Permission-safe finance work that needs a decision."
           >
@@ -390,9 +390,9 @@ export function FeeOverview() {
                 }
               />
             </div>
-          </SectionCard>
+          </Surface>
 
-          <SectionCard
+          <Surface
             title="Cashier activity"
             description="Official close state for this school day."
           >
@@ -439,7 +439,7 @@ export function FeeOverview() {
                 Cashier close status is unavailable.
               </p>
             )}
-          </SectionCard>
+          </Surface>
         </div>
       </div>
     </div>

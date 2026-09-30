@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,7 +11,6 @@ import {
 } from '@schoolos/core';
 import { api } from '@/lib/api';
 import type { StudentQrScanAudit } from '@/lib/api/students';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ProtectedFileButton } from '@/components/ui/protected-file';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -143,7 +143,7 @@ export function StudentQrCard({
   const isActive = status === 'ACTIVE';
 
   return (
-    <SectionCard
+    <Surface
       title="Student Identity QR"
       description="Secure token-based identity for library, canteen, and attendance."
     >
@@ -444,7 +444,7 @@ export function StudentQrCard({
           </p>
         </div>
       </div>
-    </SectionCard>
+    </Surface>
   );
 }
 

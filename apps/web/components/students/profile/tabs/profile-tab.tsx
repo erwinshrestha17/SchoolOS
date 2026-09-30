@@ -1,8 +1,8 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { formatBsDate, type StudentProfileDetail } from '@schoolos/core';
 import { Badge } from '@/components/ui/badge';
-import { SectionCard } from '@/components/ui/section-card';
 import {
   CalendarCheck,
   GraduationCap,
@@ -29,7 +29,7 @@ export function ProfileTab({ profile }: { profile: StudentProfileDetail }) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.55fr)]">
-      <SectionCard
+      <Surface
         title="Student profile"
         description="Official identity and enrollment details for this student."
       >
@@ -92,9 +92,9 @@ export function ProfileTab({ profile }: { profile: StudentProfileDetail }) {
             value={formatStatus(student.lifecycleStatus ?? 'ACTIVE')}
           />
         </div>
-      </SectionCard>
+      </Surface>
 
-      <SectionCard
+      <Surface
         title="Current enrollment"
         description="The student’s current academic year, class, and section placement."
       >
@@ -151,7 +151,7 @@ export function ProfileTab({ profile }: { profile: StudentProfileDetail }) {
             No active enrollment is available for this student.
           </div>
         )}
-      </SectionCard>
+      </Surface>
     </div>
   );
 }

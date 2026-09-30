@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -19,7 +20,6 @@ import {
   RotateCcw,
   ClipboardList,
 } from 'lucide-react';
-import { SectionCard } from '@/components/ui/section-card';
 import { StatCard } from '@/components/ui/stat-card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -417,7 +417,7 @@ export function ReportCardsWorkspace() {
             <div className="grid gap-8 lg:grid-cols-3">
               <div className="lg:col-span-2">
                 {!!examTermId && !!classId ? (
-                  <SectionCard
+                  <Surface
                     title="Report Cards"
                     description="View and download generated report cards."
                   >
@@ -427,7 +427,7 @@ export function ReportCardsWorkspace() {
                       isLoading={reportsQuery.isLoading}
                       getRowKey={(r) => r.id}
                     />
-                  </SectionCard>
+                  </Surface>
                 ) : (
                   <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white px-6 py-20 text-center shadow-sm">
                     <div className="h-16 w-16 rounded-2xl border border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)] flex items-center justify-center text-[var(--color-mod-academics-accent)] mb-6">
@@ -444,7 +444,7 @@ export function ReportCardsWorkspace() {
               </div>
 
               <div className="space-y-6">
-                <SectionCard
+                <Surface
                   title="Grading Policy"
                   description="Tenant policy used by report-card calculations."
                 >
@@ -524,8 +524,8 @@ export function ReportCardsWorkspace() {
                       )}
                     </div>
                   )}
-                </SectionCard>
-                <SectionCard
+                </Surface>
+                <Surface
                   title="Batch Settings"
                   description="Configure generation parameters."
                 >
@@ -541,8 +541,8 @@ export function ReportCardsWorkspace() {
                       the selected students to ensure data integrity.
                     </div>
                   </div>
-                </SectionCard>
-                <SectionCard
+                </Surface>
+                <Surface
                   title="Generation History"
                   description="Previous locked versions and correction requests."
                 >
@@ -618,14 +618,14 @@ export function ReportCardsWorkspace() {
                       Select History on a report card to view previous versions.
                     </p>
                   )}
-                </SectionCard>
+                </Surface>
               </div>
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="reports">
-          <SectionCard
+          <Surface
             title="Advanced Academic Reports"
             description="Specialized exports for CAS, Promotions, and Threshold analysis."
           >
@@ -645,7 +645,7 @@ export function ReportCardsWorkspace() {
                 Go to Reports Dashboard
               </Link>
             </div>
-          </SectionCard>
+          </Surface>
         </TabsContent>
       </Tabs>
       <ReportCardCorrectionDialog
