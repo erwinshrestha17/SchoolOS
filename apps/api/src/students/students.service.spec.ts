@@ -2335,7 +2335,7 @@ describe('students lifecycle hardening', () => {
 
     const result = await service.exportIemis(actor);
 
-    expect(result.formatVersion).toBe('SCHOLOS-IEMIS-1.0');
+    expect(result.formatVersion).toBe('SCHOLOS-IEMIS-1.1');
     expect(result.totalRecords).toBe(2);
     expect(result.validRecords).toBe(1);
     expect(result.invalidRecords).toBe(1);

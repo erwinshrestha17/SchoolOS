@@ -34,10 +34,12 @@ import {
   UserStatus,
 } from '@prisma/client';
 import sharp from 'sharp';
+import { IEMIS_REQUIREMENT_VERSION } from './iemis-rules';
 import {
   type EntitlementState,
   formatBsAcademicYear,
   formatBsDate,
+  formatBsDateForInput,
   GUARDIAN_RECOVERY_VERIFICATION_METHODS,
   type GuardianAccessAdministration,
   type GuardianRecoveryVerificationMethod,
@@ -47,6 +49,7 @@ import {
   StudentAttendanceHistorySummary,
   StudentModuleSummary,
   toBsDateFromGregorian,
+  toNepalLocalDateTime,
 } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
@@ -5033,6 +5036,9 @@ export class StudentsService {
 
   async exportIemis(actor: AuthContext) {
     this.assertSensitiveStudentReadAllowed(actor, 'iEMIS reporting export');
+    // Phase 5I: captured before reading so a handoff can prove the snapshot
+    // still matches current records (see IemisHandoffService.create).
+    const dataAsOf = new Date();
     const students = await this.prisma.student.findMany({
       where: { tenantId: actor.tenantId },
       include: {
@@ -5132,6 +5138,7 @@ export class StudentsService {
           requiresAuthorizedReview: true,
           artifactStatus,
           configurationIssueCount: configurationIssues.length,
+          dataAsOf: dataAsOf.toISOString(),
         },
         normalizedParameters: {},
         rowCount: rows.length,
@@ -7985,15 +7992,15 @@ function buildIemisRow(
     lastNameEn: student.lastNameEn,
     firstNameNp: student.firstNameNp ?? '',
     lastNameNp: student.lastNameNp ?? '',
-    dateOfBirth: student.dateOfBirth.toISOString().slice(0, 10),
+    dateOfBirth: nepalIsoDate(student.dateOfBirth),
     gender: student.gender,
     nationality: student.nationality ?? '',
     motherTongue: student.motherTongue ?? '',
     ethnicity: student.ethnicity ?? '',
     disabilityFlag: student.disabilityFlag ?? '',
-    admissionDate: (latestEnrollment?.admissionDate ?? student.admissionDate)
-      .toISOString()
-      .slice(0, 10),
+    admissionDate: nepalIsoDate(
+      latestEnrollment?.admissionDate ?? student.admissionDate,
+    ),
     admissionNumber: student.admissionNumber ?? '',
     lifecycleStatus: student.lifecycleStatus,
     academicYear: latestEnrollment?.academicYear.name ?? '',
@@ -8010,8 +8017,44 @@ function buildIemisRow(
     fatherName: fatherLink?.guardian.fullName ?? '',
     motherName: motherLink?.guardian.fullName ?? '',
     stream: '',
-    dobBs: '',
+    dobBs: bsDateForExport(student.dateOfBirth) ?? '',
   };
+}
+
+/**
+ * Phase 5I date handling for reporting. Dates are rendered as the Nepal
+ * calendar day (Asia/Kathmandu): date-only values are stored at UTC midnight
+ * and land on the same day, while instants (for example an admission recorded
+ * at 00:30 NPT) no longer slip to the previous UTC day.
+ */
+function nepalIsoDate(value: Date): string {
+  const local = toNepalLocalDateTime(value);
+  return `${local.year}-${String(local.month).padStart(2, '0')}-${String(
+    local.day,
+  ).padStart(2, '0')}`;
+}
+
+/** BS YYYY-MM-DD for the Nepal calendar day, or null outside the BS table. */
+function bsDateForExport(value: Date | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const local = toNepalLocalDateTime(value);
+    return formatBsDateForInput({
+      year: local.year,
+      month: local.month,
+      day: local.day,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function safeFormatBsDate(value: Date): string | null {
+  try {
+    return formatBsDate(value);
+  } catch {
+    return null;
+  }
 }
 
 function buildCsv(headers: string[], rows: Array<Record<string, unknown>>) {
@@ -8611,7 +8654,6 @@ function resolveDocumentRetentionUntil(
   return new Date(generatedAt.getTime() + retentionDays * 86_400_000);
 }
 
-const IEMIS_REQUIREMENT_VERSION = 'SCHOLOS-IEMIS-1.0';
 const IEMIS_ARTIFACT_PURPOSE = 'REPORTING_READINESS_HANDOFF' as const;
 const IEMIS_SCHEMA_AUTHORITY = 'SCHOOL_OS_INTERNAL_RULE_SET' as const;
 const IEMIS_EXPORT_ISSUE_LIMIT = 500;
@@ -8621,6 +8663,7 @@ const IEMIS_REQUIRED_RULE_CODES = [
   'ENGLISH_NAME_REQUIRED',
   'NEPALI_NAME_REQUIRED',
   'DATE_OF_BIRTH_REQUIRED',
+  'DATE_OF_BIRTH_BS_UNSUPPORTED',
   'GENDER_REQUIRED',
   'NATIONALITY_REQUIRED',
   'ADMISSION_DATE_REQUIRED',
@@ -8775,9 +8818,26 @@ function validateIemisStudent(
         : "The student's date of birth is required for government reporting.",
       field: 'dateOfBirth',
       currentValueSafe: student.dateOfBirth
-        ? formatBsDate(student.dateOfBirth)
+        ? (safeFormatBsDate(student.dateOfBirth) ??
+          nepalIsoDate(student.dateOfBirth))
         : null,
       requiredAction: 'Review and correct the date of birth.',
+      fixTarget: 'STUDENT_PROFILE',
+      requiredPermission: 'students:update',
+    });
+  } else if (bsDateForExport(student.dateOfBirth) === null) {
+    // Phase 5I: IEMIS works in BS. A date outside the supported BS calendar
+    // table cannot be converted, so the export would carry a blank BS date.
+    blocking({
+      code: 'DATE_OF_BIRTH_BS_UNSUPPORTED',
+      category: 'IDENTITY',
+      title: 'Date of birth cannot be converted to BS',
+      message:
+        'This date of birth is outside the BS calendar range SchoolOS can convert, so the BS date required for reporting cannot be produced.',
+      field: 'dateOfBirth',
+      currentValueSafe: nepalIsoDate(student.dateOfBirth),
+      requiredAction:
+        'Check the date of birth against the official record; it is most likely entered incorrectly.',
       fixTarget: 'STUDENT_PROFILE',
       requiredPermission: 'students:update',
     });

@@ -11,6 +11,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { IEMIS_REQUIREMENT_VERSION } from './iemis-rules';
 import type {
   CreateIemisHandoffDto,
   RecordIemisHandoffEventDto,
@@ -62,6 +63,42 @@ export class IemisHandoffService {
     });
   }
 
+  /** Record types exported to IEMIS that changed after `since`. */
+  private async recordsChangedSince(tenantId: string, since: Date) {
+    const changed = { updatedAt: { gt: since } };
+    const [student, enrollment, guardian, link, schoolCode] = await Promise.all(
+      [
+        this.prisma.student.findFirst({
+          where: { tenantId, ...changed },
+          select: { id: true },
+        }),
+        this.prisma.enrollment.findFirst({
+          where: { tenantId, ...changed },
+          select: { id: true },
+        }),
+        this.prisma.guardian.findFirst({
+          where: { tenantId, ...changed },
+          select: { id: true },
+        }),
+        this.prisma.studentGuardian.findFirst({
+          where: { tenantId, ...changed },
+          select: { id: true },
+        }),
+        this.prisma.tenantSetting.findFirst({
+          where: { tenantId, key: 'iemis_school_code', ...changed },
+          select: { id: true },
+        }),
+      ],
+    );
+    return [
+      student && 'STUDENT',
+      enrollment && 'ENROLLMENT',
+      guardian && 'GUARDIAN',
+      link && 'GUARDIAN_LINK',
+      schoolCode && 'SCHOOL_CODE',
+    ].filter((value): value is string => Boolean(value));
+  }
+
   async create(dto: CreateIemisHandoffDto, actor: AuthContext) {
     const findExisting = () =>
       this.prisma.externalAuthorityHandoff.findFirst({
@@ -94,6 +131,8 @@ export class IemisHandoffService {
         filters: true,
         rowCount: true,
         displayedTotals: true,
+        definitionVersion: true,
+        createdAt: true,
       },
     });
     if (!exportRecord) throw new NotFoundException('Export not found');
@@ -123,6 +162,36 @@ export class IemisHandoffService {
       throw new ConflictException(
         'The internal reporting artifact has unresolved issues or cannot be used as a handoff snapshot',
       );
+    }
+
+    // Phase 5I: a handoff must describe current records under the current
+    // rule set. An old snapshot is not silently handed off.
+    if (exportRecord.definitionVersion !== IEMIS_REQUIREMENT_VERSION) {
+      throw new ConflictException({
+        code: 'IEMIS_EXPORT_RULESET_OUTDATED',
+        message:
+          'This export was checked under an older reporting rule set. Generate a new export and review it before handing off.',
+        exportRuleSet: exportRecord.definitionVersion,
+        currentRuleSet: IEMIS_REQUIREMENT_VERSION,
+      });
+    }
+    const parsedAsOf =
+      typeof filters.dataAsOf === 'string' ? new Date(filters.dataAsOf) : null;
+    const dataAsOf =
+      parsedAsOf && !Number.isNaN(parsedAsOf.getTime())
+        ? parsedAsOf
+        : exportRecord.createdAt;
+    const changedRecordTypes = await this.recordsChangedSince(
+      actor.tenantId,
+      dataAsOf,
+    );
+    if (changedRecordTypes.length > 0) {
+      throw new ConflictException({
+        code: 'IEMIS_EXPORT_STALE',
+        message:
+          'Student records changed after this export was generated. Generate a new export and review it before handing off.',
+        changedRecordTypes,
+      });
     }
     const asset = await this.prisma.fileAsset.findFirst({
       where: {

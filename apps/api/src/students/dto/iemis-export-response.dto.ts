@@ -31,8 +31,8 @@ export class IemisExportConfigurationIssueResponseDto {
 }
 
 export class IemisExportResponseDto {
-  @ApiProperty({ example: 'SCHOLOS-IEMIS-1.0' })
-  formatVersion!: 'SCHOLOS-IEMIS-1.0';
+  @ApiProperty({ example: 'SCHOLOS-IEMIS-1.1' })
+  formatVersion!: 'SCHOLOS-IEMIS-1.1';
 
   @ApiProperty({ example: 'REPORTING_READINESS_HANDOFF' })
   artifactPurpose!: 'REPORTING_READINESS_HANDOFF';

@@ -7073,7 +7073,7 @@ export type IemisExportRow = {
 };
 
 export type IemisExportResult = {
-  formatVersion: "SCHOLOS-IEMIS-1.0";
+  formatVersion: "SCHOLOS-IEMIS-1.1";
   artifactPurpose: "REPORTING_READINESS_HANDOFF";
   schemaAuthority: "SCHOOL_OS_INTERNAL_RULE_SET";
   officialFormatVerified: boolean;

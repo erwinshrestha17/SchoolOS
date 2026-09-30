@@ -521,6 +521,7 @@ function getIssueActionLabel(issue: StudentIemisReadinessIssue) {
     case 'ENGLISH_NAME_REQUIRED':
       return 'Complete English name';
     case 'DATE_OF_BIRTH_REQUIRED':
+    case 'DATE_OF_BIRTH_BS_UNSUPPORTED':
       return 'Correct date of birth';
     case 'GENDER_REQUIRED':
       return 'Review gender';

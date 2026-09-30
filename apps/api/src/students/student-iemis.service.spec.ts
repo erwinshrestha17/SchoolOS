@@ -10,6 +10,7 @@ import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
 import { StudentPhotoService } from './student-photo.service';
 import { StudentLifecycleStatus, EnrollmentStatus } from '@prisma/client';
+import { formatBsDateForInput } from '@schoolos/core';
 import { AuthContext } from '../auth/auth.types';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import {
@@ -436,6 +437,66 @@ describe('StudentsService (iEMIS Export)', () => {
     });
   });
 
+  it('Phase 5I: exports the BS date of birth and Nepal-day dates', async () => {
+    const student = {
+      id: 'student-1',
+      studentSystemId: 'SCH-2026-0001',
+      firstNameEn: 'John',
+      lastNameEn: 'Doe',
+      firstNameNp: 'जोन',
+      lastNameNp: 'डो',
+      dateOfBirth: new Date('2015-01-01T00:00:00.000Z'),
+      gender: 'MALE',
+      nationality: 'Nepali',
+      // Recorded at 00:30 Nepal time on 2026-01-02 (still 01-01 in UTC).
+      admissionDate: new Date('2026-01-01T18:45:00.000Z'),
+      admissionNumber: 'ADM-001',
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      classId: 'class-1',
+      class: { name: 'Class 1' },
+      sectionRef: { name: 'A' },
+      guardianLinks: [
+        {
+          isPrimary: true,
+          relation: 'Father',
+          guardian: { fullName: 'James Doe', primaryPhone: '9800000000' },
+        },
+      ],
+      enrollments: [
+        {
+          academicYear: { name: '2081' },
+          class: { name: 'Class 1' },
+          section: { name: 'A' },
+        },
+      ],
+      tenant: { name: 'Test School' },
+    };
+    (prisma.student.findMany as jest.Mock).mockResolvedValue([student]);
+    (prisma.tenantSetting.findUnique as jest.Mock).mockResolvedValue({
+      key: 'iemis_school_code',
+      value: 'school-code-123',
+    });
+    (prisma.reportExport.create as jest.Mock).mockResolvedValue({
+      id: 'export-1',
+    });
+
+    await service.exportIemis(mockAuth);
+
+    const csv = (
+      storageService.saveBufferObject.mock.calls[0][0].content as Buffer
+    ).toString('utf8');
+    const [header, row] = csv.trim().split('\n');
+    const cells = Object.fromEntries(
+      header.split(',').map((key, index) => [key, row.split(',')[index]]),
+    );
+    expect(cells.dateOfBirth).toBe('2015-01-01');
+    expect(cells.dobBs).toBe(
+      formatBsDateForInput({ year: 2015, month: 1, day: 1 }),
+    );
+    expect(cells.dobBs).toMatch(/^20\d{2}-\d{2}-\d{2}$/);
+    expect(cells.admissionDate).toBe('2026-01-02');
+  });
+
   describe('getIemisReadiness', () => {
     it('returns backend-owned required-check counts for a ready student', async () => {
       (prisma.student.findFirst as jest.Mock).mockResolvedValue(
@@ -458,7 +519,29 @@ describe('StudentsService (iEMIS Export)', () => {
       expect(result.academicYear).toBe('2082/83');
       expect(result.className).toBe('Class 12');
       expect(result.sectionName).toBe('A');
-      expect(result.requirementVersion).toBe('SCHOLOS-IEMIS-1.0');
+      expect(result.requirementVersion).toBe('SCHOLOS-IEMIS-1.1');
+    });
+
+    it('Phase 5I: a date of birth outside the BS table is a blocking issue, not a crash', async () => {
+      (prisma.student.findFirst as jest.Mock).mockResolvedValue(
+        buildReadinessStudent({
+          dateOfBirth: new Date('1900-01-01T00:00:00.000Z'),
+        }),
+      );
+
+      const result = await service.getIemisReadiness('student-ready', mockAuth);
+
+      expect(result.exportEligible).toBe(false);
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'DATE_OF_BIRTH_BS_UNSUPPORTED',
+            blocking: true,
+            currentValueSafe: '1900-01-01',
+          }),
+        ]),
+      );
+      expect(result.passedRequiredChecks).toBe(result.totalRequiredChecks - 1);
     });
 
     it('returns exact blocking issues and safe fix metadata', async () => {
