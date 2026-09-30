@@ -2013,6 +2013,8 @@ const PRINCIPAL_OVERSIGHT_READ_KEYS: PermissionKey[] = [
   "exam-terms:read",
   "assessment-components:read",
   "cas-records:read",
+  // Phase 5F: homework oversight on Student 360 (read only).
+  "homework:read",
   // M7 read
   "staff:read",
   "hr:read",
@@ -2735,7 +2737,7 @@ const SYSTEM_ROLE_TEMPLATE_IDENTITIES: Record<
   platform_billing_admin: { displayName: "Platform Billing Admin", version: 1 },
   school_config_owner: { displayName: "School Access Owner", version: 1 },
   admin: { displayName: "School Admin", version: 1 },
-  principal: { displayName: "Principal", version: 1 },
+  principal: { displayName: "Principal", version: 2 },
   admissions_officer: { displayName: "Admissions Officer", version: 1 },
   teacher: { displayName: "Teacher", version: 1 },
   subject_teacher: { displayName: "Subject Teacher", version: 1 },

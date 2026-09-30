@@ -36,6 +36,7 @@
     "advanced:automation:read",
     "advanced:documents:read",
     "advanced:exports:read",
+    "homework:read_published",
     "hr:attendance:correct",
     "hr:leave:request",
     "notifications:manage_preferences",

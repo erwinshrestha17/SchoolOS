@@ -155,10 +155,15 @@ describe('Student 360 persona projection (Phase 5F)', () => {
       expect(sections).not.toContain(denied);
   });
 
-  it('principal: oversight includes academics, attendance and guardian administration — not fees or health', () => {
+  it('principal: oversight includes academics, homework and attendance — not fees or health', () => {
     const sections = sectionsFor('principal');
     expect(sections).toEqual(
-      expect.arrayContaining(['identity', 'academics', 'attendance']),
+      expect.arrayContaining([
+        'identity',
+        'academics',
+        'homework',
+        'attendance',
+      ]),
     );
     for (const denied of ['fees', 'health'])
       expect(sections).not.toContain(denied);

@@ -169,7 +169,8 @@ test("new catalog keys cannot enter Admin or Principal through all-except filter
     /permissionCatalog|TENANT_PERMISSION_KEYS|ALL_PERMISSION_KEYS|ADMIN_EXCLUDED_FINANCE_KEYS/,
   );
   assert.equal(systemRolePermissions.admin.length, 222);
-  assert.equal(systemRolePermissions.principal.length, 65);
+  // Principal v2 (Phase 5F): +homework:read for Student 360 oversight.
+  assert.equal(systemRolePermissions.principal.length, 66);
 });
 
 test("new duty templates do not gain incompatible effective finance authority", () => {

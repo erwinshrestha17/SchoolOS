@@ -623,7 +623,7 @@
   },
   "principal": {
     "displayName": "Principal",
-    "version": 1,
+    "version": 2,
     "securityDomain": "SCHOOL",
     "permissions": [
       "academic_years:read",
@@ -667,6 +667,7 @@
       "exam-terms:unlock",
       "finance:principal:read",
       "guardians:read",
+      "homework:read",
       "hr:attendance:read",
       "hr:leave:approve",
       "hr:leave:read",
