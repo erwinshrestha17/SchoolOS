@@ -572,7 +572,7 @@ void main() {
           }),
           principalSnapshotProvider.overrideWith((ref, key) async {
             return {
-              'metrics': {'dueToday': 0, 'overdue': 0, 'completed': 0},
+              'metrics': {'open': 0, 'highPriority': 0, 'completed': null},
               'items': <Map<String, dynamic>>[],
               'createTask': {
                 'supported': false,
@@ -596,6 +596,71 @@ void main() {
     expect(find.textContaining('backend'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'principal home shows withheld and failed panels as unavailable, never zero',
+    (tester) async {
+      final sharedPrefs = await SharedPreferences.getInstance();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPreferencesServiceProvider.overrideWithValue(
+              AppPreferencesService(sharedPrefs),
+            ),
+            tokenStorageServiceProvider.overrideWithValue(_FakeTokenStorage()),
+            authRepositoryProvider.overrideWithValue(_FakeAuthRepository()),
+            authProvider.overrideWith((ref) {
+              return _FakeAuthNotifier(
+                ref.watch(tokenStorageServiceProvider),
+                ref.watch(authRepositoryProvider),
+                ref.watch(appPreferencesServiceProvider),
+              );
+            }),
+            principalDashboardProvider.overrideWith((ref) async {
+              return {
+                'school': {'id': 't1', 'name': 'School', 'role': 'Principal'},
+                'date': 'Today',
+                'attentionCount': null,
+                'attentionComplete': false,
+                'cards': [
+                  {
+                    'key': 'fees',
+                    'label': 'Fees Snapshot',
+                    'detail': 'today',
+                    'route': '/principal/fees-snapshot',
+                    'value': null,
+                    'available': false,
+                    'unavailableReason': 'NOT_PERMITTED',
+                  },
+                  {
+                    'key': 'staffAbsence',
+                    'label': 'Staff Absence',
+                    'detail': 'staff today',
+                    'route': '/principal/staff-absence',
+                    'value': null,
+                    'available': false,
+                    'unavailableReason': 'UNAVAILABLE',
+                  },
+                ],
+                'alerts': <Map<String, dynamic>>[],
+                'quickActions': <Map<String, dynamic>>[],
+                'recentUpdates': <Map<String, dynamic>>[],
+                'modules': <String, dynamic>{},
+              };
+            }),
+          ],
+          child: const MaterialApp(home: PrincipalTodayScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Not available for your role'), findsOneWidget);
+      expect(find.text('Could not load — pull to refresh'), findsOneWidget);
+      expect(find.text('Attention count unavailable'), findsOneWidget);
+      expect(find.text('0'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('principal walkthrough capture is available online', (
     tester,

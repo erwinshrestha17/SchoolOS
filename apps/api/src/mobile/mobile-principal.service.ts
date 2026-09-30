@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
@@ -21,7 +22,12 @@ import {
   SchoolServiceRequestStatus,
   UserStatus,
 } from '@prisma/client';
-import { FEATURE_KEYS } from '@schoolos/core';
+import {
+  FEATURE_KEYS,
+  getNepalSchoolDay,
+  shiftGregorianDateOnly,
+} from '@schoolos/core';
+import { hasDomainPermission } from '../authorization/policies/domain-permission';
 import { ApprovalWorkflowService } from '../advanced-operations/approval-workflow.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -54,14 +60,48 @@ import { MobilePrincipalServiceRequestTriageDto } from './dto/mobile-principal-s
 
 type Severity = 'critical' | 'high' | 'medium' | 'low';
 
+type PanelResult<T> =
+  | { state: 'ok'; value: T }
+  | { state: 'denied' }
+  | { state: 'unavailable' };
+
+/**
+ * Drill-down route permissions (mirrors @Permissions on the controller).
+ * A home panel is only computed for actors who could open the detail.
+ */
+const FEES_SUMMARY_PERMISSIONS = ['fees:manage', 'payments:close'] as const;
+const STAFF_ABSENCE_PERMISSIONS = ['staff:read', 'hr:leave:approve'] as const;
+const APPROVALS_PERMISSIONS = [
+  'advanced:approvals:read',
+  'hr:leave:approve',
+] as const;
+const ATTENDANCE_PERMISSIONS = ['attendance:read'] as const;
+const TRANSPORT_PERMISSIONS = [
+  'transport:reports:read',
+  'transport:trips:read',
+] as const;
+const ACADEMICS_PERMISSIONS = ['academics:read', 'marks:read'] as const;
+const ACTIVITY_PERMISSIONS = ['activity_feed:moderate'] as const;
+const SERVICE_REQUEST_PERMISSIONS = ['service_requests:read'] as const;
+
+const STAFF_AWAY_STATUSES = new Set<string>([
+  'ABSENT',
+  'LEAVE',
+  'ON_LEAVE',
+  'SICK_LEAVE',
+]);
+
 interface PrincipalMetric {
   key: string;
   label: string;
-  value: number | string;
+  /** null when the panel could not be computed — never a fabricated 0. */
+  value: number | string | null;
   detail?: string;
-  tone?: 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'slate';
+  tone?: 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'slate' | 'gray';
   route?: string;
   locked?: boolean;
+  available?: boolean;
+  unavailableReason?: 'NOT_PERMITTED' | 'UNAVAILABLE';
 }
 
 interface PrincipalItem {
@@ -131,6 +171,8 @@ const MOBILE_APPROVAL_TARGET_FILTERS = MOBILE_APPROVAL_WORKFLOW_TYPES.map(
 
 @Injectable()
 export class MobilePrincipalService implements OnModuleInit {
+  private readonly logger = new Logger(MobilePrincipalService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly entitlementsService: EntitlementsService,
@@ -170,54 +212,106 @@ export class MobilePrincipalService implements OnModuleInit {
 
   async getDashboard(actor: AuthContext) {
     this.assertPrincipal(actor);
-    const [tenant, modules, attention, attendance, staff, fees, approvals] =
-      await Promise.all([
-        this.getTenant(actor.tenantId),
-        this.getModules(actor.tenantId),
-        this.getAttention(actor, 'all'),
-        this.getAttendanceSummary(actor),
-        this.getStaffAbsence(actor),
-        this.getFeesSummary(actor),
-        this.getApprovals(actor, 'pending'),
-      ]);
+    const [tenant, modules] = await Promise.all([
+      this.getTenant(actor.tenantId),
+      this.getModules(actor.tenantId),
+    ]);
+    // Phase 4: every panel is computed only when the actor may open its
+    // drill-down (summary permission ≠ detail permission), and settled
+    // independently so one failing source never blanks the home or shows 0.
+    const [attention, attendance, staff, fees, approvals] = await Promise.all([
+      this.loadPanel(true, () => this.getAttention(actor, 'all')),
+      this.loadPanel(
+        modules.attendance && this.holdsAll(actor, ATTENDANCE_PERMISSIONS),
+        () => this.getAttendanceSummary(actor),
+      ),
+      this.loadPanel(
+        modules.hr && this.holdsAll(actor, STAFF_ABSENCE_PERMISSIONS),
+        () => this.getStaffAbsence(actor),
+      ),
+      this.loadPanel(
+        modules.fees && this.holdsAll(actor, FEES_SUMMARY_PERMISSIONS),
+        () => this.getFeesSummary(actor),
+      ),
+      this.loadPanel(this.holdsAll(actor, APPROVALS_PERMISSIONS), () =>
+        this.countPendingDecisionsForActor(actor),
+      ),
+    ]);
+
+    const card = <T>(
+      base: Omit<PrincipalMetric, 'value' | 'tone'> & { locked?: boolean },
+      panel: PanelResult<T>,
+      read: (value: T) => Pick<PrincipalMetric, 'value' | 'tone'>,
+    ): PrincipalMetric =>
+      panel.state === 'ok'
+        ? { ...base, ...read(panel.value), available: true }
+        : {
+            ...base,
+            value: null,
+            tone: 'gray',
+            available: false,
+            unavailableReason:
+              panel.state === 'denied' ? 'NOT_PERMITTED' : 'UNAVAILABLE',
+          };
 
     const cards: PrincipalMetric[] = [
-      {
-        key: 'attendanceRisk',
-        label: 'Attendance Risk',
-        value: attendance.metrics.classesNotMarked,
-        detail: 'classes',
-        tone: attendance.metrics.classesNotMarked > 0 ? 'orange' : 'green',
-        route: '/principal/attendance-risk',
-        locked: !modules.attendance,
-      },
-      {
-        key: 'staffAbsence',
-        label: 'Staff Absence',
-        value: staff.metrics.absentToday,
-        detail: 'staff today',
-        tone: staff.metrics.absentToday > 0 ? 'red' : 'green',
-        route: '/principal/staff-absence',
-        locked: !modules.hr,
-      },
-      {
-        key: 'approvals',
-        label: 'Approvals',
-        value: approvals.summary.pending,
-        detail: 'pending',
-        tone: approvals.summary.pending > 0 ? 'blue' : 'green',
-        route: '/principal/approvals',
-      },
-      {
-        key: 'fees',
-        label: 'Fees Snapshot',
-        value: fees.metrics.collectedTodayFormatted,
-        detail: 'today',
-        tone: 'green',
-        route: '/principal/fees-snapshot',
-        locked: !modules.fees,
-      },
+      card(
+        {
+          key: 'attendanceRisk',
+          label: 'Attendance Risk',
+          detail: 'classes',
+          route: '/principal/attendance-risk',
+          locked: !modules.attendance,
+        },
+        attendance,
+        (value) => ({
+          value: value.metrics.classesNotMarked,
+          tone: value.metrics.classesNotMarked > 0 ? 'orange' : 'green',
+        }),
+      ),
+      card(
+        {
+          key: 'staffAbsence',
+          label: 'Staff Absence',
+          detail: 'staff today',
+          route: '/principal/staff-absence',
+          locked: !modules.hr,
+        },
+        staff,
+        (value) => ({
+          value: value.metrics.absentToday,
+          tone: value.metrics.absentToday > 0 ? 'red' : 'green',
+        }),
+      ),
+      card(
+        {
+          key: 'approvals',
+          label: 'Approvals',
+          detail: 'awaiting your decision',
+          route: '/principal/approvals',
+        },
+        approvals,
+        (value) => ({
+          value,
+          tone: value > 0 ? 'blue' : 'green',
+        }),
+      ),
+      card(
+        {
+          key: 'fees',
+          label: 'Fees Snapshot',
+          detail: 'today',
+          route: '/principal/fees-snapshot',
+          locked: !modules.fees,
+        },
+        fees,
+        (value) => ({
+          value: value.metrics.collectedTodayFormatted,
+          tone: 'green',
+        }),
+      ),
     ];
+    const attentionValue = attention.state === 'ok' ? attention.value : null;
 
     return {
       school: {
@@ -226,9 +320,12 @@ export class MobilePrincipalService implements OnModuleInit {
         role: 'Principal',
       },
       date: dayLabel(new Date()),
-      attentionCount: attention.summary.total,
+      attentionCount: attentionValue?.summary.total ?? null,
+      attentionComplete:
+        attentionValue !== null &&
+        attentionValue.unavailableSources.length === 0,
       cards,
-      alerts: attention.items.slice(0, 5),
+      alerts: attentionValue?.items.slice(0, 5) ?? [],
       quickActions: [
         {
           label: 'Review Approvals',
@@ -264,38 +361,67 @@ export class MobilePrincipalService implements OnModuleInit {
   async getAttention(actor: AuthContext, filter = 'all') {
     this.assertPrincipal(actor);
     const modules = await this.getModules(actor.tenantId);
-    const [
-      attendanceItems,
-      staffItems,
-      transportItems,
-      noticeItems,
-      feeItems,
-      academicsItems,
-      activityItems,
-      serviceRequestItems,
-    ] = await Promise.all([
-      modules.attendance ? this.attendanceAttention(actor) : [],
-      modules.hr ? this.staffAttention(actor) : [],
-      modules.transport ? this.transportAttention(actor) : [],
-      modules.notices ? this.noticeAttention(actor) : [],
-      modules.fees ? this.feeAttention(actor) : [],
-      modules.exams ? this.academicsAttention(actor) : [],
-      modules.activity ? this.activityAttention(actor) : [],
-      actor.permissions.includes('service_requests:read')
-        ? this.serviceRequestAttention(actor)
-        : [],
-    ]);
+    // Each source is gated on the module AND the source's own drill-down
+    // permissions, and settled independently: a failed source is reported in
+    // `unavailableSources` instead of silently contributing zero items.
+    const sources: Array<{
+      key: string;
+      allowed: boolean;
+      load: () => Promise<PrincipalItem[]>;
+    }> = [
+      {
+        key: 'attendance',
+        allowed:
+          modules.attendance && this.holdsAll(actor, ATTENDANCE_PERMISSIONS),
+        load: () => this.attendanceAttention(actor),
+      },
+      {
+        key: 'staff',
+        allowed: modules.hr && this.holdsAll(actor, STAFF_ABSENCE_PERMISSIONS),
+        load: () => this.staffAttention(actor),
+      },
+      {
+        key: 'transport',
+        allowed:
+          modules.transport && this.holdsAll(actor, TRANSPORT_PERMISSIONS),
+        load: () => this.transportAttention(actor),
+      },
+      {
+        key: 'notices',
+        allowed: modules.notices && this.holdsAll(actor, ['notices:read']),
+        load: () => this.noticeAttention(actor),
+      },
+      {
+        key: 'fees',
+        allowed: modules.fees && this.holdsAll(actor, FEES_SUMMARY_PERMISSIONS),
+        load: () => this.feeAttention(actor),
+      },
+      {
+        key: 'academics',
+        allowed: modules.exams && this.holdsAll(actor, ACADEMICS_PERMISSIONS),
+        load: () => this.academicsAttention(actor),
+      },
+      {
+        key: 'activity',
+        allowed: modules.activity && this.holdsAll(actor, ACTIVITY_PERMISSIONS),
+        load: () => this.activityAttention(actor),
+      },
+      {
+        key: 'serviceRequests',
+        allowed: this.holdsAll(actor, SERVICE_REQUEST_PERMISSIONS),
+        load: () => this.serviceRequestAttention(actor),
+      },
+    ];
+    const settled = await Promise.all(
+      sources.map((source) => this.loadPanel(source.allowed, source.load)),
+    );
+    const unavailableSources = sources
+      .filter((_, index) => settled[index].state === 'unavailable')
+      .map((source) => source.key);
 
-    let items = [
-      ...attendanceItems,
-      ...staffItems,
-      ...transportItems,
-      ...noticeItems,
-      ...feeItems,
-      ...academicsItems,
-      ...activityItems,
-      ...serviceRequestItems,
-    ].sort(compareAttention);
+    let items = settled
+      .flatMap((result) => (result.state === 'ok' ? result.value : []))
+      .sort(compareAttention);
 
     const normalizedFilter = filter.toLowerCase();
     if (normalizedFilter === 'critical') {
@@ -321,6 +447,9 @@ export class MobilePrincipalService implements OnModuleInit {
       filters: ['all', 'critical', 'today', 'assigned'],
       activeFilter: normalizedFilter,
       items,
+      /** Sources that failed to load; the summary is partial when non-empty. */
+      unavailableSources,
+      complete: unavailableSources.length === 0,
       modules,
       lastUpdated: nowIso(),
     };
@@ -639,6 +768,7 @@ export class MobilePrincipalService implements OnModuleInit {
       activeTab: status.toLowerCase(),
       summary: {
         pending: await this.countAllPendingApprovals(actor.tenantId),
+        awaitingMyDecision: await this.countPendingDecisionsForActor(actor),
         urgent: items.filter((item) => item.severity === 'critical').length,
         today: countToday(items),
       },
@@ -1247,6 +1377,8 @@ export class MobilePrincipalService implements OnModuleInit {
       date: dateLabel(date),
       metrics: {
         classesNotMarked: missing.length,
+        classesMarked: classSections.length - missing.length,
+        classesTotal: classSections.length,
         repeatedAbsence: repeated.length,
         lateFollowUp: pendingCorrections,
       },
@@ -1277,17 +1409,16 @@ export class MobilePrincipalService implements OnModuleInit {
         where: {
           tenantId: actor.tenantId,
           attendanceDate: { gte: start, lt: end },
-          NOT: { status: 'PRESENT' as never },
+          status: { notIn: ['PRESENT', 'HOLIDAY'] as never },
         },
         include: { staff: { select: safeStaffSelect } },
         orderBy: { createdAt: 'desc' },
-        take: 20,
       }),
       this.prisma.staffLeaveRequest.findMany({
         where: {
           tenantId: actor.tenantId,
           status: { in: ['PENDING', 'APPROVED'] as never },
-          startsOn: { lte: end },
+          startsOn: { lt: end },
           endsOn: { gte: start },
         },
         include: { staff: { select: safeStaffSelect } },
@@ -1298,6 +1429,7 @@ export class MobilePrincipalService implements OnModuleInit {
         where: {
           tenantId: actor.tenantId,
           date: { gte: start, lt: end },
+          status: { not: 'CANCELLED' },
         },
         include: {
           absentTeacher: { select: safeStaffSelect },
@@ -1346,12 +1478,27 @@ export class MobilePrincipalService implements OnModuleInit {
     const uncovered = substitutions.filter(
       (row) => row.status !== 'ASSIGNED' && row.status !== 'COMPLETED',
     );
+    // Distinct staff actually away today: a marked absence/leave status or an
+    // APPROVED leave covering the day. Pending leave is listed for review but
+    // is not an absence, LATE/HALF_DAY staff are present, and one person with
+    // both an attendance row and a leave request is counted once.
+    const absentStaffIds = new Set<string>([
+      ...attendance
+        .filter((row) => STAFF_AWAY_STATUSES.has(row.status))
+        .map((row) => row.staffId),
+      ...leaveRequests
+        .filter((row) => row.status === 'APPROVED')
+        .map((row) => row.staffId),
+    ]);
 
     return {
       date: dateLabel(date),
       tabs: ['staff_absence', 'coverage'],
       metrics: {
-        absentToday: absenceItems.length,
+        absentToday: absentStaffIds.size,
+        pendingLeaveToday: leaveRequests.filter(
+          (row) => row.status === 'PENDING',
+        ).length,
         uncoveredPeriods: uncovered.length,
         substitutionsAssigned: substitutions.length - uncovered.length,
       },
@@ -1384,11 +1531,20 @@ export class MobilePrincipalService implements OnModuleInit {
   async getFeesSummary(actor: AuthContext) {
     this.assertPrincipal(actor);
     const { start, end } = dayBounds(new Date());
+    // Receivable = issued or partially paid; drafts are not yet billed.
+    const overdueWhere: Prisma.InvoiceWhereInput = {
+      tenantId: actor.tenantId,
+      dueDate: { lt: start },
+      status: { in: ['ISSUED', 'PARTIAL'] },
+    };
     const [
       payments,
+      overdueTotals,
+      overdueAllocated,
       overdueInvoices,
       financeApprovals,
-      cashierClose,
+      pendingFinanceApprovals,
+      cashierCloses,
       paidStudents,
     ] = await Promise.all([
       this.prisma.payment.aggregate({
@@ -1400,12 +1556,22 @@ export class MobilePrincipalService implements OnModuleInit {
         },
         _sum: { amount: true },
       }),
-      this.prisma.invoice.findMany({
+      // Exact tenant-wide figures (never a sum over a truncated page).
+      this.prisma.invoice.aggregate({
+        where: overdueWhere,
+        _sum: { totalAmount: true },
+        _count: { _all: true },
+      }),
+      this.prisma.paymentAllocation.aggregate({
         where: {
           tenantId: actor.tenantId,
-          dueDate: { lt: start },
-          status: { notIn: ['PAID', 'VOID'] as never },
+          reversedAt: null,
+          invoice: overdueWhere,
         },
+        _sum: { amount: true },
+      }),
+      this.prisma.invoice.findMany({
+        where: overdueWhere,
         include: {
           student: {
             select: {
@@ -1414,9 +1580,13 @@ export class MobilePrincipalService implements OnModuleInit {
               class: { select: { name: true } },
             },
           },
+          paymentAllocations: {
+            where: { reversedAt: null },
+            select: { amount: true },
+          },
         },
         orderBy: { dueDate: 'asc' },
-        take: 20,
+        take: 3,
       }),
       this.prisma.financeApprovalRequest.findMany({
         where: { tenantId: actor.tenantId, status: 'PENDING' },
@@ -1429,13 +1599,17 @@ export class MobilePrincipalService implements OnModuleInit {
           },
         },
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: 3,
       }),
-      this.prisma.cashierClose.findFirst({
+      this.prisma.financeApprovalRequest.count({
+        where: { tenantId: actor.tenantId, status: 'PENDING' },
+      }),
+      this.prisma.cashierClose.findMany({
         where: {
           tenantId: actor.tenantId,
           openedAt: { gte: start, lt: end },
         },
+        select: { id: true, status: true, varianceAmount: true },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.payment.groupBy({
@@ -1443,15 +1617,29 @@ export class MobilePrincipalService implements OnModuleInit {
         where: {
           tenantId: actor.tenantId,
           status: 'SUCCESS',
-          paidAt: { gte: daysAgo(7), lt: end },
+          paidAt: { gte: nepalDayFromToday(-6).start, lt: end },
           reversedAt: null,
         },
       }),
     ]);
     const collectedToday = decimalToNumber(payments._sum.amount);
-    const overdueTotal = overdueInvoices.reduce(
-      (sum, row) => sum + decimalToNumber(row.totalAmount),
+    const overdueTotal = Math.max(
       0,
+      decimalToNumber(overdueTotals._sum.totalAmount) -
+        decimalToNumber(overdueAllocated._sum.amount),
+    );
+    const outstandingOf = (row: (typeof overdueInvoices)[number]) =>
+      Math.max(
+        0,
+        decimalToNumber(row.totalAmount) -
+          row.paymentAllocations.reduce(
+            (sum, allocation) => sum + decimalToNumber(allocation.amount),
+            0,
+          ),
+      );
+    const cashierCloseStatus = summarizeCashierCloses(cashierCloses);
+    const cashierVariance = cashierCloses.find(
+      (row) => decimalToNumber(row.varianceAmount) !== 0,
     );
 
     return {
@@ -1460,19 +1648,20 @@ export class MobilePrincipalService implements OnModuleInit {
         collectedTodayFormatted: formatNpr(collectedToday),
         overdueFees: overdueTotal,
         overdueFeesFormatted: formatNpr(overdueTotal),
-        pendingRefundApprovals: financeApprovals.length,
-        cashierCloseStatus: cashierClose ? 'Closed' : 'Pending',
+        overdueInvoiceCount: overdueTotals._count._all,
+        pendingRefundApprovals: pendingFinanceApprovals,
+        cashierCloseStatus,
       },
       watchlist: [
-        ...overdueInvoices.slice(0, 3).map((row) => ({
+        ...overdueInvoices.map((row) => ({
           id: row.id,
           type: 'overdue_fee',
           title: `${row.student.class?.name ?? 'Class'} overdue collection`,
-          detail: formatNpr(decimalToNumber(row.totalAmount)),
+          detail: formatNpr(outstandingOf(row)),
           status: 'High',
           severity: 'high',
         })),
-        ...financeApprovals.slice(0, 3).map((row) => ({
+        ...financeApprovals.map((row) => ({
           id: row.id,
           type: 'refund_approval',
           title: `${financeApprovalTitle(row.type)} - ${studentName(row.payment.student)}`,
@@ -1480,13 +1669,15 @@ export class MobilePrincipalService implements OnModuleInit {
           status: 'Pending',
           severity: 'medium',
         })),
-        ...(cashierClose?.varianceAmount
+        ...(cashierVariance
           ? [
               {
-                id: cashierClose.id,
+                id: cashierVariance.id,
                 type: 'cashier_variance',
                 title: 'Cashier close variance',
-                detail: formatNpr(decimalToNumber(cashierClose.varianceAmount)),
+                detail: formatNpr(
+                  decimalToNumber(cashierVariance.varianceAmount),
+                ),
                 status: 'Medium',
                 severity: 'medium' as Severity,
               },
@@ -1499,8 +1690,8 @@ export class MobilePrincipalService implements OnModuleInit {
         dueThisWeek: await this.prisma.invoice.count({
           where: {
             tenantId: actor.tenantId,
-            dueDate: { gte: start, lt: daysFromNow(7) },
-            status: { notIn: ['PAID', 'VOID'] as never },
+            dueDate: { gte: start, lt: nepalDayFromToday(7).start },
+            status: { in: ['ISSUED', 'PARTIAL'] },
           },
         }),
       },
@@ -2197,24 +2388,32 @@ export class MobilePrincipalService implements OnModuleInit {
   async getReportsSnapshot(actor: AuthContext) {
     this.assertPrincipal(actor);
     const attendance = await this.getAttendanceSummary(actor);
-    const fees = await this.getFeesSummary(actor);
+    // Fee figures only for actors who may open the fees snapshot itself.
+    const fees = this.holdsAll(actor, FEES_SUMMARY_PERMISSIONS)
+      ? await this.getFeesSummary(actor)
+      : null;
     const academics = await this.getAcademicsReadiness(actor);
     const noticeRead = await this.noticeReadPercent(actor.tenantId);
 
     return {
       metrics: [
         {
+          // Real register completion; never a derived/estimated percentage.
           key: 'attendance',
-          label: 'Attendance',
-          value: `${Math.max(0, 100 - attendance.metrics.classesNotMarked * 5)}%`,
-          status: 'School snapshot',
-        },
-        {
-          key: 'collection',
-          label: 'Collection',
-          value: fees.metrics.collectedTodayFormatted,
+          label: 'Registers marked',
+          value: `${attendance.metrics.classesMarked}/${attendance.metrics.classesTotal}`,
           status: 'Today',
         },
+        ...(fees
+          ? [
+              {
+                key: 'collection',
+                label: 'Collection',
+                value: fees.metrics.collectedTodayFormatted,
+                status: 'Today',
+              },
+            ]
+          : []),
         {
           key: 'marks',
           label: 'Marks Complete',
@@ -2236,13 +2435,17 @@ export class MobilePrincipalService implements OnModuleInit {
           attendance.lastUpdated,
           'Up to date',
         ),
-        reportRow(
-          'fees',
-          'Fees collection summary',
-          'Collections, dues, and trend overview',
-          fees.lastUpdated,
-          'Up to date',
-        ),
+        ...(fees
+          ? [
+              reportRow(
+                'fees',
+                'Fees collection summary',
+                'Collections, dues, and trend overview',
+                fees.lastUpdated,
+                'Up to date',
+              ),
+            ]
+          : []),
         reportRow(
           'academics',
           'Academic readiness',
@@ -2281,50 +2484,71 @@ export class MobilePrincipalService implements OnModuleInit {
 
   async getTasks(actor: AuthContext, tab = 'my') {
     this.assertPrincipal(actor);
-    const approvals = await this.getApprovals(
-      actor,
-      tab === 'completed' ? 'APPROVED' : 'PENDING',
-    );
-    const attention = await this.getAttention(
-      actor,
-      tab === 'assigned' ? 'assigned' : 'all',
-    );
+    const completedTab = tab === 'completed';
+    // Phase 4 truthfulness: there is no task/deadline store, so the list never
+    // invents "due today"/"overdue" states. Items carry their real age (from
+    // the source record) and the metrics only count what is actually known.
+    const [approvals, attention] = await Promise.all([
+      this.loadPanel(this.holdsAll(actor, APPROVALS_PERMISSIONS), () =>
+        this.getApprovals(actor, completedTab ? 'APPROVED' : 'PENDING'),
+      ),
+      completedTab
+        ? Promise.resolve<PanelResult<null>>({ state: 'ok', value: null })
+        : this.loadPanel(true, () =>
+            this.getAttention(actor, tab === 'assigned' ? 'assigned' : 'all'),
+          ),
+    ]);
+    const approvalItems =
+      approvals.state === 'ok' ? approvals.value.items.slice(0, 20) : [];
+    const attentionValue =
+      attention.state === 'ok' && attention.value ? attention.value : null;
+    const now = new Date();
+
     const taskItems = [
-      ...attention.items.slice(0, 8).map((item) => ({
+      ...(attentionValue?.items ?? []).slice(0, 8).map((item) => ({
         id: `attention:${item.id}`,
         title: item.nextAction ?? item.title,
         source: item.title,
         owner: item.owner ?? 'School team',
-        dueLabel:
-          item.severity === 'critical' || item.severity === 'high'
-            ? 'Due today'
-            : 'Due soon',
+        dueLabel: null as string | null,
         priority: item.severity ?? 'medium',
         status: 'OPEN',
+        route: item.route ?? null,
         createSupported: false,
       })),
-      ...approvals.items.slice(0, 6).map((item) => ({
+      ...approvalItems.map((item) => ({
         id: `approval:${item.id}`,
         title: item.nextAction ?? item.title,
         source: item.title,
         owner: 'Principal',
-        dueLabel: 'Due today',
+        dueLabel: ageLabel(item.timestamp, now),
         priority: item.severity ?? 'medium',
         status: item.status ?? 'PENDING',
+        route: item.route ?? '/principal/approvals',
         createSupported: false,
       })),
+    ];
+    const unavailableSources = [
+      ...(approvals.state === 'unavailable' ? ['approvals'] : []),
+      ...(attention.state === 'unavailable' ? ['attention'] : []),
+      ...(attentionValue?.unavailableSources ?? []),
     ];
     return {
       tabs: ['my', 'assigned', 'completed'],
       activeTab: tab,
       metrics: {
-        dueToday: taskItems.filter((item) => item.dueLabel === 'Due today')
-          .length,
-        overdue: taskItems.filter((item) => item.priority === 'critical')
-          .length,
-        completed: tab === 'completed' ? taskItems.length : 0,
+        open: completedTab ? 0 : taskItems.length,
+        highPriority: completedTab
+          ? 0
+          : taskItems.filter(
+              (item) =>
+                item.priority === 'critical' || item.priority === 'high',
+            ).length,
+        completed: completedTab ? taskItems.length : null,
       },
-      items: tab === 'completed' ? [] : taskItems,
+      items: taskItems,
+      unavailableSources,
+      complete: unavailableSources.length === 0,
       createTask: {
         supported: false,
         message:
@@ -2923,6 +3147,36 @@ export class MobilePrincipalService implements OnModuleInit {
     return scheduledFor.toISOString();
   }
 
+  /**
+   * A dashboard/attention/tasks panel may only summarise data the actor could
+   * open in detail: it requires the same permissions as the panel's own
+   * drill-down route (all-of, like @Permissions).
+   */
+  private holdsAll(actor: AuthContext, permissions: readonly string[]) {
+    return permissions.every((permission) =>
+      hasDomainPermission(actor, permission),
+    );
+  }
+
+  /**
+   * Loads one panel without letting a single failing source take down the
+   * whole home: denied → `denied`, thrown → `unavailable` (never a zero).
+   */
+  private async loadPanel<T>(
+    allowed: boolean,
+    load: () => Promise<T>,
+  ): Promise<PanelResult<T>> {
+    if (!allowed) return { state: 'denied' };
+    try {
+      return { state: 'ok', value: await load() };
+    } catch (error) {
+      this.logger.warn(
+        `principal panel unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return { state: 'unavailable' };
+    }
+  }
+
   private assertActorPermissions(
     actor: AuthContext,
     requiredPermissions: string[],
@@ -3129,6 +3383,87 @@ export class MobilePrincipalService implements OnModuleInit {
     }
   }
 
+  /**
+   * Pending decisions this actor may actually take (Phase 4 SoD): the actor
+   * must hold the decision permission of each queue, must not be the
+   * requester, and for multi-step workflows must match the current step (or
+   * be its delegate). This is what "awaiting your decision" means; the
+   * tenant-wide backlog stays in `countAllPendingApprovals`.
+   */
+  private async countPendingDecisionsForActor(actor: AuthContext) {
+    const tenantId = actor.tenantId;
+    const can = (permission: string) => hasDomainPermission(actor, permission);
+    const [leave, attendance, reportCard, workflow, notices] =
+      await Promise.all([
+        can('hr:leave:approve')
+          ? this.prisma.staffLeaveRequest.count({
+              where: {
+                tenantId,
+                status: 'PENDING',
+                staff: { userId: { not: actor.userId } },
+              },
+            })
+          : 0,
+        can('attendance:review_conflicts')
+          ? this.prisma.attendanceCorrectionRequest.count({
+              where: {
+                tenantId,
+                status: 'PENDING',
+                requestedById: { not: actor.userId },
+              },
+            })
+          : 0,
+        can('academics:report_cards:review')
+          ? this.prisma.reportCardCorrectionRequest.count({
+              where: {
+                tenantId,
+                status: 'PENDING',
+                requestedById: { not: actor.userId },
+              },
+            })
+          : 0,
+        can('advanced:approvals:decide')
+          ? this.countDecidableWorkflowApprovals(actor)
+          : 0,
+        can('notices:publish')
+          ? this.countUnlinkedHighImpactNoticeDrafts(tenantId, actor.userId)
+          : 0,
+      ]);
+    return leave + attendance + reportCard + workflow + notices;
+  }
+
+  private async countDecidableWorkflowApprovals(actor: AuthContext) {
+    const requests = await this.prisma.approvalRequest.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: 'PENDING',
+        requestedById: { not: actor.userId },
+        OR: [...MOBILE_APPROVAL_TARGET_FILTERS],
+      },
+      select: {
+        delegatedToId: true,
+        steps: {
+          where: { status: 'PENDING' },
+          orderBy: { sequence: 'asc' },
+          take: 1,
+          select: { approverRole: true, approverPermission: true },
+        },
+      },
+      take: 500,
+    });
+    return requests.filter((request) => {
+      const step = request.steps[0] ?? {
+        approverRole: null,
+        approverPermission: null,
+      };
+      return this.canActorDecideApprovalStep(
+        step,
+        actor,
+        request.delegatedToId,
+      );
+    }).length;
+  }
+
   private async countAllPendingApprovals(tenantId: string) {
     const [leave, attendance, reportCard, workflow, notices] =
       await Promise.all([
@@ -3153,7 +3488,10 @@ export class MobilePrincipalService implements OnModuleInit {
     return leave + attendance + reportCard + workflow + notices;
   }
 
-  private async countUnlinkedHighImpactNoticeDrafts(tenantId: string) {
+  private async countUnlinkedHighImpactNoticeDrafts(
+    tenantId: string,
+    excludeCreatedById?: string,
+  ) {
     const rows = await this.prisma.$queryRaw<Array<{ count: bigint }>>(
       Prisma.sql`
         SELECT COUNT(*)::bigint AS "count"
@@ -3161,6 +3499,10 @@ export class MobilePrincipalService implements OnModuleInit {
         WHERE notice."tenantId" = ${tenantId}
           AND notice."publishedAt" IS NULL
           AND notice."priority" IN ('URGENT', 'EMERGENCY')
+          AND (
+            ${excludeCreatedById ?? null}::text IS NULL
+            OR notice."createdById" IS DISTINCT FROM ${excludeCreatedById ?? null}::text
+          )
           AND NOT EXISTS (
             SELECT 1
             FROM "ApprovalRequest" AS approval
@@ -3481,8 +3823,7 @@ export class MobilePrincipalService implements OnModuleInit {
   private async collectionTrend(tenantId: string) {
     const trend: Array<{ label: string; amount: number }> = [];
     for (let index = 5; index >= 0; index -= 1) {
-      const date = daysAgo(index);
-      const { start, end } = dayBounds(date);
+      const { isoDate, start, end } = nepalDayFromToday(-index);
       const total = await this.prisma.payment.aggregate({
         where: {
           tenantId,
@@ -3493,7 +3834,10 @@ export class MobilePrincipalService implements OnModuleInit {
         _sum: { amount: true },
       });
       trend.push({
-        label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        label: new Date(`${isoDate}T00:00:00.000Z`).toLocaleDateString(
+          'en-US',
+          { weekday: 'short', timeZone: 'UTC' },
+        ),
         amount: decimalToNumber(total._sum.amount),
       });
     }
@@ -3542,23 +3886,55 @@ function parseDate(value?: string) {
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
+/**
+ * Nepal school-day bounds as UTC instants. The half-open range contains both
+ * real timestamps taken during the Nepal day and date-only business values
+ * stored at UTC midnight of the Nepal date, so it is correct for both column
+ * conventions regardless of the server's timezone.
+ */
 function dayBounds(date: Date) {
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  return { start, end };
+  const day = getNepalSchoolDay(date);
+  return { start: day.startUtc, end: day.endExclusiveUtc };
+}
+
+/** Bounds of the Nepal day `offsetDays` from today (negative = past). */
+function nepalDayFromToday(offsetDays: number) {
+  const today = getNepalSchoolDay(new Date()).gregorianDate;
+  const isoDate = shiftGregorianDateOnly(today, offsetDays);
+  // 06:00Z is 11:45 in Nepal: always inside the requested Nepal date.
+  return { isoDate, ...dayBounds(new Date(`${isoDate}T06:00:00.000Z`)) };
+}
+
+/**
+ * Today's cashier-close state across all drawers: none opened, any still in
+ * progress (OPEN/COUNTED/SUBMITTED), or every drawer settled.
+ */
+function summarizeCashierCloses(rows: Array<{ status: string }>) {
+  if (rows.length === 0) return 'Not opened';
+  const settled = new Set(['APPROVED', 'CLOSED', 'DEPOSITED']);
+  return rows.every((row) => settled.has(row.status))
+    ? 'Closed'
+    : 'In progress';
+}
+
+/** Real age of a source record ("Waiting 3 days"); null when unknown. */
+function ageLabel(timestamp: string | null | undefined, now: Date) {
+  if (!timestamp) return null;
+  const created = new Date(timestamp);
+  if (Number.isNaN(created.getTime())) return null;
+  const today = getNepalSchoolDay(now).gregorianDate;
+  const createdDay = getNepalSchoolDay(created).gregorianDate;
+  const days = Math.round(
+    (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${createdDay}T00:00:00Z`)) /
+      86_400_000,
+  );
+  if (days <= 0) return 'Raised today';
+  return days === 1 ? 'Waiting 1 day' : `Waiting ${days} days`;
 }
 
 function daysAgo(days: number) {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  return date;
-}
-
-function daysFromNow(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
   return date;
 }
 

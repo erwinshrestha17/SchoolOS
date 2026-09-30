@@ -348,7 +348,13 @@ describe('MobilePrincipalService', () => {
     });
     prisma.staffLeaveRequest.count.mockResolvedValue(2);
 
-    const result = await service.getAttention(actor, 'all');
+    const result = await service.getAttention(
+      {
+        ...actor,
+        permissions: [...actor.permissions, 'staff:read', 'hr:leave:approve'],
+      },
+      'all',
+    );
 
     expect(result.items).toEqual(
       expect.arrayContaining([
@@ -364,6 +370,41 @@ describe('MobilePrincipalService', () => {
     expect(prisma.staffLeaveRequest.count).toHaveBeenCalledWith({
       where: { tenantId: 'tenant-1', status: 'PENDING' },
     });
+  });
+
+  it('omits staff attention for actors who cannot open staff absence', async () => {
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['hr'],
+      features: [],
+    });
+    prisma.staffLeaveRequest.count.mockResolvedValue(2);
+
+    const result = await service.getAttention(actor, 'all');
+
+    expect(result.items.some((item) => item.type === 'staff_leave')).toBe(
+      false,
+    );
+    expect(prisma.staffLeaveRequest.count).not.toHaveBeenCalled();
+    expect(result.unavailableSources).toEqual([]);
+  });
+
+  it('reports a failing attention source instead of silently dropping it', async () => {
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['hr'],
+      features: [],
+    });
+    prisma.staffLeaveRequest.count.mockRejectedValue(new Error('db down'));
+
+    const result = await service.getAttention(
+      {
+        ...actor,
+        permissions: [...actor.permissions, 'staff:read', 'hr:leave:approve'],
+      },
+      'all',
+    );
+
+    expect(result.unavailableSources).toEqual(['staff']);
+    expect(result.complete).toBe(false);
   });
 
   it('returns tenant-scoped escalation candidates excluding the current assignee', async () => {

@@ -1892,7 +1892,9 @@ class _DashboardBody extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Review today\'s highest-priority school issues',
+                      data['attentionComplete'] == false
+                          ? 'Some sources could not be loaded — pull to refresh'
+                          : 'Review today\'s highest-priority school issues',
                       style: TextStyle(
                         color: AppSemanticColors.of(context).textMuted,
                         fontWeight: FontWeight.w600,
@@ -1910,18 +1912,9 @@ class _DashboardBody extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.lg),
         for (final card in _list(data['cards'])) ...[
-          _ActionRow(
-            title: _string(card['label']),
-            subtitle: card['locked'] == true
-                ? 'Module not enabled'
-                : _string(card['detail']),
-            trailing: card['locked'] == true
-                ? 'Locked'
-                : _string(card['value']),
-            icon: _iconFor(_string(card['key'])),
-            onTap: card['locked'] == true
-                ? null
-                : () => _go(context, _string(card['route'])),
+          _PrincipalMetricRow(
+            card: card,
+            onOpen: () => _go(context, _string(card['route'])),
           ),
           const SizedBox(height: AppSpacing.sm),
         ],
@@ -2504,21 +2497,23 @@ class _TasksBody extends StatelessWidget {
         _CacheBanner(data: data),
         _SummaryCards(
           values: [
+            // The API has no deadline store, so it reports open and
+            // high-priority counts instead of invented "due"/"overdue" ones.
             _SummaryValue(
-              'Due Today',
-              _num(data, 'metrics.dueToday'),
+              'Open',
+              _numOrDash(data, 'metrics.open'),
               AppColors.warning,
-              Icons.today_rounded,
+              Icons.inbox_rounded,
             ),
             _SummaryValue(
-              'Overdue',
-              _num(data, 'metrics.overdue'),
+              'High priority',
+              _numOrDash(data, 'metrics.highPriority'),
               AppColors.danger,
-              Icons.error_rounded,
+              Icons.priority_high_rounded,
             ),
             _SummaryValue(
               'Completed',
-              _num(data, 'metrics.completed'),
+              _numOrDash(data, 'metrics.completed'),
               AppColors.success,
               Icons.check_circle_rounded,
             ),
@@ -4484,6 +4479,54 @@ String _maskPhone(String value) {
   if (digits.length < 4) return '';
   final suffix = digits.substring(digits.length - 4);
   return '••••••$suffix';
+}
+
+/// Like [_num] but never turns a missing/unknown metric into a fake zero.
+Object _numOrDash(Map<String, dynamic> data, String path) {
+  Object? value = data;
+  for (final part in path.split('.')) {
+    value = value is Map<String, dynamic> ? value[part] : null;
+  }
+  if (value is num) return value.toInt();
+  return '—';
+}
+
+/// A principal home metric. Locked modules, panels the actor may not open,
+/// and panels that failed to load are shown as such — never as a zero.
+class _PrincipalMetricRow extends StatelessWidget {
+  const _PrincipalMetricRow({required this.card, required this.onOpen});
+  final Map<String, dynamic> card;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final locked = card['locked'] == true;
+    final unavailable = !locked && card['available'] == false;
+    final notPermitted =
+        unavailable && card['unavailableReason'] == 'NOT_PERMITTED';
+    final String subtitle;
+    final String trailing;
+    if (locked) {
+      subtitle = 'Module not enabled';
+      trailing = 'Locked';
+    } else if (notPermitted) {
+      subtitle = 'Not available for your role';
+      trailing = '—';
+    } else if (unavailable) {
+      subtitle = 'Could not load — pull to refresh';
+      trailing = '—';
+    } else {
+      subtitle = _string(card['detail']);
+      trailing = card['value'] == null ? '—' : _string(card['value']);
+    }
+    return _ActionRow(
+      title: _string(card['label']),
+      subtitle: subtitle,
+      trailing: trailing,
+      icon: _iconFor(_string(card['key'])),
+      onTap: locked || notPermitted ? null : onOpen,
+    );
+  }
 }
 
 int _num(Map<String, dynamic> data, String path) {
