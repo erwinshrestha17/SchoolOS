@@ -387,6 +387,9 @@ describe('backend hardening gate', () => {
       // Phase 2 adds the tenant-anchored fiscal period/year lock for manual journal transitions.
       '/accounting/accounting-posting.service.ts': 2,
       '/accounting/accounting.service.ts': 5,
+      // Phase 5: tenant-anchored Section lock (FOR UPDATE) serializing
+      // last-seat admissions; capacity is recounted under the lock.
+      '/admissions/admission-cases.service.ts': 1,
       '/app.service.ts': 1,
       '/auth/auth-account-locks.ts': 2,
       '/auth/school-authorization-transaction.ts': 1,

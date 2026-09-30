@@ -188,6 +188,7 @@ function buildPrisma(overrides: Record<string, any> = {}) {
     auditLog: { create: jest.fn().mockResolvedValue({ id: 'audit-a' }) },
     user: { findFirst: jest.fn() },
     $transaction: jest.fn(async (callback: any) => callback(prisma)),
+    $queryRaw: jest.fn().mockResolvedValue([{ id: 'section-a' }]),
     ...overrides,
   };
   return prisma;
@@ -1240,6 +1241,213 @@ describe('AdmissionCasesService', () => {
       }),
       prisma,
     );
+  });
+
+  it('Phase 5: re-checks capacity under a section lock and aborts when the last seat was taken meanwhile', async () => {
+    const approvedCase = { ...admissionCase, status: 'APPROVED' };
+    const prisma = buildPrisma({
+      admissionApplication: {
+        findFirst: jest.fn().mockResolvedValue(approvedCase),
+        update: jest.fn().mockResolvedValue(approvedCase),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      enrollment: {
+        // Evaluation and placement see a free seat; the locked recount does not.
+        count: jest
+          .fn()
+          .mockResolvedValueOnce(39)
+          .mockResolvedValueOnce(39)
+          .mockResolvedValue(40),
+        create: jest.fn().mockResolvedValue({ id: 'enrollment-a' }),
+      },
+    });
+    mockPolicy(prisma, {
+      admissionMode: 'REVIEW_REQUIRED',
+      enforceCapacityWhenAvailable: true,
+      capacityOverride: 40,
+    });
+    const service = buildService(prisma);
+
+    await expect(
+      service.finalizeApprovedCase('case-a', {}, actor),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'ADMISSION_SECTION_FULL' }),
+    });
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.student.create).not.toHaveBeenCalled();
+    expect(prisma.enrollment.create).not.toHaveBeenCalled();
+  });
+
+  describe('Phase 5: placement changes during review', () => {
+    const updatedAt = new Date('2026-09-01T00:00:00.000Z');
+
+    it('voids an approval when the class changes, returns the case to review, and records why', async () => {
+      const approved = { ...admissionCase, status: 'APPROVED', updatedAt };
+      const prisma = buildPrisma({
+        admissionApplication: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValueOnce(approved)
+            .mockResolvedValue({
+              ...approved,
+              status: 'WAITING_FOR_REVIEW',
+              classId: 'class-b',
+            }),
+          update: jest.fn().mockResolvedValue(approved),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      });
+      const auditService = { record: jest.fn() };
+      const service = buildService(prisma, { auditService });
+
+      await service.updateCase(
+        'case-a',
+        { classId: 'class-b' } as never,
+        actor,
+      );
+
+      const write = prisma.admissionApplication.updateMany.mock.calls[0][0];
+      expect(write.where).toMatchObject({ status: 'APPROVED', updatedAt });
+      expect(write.data).toMatchObject({
+        classId: 'class-b',
+        status: 'WAITING_FOR_REVIEW',
+      });
+      expect(write.data.duplicateReview.review.notes).toEqual([
+        expect.objectContaining({
+          action: 'PLACEMENT_CHANGED',
+          reason: expect.stringContaining('approval no longer applies'),
+        }),
+      ]);
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          before: expect.objectContaining({
+            status: 'APPROVED',
+            classId: 'class-a',
+          }),
+          after: expect.objectContaining({
+            classId: 'class-b',
+            voidedApproval: true,
+          }),
+        }),
+      );
+    });
+
+    it('refuses a placement change while an approval chain is in flight', async () => {
+      const waiting = {
+        ...admissionCase,
+        status: 'WAITING_FOR_REVIEW',
+        updatedAt,
+      };
+      const prisma = buildPrisma({
+        admissionApplication: {
+          findFirst: jest.fn().mockResolvedValue(waiting),
+          update: jest.fn(),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        approvalRequest: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'request-a',
+            steps: [
+              {
+                sequence: 1,
+                status: 'PENDING',
+                approverRole: 'principal',
+                approverPermission: '',
+              },
+            ],
+          }),
+        },
+        approvalPolicy: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'approval-policy-x',
+            approverRoles: ['principal'],
+            approverPermissions: [''],
+          }),
+        },
+      });
+      mockPolicy(prisma, {
+        admissionMode: 'REVIEW_REQUIRED',
+        approvalPolicyId: 'approval-policy-x',
+      });
+      const service = buildService(prisma);
+
+      await expect(
+        service.updateCase(
+          'case-a',
+          { academicYearId: 'year-b' } as never,
+          actor,
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: 'ADMISSION_PLACEMENT_LOCKED_BY_APPROVAL',
+        }),
+      });
+      expect(prisma.admissionApplication.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('loses cleanly to a concurrent reviewer decision instead of overwriting it', async () => {
+      const waiting = {
+        ...admissionCase,
+        status: 'WAITING_FOR_REVIEW',
+        updatedAt,
+      };
+      const prisma = buildPrisma({
+        admissionApplication: {
+          findFirst: jest.fn().mockResolvedValue(waiting),
+          update: jest.fn(),
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
+      });
+      const auditService = { record: jest.fn() };
+      const service = buildService(prisma, { auditService });
+
+      await expect(
+        service.updateCase('case-a', { notes: 'late edit' } as never, actor),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(auditService.record).not.toHaveBeenCalled();
+    });
+
+    it('refuses documents or edits after a final decision', async () => {
+      for (const status of ['ADMITTED', 'REJECTED', 'NOT_ADMITTED', 'CLOSED']) {
+        const prisma = buildPrisma({
+          admissionApplication: {
+            findFirst: jest
+              .fn()
+              .mockResolvedValue({ ...admissionCase, status }),
+            updateMany: jest.fn(),
+          },
+        });
+        await expect(
+          buildService(prisma).updateCase(
+            'case-a',
+            {
+              documents: [{ fileId: 'late-file', kind: 'BIRTH_CERTIFICATE' }],
+            } as never,
+            actor,
+          ),
+        ).rejects.toThrow('closed and cannot be edited');
+        expect(prisma.admissionApplication.updateMany).not.toHaveBeenCalled();
+      }
+    });
+
+    it('a plain edit outside review keeps working and adds no placement event', async () => {
+      const draft = { ...admissionCase, status: 'DRAFT', updatedAt };
+      const prisma = buildPrisma({
+        admissionApplication: {
+          findFirst: jest.fn().mockResolvedValue(draft),
+          update: jest.fn().mockResolvedValue(draft),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      });
+      await buildService(prisma).updateCase(
+        'case-a',
+        { classId: 'class-b' } as never,
+        actor,
+      );
+      const data = prisma.admissionApplication.updateMany.mock.calls[0][0].data;
+      expect(data.status).toBeUndefined();
+      expect(data.duplicateReview.review?.notes ?? []).toEqual([]);
+    });
   });
 
   it('keeps a case waitlisted when the latest enforced capacity check is full', async () => {

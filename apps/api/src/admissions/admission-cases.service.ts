@@ -21,6 +21,7 @@ import {
 } from '@prisma/client';
 import {
   ADMISSION_CASE_REVIEW_ACTIONS,
+  ADMISSION_CASE_SYSTEM_EVENTS,
   educationProgramForClassLevel,
   getNepalSchoolDay,
   toGregorianDateFromBs,
@@ -32,6 +33,7 @@ import {
   type AdmissionAssessmentStatus,
   type AdmissionAssessmentTab,
   type AdmissionCaseReviewAction,
+  type AdmissionCaseReviewHistoryItem,
   type EducationProgram,
 } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
@@ -104,9 +106,11 @@ const ADMITTABLE_STORAGE_STATUSES = [
   'APPROVED',
   'ACCEPTED',
 ] as const;
-const ADMISSION_CASE_REVIEW_ACTION_SET = new Set<string>(
-  ADMISSION_CASE_REVIEW_ACTIONS,
-);
+const ADMISSION_CASE_REVIEW_ACTION_SET = new Set<string>([
+  ...ADMISSION_CASE_REVIEW_ACTIONS,
+  ...ADMISSION_CASE_SYSTEM_EVENTS,
+]);
+const APPROVAL_VOIDED_BY_PLACEMENT_CHANGE = new Set(['APPROVED', 'ACCEPTED']);
 const REVIEW_ACTIONS_REQUIRING_REASON = new Set<AdmissionCaseReviewAction>([
   'REQUEST_INFORMATION',
   'APPROVE',
@@ -561,17 +565,66 @@ export class AdmissionCasesService implements OnModuleInit {
       );
     }
 
-    const metadata = this.mergeMetadata(
+    const mergedMetadata = this.mergeMetadata(
       this.readMetadata(current.duplicateReview),
       dto,
     );
     await this.validateDocumentReferences(
-      metadata.documents ?? [],
+      mergedMetadata.documents ?? [],
       actor,
       current.id,
     );
-    const updated = await this.prisma.admissionApplication.update({
-      where: { id: current.id },
+
+    // Phase 5 edge case: moving the applicant to another academic year,
+    // class or section after review started changes what was reviewed.
+    const nextPlacement = {
+      academicYearId: dto.academicYearId ?? current.academicYearId,
+      classId: dto.classId ?? current.classId,
+      sectionId: dto.sectionId ?? current.sectionId,
+    };
+    const placementChanged =
+      nextPlacement.academicYearId !== current.academicYearId ||
+      nextPlacement.classId !== current.classId ||
+      nextPlacement.sectionId !== current.sectionId;
+    const reviewInProgress = REVIEW_LOCKED_STATUSES.has(current.status);
+    let metadata = mergedMetadata;
+    let voidedApproval = false;
+    if (placementChanged && reviewInProgress) {
+      const before = await this.evaluate(current, actor);
+      if (before.approvalChain?.activeRequestId) {
+        throw new ConflictException({
+          code: 'ADMISSION_PLACEMENT_LOCKED_BY_APPROVAL',
+          message:
+            'An approval for the current class placement is in progress. Withdraw or complete it before changing the academic year, class or section.',
+        });
+      }
+      voidedApproval = APPROVAL_VOIDED_BY_PLACEMENT_CHANGE.has(current.status);
+      metadata = {
+        ...mergedMetadata,
+        review: {
+          ...mergedMetadata.review,
+          notes: [
+            ...(mergedMetadata.review?.notes ?? []),
+            {
+              action: 'PLACEMENT_CHANGED',
+              reason: voidedApproval
+                ? 'Placement changed after approval. The approval no longer applies; the case needs review again.'
+                : 'Placement changed during review. Reviewers must assess the new placement.',
+              at: new Date().toISOString(),
+              byUserId: actor.userId,
+            },
+          ],
+        },
+      };
+    }
+
+    const guarded = await this.prisma.admissionApplication.updateMany({
+      where: {
+        id: current.id,
+        tenantId: actor.tenantId,
+        status: current.status,
+        updatedAt: current.updatedAt,
+      },
       data: {
         firstNameEn: dto.firstNameEn
           ? requirePersonName(dto.firstNameEn, 'firstNameEn')
@@ -607,9 +660,7 @@ export class AdmissionCasesService implements OnModuleInit {
           dto.guardianEmail !== undefined
             ? optionalProfileEmail(dto.guardianEmail)
             : current.guardianEmail,
-        academicYearId: dto.academicYearId ?? current.academicYearId,
-        classId: dto.classId ?? current.classId,
-        sectionId: dto.sectionId ?? current.sectionId,
+        ...nextPlacement,
         previousSchool: this.optionalString(
           dto.previousSchool,
           current.previousSchool,
@@ -617,9 +668,16 @@ export class AdmissionCasesService implements OnModuleInit {
         source: dto.source ?? current.source,
         notes: this.optionalString(dto.notes, current.notes),
         duplicateReview: metadata as Prisma.InputJsonValue,
+        ...(voidedApproval ? { status: 'WAITING_FOR_REVIEW' } : {}),
         updatedById: actor.userId,
       },
     });
+    if (guarded.count !== 1) {
+      throw new ConflictException(
+        'This admission case changed while you were editing it. Refresh and try again.',
+      );
+    }
+    const updated = await this.findTenantCase(current.id, actor);
 
     const evaluation = await this.evaluate(updated, actor);
     const nextStatus = this.nextStatusAfterSave(updated.status, evaluation);
@@ -643,8 +701,20 @@ export class AdmissionCasesService implements OnModuleInit {
       resourceId: current.id,
       tenantId: actor.tenantId,
       userId: actor.userId,
-      before: { status: current.status },
-      after: { status: nextStatus },
+      before: {
+        status: current.status,
+        ...(placementChanged
+          ? {
+              academicYearId: current.academicYearId,
+              classId: current.classId,
+              sectionId: current.sectionId,
+            }
+          : {}),
+      },
+      after: {
+        status: nextStatus,
+        ...(placementChanged ? { ...nextPlacement, voidedApproval } : {}),
+      },
     });
 
     return this.getCase(current.id, actor);
@@ -2003,6 +2073,38 @@ export class AdmissionCasesService implements OnModuleInit {
           );
         }
 
+        // Phase 5 edge case: the seat may have gone between evaluation and
+        // this write. Serialize admissions per section and recount under the
+        // lock; a full section aborts the whole admission (claim included).
+        const seatCeiling = placement.capacityStatus?.capacity ?? null;
+        if (
+          section &&
+          seatCeiling !== null &&
+          evaluation.policyRequirements.enforceCapacityWhenAvailable
+        ) {
+          await tx.$queryRaw`
+            SELECT "id" FROM "Section"
+            WHERE "id" = ${section.id} AND "tenantId" = ${actor.tenantId}
+            FOR UPDATE`;
+          const enrolled = await tx.enrollment.count({
+            where: {
+              tenantId: actor.tenantId,
+              academicYearId: academicYear.id,
+              sectionId: section.id,
+              status: EnrollmentStatus.ACTIVE,
+            },
+          });
+          if (enrolled >= seatCeiling) {
+            throw new ConflictException({
+              code: 'ADMISSION_SECTION_FULL',
+              message:
+                'The selected section filled up while this admission was being approved. Choose another section or move the case to the waitlist.',
+              capacity: seatCeiling,
+              enrolled,
+            });
+          }
+        }
+
         const student = await tx.student.create({
           data: {
             tenantId: actor.tenantId,
@@ -2251,7 +2353,7 @@ export class AdmissionCasesService implements OnModuleInit {
         history: (metadata.review?.notes ?? [])
           .filter((item) => ADMISSION_CASE_REVIEW_ACTION_SET.has(item.action))
           .map((item) => ({
-            action: item.action as AdmissionCaseReviewAction,
+            action: item.action as AdmissionCaseReviewHistoryItem['action'],
             reason: item.reason ?? null,
             at: item.at,
             byUserId: item.byUserId,

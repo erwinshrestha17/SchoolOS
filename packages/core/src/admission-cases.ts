@@ -63,6 +63,15 @@ export const ADMISSION_CASE_REVIEW_ACTIONS = [
   "PROMOTE_FROM_WAITLIST",
 ] as const;
 
+/**
+ * History events the system records (never submitted as reviewer actions).
+ * PLACEMENT_CHANGED: academic year/class/section edited while the case was
+ * under review or approved; an approval is voided and re-review required.
+ */
+export const ADMISSION_CASE_SYSTEM_EVENTS = ["PLACEMENT_CHANGED"] as const;
+export type AdmissionCaseSystemEvent =
+  (typeof ADMISSION_CASE_SYSTEM_EVENTS)[number];
+
 export const ADMISSION_ASSESSMENT_TABS = [
   "TODAY",
   "UPCOMING",
@@ -425,7 +434,7 @@ export type AdmissionCaseEligibility = {
 };
 
 export type AdmissionCaseReviewHistoryItem = {
-  action: AdmissionCaseReviewAction;
+  action: AdmissionCaseReviewAction | AdmissionCaseSystemEvent;
   reason: string | null;
   at: string;
   byUserId: string;
