@@ -1,92 +1,9 @@
 'use client';
 
+import { resolveStatusTone, type StatusTone } from '@schoolos/core';
 import { cn } from '../../lib/utils';
 
-export type StatusTone =
-  | 'active'
-  | 'inactive'
-  | 'pending'
-  | 'approved'
-  | 'rejected'
-  | 'draft'
-  | 'published'
-  | 'locked'
-  | 'paid'
-  | 'partial'
-  | 'unpaid'
-  | 'overdue'
-  | 'waived'
-  | 'refunded'
-  | 'conflict'
-  | 'info';
-
-const statusToneMap: Record<string, StatusTone> = {
-  ACTIVE: 'active',
-  OPEN: 'active',
-  RESOLVED: 'approved',
-  INACTIVE: 'inactive',
-  CLOSED: 'locked',
-  CANCELLED: 'inactive',
-  PENDING: 'pending',
-  QUEUED: 'pending',
-  PENDING_CONFIRMATION: 'pending',
-  RETRYING: 'pending',
-  RETRIED: 'pending',
-  SUBMITTED: 'pending',
-  PROCESSING: 'pending',
-  DISPATCHING: 'pending',
-  SCHEDULED: 'pending',
-  APPROVAL_PENDING: 'pending',
-  SUCCEEDED: 'approved',
-  APPROVED: 'approved',
-  REVIEWED: 'approved',
-  ACTION_TAKEN: 'approved',
-  REJECTED: 'rejected',
-  ACCESS_DENIED: 'rejected',
-  ACCESS_REVOKED: 'rejected',
-  LOCAL_DRAFT_UNAVAILABLE: 'rejected',
-  NEEDS_CORRECTION: 'partial',
-  PARTIALLY_SUCCEEDED: 'partial',
-  PARTIALLY_DELIVERED: 'partial',
-  DISMISSED: 'rejected',
-  FAILED: 'rejected',
-  EXPIRED: 'rejected',
-  SKIPPED: 'inactive',
-  ARCHIVED: 'inactive',
-  DRAFT: 'draft',
-  SENT: 'published',
-  DELIVERED: 'published',
-  PUBLISHED: 'published',
-  READ: 'approved',
-  LOCKED: 'locked',
-  POSTED: 'locked',
-  FINALIZED: 'locked',
-  REVERSED: 'refunded',
-  RETURNED: 'partial',
-  RESUBMITTED: 'pending',
-  CORRECTED: 'info',
-  CORRECTION_REQUESTED: 'partial',
-  CONFLICTED: 'conflict',
-  PAID: 'paid',
-  PARTIAL: 'partial',
-  UNPAID: 'unpaid',
-  OVERDUE: 'overdue',
-  WAIVED: 'waived',
-  REFUNDED: 'refunded',
-  CONFLICT: 'conflict',
-  ESCALATED: 'conflict',
-  TRANSFERRED: 'pending',
-  ALUMNI: 'published',
-  GRADUATED: 'published',
-  DEACTIVATED: 'inactive',
-  WITHDRAWN: 'inactive',
-  PRESENT: 'approved',
-  ABSENT: 'rejected',
-  LATE: 'partial',
-  SICK_LEAVE: 'info',
-  EXCUSED_LEAVE: 'info',
-  UNEXCUSED_LEAVE: 'partial',
-};
+export type { StatusTone };
 
 const toneClasses: Record<StatusTone, string> = {
   active: 'border-success-100 bg-success-50 text-success-700',
@@ -122,7 +39,7 @@ export function StatusBadge({
   className,
 }: StatusBadgeProps) {
   const normalized = status.trim().toUpperCase();
-  const resolvedTone = tone ?? statusToneMap[normalized] ?? 'info';
+  const resolvedTone = tone ?? resolveStatusTone(normalized);
   const displayLabel = label ?? normalized.replace(/_/g, ' ');
 
   return (

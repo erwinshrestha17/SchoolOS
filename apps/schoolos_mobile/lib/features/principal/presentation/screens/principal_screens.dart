@@ -22,7 +22,7 @@ import '../../../../shared/widgets/app_exception_view.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/bs_date_picker.dart';
 import '../../../../shared/widgets/dispose_scope.dart';
-import '../../../../shared/widgets/offline_banner.dart';
+import '../../../../shared/widgets/sync_state_banner.dart';
 import '../../../../shared/widgets/section_header.dart';
 import '../../../../shared/widgets/status_chip.dart';
 import '../../application/principal_providers.dart';
@@ -3678,9 +3678,12 @@ class _CacheBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (data['_mobileFromCache'] != true) return const SizedBox.shrink();
+    final savedAt =
+        DateTime.tryParse('${data['_mobileLastUpdated'] ?? ''}') ??
+        DateTime.tryParse('${data['lastUpdated'] ?? ''}');
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: const OfflineBanner(visible: true),
+      child: SyncStateBanner(state: SyncState.cached, lastUpdated: savedAt),
     );
   }
 }

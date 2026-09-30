@@ -78,6 +78,28 @@ class TeacherMarksDraftStore {
     return drafts;
   }
 
+  /// Records that the server refused this draft (conflict, lock, lost
+  /// assignment). It stays on the phone so the teacher sees it and decides;
+  /// it is not retried automatically because the same request would fail.
+  Future<void> markFailed(
+    Map<String, dynamic> draft, {
+    required String reason,
+  }) async {
+    final activeScope = scope;
+    final operationId = draft['operationId'];
+    if (activeScope == null || !activeScope.isValid || operationId is! String) {
+      return;
+    }
+    await _storage.write(
+      '$_prefix${activeScope.tenantId}.${activeScope.userId}.$operationId',
+      jsonEncode({
+        ...draft,
+        'lastError': reason,
+        'failedAt': DateTime.now().toUtc().toIso8601String(),
+      }),
+    );
+  }
+
   Future<void> delete(String operationId) async {
     final activeScope = scope;
     if (activeScope == null || !activeScope.isValid) return;

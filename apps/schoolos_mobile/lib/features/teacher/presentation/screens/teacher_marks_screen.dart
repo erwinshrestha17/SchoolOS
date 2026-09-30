@@ -11,6 +11,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/network/connectivity_provider.dart';
 import '../../../../core/sync/teacher_marks_draft_store.dart';
+import '../../../../shared/widgets/sync_state_banner.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_exception_view.dart';
@@ -132,8 +133,10 @@ class _TeacherMarksEntryScreenState
   final Set<String> _absent = {};
   bool _saving = false;
   String? _error;
-  String? _queuedMessage;
   bool _didScheduleMarksDrain = false;
+  bool _syncing = false;
+  int _pendingDraftCount = 0;
+  List<Map<String, dynamic>> _failedDrafts = const [];
 
   @override
   void dispose() {
@@ -144,60 +147,154 @@ class _TeacherMarksEntryScreenState
   }
 
   Future<void> _drainQueuedMarks() async {
+    final store = ref.read(teacherMarksDraftStoreProvider);
+    var synced = 0;
     try {
-      if (!ref.read(connectivityProvider)) return;
-      final store = ref.read(teacherMarksDraftStoreProvider);
       final drafts = await store.listQueued();
-      for (final draft in drafts) {
-        final operationId = draft['operationId'] as String?;
-        final payload = draft['payload'];
-        if (operationId == null ||
-            operationId.isEmpty ||
-            payload is! Map<String, dynamic>) {
-          continue;
+      if (ref.read(connectivityProvider)) {
+        if (mounted) setState(() => _syncing = true);
+        for (final draft in drafts) {
+          // A draft the server already refused is not retried blindly.
+          if (draft['lastError'] is String) continue;
+          final operationId = draft['operationId'] as String?;
+          final upsert = _draftRequest(draft);
+          if (operationId == null || operationId.isEmpty || upsert == null) {
+            await store.markFailed(
+              draft,
+              reason: 'This saved change is incomplete and cannot be sent.',
+            );
+            continue;
+          }
+          try {
+            await upsert();
+            await store.delete(operationId);
+            synced += 1;
+          } on NetworkException {
+            break; // Still offline: keep everything queued.
+          } on TimeoutException {
+            break;
+          } on AppException catch (error) {
+            // Refused by the server (conflict, locked marks, assignment
+            // ended): surface it instead of retrying silently forever.
+            await store.markFailed(draft, reason: error.message);
+          }
         }
-        final examTermId = payload['examTermId'] as String?;
-        final assessmentComponentId =
-            payload['assessmentComponentId'] as String?;
-        final classId = payload['classId'] as String?;
-        final subjectId = payload['subjectId'] as String?;
-        final rawEntries = payload['entries'];
-        if (examTermId == null ||
-            assessmentComponentId == null ||
-            classId == null ||
-            subjectId == null ||
-            rawEntries is! List) {
-          continue;
-        }
-        try {
-          await ref
-              .read(teacherMarksRepositoryProvider)
-              .bulkUpsert(
-                examTermId: examTermId,
-                assessmentComponentId: assessmentComponentId,
-                classId: classId,
-                sectionId: payload['sectionId'] as String?,
-                subjectId: subjectId,
-                entries: [
-                  for (final item in rawEntries)
-                    if (item is Map)
-                      TeacherMarkUpsert(
-                        studentId: '${item['studentId'] ?? ''}',
-                        marksObtained: item['marksObtained'] is num
-                            ? item['marksObtained'] as num
-                            : num.tryParse('${item['marksObtained']}'),
-                        isAbsent: item['isAbsent'] == true,
-                        expectedVersion: item['expectedVersion'] as String?,
-                      ),
-                ],
-              );
-          await store.delete(operationId);
-        } catch (_) {}
       }
-      if (mounted) {
-        ref.invalidate(teacherComponentMarksProvider(widget.component));
-      }
+    } catch (_) {
+      // Storage unreadable: the banner below reports what is still known.
+    }
+    await _refreshDraftState();
+    if (!mounted) return;
+    setState(() => _syncing = false);
+    if (synced > 0) {
+      ref.invalidate(teacherComponentMarksProvider(widget.component));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            synced == 1
+                ? '1 saved mark change was sent.'
+                : '$synced saved mark changes were sent.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> Function()? _draftRequest(Map<String, dynamic> draft) {
+    final payload = draft['payload'];
+    if (payload is! Map<String, dynamic>) return null;
+    final examTermId = payload['examTermId'] as String?;
+    final assessmentComponentId = payload['assessmentComponentId'] as String?;
+    final classId = payload['classId'] as String?;
+    final subjectId = payload['subjectId'] as String?;
+    final rawEntries = payload['entries'];
+    if (examTermId == null ||
+        assessmentComponentId == null ||
+        classId == null ||
+        subjectId == null ||
+        rawEntries is! List) {
+      return null;
+    }
+    return () => ref
+        .read(teacherMarksRepositoryProvider)
+        .bulkUpsert(
+          examTermId: examTermId,
+          assessmentComponentId: assessmentComponentId,
+          classId: classId,
+          sectionId: payload['sectionId'] as String?,
+          subjectId: subjectId,
+          entries: [
+            for (final item in rawEntries)
+              if (item is Map)
+                TeacherMarkUpsert(
+                  studentId: '${item['studentId'] ?? ''}',
+                  marksObtained: item['marksObtained'] is num
+                      ? item['marksObtained'] as num
+                      : num.tryParse('${item['marksObtained']}'),
+                  isAbsent: item['isAbsent'] == true,
+                  expectedVersion: item['expectedVersion'] as String?,
+                ),
+          ],
+        );
+  }
+
+  Future<void> _refreshDraftState() async {
+    try {
+      final drafts = await ref
+          .read(teacherMarksDraftStoreProvider)
+          .listQueued();
+      if (!mounted) return;
+      setState(() {
+        _failedDrafts = [
+          for (final draft in drafts)
+            if (draft['lastError'] is String) draft,
+        ];
+        _pendingDraftCount = drafts.length - _failedDrafts.length;
+      });
     } catch (_) {}
+  }
+
+  Future<void> _discardFailedDrafts() async {
+    final store = ref.read(teacherMarksDraftStoreProvider);
+    for (final draft in _failedDrafts) {
+      final operationId = draft['operationId'];
+      if (operationId is String) await store.delete(operationId);
+    }
+    await _refreshDraftState();
+  }
+
+  Widget _syncBanner() {
+    final Widget banner;
+    if (_failedDrafts.isNotEmpty) {
+      banner = SyncStateBanner(
+        state: SyncState.failed,
+        count: _failedDrafts.length,
+        detail: _failedDrafts.first['lastError'] as String?,
+        actionLabel: 'Discard',
+        onAction: () => unawaited(_discardFailedDrafts()),
+      );
+    } else if (_syncing && _pendingDraftCount > 0) {
+      banner = SyncStateBanner(
+        state: SyncState.syncing,
+        count: _pendingDraftCount,
+      );
+    } else if (_pendingDraftCount > 0) {
+      banner = SyncStateBanner(
+        state: SyncState.pendingUpload,
+        count: _pendingDraftCount,
+      );
+    } else {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.md,
+        AppSpacing.md,
+        0,
+      ),
+      child: banner,
+    );
   }
 
   @override
@@ -248,22 +345,7 @@ class _TeacherMarksEntryScreenState
 
           return Column(
             children: [
-              if (_queuedMessage != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.md,
-                    AppSpacing.md,
-                    AppSpacing.md,
-                    0,
-                  ),
-                  child: Text(
-                    _queuedMessage!,
-                    style: TextStyle(
-                      color: AppColors.warning,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+              _syncBanner(),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.all(AppSpacing.md),
@@ -410,17 +492,11 @@ class _TeacherMarksEntryScreenState
                 'entries': upserts.map((entry) => entry.toJson()).toList(),
               },
             );
-        if (mounted) {
-          setState(() {
-            _queuedMessage =
-                'Marks queued on this phone. They are not published. Reconnect to sync.';
-          });
-        }
+        await _refreshDraftState();
         return;
       }
       ref.invalidate(teacherComponentMarksProvider(widget.component));
       if (mounted) {
-        setState(() => _queuedMessage = null);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Marks saved.')));

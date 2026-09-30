@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../app/design_system/app_radius.dart';
-import '../../app/theme/app_colors.dart';
+import '../design/status_tone.dart';
 
 enum AppStatusType {
   present,
@@ -24,10 +24,20 @@ enum AppStatusType {
 }
 
 class StatusChip extends StatelessWidget {
-  const StatusChip({super.key, required this.status, this.label});
+  const StatusChip({super.key, required this.status, this.label, this.tone});
+
+  /// A chip for a raw backend status (e.g. `OVERDUE`), toned exactly as the
+  /// Web renders it.
+  StatusChip.fromStatus(String backendStatus, {super.key, String? label})
+    : status = AppStatusType.unavailable,
+      tone = resolveStatusTone(backendStatus),
+      label = label ?? backendStatus.trim().toUpperCase().replaceAll('_', ' ');
 
   final AppStatusType status;
   final String? label;
+
+  /// Explicit semantic tone; overrides the one derived from [status].
+  final StatusTone? tone;
 
   @override
   Widget build(BuildContext context) {
@@ -98,46 +108,49 @@ class StatusChip extends StatelessWidget {
     }
   }
 
-  (Color, Color) _getColors(bool isDark) {
+  /// Every chip colour comes from the shared semantic tone table, the same
+  /// one the Web `StatusBadge` uses (Phase 4G).
+  (Color, Color) _getColors(bool isDark) =>
+      statusToneColors(tone ?? _toneFor(status), isDark: isDark);
+
+  static StatusTone _toneFor(AppStatusType status) {
     switch (status) {
       case AppStatusType.present:
-      case AppStatusType.paid:
-      case AppStatusType.approved:
-      case AppStatusType.completed:
-      case AppStatusType.synced:
-        return (
-          AppColors.successLight.withValues(alpha: isDark ? 0.15 : 0.8),
-          isDark ? AppColors.success : AppColors.successDark,
-        );
+        return resolveStatusTone('PRESENT');
       case AppStatusType.absent:
-      case AppStatusType.rejected:
-      case AppStatusType.failed:
-        return (
-          AppColors.dangerLight.withValues(alpha: isDark ? 0.15 : 0.8),
-          isDark ? AppColors.danger : AppColors.dangerDark,
-        );
+        return resolveStatusTone('ABSENT');
       case AppStatusType.late:
+        return resolveStatusTone('LATE');
+      case AppStatusType.paid:
+        return resolveStatusTone('PAID');
       case AppStatusType.due:
-      case AppStatusType.pending:
-      case AppStatusType.queued:
-      case AppStatusType.syncing:
-        return (
-          AppColors.warningLight.withValues(alpha: isDark ? 0.15 : 0.8),
-          isDark ? AppColors.warning : AppColors.warningDark,
-        );
+        return resolveStatusTone('DUE');
       case AppStatusType.onRoute:
-      case AppStatusType.published:
-        return (
-          AppColors.infoLight.withValues(alpha: isDark ? 0.15 : 0.8),
-          isDark ? AppColors.info : AppColors.infoDark,
-        );
+        return StatusTone.info;
+      case AppStatusType.pending:
+        return resolveStatusTone('PENDING');
+      case AppStatusType.approved:
+        return resolveStatusTone('APPROVED');
+      case AppStatusType.rejected:
+        return resolveStatusTone('REJECTED');
       case AppStatusType.draft:
+        return resolveStatusTone('DRAFT');
+      case AppStatusType.published:
+        return resolveStatusTone('PUBLISHED');
+      case AppStatusType.completed:
+        return resolveStatusTone('SUCCEEDED');
       case AppStatusType.notRecorded:
+        return resolveStatusTone('NOT_RECORDED');
+      case AppStatusType.queued:
+        return resolveStatusTone('QUEUED');
+      case AppStatusType.syncing:
+        return resolveStatusTone('SYNCING');
+      case AppStatusType.synced:
+        return resolveStatusTone('SYNCED');
+      case AppStatusType.failed:
+        return resolveStatusTone('FAILED');
       case AppStatusType.unavailable:
-        return (
-          isDark ? AppColors.slate800 : AppColors.slate100,
-          isDark ? AppColors.slate300 : AppColors.slate600,
-        );
+        return resolveStatusTone('UNAVAILABLE');
     }
   }
 }
