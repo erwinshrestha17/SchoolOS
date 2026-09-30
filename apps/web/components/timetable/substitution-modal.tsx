@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -50,6 +50,38 @@ export function TimetableSubstitutionModal({
   const selectedClassName =
     selectedSlot?.class?.name?.trim() || 'Class not set';
   const selectedSectionName = selectedSlot?.section?.name?.trim();
+
+  // Phase 5M: availability and professional eligibility of the chosen
+  // substitute for this slot, decided by the server before submitting.
+  const checkSlotId: string | undefined =
+    selectedSlot?.id ?? substitution?.timetableSlotId;
+  const checkDate: string | undefined =
+    mode === 'create' ? date : substitution?.date?.slice(0, 10);
+  const candidateCheckEnabled = Boolean(
+    substituteTeacherId && checkSlotId && checkDate,
+  );
+  const candidateCheck = useQuery({
+    queryKey: [
+      'substitute-candidate-check',
+      checkSlotId,
+      checkDate,
+      substituteTeacherId,
+      substitution?.id ?? null,
+    ],
+    queryFn: () =>
+      api.checkSubstituteCandidate({
+        timetableSlotId: checkSlotId as string,
+        date: checkDate as string,
+        staffId: substituteTeacherId,
+        ...(substitution?.id ? { currentSubstitutionId: substitution.id } : {}),
+      }),
+    enabled: candidateCheckEnabled,
+    staleTime: 0,
+  });
+  const candidateBlocked =
+    candidateCheckEnabled &&
+    candidateCheck.isSuccess &&
+    (candidateCheck.data === null || !candidateCheck.data.eligible);
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.createSubstitution(data),
@@ -180,6 +212,45 @@ export function TimetableSubstitutionModal({
             placeholder="Select a replacement teacher"
           />
 
+          {candidateCheckEnabled ? (
+            <div
+              role="status"
+              className={
+                candidateCheck.isLoading
+                  ? 'rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500'
+                  : candidateBlocked
+                    ? 'rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700'
+                    : candidateCheck.isSuccess
+                      ? 'rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800'
+                      : 'rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600'
+              }
+            >
+              {candidateCheck.isLoading ? (
+                'Checking availability and eligibility…'
+              ) : candidateCheck.isError ? (
+                'Eligibility could not be checked. It will still be verified when you save.'
+              ) : candidateBlocked ? (
+                <span className="flex items-start gap-2">
+                  <AlertCircle
+                    size={14}
+                    className="mt-0.5 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span>
+                    {candidateCheck.data === null
+                      ? 'This teacher cannot cover this slot.'
+                      : `Cannot cover this slot: ${candidateCheck.data.blockingReasons.join('; ')}`}
+                  </span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 size={14} aria-hidden="true" />
+                  Available and eligible for this class and subject.
+                </span>
+              )}
+            </div>
+          ) : null}
+
           <FormField
             label={mode === 'create' ? 'Absence Reason' : 'Assignment Notes'}
           >
@@ -215,7 +286,11 @@ export function TimetableSubstitutionModal({
           <Button
             onClick={handleAction}
             className="rounded-xl bg-[var(--color-mod-homework-accent)] px-8 font-bold text-white shadow-sm hover:bg-[var(--color-mod-homework-text)]"
-            disabled={createMutation.isPending || assignMutation.isPending}
+            disabled={
+              candidateBlocked ||
+              createMutation.isPending ||
+              assignMutation.isPending
+            }
           >
             {createMutation.isPending || assignMutation.isPending
               ? 'Processing...'

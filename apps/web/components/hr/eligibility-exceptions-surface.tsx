@@ -1,25 +1,12 @@
 'use client';
 
-import { formatBsDate } from '@schoolos/core';
+import { formatBsDate, teacherEligibilityReasonLabel } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import { ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 import { Surface } from '@/components/schoolos';
 import { api } from '../../lib/api';
 import { Badge } from '../ui/badge';
-
-/** Plain-language copy for eligibility reason codes. */
-const REASON_COPY: Record<string, string> = {
-  EMPLOYMENT_INACTIVE: 'Staff record is not active',
-  EMPLOYMENT_UNVERIFIED: 'No current verified employment',
-  TEACHER_PROFILE_MISSING: 'No active teacher profile',
-  QUALIFICATION_UNVERIFIED: 'No current verified qualification',
-  TEACHING_LICENCE_UNVERIFIED: 'Teaching licence missing, expired or revoked',
-  TEACHER_POLICY_UNAVAILABLE: 'No approved eligibility policy applies',
-  TEACHER_POLICY_CONFLICT: 'Conflicting eligibility policies',
-  CLASS_NOT_FOUND: 'Class no longer exists',
-  SUBJECT_NOT_FOUND: 'Subject no longer exists',
-};
 
 /**
  * Phase 5M follow-up: active teaching assignments that would fail the
@@ -88,8 +75,7 @@ export function EligibilityExceptionsSurface() {
                   </td>
                   <td>
                     <Badge variant="destructive">
-                      {REASON_COPY[item.currentReasonCode] ??
-                        item.currentReasonCode}
+                      {teacherEligibilityReasonLabel(item.currentReasonCode)}
                     </Badge>
                   </td>
                   <td className="text-xs text-slate-500">

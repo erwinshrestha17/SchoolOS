@@ -9,6 +9,7 @@ import { CommunicationsService } from '../communications/communications.service'
 import { PrismaService } from '../prisma/prisma.service';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { TimetableSubstitutionService } from './timetable-substitution.service';
+import { toTimetableDayOfWeek } from './timetable-calendar';
 import { TeacherProfessionalEligibilityService } from '../teacher-scope/teacher-professional-eligibility.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { CreateSubstitutionDto } from './dto/timetable-setup.dto';
@@ -21,6 +22,7 @@ describe('TimetableSubstitutionService', () => {
   let service: TimetableSubstitutionService;
   let prisma: PrismaService;
   let attendanceService: AttendanceService;
+  let eligibility: { projectEligibility: jest.Mock };
 
   const mockActor = {
     tenantId: 'tenant-1',
@@ -55,6 +57,10 @@ describe('TimetableSubstitutionService', () => {
           provide: TeacherProfessionalEligibilityService,
           useValue: {
             preflightAssignment: jest.fn().mockResolvedValue('assessment-1'),
+            projectEligibility: jest.fn().mockResolvedValue({
+              outcome: 'ELIGIBLE',
+              reasonCode: 'POLICY_REQUIREMENTS_SATISFIED',
+            }),
           },
         },
         {
@@ -64,6 +70,7 @@ describe('TimetableSubstitutionService', () => {
               findMany: jest.fn(),
               findFirst: jest.fn(),
               findUnique: jest.fn(),
+              count: jest.fn().mockResolvedValue(0),
             },
             timetableSubstitution: {
               create: jest.fn(),
@@ -81,6 +88,8 @@ describe('TimetableSubstitutionService', () => {
             },
             staff: {
               findFirst: jest.fn(),
+              findMany: jest.fn(),
+              count: jest.fn(),
             },
             academicYear: {
               findFirst: jest.fn(),
@@ -123,6 +132,7 @@ describe('TimetableSubstitutionService', () => {
     );
     prisma = module.get<PrismaService>(PrismaService);
     attendanceService = module.get<AttendanceService>(AttendanceService);
+    eligibility = module.get(TeacherProfessionalEligibilityService);
   });
 
   describe('listSubstitutions', () => {
@@ -761,6 +771,117 @@ describe('TimetableSubstitutionService', () => {
             date: normalizedDate,
           }),
         }),
+      );
+    });
+  });
+
+  describe('listEligibleCandidates (Phase 5M)', () => {
+    const date = '2026-10-05';
+    const actor = {
+      tenantId: 'tenant-1',
+      userId: 'user-1',
+      roles: ['admin'],
+      permissions: ['timetable:substitute'],
+    } as never;
+
+    beforeEach(() => {
+      const p = prisma as unknown as Record<string, Record<string, jest.Mock>>;
+      p.timetableSlot.findFirst.mockResolvedValue({
+        id: 'slot-1',
+        staffId: 'absent-teacher',
+        classId: 'class-9',
+        sectionId: 'section-a',
+        subjectId: 'subject-sci',
+        academicYearId: 'year-1',
+        dayOfWeek: toTimetableDayOfWeek(new Date(date)),
+        version: { status: 'PUBLISHED' },
+      });
+      p.staff.findMany.mockResolvedValue([
+        {
+          id: 'free-licensed',
+          employeeId: 'E1',
+          firstName: 'Asha',
+          lastName: 'K',
+        },
+        {
+          id: 'free-unlicensed',
+          employeeId: 'E2',
+          firstName: 'Bina',
+          lastName: 'L',
+        },
+        { id: 'busy', employeeId: 'E3', firstName: 'Chet', lastName: 'M' },
+      ]);
+      p.staff.count.mockResolvedValue(3);
+      jest
+        .spyOn(service as never, 'ensureSubstituteAllowed')
+        .mockImplementation((async (_slot: unknown, staffId: string) => {
+          if (staffId === 'busy')
+            throw new ConflictException(
+              'Teacher already has a class in this period',
+            );
+        }) as never);
+      eligibility.projectEligibility.mockImplementation(async ({ staffId }) =>
+        staffId === 'free-unlicensed'
+          ? { outcome: 'INELIGIBLE', reasonCode: 'TEACHING_LICENCE_UNVERIFIED' }
+          : {
+              outcome: 'ELIGIBLE',
+              reasonCode: 'POLICY_REQUIREMENTS_SATISFIED',
+            },
+      );
+    });
+
+    it('an available but professionally ineligible teacher is not offered as eligible', async () => {
+      const result = await service.listEligibleCandidates(actor, {
+        timetableSlotId: 'slot-1',
+        date,
+      } as never);
+      const byId = Object.fromEntries(result.items.map((i) => [i.id, i]));
+
+      expect(byId['free-licensed']).toMatchObject({
+        eligible: true,
+        professionalEligibility: { outcome: 'ELIGIBLE' },
+      });
+      expect(byId['free-unlicensed']).toMatchObject({
+        eligible: false,
+        professionalEligibility: {
+          outcome: 'INELIGIBLE',
+          reasonCode: 'TEACHING_LICENCE_UNVERIFIED',
+        },
+      });
+      expect(byId['free-unlicensed'].blockingReasons[0]).toMatch(/licence/i);
+      // Unavailable candidates are not evaluated further.
+      expect(byId.busy).toMatchObject({
+        eligible: false,
+        professionalEligibility: null,
+      });
+    });
+
+    it('can check one chosen teacher, still tenant-scoped and never the absent teacher', async () => {
+      const p = prisma as unknown as Record<string, Record<string, jest.Mock>>;
+      await service.listEligibleCandidates(actor, {
+        timetableSlotId: 'slot-1',
+        date,
+        staffId: 'free-unlicensed',
+      } as never);
+      expect(p.staff.findMany.mock.calls[0][0].where).toMatchObject({
+        tenantId: 'tenant-1',
+        id: { equals: 'free-unlicensed', not: 'absent-teacher' },
+      });
+    });
+
+    it('evaluates against the slot class and subject in the actor tenant', async () => {
+      await service.listEligibleCandidates(actor, {
+        timetableSlotId: 'slot-1',
+        date,
+      } as never);
+      expect(eligibility.projectEligibility).toHaveBeenCalledWith({
+        tenantId: 'tenant-1',
+        staffId: 'free-licensed',
+        classId: 'class-9',
+        subjectId: 'subject-sci',
+      });
+      expect(eligibility.projectEligibility).not.toHaveBeenCalledWith(
+        expect.objectContaining({ staffId: 'busy' }),
       );
     });
   });

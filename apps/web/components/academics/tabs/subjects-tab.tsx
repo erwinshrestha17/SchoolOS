@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { api } from '../../../lib/api';
 import {
@@ -84,6 +84,29 @@ export function SubjectsTab({
       showSuccess('Subject created.');
     },
   });
+
+  // Phase 5M: show the professional-eligibility outcome before activating.
+  const eligibilityReady = Boolean(
+    assign.staffId && assign.classId && assign.subjectId,
+  );
+  const eligibilityQuery = useQuery({
+    queryKey: [
+      'teacher-eligibility-preview',
+      assign.staffId,
+      assign.classId,
+      assign.subjectId,
+    ],
+    queryFn: () =>
+      api.previewTeacherEligibility({
+        staffId: assign.staffId,
+        classId: assign.classId,
+        subjectId: assign.subjectId,
+      }),
+    enabled: eligibilityReady,
+    staleTime: 0,
+  });
+  const eligibilityBlocked =
+    eligibilityReady && eligibilityQuery.data?.outcome === 'INELIGIBLE';
 
   const assignMut = useMutation({
     mutationFn: api.createTeacherAssignment,
@@ -385,6 +408,41 @@ export function SubjectsTab({
               placeholder="Search for a teacher"
             />
 
+            {eligibilityReady ? (
+              <div
+                role="status"
+                className={cn(
+                  'flex items-start gap-2 rounded-xl border px-3 py-2 text-xs font-semibold',
+                  eligibilityQuery.isLoading
+                    ? 'border-slate-200 text-slate-500'
+                    : eligibilityQuery.data?.outcome === 'ELIGIBLE'
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                      : eligibilityQuery.data
+                        ? 'border-red-200 bg-red-50 text-red-800'
+                        : 'border-slate-200 text-slate-600',
+                )}
+              >
+                {eligibilityQuery.isLoading ? (
+                  'Checking professional eligibility…'
+                ) : eligibilityQuery.data ? (
+                  <>
+                    {eligibilityQuery.data.outcome === 'ELIGIBLE' ? (
+                      <CheckCircle2 size={14} aria-hidden="true" />
+                    ) : (
+                      <AlertCircle size={14} aria-hidden="true" />
+                    )}
+                    <span>
+                      {eligibilityQuery.data.outcome === 'ELIGIBLE'
+                        ? 'Eligible to teach this class and subject.'
+                        : `Not eligible: ${eligibilityQuery.data.reasonLabel}. Update the teacher's professional records in HR first.`}
+                    </span>
+                  </>
+                ) : (
+                  'Eligibility could not be checked. The assignment will still be verified when you activate it.'
+                )}
+              </div>
+            ) : null}
+
             <Button
               className="w-full"
               onClick={() =>
@@ -397,6 +455,7 @@ export function SubjectsTab({
                 !assign.subjectId ||
                 !assign.sectionId ||
                 !assign.staffId ||
+                eligibilityBlocked ||
                 assignMut.isPending
               }
               isLoading={assignMut.isPending}

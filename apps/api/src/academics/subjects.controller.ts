@@ -18,7 +18,10 @@ import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
-import { AssignTeacherDto } from './dto/assign-teacher.dto';
+import {
+  AssignTeacherDto,
+  TeacherEligibilityPreviewQueryDto,
+} from './dto/assign-teacher.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 
@@ -87,6 +90,15 @@ export class TeacherAssignmentsController {
   @Permissions('academics:read')
   listTeacherAssignments(@CurrentAuth() auth: AuthContext) {
     return this.academicsService.listTeacherAssignments(auth);
+  }
+
+  @Get('eligibility-preview')
+  @Permissions('academics:update')
+  previewTeacherEligibility(
+    @Query() query: TeacherEligibilityPreviewQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.previewTeacherEligibility(query, auth);
   }
 
   @Post()

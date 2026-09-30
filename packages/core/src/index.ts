@@ -2,6 +2,7 @@ export * from "./permissions.js";
 export * from "./canonical-permissions.js";
 export * from "./permission-aliases.js";
 export * from "./teacher-capabilities.js";
+export * from "./teacher-eligibility.js";
 export * from "./school-web-persona.js";
 export * from "./types.js";
 export * from "./validation.js";

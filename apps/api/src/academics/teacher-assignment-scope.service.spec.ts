@@ -250,3 +250,85 @@ describe('AcademicsService.assignTeacher', () => {
     );
   });
 });
+
+describe('AcademicsService.previewTeacherEligibility (Phase 5M)', () => {
+  function build(overrides: Record<string, unknown> = {}) {
+    const prisma = {
+      class: { findFirst: jest.fn().mockResolvedValue({ id: 'class-1' }) },
+      staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff-1' }) },
+      subject: { findFirst: jest.fn().mockResolvedValue({ id: 'subject-1' }) },
+      ...overrides,
+    };
+    const eligibility = {
+      preflightAssignment: jest.fn(),
+      projectEligibility: jest.fn().mockResolvedValue({
+        outcome: 'INELIGIBLE',
+        reasonCode: 'TEACHING_LICENCE_UNVERIFIED',
+        evaluatedAt: new Date('2026-10-01T00:00:00.000Z'),
+      }),
+    };
+    const service = new AcademicsService(
+      prisma as never,
+      {} as never,
+      { record: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      eligibility as never,
+    );
+    return { service, prisma, eligibility };
+  }
+  const actor = actorFor(['admin'], ['academics:update']);
+
+  it('returns outcome, reason code and label without persisting a decision', async () => {
+    const { service, eligibility } = build();
+    const result = await service.previewTeacherEligibility(
+      { staffId: 'staff-1', classId: 'class-1', subjectId: 'subject-1' },
+      actor,
+    );
+    expect(result).toMatchObject({
+      outcome: 'INELIGIBLE',
+      reasonCode: 'TEACHING_LICENCE_UNVERIFIED',
+      reasonLabel: expect.stringMatching(/licence/i),
+    });
+    expect(Object.keys(result).sort()).toEqual([
+      'evaluatedAt',
+      'outcome',
+      'reasonCode',
+      'reasonLabel',
+    ]);
+    expect(eligibility.preflightAssignment).not.toHaveBeenCalled();
+    expect(eligibility.projectEligibility).toHaveBeenCalledWith({
+      tenantId: 'tenant-1',
+      staffId: 'staff-1',
+      classId: 'class-1',
+      subjectId: 'subject-1',
+    });
+  });
+
+  it('refuses staff outside the tenant before evaluating anything', async () => {
+    const { service, eligibility } = build({
+      staff: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+    await expect(
+      service.previewTeacherEligibility(
+        { staffId: 'foreign-staff', classId: 'class-1' },
+        actor,
+      ),
+    ).rejects.toThrow();
+    expect(eligibility.projectEligibility).not.toHaveBeenCalled();
+  });
+
+  it('refuses a subject that does not belong to the class', async () => {
+    const { service, eligibility } = build({
+      subject: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+    await expect(
+      service.previewTeacherEligibility(
+        { staffId: 'staff-1', classId: 'class-1', subjectId: 'other-subject' },
+        actor,
+      ),
+    ).rejects.toThrow('Subject not found for this class');
+    expect(eligibility.projectEligibility).not.toHaveBeenCalled();
+  });
+});

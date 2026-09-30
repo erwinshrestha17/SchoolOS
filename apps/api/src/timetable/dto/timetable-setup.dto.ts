@@ -514,6 +514,11 @@ export class SubstituteCandidateQueryDto extends PaginatedQueryDto {
   @IsString()
   @MaxLength(120)
   search?: string;
+
+  /** Phase 5M: check one already-chosen teacher (same rules as the list). */
+  @IsOptional()
+  @IsString()
+  staffId?: string;
 }
 
 export class CreateSubjectWeeklyRequirementDto {

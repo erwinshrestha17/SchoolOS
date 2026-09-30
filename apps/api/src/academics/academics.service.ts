@@ -18,7 +18,11 @@ import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { buildReportCardPdf } from '../common/pdf/simple-pdf';
 import { PrismaService } from '../prisma/prisma.service';
-import { AssignTeacherDto } from './dto/assign-teacher.dto';
+import { teacherEligibilityReasonLabel } from '@schoolos/core';
+import {
+  AssignTeacherDto,
+  TeacherEligibilityPreviewQueryDto,
+} from './dto/assign-teacher.dto';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
@@ -223,6 +227,46 @@ export class AcademicsService {
       (await this.teacherScopeService.resolveActiveStaffId(actor)) ??
       '__no_active_staff_record__'
     );
+  }
+
+  /**
+   * Phase 5M: what assignment preflight would decide, without persisting a
+   * decision. Same permission and tenant checks as assignTeacher; returns
+   * only the outcome and reason (never HR evidence).
+   */
+  async previewTeacherEligibility(
+    query: TeacherEligibilityPreviewQueryDto,
+    actor: AuthContext,
+  ) {
+    await Promise.all([
+      this.ensureClass(actor, query.classId),
+      this.ensureStaff(actor, query.staffId),
+    ]);
+    if (query.subjectId) {
+      const subject = await this.prisma.subject.findFirst({
+        where: {
+          id: query.subjectId,
+          tenantId: actor.tenantId,
+          classId: query.classId,
+        },
+        select: { id: true },
+      });
+      if (!subject) {
+        throw new NotFoundException('Subject not found for this class');
+      }
+    }
+    const projection = await this.teacherEligibility.projectEligibility({
+      tenantId: actor.tenantId,
+      staffId: query.staffId,
+      classId: query.classId,
+      subjectId: query.subjectId ?? null,
+    });
+    return {
+      outcome: projection.outcome,
+      reasonCode: projection.reasonCode,
+      reasonLabel: teacherEligibilityReasonLabel(projection.reasonCode),
+      evaluatedAt: projection.evaluatedAt,
+    };
   }
 
   async assignTeacher(dto: AssignTeacherDto, actor: AuthContext) {

@@ -15,6 +15,7 @@ import {
   TeacherDelegationStatus,
   Prisma,
 } from '@prisma/client';
+import { teacherEligibilityReasonLabel } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
@@ -591,7 +592,9 @@ export class TimetableSubstitutionService {
     }
     const staffWhere: Prisma.StaffWhereInput = {
       tenantId: actor.tenantId,
-      id: { not: slot.staffId },
+      id: query.staffId
+        ? { equals: query.staffId, not: slot.staffId }
+        : { not: slot.staffId },
       ...(query.search?.trim()
         ? {
             OR: [
@@ -650,6 +653,30 @@ export class TimetableSubstitutionService {
               : 'Candidate availability could not be verified',
           );
         }
+        // Phase 5M: an available teacher is still not a valid substitute
+        // unless professionally eligible for this class/subject; assignment
+        // runs the same evaluation and would otherwise fail with a 409.
+        let professionalEligibility: {
+          outcome: string;
+          reasonCode: string;
+        } | null = null;
+        if (blockingReasons.length === 0) {
+          const projection = await this.teacherEligibility.projectEligibility({
+            tenantId: actor.tenantId,
+            staffId: candidate.id,
+            classId: slot.classId,
+            subjectId: slot.subjectId,
+          });
+          professionalEligibility = {
+            outcome: projection.outcome,
+            reasonCode: projection.reasonCode,
+          };
+          if (projection.outcome !== 'ELIGIBLE') {
+            blockingReasons.push(
+              teacherEligibilityReasonLabel(projection.reasonCode),
+            );
+          }
+        }
         const weeklyPeriods = await this.prisma.timetableSlot.count({
           where: {
             tenantId: actor.tenantId,
@@ -671,6 +698,7 @@ export class TimetableSubstitutionService {
           weeklyPeriods,
           eligible: blockingReasons.length === 0,
           blockingReasons,
+          professionalEligibility,
         };
       }),
     );

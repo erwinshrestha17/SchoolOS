@@ -264,6 +264,18 @@ export const academicsApi = {
     request<SubjectSummary>('/subjects', { method: 'POST', json: body }),
   listTeacherAssignments: () =>
     request<TeacherAssignmentSummary[]>('/teacher-assignments'),
+  /** Phase 5M: what assignment preflight would decide (never persisted). */
+  previewTeacherEligibility: (params: {
+    staffId: string;
+    classId: string;
+    subjectId?: string;
+  }) =>
+    request<{
+      outcome: 'ELIGIBLE' | 'INELIGIBLE';
+      reasonCode: string;
+      reasonLabel: string;
+      evaluatedAt: string;
+    }>(withQuery('/teacher-assignments/eligibility-preview', params)),
   createTeacherAssignment: (body: JsonBody) =>
     request<TeacherAssignmentSummary>('/teacher-assignments', {
       method: 'POST',
@@ -778,6 +790,33 @@ export const academicsApi = {
       method: 'POST',
       json: body,
     }),
+  /**
+   * Phase 5M: availability + professional eligibility for one chosen
+   * substitute, using the same server rules as the candidate list.
+   */
+  checkSubstituteCandidate: (params: {
+    timetableSlotId: string;
+    date: string;
+    staffId: string;
+    currentSubstitutionId?: string;
+  }) =>
+    request<{
+      items: Array<{
+        id: string;
+        staffName: string;
+        eligible: boolean;
+        blockingReasons: string[];
+        professionalEligibility: {
+          outcome: 'ELIGIBLE' | 'INELIGIBLE';
+          reasonCode: string;
+        } | null;
+      }>;
+    }>(
+      withQuery('/timetable/substitutions/eligible-candidates', {
+        ...params,
+        limit: 1,
+      }),
+    ).then((page) => page.items[0] ?? null),
   assignSubstitution: (id: string, body: JsonBody) =>
     request<TimetableSubstitutionSummary>(
       `/timetable/substitutions/${encodeURIComponent(id)}/assign`,
