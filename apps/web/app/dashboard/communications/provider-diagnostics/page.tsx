@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric, MetricGroup } from '@/components/schoolos';
 import { Surface } from '@/components/schoolos';
 import type { CommunicationProviderDiagnosticChannel } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
@@ -15,7 +16,6 @@ import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell'
 import { useCommunicationsCapabilities } from '@/lib/permissions-ui';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
-import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { ModuleTabs } from '@/components/ui/module-tabs';
@@ -40,9 +40,9 @@ export default function ProviderDiagnosticsPage() {
         title="Provider Diagnostics"
         description="Review notification delivery health, failures, retries, and callback status."
       >
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
-            title="Provider Mode"
+        <MetricGroup className="sm:grid-cols-2 lg:grid-cols-4">
+          <Metric
+            label="Provider Mode"
             loading={diagnosticsQuery.isLoading}
             value={
               diagnostics ? formatMode(diagnostics.overallMode) : 'Unavailable'
@@ -53,8 +53,8 @@ export default function ProviderDiagnosticsPage() {
             }
             description="Allowed modes are disabled, dev log, mock, or configured."
           />
-          <KpiCard
-            title="Health"
+          <Metric
+            label="Health"
             loading={diagnosticsQuery.isLoading}
             value={diagnostics ? formatMode(diagnostics.health) : 'Unavailable'}
             icon={<Activity size={20} />}
@@ -67,8 +67,8 @@ export default function ProviderDiagnosticsPage() {
             }
             description="Current delivery health across channels."
           />
-          <KpiCard
-            title="Failed"
+          <Metric
+            label="Failed"
             loading={diagnosticsQuery.isLoading}
             value={
               diagnostics
@@ -86,8 +86,8 @@ export default function ProviderDiagnosticsPage() {
             }
             description="Failed delivery records across channels."
           />
-          <KpiCard
-            title="Retryable"
+          <Metric
+            label="Retryable"
             loading={diagnosticsQuery.isLoading}
             value={
               diagnostics
@@ -107,7 +107,7 @@ export default function ProviderDiagnosticsPage() {
             }
             description="Failed or retry-pending records."
           />
-        </KpiGrid>
+        </MetricGroup>
       </ModuleHeader>
 
       <ModuleTabs

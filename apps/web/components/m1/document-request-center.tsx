@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric, MetricGroup } from '@/components/schoolos';
 import type {
   AdmissionDocumentReminderBatchResult,
   AdmissionDocumentReminderSkipReason,
@@ -33,7 +34,6 @@ import { ApiRequestError } from '../../lib/api/client';
 import { Button } from '../ui/button';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { EmptyState } from '../ui/empty-state';
-import { KpiCard, KpiGrid } from '../ui/kpi-card';
 import { ModuleLockedState } from '../ui/module-locked-state';
 import { PageState } from '../ui/page-state';
 import { StatusBadge } from '../ui/status-badge';
@@ -176,17 +176,17 @@ export function DocumentRequestCenter() {
 
   return (
     <section className="space-y-5">
-      <KpiGrid className="sm:grid-cols-2 xl:grid-cols-5">
-        <KpiCard
-          title="Cases"
+      <MetricGroup className="sm:grid-cols-2 xl:grid-cols-5">
+        <Metric
+          label="Cases"
           loading={requestQuery.isLoading}
           value={summary?.casesWithRequests ?? 'Unavailable'}
           icon={<FileWarning size={18} />}
           tone={(summary?.casesWithRequests ?? 0) > 0 ? 'warning' : 'neutral'}
           description="Cases with at least one missing required document."
         />
-        <KpiCard
-          title="Missing Documents"
+        <Metric
+          label="Missing Documents"
           loading={requestQuery.isLoading}
           value={summary?.totalMissingDocuments ?? 'Unavailable'}
           icon={<FileWarning size={18} />}
@@ -195,8 +195,8 @@ export function DocumentRequestCenter() {
           }
           description="Missing requirements in the current filter."
         />
-        <KpiCard
-          title="Before Review"
+        <Metric
+          label="Before Review"
           loading={requestQuery.isLoading}
           value={summary?.beforeReviewDocuments ?? 'Unavailable'}
           icon={<FileWarning size={18} />}
@@ -205,8 +205,8 @@ export function DocumentRequestCenter() {
           }
           description="Requirements due before review."
         />
-        <KpiCard
-          title="Oldest Pending"
+        <Metric
+          label="Oldest Pending"
           loading={requestQuery.isLoading}
           value={
             summary
@@ -217,8 +217,8 @@ export function DocumentRequestCenter() {
           tone={(summary?.oldestDaysPending ?? 0) >= 7 ? 'warning' : 'neutral'}
           description="Age of the oldest matching document request."
         />
-        <KpiCard
-          title="No Phone"
+        <Metric
+          label="No Phone"
           loading={requestQuery.isLoading}
           value={summary?.casesWithoutGuardianPhone ?? 'Unavailable'}
           icon={<Phone size={18} />}
@@ -229,7 +229,7 @@ export function DocumentRequestCenter() {
           }
           description="Cases without a guardian phone for reminder follow-up."
         />
-      </KpiGrid>
+      </MetricGroup>
 
       {requestQuery.data && !requestQuery.data.scanComplete ? (
         <div className="rounded-2xl border border-warning-200 bg-warning-50 p-4 text-sm font-semibold text-warning-900">

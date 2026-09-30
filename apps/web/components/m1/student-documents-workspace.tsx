@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric } from '@/components/schoolos';
 import {
   formatBsDate,
   formatBsDateTime,
@@ -48,7 +49,6 @@ import { Button, type ButtonProps } from '../ui/button';
 import { BsDateField } from '../ui/bs-date-field';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { EmptyState } from '../ui/empty-state';
-import { KpiCard } from '../ui/kpi-card';
 import { LoadingState } from '../ui/loading-state';
 import { ModuleLockedState } from '../ui/module-locked-state';
 import { PageState } from '../ui/page-state';
@@ -783,32 +783,32 @@ export function StudentDocumentsWorkspace() {
               ) : null}
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <KpiCard
-                  title="Total"
+                <Metric
+                  label="Total"
                   value={documents.length}
                   icon={<FileCheck2 size={18} />}
                   tone="info"
                 />
-                <KpiCard
-                  title="Verified"
+                <Metric
+                  label="Verified"
                   value={verified}
                   icon={<CheckCircle2 size={18} />}
                   tone="success"
                 />
-                <KpiCard
-                  title="Pending"
+                <Metric
+                  label="Pending"
                   value={pending}
                   icon={<FileClock size={18} />}
                   tone="warning"
                 />
-                <KpiCard
-                  title="Expiring"
+                <Metric
+                  label="Expiring"
                   value={expiring}
                   icon={<FileClock size={18} />}
                   tone={expiring ? 'warning' : 'success'}
                 />
-                <KpiCard
-                  title="Rejected"
+                <Metric
+                  label="Rejected"
                   value={rejected}
                   icon={<FileWarning size={18} />}
                   tone={rejected ? 'danger' : 'success'}

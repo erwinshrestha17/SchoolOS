@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric, MetricGroup } from '@/components/schoolos';
 import { Surface } from '@/components/schoolos';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -55,7 +56,6 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { FilterBar } from '@/components/ui/filter-bar';
-import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
 import { LoadingState } from '@/components/ui/loading-state';
 import { LockedRecordBanner } from '@/components/ui/locked-record-banner';
@@ -688,28 +688,28 @@ export function AttendanceRegisterWorkspace({
           },
         ]}
       >
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
-            title="Completed registers"
+        <MetricGroup className="sm:grid-cols-2 lg:grid-cols-4">
+          <Metric
+            label="Completed registers"
             value={summary?.submittedDays ?? 'Unavailable'}
             icon={<CheckCircle2 size={20} />}
             tone="success"
           />
-          <KpiCard
-            title="Pending registers"
+          <Metric
+            label="Pending registers"
             value={summary?.notMarkedDays ?? 'Unavailable'}
             icon={<FileClock size={20} />}
             tone={(summary?.notMarkedDays ?? 0) > 0 ? 'warning' : 'neutral'}
           />
-          <KpiCard
-            title="Locked days"
+          <Metric
+            label="Locked days"
             value="Policy gated"
             icon={<LockKeyhole size={20} />}
             tone="neutral"
             description="Lock policy follows the saved attendance session."
           />
-          <KpiCard
-            title="Average attendance"
+          <Metric
+            label="Average attendance"
             value={
               summary?.attendancePercentage === null || !summary
                 ? 'Unavailable'
@@ -718,7 +718,7 @@ export function AttendanceRegisterWorkspace({
             icon={<BarChart3 size={20} />}
             tone="info"
           />
-        </KpiGrid>
+        </MetricGroup>
       </ModuleHeader>
       <AttendanceModuleTabs />
       <FilterBar
@@ -1675,9 +1675,9 @@ export function AttendanceStudentProfileWorkspace({
         title="Student Attendance Profile"
         description="Attendance-focused student profile with history limited to the current role and school."
       />
-      <KpiGrid className="sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          title="Overall attendance"
+      <MetricGroup className="sm:grid-cols-2 lg:grid-cols-4">
+        <Metric
+          label="Overall attendance"
           loading={summaryQuery.isLoading}
           value={
             summary
@@ -1687,28 +1687,28 @@ export function AttendanceStudentProfileWorkspace({
           icon={<BarChart3 size={20} />}
           tone="success"
         />
-        <KpiCard
-          title="Present"
+        <Metric
+          label="Present"
           loading={summaryQuery.isLoading}
           value={summary?.totals.present ?? 'Unavailable'}
           icon={<CheckCircle2 size={20} />}
           tone="success"
         />
-        <KpiCard
-          title="Absent"
+        <Metric
+          label="Absent"
           loading={summaryQuery.isLoading}
           value={summary?.totals.absent ?? 'Unavailable'}
           icon={<XCircle size={20} />}
           tone="danger"
         />
-        <KpiCard
-          title="Late"
+        <Metric
+          label="Late"
           loading={summaryQuery.isLoading}
           value={summary?.totals.late ?? 'Unavailable'}
           icon={<FileClock size={20} />}
           tone="warning"
         />
-      </KpiGrid>
+      </MetricGroup>
       <Surface title="Recent Attendance History">
         {historyQuery.isLoading ? (
           <LoadingState label="Loading student attendance..." />
@@ -1768,9 +1768,9 @@ export function AttendanceReportsWorkspace() {
           </Link>
         }
       >
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-5">
-          <KpiCard
-            title="School attendance rate"
+        <MetricGroup className="sm:grid-cols-2 lg:grid-cols-5">
+          <Metric
+            label="School attendance rate"
             loading={analyticsQuery.isLoading}
             value={
               analytics
@@ -1780,34 +1780,34 @@ export function AttendanceReportsWorkspace() {
             icon={<Users size={20} />}
             tone="info"
           />
-          <KpiCard
-            title="Students below 80%"
+          <Metric
+            label="Students below 80%"
             loading={analyticsQuery.isLoading}
             value={analytics?.below80Warnings?.length ?? 'Unavailable'}
             icon={<AlertTriangle size={20} />}
             tone="warning"
           />
-          <KpiCard
-            title="Avg late arrivals"
+          <Metric
+            label="Avg late arrivals"
             loading={analyticsQuery.isLoading}
             value={analytics?.todaySummary.totals.late ?? 'Unavailable'}
             icon={<FileClock size={20} />}
             tone="warning"
           />
-          <KpiCard
-            title="Perfect attendance"
+          <Metric
+            label="Perfect attendance"
             value="Unavailable"
             icon={<CheckCircle2 size={20} />}
             tone="neutral"
           />
-          <KpiCard
-            title="Leave utilization"
+          <Metric
+            label="Leave utilization"
             loading={analyticsQuery.isLoading}
             value={analytics?.todaySummary.totals.leave ?? 'Unavailable'}
             icon={<CalendarCheck size={20} />}
             tone="info"
           />
-        </KpiGrid>
+        </MetricGroup>
       </ModuleHeader>
       <AttendanceModuleTabs />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">

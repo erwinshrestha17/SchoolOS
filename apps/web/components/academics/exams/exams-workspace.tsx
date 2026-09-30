@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -14,7 +15,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { StatCard } from '@/components/ui/stat-card';
 import { ClipboardList, CheckCircle2, AlertCircle, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Toast, ToastTone } from '@/components/ui/toast';
@@ -149,20 +149,19 @@ export function ExamsWorkspace() {
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard
-          title="Total Exam Terms"
+        <Metric
+          label="Total Exam Terms"
           value={totalExams}
           icon={<ClipboardList size={20} />}
-          trend={{ value: activeExams, label: 'Active now', isUp: true }}
         />
-        <StatCard
-          title="Active Exams"
+        <Metric
+          label="Active Exams"
           value={activeExams}
           icon={<CheckCircle2 size={20} />}
           className="bg-emerald-50/50 border-emerald-100"
         />
-        <StatCard
-          title="Locked Terms"
+        <Metric
+          label="Locked Terms"
           value={lockedExams}
           icon={<AlertCircle size={20} />}
           className="bg-amber-50/50 border-amber-100"

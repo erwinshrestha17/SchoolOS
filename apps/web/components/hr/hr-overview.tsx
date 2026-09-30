@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { formatBsDate } from '@schoolos/core';
 import { api } from '../../lib/api';
@@ -11,7 +12,6 @@ import {
   AlertCircle,
   UserCheck,
 } from 'lucide-react';
-import { StatCard } from '../ui/stat-card';
 import { Badge } from '../ui/badge';
 import Link from 'next/link';
 
@@ -44,8 +44,8 @@ export function HROverview() {
     <div className="space-y-8">
       {/* Metrics Row */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Active Staff"
+        <Metric
+          label="Active Staff"
           value={
             summaryQuery.isError
               ? 'Unavailable'
@@ -55,8 +55,8 @@ export function HROverview() {
           icon={<UserCheck className="h-5 w-5 text-emerald-500" />}
           loading={isLoading}
         />
-        <StatCard
-          title="Contracts Expiring"
+        <Metric
+          label="Contracts Expiring"
           value={
             summaryQuery.isError
               ? 'Unavailable'
@@ -68,8 +68,8 @@ export function HROverview() {
           }
           loading={isLoading}
         />
-        <StatCard
-          title="Pending Leaves"
+        <Metric
+          label="Pending Leaves"
           value={
             summaryQuery.isError
               ? 'Unavailable'
@@ -79,8 +79,8 @@ export function HROverview() {
           icon={<CalendarDays className="h-5 w-5 text-amber-500" />}
           loading={isLoading}
         />
-        <StatCard
-          title="Missing Salary Structure"
+        <Metric
+          label="Missing Salary Structure"
           value={
             summaryQuery.isError
               ? 'Unavailable'

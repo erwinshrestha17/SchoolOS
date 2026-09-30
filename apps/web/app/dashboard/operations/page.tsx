@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric, MetricGroup } from '@/components/schoolos';
 import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -16,7 +17,6 @@ import {
 import { useRouter } from 'next/navigation';
 import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
 import { ModuleHeader } from '@/components/ui/module-header';
-import { KpiCard, KpiGrid } from '@/components/ui/kpi-card';
 import { ModuleTabs } from '@/components/ui/module-tabs';
 import { PermissionDenied } from '@/components/ui/permission-denied';
 import { useHasAnyPermission } from '@/lib/permissions-ui';
@@ -136,16 +136,16 @@ export default function OperationsPage() {
             : []),
         ]}
       >
-        <KpiGrid className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-          <KpiCard
-            title="Books Issued Today"
+        <MetricGroup className="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+          <Metric
+            label="Books Issued Today"
             value={canUseLibrary ? 'Unavailable' : 'Restricted'}
             icon={<BookOpen size={20} />}
             tone="neutral"
             description="A date-bounded issue summary is not available."
           />
-          <KpiCard
-            title="Active Trips"
+          <Metric
+            label="Active Trips"
             value={
               canUseTransport
                 ? safeValue(
@@ -159,8 +159,8 @@ export default function OperationsPage() {
             tone="info"
             description="Active trip records."
           />
-          <KpiCard
-            title="Meals Served"
+          <Metric
+            label="Meals Served"
             value={
               canUseCanteen
                 ? safeValue(mealCountQuery.isError, mealsServed)
@@ -171,8 +171,8 @@ export default function OperationsPage() {
             tone="success"
             description="Meals recorded today."
           />
-          <KpiCard
-            title="Overdue Books"
+          <Metric
+            label="Overdue Books"
             value={
               canUseLibrary
                 ? safeValue(overdueQuery.isError, overdueQuery.data?.meta.total)
@@ -183,8 +183,8 @@ export default function OperationsPage() {
             tone="warning"
             description="Current overdue total."
           />
-          <KpiCard
-            title="Stale GPS Alerts"
+          <Metric
+            label="Stale GPS Alerts"
             value={
               canUseTransport
                 ? safeValue(staleGpsQuery.isError, staleGpsAlerts)
@@ -195,8 +195,8 @@ export default function OperationsPage() {
             tone="warning"
             description="Stale records are never presented as live."
           />
-          <KpiCard
-            title="Low Wallets"
+          <Metric
+            label="Low Wallets"
             value={
               canUseCanteen
                 ? safeValue(
@@ -210,7 +210,7 @@ export default function OperationsPage() {
             tone="warning"
             description="Wallets below the configured threshold."
           />
-        </KpiGrid>
+        </MetricGroup>
       </ModuleHeader>
 
       <ModuleTabs

@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric } from '@/components/schoolos';
 import { Surface } from '@/components/schoolos';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -15,7 +16,6 @@ import {
   type TimetableVersionSummary,
 } from '@schoolos/core';
 import { cn } from '../../../lib/utils';
-import { StatCard } from '../../ui/stat-card';
 import { Badge } from '../../ui/badge';
 import { EmptyState } from '../../ui/empty-state';
 import { LoadingState } from '../../ui/loading-state';
@@ -335,14 +335,14 @@ export function TimetableBuilderTab({
           )}
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-              title="Periods"
+            <Metric
+              label="Periods"
               value={periodsQuery.data?.length ?? 0}
               icon={<Clock className="h-5 w-5" />}
               loading={periodsQuery.isLoading}
             />
-            <StatCard
-              title="Rooms"
+            <Metric
+              label="Rooms"
               value={rooms.length}
               icon={<CheckCircle2 className="h-5 w-5" />}
               loading={roomsQuery.isLoading}

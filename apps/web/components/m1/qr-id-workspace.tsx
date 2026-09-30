@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric, MetricGroup } from '@/components/schoolos';
 import {
   formatBsDate,
   formatBsDateTime,
@@ -14,7 +15,6 @@ import { StudentQrCard } from '../students/profile/student-qr-card';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/empty-state';
 import { ErrorState } from '../ui/error-state';
-import { KpiCard, KpiGrid } from '../ui/kpi-card';
 import { LoadingState } from '../ui/loading-state';
 import { StatusBadge } from '../ui/status-badge';
 
@@ -62,9 +62,9 @@ export function QrIdWorkspace() {
 
   return (
     <div className="space-y-6">
-      <KpiGrid className="sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          title="Active QR Cards"
+      <MetricGroup className="sm:grid-cols-2 xl:grid-cols-4">
+        <Metric
+          label="Active QR Cards"
           value={summary?.activeCredentials ?? 'Unavailable'}
           icon={<QrCode size={19} />}
           tone="success"
@@ -74,8 +74,8 @@ export function QrIdWorkspace() {
               : 'Ready for protected school workflows'
           }
         />
-        <KpiCard
-          title="Replacement Files"
+        <Metric
+          label="Replacement Files"
           value={summary?.replacementFilesNeeded ?? 'Unavailable'}
           icon={<Printer size={19} />}
           tone={summary?.replacementFilesNeeded ? 'warning' : 'neutral'}
@@ -85,8 +85,8 @@ export function QrIdWorkspace() {
               : 'Active credentials missing an ID-card file'
           }
         />
-        <KpiCard
-          title="Inactive Credentials"
+        <Metric
+          label="Inactive Credentials"
           value={summary?.inactiveCredentials ?? 'Unavailable'}
           icon={<CreditCard size={19} />}
           tone="neutral"
@@ -96,8 +96,8 @@ export function QrIdWorkspace() {
               : 'Rotated or revoked audit history'
           }
         />
-        <KpiCard
-          title="Scans Today"
+        <Metric
+          label="Scans Today"
           value={summary?.successfulScansToday ?? 'Unavailable'}
           icon={<History size={19} />}
           tone="neutral"
@@ -107,7 +107,7 @@ export function QrIdWorkspace() {
               : 'Nepal school-day total could not load'
           }
         />
-      </KpiGrid>
+      </MetricGroup>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

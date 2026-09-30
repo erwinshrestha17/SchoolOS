@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
@@ -20,7 +21,6 @@ import { ModuleTabs } from '@/components/dashboard/module-tabs';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { PageHeader } from '@/components/ui/page-header';
-import { StatCard } from '@/components/ui/stat-card';
 import { TimetableGrid } from '@/components/timetable/timetable-grid';
 import { TimetableVersionsList } from '@/components/timetable/versions-list';
 import { WeeklyRequirementsList } from '@/components/timetable/weekly-requirements-list';
@@ -221,9 +221,9 @@ function SchoolTimetableConsole() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
-          <StatCard
+          <Metric
             key={stat.title}
-            title={stat.title}
+            label={stat.title}
             value={stat.value}
             icon={stat.icon}
             loading={stat.loading}

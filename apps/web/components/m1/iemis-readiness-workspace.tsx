@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric, MetricGroup } from '@/components/schoolos';
 import {
   formatBsDate,
   formatBsDateTime,
@@ -24,7 +25,6 @@ import { Button } from '../ui/button';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { EmptyState } from '../ui/empty-state';
 import { ErrorState } from '../ui/error-state';
-import { KpiCard, KpiGrid } from '../ui/kpi-card';
 import { LoadingState } from '../ui/loading-state';
 import { ProtectedFileButton } from '../ui/protected-file';
 import { StatusBadge } from '../ui/status-badge';
@@ -265,44 +265,44 @@ export function IemisReadinessWorkspace() {
         }}
       />
 
-      <KpiGrid className="sm:grid-cols-2 xl:grid-cols-6">
-        <KpiCard
-          title="Ready Records"
+      <MetricGroup className="sm:grid-cols-2 xl:grid-cols-6">
+        <Metric
+          label="Ready Records"
           value={readyCount}
           icon={<CheckCircle2 size={19} />}
           tone="success"
           description="Current validation result"
         />
-        <KpiCard
-          title="Validation Errors"
+        <Metric
+          label="Validation Errors"
           value={issueRows.length}
           icon={<AlertTriangle size={19} />}
           tone={issueRows.length ? 'danger' : 'success'}
           description="Current readiness result"
         />
-        <KpiCard
-          title="Missing Fields"
+        <Metric
+          label="Missing Fields"
           value={missingFields}
           icon={<FileSpreadsheet size={19} />}
           tone={missingFields ? 'warning' : 'success'}
           description="From validation messages"
         />
-        <KpiCard
-          title="Duplicate Rows"
+        <Metric
+          label="Duplicate Rows"
           value="—"
           icon={<FileSpreadsheet size={19} />}
           tone="neutral"
           description="Duplicate summary unavailable"
         />
-        <KpiCard
-          title="Last Export"
+        <Metric
+          label="Last Export"
           value={exportResult ? formatBsDate(exportResult.exportedAt) : '—'}
           icon={<Download size={19} />}
           tone="info"
           description="Latest export requested here"
         />
-        <KpiCard
-          title="Import Jobs"
+        <Metric
+          label="Import Jobs"
           value={
             importMutation.isPending || validateImportMutation.isPending
               ? 'Running'
@@ -316,7 +316,7 @@ export function IemisReadinessWorkspace() {
           }
           description="Persisted admission import batches"
         />
-      </KpiGrid>
+      </MetricGroup>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

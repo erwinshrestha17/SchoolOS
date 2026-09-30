@@ -1,12 +1,12 @@
 'use client';
 
+import { Metric } from '@/components/schoolos';
 import { Surface } from '@/components/schoolos';
 import {
   formatBsDate,
   type AttendanceAnalytics as AttendanceAnalyticsData,
 } from '@schoolos/core';
 import type { ReactNode } from 'react';
-import { StatCard } from '@/components/ui/stat-card';
 import { Badge } from '@/components/ui/badge';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/loading-state';
@@ -68,26 +68,26 @@ export function AttendanceAnalytics({
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Sessions Reviewed"
+        <Metric
+          label="Sessions Reviewed"
           value={analytics.sessionsReviewed}
           icon={<Users size={20} />}
           tone="info"
         />
-        <StatCard
-          title="Monthly Attendance"
+        <Metric
+          label="Monthly Attendance"
           value={`${analytics.monthlyAttendance.attendancePercent}%`}
           icon={<TrendingDown size={20} />}
           tone="success"
         />
-        <StatCard
-          title="Students Below 80%"
+        <Metric
+          label="Students Below 80%"
           value={analytics.below80Warnings?.length ?? 0}
           icon={<AlertCircle size={20} />}
           tone="warning"
         />
-        <StatCard
-          title="Anomaly Alerts"
+        <Metric
+          label="Anomaly Alerts"
           value={isLoadingAnomalies ? '...' : totalAnomalies}
           icon={<CalendarX size={20} />}
           tone={totalAnomalies > 0 ? 'warning' : 'neutral'}

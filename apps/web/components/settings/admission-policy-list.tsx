@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric, MetricGroup } from '@/components/schoolos';
 import type {
   AdmissionPolicySummary,
   AdmissionPolicyStatus,
@@ -16,7 +17,6 @@ import { ActionMenu } from '../ui/action-menu';
 import { Button } from '../ui/button';
 import { DataTable } from '../ui/data-table';
 import { ErrorState } from '../ui/error-state';
-import { KpiCard, KpiGrid } from '../ui/kpi-card';
 import type { StatusTone } from '../ui/status-badge';
 import { StatusBadge } from '../ui/status-badge';
 
@@ -101,32 +101,32 @@ export function AdmissionPolicyList() {
         </p>
       ) : null}
 
-      <KpiGrid>
-        <KpiCard
-          title="Active Policies"
+      <MetricGroup>
+        <Metric
+          label="Active Policies"
           value={summary?.activePolicies ?? 0}
           loading={policiesQuery.isLoading}
           tone="success"
         />
-        <KpiCard
-          title="Policies needing review"
+        <Metric
+          label="Policies needing review"
           value={summary?.policiesNeedingReview ?? 0}
           loading={policiesQuery.isLoading}
           tone="warning"
         />
-        <KpiCard
-          title="Applications waiting for documents"
+        <Metric
+          label="Applications waiting for documents"
           value={summary?.applicationsWaitingForDocuments ?? 0}
           loading={policiesQuery.isLoading}
           tone="info"
         />
-        <KpiCard
-          title="Applications waiting for decision"
+        <Metric
+          label="Applications waiting for decision"
           value={summary?.applicationsWaitingForDecision ?? 0}
           loading={policiesQuery.isLoading}
           tone="neutral"
         />
-      </KpiGrid>
+      </MetricGroup>
 
       <DataTable<AdmissionPolicySummary>
         isLoading={policiesQuery.isLoading}

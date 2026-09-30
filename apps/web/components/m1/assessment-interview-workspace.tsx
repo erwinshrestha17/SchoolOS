@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric, MetricGroup } from '@/components/schoolos';
 import type {
   AdmissionAssessmentMode,
   AdmissionAssessmentResult,
@@ -37,7 +38,6 @@ import { useUrlFilters } from '../../lib/hooks/use-url-filters';
 import { useSession } from '../session-provider';
 import { Button } from '../ui/button';
 import { EmptyState } from '../ui/empty-state';
-import { KpiCard, KpiGrid } from '../ui/kpi-card';
 import { ModuleLockedState } from '../ui/module-locked-state';
 import { PageState } from '../ui/page-state';
 import { StatusBadge } from '../ui/status-badge';
@@ -229,40 +229,40 @@ export function AssessmentInterviewWorkspace() {
 
   return (
     <section className="space-y-5">
-      <KpiGrid className="sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          title="Today"
+      <MetricGroup className="sm:grid-cols-2 xl:grid-cols-4">
+        <Metric
+          label="Today"
           loading={sessionsQuery.isLoading}
           value={summary?.today ?? 'Unavailable'}
           icon={<CalendarClock size={18} />}
           tone={(summary?.today ?? 0) > 0 ? 'warning' : 'neutral'}
           description="Scheduled assessment and interview sessions due today."
         />
-        <KpiCard
-          title="Upcoming"
+        <Metric
+          label="Upcoming"
           loading={sessionsQuery.isLoading}
           value={summary?.upcoming ?? 'Unavailable'}
           icon={<RefreshCw size={18} />}
           tone="neutral"
           description="Future sessions already scheduled."
         />
-        <KpiCard
-          title="Awaiting Results"
+        <Metric
+          label="Awaiting Results"
           loading={sessionsQuery.isLoading}
           value={summary?.awaitingResults ?? 'Unavailable'}
           icon={<ClipboardCheck size={18} />}
           tone={(summary?.awaitingResults ?? 0) > 0 ? 'danger' : 'neutral'}
           description="Scheduled sessions whose result has not been recorded."
         />
-        <KpiCard
-          title="Needs Scheduling"
+        <Metric
+          label="Needs Scheduling"
           loading={sessionsQuery.isLoading || candidatesQuery.isLoading}
           value={summary?.needsScheduling ?? 'Unavailable'}
           icon={<UserRoundCheck size={18} />}
           tone={(summary?.needsScheduling ?? 0) > 0 ? 'warning' : 'neutral'}
           description="Open cases matched to a policy that requires an interview."
         />
-      </KpiGrid>
+      </MetricGroup>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">

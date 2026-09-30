@@ -1,11 +1,11 @@
 'use client';
 
+import { Metric } from '@/components/schoolos';
 import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../../../lib/api';
 import type { TeacherWorkloadSummary } from '@schoolos/core';
-import { StatCard } from '../../ui/stat-card';
 import { Badge } from '../../ui/badge';
 import { EmptyState } from '../../ui/empty-state';
 import { LoadingState } from '../../ui/loading-state';
@@ -228,18 +228,18 @@ export function TeacherWorkloadTab({
     <div className="space-y-8">
       {/* Metrics Row */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <StatCard
-          title="Total Weekly Hours"
+        <Metric
+          label="Total Weekly Hours"
           value={totalHours.toFixed(1)}
           icon={<Clock className="h-5 w-5" />}
         />
-        <StatCard
-          title="Avg. Daily Slots"
+        <Metric
+          label="Avg. Daily Slots"
           value={avgSlots.toFixed(1)}
           icon={<Calendar className="h-5 w-5" />}
         />
-        <StatCard
-          title="Active Teachers"
+        <Metric
+          label="Active Teachers"
           value={teacherCount}
           icon={<Users className="h-5 w-5" />}
         />

@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric } from '@/components/schoolos';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useEffect,
@@ -10,7 +11,6 @@ import {
 } from 'react';
 import { api } from '../../lib/api';
 import { PageHeader } from '../ui/page-header';
-import { StatCard } from '../ui/stat-card';
 
 const currentYear = new Date().getFullYear();
 
@@ -129,14 +129,14 @@ export function SetupForm() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Academic Years"
+        <Metric
+          label="Academic Years"
           value={academicYears.length}
           tone="neutral"
         />
-        <StatCard title="Classes" value={classes.length} tone="success" />
-        <StatCard title="Sections" value={sections.length} tone="warning" />
-        <StatCard title="Students" value={totalStudents} tone="info" />
+        <Metric label="Classes" value={classes.length} tone="success" />
+        <Metric label="Sections" value={sections.length} tone="warning" />
+        <Metric label="Students" value={totalStudents} tone="info" />
       </div>
 
       <section className="grid gap-4 rounded-2xl border border-[var(--line)] bg-white/85 p-4 shadow-sm backdrop-blur-xl lg:grid-cols-3">

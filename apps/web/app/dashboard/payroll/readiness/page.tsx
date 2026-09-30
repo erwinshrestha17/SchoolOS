@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric, MetricGroup } from '@/components/schoolos';
 import type {
   PayrollExceptionSeverity,
   PayrollExceptionStatus,
@@ -30,7 +31,6 @@ import {
 import { EmptyState } from '../../../../components/ui/empty-state';
 import { ErrorState } from '../../../../components/ui/error-state';
 import { Input } from '../../../../components/ui/input';
-import { KpiCard, KpiGrid } from '../../../../components/ui/kpi-card';
 import { LoadingState } from '../../../../components/ui/loading-state';
 import { Select } from '../../../../components/ui/select';
 import { StatusBadge } from '../../../../components/ui/status-badge';
@@ -228,9 +228,9 @@ export default function PayrollReadinessPage() {
         />
       ) : null}
 
-      <KpiGrid className="sm:grid-cols-2 xl:grid-cols-5">
-        <KpiCard
-          title="Readiness"
+      <MetricGroup className="sm:grid-cols-2 xl:grid-cols-5">
+        <Metric
+          label="Readiness"
           value={
             query.isError
               ? 'Unavailable'
@@ -246,8 +246,8 @@ export default function PayrollReadinessPage() {
               : 'Calculated from the current payroll records'
           }
         />
-        <KpiCard
-          title="Staff considered"
+        <Metric
+          label="Staff considered"
           value={
             query.isError ? 'Unavailable' : (readiness?.staffConsidered ?? 0)
           }
@@ -256,8 +256,8 @@ export default function PayrollReadinessPage() {
           tone="neutral"
           description={`${readiness?.staffExcluded ?? 0} excluded from the selected run`}
         />
-        <KpiCard
-          title="Blocking"
+        <Metric
+          label="Blocking"
           value={
             query.isError
               ? 'Unavailable'
@@ -270,16 +270,16 @@ export default function PayrollReadinessPage() {
           }
           description="Must be fixed at the source"
         />
-        <KpiCard
-          title="Warnings"
+        <Metric
+          label="Warnings"
           value={query.isError ? 'Unavailable' : (readiness?.warningCount ?? 0)}
           icon={<AlertTriangle className="h-5 w-5" />}
           loading={query.isLoading}
           tone={(readiness?.warningCount ?? 0) > 0 ? 'warning' : 'success'}
           description="Open warnings need acknowledgement"
         />
-        <KpiCard
-          title="Information"
+        <Metric
+          label="Information"
           value={
             query.isError ? 'Unavailable' : (readiness?.informationalCount ?? 0)
           }
@@ -288,7 +288,7 @@ export default function PayrollReadinessPage() {
           tone="info"
           description={`Next action: ${readiness?.allowedNextAction?.replaceAll('_', ' ') ?? 'Resolve blockers'}`}
         />
-      </KpiGrid>
+      </MetricGroup>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">

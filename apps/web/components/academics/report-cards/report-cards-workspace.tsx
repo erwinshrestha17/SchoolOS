@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric } from '@/components/schoolos';
 import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -20,7 +21,6 @@ import {
   RotateCcw,
   ClipboardList,
 } from 'lucide-react';
-import { StatCard } from '@/components/ui/stat-card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
@@ -311,20 +311,20 @@ export function ReportCardsWorkspace() {
               </div>
             )}
             <div className="grid gap-4 md:grid-cols-3">
-              <StatCard
-                title="Generated Reports"
+              <Metric
+                label="Generated Reports"
                 value={reportsQuery.data?.length ?? 0}
                 icon={<FileText size={20} />}
                 className="border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)]"
               />
-              <StatCard
-                title="Total Students"
+              <Metric
+                label="Total Students"
                 value={studentsQuery.data?.total ?? 0}
                 icon={<CheckCircle2 size={20} />}
                 className="bg-emerald-50/50 border-emerald-100"
               />
-              <StatCard
-                title="Avg. Class GPA"
+              <Metric
+                label="Avg. Class GPA"
                 value={
                   reportsQuery.data?.length
                     ? (

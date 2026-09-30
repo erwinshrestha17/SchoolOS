@@ -38,8 +38,8 @@ export const LEGACY_PRIMITIVES: readonly LegacyPrimitive[] = [
     replacement: 'DataWorkspace / Surface / Panel',
     maxImporters: 27,
   },
-  { module: 'components/ui/stat-card', replacement: 'Metric', maxImporters: 9 },
-  { module: 'components/ui/kpi-card', replacement: 'Metric', maxImporters: 11 },
+  { module: 'components/ui/stat-card', replacement: 'Metric', maxImporters: 0 },
+  { module: 'components/ui/kpi-card', replacement: 'Metric', maxImporters: 0 },
   {
     module: 'components/marketing/metric-card',
     replacement: 'Metric',

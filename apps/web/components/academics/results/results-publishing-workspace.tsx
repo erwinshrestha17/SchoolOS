@@ -1,5 +1,6 @@
 'use client';
 
+import { Metric } from '@/components/schoolos';
 import { Surface } from '@/components/schoolos';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -16,7 +17,6 @@ import { DataTable } from '@/components/ui/data-table';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { Select } from '@/components/ui/form-field';
 import { PageState } from '@/components/ui/page-state';
-import { StatCard } from '@/components/ui/stat-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 
 export function ResultsPublishingWorkspace() {
@@ -139,26 +139,26 @@ export function ResultsPublishingWorkspace() {
   return (
     <div className="space-y-8">
       <div className="grid gap-4 md:grid-cols-4">
-        <StatCard
-          title="Previewed Students"
+        <Metric
+          label="Previewed Students"
           value={previewQuery.data?.meta.total ?? 0}
           icon={<FileText size={20} />}
           className="border-[var(--color-mod-academics-border)] bg-[var(--color-mod-academics-surface)]"
         />
-        <StatCard
-          title="Ready for Lock"
+        <Metric
+          label="Ready for Lock"
           value={readyCount}
           icon={<CheckCircle2 size={20} />}
           className="bg-emerald-50/50 border-emerald-100"
         />
-        <StatCard
-          title="Needs Attention"
+        <Metric
+          label="Needs Attention"
           value={incompleteCount + failedCount + withheldCount}
           icon={<AlertTriangle size={20} />}
           className="bg-amber-50/50 border-amber-100"
         />
-        <StatCard
-          title="Term State"
+        <Metric
+          label="Term State"
           value={selectedExam?.isLocked ? 'Locked' : 'Open'}
           icon={<Lock size={20} />}
           className="bg-slate-50/80 border-slate-200"
