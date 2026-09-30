@@ -51,6 +51,7 @@ import {
   TeacherScopeService,
 } from '../teacher-scope/teacher-scope.service';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
+import { resolveStudentActorScope } from '../students/student-actor-scope';
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { CorrectStaffAttendanceDto } from './dto/correct-staff-attendance.dto';
 import {
@@ -2789,12 +2790,18 @@ export class AttendanceService {
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 25;
-    const where = {
+    const actorScope = await this.correctionActorScope(actor);
+    const where: Prisma.AttendanceCorrectionRequestWhereInput = {
       tenantId: actor.tenantId,
+      ...(actorScope ?? {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.studentId ? { studentId: query.studentId } : {}),
       ...(query.requestedById ? { requestedById: query.requestedById } : {}),
     };
+    if (actorScope && query.studentId) {
+      // Both constraints must hold; keep the actor scope authoritative.
+      where.AND = [actorScope, { studentId: query.studentId }];
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.attendanceCorrectionRequest.findMany({
@@ -2833,17 +2840,44 @@ export class AttendanceService {
     };
   }
 
+  /**
+   * Correction requests carry student names and guardian-supplied reasons.
+   * Collection and detail reads use the same actor scope as the student
+   * directory: guardians see their linked children, teacher-only actors
+   * their live assigned sections, other attendance readers the tenant.
+   * Returns null for tenant-wide readers.
+   */
+  private async correctionActorScope(
+    actor: AuthContext,
+  ): Promise<Prisma.AttendanceCorrectionRequestWhereInput | null> {
+    const scope = await resolveStudentActorScope(
+      this.prisma,
+      this.teacherScopeService,
+      actor,
+    );
+    if (scope.kind === 'tenant') return null;
+    if (scope.kind === 'students')
+      return { studentId: { in: scope.studentIds } };
+    return { student: { sectionId: { in: scope.sectionIds } } };
+  }
+
   async getCorrectionSummary(actor: AuthContext) {
+    const actorScope = await this.correctionActorScope(actor);
     const pending = await this.prisma.attendanceCorrectionRequest.count({
-      where: { tenantId: actor.tenantId, status: 'PENDING' },
+      where: {
+        tenantId: actor.tenantId,
+        status: 'PENDING',
+        ...(actorScope ?? {}),
+      },
     });
 
     return { pending };
   }
 
   async getCorrectionRequest(id: string, actor: AuthContext) {
+    const actorScope = await this.correctionActorScope(actor);
     const request = await this.prisma.attendanceCorrectionRequest.findFirst({
-      where: { id, tenantId: actor.tenantId },
+      where: { id, tenantId: actor.tenantId, ...(actorScope ?? {}) },
       select: {
         ...attendanceCorrectionRequestSelect,
         student: {

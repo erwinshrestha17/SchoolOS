@@ -4,6 +4,7 @@ import {
   calculatePayrollTotals,
   getPayrollRunActions,
   getOverlapDays,
+  payrollRunLifecycle,
 } from './payroll.service';
 
 describe('payroll calculations', () => {
@@ -56,7 +57,7 @@ describe('payroll calculations', () => {
   });
 
   it('enforces validation, independent review, approval, finalization and posting workflow actions', () => {
-    expect(getPayrollRunActions('DRAFT')).toEqual({
+    expect(payrollRunLifecycle('DRAFT')).toEqual({
       canEdit: true,
       canValidate: true,
       canFinalize: false,
@@ -71,11 +72,11 @@ describe('payroll calculations', () => {
       canReverse: false,
       isLocked: false,
     });
-    expect(getPayrollRunActions('VALIDATED')).toMatchObject({
+    expect(payrollRunLifecycle('VALIDATED')).toMatchObject({
       canSubmitReview: true,
       canApprove: false,
     });
-    expect(getPayrollRunActions('UNDER_REVIEW')).toMatchObject({
+    expect(payrollRunLifecycle('UNDER_REVIEW')).toMatchObject({
       canEdit: false,
       canReview: false,
       canSubmitReview: false,
@@ -84,20 +85,20 @@ describe('payroll calculations', () => {
       canReject: true,
       canPost: false,
     });
-    expect(getPayrollRunActions('REVIEWED')).toMatchObject({
+    expect(payrollRunLifecycle('REVIEWED')).toMatchObject({
       canCompleteReview: false,
       canApprove: true,
       canReject: true,
       canPost: false,
     });
-    expect(getPayrollRunActions('APPROVED')).toMatchObject({
+    expect(payrollRunLifecycle('APPROVED')).toMatchObject({
       canReview: false,
       canApprove: false,
       canReject: true,
       canFinalize: true,
       canPost: false,
     });
-    expect(getPayrollRunActions('FINALIZED')).toMatchObject({
+    expect(payrollRunLifecycle('FINALIZED')).toMatchObject({
       canEdit: false,
       canPost: true,
       isLocked: true,
@@ -106,11 +107,39 @@ describe('payroll calculations', () => {
     });
   });
 
+  it('never advertises actor-facing actions the actor does not hold', () => {
+    const noPayrollDuties = {
+      tenantId: 'tenant-1',
+      tenantSlug: 'tenant-one',
+      userId: 'viewer-1',
+      email: null,
+      authMethod: 'PASSWORD',
+      roles: ['principal'],
+      permissions: ['payroll:run:read'],
+    } as never;
+    for (const status of [
+      'DRAFT',
+      'VALIDATED',
+      'UNDER_REVIEW',
+      'REVIEWED',
+      'APPROVED',
+      'FINALIZED',
+      'POSTED',
+      'PAID',
+    ]) {
+      const actions = getPayrollRunActions(status, noPayrollDuties);
+      for (const [key, value] of Object.entries(actions)) {
+        if (key !== 'isLocked')
+          expect({ status, key, value }).toEqual({ status, key, value: false });
+      }
+    }
+  });
+
   it('allows approval after review statuses', () => {
-    expect(getPayrollRunActions('DRAFT').canApprove).toBe(false);
-    expect(getPayrollRunActions('REVIEWED').canApprove).toBe(true);
-    expect(getPayrollRunActions('APPROVED').canApprove).toBe(false);
-    expect(getPayrollRunActions('POSTED').canApprove).toBe(false);
+    expect(payrollRunLifecycle('DRAFT').canApprove).toBe(false);
+    expect(payrollRunLifecycle('REVIEWED').canApprove).toBe(true);
+    expect(payrollRunLifecycle('APPROVED').canApprove).toBe(false);
+    expect(payrollRunLifecycle('POSTED').canApprove).toBe(false);
   });
 
   it('calculates overlap days correctly for leave requests', () => {

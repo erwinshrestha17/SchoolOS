@@ -2927,7 +2927,7 @@ export class MobilePrincipalService implements OnModuleInit {
     actor: AuthContext,
     requiredPermissions: string[],
   ) {
-    if (actor.roles.includes('platform_super_admin')) return;
+    // Platform identities never act inside the school domain (AGENTS.md §8).
     if (
       requiredPermissions.some(
         (permission) => !actor.permissions.includes(permission),
@@ -2947,9 +2947,6 @@ export class MobilePrincipalService implements OnModuleInit {
     actor: AuthContext,
     delegatedToId?: string | null,
   ) {
-    if (actor.roles.includes('platform_super_admin')) {
-      return true;
-    }
     if (delegatedToId) {
       return actor.userId === delegatedToId;
     }
@@ -3125,11 +3122,7 @@ export class MobilePrincipalService implements OnModuleInit {
   }
 
   private assertPrincipal(actor: AuthContext) {
-    if (
-      !actor.roles.some((role) =>
-        ['principal', 'admin', 'platform_super_admin'].includes(role),
-      )
-    ) {
+    if (!actor.roles.some((role) => ['principal', 'admin'].includes(role))) {
       throw new ForbiddenException(
         'You do not have permission to view principal mobile information.',
       );
@@ -3798,7 +3791,7 @@ function emergencyApprovalState(input: {
 }) {
   const isEmergency = input.priority === NoticePriority.EMERGENCY;
   const actorIsAdmin = input.actor.roles.some((role) =>
-    ['admin', 'platform_super_admin'].includes(role),
+    ['admin'].includes(role),
   );
   const required =
     isEmergency &&

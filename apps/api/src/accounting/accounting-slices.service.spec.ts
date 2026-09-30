@@ -652,6 +652,35 @@ describe('AccountingService - Slices 2-5', () => {
 
       expect(readiness.allowedActions).toEqual(['REOPEN']);
     });
+
+    it('advertises no close/reopen action to a reports-only reader', async () => {
+      const reportsReader = {
+        ...actor,
+        roles: ['financial_auditor'],
+        permissions: ['accounting:reports:read'],
+      };
+      for (const status of ['OPEN', 'CLOSED'] as const) {
+        prisma.fiscalYear.findFirst.mockResolvedValue({
+          id: 'fy-1',
+          tenantId: 'tenant-1',
+          name: 'FY 2026',
+          status,
+          startDate: new Date('2026-04-01'),
+          endDate: new Date('2027-03-31'),
+          periods: [{ id: 'p-1', status: 'CLOSED' }],
+        });
+
+        const readiness = await service.getFiscalYearCloseReadiness(
+          'fy-1',
+          reportsReader,
+        );
+
+        expect({ status, actions: readiness.allowedActions }).toEqual({
+          status,
+          actions: [],
+        });
+      }
+    });
   });
 
   describe('reopenFiscalYear', () => {

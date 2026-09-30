@@ -4655,6 +4655,58 @@ describe('staff-attendance and leave confirmed-gap fixes (2026-07-19)', () => {
     expect(prisma.attendanceCorrectionRequest.findMany).not.toHaveBeenCalled();
   });
 
+  it('scopes correction list, summary and detail to a teacher-only actor’s assigned sections', async () => {
+    const { service, prisma } = buildService({});
+    prisma.attendanceCorrectionRequest.count.mockResolvedValue(0);
+    prisma.attendanceCorrectionRequest.findMany.mockResolvedValue([]);
+    prisma.attendanceCorrectionRequest.findFirst.mockResolvedValue(null);
+
+    await service.listCorrectionRequests(teacherActor, {
+      page: 1,
+      limit: 25,
+      studentId: 'student-elsewhere',
+    });
+    const listWhere =
+      prisma.attendanceCorrectionRequest.findMany.mock.calls[0][0].where;
+    expect(listWhere.tenantId).toBe(teacherActor.tenantId);
+    // A client-supplied studentId narrows but never widens the actor scope.
+    expect(listWhere.AND).toEqual([
+      { student: { sectionId: { in: expect.any(Array) } } },
+      { studentId: 'student-elsewhere' },
+    ]);
+    const scopedSections = listWhere.AND[0].student.sectionId.in as string[];
+
+    await service.getCorrectionSummary(teacherActor);
+    expect(prisma.attendanceCorrectionRequest.count).toHaveBeenLastCalledWith({
+      where: {
+        tenantId: teacherActor.tenantId,
+        status: 'PENDING',
+        student: { sectionId: { in: scopedSections } },
+      },
+    });
+
+    await expect(
+      service.getCorrectionRequest('correction-other-section', teacherActor),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(
+      prisma.attendanceCorrectionRequest.findFirst.mock.calls[0][0].where,
+    ).toEqual({
+      id: 'correction-other-section',
+      tenantId: teacherActor.tenantId,
+      student: { sectionId: { in: scopedSections } },
+    });
+  });
+
+  it('keeps correction reads tenant-wide for attendance administrators', async () => {
+    const { service, prisma } = buildService({});
+    prisma.attendanceCorrectionRequest.count.mockResolvedValue(2);
+
+    await service.getCorrectionSummary(adminActor);
+    expect(prisma.attendanceCorrectionRequest.count).toHaveBeenLastCalledWith({
+      where: { tenantId: adminActor.tenantId, status: 'PENDING' },
+    });
+  });
+
   it('returns a tenant-scoped paginated active-staff attendance roster with minimal fields', async () => {
     const rosterActor = {
       ...hrActor,

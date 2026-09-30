@@ -70,7 +70,7 @@ enum BoardReadinessTrackParam {
 @Controller('mobile/principal')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement(FEATURE_KEYS.MOBILE_FULL_ROLE)
-@Roles('principal', 'admin', 'platform_super_admin')
+@Roles('principal', 'admin')
 export class MobilePrincipalController {
   constructor(
     private readonly service: MobilePrincipalService,

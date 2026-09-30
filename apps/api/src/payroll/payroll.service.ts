@@ -1673,7 +1673,7 @@ export class PayrollService {
       month: run.periodMonth,
       payrollRunId: run.id,
     });
-    const actions = getPayrollRunActions(run.status);
+    const actions = payrollRunLifecycle(run.status);
 
     if (run.journalEntryId) {
       throw new ConflictException('Payroll run is already posted');
@@ -1808,7 +1808,7 @@ export class PayrollService {
   ) {
     requireDomainPermission(actor, 'payroll:run:reverse');
     const run = await this.getPayrollRunOrThrow(id, actor);
-    const actions = getPayrollRunActions(run.status);
+    const actions = payrollRunLifecycle(run.status);
 
     if (!actions.canReverse) {
       throw new ConflictException(
@@ -3397,7 +3397,7 @@ export class PayrollService {
 
   async regeneratePayrollLines(id: string, actor: AuthContext) {
     const run = await this.getPayrollRunOrThrow(id, actor);
-    const actions = getPayrollRunActions(run.status);
+    const actions = payrollRunLifecycle(run.status);
 
     if (!actions.canEdit) {
       throw new ConflictException(
@@ -3589,13 +3589,41 @@ export function calculatePayrollTotals(
   );
 }
 
+/**
+ * Status-only transition table used by internal lifecycle guards (a caller
+ * that has already enforced the duty/permission). NEVER serialize this as
+ * actor-facing actions: it says what the lifecycle permits, not what the
+ * actor may do.
+ */
+export function payrollRunLifecycle(status: string) {
+  return buildPayrollRunActions(
+    status,
+    () => true,
+    () => true,
+  );
+}
+
+/**
+ * Actor-facing actions. The actor is required: there is no default-allow
+ * path, so a response built without an actor cannot advertise actions.
+ */
 export function getPayrollRunActions(
   status: string,
-  actor?: AuthContext,
+  actor: AuthContext,
   run = {},
 ) {
-  const available = (duty: PayrollDuty) =>
-    actor ? payrollDutyAvailable(actor, duty, run) : true;
+  return buildPayrollRunActions(
+    status,
+    (duty) => payrollDutyAvailable(actor, duty, run),
+    (permission) => hasDomainPermission(actor, permission),
+  );
+}
+
+function buildPayrollRunActions(
+  status: string,
+  available: (duty: PayrollDuty) => boolean,
+  holds: (permission: 'payroll:run:pay' | 'payroll:run:reverse') => boolean,
+) {
   const editable =
     status === PayrollRunStatus.DRAFT || status === PayrollRunStatus.GENERATED;
   return {
@@ -3617,13 +3645,11 @@ export function getPayrollRunActions(
         status === PayrollRunStatus.APPROVED) &&
       available('REVIEW'),
     canPost: status === PayrollRunStatus.FINALIZED && available('POST'),
-    canPay:
-      status === PayrollRunStatus.POSTED &&
-      (!actor || hasDomainPermission(actor, 'payroll:run:pay')),
+    canPay: status === PayrollRunStatus.POSTED && holds('payroll:run:pay'),
     canReverse:
       (status === PayrollRunStatus.POSTED ||
         status === PayrollRunStatus.PAID) &&
-      (!actor || hasDomainPermission(actor, 'payroll:run:reverse')),
+      holds('payroll:run:reverse'),
     isLocked: [
       PayrollRunStatus.FINALIZED,
       PayrollRunStatus.POSTED,
@@ -3882,7 +3908,7 @@ function serializePayrollRunSummary(
     payslips?: unknown;
     _count?: { lines?: number; payslips?: number };
   },
-  actor?: AuthContext,
+  actor: AuthContext,
 ) {
   const _count = run._count;
   const rest = {

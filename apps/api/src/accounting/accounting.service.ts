@@ -60,7 +60,10 @@ import {
 import { ApprovalWorkflowService } from '../advanced-operations/approval-workflow.service';
 import { ListPostingBatchesQueryDto } from './dto/list-posting-batches.query.dto';
 import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
-import { requireDomainPermission } from '../authorization/policies/domain-permission';
+import {
+  hasDomainPermission,
+  requireDomainPermission,
+} from '../authorization/policies/domain-permission';
 import { isFinancialTransactionConflict } from '../authorization/policies/financial-transaction-conflict';
 import {
   journalAllowedActions,
@@ -2783,10 +2786,15 @@ export class AccountingService implements OnModuleInit {
           : warningCount > 0
             ? 'NEEDS_ACKNOWLEDGEMENT'
             : 'READY';
+    // Actor-aware: readiness is readable with accounting:reports:read, so the
+    // advertised actions must reflect what THIS actor may do, not only the
+    // lifecycle (close needs fiscal:manage, reopen needs fiscal:reopen).
     const allowedActions: Array<'CLOSE' | 'REOPEN'> =
       fiscalYear.status === 'CLOSED'
-        ? ['REOPEN']
-        : readyToClose
+        ? hasDomainPermission(actor, 'accounting:fiscal:reopen')
+          ? ['REOPEN']
+          : []
+        : readyToClose && hasDomainPermission(actor, 'accounting:fiscal:manage')
           ? ['CLOSE']
           : [];
 
