@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
@@ -17,9 +18,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/ui/primitives/table';
 import { TablePagination } from '@/components/ui/table-pagination';
-import { WorkSurface } from '@/components/ui/work-surface';
 
 const PAGE_SIZE = 25;
 const DAY_LABELS = [
@@ -60,7 +60,7 @@ export function SupportPublishedTimetable() {
         </p>
       </div>
 
-      <WorkSurface
+      <Surface
         title="Schedule slots"
         description="Server-paginated rows from the school’s published timetable only."
       >
@@ -131,7 +131,7 @@ export function SupportPublishedTimetable() {
             />
           </div>
         )}
-      </WorkSurface>
+      </Surface>
     </DashboardPageShell>
   );
 }

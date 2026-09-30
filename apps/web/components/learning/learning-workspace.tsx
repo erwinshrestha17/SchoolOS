@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatBsDateTime } from '@schoolos/core';
@@ -33,7 +34,6 @@ import { LoadingState } from '../ui/loading-state';
 import { OperationalSummaryGrid } from '../ui/operational-summary-grid';
 import { StatusBadge } from '../ui/status-badge';
 import { TablePagination } from '../ui/table-pagination';
-import { WorkSurface } from '../ui/work-surface';
 import { LearningResourcesPanel } from './learning-resources-panel';
 import { LearningSessionsPanel } from './learning-sessions-panel';
 import { LearningRouteGuard } from './learning-runtime';
@@ -768,15 +768,14 @@ function ActivityList({
   }
 
   return (
-    <WorkSurface
+    <Surface
       title={title}
       description={
         total === undefined
           ? 'Open an activity to edit, archive, or launch it.'
           : `${total} activities match the current server filters.`
       }
-      variant="table"
-      flush
+      padding="flush"
       footer={
         page && pageSize && total !== undefined && onPageChange ? (
           <TablePagination
@@ -844,13 +843,13 @@ function ActivityList({
           </div>
         ))}
       </div>
-    </WorkSurface>
+    </Surface>
   );
 }
 
 function BoardLaunchPanel() {
   return (
-    <WorkSurface title="Smart Board Runtime" variant="monitoring">
+    <Surface title="Smart Board Runtime">
       <p className="mt-1 text-sm text-slate-500">
         Open a monitored session from the Sessions tab to launch the classroom
         board. The board route reads safe session data and never exposes answer
@@ -863,13 +862,13 @@ function BoardLaunchPanel() {
         <MonitorPlay size={17} />
         Open sessions
       </Link>
-    </WorkSurface>
+    </Surface>
   );
 }
 
 function LabPanel() {
   return (
-    <WorkSurface title="Computer Lab Access" variant="monitoring">
+    <Surface title="Computer Lab Access">
       <p className="mt-1 text-sm text-slate-500">
         Students join with the session code or QR token, then start an
         individual attempt.
@@ -883,7 +882,7 @@ function LabPanel() {
           Open student join
         </Link>
       </div>
-    </WorkSurface>
+    </Surface>
   );
 }
 

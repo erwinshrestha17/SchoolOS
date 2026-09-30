@@ -1,6 +1,6 @@
 'use client';
 
-import { Surface } from '@/components/schoolos';
+import { Surface, PaginatedDataTable } from '@/components/schoolos';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -29,7 +29,6 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { DataTable } from '@/components/ui/data-table';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Toast, ToastTone } from '@/components/ui/toast';
@@ -264,8 +263,8 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
 
   const registerColumns = [
     {
+      id: 'rollnumber',
       header: 'Roll',
-      accessorKey: 'rollNumber',
       cell: (row: HomeworkRegisterRow) => (
         <span className="text-sm font-medium text-slate-700">
           {row.rollNumber ?? '—'}
@@ -273,15 +272,15 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
       ),
     },
     {
+      id: 'studentname',
       header: 'Student',
-      accessorKey: 'studentName',
       cell: (row: HomeworkRegisterRow) => (
         <span className="font-bold text-slate-900">{row.studentName}</span>
       ),
     },
     {
+      id: 'status',
       header: 'Status',
-      accessorKey: 'status',
       cell: (row: HomeworkRegisterRow) => {
         const isRowUpdating =
           statusMutation.isPending &&
@@ -316,8 +315,8 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
       },
     },
     {
+      id: 'teacherremarks',
       header: 'Teacher note',
-      accessorKey: 'teacherRemarks',
       cell: (row: HomeworkRegisterRow) => (
         <Input
           aria-label={`Teacher note for ${row.studentName}`}
@@ -329,6 +328,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
       ),
     },
     {
+      id: 'follow-up',
       header: 'Follow-up',
       cell: (row: HomeworkRegisterRow) =>
         row.followUp?.flagged ? (
@@ -345,8 +345,8 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
 
   const submissionColumns = [
     {
+      id: 'student-fullnameen',
       header: 'Student',
-      accessorKey: 'student.fullNameEn',
       cell: (row: any) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">
@@ -359,19 +359,19 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
       ),
     },
     {
+      id: 'status',
       header: 'Status',
-      accessorKey: 'status',
       cell: (row: any) => <StatusBadge status={row.status} />,
     },
     {
+      id: 'submittedat',
       header: 'Submitted At',
-      accessorKey: 'submittedAt',
       cell: (row: any) =>
         row.submittedAt ? formatBsDateTime(row.submittedAt) : '—',
     },
     {
+      id: 'score',
       header: 'Score',
-      accessorKey: 'score',
       cell: (row: any) => (
         <span className="font-medium">
           {row.score !== null ? `${row.score} / ${homework.maxScore}` : '—'}
@@ -379,6 +379,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
       ),
     },
     {
+      id: 'actions',
       header: 'Actions',
       cell: (row: any) => (
         <ActionMenu
@@ -625,10 +626,11 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                         description="There are no roster entries for this assignment yet."
                       />
                     ) : (
-                      <DataTable
+                      <PaginatedDataTable
                         columns={registerColumns}
-                        data={registerQuery.data.roster}
-                        getRowKey={(row) => row.submissionId}
+                        items={registerQuery.data.roster}
+                        getRowId={(row) => row.submissionId}
+                        completeList
                       />
                     )}
                   </div>
@@ -644,9 +646,11 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                     description="Students haven't submitted any work for this assignment yet."
                   />
                 ) : (
-                  <DataTable
+                  <PaginatedDataTable
                     columns={submissionColumns}
-                    data={submissionsQuery.data?.items ?? []}
+                    items={submissionsQuery.data?.items ?? []}
+                    getRowId={(row) => row.id}
+                    completeList
                   />
                 )}
               </TabsContent>

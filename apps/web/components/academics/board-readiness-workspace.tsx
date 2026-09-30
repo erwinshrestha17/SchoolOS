@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -23,7 +24,6 @@ import {
 import { api } from '@/lib/api';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { WorkspaceTabs } from '@/components/ui/module-tabs';
-import { WorkSurface } from '@/components/ui/work-surface';
 import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { LoadingState } from '@/components/ui/loading-state';
@@ -95,7 +95,7 @@ export function BoardReadinessWorkspace() {
         />
       ) : (
         <>
-          <WorkSurface
+          <Surface
             title="Readiness track"
             description="Each track uses active students, the latest examination term, submitted marks, report-card generation, and iEMIS data checks from the current academic year."
           >
@@ -117,7 +117,7 @@ export function BoardReadinessWorkspace() {
                 </Button>
               ))}
             </div>
-          </WorkSurface>
+          </Surface>
 
           {readinessQuery.isLoading ? (
             <LoadingState
@@ -168,7 +168,7 @@ export function BoardReadinessWorkspace() {
                 />
               </SummaryGrid>
 
-              <WorkSurface
+              <Surface
                 title={`${TRACKS.find((item) => item.value === track)?.label ?? track} checks`}
                 description={`Current academic year • Grade ${readiness.classLevel} • Rules-only, non-predictive readiness`}
               >
@@ -209,9 +209,9 @@ export function BoardReadinessWorkspace() {
                     </article>
                   ))}
                 </div>
-              </WorkSurface>
+              </Surface>
 
-              <WorkSurface
+              <Surface
                 title="Source status"
                 description="Unavailable and empty sources remain explicit; they are never converted into a zero-readiness score."
               >
@@ -232,7 +232,7 @@ export function BoardReadinessWorkspace() {
                     ),
                   )}
                 </div>
-              </WorkSurface>
+              </Surface>
             </>
           )}
         </>

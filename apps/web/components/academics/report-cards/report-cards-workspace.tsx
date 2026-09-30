@@ -1,6 +1,6 @@
 'use client';
 
-import { Metric } from '@/components/schoolos';
+import { Metric, PaginatedDataTable } from '@/components/schoolos';
 import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,7 +8,6 @@ import { api } from '@/lib/api';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { Select, TextArea } from '@/components/ui/form-field';
 import { Button } from '@/components/ui/button';
-import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
   AlertTriangle,
@@ -210,6 +209,7 @@ export function ReportCardsWorkspace() {
 
   const columns = [
     {
+      id: 'student',
       header: 'Student',
       cell: (row: any) => (
         <div className="flex flex-col">
@@ -223,6 +223,7 @@ export function ReportCardsWorkspace() {
       ),
     },
     {
+      id: 'result',
       header: 'Result',
       cell: (row: any) => (
         <div className="flex items-center gap-2">
@@ -234,8 +235,8 @@ export function ReportCardsWorkspace() {
       ),
     },
     {
+      id: 'gpa',
       header: 'GPA',
-      accessorKey: 'gpa',
       cell: (row: any) => (
         <span className="font-bold text-slate-700">
           {Number(row.gpa).toFixed(2)}
@@ -243,6 +244,7 @@ export function ReportCardsWorkspace() {
       ),
     },
     {
+      id: 'status',
       header: 'Status',
       cell: (row: any) => (
         <StatusBadge
@@ -253,8 +255,9 @@ export function ReportCardsWorkspace() {
       ),
     },
     {
+      id: 'action',
       header: 'Action',
-      className: 'w-56',
+      cellClassName: 'w-56',
       cell: (row: any) => (
         <div className="flex flex-wrap gap-2">
           <Button
@@ -421,11 +424,12 @@ export function ReportCardsWorkspace() {
                     title="Report Cards"
                     description="View and download generated report cards."
                   >
-                    <DataTable
+                    <PaginatedDataTable
                       columns={columns}
-                      data={reportsQuery.data ?? []}
-                      isLoading={reportsQuery.isLoading}
-                      getRowKey={(r) => r.id}
+                      items={reportsQuery.data ?? []}
+                      getRowId={(r) => r.id}
+                      status={reportsQuery.isLoading ? 'loading' : 'ready'}
+                      completeList
                     />
                   </Surface>
                 ) : (

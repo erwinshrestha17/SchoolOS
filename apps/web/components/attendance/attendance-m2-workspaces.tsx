@@ -67,7 +67,6 @@ import {
 } from '@/components/settings/settings-page-header';
 import { ModuleTabs, WorkspaceTabs } from '@/components/ui/module-tabs';
 import { ProtectedFileButton } from '@/components/ui/protected-file';
-import { WorkSurface } from '@/components/ui/work-surface';
 import {
   Table,
   TableBody,
@@ -75,7 +74,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/ui/primitives/table';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -370,10 +369,9 @@ export function AttendanceOverviewWorkspace() {
       <AttendanceWorkspaceTabs />
 
       <div className="space-y-6">
-        <WorkSurface
+        <Surface
           title="Class Attendance Status"
           description="Latest class sessions from the attendance overview."
-          variant="monitoring"
         >
           {analyticsQuery.isLoading ? (
             <LoadingState label="Loading class attendance status..." />
@@ -420,7 +418,7 @@ export function AttendanceOverviewWorkspace() {
               </TableBody>
             </Table>
           )}
-        </WorkSurface>
+        </Surface>
 
         <div>
           <AtRiskPanel

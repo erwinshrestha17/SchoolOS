@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { BookOpenCheck, GraduationCap, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
@@ -19,9 +20,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/ui/primitives/table';
 import { TablePagination } from '@/components/ui/table-pagination';
-import { WorkSurface } from '@/components/ui/work-surface';
 
 const MARKS_PAGE_SIZE = 20;
 const REPORT_CARD_PREVIEW_LIMIT = 20;
@@ -92,7 +92,7 @@ export function SupportAcademicsOverview() {
         />
       </SummaryGrid>
 
-      <WorkSurface
+      <Surface
         title="Marks evidence"
         description="Server-paginated mark rows with narrow student identity only."
       >
@@ -160,9 +160,9 @@ export function SupportAcademicsOverview() {
             />
           </div>
         )}
-      </WorkSurface>
+      </Surface>
 
-      <WorkSurface
+      <Surface
         title="Recent report-card evidence"
         description="A bounded preview of the most recently updated report cards. History, correction requests, and PDFs are excluded from support responses."
       >
@@ -218,7 +218,7 @@ export function SupportAcademicsOverview() {
             </Table>
           </div>
         )}
-      </WorkSurface>
+      </Surface>
     </DashboardPageShell>
   );
 }

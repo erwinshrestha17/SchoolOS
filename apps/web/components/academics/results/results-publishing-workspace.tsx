@@ -1,6 +1,6 @@
 'use client';
 
-import { Metric } from '@/components/schoolos';
+import { Metric, PaginatedDataTable } from '@/components/schoolos';
 import { Surface } from '@/components/schoolos';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -13,7 +13,6 @@ import {
   Search,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { DataTable } from '@/components/ui/data-table';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { Select } from '@/components/ui/form-field';
 import { PageState } from '@/components/ui/page-state';
@@ -78,6 +77,7 @@ export function ResultsPublishingWorkspace() {
 
   const columns = [
     {
+      id: 'student',
       header: 'Student',
       cell: (row: (typeof rows)[number]) => (
         <div className="flex flex-col">
@@ -90,6 +90,7 @@ export function ResultsPublishingWorkspace() {
       ),
     },
     {
+      id: 'grade',
       header: 'Grade',
       cell: (row: (typeof rows)[number]) => (
         <div className="flex items-center gap-2">
@@ -102,12 +103,14 @@ export function ResultsPublishingWorkspace() {
       ),
     },
     {
+      id: 'status',
       header: 'Status',
       cell: (row: (typeof rows)[number]) => (
         <StatusBadge status={row.summary.resultStatus} />
       ),
     },
     {
+      id: 'validation',
       header: 'Validation',
       cell: (row: (typeof rows)[number]) => {
         const warnings = [
@@ -242,14 +245,21 @@ export function ResultsPublishingWorkspace() {
             title="Result Preview"
             description="Calculated from saved academic records. Use this view to find issues before lock."
           >
-            <DataTable
+            <PaginatedDataTable
               columns={columns}
-              data={rows}
-              isLoading={previewQuery.isLoading}
-              error={previewQuery.error as Error | null}
+              items={rows}
               emptyTitle="No preview data"
-              emptyMessage="No students or assessment results were found for this class and term."
-              getRowKey={(row) => row.student.id}
+              emptyDescription="No students or assessment results were found for this class and term."
+              getRowId={(row) => row.student.id}
+              status={
+                previewQuery.error
+                  ? 'error'
+                  : previewQuery.isLoading
+                    ? 'loading'
+                    : 'ready'
+              }
+              errorMessage={previewQuery.error?.message}
+              completeList
             />
           </Surface>
 

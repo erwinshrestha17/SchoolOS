@@ -1,6 +1,6 @@
 'use client';
 
-import { Surface } from '@/components/schoolos';
+import { Surface, PaginatedDataTable } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
@@ -27,7 +27,6 @@ import { ApiRequestError, api } from '../../../lib/api';
 import type { HomeworkCompletionReportRow } from '../../../lib/api';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
 import { FilterBar } from '../../../components/dashboard/filter-bar';
-import { DataTable } from '../../../components/ui/data-table';
 import { StatusBadge } from '../../../components/ui/status-badge';
 import { ActionMenu } from '../../../components/ui/action-menu';
 import { LoadingState } from '../../../components/ui/loading-state';
@@ -42,7 +41,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ModuleHeader } from '../../../components/ui/module-header';
 import { SummaryCard, SummaryGrid } from '../../../components/ui/summary-card';
 import { WorkspaceTabs } from '../../../components/dashboard/module-tabs';
-import { WorkSurface } from '../../../components/ui/work-surface';
 import { useUrlFilters } from '../../../lib/hooks/use-url-filters';
 import { useTeacherAssignmentScope } from '../../../lib/hooks/use-teacher-assignment-scope';
 import { useHomeworkCapabilities } from '../../../lib/permissions-ui';
@@ -358,8 +356,8 @@ function HomeworkWorkspace() {
 
   const columns = [
     {
+      id: 'class-name',
       header: 'Class',
-      accessorKey: 'class.name',
       cell: (row: HomeworkAssignmentSummary) => (
         <div className="flex flex-col">
           <span className="font-medium text-slate-700">
@@ -372,8 +370,8 @@ function HomeworkWorkspace() {
       ),
     },
     {
+      id: 'subject-name',
       header: 'Subject',
-      accessorKey: 'subject.name',
       cell: (row: HomeworkAssignmentSummary) => (
         <span className="text-sm font-medium text-slate-700">
           {row.subject?.name?.trim() || 'Subject not set'}
@@ -381,8 +379,8 @@ function HomeworkWorkspace() {
       ),
     },
     {
+      id: 'title',
       header: 'Homework',
-      accessorKey: 'title',
       cell: (row: HomeworkAssignmentSummary) => (
         <div className="flex flex-col">
           <button
@@ -399,8 +397,8 @@ function HomeworkWorkspace() {
       ),
     },
     {
+      id: 'dueat',
       header: 'Due date',
-      accessorKey: 'dueAt',
       cell: (row: HomeworkAssignmentSummary) => (
         <div className="flex flex-col">
           <span className="text-sm font-medium text-slate-700">
@@ -413,14 +411,15 @@ function HomeworkWorkspace() {
       ),
     },
     {
+      id: 'teacher',
       header: 'Teacher',
       cell: (row: HomeworkAssignmentSummary) => (
         <span className="text-sm text-slate-600">{teacherName(row)}</span>
       ),
     },
     {
+      id: 'status',
       header: 'Status',
-      accessorKey: 'status',
       cell: (row: HomeworkAssignmentSummary) => (
         <StatusBadge
           status={row.status || 'DRAFT'}
@@ -429,6 +428,7 @@ function HomeworkWorkspace() {
       ),
     },
     {
+      id: 'actions',
       header: 'Actions',
       cell: (row: HomeworkAssignmentSummary) => (
         <ActionMenu
@@ -735,7 +735,7 @@ function HomeworkWorkspace() {
           </FilterBar>
 
           <div className="space-y-6">
-            <WorkSurface
+            <Surface
               title={
                 activeTab === 'today' ? "Today's homework" : 'All homework'
               }
@@ -744,7 +744,7 @@ function HomeworkWorkspace() {
                   ? 'Homework assigned on the selected date.'
                   : 'The full homework history for the filtered scope.'
               }
-              action={
+              actions={
                 <StatusBadge
                   status="INFO"
                   label={
@@ -822,11 +822,12 @@ function HomeworkWorkspace() {
                 />
               ) : (
                 <div className="overflow-hidden rounded-2xl border border-slate-100">
-                  <DataTable
+                  <PaginatedDataTable
                     columns={columns}
-                    data={homeworkItems}
-                    getRowKey={(row) => row.id}
+                    items={homeworkItems}
+                    getRowId={(row) => row.id}
                     className="rounded-none border-0"
+                    completeList
                   />
                   {homeworkMeta ? (
                     <TablePagination
@@ -838,7 +839,7 @@ function HomeworkWorkspace() {
                   ) : null}
                 </div>
               )}
-            </WorkSurface>
+            </Surface>
           </div>
         </>
       ) : null}
@@ -1219,6 +1220,7 @@ function StudentHomeworkView() {
 
   const columns = [
     {
+      id: 'homework',
       header: 'Homework',
       cell: (row: HomeworkAssignmentSummary) => (
         <div className="flex flex-col">
@@ -1237,6 +1239,7 @@ function StudentHomeworkView() {
       ),
     },
     {
+      id: 'subject',
       header: 'Subject',
       cell: (row: HomeworkAssignmentSummary) => (
         <span className="text-sm font-medium text-slate-700">
@@ -1245,18 +1248,21 @@ function StudentHomeworkView() {
       ),
     },
     {
+      id: 'due-date',
       header: 'Due date',
       cell: (row: HomeworkAssignmentSummary) => (
         <span className="text-sm text-slate-700">{formatDate(row.dueAt)}</span>
       ),
     },
     {
+      id: 'teacher',
       header: 'Teacher',
       cell: (row: HomeworkAssignmentSummary) => (
         <span className="text-sm text-slate-600">{teacherName(row)}</span>
       ),
     },
     {
+      id: 'status',
       header: 'Status',
       cell: (row: HomeworkAssignmentSummary) => (
         <StatusBadge
@@ -1266,6 +1272,7 @@ function StudentHomeworkView() {
       ),
     },
     {
+      id: 'attachments',
       header: 'Attachments',
       cell: (row: HomeworkAssignmentSummary) =>
         row.attachments?.length ? (
@@ -1336,11 +1343,12 @@ function StudentHomeworkView() {
           />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-slate-100">
-            <DataTable
+            <PaginatedDataTable
               columns={columns}
-              data={items}
-              getRowKey={(row) => row.id}
+              items={items}
+              getRowId={(row) => row.id}
               className="rounded-none border-0"
+              completeList
             />
           </div>
         )}

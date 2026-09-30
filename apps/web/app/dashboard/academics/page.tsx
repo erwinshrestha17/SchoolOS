@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -24,7 +25,6 @@ import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell'
 import { SummaryCard, SummaryGrid } from '@/components/ui/summary-card';
 import { ModuleHeader } from '@/components/ui/module-header';
 import { WorkspaceTabs } from '@/components/ui/module-tabs';
-import { WorkSurface } from '@/components/ui/work-surface';
 import { Button } from '@/components/ui/primitives/button';
 import { api } from '@/lib/api';
 import { SupportAcademicsOverview } from '@/components/academics/support-academics-overview';
@@ -204,10 +204,10 @@ function SchoolAcademicsOverviewPage() {
           overflowItems={academicsWorkspaceOverflowTabs}
         />
 
-        <WorkSurface
+        <Surface
           title="Core academic workspaces"
           description="Open the next focused job. Marks, locks, grading, promotion, publishing, and protected PDF access remain permission-controlled in tenant-scoped and permissioned M4 workspaces."
-          flush
+          padding="flush"
         >
           <div className="divide-y divide-slate-100">
             {workflowSections.map((section) => {
@@ -236,7 +236,7 @@ function SchoolAcademicsOverviewPage() {
               );
             })}
           </div>
-        </WorkSurface>
+        </Surface>
       </div>
     </DashboardPageShell>
   );

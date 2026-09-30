@@ -1,9 +1,9 @@
 'use client';
 
+import { PaginatedDataTable } from '@/components/schoolos';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { DataTable } from '@/components/ui/data-table';
 import { LoadingState } from '@/components/ui/loading-state';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
@@ -235,8 +235,8 @@ export function WeeklyRequirementsList({ filters }: { filters: any }) {
 
   const columns = [
     {
+      id: 'subject-name',
       header: 'Subject',
-      accessorKey: 'subject.name',
       cell: (row: any) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">
@@ -249,8 +249,8 @@ export function WeeklyRequirementsList({ filters }: { filters: any }) {
       ),
     },
     {
+      id: 'class-name',
       header: 'Class / Section',
-      accessorKey: 'class.name',
       cell: (row: any) => (
         <div className="flex flex-col">
           <span className="text-sm font-medium text-slate-700">
@@ -263,8 +263,8 @@ export function WeeklyRequirementsList({ filters }: { filters: any }) {
       ),
     },
     {
+      id: 'requiredperiodsperweek',
       header: 'Required Periods',
-      accessorKey: 'requiredPeriodsPerWeek',
       cell: (row: any) => (
         <Badge variant="outline" className="font-bold">
           {row.requiredPeriodsPerWeek} / week
@@ -308,7 +308,7 @@ export function WeeklyRequirementsList({ filters }: { filters: any }) {
     {
       header: 'Actions',
       id: 'actions',
-      className: 'text-right',
+      cellClassName: 'text-right',
       cell: (row: SubjectWeeklyRequirementSummary) => (
         <div className="flex justify-end gap-2">
           <Tooltip content="Edit weekly requirement">
@@ -373,10 +373,11 @@ export function WeeklyRequirementsList({ filters }: { filters: any }) {
           }
         />
       ) : (
-        <DataTable
+        <PaginatedDataTable
           columns={columns}
-          data={requirementsQuery.data || []}
-          getRowKey={(row) => row.id}
+          items={requirementsQuery.data || []}
+          getRowId={(row) => row.id}
+          completeList
         />
       )}
 

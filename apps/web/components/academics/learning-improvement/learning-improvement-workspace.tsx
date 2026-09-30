@@ -1,5 +1,6 @@
 'use client';
 
+import { Surface } from '@/components/schoolos';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -41,7 +42,6 @@ import { PermissionDenied } from '@/components/ui/permission-denied';
 import { WorkspaceTabs } from '@/components/ui/module-tabs';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { TablePagination } from '@/components/ui/table-pagination';
-import { WorkSurface } from '@/components/ui/work-surface';
 import { Button } from '@/components/ui/primitives/button';
 import { Input } from '@/components/ui/primitives/input';
 import {
@@ -594,10 +594,10 @@ function AttentionView({
   }
 
   return (
-    <WorkSurface
+    <Surface
       title="Students needing attention"
       description="Rules-based signals only. Teachers review context before opening a follow-up case."
-      flush
+      padding="flush"
     >
       <Table>
         <TableHeader>
@@ -688,7 +688,7 @@ function AttentionView({
           ))}
         </TableBody>
       </Table>
-    </WorkSurface>
+    </Surface>
   );
 }
 
@@ -709,10 +709,10 @@ function CasesView({
     );
   }
   return (
-    <WorkSurface
+    <Surface
       title="Learning follow-up cases"
       description="Each case has an owner, next follow-up, versioned lifecycle, and auditable timeline."
-      flush
+      padding="flush"
     >
       <Table>
         <TableHeader>
@@ -774,7 +774,7 @@ function CasesView({
           ))}
         </TableBody>
       </Table>
-    </WorkSurface>
+    </Surface>
   );
 }
 
@@ -795,10 +795,10 @@ function EvidenceView({
 }) {
   return (
     <div className="grid gap-5 xl:grid-cols-2">
-      <WorkSurface
+      <Surface
         title="Learning outcomes"
         description="Class- and subject-owned skills used for checks and progress history."
-        action={
+        actions={
           canWrite ? (
             <Button size="sm" variant="outline" onClick={onCreateOutcome}>
               <Plus />
@@ -806,7 +806,7 @@ function EvidenceView({
             </Button>
           ) : undefined
         }
-        flush
+        padding="flush"
       >
         {outcomes.length ? (
           <div className="divide-y">
@@ -854,11 +854,11 @@ function EvidenceView({
             icon={<BookOpenCheck size={28} />}
           />
         )}
-      </WorkSurface>
-      <WorkSurface
+      </Surface>
+      <Surface
         title="Recent formative checks"
         description="Teacher-recorded evidence, including reassessment and optional family-facing summaries."
-        action={
+        actions={
           canWrite ? (
             <Button size="sm" onClick={onCreateAssessment}>
               <Plus />
@@ -866,7 +866,7 @@ function EvidenceView({
             </Button>
           ) : undefined
         }
-        flush
+        padding="flush"
       >
         {assessments.length ? (
           <div className="divide-y">
@@ -902,7 +902,7 @@ function EvidenceView({
             icon={<ClipboardCheck size={28} />}
           />
         )}
-      </WorkSurface>
+      </Surface>
     </div>
   );
 }
@@ -926,10 +926,10 @@ function RemedialView({
     );
   }
   return (
-    <WorkSurface
+    <Surface
       title="Remedial groups"
       description="Focused support groups with explicit purpose, schedule, membership, and lifecycle."
-      flush
+      padding="flush"
     >
       <Table>
         <TableHeader>
@@ -985,7 +985,7 @@ function RemedialView({
           ))}
         </TableBody>
       </Table>
-    </WorkSurface>
+    </Surface>
   );
 }
 
@@ -1046,10 +1046,10 @@ function CurriculumView({
           icon={<ListChecks size={28} />}
         />
       ) : (
-        <WorkSurface
+        <Surface
           title="Curriculum progress"
           description="Pace is derived from the filtered curriculum progress records."
-          flush
+          padding="flush"
         >
           <Table>
             <TableHeader>
@@ -1098,7 +1098,7 @@ function CurriculumView({
               ))}
             </TableBody>
           </Table>
-        </WorkSurface>
+        </Surface>
       )}
     </div>
   );
@@ -1123,10 +1123,10 @@ function GuidanceView({
     );
   }
   return (
-    <WorkSurface
+    <Surface
       title="Parent learning guidance"
       description="Only published, in-window guidance is shown to linked parents."
-      flush
+      padding="flush"
     >
       <Table>
         <TableHeader>
@@ -1192,7 +1192,7 @@ function GuidanceView({
           ))}
         </TableBody>
       </Table>
-    </WorkSurface>
+    </Surface>
   );
 }
 

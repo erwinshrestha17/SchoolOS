@@ -1,7 +1,7 @@
 'use client';
 
+import { PaginatedDataTable } from '@/components/schoolos';
 import { formatBsDate, type ExamTermSummary } from '@schoolos/core';
-import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,8 +32,8 @@ export function ExamList({
 }: ExamListProps) {
   const columns = [
     {
+      id: 'name',
       header: 'Exam Term',
-      accessorKey: 'name',
       cell: (exam: ExamTermSummary) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">{exam.name}</span>
@@ -44,6 +44,7 @@ export function ExamList({
       ),
     },
     {
+      id: 'duration',
       header: 'Duration',
       cell: (exam: ExamTermSummary) => (
         <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
@@ -55,6 +56,7 @@ export function ExamList({
       ),
     },
     {
+      id: 'weighting',
       header: 'Weighting',
       cell: (exam: ExamTermSummary) => (
         <div className="flex items-center gap-2">
@@ -71,6 +73,7 @@ export function ExamList({
       ),
     },
     {
+      id: 'status',
       header: 'Status',
       cell: (exam: ExamTermSummary) => (
         <div className="flex items-center gap-2">
@@ -84,6 +87,7 @@ export function ExamList({
       ),
     },
     {
+      id: 'components',
       header: 'Components',
       cell: (exam: ExamTermSummary) => (
         <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600">
@@ -132,12 +136,14 @@ export function ExamList({
   ];
 
   return (
-    <DataTable
+    <PaginatedDataTable
       columns={columns}
-      data={exams}
-      isLoading={isLoading}
+      items={exams}
       emptyTitle="No exams found"
-      emptyMessage="Start by creating your first exam term for this academic year."
+      emptyDescription="Start by creating your first exam term for this academic year."
+      status={isLoading ? 'loading' : 'ready'}
+      getRowId={(row) => row.id}
+      completeList
     />
   );
 }
