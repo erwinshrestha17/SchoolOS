@@ -54,11 +54,14 @@ export interface TeacherTodayMarksDeadline {
 export interface TeacherTodaySummary {
   generatedAt: string;
   date: string;
+  /** False when the requested date is not the current Nepal school day. */
+  isToday?: boolean;
   currentPeriod: TeacherTodayPeriod | null;
   nextPeriod: TeacherTodayPeriod | null;
-  todaysPeriods: TeacherTodayPeriod[];
-  assignedClasses: TeacherTodayAssignedClass[];
-  pendingAttendanceCount: number;
+  /** null when the attendance/schedule source could not be loaded. */
+  todaysPeriods: TeacherTodayPeriod[] | null;
+  assignedClasses: TeacherTodayAssignedClass[] | null;
+  pendingAttendanceCount: number | null;
   homework: {
     givenToday: number;
     dueToday: number;
@@ -67,6 +70,8 @@ export interface TeacherTodaySummary {
   substitutions: TeacherTodaySubstitution[] | null;
   marksDeadlines: TeacherTodayMarksDeadline[] | null;
   unavailableModules?: string[];
+  /** Panels whose source failed to load (null field ≠ empty). */
+  unavailablePanels?: string[];
 }
 
 /**

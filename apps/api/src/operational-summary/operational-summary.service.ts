@@ -9,6 +9,7 @@ import {
   resolveSchoolWebPersona,
 } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
+import { hasDomainPermission } from '../authorization/policies/domain-permission';
 import { getParentStudentIds } from '../common/security/parent-scope';
 import { EntitlementsService } from '../plans/entitlements.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -136,6 +137,47 @@ const MODULE_CONFIG: Record<
     route: '/dashboard/learning',
     label: 'Learning',
   },
+};
+
+/**
+ * Phase 4: a module summary is visible with ANY of the module's permissions,
+ * but several metrics summarise narrower domains (payroll, cashier close,
+ * delivery diagnostics, consents, identity documents…). Such a metric is only
+ * computed when the actor holds its drill-down route's permissions (all-of,
+ * mirroring @Permissions); otherwise it is withheld — never shown as zero.
+ */
+const METRIC_PERMISSIONS: Record<string, readonly string[]> = {
+  applicationsNeedingReview: ['enrollments:read'],
+  unverifiedDocuments: ['student_documents:manage'],
+  duplicateCandidates: ['students:manage_lifecycle'],
+  qrCredentialIssues: ['students:qr:read'],
+  iemisReadinessBlockers: ['students:manage_lifecycle'],
+  refundsToday: ['payments:refund', 'payments:reverse', 'ledger:read'],
+  billingRunsToday: ['fees:bill'],
+  cashierVarianceRisks: ['payments:close'],
+  pendingReview: ['activity_feed:moderate'],
+  failedUploads: ['activity_feed:moderate'],
+  consentIssues: ['consents:manage'],
+  failedHomeworkReminders: ['homework:notify'],
+  staffPresentToday: ['hr:attendance:read'],
+  staffAttendanceAnomalies: ['hr:attendance:read'],
+  staffOnApprovedLeaveToday: ['hr:read'],
+  pendingLeaveRequests: ['hr:read'],
+  contractsExpiringSoon: ['hr:read'],
+  draftPayrollRuns: ['payroll:run:read'],
+  payslipsNotIssued: ['payroll:read'],
+  unpostedJournals: ['accounting:journals:read'],
+  unreconciledStatements: ['accounting:reports:read'],
+  periodCloseBlockers: ['accounting:reports:read'],
+  failedDeliveries: ['notifications:view_delivery_diagnostics'],
+  unreadNoticeRecipients: ['notifications:view_delivery_diagnostics'],
+};
+
+/** Recent-activity feeds that expose a narrower domain than the module. */
+const RECENT_PERMISSIONS: Partial<Record<SummaryModule, readonly string[]>> = {
+  m7_hr_payroll: ['payroll:run:read'],
+  m11_accounting: ['accounting:journals:read'],
+  m10_communications: ['notifications:view_delivery_diagnostics'],
 };
 
 const TEACHING_ROLES = new Set(['teacher', 'subject_teacher']);
@@ -307,12 +349,22 @@ export class OperationalSummaryService {
       return this.emptySummary(module, day, 'empty', true);
     }
 
-    const metrics = await this.moduleMetrics(module, actor, day, teacherScope);
-    const recent = await this.recentItems(
-      this.recentModel(module),
-      this.recentWhere(module, actor, teacherScope),
-      config.label,
+    const { metrics, withheld } = await this.moduleMetrics(
+      module,
+      actor,
+      day,
+      teacherScope,
     );
+    const recentAllowed = (RECENT_PERMISSIONS[module] ?? []).every(
+      (permission) => hasDomainPermission(actor, permission),
+    );
+    const recent = recentAllowed
+      ? await this.recentItems(
+          this.recentModel(module),
+          this.recentWhere(module, actor, teacherScope),
+          config.label,
+        )
+      : { items: [], failed: false };
     const status =
       metrics.some((metric) => metric.failed) || recent.failed
         ? 'partial'
@@ -333,6 +385,7 @@ export class OperationalSummaryService {
       summary: Object.fromEntries(
         metrics.map((metric) => [metric.key, metric.value]),
       ),
+      withheldMetrics: withheld,
       attentionItems,
       recentItems: recent.items,
       // Only surface a dashboard shortcut for this module when it genuinely
@@ -360,7 +413,7 @@ export class OperationalSummaryService {
     actor: AuthContext,
     day: Day,
     teacherScope: TeacherScope | null,
-  ): Promise<Metric[]> {
+  ): Promise<{ metrics: Metric[]; withheld: string[] }> {
     const tenantId = actor.tenantId;
     const now = new Date();
     const thirtyDays = new Date(
@@ -743,7 +796,7 @@ export class OperationalSummaryService {
         this.def('staffOnApprovedLeaveToday', 'staffLeaveRequest', {
           tenantId,
           status: 'APPROVED',
-          startsOn: { lte: day.endExclusiveUtc },
+          startsOn: { lt: day.endExclusiveUtc },
           endsOn: { gte: day.startUtc },
         }),
         this.def(
@@ -1000,8 +1053,17 @@ export class OperationalSummaryService {
           ],
     };
 
+    const permitted = (key: string) =>
+      (METRIC_PERMISSIONS[key] ?? []).every((permission) =>
+        hasDomainPermission(actor, permission),
+      );
+    const withheld = definitions[module]
+      .filter((definition) => !permitted(definition.key))
+      .map((definition) => definition.key);
     const metrics = await Promise.all(
-      definitions[module].map((definition) => this.countMetric(definition)),
+      definitions[module]
+        .filter((definition) => permitted(definition.key))
+        .map((definition) => this.countMetric(definition)),
     );
     if (module === 'm3_fees') {
       metrics.unshift(
@@ -1031,7 +1093,7 @@ export class OperationalSummaryService {
         ),
       );
     }
-    return metrics;
+    return { metrics, withheld };
   }
 
   private teacherAttendanceDefinitions(

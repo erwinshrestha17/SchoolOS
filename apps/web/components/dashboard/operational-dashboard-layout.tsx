@@ -34,7 +34,10 @@ export function OperationalDashboardLayout({
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="min-w-0 xl:col-start-1 xl:row-start-1">
-          <DashboardAttentionPanel items={dashboard.attentionItems} />
+          <DashboardAttentionPanel
+            items={dashboard.attentionItems}
+            partial={dashboard.status === 'partial'}
+          />
         </div>
         <div className="min-w-0 xl:col-start-2 xl:row-start-1">
           <TodayOperationsPanel moduleMap={moduleMap} persona={persona} />

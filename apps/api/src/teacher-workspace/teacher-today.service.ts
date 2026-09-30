@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { toNepalLocalDateTime } from '@schoolos/core';
+import { Injectable, Logger } from '@nestjs/common';
+import { getNepalSchoolDay, toNepalLocalDateTime } from '@schoolos/core';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
@@ -35,8 +35,20 @@ function nepalTimeOfDay(instant: Date): string {
  * timetable) -- this only composes their results and computes
  * current/next-period and upcoming marks deadlines on top.
  */
+type Settled<T> = { ok: true; value: T } | { ok: false };
+
+/** Nepal school date ("YYYY-MM-DD") of a requested date, defaulting to now. */
+function requestedSchoolDate(dateInput: string | undefined, now: Date) {
+  if (dateInput && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) return dateInput;
+  const parsed = dateInput ? new Date(dateInput) : now;
+  return getNepalSchoolDay(Number.isNaN(parsed.getTime()) ? now : parsed)
+    .gregorianDate;
+}
+
 @Injectable()
 export class TeacherTodayService {
+  private readonly logger = new Logger(TeacherTodayService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly attendanceService: AttendanceService,
@@ -63,45 +75,75 @@ export class TeacherTodayService {
       ['homework', 'timetable', 'exams'],
     );
 
-    const [attendanceToday, homeworkSummary, timetableToday, marksDeadlines] =
-      await Promise.all([
+    // Phase 4: each panel settles independently. A failing source is named in
+    // `unavailablePanels` and its field is null — never an empty/zero value
+    // that would read as "nothing to do".
+    const [attendance, homework, timetable, marks] = await Promise.all([
+      this.settle('attendance', () =>
         this.attendanceService.getTeacherMobileToday(actor, dateInput),
-        homeworkEnabled
-          ? this.homeworkService.getHomeworkSummaryToday(actor, {
+      ),
+      homeworkEnabled
+        ? this.settle('homework', () =>
+            this.homeworkService.getHomeworkSummaryToday(actor, {
               date: dateInput,
-            })
-          : Promise.resolve(null),
-        timetableEnabled
-          ? this.timetableService.getTeacherMobileTimetable(actor, {
+            }),
+          )
+        : Promise.resolve<Settled<null>>({ ok: true, value: null }),
+      timetableEnabled
+        ? this.settle('timetable', () =>
+            this.timetableService.getTeacherMobileTimetable(actor, {
               date: dateInput,
               days: 1,
-            })
-          : Promise.resolve(null),
-        examsEnabled
-          ? this.getUpcomingMarksDeadlines(actor, now)
-          : Promise.resolve(null),
-      ]);
+            }),
+          )
+        : Promise.resolve<Settled<null>>({ ok: true, value: null }),
+      examsEnabled
+        ? this.settle('marksDeadlines', () =>
+            this.getUpcomingMarksDeadlines(actor, now),
+          )
+        : Promise.resolve<Settled<null>>({ ok: true, value: null }),
+    ]);
+    const unavailablePanels = [
+      ...(attendance.ok ? [] : ['attendance']),
+      ...(homework.ok ? [] : ['homework']),
+      ...(timetable.ok ? [] : ['timetable']),
+      ...(marks.ok ? [] : ['marksDeadlines']),
+    ];
+    const attendanceToday = attendance.ok ? attendance.value : null;
+    const homeworkSummary = homework.ok ? homework.value : null;
+    const timetableToday = timetable.ok ? timetable.value : null;
 
+    // Attendance reports its business day as UTC midnight of the Nepal date.
+    const schoolDate =
+      attendanceToday?.date.slice(0, 10) ?? requestedSchoolDate(dateInput, now);
+    // Current/next period only describe the real present moment: for any
+    // other requested date they are null (the schedule is still returned).
+    const isToday = schoolDate === getNepalSchoolDay(now).gregorianDate;
     const nowTimeOfDay = nepalTimeOfDay(now);
-    const periods = attendanceToday.periods as TodayPeriod[];
-    const currentPeriod =
-      periods.find(
-        (period) =>
-          period.startsAt <= nowTimeOfDay && nowTimeOfDay <= period.endsAt,
-      ) ?? null;
-    const nextPeriod =
-      periods
-        .filter((period) => period.startsAt > nowTimeOfDay)
-        .sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0] ?? null;
+    const periods = (attendanceToday?.periods ?? []) as TodayPeriod[];
+    // A period COVERED by a substitute is not taught by this teacher today.
+    const teaching = periods
+      .filter((period) => period.coverageStatus !== 'COVERED')
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    const currentPeriod = isToday
+      ? (teaching.find(
+          (period) =>
+            period.startsAt <= nowTimeOfDay && nowTimeOfDay < period.endsAt,
+        ) ?? null)
+      : null;
+    const nextPeriod = isToday
+      ? (teaching.find((period) => period.startsAt > nowTimeOfDay) ?? null)
+      : null;
 
     return {
       generatedAt: now.toISOString(),
-      date: attendanceToday.date,
+      date: attendanceToday?.date ?? `${schoolDate}T00:00:00.000Z`,
+      isToday,
       currentPeriod,
       nextPeriod,
-      todaysPeriods: periods,
-      assignedClasses: attendanceToday.classes,
-      pendingAttendanceCount: attendanceToday.pendingAttendanceCount,
+      todaysPeriods: attendanceToday ? periods : null,
+      assignedClasses: attendanceToday?.classes ?? null,
+      pendingAttendanceCount: attendanceToday?.pendingAttendanceCount ?? null,
       homework: homeworkSummary
         ? {
             givenToday: homeworkSummary.givenToday,
@@ -110,9 +152,24 @@ export class TeacherTodayService {
           }
         : null,
       substitutions: timetableToday?.substitutions ?? null,
-      marksDeadlines,
+      marksDeadlines: marks.ok ? marks.value : null,
       unavailableModules,
+      unavailablePanels,
     };
+  }
+
+  private async settle<T>(
+    panel: string,
+    load: () => Promise<T>,
+  ): Promise<Settled<T>> {
+    try {
+      return { ok: true, value: await load() };
+    } catch (error) {
+      this.logger.warn(
+        `teacher today panel ${panel} unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return { ok: false };
+    }
   }
 
   private async getUpcomingMarksDeadlines(actor: AuthContext, now: Date) {
@@ -135,14 +192,19 @@ export class TeacherTodayService {
     ];
     if (subjectIds.length === 0) return [];
 
-    const withinSevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    // Exam-term end dates are business dates: compare on Nepal day bounds so
+    // a term ending today is still listed for the whole Nepal school day.
+    const today = getNepalSchoolDay(now);
+    const withinSevenDays = new Date(
+      today.endExclusiveUtc.getTime() + 7 * 24 * 60 * 60 * 1000,
+    );
 
     const terms = await this.prisma.examTerm.findMany({
       where: {
         tenantId: actor.tenantId,
         academicYearId: currentYear.id,
         isLocked: false,
-        endsOn: { gte: now, lte: withinSevenDays },
+        endsOn: { gte: today.startUtc, lt: withinSevenDays },
         components: { some: { subjectId: { in: subjectIds } } },
       },
       select: { id: true, name: true, endsOn: true },

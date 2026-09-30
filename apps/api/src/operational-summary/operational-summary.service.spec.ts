@@ -140,6 +140,42 @@ describe('OperationalSummaryService', () => {
     );
   });
 
+  it('withholds fee metrics whose drill-down the actor cannot open (Phase 4)', async () => {
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['fees'],
+    } as never);
+
+    const summary = await service.getModuleSummary('m3_fees', actor);
+
+    // fees:read may see the module but not cashier close, refunds or billing.
+    expect(summary.withheldMetrics).toEqual(
+      expect.arrayContaining([
+        'cashierVarianceRisks',
+        'refundsToday',
+        'billingRunsToday',
+      ]),
+    );
+    expect(summary.summary).not.toHaveProperty('cashierVarianceRisks');
+    expect(
+      (prisma as unknown as { cashierClose: { count: jest.Mock } }).cashierClose
+        .count,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('computes a withheld fee metric once the drill-down permission is held', async () => {
+    entitlements.getEntitlements.mockResolvedValue({
+      modules: ['fees'],
+    } as never);
+
+    const summary = await service.getModuleSummary('m3_fees', {
+      ...actor,
+      permissions: [...actor.permissions, 'payments:close'],
+    });
+
+    expect(summary.withheldMetrics).not.toContain('cashierVarianceRisks');
+    expect(summary.summary).toHaveProperty('cashierVarianceRisks', 0);
+  });
+
   it('omits the module next-action when nothing needs attention', async () => {
     entitlements.getEntitlements.mockResolvedValue({
       modules: ['fees'],

@@ -32,8 +32,11 @@ const DEFAULT_VISIBLE_ITEMS = 5;
  */
 export function DashboardAttentionPanel({
   items,
+  partial = false,
 }: {
   items: DashboardAttentionItem[];
+  /** True when at least one source failed: an empty list is not "all clear". */
+  partial?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const openItems = items.filter((item) => item.count > 0);
@@ -57,14 +60,16 @@ export function DashboardAttentionPanel({
         description={
           openItems.length
             ? 'Start with the items that can affect today’s school day.'
-            : 'Nothing needs your attention right now.'
+            : partial
+              ? 'Some sources could not be loaded, so this list may be incomplete.'
+              : 'Nothing needs your attention right now.'
         }
         headerAction={
           openItems.length ? (
             <span className="inline-flex items-center rounded-full border border-warning-100 bg-warning-50 px-2.5 py-1 text-xs font-bold text-warning-700">
               {formatNumber(openItems.length)}
             </span>
-          ) : (
+          ) : partial ? null : (
             <CheckCircle2
               className="h-5 w-5 text-success-600"
               aria-hidden="true"

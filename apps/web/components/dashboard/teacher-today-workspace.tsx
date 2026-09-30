@@ -38,6 +38,34 @@ function ModuleUnavailableNotice({ moduleName }: { moduleName: string }) {
   );
 }
 
+/** A source that is enabled but failed to load — never shown as empty. */
+function PanelUnavailableNotice({
+  panelName,
+  onRetry,
+}: {
+  panelName: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-warning-100 bg-warning-50 p-3">
+      <RefreshCcw
+        className="mt-0.5 h-4 w-4 shrink-0 text-warning-700"
+        aria-hidden="true"
+      />
+      <div className="min-w-0 flex-1 text-sm leading-5 text-warning-900">
+        <p>{panelName} could not be loaded right now.</p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-1 font-bold underline underline-offset-2"
+        >
+          Try again
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Teacher Home/Today (Teacher Persona spec 10.1 / 21.1). Every number here
  * comes straight from GET /teacher-workspace/today, which is itself only a
@@ -88,10 +116,21 @@ export function TeacherTodayWorkspace() {
   }
 
   const data = todayQuery.data;
-  const hasAttendanceClasses = data.assignedClasses.length > 0;
+  const unavailable = new Set(data.unavailablePanels ?? []);
+  const retry = () => void todayQuery.refetch();
+  const attendanceUnavailable =
+    unavailable.has('attendance') || data.assignedClasses === null;
+  const assignedClasses = data.assignedClasses ?? [];
+  const todaysPeriods = data.todaysPeriods ?? [];
+  const pendingAttendanceCount = data.pendingAttendanceCount ?? 0;
+  const isToday = data.isToday ?? true;
+  const schoolDate = data.date.slice(0, 10);
+  const hasAttendanceClasses = assignedClasses.length > 0;
+  // Only conclude "no assignments" when the schedule source actually loaded.
   const hasTeachingWork =
+    attendanceUnavailable ||
     hasAttendanceClasses ||
-    data.todaysPeriods.length > 0 ||
+    todaysPeriods.length > 0 ||
     Boolean(data.substitutions?.length);
 
   return (
@@ -136,23 +175,58 @@ export function TeacherTodayWorkspace() {
             <PeriodCard
               label="Current period"
               period={data.currentPeriod}
-              emptyText="No class right now"
+              emptyText={
+                attendanceUnavailable
+                  ? 'Schedule unavailable'
+                  : isToday
+                    ? 'No class right now'
+                    : 'Not shown for another date'
+              }
             />
             <PeriodCard
               label="Next period"
               period={data.nextPeriod}
-              emptyText="Nothing else scheduled today"
+              emptyText={
+                attendanceUnavailable
+                  ? 'Schedule unavailable'
+                  : isToday
+                    ? 'Nothing else scheduled today'
+                    : 'Not shown for another date'
+              }
             />
           </div>
+
+          <SectionCard
+            title="Today's schedule"
+            description="Your periods for the day, in order."
+          >
+            {attendanceUnavailable ? (
+              <PanelUnavailableNotice
+                panelName="Your schedule"
+                onRetry={retry}
+              />
+            ) : todaysPeriods.length === 0 ? (
+              <p className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm leading-5 text-slate-600">
+                No periods are scheduled for you on this day.
+              </p>
+            ) : (
+              <ScheduleList
+                periods={todaysPeriods}
+                currentId={data.currentPeriod?.id ?? null}
+                nextId={data.nextPeriod?.id ?? null}
+              />
+            )}
+          </SectionCard>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
               title="Attendance Classes"
               description="Assigned homeroom sections available for attendance."
               headerAction={
-                hasAttendanceClasses && data.pendingAttendanceCount > 0 ? (
+                attendanceUnavailable ? null : hasAttendanceClasses &&
+                  pendingAttendanceCount > 0 ? (
                   <span className="inline-flex items-center rounded-full border border-warning-100 bg-warning-50 px-2.5 py-1 text-xs font-bold text-warning-700">
-                    {data.pendingAttendanceCount} pending
+                    {pendingAttendanceCount} pending
                   </span>
                 ) : hasAttendanceClasses ? (
                   <CheckCircle2
@@ -172,10 +246,15 @@ export function TeacherTodayWorkspace() {
                 ) : undefined
               }
             >
-              {hasAttendanceClasses ? (
+              {attendanceUnavailable ? (
+                <PanelUnavailableNotice
+                  panelName="Attendance classes"
+                  onRetry={retry}
+                />
+              ) : hasAttendanceClasses ? (
                 <ul className="space-y-2">
-                  {data.assignedClasses.map((item) => (
-                    <ClassRow key={item.id} item={item} />
+                  {assignedClasses.map((item) => (
+                    <ClassRow key={item.id} item={item} date={schoolDate} />
                   ))}
                 </ul>
               ) : (
@@ -226,6 +305,8 @@ export function TeacherTodayWorkspace() {
                     checked.
                   </p>
                 </div>
+              ) : unavailable.has('homework') ? (
+                <PanelUnavailableNotice panelName="Homework" onRetry={retry} />
               ) : (
                 <ModuleUnavailableNotice moduleName="Homework" />
               )}
@@ -237,7 +318,14 @@ export function TeacherTodayWorkspace() {
               title="Substitution Alerts"
               description="Timetable changes affecting you today."
             >
-              <ModuleUnavailableNotice moduleName="Timetable" />
+              {unavailable.has('timetable') ? (
+                <PanelUnavailableNotice
+                  panelName="Substitutions"
+                  onRetry={retry}
+                />
+              ) : (
+                <ModuleUnavailableNotice moduleName="Timetable" />
+              )}
             </SectionCard>
           ) : data.substitutions.length > 0 ? (
             <SectionCard
@@ -280,7 +368,14 @@ export function TeacherTodayWorkspace() {
               title="Marks Deadlines"
               description="Upcoming exam terms for your assigned subjects."
             >
-              <ModuleUnavailableNotice moduleName="Exams" />
+              {unavailable.has('marksDeadlines') ? (
+                <PanelUnavailableNotice
+                  panelName="Marks deadlines"
+                  onRetry={retry}
+                />
+              ) : (
+                <ModuleUnavailableNotice moduleName="Exams" />
+              )}
             </SectionCard>
           ) : data.marksDeadlines.length > 0 ? (
             <SectionCard
@@ -368,8 +463,82 @@ function PeriodCard({
   );
 }
 
-function ClassRow({ item }: { item: TeacherTodayAssignedClass }) {
+function ScheduleList({
+  periods,
+  currentId,
+  nextId,
+}: {
+  periods: TeacherTodayPeriod[];
+  currentId: string | null;
+  nextId: string | null;
+}) {
+  const ordered = [...periods].sort((a, b) =>
+    a.startsAt.localeCompare(b.startsAt),
+  );
+  return (
+    <ol className="space-y-2" aria-label="Today's periods">
+      {ordered.map((period) => {
+        const isNow = period.id === currentId;
+        const isNext = period.id === nextId;
+        const covered = period.coverageStatus === 'COVERED';
+        return (
+          <li
+            key={period.id}
+            aria-current={isNow ? 'time' : undefined}
+            className={`flex items-center gap-3 rounded-xl border p-3 ${
+              isNow
+                ? 'border-[var(--primary)] bg-[var(--primary-soft)]'
+                : 'border-slate-100'
+            }`}
+          >
+            <span className="w-24 shrink-0 text-xs font-bold tabular-nums text-slate-600">
+              {period.startsAt}–{period.endsAt}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p
+                className={`truncate text-sm font-bold ${covered ? 'text-slate-500 line-through' : 'text-slate-900'}`}
+              >
+                {period.subjectName}
+              </p>
+              <p className="truncate text-xs font-medium text-slate-600">
+                {period.className}
+                {covered ? ' • covered by a substitute' : ''}
+                {period.coverageStatus === 'SUBSTITUTING'
+                  ? ' • you are substituting'
+                  : ''}
+              </p>
+            </div>
+            {isNow ? (
+              <span className="shrink-0 rounded-full bg-[var(--primary)] px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-white">
+                Now
+              </span>
+            ) : isNext ? (
+              <span className="shrink-0 rounded-full border border-slate-200 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-slate-600">
+                Next
+              </span>
+            ) : null}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function ClassRow({
+  item,
+  date,
+}: {
+  item: TeacherTodayAssignedClass;
+  date: string;
+}) {
   const { attendance } = item;
+  const canTake = !attendance.isSubmitted && !attendance.isLocked;
+  const markHref = `/dashboard/attendance/mark?${new URLSearchParams({
+    academicYearId: item.academicYearId,
+    classId: item.classId,
+    ...(item.sectionId ? { sectionId: item.sectionId } : {}),
+    attendanceDate: date,
+  }).toString()}`;
   const status = attendance.isSubmitted
     ? {
         label: 'Submitted',
@@ -396,11 +565,20 @@ function ClassRow({ item }: { item: TeacherTodayAssignedClass }) {
           {item.subject}
         </p>
       </div>
-      <span
-        className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide ${status.className}`}
-      >
-        {status.label}
-      </span>
+      {canTake ? (
+        <Link
+          href={markHref}
+          className="shrink-0 rounded-full border border-[var(--primary)] px-2.5 py-0.5 text-xs font-bold text-[var(--primary)] transition hover:bg-[var(--primary-soft)]"
+        >
+          Take attendance
+        </Link>
+      ) : (
+        <span
+          className={`shrink-0 rounded-full border px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide ${status.className}`}
+        >
+          {status.label}
+        </span>
+      )}
     </li>
   );
 }

@@ -83,6 +83,12 @@ export interface OperationalModuleSummary {
   status: OperationalSummaryStatus;
   permissions: { canView: boolean };
   summary: Record<string, OperationalSummaryMetricValue>;
+  /**
+   * Metric keys omitted from `summary` because the actor may view the module
+   * but not the metric's drill-down (summary permission ≠ detail permission).
+   * Clients must render these as unavailable, never as zero.
+   */
+  withheldMetrics?: string[];
   attentionItems: OperationalAttentionItem[];
   recentItems: OperationalRecentItem[];
   nextActions: OperationalNextAction[];

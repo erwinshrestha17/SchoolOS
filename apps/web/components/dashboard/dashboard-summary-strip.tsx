@@ -182,18 +182,21 @@ function buildSummaryCards(
         icon: Landmark,
         iconClass: 'border-amber-100 bg-amber-50 text-amber-700',
         href: '/dashboard/finance-overview',
+        // "All clear" only when every contributing count is known.
         value:
           issueCount === null
             ? 'Unavailable'
-            : issueCount === 0
+            : issueCount === 0 && knownCounts.length === 2
               ? 'All clear'
               : `${formatNumber(issueCount)} issue${issueCount === 1 ? '' : 's'}`,
         description:
           issueCount === null
             ? 'Information is not available yet.'
-            : issueCount === 0
-              ? 'No reconciliation or posting exceptions reported.'
-              : breakdown.join(' · '),
+            : knownCounts.length < 2
+              ? `${breakdown.join(' · ')} · partial information`
+              : issueCount === 0
+                ? 'No reconciliation or posting exceptions reported.'
+                : breakdown.join(' · '),
       });
     }
   }
@@ -279,10 +282,14 @@ function buildSummaryCards(
       : null,
     value: attentionItems.length
       ? `${formatNumber(attentionItems.length)} item${attentionItems.length === 1 ? '' : 's'}`
-      : 'All clear',
+      : dashboard.status === 'partial'
+        ? 'Partial'
+        : 'All clear',
     description: attentionItems.length
       ? breakdown.join(' · ')
-      : 'Nothing is waiting for your review.',
+      : dashboard.status === 'partial'
+        ? 'Some sources could not be loaded.'
+        : 'Nothing is waiting for your review.',
   });
 
   return cards;

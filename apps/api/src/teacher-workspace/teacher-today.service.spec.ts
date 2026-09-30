@@ -108,6 +108,7 @@ describe('TeacherTodayService', () => {
     return {
       service,
       prisma,
+      attendanceService,
       homeworkService,
       timetableService,
       moduleResolver,
@@ -141,6 +142,70 @@ describe('TeacherTodayService', () => {
 
     expect(result.currentPeriod).toBeNull();
     expect(result.nextPeriod?.id).toBe('period-2');
+  });
+
+  it('never treats a period covered by a substitute as the current or next class', async () => {
+    const { service } = makeService({
+      periods: [
+        {
+          ...makePeriod('period-1', '09:10', '09:50'),
+          coverageStatus: 'COVERED',
+        },
+        makePeriod('period-2', '09:50', '10:30'),
+        {
+          ...makePeriod('period-3', '10:30', '11:10'),
+          coverageStatus: 'COVERED',
+        },
+      ] as never,
+    });
+
+    const result = await service.getToday(actor, undefined, NOW_NPT_09_15);
+
+    expect(result.currentPeriod).toBeNull();
+    expect(result.nextPeriod?.id).toBe('period-2');
+  });
+
+  it('does not report current/next periods for a date other than today', async () => {
+    const { service } = makeService({
+      periods: [makePeriod('period-1', '09:10', '09:50')],
+    });
+
+    const result = await service.getToday(actor, '2026-07-20', NOW_NPT_09_15);
+
+    // The schedule is the requested date's; "now" does not apply to it.
+    expect(result.isToday).toBe(true); // fixture attendance date is today
+    const other = await makeService({
+      periods: [makePeriod('period-1', '09:10', '09:50')],
+    }).service.getToday(actor, '2026-07-20', new Date('2026-07-21T03:30:00Z'));
+    expect(other.isToday).toBe(false);
+    expect(other.currentPeriod).toBeNull();
+    expect(other.nextPeriod).toBeNull();
+    expect(result.currentPeriod?.id).toBe('period-1');
+  });
+
+  it('reports a failing panel as unavailable instead of zero or empty', async () => {
+    const { service, homeworkService } = makeService();
+    homeworkService.getHomeworkSummaryToday.mockRejectedValue(
+      new Error('timeout'),
+    );
+
+    const result = await service.getToday(actor, undefined, NOW_NPT_09_15);
+
+    expect(result.homework).toBeNull();
+    expect(result.unavailablePanels).toEqual(['homework']);
+    expect(result.pendingAttendanceCount).toBe(1);
+  });
+
+  it('returns null schedule fields when attendance itself cannot load', async () => {
+    const { service, attendanceService } = makeService();
+    attendanceService.getTeacherMobileToday.mockRejectedValue(new Error('db'));
+
+    const result = await service.getToday(actor, undefined, NOW_NPT_09_15);
+
+    expect(result.unavailablePanels).toContain('attendance');
+    expect(result.todaysPeriods).toBeNull();
+    expect(result.pendingAttendanceCount).toBeNull();
+    expect(result.date).toBe('2026-07-19T00:00:00.000Z');
   });
 
   it('returns null for both when the school day is over', async () => {

@@ -97,7 +97,10 @@ export default function PrincipalAttentionPage() {
         />
       ) : null}
       {dashboard ? (
-        <DashboardAttentionPanel items={dashboard.attentionItems} />
+        <DashboardAttentionPanel
+          items={dashboard.attentionItems}
+          partial={dashboard.status === 'partial'}
+        />
       ) : null}
     </div>
   );

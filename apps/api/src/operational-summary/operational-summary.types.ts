@@ -54,6 +54,8 @@ export interface OperationalModuleSummary {
     canView: boolean;
   };
   summary: Record<string, number | string | null>;
+  /** Metrics withheld because the actor cannot open their drill-down. */
+  withheldMetrics?: string[];
   attentionItems: OperationalAttentionItem[];
   recentItems: OperationalRecentItem[];
   nextActions: OperationalNextAction[];

@@ -221,6 +221,10 @@ function operationsRowState(
       if (failed === null && scheduled === null) {
         return { text: 'Information is not available yet.', tone: 'muted' };
       }
+      // Never claim "all clear" from partial data (a withheld/failed metric).
+      if (failed === null || scheduled === null) {
+        return { text: 'Partial information only', tone: 'muted' };
+      }
       return { text: 'No open notice issue', tone: 'ok' };
     }
     case 'm8b_transport': {
@@ -248,6 +252,9 @@ function operationsRowState(
       if (delayed === null && stale === null && active === null) {
         return { text: 'Information is not available yet.', tone: 'muted' };
       }
+      if (delayed === null || stale === null) {
+        return { text: 'Partial information only', tone: 'muted' };
+      }
       return { text: 'No open transport issue', tone: 'ok' };
     }
     case 'm6_homework_timetable': {
@@ -268,6 +275,9 @@ function operationsRowState(
       if (overdue === null && dueToday === null) {
         return { text: 'Information is not available yet.', tone: 'muted' };
       }
+      if (overdue === null || dueToday === null) {
+        return { text: 'Partial information only', tone: 'muted' };
+      }
       return { text: 'No homework due today', tone: 'ok' };
     }
     case 'm7_hr_payroll': {
@@ -287,6 +297,9 @@ function operationsRowState(
       }
       if (leaveRequests === null && anomalies === null) {
         return { text: 'Information is not available yet.', tone: 'muted' };
+      }
+      if (leaveRequests === null || anomalies === null) {
+        return { text: 'Partial information only', tone: 'muted' };
       }
       return { text: 'No open staff issue', tone: 'ok' };
     }
