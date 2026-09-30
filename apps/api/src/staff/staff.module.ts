@@ -14,7 +14,10 @@ import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { UsageModule } from '../usage/usage.module';
 import { AddressModule } from '../addresses/address.module';
 import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
-import { HrProfessionalIdentityController } from '../hr/hr-professional-identity.controller';
+import {
+  HrProfessionalIdentityController,
+  HrProfessionalReportsController,
+} from '../hr/hr-professional-identity.controller';
 import { ProfessionalIdentityService } from '../hr/professional-identity.service';
 
 @Module({
@@ -40,6 +43,7 @@ import { ProfessionalIdentityService } from '../hr/professional-identity.service
     HrStaffController,
     HrCoverageController,
     HrProfessionalIdentityController,
+    HrProfessionalReportsController,
   ],
   exports: [
     StaffService,

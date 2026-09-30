@@ -66,12 +66,38 @@ export interface ProfessionalIdentityOverview {
   }>;
 }
 
+export interface EligibilityExceptionsReport {
+  evaluatedAt: string;
+  scanned: number;
+  truncated: boolean;
+  items: Array<{
+    assignmentId: string;
+    assignmentType: string;
+    staff: { id: string; name: string; employeeId: string };
+    className: string;
+    sectionName: string;
+    subjectName: string | null;
+    currentReasonCode: string;
+    createdUnder: {
+      id: string;
+      outcome: 'ELIGIBLE' | 'INELIGIBLE';
+      reasonCode: string;
+      evaluatedAt: string;
+      policyVersionId: string;
+    } | null;
+  }>;
+}
+
 export type EvidenceKind = 'qualifications' | 'licences';
 
 const base = (staffId: string) =>
   `/hr/staff/${encodeURIComponent(staffId)}/professional`;
 
 export const professionalIdentityApi = {
+  getEligibilityExceptions: () =>
+    request<EligibilityExceptionsReport>(
+      '/hr/professional/eligibility-exceptions',
+    ),
   getProfessionalIdentity: (staffId: string) =>
     request<ProfessionalIdentityOverview>(base(staffId)),
   createStaffEmployment: (staffId: string, body: JsonBody) =>

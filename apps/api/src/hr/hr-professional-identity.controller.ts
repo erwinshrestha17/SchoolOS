@@ -199,3 +199,17 @@ export class HrProfessionalIdentityController {
     );
   }
 }
+
+/** Tenant-wide professional eligibility reports (Phase 5M follow-up). */
+@Controller('hr/professional')
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.hr')
+export class HrProfessionalReportsController {
+  constructor(private readonly service: ProfessionalIdentityService) {}
+
+  @Get('eligibility-exceptions')
+  @Permissions('hr:read')
+  eligibilityExceptions(@CurrentAuth() auth: AuthContext) {
+    return this.service.listEligibilityExceptions(auth);
+  }
+}

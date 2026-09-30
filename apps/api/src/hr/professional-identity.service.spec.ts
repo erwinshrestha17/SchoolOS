@@ -472,6 +472,95 @@ describe('ProfessionalIdentityService (Phase 5J–5L)', () => {
     });
   });
 
+  describe('eligibility exceptions report', () => {
+    const assignment = (
+      id: string,
+      staffId: string,
+      classId: string,
+      snapshot: any = null,
+    ) => ({
+      id,
+      staffId,
+      classId,
+      sectionId: 'sec',
+      subjectId: 'sub',
+      assignmentType: 'SUBJECT_TEACHER',
+      effectiveFrom: new Date('2025-04-14'),
+      staff: { firstName: 'Sita', lastName: 'Rai', employeeId: 'E-1' },
+      class: { name: 'Grade 9' },
+      section: { name: 'A' },
+      subject: { name: 'Science' },
+      eligibilityAssessment: snapshot,
+    });
+
+    it('lists only assignments that would fail eligibility today, with the creation snapshot, and memoizes', async () => {
+      const { service, tx, eligibility } = setup();
+      const snapshot = {
+        id: 'a1',
+        outcome: 'ELIGIBLE',
+        reasonCode: 'POLICY_REQUIREMENTS_SATISFIED',
+        evaluatedAt: PAST,
+        policyVersionId: 'pol-v3',
+      };
+      tx.teacherAssignment = {
+        findMany: jest.fn(() => [
+          assignment('ta-1', 's1', 'c9', snapshot),
+          assignment('ta-2', 's1', 'c9', snapshot), // same combo -> memoized
+          assignment('ta-3', 's2', 'c9'),
+        ]),
+      };
+      eligibility.projectEligibility = jest.fn(({ staffId }: any) =>
+        staffId === 's1'
+          ? { outcome: 'INELIGIBLE', reasonCode: 'TEACHING_LICENCE_UNVERIFIED' }
+          : {
+              outcome: 'ELIGIBLE',
+              reasonCode: 'POLICY_REQUIREMENTS_SATISFIED',
+            },
+      );
+
+      const report: any = await service.listEligibilityExceptions(HR_A);
+
+      expect(eligibility.projectEligibility).toHaveBeenCalledTimes(2);
+      expect(report.items.map((i: any) => i.assignmentId)).toEqual([
+        'ta-1',
+        'ta-2',
+      ]);
+      expect(report.items[0]).toMatchObject({
+        currentReasonCode: 'TEACHING_LICENCE_UNVERIFIED',
+        createdUnder: { policyVersionId: 'pol-v3', outcome: 'ELIGIBLE' },
+        staff: { name: 'Sita Rai' },
+      });
+      expect(
+        tx.teacherAssignment.findMany.mock.calls[0][0].where,
+      ).toMatchObject({
+        tenantId: 't1',
+        status: 'ACTIVE',
+      });
+      expect(report.truncated).toBe(false);
+    });
+
+    it('reports truncation instead of silently dropping rows', async () => {
+      const { service, tx, eligibility } = setup();
+      tx.teacherAssignment = {
+        findMany: jest.fn(() =>
+          Array.from({ length: 1001 }, (_, i) =>
+            assignment(`ta-${i}`, 's1', 'c9'),
+          ),
+        ),
+      };
+      eligibility.projectEligibility = jest.fn(() => ({
+        outcome: 'ELIGIBLE',
+        reasonCode: 'OK',
+      }));
+      const report: any = await service.listEligibilityExceptions(HR_A);
+      expect(report).toMatchObject({
+        truncated: true,
+        scanned: 1000,
+        items: [],
+      });
+    });
+  });
+
   it('eligibility projection is tenant-scoped and delegates to the shared evaluator', async () => {
     const { service, eligibility } = setup();
     await service.projectEligibility('s1', { classId: 'c1' }, HR_A);

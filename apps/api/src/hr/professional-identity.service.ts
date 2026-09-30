@@ -572,6 +572,92 @@ export class ProfessionalIdentityService {
     });
   }
 
+  /**
+   * 5M follow-up: active assignments whose professional eligibility no longer
+   * holds (licence expired/revoked, employment ended, policy changed...).
+   * Read-only report. It never revokes anything: the assignment keeps the
+   * policy/evidence snapshot it was created under, and live authorization is
+   * still enforced by the database guard on every activation.
+   */
+  async listEligibilityExceptions(actor: AuthContext) {
+    const now = new Date();
+    const assignments = await this.prisma.teacherAssignment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: 'ACTIVE',
+        effectiveFrom: { lte: now },
+        OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: now } }],
+      },
+      select: {
+        id: true,
+        staffId: true,
+        classId: true,
+        sectionId: true,
+        subjectId: true,
+        assignmentType: true,
+        effectiveFrom: true,
+        staff: {
+          select: { firstName: true, lastName: true, employeeId: true },
+        },
+        class: { select: { name: true } },
+        section: { select: { name: true } },
+        subject: { select: { name: true } },
+        eligibilityAssessment: {
+          select: {
+            id: true,
+            outcome: true,
+            reasonCode: true,
+            evaluatedAt: true,
+            policyVersionId: true,
+          },
+        },
+      },
+      orderBy: [{ staffId: 'asc' }, { classId: 'asc' }],
+      take: EXCEPTION_SCAN_LIMIT + 1,
+    });
+    const truncated = assignments.length > EXCEPTION_SCAN_LIMIT;
+    const scanned = assignments.slice(0, EXCEPTION_SCAN_LIMIT);
+
+    const cache = new Map<
+      string,
+      Awaited<
+        ReturnType<TeacherProfessionalEligibilityService['projectEligibility']>
+      >
+    >();
+    const items: EligibilityExceptionItem[] = [];
+    for (const assignment of scanned) {
+      const key = `${assignment.staffId}|${assignment.classId}|${assignment.subjectId ?? ''}`;
+      let projection = cache.get(key);
+      if (!projection) {
+        projection = await this.eligibility.projectEligibility({
+          tenantId: actor.tenantId,
+          staffId: assignment.staffId,
+          classId: assignment.classId,
+          subjectId: assignment.subjectId,
+        });
+        cache.set(key, projection);
+      }
+      if (projection.outcome === 'ELIGIBLE') continue;
+      items.push({
+        assignmentId: assignment.id,
+        assignmentType: assignment.assignmentType,
+        effectiveFrom: assignment.effectiveFrom,
+        staff: {
+          id: assignment.staffId,
+          name: `${assignment.staff.firstName} ${assignment.staff.lastName}`.trim(),
+          employeeId: assignment.staff.employeeId,
+        },
+        className: assignment.class.name,
+        sectionName: assignment.section.name,
+        subjectName: assignment.subject?.name ?? null,
+        currentReasonCode: projection.reasonCode,
+        // What the assignment was created under (null for legacy rows).
+        createdUnder: assignment.eligibilityAssessment,
+      });
+    }
+    return { evaluatedAt: now, scanned: scanned.length, truncated, items };
+  }
+
   // ---- helpers -----------------------------------------------------------
 
   private write<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
@@ -684,6 +770,26 @@ export class ProfessionalIdentityService {
 }
 
 const FAR_FUTURE = new Date('9999-12-31T00:00:00.000Z');
+
+export interface EligibilityExceptionItem {
+  assignmentId: string;
+  assignmentType: string;
+  effectiveFrom: Date;
+  staff: { id: string; name: string; employeeId: string };
+  className: string;
+  sectionName: string;
+  subjectName: string | null;
+  currentReasonCode: string;
+  createdUnder: {
+    id: string;
+    outcome: string;
+    reasonCode: string;
+    evaluatedAt: Date;
+    policyVersionId: string;
+  } | null;
+}
+/** Bounded report cost; the response says when it was truncated. */
+const EXCEPTION_SCAN_LIMIT = 1000;
 
 const RESOURCE: Record<EvidenceKind, string> = {
   qualification: 'teacher_qualification_evidence',

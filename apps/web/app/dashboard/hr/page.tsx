@@ -18,6 +18,7 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
+import { EligibilityExceptionsSurface } from '../../../components/hr/eligibility-exceptions-surface';
 import { api } from '../../../lib/api';
 import { cn } from '../../../lib/utils';
 import { ModuleHeader } from '../../../components/ui/module-header';
@@ -533,6 +534,8 @@ export default function HRDashboardPage() {
           />
         )}
       </Surface>
+
+      <EligibilityExceptionsSurface />
     </DashboardPageShell>
   );
 }
