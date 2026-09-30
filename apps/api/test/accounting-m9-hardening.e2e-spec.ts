@@ -27,7 +27,12 @@ describe('Accounting M9 Hardening (E2E)', () => {
   let postingService: AccountingPostingService;
 
   const tenantId = 'tenant-hardening';
-  const actor = createAuthContextMock({ tenantId });
+  // Calls the service directly, so the actor carries the reverse duty the
+  // route requires (the service re-checks it).
+  const actor = createAuthContextMock({
+    tenantId,
+    permissions: ['accounting:journals:reverse'],
+  });
 
   beforeEach(async () => {
     prisma = createPrismaMock() as unknown as PrismaMock;

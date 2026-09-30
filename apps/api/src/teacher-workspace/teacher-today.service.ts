@@ -202,7 +202,10 @@ export class TeacherTodayService {
         TeacherCapability.MARKS_ENTER,
         { academicYearId: currentYear.id },
       )
-    ).filter((assignment) => Boolean(assignment.subjectId));
+    ).filter(
+      (assignment): assignment is typeof assignment & { subjectId: string } =>
+        Boolean(assignment.subjectId),
+    );
     const results: Array<{
       assessmentComponentId: string;
       componentName: string;
@@ -216,7 +219,7 @@ export class TeacherTodayService {
       const components = await this.prisma.assessmentComponent.findMany({
         where: {
           tenantId: actor.tenantId,
-          subjectId: assignment.subjectId as string,
+          subjectId: assignment.subjectId,
           subject: { classId: assignment.classId },
           examTerm: { academicYearId: currentYear.id, isLocked: false },
         },

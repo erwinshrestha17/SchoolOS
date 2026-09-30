@@ -40,11 +40,11 @@ describe('TeacherTodayService', () => {
       subjectAssignments?: { subjectId: string }[];
       examTerms?: { id: string; name: string; endsOn: Date }[];
       enabledModules?: string[];
-      components?: Array<{
+      components?: {
         id: string;
         name: string;
         examTerm: { name: string };
-      }>;
+      }[];
       rosterSize?: number;
       entered?: number;
     } = {},
@@ -400,7 +400,7 @@ describe('TeacherTodayService', () => {
 
       expect(result.corrections).toEqual({ pending: 2, rejectedRecently: 1 });
       for (const [args] of prisma.attendanceCorrectionRequest.count.mock
-        .calls as Array<[{ where: Record<string, unknown> }]>) {
+        .calls as [{ where: Record<string, unknown> }][]) {
         expect(args.where).toMatchObject({
           tenantId: 'tenant-1',
           requestedById: 'user-1',
