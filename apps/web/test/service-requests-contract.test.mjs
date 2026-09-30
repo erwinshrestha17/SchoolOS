@@ -46,7 +46,7 @@ describe('Service requests Action Centre contracts', () => {
     assert.match(layout, /\/dashboard\/service-requests/);
     assert.match(layout, /service_requests:read/);
     assert.match(personaNav, /\/dashboard\/service-requests/);
-    assert.match(personaNav, /Action Centre/);
+    assert.match(personaNav, /label: 'Service Requests'/);
     assert.match(listPage, /ServiceRequestsQueueWorkspace/);
     assert.match(detailPage, /ServiceRequestDetailWorkspace/);
   });

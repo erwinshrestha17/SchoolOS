@@ -90,31 +90,74 @@ describe('school operations sidebar', () => {
     assert.doesNotMatch(sidebar, /export const principalNavGroups: NavGroup/);
   });
 
-  it('uses the consolidated school-operating information architecture', () => {
-    for (const label of [
-      'Home',
-      'Students & Admissions',
+  it('uses the canonical ASTRA §9.1 navigation hierarchy', () => {
+    const adminSlice = sliceNavGroupsExport(personaNavBase, 'adminNavGroups');
+    const adminGroups = [...adminSlice.matchAll(/^    label: '([^']+)'/gm)].map(
+      (match) => match[1],
+    );
+    assert.deepEqual(adminGroups, [
+      'Overview',
+      'People',
       'Academics',
+      'Finance',
+      'Communication',
+      'Operations',
+      'Insights',
+    ]);
+    const principalSlice = sliceNavGroupsExport(
+      personaNavEntry,
+      'principalNavGroups',
+    );
+    const principalGroups = [
+      ...principalSlice.matchAll(/^    label: '([^']+)'/gm),
+    ].map((match) => match[1]);
+    assert.deepEqual(principalGroups, [
+      'Overview',
+      'People',
+      'Academics',
+      'Finance',
+      'Communication',
+      'Operations',
+      'Insights',
+    ]);
+    for (const label of [
+      'Students',
+      'Admissions',
+      'Staff',
       'Attendance',
-      'School Operations',
-      'Staff & Finance',
-      'Notices & Announcements',
-      'Homework & Timetable',
-      'Exams & Results',
-      'Reports & Exports',
+      'Academics',
+      'Homework',
+      'Timetable',
       'Fees & Receipts',
+      'Accounting',
+      'Payroll',
+      'Notices',
+      'Activities',
+      'Service Requests',
+      'Reports',
+      'Audit',
     ]) {
-      assert.match(personaNavConfig, new RegExp(`label: '${label}'`));
+      assert.match(adminSlice, new RegExp(`label: '${label}'`));
     }
 
     assert.match(sidebar, /function NavGroupSection/);
-    assert.doesNotMatch(personaNavConfig, /label: ['"]Overview['"]/);
-    assert.doesNotMatch(personaNavConfig, /label: ['"]People['"]/);
-    assert.doesNotMatch(personaNavConfig, /label: ['"]Campus Services['"]/);
-    assert.doesNotMatch(personaNavConfig, /label: ['"]Workforce & Finance['"]/);
-    assert.doesNotMatch(personaNavConfig, /label: ['"]Insights['"]/);
-    assert.doesNotMatch(personaNavConfig, /label: ['"]CAS Records['"]/);
-    assert.doesNotMatch(personaNavConfig, /label: ['"]Report Cards['"]/);
+    for (const obsolete of [
+      'Students & Admissions',
+      'Staff & Finance',
+      'Homework & Timetable',
+      'School Operations',
+      'School Readiness',
+      'Reports & Audit',
+      'Campus Services',
+      'Workforce & Finance',
+      'CAS Records',
+      'Report Cards',
+    ]) {
+      assert.doesNotMatch(
+        personaNavConfig,
+        new RegExp(`label: ['"]${obsolete}['"]`),
+      );
+    }
   });
 
   it('keeps notice compatibility and academic routes active through their consolidated entries', () => {
@@ -333,20 +376,22 @@ describe('persona sidebar contracts', () => {
     );
   });
 
-  it('keeps Operations inside School Readiness and uses school-friendly Reports & Audit wording', () => {
+  it('keeps Principal Operations and Insights in the canonical groups', () => {
     const principalSlice = sliceNavGroupsExport(
       personaNavEntry,
       'principalNavGroups',
     );
-    const readinessStart = principalSlice.indexOf("label: 'School Readiness'");
-    const communicationStart = principalSlice.indexOf("label: 'Communication'");
-    const readinessSlice = principalSlice.slice(
-      readinessStart,
-      communicationStart,
+    const operationsStart = principalSlice.indexOf("label: 'Operations'");
+    const insightsStart = principalSlice.indexOf("label: 'Insights'");
+    const operationsSlice = principalSlice.slice(
+      operationsStart,
+      insightsStart,
     );
-    assert.match(readinessSlice, /label: ['"]Operations Overview['"]/);
-    assert.doesNotMatch(principalSlice, /label: ['"]School Operations['"]/);
-    assert.match(principalSlice, /label: ['"]Reports & Audit['"]/);
+    assert.match(operationsSlice, /label: ['"]Operations Overview['"]/);
+    assert.match(
+      principalSlice.slice(insightsStart),
+      /label: ['"]Leadership Audit['"]/,
+    );
   });
 
   it('keeps institutional Settings out of the Principal leadership-only shell', () => {

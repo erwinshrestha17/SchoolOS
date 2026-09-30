@@ -43,7 +43,8 @@ const principalCommunicationRead: PermissionKey[] = [
 ];
 
 /**
- * Principal navigation is leadership-shaped rather than operator-shaped.
+ * Principal navigation is leadership-shaped rather than operator-shaped and
+ * grouped by the canonical ASTRA §9.1 hierarchy (presentation only).
  * Permission and entitlement filtering remains UX-only; backend guards are
  * still authoritative for every destination and request.
  *
@@ -53,7 +54,7 @@ const principalCommunicationRead: PermissionKey[] = [
  */
 export const principalNavGroups: NavGroup[] = [
   {
-    label: 'Leadership',
+    label: 'Overview',
     icon: LayoutDashboard,
     items: [
       {
@@ -75,7 +76,7 @@ export const principalNavGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Students & Admissions',
+    label: 'People',
     icon: Users,
     items: [
       {
@@ -90,11 +91,17 @@ export const principalNavGroups: NavGroup[] = [
         icon: UserPlus,
         permissions: principalStudentRead,
       },
+      {
+        href: '/dashboard/hr/overview',
+        label: 'Staff Overview',
+        icon: BriefcaseBusiness,
+        permissions: principalStaffRead,
+      },
     ],
   },
   {
-    label: 'School Readiness',
-    icon: School,
+    label: 'Academics',
+    icon: GraduationCap,
     items: [
       {
         href: '/dashboard/attendance/overview',
@@ -108,24 +115,17 @@ export const principalNavGroups: NavGroup[] = [
         icon: GraduationCap,
         permissions: principalAcademicRead,
       },
-      {
-        href: '/dashboard/hr/overview',
-        label: 'Staff Overview',
-        icon: BriefcaseBusiness,
-        permissions: principalStaffRead,
-      },
+    ],
+  },
+  {
+    label: 'Finance',
+    icon: Wallet,
+    items: [
       {
         href: '/dashboard/finance-overview',
         label: 'Finance Overview',
         icon: Wallet,
         permissions: principalFinanceRead,
-      },
-      {
-        href: '/dashboard/operations/overview',
-        label: 'Operations Overview',
-        icon: School,
-        permissions: ['reports:read'],
-        moduleKeys: ['library', 'transport', 'canteen'],
       },
     ],
   },
@@ -145,16 +145,29 @@ export const principalNavGroups: NavGroup[] = [
         icon: MessageSquare,
         permissions: ['notices:read'],
       },
+    ],
+  },
+  {
+    label: 'Operations',
+    icon: School,
+    items: [
       {
         href: '/dashboard/activity/oversight',
         label: 'Activity Oversight',
         icon: Images,
         permissions: ['activity_feed:read'],
       },
+      {
+        href: '/dashboard/operations/overview',
+        label: 'Operations Overview',
+        icon: School,
+        permissions: ['reports:read'],
+        moduleKeys: ['library', 'transport', 'canteen'],
+      },
     ],
   },
   {
-    label: 'Reports & Audit',
+    label: 'Insights',
     icon: FileCheck2,
     items: [
       {

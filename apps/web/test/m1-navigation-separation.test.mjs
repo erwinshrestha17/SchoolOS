@@ -22,7 +22,7 @@ describe('M1 Students and Admissions workspace navigation', () => {
   const workspaceTabs = read('components/dashboard/module-tabs.tsx');
 
   it('keeps Students and Admissions as separate sidebar workspaces', () => {
-    assert.match(personaNav, /label: ['"]Students & Admissions['"]/);
+    assert.match(personaNav, /label: ['"]People['"]/);
     assert.match(
       personaNav,
       /href: ['"]\/dashboard\/students['"],\s*label: ['"]Students['"]/,

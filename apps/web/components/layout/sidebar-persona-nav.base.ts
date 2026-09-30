@@ -139,26 +139,20 @@ export function shouldShowSettingsHub(
 }
 
 /**
- * Admin / school_config_owner nav (persona mapping §4 Admin Web).
+ * Admin / school_config_owner nav (persona mapping §4 Admin Web), grouped by
+ * the canonical ASTRA §9.1 hierarchy. Labels and grouping are presentation
+ * only: every href, permission and module gate is unchanged.
  * Finance, payroll, and accounting entries remain permission-gated — the admin
  * preset excludes finance keys by default.
  */
 export const adminNavGroups: NavGroup[] = [
   {
-    label: 'Home',
+    label: 'Overview',
     icon: LayoutDashboard,
-    items: [
-      { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
-      {
-        href: '/dashboard/service-requests',
-        label: 'Action Centre',
-        icon: LifeBuoy,
-        permissions: ['service_requests:read', 'service_requests:manage'],
-      },
-    ],
+    items: [{ href: '/dashboard', label: 'Home', icon: LayoutDashboard }],
   },
   {
-    label: 'Students & Admissions',
+    label: 'People',
     icon: Users,
     items: [
       {
@@ -173,30 +167,12 @@ export const adminNavGroups: NavGroup[] = [
         icon: UserPlus,
         permissions: ['students:read', 'students:create'],
       },
-    ],
-  },
-  {
-    label: 'Attendance',
-    icon: CalendarCheck,
-    items: [
       {
-        href: '/dashboard/attendance',
-        label: 'Attendance',
-        icon: CalendarCheck,
-        permissions: ['attendance:read', 'attendance:mark'],
-      },
-    ],
-  },
-  {
-    label: 'Fees & Receipts',
-    icon: Wallet,
-    items: [
-      {
-        href: '/dashboard/fees',
-        label: 'Fees & Receipts',
-        icon: Wallet,
-        permissions: feeOperationsPermissions,
-        activeWhen: ['/dashboard/fees', '/dashboard/finance'],
+        href: '/dashboard/hr',
+        label: 'Staff',
+        icon: UserCog,
+        permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
+        activeWhen: ['/dashboard/hr'],
       },
     ],
   },
@@ -204,6 +180,12 @@ export const adminNavGroups: NavGroup[] = [
     label: 'Academics',
     icon: GraduationCap,
     items: [
+      {
+        href: '/dashboard/attendance',
+        label: 'Attendance',
+        icon: CalendarCheck,
+        permissions: ['attendance:read', 'attendance:mark'],
+      },
       {
         href: '/dashboard/academics',
         label: 'Academics',
@@ -222,30 +204,6 @@ export const adminNavGroups: NavGroup[] = [
         ],
       },
       {
-        href: '/dashboard/learning',
-        label: 'Learning',
-        icon: BookOpen,
-        permissions: learningPermissions,
-      },
-    ],
-  },
-  {
-    label: 'Activities',
-    icon: Images,
-    items: [
-      {
-        href: '/dashboard/activity',
-        label: 'Activity Feed',
-        icon: Images,
-        permissions: ['activity_feed:read', 'activity_feed:create'],
-      },
-    ],
-  },
-  {
-    label: 'Homework & Timetable',
-    icon: CalendarDays,
-    items: [
-      {
         href: '/dashboard/homework',
         label: 'Homework',
         icon: ClipboardList,
@@ -259,24 +217,24 @@ export const adminNavGroups: NavGroup[] = [
         permissions: timetablePermissions,
         moduleKeys: ['timetable'],
       },
+      {
+        href: '/dashboard/learning',
+        label: 'Learning',
+        icon: BookOpen,
+        permissions: learningPermissions,
+      },
     ],
   },
   {
-    label: 'Staff & Finance',
-    icon: UserCog,
+    label: 'Finance',
+    icon: Wallet,
     items: [
       {
-        href: '/dashboard/hr',
-        label: 'Staff',
-        icon: UserCog,
-        permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
-        activeWhen: ['/dashboard/hr'],
-      },
-      {
-        href: '/dashboard/payroll',
-        label: 'Payroll',
+        href: '/dashboard/fees',
+        label: 'Fees & Receipts',
         icon: Wallet,
-        permissions: ['payroll:read', 'payroll:manage'],
+        permissions: feeOperationsPermissions,
+        activeWhen: ['/dashboard/fees', '/dashboard/finance'],
       },
       {
         href: '/dashboard/accounting',
@@ -284,12 +242,49 @@ export const adminNavGroups: NavGroup[] = [
         icon: Calculator,
         permissions: accountingReadPermissions,
       },
+      {
+        href: '/dashboard/payroll',
+        label: 'Payroll',
+        icon: Wallet,
+        permissions: ['payroll:read', 'payroll:manage'],
+      },
     ],
   },
   {
-    label: 'School Operations',
+    label: 'Communication',
+    icon: MessageSquare,
+    items: [
+      {
+        href: '/dashboard/notices',
+        label: 'Notices',
+        icon: MessageSquare,
+        permissions: noticesPermissions,
+        activeWhen: ['/dashboard/communications', '/dashboard/notices'],
+      },
+      {
+        href: '/dashboard/notifications',
+        label: 'Notifications',
+        icon: Bell,
+        permissions: ['notifications:view_own'],
+      },
+    ],
+  },
+  {
+    label: 'Operations',
     icon: School,
     items: [
+      {
+        href: '/dashboard/activity',
+        label: 'Activities',
+        icon: Images,
+        permissions: ['activity_feed:read', 'activity_feed:create'],
+      },
+      {
+        href: '/dashboard/service-requests',
+        label: 'Service Requests',
+        icon: LifeBuoy,
+        permissions: ['service_requests:read', 'service_requests:manage'],
+      },
       {
         href: '/dashboard/library',
         label: 'Library',
@@ -319,37 +314,12 @@ export const adminNavGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Notifications',
-    icon: Bell,
-    items: [
-      {
-        href: '/dashboard/notifications',
-        label: 'Notifications',
-        icon: Bell,
-        permissions: ['notifications:view_own'],
-      },
-    ],
-  },
-  {
-    label: 'Notices',
-    icon: MessageSquare,
-    items: [
-      {
-        href: '/dashboard/notices',
-        label: 'Notices & Announcements',
-        icon: MessageSquare,
-        permissions: noticesPermissions,
-        activeWhen: ['/dashboard/communications', '/dashboard/notices'],
-      },
-    ],
-  },
-  {
-    label: 'Reports',
+    label: 'Insights',
     icon: ClipboardList,
     items: [
       {
         href: '/dashboard/reports',
-        label: 'Reports & Exports',
+        label: 'Reports',
         icon: ClipboardList,
         permissions: [
           'accounting:reports:read',
