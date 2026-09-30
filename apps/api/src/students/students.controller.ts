@@ -85,8 +85,13 @@ export class StudentsController {
   listStudents(
     @Query() query: ListStudentsDto,
     @CurrentAuth() auth: AuthContext,
+    @EntitlementEvidence() entitlementEvidence: readonly string[],
   ) {
-    return this.studentsService.listStudents(query, auth);
+    return this.studentsService.listStudents(
+      query,
+      auth,
+      entitlementStateFromEvidence(entitlementEvidence, 'students'),
+    );
   }
 
   @Get('options')

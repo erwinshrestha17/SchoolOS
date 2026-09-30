@@ -550,6 +550,7 @@ describe('School OS Auth + RBAC integration', () => {
       studentsController.listStudents(
         {},
         secondTenantRequest.auth as unknown as AuthContext,
+        ['students'],
       ),
     ).resolves.toMatchObject({ items: [], total: 0 });
 

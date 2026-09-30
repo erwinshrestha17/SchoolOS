@@ -242,3 +242,38 @@ export function projectStudentProfile<P extends ProfileLike>(
     authorization: StudentProfileAuthorization;
   };
 }
+
+/**
+ * Keys on a GET /students directory row and the section that releases them.
+ * Basic identity (name, class, roll, lifecycle) is the row itself; everything
+ * below needs the same section the profile page would require.
+ */
+export const STUDENT_DIRECTORY_ROW_KEY_SECTIONS = {
+  guardians: 'guardianContacts',
+  qrCredential: 'qrCredential',
+  documentCount: 'documents',
+  // The student's own login account is an identity credential.
+  email: 'identityCredentials',
+  hasLogin: 'identityCredentials',
+} as const satisfies Record<string, StudentProfileSection>;
+
+/**
+ * Directory/inspector/search rows use the SAME decisions as the profile page
+ * (Phase 3 edge case: inspector and full page must not project differently).
+ */
+export function projectStudentDirectoryRow<
+  R extends Record<string, unknown> & { guardians?: GuardianLike[] },
+>(row: R, authorization: StudentProfileAuthorization) {
+  const decisions = studentProfileSectionDecisions(authorization);
+  const projected: Record<string, unknown> = omitUnauthorizedKeys(
+    row,
+    STUDENT_DIRECTORY_ROW_KEY_SECTIONS,
+    decisions,
+  );
+  if (decisions.guardianContacts && row.guardians)
+    projected.guardians = projectGuardians(row.guardians, decisions);
+  projected.authorization = authorization;
+  return projected as Partial<R> & {
+    authorization: StudentProfileAuthorization;
+  };
+}

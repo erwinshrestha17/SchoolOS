@@ -6,6 +6,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
+import {
+  EntitlementEvidence,
+  entitlementStateFromEvidence,
+} from '../auth/decorators/entitlement-evidence.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { StudentSearchQueryDto } from './dto/student-search-query.dto';
 import { StudentSearchService } from './student-search.service';
@@ -22,7 +26,12 @@ export class StudentSearchController {
   searchStudents(
     @Query() query: StudentSearchQueryDto,
     @CurrentAuth() auth: AuthContext,
+    @EntitlementEvidence() entitlementEvidence: readonly string[],
   ) {
-    return this.studentSearchService.searchStudents(query.q, auth);
+    return this.studentSearchService.searchStudents(
+      query.q,
+      auth,
+      entitlementStateFromEvidence(entitlementEvidence, 'students'),
+    );
   }
 }

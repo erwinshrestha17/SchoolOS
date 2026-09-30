@@ -143,6 +143,10 @@ export const Prisma = {
     strings,
     values,
   }),
+  join: (values: readonly unknown[], separator = ',') => ({
+    joined: [...values],
+    separator,
+  }),
   validator:
     <T>() =>
     (val: T) =>

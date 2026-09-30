@@ -6467,6 +6467,11 @@ export type StudentProfile = {
     lastScannedAt: string | null;
     fileAssetId?: string | null;
   } | null;
+  /**
+   * GET /students rows carry the same Phase 3B projection as the profile:
+   * section-bound keys are omitted unless listed in authorizedSections.
+   */
+  authorization?: StudentProfileAuthorization;
 };
 
 export type StudentLookupOption = {

@@ -19,8 +19,9 @@ type StudentSearchResult = {
   className: string;
   sectionName: string | null;
   rollNumber: number | null;
-  guardianName: string | null;
-  guardianPhone: string | null;
+  /** Omitted by the server unless the guardianContacts section is authorized. */
+  guardianName?: string | null;
+  guardianPhone?: string | null;
   lifecycleStatus: string;
 };
 

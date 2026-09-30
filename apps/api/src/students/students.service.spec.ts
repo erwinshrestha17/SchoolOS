@@ -449,7 +449,8 @@ describe('students lifecycle hardening', () => {
         page: 2,
         limit: 25,
       },
-      actor,
+      { ...actor, permissions: [...actor.permissions, 'students:qr:read'] },
+      studentsEntitlement,
     );
 
     expect(prisma.student.count).toHaveBeenCalledWith({
@@ -547,7 +548,11 @@ describe('students lifecycle hardening', () => {
       supportOverrideScopes: ['STUDENT_RECORDS' as const],
     };
 
-    const result = await service.listStudents({}, supportActor);
+    const result = await service.listStudents(
+      {},
+      supportActor,
+      studentsEntitlement,
+    );
     const query = prisma.student.findMany.mock.calls[0][0];
 
     expect(query.select._count).toBe(false);
@@ -570,7 +575,7 @@ describe('students lifecycle hardening', () => {
     expect(result.items[0]).not.toHaveProperty('email');
     expect(result.items[0]).not.toHaveProperty('hasLogin');
     expect(result.items[0].photoVersion).toBeNull();
-    expect(result.items[0].guardians[0]).toEqual(
+    expect(result.items[0].guardians?.[0]).toEqual(
       expect.objectContaining({
         fullName: 'Maya Shrestha',
         primaryPhone: '9800000000',
@@ -885,6 +890,149 @@ describe('students lifecycle hardening', () => {
           ]),
         },
       });
+    });
+
+    it('projects a teacher directory row exactly like the profile: verified contacts only, no guardian administration, QR, documents or login (Phase 3B)', async () => {
+      const teacherActor = {
+        ...actor,
+        userId: 'teacher-user-1',
+        roles: ['subject_teacher'],
+        permissions: ['students:read'],
+      };
+      const link = (
+        overrides: Partial<{
+          status: GuardianRelationshipStatus;
+          verificationStatus: GuardianRelationshipVerificationStatus;
+          name: string;
+        }>,
+      ) => ({
+        guardian: {
+          id: `guardian-${overrides.name ?? 'maya'}`,
+          fullName: overrides.name ?? 'Maya Shrestha',
+          primaryPhone: '9800000000',
+          secondaryPhone: '9800000001',
+          email: 'maya@example.com',
+          occupation: 'Engineer',
+          wardNumber: '5',
+          privacyConsentAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+        relation: 'mother',
+        isPrimary: true,
+        capabilities: [GuardianCapability.ACADEMICS_VIEW],
+        verificationStatus:
+          overrides.verificationStatus ??
+          GuardianRelationshipVerificationStatus.VERIFIED,
+        status: overrides.status ?? GuardianRelationshipStatus.ACTIVE,
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        effectiveUntil: null,
+        emergencyContactPriority: 1,
+        approvalStatus: GuardianRelationshipApprovalStatus.APPROVED,
+        restrictionReasonRef: 'SAFEGUARD-1',
+      });
+      const prisma = buildPrisma({
+        studentFindManyResult: [
+          {
+            ...buildStudent({ sectionId: 'section-1' }),
+            enrollments: [],
+            guardianLinks: [
+              link({}),
+              link({
+                name: 'Unverified Guardian',
+                verificationStatus:
+                  GuardianRelationshipVerificationStatus.UNVERIFIED,
+              }),
+            ],
+            qrCredentials: [
+              {
+                id: 'qr-1',
+                status: 'ACTIVE',
+                createdAt: new Date('2026-02-01T00:00:00.000Z'),
+              },
+            ],
+            _count: { documents: 3 },
+            user: { email: 'student@example.com' },
+            userId: 'student-user-1',
+          },
+        ],
+        studentCountQueue: [1],
+      });
+      const { service } = buildService(prisma, {
+        resolveReadableScope: jest.fn().mockResolvedValue({
+          assignments: [],
+          homeroomSectionIds: new Set(['section-1']),
+          subjectsBySection: new Map(),
+          allSectionIds: new Set(['section-1']),
+        }),
+      });
+
+      const result = await service.listStudents(
+        {},
+        teacherActor,
+        studentsEntitlement,
+      );
+      const row = result.items[0] as Record<string, unknown>;
+
+      expect(row.authorization).toEqual(
+        expect.objectContaining({
+          authorizedSections: ['guardianContacts', 'identity'],
+          allowedActions: [],
+        }),
+      );
+      for (const key of ['qrCredential', 'documentCount', 'email', 'hasLogin'])
+        expect(row).not.toHaveProperty(key);
+      expect(row.guardians).toEqual([
+        {
+          id: 'guardian-maya',
+          fullName: 'Maya Shrestha',
+          relation: 'mother',
+          primaryPhone: '9800000000',
+          secondaryPhone: '9800000001',
+          email: 'maya@example.com',
+          isPrimary: true,
+          emergencyContactPriority: 1,
+        },
+      ]);
+    });
+
+    it('releases no protected directory section without entitlement evidence', async () => {
+      const prisma = buildPrisma({
+        studentFindManyResult: [
+          {
+            ...buildStudent(),
+            enrollments: [],
+            qrCredentials: [
+              {
+                id: 'qr-1',
+                status: 'ACTIVE',
+                createdAt: new Date('2026-02-01T00:00:00.000Z'),
+              },
+            ],
+            _count: { documents: 2 },
+            user: { email: 'student@example.com' },
+          },
+        ],
+        studentCountQueue: [1],
+      });
+      const { service } = buildService(prisma);
+
+      const result = await service.listStudents({}, actor);
+      const row = result.items[0] as Record<string, unknown>;
+
+      expect(row).toEqual(
+        expect.objectContaining({ studentSystemId: 'SCH-2026-0001' }),
+      );
+      for (const key of [
+        'guardians',
+        'qrCredential',
+        'documentCount',
+        'email',
+        'hasLogin',
+      ])
+        expect(row).not.toHaveProperty(key);
+      expect(
+        (row.authorization as { authorizedSections: string[] })
+          .authorizedSections,
+      ).toEqual([]);
     });
 
     it('returns an empty directory scope for a teacher with no active assignment', async () => {

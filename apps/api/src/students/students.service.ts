@@ -1,8 +1,10 @@
 import { grantAllows } from '../authorization/scopes/scope-resolver';
 import { studentResourceScope } from '../authorization/scopes/student-resource-scope';
+import { resolveStudentActorScope } from './student-actor-scope';
 import {
   authorizeStudentProfile,
   authorizeSupportStudentProfile,
+  projectStudentDirectoryRow,
   projectStudentProfile,
   studentProfileSectionDecisions,
 } from './student-profile.projection';
@@ -20,7 +22,6 @@ import {
   AudienceType,
   EnrollmentStatus,
   GuardianRelationshipApprovalStatus,
-  GuardianCapability,
   GuardianRelationshipStatus,
   GuardianRelationshipVerificationStatus,
   NotificationChannel,
@@ -51,7 +52,6 @@ import { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import {
   buildActiveGuardianRelationshipWhere,
-  getParentStudentIds,
   isTeacherOnly,
 } from '../common/security/parent-scope';
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
@@ -380,7 +380,14 @@ export class StudentsService {
     };
   }
 
-  async listStudents(query: ListStudentsDto, actor: AuthContext) {
+  async listStudents(
+    query: ListStudentsDto,
+    actor: AuthContext,
+    entitlementState: EntitlementState = {
+      module: 'students',
+      state: 'UNKNOWN',
+    },
+  ) {
     const {
       page = 1,
       limit = 50,
@@ -409,6 +416,9 @@ export class StudentsService {
         where,
         select: {
           id: true,
+          tenantId: true,
+          classId: true,
+          sectionId: true,
           studentSystemId: true,
           firstNameEn: true,
           lastNameEn: true,
@@ -422,6 +432,19 @@ export class StudentsService {
           section: true,
           rollNumber: true,
           lifecycleStatus: true,
+          // Row scope for the shared Phase 3B section rules, so the directory
+          // (and its inspector) projects exactly like GET /students/:id.
+          enrollments: {
+            select: {
+              academicYearId: true,
+              classId: true,
+              sectionId: true,
+              status: true,
+              effectiveFrom: true,
+              effectiveUntil: true,
+              academicYear: { select: { isCurrent: true } },
+            },
+          },
           userId: !isSupportOverride,
           photoFileId: !isSupportOverride,
           class: { select: { id: true, name: true } },
@@ -491,97 +514,122 @@ export class StudentsService {
       }),
     ]);
 
+    const teacherOnly = isTeacherOnly(actor);
     return {
-      items: students.map((student) => ({
-        id: student.id,
-        studentSystemId: student.studentSystemId,
-        firstNameEn: student.firstNameEn,
-        lastNameEn: student.lastNameEn,
-        firstNameNp: student.firstNameNp,
-        lastNameNp: student.lastNameNp,
-        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
-        fullNameNp:
-          student.firstNameNp || student.lastNameNp
-            ? `${student.firstNameNp ?? ''} ${student.lastNameNp ?? ''}`.trim()
-            : null,
-        gender: student.gender,
-        nationality: student.nationality,
-        dateOfBirth: student.dateOfBirth.toISOString().slice(0, 10),
-        admissionNumber: student.admissionNumber,
-        admissionDate: student.admissionDate.toISOString().slice(0, 10),
-        class: {
-          id: student.class.id,
-          name: student.class.name,
-        },
-        className: student.class.name,
-        section: student.section,
-        sectionName: student.sectionRef?.name ?? student.section ?? null,
-        rollNumber: student.rollNumber,
-        guardians: student.guardianLinks.map((link) => ({
-          id: link.guardian.id,
-          fullName: link.guardian.fullName,
-          relation: link.relation,
-          primaryPhone: link.guardian.primaryPhone,
-          secondaryPhone: isSupportOverride
-            ? null
-            : (link.guardian.secondaryPhone ?? null),
-          email: isSupportOverride ? null : (link.guardian.email ?? null),
-          occupation: isSupportOverride
-            ? null
-            : (link.guardian.occupation ?? null),
-          wardNumber: isSupportOverride
-            ? null
-            : (link.guardian.wardNumber ?? null),
-          isPrimary: link.isPrimary,
-          consentedAt: isSupportOverride
-            ? null
-            : (link.guardian.privacyConsentAt?.toISOString?.() ??
-              link.guardian.privacyConsentAt ??
-              null),
-          capabilities: link.capabilities,
-          verificationStatus: link.verificationStatus,
-          status: link.status,
-          effectiveFrom: link.effectiveFrom.toISOString(),
-          effectiveUntil: link.effectiveUntil?.toISOString() ?? null,
-          emergencyContactPriority: link.emergencyContactPriority,
-          approvalStatus: link.approvalStatus,
-          restrictionReasonRef: isSupportOverride
-            ? null
-            : link.restrictionReasonRef,
-        })),
-        ...(isSupportOverride
-          ? {}
-          : { documentCount: student._count.documents }),
-        ...(isSupportOverride
-          ? {}
-          : {
-              email: student.user?.email ?? null,
-              hasLogin: Boolean(student.userId),
-            }),
-        lifecycleStatus: student.lifecycleStatus,
-        photoVersion: isSupportOverride ? null : (student.photoFileId ?? null),
-        qrCredential:
-          !isSupportOverride && student.qrCredentials[0]
-            ? {
-                id: student.qrCredentials[0].id,
-                status: student.qrCredentials[0].status,
-                createdById: student.qrCredentials[0].createdById,
-                updatedById: student.qrCredentials[0].updatedById,
-                expiresAt:
-                  student.qrCredentials[0].expiresAt?.toISOString() ?? null,
-                createdAt: student.qrCredentials[0].createdAt.toISOString(),
-                rotatedAt:
-                  student.qrCredentials[0].rotatedAt?.toISOString() ?? null,
-                revokedAt:
-                  student.qrCredentials[0].revokedAt?.toISOString() ?? null,
-                rotateReason: student.qrCredentials[0].rotateReason ?? null,
-                revokeReason: student.qrCredentials[0].revokeReason ?? null,
-                lastScannedAt:
-                  student.qrCredentials[0].lastScannedAt?.toISOString() ?? null,
-                fileAssetId: student.qrCredentials[0].fileAssetId ?? null,
-              }
-            : null,
-      })),
+      items: students.map((student) => {
+        // Phase 3B: a directory row (and the inspector built from it) uses
+        // the SAME section rules as GET /students/:id for this row's scope.
+        // Teacher rows are already limited to assigned sections by
+        // buildActorStudentScope, so contact release matches the profile.
+        const authorization = isSupportOverride
+          ? authorizeSupportStudentProfile({
+              lifecycleState: student.lifecycleStatus ?? null,
+              entitlementState,
+            })
+          : authorizeStudentProfile({
+              actor,
+              resource: studentResourceScope(student),
+              teacherAssignmentVerified: teacherOnly,
+              lifecycleState: student.lifecycleStatus ?? null,
+              entitlementState,
+            });
+        return projectStudentDirectoryRow(
+          {
+            id: student.id,
+            studentSystemId: student.studentSystemId,
+            firstNameEn: student.firstNameEn,
+            lastNameEn: student.lastNameEn,
+            firstNameNp: student.firstNameNp,
+            lastNameNp: student.lastNameNp,
+            fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+            fullNameNp:
+              student.firstNameNp || student.lastNameNp
+                ? `${student.firstNameNp ?? ''} ${student.lastNameNp ?? ''}`.trim()
+                : null,
+            gender: student.gender,
+            nationality: student.nationality,
+            dateOfBirth: student.dateOfBirth.toISOString().slice(0, 10),
+            admissionNumber: student.admissionNumber,
+            admissionDate: student.admissionDate.toISOString().slice(0, 10),
+            class: {
+              id: student.class.id,
+              name: student.class.name,
+            },
+            className: student.class.name,
+            section: student.section,
+            sectionName: student.sectionRef?.name ?? student.section ?? null,
+            rollNumber: student.rollNumber,
+            guardians: student.guardianLinks.map((link) => ({
+              id: link.guardian.id,
+              fullName: link.guardian.fullName,
+              relation: link.relation,
+              primaryPhone: link.guardian.primaryPhone,
+              secondaryPhone: isSupportOverride
+                ? null
+                : (link.guardian.secondaryPhone ?? null),
+              email: isSupportOverride ? null : (link.guardian.email ?? null),
+              occupation: isSupportOverride
+                ? null
+                : (link.guardian.occupation ?? null),
+              wardNumber: isSupportOverride
+                ? null
+                : (link.guardian.wardNumber ?? null),
+              isPrimary: link.isPrimary,
+              consentedAt: isSupportOverride
+                ? null
+                : (link.guardian.privacyConsentAt?.toISOString?.() ??
+                  link.guardian.privacyConsentAt ??
+                  null),
+              capabilities: link.capabilities,
+              verificationStatus: link.verificationStatus,
+              status: link.status,
+              effectiveFrom: link.effectiveFrom.toISOString(),
+              effectiveUntil: link.effectiveUntil?.toISOString() ?? null,
+              emergencyContactPriority: link.emergencyContactPriority,
+              approvalStatus: link.approvalStatus,
+              restrictionReasonRef: isSupportOverride
+                ? null
+                : link.restrictionReasonRef,
+            })),
+            ...(isSupportOverride
+              ? {}
+              : { documentCount: student._count.documents }),
+            ...(isSupportOverride
+              ? {}
+              : {
+                  email: student.user?.email ?? null,
+                  hasLogin: Boolean(student.userId),
+                }),
+            lifecycleStatus: student.lifecycleStatus,
+            photoVersion: isSupportOverride
+              ? null
+              : (student.photoFileId ?? null),
+            qrCredential:
+              !isSupportOverride && student.qrCredentials[0]
+                ? {
+                    id: student.qrCredentials[0].id,
+                    status: student.qrCredentials[0].status,
+                    createdById: student.qrCredentials[0].createdById,
+                    updatedById: student.qrCredentials[0].updatedById,
+                    expiresAt:
+                      student.qrCredentials[0].expiresAt?.toISOString() ?? null,
+                    createdAt: student.qrCredentials[0].createdAt.toISOString(),
+                    rotatedAt:
+                      student.qrCredentials[0].rotatedAt?.toISOString() ?? null,
+                    revokedAt:
+                      student.qrCredentials[0].revokedAt?.toISOString() ?? null,
+                    rotateReason: student.qrCredentials[0].rotateReason ?? null,
+                    revokeReason: student.qrCredentials[0].revokeReason ?? null,
+                    lastScannedAt:
+                      student.qrCredentials[0].lastScannedAt?.toISOString() ??
+                      null,
+                    fileAssetId: student.qrCredentials[0].fileAssetId ?? null,
+                  }
+                : null,
+          },
+          authorization,
+        );
+      }),
       total,
       page,
       limit,
@@ -916,23 +964,21 @@ export class StudentsService {
     actor: AuthContext,
     academicYearId?: string,
   ): Promise<Prisma.StudentWhereInput | null> {
-    const parentStudentIds = await getParentStudentIds(
+    // Shared with student search so every collection read scopes the same way.
+    const scope = await resolveStudentActorScope(
       this.prisma,
+      this.teacherScopeService,
       actor,
-      GuardianCapability.ACADEMICS_VIEW,
+      academicYearId,
     );
-    if (parentStudentIds !== null) {
-      return { id: { in: parentStudentIds } };
-    }
-
-    if (!isTeacherOnly(actor)) {
+    if (scope.kind === 'tenant') {
       return null; // no restriction for admin/principal/accountant/etc.
     }
+    if (scope.kind === 'students') {
+      return { id: { in: scope.studentIds } };
+    }
 
-    const scope = await this.teacherScopeService.resolveReadableScope(actor, {
-      academicYearId,
-    });
-    const clauses: Prisma.StudentWhereInput[] = [...scope.allSectionIds].map(
+    const clauses: Prisma.StudentWhereInput[] = scope.sectionIds.map(
       (sectionId): Prisma.StudentWhereInput => ({ sectionId }),
     );
 
