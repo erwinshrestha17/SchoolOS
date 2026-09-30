@@ -51,6 +51,8 @@ export const STUDENT_PROFILE_KEY_SECTIONS = {
   invoices: 'fees',
   attendanceRecords: 'attendance',
   activityPosts: 'activity',
+  academicResults: 'academics',
+  homeworkSubmissions: 'homework',
 } as const satisfies Record<string, StudentProfileSection>;
 
 /** Guardian fields released by `guardianContacts` alone. */
@@ -100,6 +102,10 @@ export function authorizeStudentProfile(
     fees: () => holds('ledger:read') || holds('fees:manage'),
     attendance: () => holds('attendance:read'),
     activity: () => holds('activity_feed:read'),
+    // Phase 5F: marks/results are academic data. Finance-only personas
+    // (Accountant) hold neither permission and never receive them.
+    academics: () => holds('results:read') || holds('marks:read'),
+    homework: () => holds('homework:read'),
   });
 
   // INVARIANT: UPDATE_PROFILE must imply `health` and `identityCredentials`.
@@ -149,6 +155,8 @@ export function authorizeSupportStudentProfile(input: {
       fees: false,
       attendance: false,
       activity: false,
+      academics: false,
+      homework: false,
     },
     lifecycleState: input.lifecycleState,
     entitlementState: input.entitlementState,
@@ -174,6 +182,8 @@ export function studentProfileSectionDecisions(
     fees: () => authorization.authorizedSections.includes('fees'),
     attendance: () => authorization.authorizedSections.includes('attendance'),
     activity: () => authorization.authorizedSections.includes('activity'),
+    academics: () => authorization.authorizedSections.includes('academics'),
+    homework: () => authorization.authorizedSections.includes('homework'),
   });
 }
 

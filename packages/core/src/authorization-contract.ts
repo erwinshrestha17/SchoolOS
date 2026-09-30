@@ -210,6 +210,10 @@ export const STUDENT_PROFILE_SECTIONS = [
   "attendance",
   /** Activity posts that mention or target the student. */
   "activity",
+  /** Published, current report-card results (Phase 5F; never drafts). */
+  "academics",
+  /** The student's homework submissions and review state (Phase 5F). */
+  "homework",
 ] as const;
 export type StudentProfileSection = (typeof STUDENT_PROFILE_SECTIONS)[number];
 

@@ -5070,6 +5070,111 @@ describe('students lifecycle hardening', () => {
     expect(profile.attendanceRecords[0].attendanceDate).toBe('2026-04-27');
   });
 
+  it('Phase 5F: academics and homework are fetched only when authorized, tenant- and student-scoped', async () => {
+    const student = buildStudent({});
+    const financeOnly = buildPrisma({ studentFindFirstQueue: [student] });
+    const finance = buildService(financeOnly).service;
+    const financeProfile = await finance.getStudentProfile(
+      student.id,
+      { ...actor, permissions: ['students:read', 'ledger:read'] },
+      studentsEntitlement,
+    );
+    expect(financeOnly.reportCard.findMany).not.toHaveBeenCalled();
+    expect(financeOnly.homeworkSubmission.findMany).not.toHaveBeenCalled();
+    expect(financeProfile).not.toHaveProperty('academicResults');
+    expect(financeProfile).not.toHaveProperty('homeworkSubmissions');
+
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      reportCardFindManyResult: [
+        {
+          id: 'rc-1',
+          version: 2,
+          percentage: '81.50',
+          grade: 'A',
+          gpa: '3.60',
+          publishedAt: new Date('2026-06-01T00:00:00.000Z'),
+          examTerm: { id: 'term-1', name: 'First Terminal' },
+          academicYear: { id: 'year-1', name: '2083' },
+          subjectResults: [
+            {
+              subjectId: 'sub-1',
+              subjectName: 'Science',
+              grade: 'A',
+              gpa: '3.60',
+              percentage: '80',
+              resultStatus: 'PASS',
+              version: 2,
+            },
+            {
+              subjectId: 'sub-1',
+              subjectName: 'Science',
+              grade: 'B',
+              gpa: '3.00',
+              percentage: '70',
+              resultStatus: 'PASS',
+              version: 1,
+            },
+          ],
+        },
+      ],
+      homeworkSubmissionFindManyResult: [
+        {
+          id: 'hs-1',
+          status: 'SUBMITTED',
+          submittedAt: new Date('2026-06-02T00:00:00.000Z'),
+          reviewedAt: null,
+          score: null,
+          feedback: 'private teacher feedback',
+          homework: {
+            id: 'hw-1',
+            title: 'Photosynthesis',
+            dueDate: new Date('2026-06-03T00:00:00.000Z'),
+            status: 'ASSIGNED',
+            subject: { id: 'sub-1', name: 'Science' },
+          },
+        },
+      ],
+    });
+    const { service } = buildService(prisma);
+    const profile = await service.getStudentProfile(
+      student.id,
+      {
+        ...actor,
+        permissions: ['students:read', 'results:read', 'homework:read'],
+      },
+      studentsEntitlement,
+    );
+    expect(prisma.reportCard.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          studentId: student.id,
+          isCurrent: true,
+          publishStatus: 'PUBLISHED',
+        }),
+      }),
+    );
+    expect(prisma.homeworkSubmission.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          studentId: student.id,
+        }),
+      }),
+    );
+    // Only the current version's subject rows are shown.
+    expect(profile.academicResults[0].subjects).toEqual([
+      expect.objectContaining({ subjectName: 'Science', grade: 'A' }),
+    ]);
+    expect(profile.homeworkSubmissions[0]).toEqual(
+      expect.objectContaining({ title: 'Photosynthesis', status: 'SUBMITTED' }),
+    );
+    expect(JSON.stringify(profile.homeworkSubmissions)).not.toContain(
+      'private teacher feedback',
+    );
+  });
+
   it('projects support student records without financial, health, credential, file, attendance, or activity data', async () => {
     const student = {
       ...buildStudent({
@@ -5146,6 +5251,8 @@ describe('students lifecycle hardening', () => {
       'generatedDocuments',
       'attendanceRecords',
       'activityPosts',
+      'academicResults',
+      'homeworkSubmissions',
     ])
       expect(profile).not.toHaveProperty(key);
     for (const key of [
@@ -7385,6 +7492,8 @@ function buildPrisma(options: {
   guardianIdentityVerificationFindManyResult?: unknown[];
   guardianIdentityVerificationFindFirstQueue?: unknown[];
   activityPostFindManyResult?: unknown[];
+  reportCardFindManyResult?: unknown[];
+  homeworkSubmissionFindManyResult?: unknown[];
   transactionGuardianIdentityVerificationUpdateManyCount?: number;
   transactionStudentUpdateResult?: unknown;
   transactionStudentUpdateManyCount?: number;
@@ -8011,6 +8120,16 @@ function buildPrisma(options: {
       findMany: jest
         .fn()
         .mockResolvedValue(options.activityPostFindManyResult ?? []),
+    },
+    reportCard: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.reportCardFindManyResult ?? []),
+    },
+    homeworkSubmission: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.homeworkSubmissionFindManyResult ?? []),
     },
     studentLifecycleTransition: {
       create: jest.fn().mockResolvedValue({ id: 'transition-1' }),

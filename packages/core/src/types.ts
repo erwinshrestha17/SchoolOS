@@ -6623,6 +6623,39 @@ export type StudentProfileAttendanceRecord = {
   submittedAt: string | null;
 };
 
+/** Phase 5F `academics` section: published, current report-card results. */
+export type StudentProfileAcademicResult = {
+  id: string;
+  examTerm: { id: string; name: string };
+  academicYear: { id: string; name: string };
+  percentage: number;
+  grade: string;
+  gpa: number;
+  publishedAt: string | null;
+  subjects: Array<{
+    subjectId: string;
+    subjectName: string;
+    grade: string;
+    gpa: number;
+    percentage: number;
+    resultStatus: string;
+  }>;
+};
+
+/** Phase 5F `homework` section: the student's submissions. */
+export type StudentProfileHomeworkSubmission = {
+  id: string;
+  homeworkId: string;
+  title: string;
+  subject: { id: string; name: string };
+  dueDate: string;
+  homeworkStatus: string;
+  status: string;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  score: number | null;
+};
+
 /** Guardian fields released by the `guardianContacts` section. */
 export type GuardianContactProfile = Pick<
   GuardianProfile,
@@ -6659,6 +6692,8 @@ export type StudentProfileDetail = {
   invoices?: StudentProfileInvoice[];
   attendanceRecords?: StudentProfileAttendanceRecord[];
   activityPosts?: ActivityPost[];
+  academicResults?: StudentProfileAcademicResult[];
+  homeworkSubmissions?: StudentProfileHomeworkSubmission[];
   authorization?: StudentProfileAuthorization;
 };
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { Surface } from '@/components/schoolos';
-import { StudentProfileDetail } from '@schoolos/core';
+import { formatBsDate, type StudentProfileDetail } from '@schoolos/core';
 import { FileText, Download, Award, Calendar, BookOpen } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/session-provider';
@@ -9,9 +9,18 @@ import { useSession } from '@/components/session-provider';
 type AcademicsTabProps = {
   profile: StudentProfileDetail;
   onOpenPdf: (kind: string) => void;
+  /** Server-authorized `academics` section (Phase 5F). */
+  canViewResults?: boolean;
+  /** Server-authorized `homework` section (Phase 5F). */
+  canViewHomework?: boolean;
 };
 
-export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
+export function AcademicsTab({
+  profile,
+  onOpenPdf,
+  canViewResults = false,
+  canViewHomework = false,
+}: AcademicsTabProps) {
   const { session } = useSession();
   const canViewReportCards = session?.user.isSupportOverride !== true;
   const reportCards = (profile.generatedDocuments || []).filter(
@@ -150,6 +159,116 @@ export function AcademicsTab({ profile, onOpenPdf }: AcademicsTabProps) {
           </Surface>
         ) : null}
       </div>
+
+      {canViewResults ? (
+        <Surface
+          title="Published Results"
+          description="Current published term results. Drafts and unpublished marks never appear here."
+        >
+          {profile.academicResults && profile.academicResults.length > 0 ? (
+            <div className="space-y-4">
+              {profile.academicResults.map((result) => (
+                <div
+                  key={result.id}
+                  className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-bold text-slate-900">
+                      {result.examTerm.name} · {result.academicYear.name}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="info">Grade {result.grade}</Badge>
+                      <Badge variant="neutral">
+                        GPA {result.gpa.toFixed(2)}
+                      </Badge>
+                    </div>
+                  </div>
+                  {result.subjects.length > 0 ? (
+                    <table className="mt-3 w-full text-sm">
+                      <thead className="text-left text-xs uppercase text-slate-500">
+                        <tr>
+                          <th className="py-1">Subject</th>
+                          <th>Grade</th>
+                          <th>GPA</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {result.subjects.map((subject) => (
+                          <tr key={subject.subjectId}>
+                            <td className="py-1">{subject.subjectName}</td>
+                            <td>{subject.grade}</td>
+                            <td>{subject.gpa.toFixed(2)}</td>
+                            <td>{subject.resultStatus}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-6 text-center text-sm text-slate-500">
+              No published results yet.
+            </p>
+          )}
+        </Surface>
+      ) : null}
+
+      {canViewHomework ? (
+        <Surface
+          title="Homework"
+          description="Recent homework for this student and its submission state."
+        >
+          {profile.homeworkSubmissions &&
+          profile.homeworkSubmissions.length > 0 ? (
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="py-2">Homework</th>
+                  <th>Subject</th>
+                  <th>Due</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {profile.homeworkSubmissions.map((item) => (
+                  <tr key={item.id}>
+                    <td className="py-2 font-medium text-slate-900">
+                      <BookOpen
+                        size={14}
+                        className="mr-1 inline"
+                        aria-hidden="true"
+                      />
+                      {item.title}
+                    </td>
+                    <td>{item.subject.name}</td>
+                    <td>{formatBsDate(item.dueDate)}</td>
+                    <td>
+                      <Badge
+                        variant={
+                          item.status === 'NOT_SUBMITTED'
+                            ? 'warning'
+                            : item.reviewedAt
+                              ? 'success'
+                              : 'info'
+                        }
+                      >
+                        {item.status.replaceAll('_', ' ')}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="py-6 text-center text-sm text-slate-500">
+              No homework recorded.
+            </p>
+          )}
+        </Surface>
+      ) : null}
     </div>
   );
 }

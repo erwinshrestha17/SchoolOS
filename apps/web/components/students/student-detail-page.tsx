@@ -124,6 +124,8 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const canViewQr = access.sees('qrCredential');
   const canViewHealth = access.sees('health');
   const canViewActivity = access.sees('activity');
+  const canViewAcademicResults = access.sees('academics');
+  const canViewHomework = access.sees('homework');
   const canViewGuardians = access.sees('guardianContacts');
   const canAdministerGuardians =
     canViewGuardians && access.sees('guardianAdministration');
@@ -507,6 +509,8 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
             <ProfileTabs.AcademicsTab
               profile={profile}
               onOpenPdf={openStudentPdf}
+              canViewResults={canViewAcademicResults}
+              canViewHomework={canViewHomework}
             />
           </TabsContent>
           {canManageDocuments ? (

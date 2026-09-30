@@ -24,6 +24,7 @@ import {
   GuardianRelationshipApprovalStatus,
   GuardianRelationshipStatus,
   GuardianRelationshipVerificationStatus,
+  HomeworkAssignmentStatus,
   NotificationChannel,
   OtpPurpose,
   Prisma,
@@ -1267,6 +1268,57 @@ export class StudentsService {
           take: 12,
         });
 
+    // Phase 5F: denied sections are never queried.
+    const academicResults = !allowed.academics
+      ? []
+      : await this.prisma.reportCard.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: student.id,
+            isCurrent: true,
+            publishStatus: 'PUBLISHED',
+          },
+          include: {
+            examTerm: { select: { id: true, name: true } },
+            academicYear: { select: { id: true, name: true } },
+            subjectResults: {
+              orderBy: [{ subjectName: 'asc' }],
+            },
+          },
+          orderBy: [{ publishedAt: 'desc' }],
+          take: 6,
+        });
+
+    const homeworkSubmissions = !allowed.homework
+      ? []
+      : await this.prisma.homeworkSubmission.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: student.id,
+            homework: {
+              status: {
+                in: [
+                  HomeworkAssignmentStatus.ASSIGNED,
+                  HomeworkAssignmentStatus.CLOSED,
+                ],
+              },
+            },
+          },
+          include: {
+            homework: {
+              select: {
+                id: true,
+                title: true,
+                dueDate: true,
+                status: true,
+                subject: { select: { id: true, name: true } },
+              },
+            },
+          },
+          orderBy: [{ homework: { dueDate: 'desc' } }],
+          take: 20,
+        });
+
     const latestEnrollment = (student.enrollments || [])[0] ?? null;
     const classTeacher = student.sectionRef?.classTeacher
       ? {
@@ -1451,6 +1503,37 @@ export class StudentsService {
           lateAt: record.lateAt?.toISOString() ?? null,
           submittedAt:
             record.attendanceSession.submittedAt?.toISOString() ?? null,
+        })),
+        academicResults: academicResults.map((card) => ({
+          id: card.id,
+          examTerm: card.examTerm,
+          academicYear: card.academicYear,
+          percentage: Number(card.percentage),
+          grade: card.grade,
+          gpa: Number(card.gpa),
+          publishedAt: card.publishedAt?.toISOString() ?? null,
+          subjects: card.subjectResults
+            .filter((result) => result.version === card.version)
+            .map((result) => ({
+              subjectId: result.subjectId,
+              subjectName: result.subjectName,
+              grade: result.grade,
+              gpa: Number(result.gpa),
+              percentage: Number(result.percentage),
+              resultStatus: result.resultStatus,
+            })),
+        })),
+        homeworkSubmissions: homeworkSubmissions.map((submission) => ({
+          id: submission.id,
+          homeworkId: submission.homework.id,
+          title: submission.homework.title,
+          subject: submission.homework.subject,
+          dueDate: submission.homework.dueDate.toISOString(),
+          homeworkStatus: submission.homework.status,
+          status: submission.status,
+          submittedAt: submission.submittedAt?.toISOString() ?? null,
+          reviewedAt: submission.reviewedAt?.toISOString() ?? null,
+          score: submission.score === null ? null : Number(submission.score),
         })),
         activityPosts: activityPosts.map((post) => ({
           id: post.id,

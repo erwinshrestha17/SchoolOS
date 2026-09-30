@@ -78,6 +78,8 @@ describe('Student profile projection policy (Phase 3B)', () => {
       'fees',
       'attendance',
       'activity',
+      'academics',
+      'homework',
     ]);
     for (const section of [
       ...Object.values(STUDENT_RECORD_KEY_SECTIONS),
@@ -107,5 +109,73 @@ describe('Student profile projection policy (Phase 3B)', () => {
     expect(projected).not.toHaveProperty('guardians');
     expect(projected).toHaveProperty('enrollments');
     expect(JSON.stringify(projected)).not.toContain('secret');
+  });
+});
+
+describe('Student 360 persona projection (Phase 5F)', () => {
+  // Bind to the shipped role templates, not hand-picked permission lists, so
+  // a template change that leaks academics to finance fails here.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { systemRolePermissions } = require('@schoolos/core') as {
+    systemRolePermissions: Record<string, string[]>;
+  };
+  const sectionsFor = (role: string, teacher = false) =>
+    authorizeStudentProfile({
+      actor: actorWith(systemRolePermissions[role], [role]),
+      resource,
+      teacherAssignmentVerified: teacher,
+      lifecycleState: 'ACTIVE',
+      entitlementState: enabled,
+    }).authorizedSections;
+
+  it('teacher: identity, attendance, academics, homework, permitted guardian contact — no fees, health or documents', () => {
+    const sections = sectionsFor('teacher', true);
+    expect(sections).toEqual(
+      expect.arrayContaining([
+        'identity',
+        'attendance',
+        'academics',
+        'homework',
+        'guardianContacts',
+      ]),
+    );
+    for (const denied of [
+      'fees',
+      'health',
+      'documents',
+      'guardianAdministration',
+    ])
+      expect(sections).not.toContain(denied);
+  });
+
+  it('accountant: identity and fees — never marks, homework, attendance or health', () => {
+    const sections = sectionsFor('accountant');
+    expect(sections).toEqual(expect.arrayContaining(['identity', 'fees']));
+    for (const denied of ['academics', 'homework', 'attendance', 'health'])
+      expect(sections).not.toContain(denied);
+  });
+
+  it('principal: oversight includes academics, attendance and guardian administration — not fees or health', () => {
+    const sections = sectionsFor('principal');
+    expect(sections).toEqual(
+      expect.arrayContaining(['identity', 'academics', 'attendance']),
+    );
+    for (const denied of ['fees', 'health'])
+      expect(sections).not.toContain(denied);
+  });
+
+  it('denied academic sections are absent from the JSON, not empty', () => {
+    const projected = projectStudentProfile(
+      {
+        student: { id: 'student-1' },
+        academicResults: [{ id: 'rc-1', grade: 'A' }],
+        homeworkSubmissions: [{ id: 'hs-1' }],
+        invoices: [{ id: 'inv-1' }],
+      },
+      authorize(['students:read', 'ledger:read']),
+    );
+    expect(projected).not.toHaveProperty('academicResults');
+    expect(projected).not.toHaveProperty('homeworkSubmissions');
+    expect(projected).toHaveProperty('invoices');
   });
 });
