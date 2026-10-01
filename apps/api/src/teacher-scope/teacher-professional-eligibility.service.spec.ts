@@ -175,7 +175,7 @@ function world(overrides: Partial<Record<string, Row[]>> = {}) {
     teacherEligibilityAssessment: {
       create: jest.fn(({ data: row }) => {
         created.push(row);
-        return { id: `a${created.length}` };
+        return { id: `a${String(created.length)}` };
       }),
     },
   };
