@@ -3,7 +3,7 @@
 import { createHmac, randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { repoRoot, loadEnvFile } from './lib/schoolos-env.mjs';
+import { repoRoot, loadEnvFile } from '../lib/schoolos-env.mjs';
 
 const apiBaseUrl =
   process.env.SMOKE_API_BASE_URL ??
@@ -451,7 +451,7 @@ async function main() {
     record(
       'Online gateway readiness',
       false,
-      'mock gateway not running (start scripts/mock-payment-gateway-local.mjs)',
+      'mock gateway not running (start scripts/smoke/mock-payment-gateway-local.mjs)',
     );
     record(
       'Online payment initiate',

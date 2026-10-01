@@ -2,7 +2,7 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { repoRoot, loadEnvFile } from './lib/schoolos-env.mjs';
+import { repoRoot, loadEnvFile } from '../lib/schoolos-env.mjs';
 
 const apiBaseUrl =
   process.env.SMOKE_API_BASE_URL ??
@@ -62,39 +62,33 @@ function authHeaders(token) {
 async function main() {
   const adminLogin = await login('admin@schoolos.com');
   if (adminLogin.token) {
-    const books = await request('/library/books?page=1&limit=5', {
+    const menuItems = await request('/canteen/menu-items?page=1&limit=5', {
       headers: authHeaders(adminLogin.token),
     });
     record(
-      'Librarian/admin catalogue read',
-      books.status === 200,
-      `HTTP ${books.status}`,
+      'Canteen menu items read (entitled tenant)',
+      menuItems.status === 200,
+      `HTTP ${menuItems.status}`,
+    );
+
+    const posSales = await request('/canteen/pos-sales?page=1&limit=5', {
+      headers: authHeaders(adminLogin.token),
+    });
+    record(
+      'Canteen POS sales read',
+      posSales.status === 200,
+      `HTTP ${posSales.status}`,
     );
   } else {
     record(
-      'Librarian/admin catalogue read',
+      'Canteen menu items read (entitled tenant)',
       false,
       `login failed HTTP ${adminLogin.status}`,
     );
-  }
-
-  const teacherLogin = await login('classteacher.1a@schoolos.com');
-  if (teacherLogin.token) {
-    const myIssues = await request('/library/my/issues?page=1&limit=5', {
-      headers: authHeaders(teacherLogin.token),
-    });
     record(
-      'Teacher scoped library issue history',
-      myIssues.status === 200,
-      myIssues.status === 403
-        ? 'HTTP 403 — teacher lacks library entitlement (needs seed/role review)'
-        : `HTTP ${myIssues.status}`,
-    );
-  } else {
-    record(
-      'Teacher scoped library issue history',
+      'Canteen POS sales read',
       true,
-      `skipped — teacher login failed HTTP ${teacherLogin.status}`,
+      'skipped — admin login failed',
     );
   }
 
@@ -105,10 +99,10 @@ async function main() {
 
 function writeEvidence(passed) {
   mkdirSync(evidenceDir, { recursive: true });
-  const path = join(evidenceDir, `m8-library-core-${stamp}-local.md`);
+  const path = join(evidenceDir, `m10-canteen-core-${stamp}-local.md`);
   writeFileSync(
     path,
-    `# M8 Library verification (${stamp}, local)
+    `# M10 Canteen verification (${stamp}, local)
 
 - Tenant slug: \`${tenantSlug}\`
 - API: ${apiBaseUrl}

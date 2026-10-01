@@ -3,7 +3,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { repoRoot, loadEnvFile } from './lib/schoolos-env.mjs';
+import { repoRoot, loadEnvFile } from '../lib/schoolos-env.mjs';
 
 const apiBaseUrl =
   process.env.SMOKE_API_BASE_URL ??

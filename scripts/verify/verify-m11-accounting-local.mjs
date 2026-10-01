@@ -2,7 +2,7 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { repoRoot, loadEnvFile } from './lib/schoolos-env.mjs';
+import { repoRoot, loadEnvFile } from '../lib/schoolos-env.mjs';
 
 const apiBaseUrl =
   process.env.SMOKE_API_BASE_URL ??
@@ -20,7 +20,8 @@ loadEnvFile(join(repoRoot, 'apps/api/.env'));
 
 const checks = [];
 const evidenceDir = join(repoRoot, 'docs/production/evidence');
-const stamp = new Date().toISOString().slice(0, 10);
+const evidenceDate = new Date().toISOString().slice(0, 10);
+const evidenceStamp = new Date().toISOString().replace(/[:.]/g, '-');
 
 async function request(path, options = {}) {
   const response = await fetch(`${apiBaseUrl}${path}`, options);
@@ -39,14 +40,14 @@ function record(name, ok, detail = '') {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-async function login(email) {
+async function login(email, password = personaPassword) {
   const result = await request('/auth/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'User-Agent': 'flutter',
     },
-    body: JSON.stringify({ tenantSlug, email, password: personaPassword }),
+    body: JSON.stringify({ tenantSlug, email, password }),
   });
   const token = result.body?.data?.accessToken ?? result.body?.accessToken;
   return { ...result, token };
@@ -55,6 +56,7 @@ async function login(email) {
 function authHeaders(token) {
   return {
     Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
     'User-Agent': 'flutter',
   };
 }
@@ -67,53 +69,67 @@ function getItems(body) {
 }
 
 async function main() {
-  const driverLogin = await login('driver@schoolos.com');
-  if (driverLogin.token) {
-    const assignments = await request('/transport/driver/assignments', {
-      headers: authHeaders(driverLogin.token),
+  const accountantLogin = await login('accountant@schoolos.com');
+  if (accountantLogin.token) {
+    const journals = await request('/accounting/journals?page=1&limit=5', {
+      headers: authHeaders(accountantLogin.token),
     });
     record(
-      'Driver assigned trips list',
-      assignments.status === 200,
-      `HTTP ${assignments.status}`,
+      'Accountant journal list',
+      journals.status === 200,
+      `HTTP ${journals.status}`,
     );
   } else {
     record(
-      'Driver assigned trips list',
+      'Accountant journal list',
       false,
-      `login failed HTTP ${driverLogin.status}`,
+      `login failed HTTP ${accountantLogin.status}`,
     );
   }
 
-  const parentLogin = await login('guardian.c01a001@schoolos.test');
-  if (parentLogin.token) {
-    const parentAuth = authHeaders(parentLogin.token);
-    const children = getItems(
-      (await request('/mobile/me/students', { headers: parentAuth })).body,
+  const e2eAccountantLogin = await login('e2e.accountant@schoolos.test');
+  if (e2eAccountantLogin.token) {
+    const journals = await request('/accounting/journals?page=1&limit=5', {
+      headers: authHeaders(e2eAccountantLogin.token),
+    });
+    const journalId = getItems(journals.body)[0]?.id;
+    record(
+      'E2E accountant journal read',
+      journals.status === 200,
+      `HTTP ${journals.status}`,
     );
-    const childId = children[0]?.id;
-    if (childId) {
-      const status = await request(
-        `/transport/parent/students/${childId}/status`,
-        { headers: parentAuth },
+
+    if (journalId) {
+      const deniedApprove = await request(
+        `/accounting/journals/${journalId}/approve`,
+        {
+          method: 'POST',
+          headers: authHeaders(e2eAccountantLogin.token),
+          body: JSON.stringify({ reason: 'M11 verify boundary probe' }),
+        },
       );
       record(
-        'Parent linked-child transport status',
-        status.status === 200,
-        `HTTP ${status.status}`,
+        'Prepare role denied journal approve',
+        deniedApprove.status === 403,
+        `HTTP ${deniedApprove.status}`,
       );
     } else {
       record(
-        'Parent linked-child transport status',
+        'Prepare role denied journal approve',
         false,
-        'skipped — no linked children',
+        'cannot verify — no journals seeded',
       );
     }
   } else {
     record(
-      'Parent linked-child transport status',
+      'E2E accountant journal read',
       false,
-      `login failed HTTP ${parentLogin.status}`,
+      `login failed HTTP ${e2eAccountantLogin.status}`,
+    );
+    record(
+      'Prepare role denied journal approve',
+      false,
+      'cannot verify — e2e accountant login failed',
     );
   }
 
@@ -124,10 +140,13 @@ async function main() {
 
 function writeEvidence(passed) {
   mkdirSync(evidenceDir, { recursive: true });
-  const path = join(evidenceDir, `m9-transport-core-${stamp}-local.md`);
+  const path = join(
+    evidenceDir,
+    `m11-accounting-core-${evidenceStamp}-local.md`,
+  );
   writeFileSync(
     path,
-    `# M9 Transport verification (${stamp}, local)
+    `# M11 Accounting verification (${evidenceDate}, local)
 
 - Tenant slug: \`${tenantSlug}\`
 - API: ${apiBaseUrl}

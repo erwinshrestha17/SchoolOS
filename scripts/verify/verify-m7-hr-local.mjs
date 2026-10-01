@@ -2,22 +2,18 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { repoRoot, loadEnvFile } from './lib/schoolos-env.mjs';
+import { repoRoot, loadEnvFile } from '../lib/schoolos-env.mjs';
 
 const apiBaseUrl =
   process.env.SMOKE_API_BASE_URL ??
   process.env.STAGING_API_BASE_URL ??
   'http://localhost:4000/api/v1';
 
-const tenantSlug = process.env.SMOKE_TENANT_SLUG ?? 'pilot-rehearsal-1';
+const tenantSlug = process.env.SMOKE_TENANT_SLUG ?? 'default-school';
 const personaPassword =
   process.env.SMOKE_PASSWORD ??
-  process.env.PILOT_REHEARSAL_PERSONA_PASSWORD ??
-  'PilotRehearsal1!';
-const classTeacherEmail =
-  process.env.SMOKE_CLASS_TEACHER_EMAIL ?? 'classteacher.1a@schoolos.com';
-const parentEmail =
-  process.env.SMOKE_PARENT_EMAIL ?? 'guardian.c01a001@schoolos.test';
+  process.env.SCHOOLOS_DEMO_PASSWORD ??
+  'schoolos-local-demo-only';
 
 loadEnvFile(join(repoRoot, 'apps/api/.env.staging-local'));
 loadEnvFile(join(repoRoot, 'apps/api/.env'));
@@ -43,18 +39,14 @@ function record(name, ok, detail = '') {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-async function login(email) {
+async function login(email, password = personaPassword) {
   const result = await request('/auth/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'User-Agent': 'flutter',
     },
-    body: JSON.stringify({
-      tenantSlug,
-      email,
-      password: personaPassword,
-    }),
+    body: JSON.stringify({ tenantSlug, email, password }),
   });
   const token = result.body?.data?.accessToken ?? result.body?.accessToken;
   return { ...result, token };
@@ -75,59 +67,78 @@ function getItems(body) {
 }
 
 async function main() {
-  const classTeacherLogin = await login(classTeacherEmail);
-  record(
-    'M5 class teacher login',
-    classTeacherLogin.token,
-    classTeacherLogin.token ? 'token received' : `HTTP ${classTeacherLogin.status}`,
-  );
-
-  if (classTeacherLogin.token) {
-    const scopesResult = await request('/mobile/teacher/activity/scopes', {
-      headers: authHeaders(classTeacherLogin.token),
+  const staffLogin = await login('staff@schoolos.com');
+  if (staffLogin.token) {
+    const ownPayslips = await request('/payroll/me/payslips', {
+      headers: authHeaders(staffLogin.token),
     });
-    const scopes = getItems(scopesResult.body);
     record(
-      'Teacher activity scopes reachable',
-      scopesResult.status === 200,
-      `HTTP ${scopesResult.status}, count=${scopes.length}`,
+      'Staff self-service own payslips',
+      ownPayslips.status === 200,
+      `HTTP ${ownPayslips.status}`,
     );
 
-    const postsResult = await request('/mobile/teacher/activity/posts?limit=5', {
-      headers: authHeaders(classTeacherLogin.token),
+    const deniedAll = await request('/payroll/payslips', {
+      headers: authHeaders(staffLogin.token),
     });
     record(
-      'Teacher activity posts list',
-      postsResult.status === 200,
-      `HTTP ${postsResult.status}`,
+      'Staff denied admin payslip list',
+      deniedAll.status === 403,
+      `HTTP ${deniedAll.status}`,
+    );
+  } else {
+    record(
+      'Staff self-service own payslips',
+      false,
+      `login failed HTTP ${staffLogin.status}`,
+    );
+    record(
+      'Staff denied admin payslip list',
+      true,
+      'skipped — staff login failed',
     );
   }
 
-  const parentLogin = await login(parentEmail);
-  record(
-    'M5 parent login',
-    Boolean(parentLogin.token),
-    parentLogin.token ? 'token received' : `HTTP ${parentLogin.status}`,
-  );
-
-  if (parentLogin.token) {
-    const childrenResult = await request('/mobile/me/students', {
-      headers: authHeaders(parentLogin.token),
+  const hrLogin = await login('hr@schoolos.com');
+  if (hrLogin.token) {
+    const runs = await request('/payroll/runs', {
+      headers: authHeaders(hrLogin.token),
     });
-    const childId = getItems(childrenResult.body)[0]?.id;
-    if (childId) {
-      const feedResult = await request(
-        `/mobile/students/${childId}/activity-feed?limit=5`,
-        { headers: authHeaders(parentLogin.token) },
-      );
+    record(
+      'HR payroll runs list',
+      runs.status === 200,
+      `HTTP ${runs.status}`,
+    );
+
+    const runId = getItems(runs.body)[0]?.id;
+    if (runId) {
+      const deniedApprove = await request(`/payroll/runs/${runId}/approve`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders(hrLogin.token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason: 'M7 verify boundary probe' }),
+      });
       record(
-        'Parent linked-child activity feed',
-        feedResult.status === 200,
-        `HTTP ${feedResult.status}`,
+        'HR denied payroll approve without approver role',
+        deniedApprove.status === 403,
+        `HTTP ${deniedApprove.status}`,
       );
     } else {
-      record('Parent linked-child activity feed', false, 'no linked child');
+      record(
+        'HR denied payroll approve without approver role',
+        true,
+        'skipped — no payroll runs seeded',
+      );
     }
+  } else {
+    record('HR payroll runs list', false, `login failed HTTP ${hrLogin.status}`);
+    record(
+      'HR denied payroll approve without approver role',
+      true,
+      'skipped — hr login failed',
+    );
   }
 
   const failed = checks.filter((check) => !check.ok);
@@ -137,10 +148,10 @@ async function main() {
 
 function writeEvidence(passed) {
   mkdirSync(evidenceDir, { recursive: true });
-  const path = join(evidenceDir, `m5-activity-core-${stamp}-local.md`);
+  const path = join(evidenceDir, `m7-hr-core-${stamp}-local.md`);
   writeFileSync(
     path,
-    `# M5 Activity verification (${stamp}, local)
+    `# M7 HR verification (${stamp}, local)
 
 - Tenant slug: \`${tenantSlug}\`
 - API: ${apiBaseUrl}
