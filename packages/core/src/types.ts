@@ -2259,6 +2259,11 @@ export type AttendanceSyncResult = {
   serverReceivedAt: string;
   replayed: boolean;
   rejectionReason: string | null;
+  /**
+   * Optional finer detail (e.g. ELIGIBILITY_LAPSED) for a rejection whose
+   * reason stays SCOPE_REVOKED. Absent from older servers.
+   */
+  rejectionDetail?: string | null;
   createdAt: string;
 };
 
