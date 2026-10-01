@@ -252,13 +252,30 @@ export class ResultPublishingService {
         continue;
       }
 
-      const updated = await this.prisma.reportCard.update({
-        where: { id: card.id },
+      // Conditional publish: a concurrent or retried publish of the same
+      // card is a no-op instead of a second publication event.
+      const claimed = await this.prisma.reportCard.updateMany({
+        where: {
+          id: card.id,
+          tenantId: actor.tenantId,
+          status: GradeLockStatus.LOCKED,
+          OR: [
+            { publishStatus: null },
+            { publishStatus: { not: 'PUBLISHED' } },
+          ],
+        },
         data: {
           publishStatus: 'PUBLISHED',
           publishedAt: new Date(),
           publishedById: actor.userId,
         },
+      });
+      if (claimed.count !== 1) {
+        results.skipped++;
+        continue;
+      }
+      const updated = await this.prisma.reportCard.findUniqueOrThrow({
+        where: { id: card.id },
       });
 
       results.published++;

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -20,6 +21,7 @@ import {
   SubmitMarkSheetDto,
   UnlockMarkSheetDto,
 } from './dto/mark-sheet.dto';
+import { MarkReadinessService } from './mark-readiness.service';
 import { MarkSheetService } from './mark-sheet.service';
 
 /**
@@ -33,12 +35,34 @@ import { MarkSheetService } from './mark-sheet.service';
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.exams')
 export class MarkSheetsController {
-  constructor(private readonly markSheetService: MarkSheetService) {}
+  constructor(
+    private readonly markSheetService: MarkSheetService,
+    private readonly markReadinessService: MarkReadinessService,
+  ) {}
 
   @Get()
   @Permissions('marks:read', 'academics:read', 'academics:enter_marks')
   list(@Query() query: ListMarkSheetsDto, @CurrentAuth() auth: AuthContext) {
     return this.markSheetService.list(query, auth);
+  }
+
+  /**
+   * 6E readiness matrix: component x section lifecycle state for a term.
+   * Coordinator/leadership view (marks:review_lock); counts are exact.
+   */
+  @Get('readiness')
+  @Permissions('marks:review_lock')
+  readiness(
+    @Query('examTermId') examTermId: string,
+    @Query('classId') classId: string | undefined,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    if (!examTermId) {
+      throw new BadRequestException('examTermId is required');
+    }
+    return this.markReadinessService.getTermReadiness(examTermId, auth, {
+      classId: classId || undefined,
+    });
   }
 
   @Get(':id')

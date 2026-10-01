@@ -331,11 +331,26 @@ class ParentRepository {
     final data = await _getMap('/mobile/students/$childId/report-cards');
     final items = data['items'] as List<dynamic>? ?? const [];
 
-    return items
+    final reportCards = items
         .whereType<Map<String, dynamic>>()
         .map(ParentReportCard.fromJson)
         .toList();
+    // The server only lists current, published results. Drop any earlier
+    // download of a result that has since been withdrawn or corrected.
+    if (protectedDownloads?.hasValidScope == true) {
+      await protectedDownloads!.pruneRecords(
+        childId: childId,
+        bucket: 'report-cards',
+        keepRecordIds: reportCards.map(_reportCardDownloadRecordId),
+      );
+    }
+    return reportCards;
   }
+
+  /// A republished correction gets a new publishedAt, so its PDF is stored
+  /// under a new record key and the superseded file is pruned.
+  static String _reportCardDownloadRecordId(ParentReportCard reportCard) =>
+      '${reportCard.id}@${reportCard.publishedAt ?? ''}';
 
   Future<List<ParentConsentStatus>> getMyConsentStatus() async {
     final response = await _client.get('/mobile/me/consents');
@@ -709,7 +724,7 @@ class ParentRepository {
     final file = await _saveProtectedDownload(
       childId: childId,
       bucket: 'report-cards',
-      recordId: reportCard.id,
+      recordId: _reportCardDownloadRecordId(reportCard),
       fileName: fileName,
       bytes: bytes,
     );

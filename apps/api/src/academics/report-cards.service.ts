@@ -446,6 +446,38 @@ export class ReportCardsService {
     );
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Claim the version this correction was computed from. A concurrent
+      // correction of the same card fails here instead of writing a
+      // duplicate history row and silently overwriting the other result.
+      const versionClaim = await tx.reportCard.updateMany({
+        where: {
+          id: reportCardId,
+          tenantId: actor.tenantId,
+          version: reportCard.version,
+        },
+        data: { version: reportCard.version },
+      });
+      if (versionClaim.count !== 1) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'REPORT_CARD_VERSION_CONFLICT',
+          message:
+            'This report card was corrected by someone else. Reload it before applying another correction.',
+        });
+      }
+      const requestClaim = await tx.reportCardCorrectionRequest.updateMany({
+        where: {
+          id: approvedRequest.id,
+          tenantId: actor.tenantId,
+          status: 'APPROVED',
+        },
+        data: { status: 'COMPLETED' },
+      });
+      if (requestClaim.count !== 1) {
+        throw new ConflictException(
+          'This correction request was already applied',
+        );
+      }
       const request = await tx.reportCardCorrectionRequest.update({
         where: { id: approvedRequest.id },
         data: {

@@ -382,6 +382,27 @@ export class MarkSheetService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        if (action === MarkSheetAction.UNLOCK) {
+          // Claim the exam-term row while it is unlocked; serializes with a
+          // concurrent term-lock approval so a sheet cannot be reopened
+          // inside a term that has just been locked.
+          const termClaim = await tx.examTerm.updateMany({
+            where: {
+              id: sheet.examTermId,
+              tenantId: actor.tenantId,
+              isLocked: false,
+            },
+            data: { updatedAt: now },
+          });
+          if (termClaim.count !== 1) {
+            throw new ConflictException({
+              statusCode: 409,
+              code: 'EXAM_TERM_LOCKED',
+              message:
+                'The whole exam term is locked. Unlock the term before unlocking a single mark sheet.',
+            });
+          }
+        }
         const updated = await tx.markSheet.updateMany({
           where: {
             id: sheet.id,

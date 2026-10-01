@@ -26,12 +26,14 @@ describe('ReportCardsService', () => {
       findFirst: jest.Mock;
       upsert: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
     reportCardCorrectionRequest: {
       create: jest.Mock;
       findMany: jest.Mock;
       findFirst: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
     reportCardHistory: { create: jest.Mock; findMany: jest.Mock };
     $transaction: jest.Mock;
@@ -75,12 +77,14 @@ describe('ReportCardsService', () => {
         findFirst: jest.fn(),
         upsert: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       reportCardCorrectionRequest: {
         create: jest.fn(),
         findMany: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       reportCardHistory: {
         create: jest.fn(),

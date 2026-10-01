@@ -197,6 +197,7 @@ model ReportCardHistory {
   student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
   file         FileAsset?   @relation("ReportCardHistoryFile", fields: [fileId], references: [id], onDelete: SetNull)
 
+  @@unique([tenantId, reportCardId, version])
   @@index([tenantId, reportCardId])
 }
 

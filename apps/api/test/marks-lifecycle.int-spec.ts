@@ -5,6 +5,8 @@ import { MarkEntryStatus, MarkSheetStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../src/audit/audit.service';
 import type { AuthContext } from '../src/auth/auth.types';
 import { MarkSheetService } from '../src/academics/mark-sheet.service';
+import { MarkLockWorkflowService } from '../src/academics/mark-lock-workflow.service';
+import { MarkReadinessService } from '../src/academics/mark-readiness.service';
 import { MarksService } from '../src/academics/marks.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { IsolatedAuthCls } from './helpers/auth-test-isolation';
@@ -41,6 +43,8 @@ function errorCode(reason: unknown): string | undefined {
   let prisma: PrismaService;
   let sheets: MarkSheetService;
   let marks: MarksService;
+  let readiness: MarkReadinessService;
+  let termLocks: MarkLockWorkflowService;
   let tenantId: string;
   let termId: string;
   let componentId: string;
@@ -107,6 +111,8 @@ function errorCode(reason: unknown): string | undefined {
     const teacherScope = {} as never;
     sheets = new MarkSheetService(prisma, audit, teacherScope);
     marks = new MarksService(prisma, audit, teacherScope, sheets);
+    readiness = new MarkReadinessService(prisma);
+    termLocks = new MarkLockWorkflowService(prisma, audit, readiness);
   });
 
   beforeEach(async () => {
@@ -606,6 +612,152 @@ function errorCode(reason: unknown): string | undefined {
       ]);
       expect(saveResult.status).toBe('fulfilled');
       expect((await sheet()).status).toBe(MarkSheetStatus.RETURNED);
+    });
+  });
+
+  describe('term lock gate and readiness (6E/6H)', () => {
+    const fillAndLockSheet = async () => {
+      await save(teacher, [
+        { studentId: studentIds[0], marksObtained: 60 },
+        { studentId: studentIds[1], isAbsent: true },
+      ]);
+      let current = await sheet();
+      current = await scoped(() =>
+        sheets.submit(
+          current.id,
+          { expectedVersion: current.version, idempotencyKey: key() },
+          teacher,
+        ),
+      );
+      current = await scoped(() =>
+        sheets.review(
+          current.id,
+          {
+            action: 'REVIEW',
+            expectedVersion: current.version,
+            idempotencyKey: key(),
+          },
+          reviewer,
+        ),
+      );
+      return scoped(() =>
+        sheets.review(
+          current.id,
+          {
+            action: 'LOCK',
+            expectedVersion: current.version,
+            idempotencyKey: key(),
+          },
+          principal,
+        ),
+      );
+    };
+
+    it('reports exact component x section readiness', async () => {
+      await save(teacher, [{ studentId: studentIds[0], marksObtained: 60 }]);
+      const result = await scoped(() =>
+        readiness.getTermReadiness(termId, principal),
+      );
+      expect(result.cells).toEqual([
+        expect.objectContaining({
+          assessmentComponentId: componentId,
+          sectionId,
+          studentCount: 2,
+          finalCount: 1,
+          sheetStatus: 'DRAFT',
+          state: 'IN_PROGRESS',
+        }),
+      ]);
+      expect(result.allLocked).toBe(false);
+    });
+
+    it('refuses a term lock while any sheet is not locked', async () => {
+      await save(teacher, [{ studentId: studentIds[0], marksObtained: 60 }]);
+      const result = await scoped(() =>
+        termLocks.request(
+          { examTermId: termId, reason: 'Term complete' } as never,
+          teacher,
+        ),
+      ).catch((error: unknown) => error);
+      expect(errorCode(result)).toBe('TERM_LOCK_BLOCKED');
+    });
+
+    it('locks the term only after every sheet is locked, by someone other than the requester', async () => {
+      await fillAndLockSheet();
+      const request = await scoped(() =>
+        termLocks.request(
+          { examTermId: termId, reason: 'Term complete' } as never,
+          reviewer,
+        ),
+      );
+      const own = await scoped(() =>
+        termLocks.review(request.id, { status: 'APPROVED' } as never, reviewer),
+      ).catch((error: unknown) => error);
+      expect(errorCode(own)).toBe('SELF_APPROVAL_PROHIBITED');
+
+      await scoped(() =>
+        termLocks.review(
+          request.id,
+          { status: 'APPROVED' } as never,
+          principal,
+        ),
+      );
+      const term = await scoped(() =>
+        prisma.examTerm.findUniqueOrThrow({ where: { id: termId } }),
+      );
+      expect(term.isLocked).toBe(true);
+
+      const locked = await sheet();
+      const unlock = await scoped(() =>
+        sheets.unlock(
+          locked.id,
+          {
+            reason: 'Correct a transcription error',
+            expectedVersion: locked.version,
+            idempotencyKey: key(),
+          },
+          principal,
+        ),
+      ).catch((error: unknown) => error);
+      expect(errorCode(unlock)).toBe('EXAM_TERM_LOCKED');
+    });
+
+    it('a sheet unlock racing a term lock never leaves an open sheet in a locked term', async () => {
+      await fillAndLockSheet();
+      const request = await scoped(() =>
+        termLocks.request(
+          { examTermId: termId, reason: 'Term complete' } as never,
+          reviewer,
+        ),
+      );
+      const locked = await sheet();
+      await Promise.allSettled([
+        scoped(() =>
+          termLocks.review(
+            request.id,
+            { status: 'APPROVED' } as never,
+            principal,
+          ),
+        ),
+        scoped(() =>
+          sheets.unlock(
+            locked.id,
+            {
+              reason: 'Correct a transcription error',
+              expectedVersion: locked.version,
+              idempotencyKey: key(),
+            },
+            principal,
+          ),
+        ),
+      ]);
+      const term = await scoped(() =>
+        prisma.examTerm.findUniqueOrThrow({ where: { id: termId } }),
+      );
+      const after = await sheet();
+      expect(after.status).toBe(
+        term.isLocked ? MarkSheetStatus.LOCKED : MarkSheetStatus.RETURNED,
+      );
     });
   });
 });

@@ -9,6 +9,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
+import { MarkSheetStatus } from '@prisma/client';
+import { requireIndependentActor } from '../authorization/policies/domain-permission';
+import { MarkReadinessService } from './mark-readiness.service';
 
 interface MarkLockFilters {
   examTermId?: string;
@@ -31,6 +34,7 @@ export class MarkLockWorkflowService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly markReadinessService: MarkReadinessService,
   ) {}
 
   async list(actor: AuthContext, filters: MarkLockFilters = {}) {
@@ -103,6 +107,9 @@ export class MarkLockWorkflowService {
       );
     }
 
+    // Surface blockers when the lock is requested, not only at approval.
+    await this.ensureRequiredMarksExist(actor, { examTermId: term.id });
+
     const request = await this.prisma.markLockRequest.create({
       data: {
         tenantId: actor.tenantId,
@@ -157,6 +164,9 @@ export class MarkLockWorkflowService {
       throw new ConflictException('Rejection requires a review note');
     }
 
+    // Separation of duties: whoever asked for the lock cannot approve it.
+    requireIndependentActor(actor, [request.requestedById]);
+
     if (dto.status === 'APPROVED') {
       await this.ensureRequiredMarksExist(actor, {
         examTermId: request.examTermId,
@@ -164,6 +174,47 @@ export class MarkLockWorkflowService {
     }
 
     const reviewed = await this.prisma.$transaction(async (tx) => {
+      // Claim the pending request: a competing decision fails here instead
+      // of overwriting this one.
+      const claimed = await tx.markLockRequest.updateMany({
+        where: { id: request.id, tenantId: actor.tenantId, status: 'PENDING' },
+        data: { status: dto.status },
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictException(
+          'This lock request was already decided by someone else',
+        );
+      }
+      if (dto.status === 'APPROVED') {
+        // Claim the term row (serializes with single-sheet UNLOCK) and
+        // re-check under the claim that every mark sheet is LOCKED.
+        const termClaim = await tx.examTerm.updateMany({
+          where: {
+            id: request.examTermId,
+            tenantId: actor.tenantId,
+            isLocked: false,
+          },
+          data: { isLocked: true },
+        });
+        if (termClaim.count !== 1) {
+          throw new ConflictException('Exam term is already locked');
+        }
+        const openSheets = await tx.markSheet.count({
+          where: {
+            tenantId: actor.tenantId,
+            examTermId: request.examTermId,
+            status: { not: MarkSheetStatus.LOCKED },
+          },
+        });
+        if (openSheets > 0) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'TERM_LOCK_BLOCKED',
+            message:
+              'A mark sheet was reopened while this lock was being approved. Review the readiness list and try again.',
+          });
+        }
+      }
       const updated = await tx.markLockRequest.update({
         where: { id: request.id },
         data: {
@@ -182,10 +233,6 @@ export class MarkLockWorkflowService {
       });
 
       if (dto.status === 'APPROVED') {
-        await tx.examTerm.update({
-          where: { id: request.examTermId },
-          data: { isLocked: true },
-        });
         await tx.markEntry.updateMany({
           where: {
             tenantId: actor.tenantId,
@@ -364,49 +411,43 @@ export class MarkLockWorkflowService {
     }
   }
 
+  /**
+   * The term can only be locked when every component x section mark sheet
+   * with active students has been reviewed and LOCKED (Phase 6G). This is
+   * what keeps report cards from being generated over unreviewed marks.
+   */
   private async ensureRequiredMarksExist(
     actor: AuthContext,
     scope: { examTermId: string },
   ) {
-    const components = await this.prisma.assessmentComponent.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        examTermId: scope.examTermId,
-      },
-      select: { id: true, name: true },
-      take: 500,
-    });
-
-    if (components.length === 0) {
+    const readiness = await this.markReadinessService.getTermReadiness(
+      scope.examTermId,
+      actor,
+    );
+    if (readiness.cells.length === 0) {
       throw new ConflictException(
         'Cannot lock marks before assessment components are configured',
       );
     }
-
-    const componentIds = components.map((component) => component.id);
-    const marks = await this.prisma.markEntry.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        examTermId: scope.examTermId,
-        assessmentComponentId: { in: componentIds },
-      },
-      select: { assessmentComponentId: true },
-      take: 1000,
-    });
-
-    const markedComponentIds = new Set(
-      marks.map((mark) => mark.assessmentComponentId),
-    );
-    const missing = components.filter(
-      (component) => !markedComponentIds.has(component.id),
-    );
-
-    if (missing.length > 0) {
-      throw new ConflictException(
-        `Cannot lock marks; missing marks for component(s): ${missing
-          .map((component) => component.name)
-          .join(', ')}`,
+    if (!readiness.allLocked) {
+      const blockers = readiness.cells.filter(
+        (cell) => cell.state !== 'LOCKED',
       );
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'TERM_LOCK_BLOCKED',
+        blockerCount: blockers.length,
+        blockers: blockers.slice(0, 50).map((cell) => ({
+          className: cell.className,
+          sectionName: cell.sectionName,
+          subjectName: cell.subjectName,
+          componentName: cell.componentName,
+          state: cell.state,
+          finalCount: cell.finalCount,
+          studentCount: cell.studentCount,
+        })),
+        message: `${blockers.length} mark sheet(s) are not locked yet. Every class, section and component must be reviewed and locked before the exam term is locked.`,
+      });
     }
   }
 

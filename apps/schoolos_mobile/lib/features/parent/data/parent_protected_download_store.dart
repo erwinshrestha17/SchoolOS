@@ -99,6 +99,37 @@ class ParentProtectedDownloadStore {
         _linkedChildIds = linked;
       });
 
+  /// Removes this child's downloads in [bucket] whose record is not in
+  /// [keepRecordIds]. Call only with a fresh server listing: a result that
+  /// was withdrawn or superseded by a correction must not stay readable
+  /// offline from an earlier download.
+  Future<void> pruneRecords({
+    required String childId,
+    required String bucket,
+    required Iterable<String> keepRecordIds,
+  }) => _serialized(() async {
+    if (childId.isEmpty || !_safeBucket.hasMatch(bucket)) return;
+    final namespace = _namespace();
+    final root = await getTemporaryDirectory();
+    final bucketDirectory = Directory(
+      '${root.path}/schoolos/parent-downloads/$namespace/${_key(childId)}/$bucket',
+    );
+    if (!await bucketDirectory.exists()) return;
+    final keep = keepRecordIds.map(_key).toSet();
+    await for (final recordDirectory in bucketDirectory.list(
+      followLinks: false,
+    )) {
+      if (recordDirectory is Directory &&
+          !keep.contains(
+            recordDirectory.uri.pathSegments
+                .where((segment) => segment.isNotEmpty)
+                .last,
+          )) {
+        await recordDirectory.delete(recursive: true);
+      }
+    }
+  });
+
   String _namespace() {
     final current = scope;
     if (current == null || !hasValidScope) {

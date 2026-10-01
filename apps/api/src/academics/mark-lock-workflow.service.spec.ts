@@ -1,14 +1,24 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
+import { MarkReadinessService } from './mark-readiness.service';
 
 describe('MarkLockWorkflowService', () => {
   let service: MarkLockWorkflowService;
   let prisma: {
-    examTerm: { findFirst: jest.Mock; update: jest.Mock };
+    examTerm: {
+      findFirst: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
+    markSheet: { count: jest.Mock };
     class: { findFirst: jest.Mock };
     section: { findFirst: jest.Mock };
     subject: { findFirst: jest.Mock };
@@ -20,11 +30,31 @@ describe('MarkLockWorkflowService', () => {
       count: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
     reportCard: { count: jest.Mock };
     $transaction: jest.Mock;
   };
   let auditService: { record: jest.Mock };
+  let readiness: { getTermReadiness: jest.Mock };
+  const lockedReadiness = {
+    cells: [{ state: 'LOCKED' }],
+    allLocked: true,
+  };
+  const openReadiness = {
+    cells: [
+      {
+        state: 'IN_PROGRESS',
+        className: 'Grade 9',
+        sectionName: 'A',
+        subjectName: 'Science',
+        componentName: 'Theory',
+        finalCount: 10,
+        studentCount: 30,
+      },
+    ],
+    allLocked: false,
+  };
 
   const actor: AuthContext = {
     userId: 'user-1',
@@ -41,7 +71,9 @@ describe('MarkLockWorkflowService', () => {
       examTerm: {
         findFirst: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      markSheet: { count: jest.fn().mockResolvedValue(0) },
       class: { findFirst: jest.fn() },
       section: { findFirst: jest.fn() },
       subject: { findFirst: jest.fn() },
@@ -59,6 +91,7 @@ describe('MarkLockWorkflowService', () => {
         count: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       reportCard: { count: jest.fn() },
       $transaction: jest.fn(async (callback: unknown) => {
@@ -70,12 +103,16 @@ describe('MarkLockWorkflowService', () => {
     };
 
     auditService = { record: jest.fn() };
+    readiness = {
+      getTermReadiness: jest.fn().mockResolvedValue(lockedReadiness),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MarkLockWorkflowService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: auditService },
+        { provide: MarkReadinessService, useValue: readiness },
       ],
     }).compile();
 
@@ -187,14 +224,33 @@ describe('MarkLockWorkflowService', () => {
       status: 'PENDING',
       examTerm: { id: 'term-1' },
     });
-    prisma.assessmentComponent.findMany.mockResolvedValue([
-      { id: 'component-1', name: 'Theory' },
-    ]);
-    prisma.markEntry.findMany.mockResolvedValue([]);
+    readiness.getTermReadiness.mockResolvedValue(openReadiness);
+
+    const error = await service
+      .review('lock-1', { status: 'APPROVED' }, actor)
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toMatchObject({
+      code: 'TERM_LOCK_BLOCKED',
+      blockerCount: 1,
+    });
+    expect(prisma.examTerm.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('does not let the requester approve their own lock', async () => {
+    prisma.markLockRequest.findFirst.mockResolvedValue({
+      id: 'lock-1',
+      tenantId: actor.tenantId,
+      examTermId: 'term-1',
+      status: 'PENDING',
+      requestedById: actor.userId,
+      examTerm: { id: 'term-1' },
+    });
 
     await expect(
       service.review('lock-1', { status: 'APPROVED' }, actor),
-    ).rejects.toThrow(ConflictException);
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.markLockRequest.updateMany).not.toHaveBeenCalled();
   });
 
   it('approves lock and locks term plus mark entries in one transaction', async () => {
@@ -217,7 +273,6 @@ describe('MarkLockWorkflowService', () => {
       status: 'APPROVED',
       reviewNote: null,
     });
-    prisma.examTerm.update.mockResolvedValue({ id: 'term-1', isLocked: true });
     prisma.markEntry.updateMany.mockResolvedValue({ count: 10 });
 
     const result = await service.review(
@@ -227,10 +282,13 @@ describe('MarkLockWorkflowService', () => {
     );
 
     expect(result.status).toBe('APPROVED');
-    expect(prisma.examTerm.update).toHaveBeenCalledWith({
-      where: { id: 'term-1' },
+    // The term row is claimed only while unlocked, and every sheet is
+    // re-checked as LOCKED under that claim.
+    expect(prisma.examTerm.updateMany).toHaveBeenCalledWith({
+      where: { id: 'term-1', tenantId: actor.tenantId, isLocked: false },
       data: { isLocked: true },
     });
+    expect(prisma.markSheet.count).toHaveBeenCalled();
     expect(prisma.markEntry.updateMany).toHaveBeenCalledWith({
       where: { tenantId: actor.tenantId, examTermId: 'term-1' },
       data: { isLocked: true },

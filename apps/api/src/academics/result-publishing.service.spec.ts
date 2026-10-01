@@ -17,7 +17,12 @@ import { ResultPublishingService } from './result-publishing.service';
 describe('ResultPublishingService', () => {
   let service: ResultPublishingService;
   let prisma: {
-    reportCard: { findMany: jest.Mock; update: jest.Mock };
+    reportCard: {
+      findMany: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
+    };
     assessmentRetake: { findMany: jest.Mock };
     tenantSetting: { findFirst: jest.Mock };
   };
@@ -40,6 +45,8 @@ describe('ResultPublishingService', () => {
       reportCard: {
         findMany: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'rc-1' }),
       },
       assessmentRetake: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -153,8 +160,13 @@ describe('ResultPublishingService', () => {
 
     expect(result.published).toBe(1);
     expect(result.skipped).toBe(0);
-    expect(prisma.reportCard.update).toHaveBeenCalledWith({
-      where: { id: 'rc-1' },
+    // Conditional publish: only a locked, not-yet-published card is claimed.
+    expect(prisma.reportCard.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: 'rc-1',
+        tenantId: actor.tenantId,
+        status: 'LOCKED',
+      }),
       data: expect.objectContaining({
         publishStatus: 'PUBLISHED',
         publishedAt: expect.any(Date),
