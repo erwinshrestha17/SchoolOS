@@ -87,6 +87,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Show pending Web formatting diff
+        run: |
+          pnpm --filter @schoolos/web exec prettier --write "test/m1-workspace-contract.test.mjs" "test/student-360-revalidation-contract.test.mjs"
+          git diff -- apps/web/test/m1-workspace-contract.test.mjs apps/web/test/student-360-revalidation-contract.test.mjs
+          exit 1
+
       - name: Detect web-impacting changes
         id: changes
         uses: dorny/paths-filter@v3
