@@ -6,7 +6,7 @@ import {
   HomeworkAssignmentStatus,
   HomeworkSubmissionStatus,
 } from '@prisma/client';
-import { HomeworkService } from './homework.service';
+import { HomeworkService, homeworkDeadline } from './homework.service';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import {
   createTeacherScopeServiceForTests,
@@ -28,6 +28,8 @@ describe('Homework Workflow', () => {
       findUnique: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
       delete: jest.Mock;
       findMany: jest.Mock;
     };
@@ -110,6 +112,8 @@ describe('Homework Workflow', () => {
           .mockImplementation((q) =>
             Promise.resolve({ id: 'hw-1', ...q.data }),
           ),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn(),
         delete: jest.fn(),
         findMany: jest.fn(),
       },
@@ -372,24 +376,55 @@ describe('Homework Workflow', () => {
     it('should publish draft homework and emit notification', async () => {
       prisma.homeworkAssignment.findFirst.mockResolvedValue(mockAssignment);
       prisma.student.findMany.mockResolvedValue([{ id: 'student-1' }]);
-      prisma.homeworkAssignment.update.mockResolvedValue({
+      prisma.homeworkAssignment.findUniqueOrThrow.mockResolvedValue({
         ...mockAssignment,
         status: HomeworkAssignmentStatus.ASSIGNED,
       });
       await service.assignHomework('hw-1', mockActor);
 
-      expect(prisma.homeworkAssignment.update).toHaveBeenCalledWith({
-        where: { id: 'hw-1' },
+      // Conditional claim: only a DRAFT homework is transitioned.
+      expect(prisma.homeworkAssignment.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'hw-1',
+          tenantId: mockActor.tenantId,
+          status: HomeworkAssignmentStatus.DRAFT,
+        },
         data: expect.objectContaining({
           status: HomeworkAssignmentStatus.ASSIGNED,
         }),
-        include: expect.anything(),
       });
       expect(communications.recordDeliveryRecords).toHaveBeenCalledWith(
         expect.objectContaining({
           sourceType: 'homework_published',
         }),
       );
+    });
+
+    it('a retried publish of assigned homework does not notify parents again', async () => {
+      prisma.homeworkAssignment.findFirst.mockResolvedValue({
+        ...mockAssignment,
+        status: HomeworkAssignmentStatus.ASSIGNED,
+      });
+
+      await service.assignHomework('hw-1', mockActor);
+
+      expect(prisma.homeworkAssignment.updateMany).not.toHaveBeenCalled();
+      expect(communications.recordDeliveryRecords).not.toHaveBeenCalled();
+    });
+
+    it('the loser of a concurrent publish returns the published homework without a second notice', async () => {
+      prisma.homeworkAssignment.findFirst
+        .mockResolvedValueOnce(mockAssignment)
+        .mockResolvedValue({
+          ...mockAssignment,
+          status: HomeworkAssignmentStatus.ASSIGNED,
+        });
+      prisma.student.findMany.mockResolvedValue([{ id: 'student-1' }]);
+      prisma.homeworkAssignment.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.assignHomework('hw-1', mockActor);
+
+      expect(communications.recordDeliveryRecords).not.toHaveBeenCalled();
     });
   });
 
@@ -428,11 +463,26 @@ describe('Homework Workflow', () => {
         {
           studentId: 'student-1',
           submissionText: 'Too late',
-        },
+          // An offline device claiming it submitted before the deadline is
+          // not authoritative: the server's receipt time decides.
+          submittedAt: '2019-12-31T00:00:00.000Z',
+        } as never,
         mockActor,
       );
 
       expect(result.status).toBe(HomeworkSubmissionStatus.LATE);
+      expect(prisma.homeworkSubmission.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          status: HomeworkSubmissionStatus.LATE,
+          submittedAt: expect.any(Date),
+        }),
+      });
+      const stored = (
+        prisma.homeworkSubmission.create.mock.calls[0][0] as {
+          data: { submittedAt: Date };
+        }
+      ).data.submittedAt;
+      expect(+stored).toBeGreaterThan(+new Date('2020-01-02'));
     });
 
     it('blocks submission when the student is no longer active in the homework class scope', async () => {
@@ -526,5 +576,26 @@ describe('Homework Workflow', () => {
         }),
       );
     });
+  });
+});
+
+describe('homeworkDeadline', () => {
+  it('uses the exact due time when one was set', () => {
+    expect(
+      homeworkDeadline({
+        dueDate: new Date('2026-10-05T00:00:00.000Z'),
+        dueAt: new Date('2026-10-05T10:15:00.000Z'),
+      }).toISOString(),
+    ).toBe('2026-10-05T10:15:00.000Z');
+  });
+
+  it('treats a date-only due date as the end of that Nepal school day', () => {
+    // Not UTC midnight (05:45 NPT): due by 23:59:59 NPT on 5 October.
+    expect(
+      homeworkDeadline({
+        dueDate: new Date('2026-10-05T00:00:00.000Z'),
+        dueAt: new Date('2026-10-05T00:00:00.000Z'),
+      }).toISOString(),
+    ).toBe('2026-10-05T18:15:00.000Z');
   });
 });

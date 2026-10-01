@@ -1138,17 +1138,38 @@ export class HomeworkService {
   ) {
     const assignment = await this.findAssignmentOrThrow(actor, homeworkId);
     await this.ensureSubjectTeacherScopeForRead(actor, assignment);
+    // A retried publish (e.g. after a timeout) returns the already-assigned
+    // homework without notifying parents a second time.
+    if (assignment.status === HomeworkAssignmentStatus.ASSIGNED) {
+      return mapHomeworkAssignmentDetail(assignment);
+    }
     if (assignment.status !== HomeworkAssignmentStatus.DRAFT) {
       throw new ConflictException('Only draft homework can be assigned');
     }
 
     await this.ensureAssignmentSubmissions(assignment.id, actor);
-    const updated = await this.prisma.homeworkAssignment.update({
-      where: { id: assignment.id },
+    // Conditional claim: of two concurrent publishes only one transitions
+    // the homework and sends the publication notice.
+    const claimed = await this.prisma.homeworkAssignment.updateMany({
+      where: {
+        id: assignment.id,
+        tenantId: actor.tenantId,
+        status: HomeworkAssignmentStatus.DRAFT,
+      },
       data: {
         status: HomeworkAssignmentStatus.ASSIGNED,
         assignedDate: new Date(),
       },
+    });
+    if (claimed.count !== 1) {
+      const current = await this.findAssignmentOrThrow(actor, assignment.id);
+      if (current.status === HomeworkAssignmentStatus.ASSIGNED) {
+        return mapHomeworkAssignmentDetail(current);
+      }
+      throw new ConflictException('Only draft homework can be assigned');
+    }
+    const updated = await this.prisma.homeworkAssignment.findUniqueOrThrow({
+      where: { id: assignment.id },
       include: homeworkAssignmentInclude(),
     });
     await this.notifyHomeworkAssigned(
@@ -1284,6 +1305,9 @@ export class HomeworkService {
     const scopeWhere: Prisma.HomeworkSubmissionWhereInput = {
       tenantId: actor.tenantId,
       homeworkId: assignment.id,
+      // Students who have left the class/school drop out of live queues; their
+      // historical rows remain stored for audit.
+      AND: [{ student: { lifecycleStatus: StudentLifecycleStatus.ACTIVE } }],
       ...(studentScope
         ? { studentId: query.studentId ?? { in: studentScope } }
         : query.studentId
@@ -1293,10 +1317,10 @@ export class HomeworkService {
 
     const submittedAtFilter: Prisma.DateTimeNullableFilter = {};
     if (query.timing === 'LATE') {
-      submittedAtFilter.gt = assignment.dueDate;
+      submittedAtFilter.gt = homeworkDeadline(assignment);
     } else if (query.timing === 'ON_TIME') {
       submittedAtFilter.not = null;
-      submittedAtFilter.lte = assignment.dueDate;
+      submittedAtFilter.lte = homeworkDeadline(assignment);
     }
     if (query.submittedFrom) {
       submittedAtFilter.gte = new Date(query.submittedFrom);
@@ -1442,36 +1466,48 @@ export class HomeworkService {
       throw new ConflictException('Submission already exists');
     }
 
-    const isLate = new Date() > assignment.dueDate;
+    // The server's receipt time decides lateness against the exact due
+    // time. A device that saved the work offline before the deadline but
+    // synced after it is late: a client-claimed time is not authoritative.
+    const receivedAt = new Date();
+    const isLate = receivedAt > homeworkDeadline(assignment);
     const status = isLate
       ? HomeworkSubmissionStatus.LATE
       : HomeworkSubmissionStatus.SUBMITTED;
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const submission = await tx.homeworkSubmission.create({
-        data: {
-          tenantId: actor.tenantId,
-          homeworkId: assignmentId,
-          studentId,
-          status,
-          submissionText: dto.submissionText,
-          studentRemarks: dto.studentRemarks,
-          submittedAt: dto.submittedAt ? new Date(dto.submittedAt) : new Date(),
-        },
+    const result = await this.prisma
+      .$transaction(async (tx) => {
+        const submission = await tx.homeworkSubmission.create({
+          data: {
+            tenantId: actor.tenantId,
+            homeworkId: assignmentId,
+            studentId,
+            status,
+            submissionText: dto.submissionText,
+            studentRemarks: dto.studentRemarks,
+            submittedAt: receivedAt,
+          },
+        });
+
+        if (dto.attachmentFileIds?.length) {
+          await this.linkAttachments(
+            actor,
+            assignmentId,
+            submission.id,
+            dto.attachmentFileIds,
+            tx,
+          );
+        }
+
+        return submission;
+      })
+      .catch((error: unknown) => {
+        // A concurrent duplicate lost the unique (homework, student) race.
+        if (isPrismaUniqueViolation(error)) {
+          throw new ConflictException('Submission already exists');
+        }
+        throw error;
       });
-
-      if (dto.attachmentFileIds?.length) {
-        await this.linkAttachments(
-          actor,
-          assignmentId,
-          submission.id,
-          dto.attachmentFileIds,
-          tx,
-        );
-      }
-
-      return submission;
-    });
 
     const submission = await this.findSubmissionOrThrow(actor, result.id);
 
@@ -3620,4 +3656,19 @@ function isTeacherActor(actor: AuthContext) {
   return (
     actor.roles.includes('teacher') || actor.roles.includes('subject_teacher')
   );
+}
+
+/**
+ * The exact moment homework is due. `dueAt` carries the time of day; older
+ * rows only had the date, which is treated as due at the end of that Nepal
+ * school day rather than at UTC midnight (05:45 NPT).
+ */
+export function homeworkDeadline(assignment: {
+  dueAt: Date | null;
+  dueDate: Date;
+}): Date {
+  if (assignment.dueAt && +assignment.dueAt !== +assignment.dueDate) {
+    return assignment.dueAt;
+  }
+  return getNepalSchoolDay(assignment.dueDate).endExclusiveUtc;
 }

@@ -1182,6 +1182,8 @@ describe('Homework Hardening', () => {
             tenantId: 'tenant-a',
             homeworkId: 'hw-1',
             studentId: { in: ['student-1'] },
+            // Students who left the class drop out of live submission lists.
+            AND: [{ student: { lifecycleStatus: 'ACTIVE' } }],
           }),
         }),
       );
