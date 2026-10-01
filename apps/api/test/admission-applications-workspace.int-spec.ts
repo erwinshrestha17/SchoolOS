@@ -213,9 +213,13 @@ describeDatabase('Admission applications workspace (real PostgreSQL)', () => {
   });
 
   it('finds an application by its reference', async () => {
-    const reference = (await list({})).items.find(
+    const application = (await list({})).items.find(
       (item) => item.firstNameEn === 'OnFile',
-    )!.reference;
+    );
+    if (!application) {
+      throw new Error('Expected OnFile admission application fixture');
+    }
+    const reference = application.reference;
     expect(await names({ search: reference })).toEqual(['OnFile']);
     // Case-insensitive, and a partial reference (4+ hex characters) works.
     expect(await names({ search: reference.toLowerCase() })).toEqual([
