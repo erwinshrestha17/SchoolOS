@@ -558,8 +558,14 @@ test('M1 student roster uses a focused backend summary, safe filters, and pagina
   ]) {
     assert.match(directory, new RegExp(`header: '${header}'`));
   }
-  assert.match(directory, /onRowClick=\{\(student\) => openInspector\(student\.id\)\}/);
-  assert.doesNotMatch(directory, /lg:flex-row lg:items-center lg:justify-between/);
+  assert.match(
+    directory,
+    /onRowClick=\{\(student\) => openInspector\(student\.id\)\}/,
+  );
+  assert.doesNotMatch(
+    directory,
+    /lg:flex-row lg:items-center lg:justify-between/,
+  );
   assert.match(directory, /value=['"]ARCHIVED['"]/);
   assert.match(directory, /value=['"]MERGED['"]/);
   assert.doesNotMatch(
@@ -613,9 +619,11 @@ test('M1 Admissions overview shows a real, actionable, honest stage strip', () =
   assert.doesNotMatch(page, /\.items\.length/);
 
   // Every stage opens its real server-filtered queue.
-  assert.match(page, /href=\{`\/dashboard\/admissions\?queue=\$\{stage\.queue\}`\}/);
+  assert.match(
+    page,
+    /href=\{`\/dashboard\/admissions\?queue=\$\{stage\.queue\}`\}/,
+  );
 });
-
 
 test('student directory row actions use the shared keyboard-accessible ActionMenu, not a hover-only menu', () => {
   const directory = read('components/forms/student-directory.tsx');

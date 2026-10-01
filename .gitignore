@@ -20,6 +20,11 @@ apps/api/dist
 apps/api/coverage
 apps/api/.env.staging-local
 apps/api/storage
+apps/api/.npm/
+apps/api/.prisma_cache/
+apps/api/.tmp_home/
+apps/api/Library/
+packages/core/.npm/
 
 apps/web/.next
 apps/web/playwright-report
@@ -91,6 +96,10 @@ apps/schoolos_mobile/web/manifest.json
 # Load-test run output
 tests/load/results/
 
-# Repository documentation policy: AGENTS.md is the sole tracked Markdown source of truth.
+# Repository documentation policy: only the authoritative root execution documents are unignored by default.
 **/*.md
 !/AGENTS.md
+!/SCHOOLOS_RBAC_AUTHORIZATION_IMPLEMENTATION.md
+!/SCHOOLOS_WEB_DESIGN_ASTRA.md
+!/SCHOOLOS_APP_DESIGN_ASTRA.md
+!/SCHOOLOS_PHASE_WISE_IMPLEMENTATION_MASTER_PLAN_WITH_EDGE_CASES.md

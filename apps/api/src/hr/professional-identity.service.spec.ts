@@ -563,13 +563,17 @@ describe('ProfessionalIdentityService (Phase 5J–5L)', () => {
           assignment('ta-3', 's2', 'c9'),
         ]),
       };
-      eligibility.projectEligibility = jest.fn(({ staffId }: any) =>
-        staffId === 's1'
-          ? { outcome: 'INELIGIBLE', reasonCode: 'TEACHING_LICENCE_UNVERIFIED' }
-          : {
-              outcome: 'ELIGIBLE',
-              reasonCode: 'POLICY_REQUIREMENTS_SATISFIED',
-            },
+      (eligibility.projectEligibility as jest.Mock).mockImplementation(
+        ({ staffId }: { staffId: string }) =>
+          staffId === 's1'
+            ? {
+                outcome: 'INELIGIBLE',
+                reasonCode: 'TEACHING_LICENCE_UNVERIFIED',
+              }
+            : {
+                outcome: 'ELIGIBLE',
+                reasonCode: 'POLICY_REQUIREMENTS_SATISFIED',
+              },
       );
 
       const report: any = await service.listEligibilityExceptions(HR_A);
@@ -598,7 +602,7 @@ describe('ProfessionalIdentityService (Phase 5J–5L)', () => {
       tx.teacherAssignment = {
         findMany: jest.fn(() =>
           Array.from({ length: 1001 }, (_, i) =>
-            assignment(`ta-${i}`, 's1', 'c9'),
+            assignment(`ta-${String(i)}`, 's1', 'c9'),
           ),
         ),
       };

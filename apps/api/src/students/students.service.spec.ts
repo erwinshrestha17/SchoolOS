@@ -5090,9 +5090,11 @@ describe('students lifecycle hardening', () => {
       studentsEntitlement,
     );
 
-    expect(profile.unavailableSections).toEqual(['homework']);
-    expect(profile.homeworkSubmissions).toEqual([]);
-    expect(profile.academicResults).toEqual([]);
+    expect(profile).toMatchObject({
+      unavailableSections: ['homework'],
+      homeworkSubmissions: [],
+      academicResults: [],
+    });
     expect(profile.student.id).toBe(student.id);
     expect(profile.authorization.authorizedSections).toEqual(
       expect.arrayContaining(['identity', 'academics', 'homework']),
@@ -5108,7 +5110,7 @@ describe('students lifecycle hardening', () => {
       { ...actor, permissions: ['students:read', 'homework:read'] },
       studentsEntitlement,
     );
-    expect(profile.unavailableSections).toEqual([]);
+    expect(profile).toMatchObject({ unavailableSections: [] });
   });
 
   it('Phase 5F: academics and homework are fetched only when authorized, tenant- and student-scoped', async () => {
@@ -5205,15 +5207,22 @@ describe('students lifecycle hardening', () => {
       }),
     );
     // Only the current version's subject rows are shown.
-    expect(profile.academicResults[0].subjects).toEqual([
-      expect.objectContaining({ subjectName: 'Science', grade: 'A' }),
-    ]);
-    expect(profile.homeworkSubmissions[0]).toEqual(
-      expect.objectContaining({ title: 'Photosynthesis', status: 'SUBMITTED' }),
-    );
-    expect(JSON.stringify(profile.homeworkSubmissions)).not.toContain(
-      'private teacher feedback',
-    );
+    expect(profile).toMatchObject({
+      academicResults: [
+        expect.objectContaining({
+          subjects: [
+            expect.objectContaining({ subjectName: 'Science', grade: 'A' }),
+          ],
+        }),
+      ],
+      homeworkSubmissions: [
+        expect.objectContaining({
+          title: 'Photosynthesis',
+          status: 'SUBMITTED',
+        }),
+      ],
+    });
+    expect(JSON.stringify(profile)).not.toContain('private teacher feedback');
   });
 
   it('projects support student records without financial, health, credential, file, attendance, or activity data', async () => {

@@ -773,6 +773,7 @@ export type M2OfflineConflictResponse = {
     conflictId: string | null;
     syncStatus: string;
     rejectionReason: string | null;
+    rejectionDetail?: string | null;
     syncAttemptCount: number;
     deviceId: string | null;
     deviceLabel: string | null;
