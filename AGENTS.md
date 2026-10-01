@@ -576,24 +576,99 @@ Avoid:
 
 ## 18.1 Design skill orchestration (Claude Code + Codex)
 
-When compatible agent skills are installed and available, use them as **implementation aids** within the authority of this `AGENTS.md` and the applicable SchoolOS Web/Mobile playbook. They do not replace or override repository design, security, accessibility, domain, or verification rules.
+When compatible agent skills are installed and available, use them as **implementation aids** within the authority of this `AGENTS.md` and the applicable SchoolOS Web/Mobile playbook. They do not replace or override repository design, security, accessibility, domain, architecture, or verification rules.
+
+### Core responsibility split
 
 Use the design skills with distinct responsibilities:
 
-- `design-taste-frontend` — **direction**: establish or challenge visual direction, composition, hierarchy, density, and anti-generic UI choices before implementation.
-- `impeccable` — **polish**: critique and refine layout, typography, spacing, responsiveness, accessibility, consistency, and final UI quality.
-- `emil-design-eng` plus the applicable Emil animation skills — **motion/interactions**: interaction quality, purposeful motion, transitions, micro-interactions, animation review, and motion performance.
+- `design-taste-frontend` — **selective visual direction/exploration**: challenge composition, hierarchy, density, and generic-AI defaults when a task genuinely needs a new visual direction. It is not the default authority for SchoolOS operational dashboards, dense tables, or multi-step administrative workflows.
+- `impeccable` — **default UI audit and polish**: critique and refine layout, typography, spacing, responsiveness, accessibility, consistency, UX copy, error/empty/loading states, design-token use, and final interface quality.
+- `emil-design-eng` — **interaction/design engineering**: refine component behavior, micro-interactions, state transitions, defaults, interruptibility, feedback, and the implementation details that make interaction feel coherent and responsive.
 
-Orchestration rules:
+Default rule:
 
-1. **Taste for direction, Impeccable for polish, Emil for motion/interactions.**
-2. Do not invoke all design skills indiscriminately on every task; use only the skill(s) relevant to the current design problem.
-3. If skill guidance conflicts, the applicable SchoolOS Web/Mobile playbook wins; this `AGENTS.md` remains the final repository authority.
-4. Preserve the canonical SchoolOS design system and existing component architecture unless the applicable playbook or current task explicitly authorizes change.
-5. Do not let a skill introduce a parallel component system, conflicting visual language, decorative motion, excessive effects, or generic AI-SaaS styling.
-6. Motion MUST improve feedback, state comprehension, spatial continuity, or perceived responsiveness; it MUST NOT slow frequent operational workflows.
+1. **Taste for selective direction.**
+2. **Impeccable for audit/polish.**
+3. **Emil for interaction/motion.**
+
+Do not invoke all design skills indiscriminately on every task.
+
+### Emil skill routing
+
+Use Emil's specialist skills only when their scope matches the task:
+
+| Skill | SchoolOS use |
+| --- | --- |
+| `emil-design-eng` | Default interaction/design-engineering refinement for Web UI |
+| `find-animation-opportunities` | Read-only scan for places where motion would materially improve feedback or spatial/state comprehension |
+| `animate` | Implement approved Web motion using appropriate CSS/WAAPI/Motion patterns |
+| `review-animations` | Review changed animation code for justification, timing, easing, interruptibility, performance, and reduced-motion behavior |
+| `improve-animations` | Broad/read-only motion audit that produces a prioritized improvement plan |
+| `animation-vocabulary` | Identify precise motion/interaction terminology when the desired effect is unclear |
+| `prototype` | Produce a small number of genuinely different component/workspace alternatives when a design decision is unresolved; do not prototype the entire application at once |
+| `pick-ui-library` | Advise on mature libraries only after inspecting existing SchoolOS dependencies/primitives; it MUST NOT introduce a parallel component system by default |
+| `ask-sonner` | Use only when Sonner is already present or its adoption is explicitly authorized |
+| `mobile-native` | Improve responsive Web behavior in mobile browsers; it is not a Flutter design skill |
+| `apple-design` | Borrow interaction/gesture/feedback principles selectively; never copy an Apple visual identity over SchoolOS |
+| `animate-expo` | React Native/Expo only; do not use for SchoolOS Flutter work |
+| `write-swift` | Native Swift/iOS code only; do not use for ordinary SchoolOS Flutter work |
+
+### Web routing
+
+For ordinary `apps/web` product work, prefer this decision path:
+
+```text
+Read AGENTS.md + SCHOOLOS_WEB_DESIGN_ASTRA.md
+        ↓
+Inspect the existing rendered flow and canonical primitives
+        ↓
+Need a new visual direction?
+        ├─ no  → continue
+        └─ yes → design-taste-frontend selectively
+        ↓
+Need alternative component/workspace concepts?
+        ├─ no  → continue
+        └─ yes → prototype
+        ↓
+Implement/refine with existing SchoolOS component system
+        ↓
+impeccable audit/polish
+        ↓
+emil-design-eng for interaction details
+        ↓
+Does motion materially help?
+        ├─ no  → no animation
+        └─ yes → find-animation-opportunities → animate → review-animations
+        ↓
+Visual + functional + accessibility verification
+```
+
+For dense operational surfaces such as attendance, Student/Staff 360, finance, payroll, access control, reports, search, and high-volume tables, the SchoolOS Web playbook and `impeccable` SHOULD normally carry more weight than broad visual experimentation.
+
+### Mobile routing
+
+SchoolOS Mobile is Flutter. Web/React-specific design skills MUST NOT be mechanically translated into Flutter implementation.
+
+For `apps/schoolos_mobile`:
+
+- the Flutter Mobile playbook is authoritative for layout, navigation, adaptation, accessibility, offline/sync UX, and platform behavior;
+- `impeccable` MAY contribute general critique principles such as hierarchy, spacing, copy, accessibility, and state clarity when they are framework-neutral;
+- `emil-design-eng`, `apple-design`, and `animation-vocabulary` MAY contribute framework-neutral interaction principles;
+- `animate`, `animate-expo`, `mobile-native`, `ask-sonner`, and Web library recommendations MUST NOT be treated as Flutter implementation guidance;
+- Flutter-native implementation must use the repository's established Flutter/Dart patterns and the Mobile playbook.
+
+### Conflict and safety rules
+
+1. If skill guidance conflicts, the applicable SchoolOS Web/Mobile playbook wins; this `AGENTS.md` remains the final repository authority.
+2. Preserve the canonical SchoolOS design system and existing component architecture unless the applicable playbook or current task explicitly authorizes change.
+3. Do not let a skill introduce a parallel component system, conflicting visual language, decorative motion, excessive effects, or generic AI-SaaS styling.
+4. Before adding a dependency suggested by `pick-ui-library` or another skill, inspect existing dependencies and canonical primitives; prefer reuse or extension.
+5. Motion MUST improve feedback, state comprehension, spatial continuity, or perceived responsiveness; it MUST NOT slow frequent operational workflows.
+6. High-frequency interactions SHOULD bias toward immediate response and minimal motion.
 7. Skill-generated recommendations remain subject to SchoolOS accessibility, performance, responsive/adaptive, authorization, offline, localization, and verification requirements.
 8. When a skill is unavailable in the current agent environment, continue using the same responsibility split and repository playbooks rather than blocking the task.
+9. Skills are advisory/implementation aids; they never grant permission to change product scope, security semantics, backend authority, or release gates.
 
 For Web design work:
 
