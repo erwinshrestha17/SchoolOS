@@ -9,6 +9,7 @@ import {
 } from '@prisma/client';
 import { ForbiddenException, ConflictException } from '@nestjs/common';
 import { MarksService } from './marks.service';
+import { MarkSheetService } from './mark-sheet.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
@@ -30,6 +31,27 @@ function makeAllowingTeacherScopeService() {
   };
 }
 
+/** Sheet lifecycle collaborator: an editable DRAFT sheet for unit tests. */
+function markSheetStub() {
+  return {
+    ensureSheet: jest.fn().mockResolvedValue({
+      id: 'sheet-1',
+      status: 'DRAFT',
+      version: 1,
+    }),
+    claimForMarkWrite: jest.fn().mockResolvedValue(undefined),
+  } as unknown as MarkSheetService;
+}
+
+/** Interactive-transaction mock that runs the callback against `client`. */
+function interactiveTransaction(client: Record<string, unknown>) {
+  return jest.fn((arg: unknown) =>
+    typeof arg === 'function'
+      ? (arg as (tx: unknown) => unknown)(client)
+      : Promise.all(arg as Promise<unknown>[]),
+  );
+}
+
 describe('MarksService', () => {
   let service: MarksService;
 
@@ -48,6 +70,10 @@ describe('MarksService', () => {
         {
           provide: TeacherScopeService,
           useValue: {}, // Mock TeacherScopeService
+        },
+        {
+          provide: MarkSheetService,
+          useValue: markSheetStub(),
         },
       ],
     }).compile();
@@ -99,6 +125,7 @@ describe('MarksService', () => {
         prisma as unknown as PrismaService,
         { record: jest.fn() } as unknown as AuditService,
         teacherScopeService as unknown as TeacherScopeService,
+        markSheetStub(),
       );
 
       const result = await marksService.listAssignedComponents(actor, {
@@ -157,6 +184,7 @@ describe('MarksService', () => {
         prisma as unknown as PrismaService,
         { record: jest.fn() } as unknown as AuditService,
         teacherScopeService as unknown as TeacherScopeService,
+        markSheetStub(),
       );
 
       await expect(
@@ -233,22 +261,22 @@ describe('MarksService', () => {
       },
       markEntry: {
         findMany: jest.fn().mockResolvedValue([]),
-        upsert: jest.fn((query: { create: Record<string, unknown> }) =>
+        create: jest.fn((query: { data: Record<string, unknown> }) =>
           Promise.resolve({
-            id: `mark-${String(query.create.studentId)}`,
-            ...query.create,
+            id: `mark-${String(query.data.studentId)}`,
+            ...query.data,
           }),
         ),
       },
-      $transaction: jest.fn((operations: Promise<unknown>[]) =>
-        Promise.all(operations),
-      ),
+      $transaction: jest.fn(),
     };
+    prisma.$transaction = interactiveTransaction(prisma);
     const auditService = { record: jest.fn().mockResolvedValue(undefined) };
     const marksService = new MarksService(
       prisma as unknown as PrismaService,
       auditService as unknown as AuditService,
       makeAllowingTeacherScopeService() as unknown as TeacherScopeService,
+      markSheetStub(),
     );
 
     const result = await marksService.bulkUpsert(
@@ -275,41 +303,30 @@ describe('MarksService', () => {
         classId: 'class-1',
       },
     });
-    expect(prisma.markEntry.upsert).toHaveBeenCalledTimes(3);
-    expect(prisma.markEntry.upsert).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        where: {
-          tenantId_assessmentComponentId_studentId: {
-            tenantId: actor.tenantId,
-            assessmentComponentId: 'component-1',
-            studentId: 'student-draft',
-          },
-        },
-        create: expect.objectContaining({
-          status: MarkEntryStatus.DRAFT,
-          marksObtained: new Prisma.Decimal(0),
-        }),
+    // Non-numeric outcomes are stored without a number, never as zero
+    // (MarkEntry_marks_match_status_check); a blank draft has no number yet.
+    expect(prisma.markEntry.create).toHaveBeenCalledTimes(3);
+    expect(prisma.markEntry.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        studentId: 'student-draft',
+        status: MarkEntryStatus.DRAFT,
+        marksObtained: null,
       }),
-    );
-    expect(prisma.markEntry.upsert).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        create: expect.objectContaining({
-          status: MarkEntryStatus.ABSENT,
-          marksObtained: new Prisma.Decimal(0),
-        }),
+    });
+    expect(prisma.markEntry.create).toHaveBeenNthCalledWith(2, {
+      data: expect.objectContaining({
+        studentId: 'student-absent',
+        status: MarkEntryStatus.ABSENT,
+        marksObtained: null,
       }),
-    );
-    expect(prisma.markEntry.upsert).toHaveBeenNthCalledWith(
-      3,
-      expect.objectContaining({
-        create: expect.objectContaining({
-          status: MarkEntryStatus.WITHHELD,
-          marksObtained: new Prisma.Decimal(0),
-        }),
+    });
+    expect(prisma.markEntry.create).toHaveBeenNthCalledWith(3, {
+      data: expect.objectContaining({
+        studentId: 'student-withheld',
+        status: MarkEntryStatus.WITHHELD,
+        marksObtained: null,
       }),
-    );
+    });
     expect(result.updated).toBe(3);
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -396,6 +413,7 @@ describe('MarksService', () => {
       prisma as unknown as PrismaService,
       auditService as unknown as AuditService,
       makeAllowingTeacherScopeService() as unknown as TeacherScopeService,
+      markSheetStub(),
     );
 
     await expect(
@@ -472,6 +490,7 @@ describe('MarksService', () => {
       prisma as unknown as PrismaService,
       { record: jest.fn() } as unknown as AuditService,
       makeAllowingTeacherScopeService() as unknown as TeacherScopeService,
+      markSheetStub(),
     );
 
     await expect(
@@ -523,6 +542,7 @@ describe('MarksService', () => {
         prisma as unknown as PrismaService,
         { record: jest.fn() } as unknown as AuditService,
         teacherScopeService,
+        markSheetStub(),
       );
     }
 
@@ -612,7 +632,9 @@ describe('MarksService', () => {
               maxMarks: new Prisma.Decimal(100),
             },
           }),
-          update: jest.fn().mockResolvedValue({
+          update: jest.fn(),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          findUniqueOrThrow: jest.fn().mockResolvedValue({
             id: 'mark-1',
             marksObtained: new Prisma.Decimal(90),
             status: MarkEntryStatus.SUBMITTED,
@@ -635,12 +657,22 @@ describe('MarksService', () => {
         assessmentRetake: { findFirst: jest.fn().mockResolvedValue(null) },
         reportCardCorrectionRequest: { findFirst: jest.fn() },
       };
+      (prisma as Record<string, unknown>).$transaction =
+        interactiveTransaction(prisma);
       const marksService = buildMarksService(prisma);
 
       await expect(
         marksService.updateMark('mark-1', { marksObtained: 90 }, teacherActor),
       ).resolves.toBeDefined();
-      expect(prisma.markEntry.update).toHaveBeenCalled();
+      // Compare-and-set against the version that was read.
+      expect(prisma.markEntry.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'mark-1',
+            tenantId: 'tenant-1',
+          }),
+        }),
+      );
     });
 
     it('listMarks scopes results to SUBJECT_RECORD_READ assignments for teachers', async () => {

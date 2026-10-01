@@ -17,6 +17,8 @@ import { CasRecordsService } from './cas-records.service';
 import { GradeCalculatorService } from './grade-calculator.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
 import { MarksService } from './marks.service';
+import { MarkSheetService } from './mark-sheet.service';
+import { MarkSheetsController } from './mark-sheets.controller';
 import { PromotionReadinessService } from './promotion-readiness.service';
 import { ReportCardPdfService } from './report-card-pdf.service';
 import { ReportCardsService } from './report-cards.service';
@@ -46,6 +48,7 @@ import {
     SubjectsController,
     TeacherAssignmentsController,
     AcademicsController,
+    MarkSheetsController,
   ],
   providers: [
     AcademicsService,
@@ -55,6 +58,7 @@ import {
     CasRecordsService,
     GradeCalculatorService,
     MarkLockWorkflowService,
+    MarkSheetService,
     MarksService,
     PromotionReadinessService,
     ReportCardPdfService,
@@ -71,6 +75,7 @@ import {
     CasRecordsService,
     GradeCalculatorService,
     MarkLockWorkflowService,
+    MarkSheetService,
     MarksService,
     PromotionReadinessService,
     ReportCardPdfService,

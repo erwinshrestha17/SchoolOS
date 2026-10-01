@@ -8,7 +8,9 @@ import {
   AssessmentRetakeStatus,
   AssessmentType,
   MarkEntryStatus,
+  MarkSheetStatus,
   Prisma,
+  type MarkEntry,
   TeacherAssignmentComponentScope,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -21,6 +23,7 @@ import { UpdateMarkDto } from './dto/update-mark.dto';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { assertClientAuthorityFence } from '../sync/authority-fence';
+import { MarkSheetService } from './mark-sheet.service';
 
 /**
  * Roles that retain the pre-existing coarse permission-gated access to marks
@@ -43,6 +46,7 @@ export class MarksService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly teacherScopeService: TeacherScopeService,
+    private readonly markSheetService: MarkSheetService,
   ) {}
 
   /**
@@ -297,19 +301,32 @@ export class MarksService {
       },
     });
 
+    // Optimistic concurrency: changing an existing mark requires the version
+    // (updatedAt) the client last saw; the write below is a compare-and-set.
+    const existingByStudent = new Map(
+      existingMarks.map((mark) => [mark.studentId, mark]),
+    );
+    const expectedVersions = new Map<string, Date>();
     for (const entry of entries) {
+      const existing = existingByStudent.get(entry.studentId);
+      if (!existing) continue;
       const expectedVersion = entry.expectedVersion?.trim();
-      if (!expectedVersion) {
-        continue;
+      const expected = expectedVersion ? new Date(expectedVersion) : null;
+      if (
+        !expected ||
+        Number.isNaN(+expected) ||
+        +expected !== +existing.updatedAt
+      ) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: MARK_VERSION_CONFLICT_CODE,
+          studentId: entry.studentId,
+          currentVersion: existing.updatedAt.toISOString(),
+          message:
+            'Someone else changed this mark after you loaded it. Reload and review before saving.',
+        });
       }
-      const existing = existingMarks.find(
-        (mark) => mark.studentId === entry.studentId,
-      );
-      if (!existing || existing.updatedAt.toISOString() !== expectedVersion) {
-        throw new ConflictException(
-          `Mark version conflict for student ${entry.studentId}`,
-        );
-      }
+      expectedVersions.set(entry.studentId, expected);
     }
 
     if (existingMarks.length > 0) {
@@ -343,44 +360,124 @@ export class MarksService {
       }
     }
 
+    // One mark sheet per section touched (class-wide when a student has no
+    // section). Writes are only allowed while the sheet is DRAFT/RETURNED; a
+    // LOCKED sheet accepts writes only for students with an approved
+    // report-card correction (existing correction workflow).
+    const sectionByStudent = new Map(
+      students.map((student) => [student.id, student.sectionId ?? null]),
+    );
+    const sheetSections = [
+      ...new Set(
+        entries.map((entry) => sectionByStudent.get(entry.studentId) ?? null),
+      ),
+    ];
+
     const results = await this.prisma.$transaction(
-      entries.map((entry) => {
-        let status: MarkEntryStatus = MarkEntryStatus.SUBMITTED;
-        if (entry.isDraft) status = MarkEntryStatus.DRAFT;
-        else if (entry.isAbsent) status = MarkEntryStatus.ABSENT;
-        else if (entry.isWithheld) status = MarkEntryStatus.WITHHELD;
-
-        const val = entry.marksObtained ?? 0;
-
-        return this.prisma.markEntry.upsert({
-          where: {
-            tenantId_assessmentComponentId_studentId: {
-              tenantId: actor.tenantId,
+      async (tx) => {
+        for (const sectionId of sheetSections) {
+          const sheet = await this.markSheetService.ensureSheet(
+            tx,
+            actor.tenantId,
+            {
+              examTermId: dto.examTermId,
               assessmentComponentId: dto.assessmentComponentId,
-              studentId: entry.studentId,
+              subjectId: dto.subjectId,
+              classId: dto.classId,
+              sectionId,
             },
-          },
-          update: {
-            marksObtained: new Prisma.Decimal(val),
+          );
+          const sheetStudentIds = entries
+            .filter(
+              (entry) =>
+                (sectionByStudent.get(entry.studentId) ?? null) === sectionId,
+            )
+            .map((entry) => entry.studentId);
+          await this.markSheetService.claimForMarkWrite(
+            tx,
+            actor.tenantId,
+            sheet,
+            {
+              allowLockedCorrection:
+                sheet.status === MarkSheetStatus.LOCKED &&
+                sheetStudentIds.every((id) => approvedStudentIds.has(id)),
+            },
+          );
+        }
+
+        const written: MarkEntry[] = [];
+        for (const entry of entries) {
+          let status: MarkEntryStatus = MarkEntryStatus.SUBMITTED;
+          if (entry.isDraft) status = MarkEntryStatus.DRAFT;
+          else if (entry.isAbsent) status = MarkEntryStatus.ABSENT;
+          else if (entry.isWithheld) status = MarkEntryStatus.WITHHELD;
+
+          const marksObtained = marksForStatus(status, entry.marksObtained);
+          const data = {
+            marksObtained,
             status,
             remarks: entry.remarks || null,
             enteredById: actor.userId,
             isLocked: examTerm.isLocked,
-          },
-          create: {
-            tenantId: actor.tenantId,
-            examTermId: dto.examTermId,
-            assessmentComponentId: dto.assessmentComponentId,
-            subjectId: dto.subjectId,
-            studentId: entry.studentId,
-            enteredById: actor.userId,
-            marksObtained: new Prisma.Decimal(val),
-            status,
-            remarks: entry.remarks || null,
-            isLocked: examTerm.isLocked,
-          },
-        });
-      }),
+          };
+          const existing = existingByStudent.get(entry.studentId);
+          if (existing) {
+            const updated = await tx.markEntry.updateMany({
+              where: {
+                id: existing.id,
+                tenantId: actor.tenantId,
+                updatedAt: expectedVersions.get(entry.studentId),
+              },
+              data,
+            });
+            if (updated.count !== 1) {
+              throw new ConflictException({
+                statusCode: 409,
+                code: MARK_VERSION_CONFLICT_CODE,
+                studentId: entry.studentId,
+                message:
+                  'Someone else changed this mark while you were saving. Reload and review before saving.',
+              });
+            }
+            written.push(
+              await tx.markEntry.findUniqueOrThrow({
+                where: { id: existing.id },
+              }),
+            );
+          } else {
+            try {
+              written.push(
+                await tx.markEntry.create({
+                  data: {
+                    tenantId: actor.tenantId,
+                    examTermId: dto.examTermId,
+                    assessmentComponentId: dto.assessmentComponentId,
+                    subjectId: dto.subjectId,
+                    studentId: entry.studentId,
+                    ...data,
+                  },
+                }),
+              );
+            } catch (error) {
+              if (
+                error instanceof Prisma.PrismaClientKnownRequestError &&
+                error.code === 'P2002'
+              ) {
+                throw new ConflictException({
+                  statusCode: 409,
+                  code: MARK_VERSION_CONFLICT_CODE,
+                  studentId: entry.studentId,
+                  message:
+                    'Someone else entered this mark at the same time. Reload and review before saving.',
+                });
+              }
+              throw error;
+            }
+          }
+        }
+        return written;
+      },
+      { timeout: 20_000 },
     );
 
     await this.auditService.record({
@@ -783,7 +880,10 @@ export class MarksService {
     }
 
     let status: MarkEntryStatus = existingMark.status;
-    let val = Number(existingMark.marksObtained);
+    let val =
+      existingMark.marksObtained === null
+        ? null
+        : Number(existingMark.marksObtained);
 
     if (isDraft) status = MarkEntryStatus.DRAFT;
     else if (isAbsent) status = MarkEntryStatus.ABSENT;
@@ -797,7 +897,7 @@ export class MarksService {
           ? dto.marksObtained
           : val;
       const maxMarks = Number(existingMark.assessmentComponent.maxMarks);
-      if (val < 0 || val > maxMarks) {
+      if (val === null || val < 0 || val > maxMarks) {
         throw new ConflictException(
           `marksObtained must be between 0 and ${maxMarks}`,
         );
@@ -808,15 +908,46 @@ export class MarksService {
       }
     }
 
-    const updated = await this.prisma.markEntry.update({
-      where: { id },
-      data: {
-        marksObtained: new Prisma.Decimal(val),
-        status,
-        remarks: dto.remarks !== undefined ? dto.remarks : existingMark.remarks,
-        enteredById: actor.userId,
-        isLocked: examTerm?.isLocked || existingMark.isLocked,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const sheet = await this.markSheetService.ensureSheet(
+        tx,
+        actor.tenantId,
+        {
+          examTermId: existingMark.examTermId,
+          assessmentComponentId: existingMark.assessmentComponentId,
+          subjectId: existingMark.subjectId,
+          classId: student.classId,
+          sectionId: student.sectionId ?? null,
+        },
+      );
+      // A locked mark only reaches here with an approved correction.
+      await this.markSheetService.claimForMarkWrite(tx, actor.tenantId, sheet, {
+        allowLockedCorrection: isLocked,
+      });
+      const result = await tx.markEntry.updateMany({
+        where: {
+          id,
+          tenantId: actor.tenantId,
+          updatedAt: existingMark.updatedAt,
+        },
+        data: {
+          marksObtained: marksForStatus(status, val),
+          status,
+          remarks:
+            dto.remarks !== undefined ? dto.remarks : existingMark.remarks,
+          enteredById: actor.userId,
+          isLocked: examTerm?.isLocked || existingMark.isLocked,
+        },
+      });
+      if (result.count !== 1) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: MARK_VERSION_CONFLICT_CODE,
+          message:
+            'Someone else changed this mark while you were saving. Reload and review before saving.',
+        });
+      }
+      return tx.markEntry.findUniqueOrThrow({ where: { id } });
     });
 
     await this.auditService.record({
@@ -826,11 +957,15 @@ export class MarksService {
       userId: actor.userId,
       resourceId: id,
       before: {
-        marksObtained: Number(existingMark.marksObtained),
+        marksObtained:
+          existingMark.marksObtained === null
+            ? null
+            : Number(existingMark.marksObtained),
         status: existingMark.status,
       },
       after: {
-        marksObtained: Number(updated.marksObtained),
+        marksObtained:
+          updated.marksObtained === null ? null : Number(updated.marksObtained),
         status: updated.status,
       },
     });
@@ -998,4 +1133,27 @@ export class MarksService {
 
     return { OR: orConditions };
   }
+}
+
+export const MARK_VERSION_CONFLICT_CODE = 'MARK_VERSION_CONFLICT';
+
+/**
+ * Non-numeric outcomes are stored without a number (never zero); see
+ * MarkEntry_marks_match_status_check. A draft keeps whatever was typed.
+ */
+export function marksForStatus(
+  status: MarkEntryStatus,
+  value: number | null | undefined,
+): Prisma.Decimal | null {
+  if (
+    status === MarkEntryStatus.ABSENT ||
+    status === MarkEntryStatus.EXCUSED ||
+    status === MarkEntryStatus.WITHHELD ||
+    status === MarkEntryStatus.MISSING
+  ) {
+    return null;
+  }
+  return value === null || value === undefined
+    ? null
+    : new Prisma.Decimal(value);
 }

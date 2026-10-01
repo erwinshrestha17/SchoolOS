@@ -45,6 +45,23 @@ import { EmptyState } from '../../ui/empty-state';
 import { ErrorState } from '../../ui/error-state';
 import { LoadingState } from '../../ui/loading-state';
 import { AssessmentRetakeRequestDialog } from '../assessment-retake-request-dialog';
+import { isMarkSheetEditable, MarkSheetPanel } from '../mark-sheet-panel';
+import { ApiRequestError } from '../../../lib/api/client';
+
+const NON_NUMERIC_MARK_LABEL: Record<string, string> = {
+  ABSENT: 'Absent',
+  EXCUSED: 'Excused',
+  WITHHELD: 'Withheld',
+  MISSING: 'Missing',
+};
+
+/** Saved value as shown to staff: a number, or the outcome when there is none. */
+function savedMarkLabel(mark: { marksObtained: unknown; status?: string }) {
+  if (mark.marksObtained === null || mark.marksObtained === undefined) {
+    return NON_NUMERIC_MARK_LABEL[mark.status ?? ''] ?? '—';
+  }
+  return String(Number(mark.marksObtained));
+}
 
 function StatusSegmentButton({
   label,
@@ -147,6 +164,27 @@ export function MarksEntryTab({
     ),
   });
 
+  const markSheetsQueryKey = [
+    'mark-sheets',
+    filters.examTermId,
+    filters.classId,
+    filters.sectionId,
+    filters.assessmentComponentId,
+  ] as const;
+  const markSheetsQuery = useQuery({
+    queryKey: markSheetsQueryKey,
+    queryFn: () =>
+      api.listMarkSheets({
+        examTermId: filters.examTermId,
+        classId: filters.classId,
+        sectionId: filters.sectionId || undefined,
+        assessmentComponentId: filters.assessmentComponentId,
+      }),
+    enabled: Boolean(
+      filters.examTermId && filters.classId && filters.assessmentComponentId,
+    ),
+  });
+
   const rosterQuery = useQuery({
     queryKey: ['students', 'roster', filters.classId, filters.sectionId],
     queryFn: () =>
@@ -168,6 +206,7 @@ export function MarksEntryTab({
       setSaveSuccess(data.updated);
       setQueuedMarksMessage(null);
       void queryClient.invalidateQueries({ queryKey: ['marks', filters] });
+      void queryClient.invalidateQueries({ queryKey: markSheetsQueryKey });
       setMarks({});
       setStatuses({});
       setRemarks({});
@@ -229,19 +268,28 @@ export function MarksEntryTab({
     return () => window.removeEventListener('online', handleOnline);
   }, [session?.tenant.id, session?.user.id]);
 
+  // Lifecycle/version conflicts carry a specific server message (sheet
+  // submitted or locked, someone else changed a mark). Unsaved entries stay
+  // in the grid either way so nothing typed is lost.
   const saveErrorMessage =
-    batchMut.isError && !(batchMut.error instanceof OfflineMutationError)
-      ? schoolFacingErrorMessage(batchMut.error, {
-          fallback: 'These marks could not be saved. No entries were changed.',
-          invalid:
-            'Review the marks, status, and remarks before saving — a value is out of range or otherwise invalid.',
-          forbidden:
-            'You do not have permission to enter marks for this class or subject.',
-          notFound:
-            'This exam term, component, class, or section is no longer available.',
-          conflict: 'These marks changed on the server. Refresh and try again.',
-        })
-      : '';
+    batchMut.isError &&
+    batchMut.error instanceof ApiRequestError &&
+    batchMut.error.statusCode === 409
+      ? batchMut.error.message
+      : batchMut.isError && !(batchMut.error instanceof OfflineMutationError)
+        ? schoolFacingErrorMessage(batchMut.error, {
+            fallback:
+              'These marks could not be saved. No entries were changed.',
+            invalid:
+              'Review the marks, status, and remarks before saving — a value is out of range or otherwise invalid.',
+            forbidden:
+              'You do not have permission to enter marks for this class or subject.',
+            notFound:
+              'This exam term, component, class, or section is no longer available.',
+            conflict:
+              'These marks changed on the server. Refresh and try again.',
+          })
+        : '';
 
   // A teacher only ever picks from their own assignments; an administrator
   // keeps the full school lists. `classes`/`allSections` remain the props the
@@ -358,6 +406,29 @@ export function MarksEntryTab({
   const getExistingMark = (existing: any[] | undefined, studentId: string) => {
     return existing?.find((m: any) => m.studentId === studentId);
   };
+
+  const markSheets = markSheetsQuery.data?.items ?? [];
+  // Map a roster row to its mark sheet: the chosen section, or (for "All
+  // sections") the row's section by name within this class. Unmatched rows
+  // stay typeable; the server's sheet gate still decides on save.
+  const sheetForStudent = (student: { sectionName?: string | null }) => {
+    if (filters.sectionId) {
+      return markSheets.find((sheet) => sheet.sectionId === filters.sectionId);
+    }
+    const section = availableSections.find(
+      (candidate: any) => candidate.name === student.sectionName,
+    );
+    return section
+      ? markSheets.find((sheet) => sheet.sectionId === section.id)
+      : undefined;
+  };
+  const sectionNames = useMemo(
+    () =>
+      Object.fromEntries(
+        allSections.map((section: any) => [section.id, section.name]),
+      ) as Record<string, string>,
+    [allSections],
+  );
 
   const statusOptions = [
     { value: 'PRESENT', label: 'P', color: 'text-emerald-600 bg-emerald-50' },
@@ -665,6 +736,15 @@ export function MarksEntryTab({
         </div>
       )}
 
+      {filters.assessmentComponentId && markSheets.length > 0 ? (
+        <MarkSheetPanel
+          sheets={markSheets}
+          sectionNames={sectionNames}
+          hasUnsavedChanges={hasUnsavedChanges}
+          queryKeys={[markSheetsQueryKey, ['marks', filters]]}
+        />
+      ) : null}
+
       {filters.assessmentComponentId ? (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
@@ -674,7 +754,7 @@ export function MarksEntryTab({
                   <th className="py-6 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400 w-16">
                     #
                   </th>
-                  <th className="py-6 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400">
+                  <th className="sticky left-0 z-10 bg-slate-50 py-6 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400">
                     Student Info
                   </th>
                   <th className="py-6 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400 w-24 text-center">
@@ -753,8 +833,14 @@ export function MarksEntryTab({
                       (numericValue < 0 || numericValue > maxMarks);
                     const passed =
                       passMarks === null ||
-                      (existing && Number(existing.marksObtained) >= passMarks);
-                    const isStudentLocked = lockedStudentIds.has(student.id);
+                      (existing &&
+                        existing.marksObtained !== null &&
+                        Number(existing.marksObtained) >= passMarks);
+                    // Submitted/reviewed/locked sheets are read-only here;
+                    // the server enforces the same rule on save.
+                    const isStudentLocked =
+                      lockedStudentIds.has(student.id) ||
+                      !isMarkSheetEditable(sheetForStudent(student));
 
                     return (
                       <tr
@@ -767,7 +853,7 @@ export function MarksEntryTab({
                         <td className="py-4 px-6 text-[10px] font-black text-slate-300">
                           {index + 1}
                         </td>
-                        <td className="py-4 px-6">
+                        <td className="sticky left-0 z-10 bg-white py-4 px-6">
                           <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:shadow-sm transition-all">
                               <User size={18} />
@@ -820,7 +906,7 @@ export function MarksEntryTab({
                                   passed ? 'text-emerald-600' : 'text-rose-600',
                                 )}
                               >
-                                {Number(existing.marksObtained)}
+                                {savedMarkLabel(existing)}
                               </span>
                               <span className="text-[8px] font-black uppercase text-slate-300 tracking-widest">
                                 Saved Score
@@ -846,7 +932,7 @@ export function MarksEntryTab({
                                 currentStatus === 'ABSENT'
                               }
                               placeholder={
-                                existing
+                                existing && existing.marksObtained !== null
                                   ? String(Number(existing.marksObtained))
                                   : '0.0'
                               }

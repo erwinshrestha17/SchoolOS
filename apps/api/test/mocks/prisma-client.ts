@@ -897,6 +897,24 @@ export const MarkEntryStatus = {
   RETEST: 'RETEST',
 } as const;
 
+export const MarkSheetStatus = {
+  DRAFT: 'DRAFT',
+  SUBMITTED: 'SUBMITTED',
+  RETURNED: 'RETURNED',
+  RESUBMITTED: 'RESUBMITTED',
+  REVIEWED: 'REVIEWED',
+  LOCKED: 'LOCKED',
+} as const;
+
+export const MarkSheetAction = {
+  SUBMIT: 'SUBMIT',
+  RETURN: 'RETURN',
+  RESUBMIT: 'RESUBMIT',
+  REVIEW: 'REVIEW',
+  LOCK: 'LOCK',
+  UNLOCK: 'UNLOCK',
+} as const;
+
 export const AssessmentRetakeType = {
   RETEST: 'RETEST',
   MAKE_UP: 'MAKE_UP',

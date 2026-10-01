@@ -250,6 +250,8 @@ model Tenant {
   teacherReplacementPendingWork TeacherReplacementPendingWork[]
   teacherHandoverNotes          TeacherHandoverNote[]
   authorityFence                TenantAuthorityFence?
+  markSheets                MarkSheet[]
+  markSheetTransitions      MarkSheetTransition[]
 }
 
 model TenantAuthorityFence {

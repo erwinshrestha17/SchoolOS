@@ -145,6 +145,7 @@ model User {
   activatedTeacherReplacements   TeacherReplacement[]             @relation("ActivatedTeacherReplacements")
   disposedReplacementPendingWork TeacherReplacementPendingWork[]  @relation("DisposedReplacementPendingWork")
   createdHandoverNotes           TeacherHandoverNote[]            @relation("CreatedHandoverNotes")
+  markSheetTransitions MarkSheetTransition[] @relation("MarkSheetTransitionActor")
 
   @@unique([id, tenantId])
   @@unique([tenantId, email])

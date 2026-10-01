@@ -15,6 +15,7 @@ import type {
   HomeworkSubmissionPage,
   HomeworkSubmissionSummary,
   MarkEntrySummary,
+  MarkSheetSummary,
   PaginatedResponse,
   PromotionReadiness,
   PublishingResult,
@@ -354,6 +355,37 @@ export const academicsApi = {
         method: 'POST',
         json: body,
       },
+    ),
+  listMarkSheets: (params: {
+    examTermId: string;
+    classId?: string;
+    sectionId?: string;
+    subjectId?: string;
+    assessmentComponentId?: string;
+  }) =>
+    request<{ items: MarkSheetSummary[] }>(
+      withQuery('/academics/mark-sheets', params),
+    ),
+  submitMarkSheet: (
+    id: string,
+    body: { expectedVersion: number; idempotencyKey: string },
+  ) =>
+    request<MarkSheetSummary>(
+      `/academics/mark-sheets/${encodeURIComponent(id)}/submit`,
+      { method: 'POST', json: body },
+    ),
+  reviewMarkSheet: (
+    id: string,
+    body: {
+      action: 'RETURN' | 'REVIEW' | 'LOCK';
+      reason?: string;
+      expectedVersion: number;
+      idempotencyKey: string;
+    },
+  ) =>
+    request<MarkSheetSummary>(
+      `/academics/mark-sheets/${encodeURIComponent(id)}/review`,
+      { method: 'POST', json: body },
     ),
   listAssessmentRetakes: (params?: {
     status?: AssessmentRetakeStatus | null;

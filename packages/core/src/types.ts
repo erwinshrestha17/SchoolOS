@@ -1115,7 +1115,8 @@ export type MarkEntrySummary = {
   assessmentComponentId: string;
   subjectId: string;
   studentId: string;
-  marksObtained: number;
+  /** null for ABSENT/EXCUSED/WITHHELD/MISSING (never a numeric zero). */
+  marksObtained: number | null;
   status:
     | "DRAFT"
     | "PRESENT"
@@ -1223,6 +1224,46 @@ export type ResultPublishingReadiness = {
   publishedBy: string | null;
   blockedReasons: string[];
   notificationEligibility: boolean;
+};
+
+/** Phase 6G marks lifecycle for one assessment component + section. */
+export type MarkSheetStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "RETURNED"
+  | "RESUBMITTED"
+  | "REVIEWED"
+  | "LOCKED";
+
+export type MarkSheetAction =
+  | "SUBMIT"
+  | "RETURN"
+  | "RESUBMIT"
+  | "REVIEW"
+  | "LOCK"
+  | "UNLOCK";
+
+export type MarkSheetSummary = {
+  id: string;
+  examTermId: string;
+  assessmentComponentId: string;
+  subjectId: string;
+  classId: string;
+  sectionId: string | null;
+  status: MarkSheetStatus;
+  version: number;
+  submittedById: string | null;
+  submittedAt: string | null;
+  reviewedById: string | null;
+  reviewedAt: string | null;
+  lockedById: string | null;
+  lockedAt: string | null;
+  returnedById: string | null;
+  returnedAt: string | null;
+  returnReason: string | null;
+  updatedAt: string;
+  /** Server-computed; every action is re-authorized by the API. */
+  allowedActions: MarkSheetAction[];
 };
 
 // ─── Compiled from types/accounting.ts ───

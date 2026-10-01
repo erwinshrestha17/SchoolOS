@@ -19,6 +19,7 @@ model ExamTerm {
   timetableSlots   ExamTimetableSlot[]
   markLockRequests MarkLockRequest[]
   assessmentRetakes AssessmentRetake[]
+  markSheets       MarkSheet[]
 
   @@unique([tenantId, academicYearId, name])
 }
@@ -41,6 +42,7 @@ model AssessmentComponent {
   subject     Subject     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   markEntries MarkEntry[]
   assessmentRetakes AssessmentRetake[]
+  markSheets  MarkSheet[]
 
   @@unique([tenantId, examTermId, subjectId, name])
 }
@@ -53,7 +55,9 @@ model MarkEntry {
   subjectId             String
   studentId             String
   enteredById           String?
-  marksObtained         Decimal         @db.Decimal(8, 2)
+  /// NULL for ABSENT/EXCUSED/WITHHELD/MISSING (never a numeric zero);
+  /// enforced by MarkEntry_marks_match_status_check.
+  marksObtained         Decimal?        @db.Decimal(8, 2)
   status                MarkEntryStatus @default(SUBMITTED)
   remarks               String?
   isLocked              Boolean         @default(false)
@@ -254,7 +258,7 @@ model AssessmentRetake {
   type                 AssessmentRetakeType
   status               AssessmentRetakeStatus        @default(REQUESTED)
   reason               String
-  originalMarks        Decimal                        @db.Decimal(8, 2)
+  originalMarks        Decimal?                       @db.Decimal(8, 2)
   originalStatus       MarkEntryStatus
   scheduledStartsAt    DateTime?
   scheduledEndsAt      DateTime?
@@ -319,6 +323,86 @@ model MarkLockRequest {
 
   @@index([tenantId, examTermId, status])
 }
+/// Phase 6 marks lifecycle for one assessment component and section:
+/// DRAFT -> SUBMITTED -> (RETURNED -> RESUBMITTED)* -> REVIEWED -> LOCKED.
+/// Publication/withdrawal/correction of results is carried by ReportCard.
+enum MarkSheetStatus {
+  DRAFT
+  SUBMITTED
+  RETURNED
+  RESUBMITTED
+  REVIEWED
+  LOCKED
+}
+
+enum MarkSheetAction {
+  SUBMIT
+  RETURN
+  RESUBMIT
+  REVIEW
+  LOCK
+  UNLOCK
+}
+
+model MarkSheet {
+  id                    String          @id @default(uuid())
+  tenantId              String
+  examTermId            String
+  assessmentComponentId String
+  subjectId             String
+  classId               String
+  sectionId             String?
+  status                MarkSheetStatus @default(DRAFT)
+  /// Optimistic concurrency token; incremented by every mark write and transition.
+  version               Int             @default(1)
+  submittedById         String?
+  submittedAt           DateTime?
+  reviewedById          String?
+  reviewedAt            DateTime?
+  lockedById            String?
+  lockedAt              DateTime?
+  returnedById          String?
+  returnedAt            DateTime?
+  returnReason          String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  tenant              Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  examTerm            ExamTerm              @relation(fields: [examTermId], references: [id], onDelete: Cascade)
+  assessmentComponent AssessmentComponent   @relation(fields: [assessmentComponentId], references: [id], onDelete: Cascade)
+  subject             Subject               @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  class               Class                 @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section             Section?              @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  transitions         MarkSheetTransition[]
+
+  /// Recreated NULLS NOT DISTINCT in migration (one class-wide sheet).
+  @@unique([tenantId, assessmentComponentId, sectionId])
+  @@index([tenantId, examTermId, status])
+  @@index([tenantId, classId, sectionId])
+}
+
+model MarkSheetTransition {
+  id             String          @id @default(uuid())
+  tenantId       String
+  markSheetId    String
+  action         MarkSheetAction
+  fromStatus     MarkSheetStatus
+  toStatus       MarkSheetStatus
+  actorId        String
+  reason         String?
+  idempotencyKey String
+  /// MarkSheet.version after this transition.
+  sheetVersion   Int
+  createdAt      DateTime        @default(now())
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  markSheet MarkSheet @relation(fields: [markSheetId], references: [id], onDelete: Cascade)
+  actor     User      @relation("MarkSheetTransitionActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, markSheetId, idempotencyKey])
+  @@index([tenantId, markSheetId, createdAt])
+}
+
 
 model PromotionRecord {
   id             String   @id @default(uuid())
