@@ -564,7 +564,7 @@ describe('ProfessionalIdentityService (Phase 5J–5L)', () => {
         ]),
       };
       (eligibility.projectEligibility as jest.Mock).mockImplementation(
-        ({ staffId }: any) =>
+        ({ staffId }: { staffId: string }) =>
           staffId === 's1'
             ? {
                 outcome: 'INELIGIBLE',
