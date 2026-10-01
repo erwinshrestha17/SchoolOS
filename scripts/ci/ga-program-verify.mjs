@@ -2,7 +2,7 @@
 
 /**
  * GA program wave verification helper.
- * Usage: node scripts/ga-program-verify.mjs wave0|wave1|wave2|wave3|wave4|wave5|wave6
+ * Usage: node scripts/ci/ga-program-verify.mjs wave0|wave1|wave2|wave3|wave4|wave5|wave6
  *
  * Release-truth rule:
  * - Every check declared for a wave is blocking by default.
@@ -15,7 +15,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { repoRoot } from './lib/schoolos-env.mjs';
+import { repoRoot } from '../lib/schoolos-env.mjs';
 
 const wave = process.argv[2] ?? 'wave0';
 const evidenceDir = join(repoRoot, 'docs/production/evidence');
@@ -290,7 +290,7 @@ if (wave === 'wave1' || wave === 'wave0') {
   for (const platform of ['android', 'ios']) {
     checks.push(
       run(`mobile ${platform} release configuration`, 'node', [
-        'scripts/check-mobile-release-config.mjs',
+        'scripts/ci/check-mobile-release-config.mjs',
         platform,
         process.env[`SCHOOLOS_MOBILE_${platform.toUpperCase()}_DEFINES_FILE`] ?? '',
       ]),

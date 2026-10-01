@@ -6,7 +6,7 @@ import {
   loadSchoolOsEnv,
   resolveBackupOutputDir,
   resolveStorageRoot,
-} from './lib/schoolos-env.mjs';
+} from '../lib/schoolos-env.mjs';
 import {
   buildManifest,
   checkPostgresConnectivity,
@@ -16,7 +16,7 @@ import {
   runPgDump,
   runStorageArchive,
   writeManifest,
-} from './lib/backup-restore.mjs';
+} from '../lib/backup-restore.mjs';
 
 loadSchoolOsEnv();
 

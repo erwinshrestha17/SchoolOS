@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url";
 import {
   inspectMobileReleaseConfig,
   releaseBuildArgs,
-} from "./lib/mobile-release-config.mjs";
+} from "../lib/mobile-release-config.mjs";
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const args = process.argv.slice(2).filter((arg) => arg !== "--");
 const [platform, definesPath, mode] = args;
 if (args.length < 2 || args.length > 3 || (mode && mode !== "--build")) {

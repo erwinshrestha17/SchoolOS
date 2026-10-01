@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { repoRoot } from './lib/schoolos-env.mjs';
+import { repoRoot } from '../lib/schoolos-env.mjs';
 
 const evidenceDir = join(repoRoot, 'docs/production/evidence');
 const apiBaseUrl =
@@ -44,7 +44,7 @@ async function main() {
   results.push({ name: 'smoke:pilot', ...run('pnpm', ['smoke:pilot'], true) });
   results.push({
     name: 'verify-def-staging',
-    ...run('node', ['scripts/verify-def-staging.mjs'], true),
+    ...run('node', ['scripts/deploy/verify-def-staging.mjs'], true),
   });
 
   const webE2e = run(

@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { repoRoot } from './lib/schoolos-env.mjs';
+import { repoRoot } from '../lib/schoolos-env.mjs';
 
 const apiBaseUrl = (
   process.env.SMOKE_API_BASE_URL ?? 'http://localhost:4000/api/v1'

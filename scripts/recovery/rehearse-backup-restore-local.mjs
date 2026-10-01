@@ -9,7 +9,7 @@ import {
   loadSchoolOsEnv,
   repoRoot,
   resolveBackupOutputDir,
-} from './lib/schoolos-env.mjs';
+} from '../lib/schoolos-env.mjs';
 import {
   assertSafeRestoreTarget,
   checkPostgresConnectivity,
@@ -22,7 +22,7 @@ import {
   runPgRestore,
   runStorageExtract,
   buildAdminDatabaseUrl,
-} from './lib/backup-restore.mjs';
+} from '../lib/backup-restore.mjs';
 
 loadSchoolOsEnv();
 
@@ -177,7 +177,7 @@ async function main() {
     throw new Error('Source Postgres is not reachable.');
   }
 
-  const backupResult = spawnSync('node', [join(repoRoot, 'scripts/backup-schoolos.mjs')], {
+  const backupResult = spawnSync('node', [join(repoRoot, 'scripts/recovery/backup-schoolos.mjs')], {
     cwd: repoRoot,
     stdio: 'inherit',
     env: process.env,

@@ -6,7 +6,7 @@ import {
   defaultRestoreDatabaseUrl,
   loadSchoolOsEnv,
   resolveBackupOutputDir,
-} from './lib/schoolos-env.mjs';
+} from '../lib/schoolos-env.mjs';
 import {
   assertSafeRestoreTarget,
   buildAdminDatabaseUrl,
@@ -19,7 +19,7 @@ import {
   resolveManifestPathArg,
   runPgRestore,
   runStorageExtract,
-} from './lib/backup-restore.mjs';
+} from '../lib/backup-restore.mjs';
 
 loadSchoolOsEnv();
 

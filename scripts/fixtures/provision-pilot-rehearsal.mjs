@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { repoRoot, loadEnvFile } from './lib/schoolos-env.mjs';
+import { repoRoot, loadEnvFile } from '../lib/schoolos-env.mjs';
 
 const evidenceDir = join(repoRoot, 'docs/production/evidence');
 const localStagingEnv = join(repoRoot, 'deploy/env.local-staging.example');

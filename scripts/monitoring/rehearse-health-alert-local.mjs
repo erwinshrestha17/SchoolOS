@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
-import { repoRoot } from './lib/schoolos-env.mjs';
+import { repoRoot } from '../lib/schoolos-env.mjs';
 
 const evidencePath = join(
   repoRoot,
@@ -86,7 +86,7 @@ async function main() {
   ]);
 
   try {
-    monitor = spawn('node', ['scripts/monitor-schoolos-health.mjs'], {
+    monitor = spawn('node', ['scripts/monitoring/monitor-schoolos-health.mjs'], {
       cwd: repoRoot,
       env: {
         ...process.env,

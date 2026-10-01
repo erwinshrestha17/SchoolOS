@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadEnvFile, repoRoot } from './lib/schoolos-env.mjs';
+import { loadEnvFile, repoRoot } from '../lib/schoolos-env.mjs';
 
 const envPath = join(repoRoot, 'apps/api/.env.staging-local');
 if (existsSync(envPath)) {
