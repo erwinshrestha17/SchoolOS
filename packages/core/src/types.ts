@@ -1266,6 +1266,40 @@ export type MarkSheetSummary = {
   allowedActions: MarkSheetAction[];
 };
 
+/** Phase 6E: one assessment component x section cell of the readiness matrix. */
+export type MarkReadinessState =
+  | "NOT_STARTED"
+  | "IN_PROGRESS"
+  | "SUBMITTED"
+  | "RETURNED"
+  | "REVIEWED"
+  | "LOCKED";
+
+export type MarkReadinessCell = {
+  assessmentComponentId: string;
+  componentName: string;
+  subjectId: string;
+  subjectName: string;
+  classId: string;
+  className: string;
+  sectionId: string | null;
+  sectionName: string | null;
+  studentCount: number;
+  finalCount: number;
+  markSheetId: string | null;
+  sheetStatus: MarkSheetStatus | null;
+  state: MarkReadinessState;
+};
+
+export type MarkReadinessSummary = {
+  examTermId: string;
+  isTermLocked: boolean;
+  cells: MarkReadinessCell[];
+  totals: Record<MarkReadinessState, number>;
+  allLocked: boolean;
+  asOf: string;
+};
+
 // ─── Compiled from types/accounting.ts ───
 export type JournalEntryView = {
   id: string;

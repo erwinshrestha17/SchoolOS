@@ -15,6 +15,7 @@ import type {
   HomeworkSubmissionPage,
   HomeworkSubmissionSummary,
   MarkEntrySummary,
+  MarkReadinessSummary,
   MarkSheetSummary,
   PaginatedResponse,
   PromotionReadiness,
@@ -355,6 +356,10 @@ export const academicsApi = {
         method: 'POST',
         json: body,
       },
+    ),
+  getMarkReadiness: (params: { examTermId: string; classId?: string }) =>
+    request<MarkReadinessSummary>(
+      withQuery('/academics/mark-sheets/readiness', params),
     ),
   listMarkSheets: (params: {
     examTermId: string;

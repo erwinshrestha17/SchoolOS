@@ -28,6 +28,7 @@ import { WorkspaceTabs } from '@/components/ui/module-tabs';
 import { Button } from '@/components/ui/primitives/button';
 import { api } from '@/lib/api';
 import { SupportAcademicsOverview } from '@/components/academics/support-academics-overview';
+import { MarksReadinessMatrix } from '@/components/academics/marks-readiness-matrix';
 
 const workflowSections = [
   {
@@ -78,6 +79,8 @@ function SchoolAcademicsOverviewPage() {
   const router = useRouter();
   const { hasPermissions, session } = useSession();
   const canManageAcademics = hasPermissions(['academics:manage']);
+  // Coordinator/leadership view; the API enforces marks:review_lock.
+  const canReviewMarks = hasPermissions(['marks:review_lock']);
   const canEnterMarks =
     hasPermissions(['academics:enter_marks']) ||
     hasPermissions(['marks:manage']) ||
@@ -203,6 +206,8 @@ function SchoolAcademicsOverviewPage() {
           items={academicsWorkspaceTabs}
           overflowItems={academicsWorkspaceOverflowTabs}
         />
+
+        {canReviewMarks ? <MarksReadinessMatrix /> : null}
 
         <Surface
           title="Core academic workspaces"
