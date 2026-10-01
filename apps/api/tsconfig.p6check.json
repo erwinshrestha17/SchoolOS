@@ -1,2 +1,0 @@
-{ "extends": "./tsconfig.json", "compilerOptions": {"noEmit": true, "incremental": false},
-  "include": [], "files": ["src/teacher-scope/teacher-scope.service.ts","src/teacher-scope/teacher-scope.service.spec.ts","src/attendance/attendance.service.ts","src/attendance/dto/attendance-sync-result.dto.ts","src/attendance/attendance.service.spec.ts"] }
