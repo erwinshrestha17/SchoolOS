@@ -12,6 +12,10 @@ import {
   StudentLifecycleStatus,
   type MarkSheet,
 } from '@prisma/client';
+import {
+  buildResourceAuthorization,
+  type ResourceAuthorization,
+} from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import {
@@ -99,8 +103,13 @@ export interface MarkSheetScope {
   sectionId: string | null;
 }
 
+/** Mark sheet plus the canonical, server-computed authorization projection. */
 export type MarkSheetView = MarkSheet & {
-  allowedActions: MarkSheetAction[];
+  authorization: ResourceAuthorization<
+    MarkSheetAction,
+    'marks',
+    MarkSheetStatus
+  >;
 };
 
 /** Internal signal: the same idempotency key already committed. */
@@ -222,7 +231,7 @@ export class MarkSheetService {
       if (!(await this.canRead(sheet, actor))) continue;
       visible.push({
         ...sheet,
-        allowedActions: this.allowedActions(sheet, actor),
+        authorization: this.authorizationFor(sheet, actor),
       });
     }
     return { items: visible };
@@ -233,7 +242,7 @@ export class MarkSheetService {
     if (!(await this.canRead(sheet, actor))) {
       throw new NotFoundException('Mark sheet not found');
     }
-    return { ...sheet, allowedActions: this.allowedActions(sheet, actor) };
+    return { ...sheet, authorization: this.authorizationFor(sheet, actor) };
   }
 
   async history(id: string, actor: AuthContext) {
@@ -314,26 +323,45 @@ export class MarkSheetService {
     return this.transition(sheet, MarkSheetAction.UNLOCK, dto, actor);
   }
 
-  allowedActions(sheet: MarkSheet, actor: AuthContext): MarkSheetAction[] {
-    return (Object.keys(MARK_SHEET_TRANSITIONS) as MarkSheetAction[]).filter(
-      (action) => {
-        if (!MARK_SHEET_TRANSITIONS[action].from.includes(sheet.status)) {
-          return false;
-        }
-        if (!hasDomainPermission(actor, ACTION_PERMISSION[action])) {
-          return false;
-        }
-        if (
-          (action === MarkSheetAction.RETURN ||
-            action === MarkSheetAction.REVIEW ||
-            action === MarkSheetAction.LOCK) &&
-          sheet.submittedById === actor.userId
-        ) {
-          return false;
-        }
-        return true;
-      },
-    );
+  /**
+   * Canonical ResourceAuthorization for this actor and sheet. Presentation
+   * only: every transition is re-authorized by its own guarded route.
+   */
+  authorizationFor(
+    sheet: MarkSheet,
+    actor: AuthContext,
+  ): ResourceAuthorization<MarkSheetAction, 'marks', MarkSheetStatus> {
+    const actions = Object.fromEntries(
+      (Object.keys(MARK_SHEET_TRANSITIONS) as MarkSheetAction[]).map(
+        (action) => [action, this.isActionAvailable(sheet, actor, action)],
+      ),
+    ) as Record<MarkSheetAction, boolean>;
+    return buildResourceAuthorization({
+      actions,
+      sections: { marks: true },
+      lifecycleState: sheet.status,
+      // Routes require module.exams, so reaching here means ENABLED.
+      entitlementState: { module: 'exams', state: 'ENABLED' },
+    });
+  }
+
+  private isActionAvailable(
+    sheet: MarkSheet,
+    actor: AuthContext,
+    action: MarkSheetAction,
+  ): boolean {
+    if (!MARK_SHEET_TRANSITIONS[action].from.includes(sheet.status)) {
+      return false;
+    }
+    if (!hasDomainPermission(actor, ACTION_PERMISSION[action])) {
+      return false;
+    }
+    // Separation of duties: the submitter never reviews or locks.
+    const reviewDuty =
+      action === MarkSheetAction.RETURN ||
+      action === MarkSheetAction.REVIEW ||
+      action === MarkSheetAction.LOCK;
+    return !(reviewDuty && sheet.submittedById === actor.userId);
   }
 
   private async transition(
@@ -500,7 +528,7 @@ export class MarkSheetService {
           },
           tx,
         );
-        return { ...after, allowedActions: this.allowedActions(after, actor) };
+        return { ...after, authorization: this.authorizationFor(after, actor) };
       });
     } catch (error) {
       if (error instanceof IdempotentReplay) {
@@ -550,7 +578,7 @@ export class MarkSheetService {
       replay.markSheetId,
       actor,
     );
-    return { ...sheet, allowedActions: this.allowedActions(sheet, actor) };
+    return { ...sheet, authorization: this.authorizationFor(sheet, actor) };
   }
 
   /** Every active student on the sheet has a final (non-draft) entry. */

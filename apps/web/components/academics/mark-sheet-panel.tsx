@@ -131,7 +131,7 @@ export function MarkSheetPanel({
   if (sheets.length === 0) return null;
 
   const can = (sheet: MarkSheetSummary, action: MarkSheetAction) =>
-    sheet.allowedActions.includes(action);
+    sheet.authorization.capabilities[action];
 
   return (
     <section

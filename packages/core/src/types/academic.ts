@@ -408,8 +408,12 @@ export type MarkSheetSummary = {
   returnedAt: string | null;
   returnReason: string | null;
   updatedAt: string;
-  /** Server-computed; every action is re-authorized by the API. */
-  allowedActions: MarkSheetAction[];
+  /** Canonical ResourceAuthorization; every action is re-authorized by the API. */
+  authorization: {
+    allowedActions: MarkSheetAction[];
+    capabilities: Record<MarkSheetAction, boolean>;
+    lifecycleState: MarkSheetStatus | null;
+  };
 };
 
 /** Phase 6E: one assessment component x section cell of the readiness matrix. */

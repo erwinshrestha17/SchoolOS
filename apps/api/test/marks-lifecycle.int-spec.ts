@@ -441,7 +441,9 @@ function errorCode(reason: unknown): string | undefined {
         ),
       ).catch((error: unknown) => error);
       expect(errorCode(result)).toBe('SELF_APPROVAL_PROHIBITED');
-      expect(sheets.allowedActions(current, principal)).not.toContain('REVIEW');
+      expect(
+        sheets.authorizationFor(current, principal).allowedActions,
+      ).not.toContain('REVIEW');
     });
 
     it('a retried submit with the same key returns the original outcome once', async () => {
