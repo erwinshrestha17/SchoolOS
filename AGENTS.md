@@ -574,6 +574,27 @@ Avoid:
 
 # 18. Design-Task Execution Rules
 
+## 18.1 Design skill orchestration (Claude Code + Codex)
+
+When compatible agent skills are installed and available, use them as **implementation aids** within the authority of this `AGENTS.md` and the applicable SchoolOS Web/Mobile playbook. They do not replace or override repository design, security, accessibility, domain, or verification rules.
+
+Use the design skills with distinct responsibilities:
+
+- `design-taste-frontend` — **direction**: establish or challenge visual direction, composition, hierarchy, density, and anti-generic UI choices before implementation.
+- `impeccable` — **polish**: critique and refine layout, typography, spacing, responsiveness, accessibility, consistency, and final UI quality.
+- `emil-design-eng` plus the applicable Emil animation skills — **motion/interactions**: interaction quality, purposeful motion, transitions, micro-interactions, animation review, and motion performance.
+
+Orchestration rules:
+
+1. **Taste for direction, Impeccable for polish, Emil for motion/interactions.**
+2. Do not invoke all design skills indiscriminately on every task; use only the skill(s) relevant to the current design problem.
+3. If skill guidance conflicts, the applicable SchoolOS Web/Mobile playbook wins; this `AGENTS.md` remains the final repository authority.
+4. Preserve the canonical SchoolOS design system and existing component architecture unless the applicable playbook or current task explicitly authorizes change.
+5. Do not let a skill introduce a parallel component system, conflicting visual language, decorative motion, excessive effects, or generic AI-SaaS styling.
+6. Motion MUST improve feedback, state comprehension, spatial continuity, or perceived responsiveness; it MUST NOT slow frequent operational workflows.
+7. Skill-generated recommendations remain subject to SchoolOS accessibility, performance, responsive/adaptive, authorization, offline, localization, and verification requirements.
+8. When a skill is unavailable in the current agent environment, continue using the same responsibility split and repository playbooks rather than blocking the task.
+
 For Web design work:
 
 1. Read this file.
