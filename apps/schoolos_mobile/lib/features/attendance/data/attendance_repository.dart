@@ -754,7 +754,14 @@ class AttendanceRepository {
       serverStatus: _parseAttendanceServerSyncStatus(data['syncStatus']),
       replayed: data['replayed'] as bool? ?? false,
       rejectionReason: data['rejectionReason'] as String?,
+      rejectionDetail: data['rejectionDetail'] as String?,
     );
+    if (result.isEligibilityLapsed) {
+      throw const PermissionException(
+        'Your professional eligibility (employment, qualification or licence) is no longer current. This attendance draft can no longer be submitted. Contact HR.',
+        'TEACHER_SCOPE_DENIED',
+      );
+    }
     if (result.isAuthorizationRevoked) {
       throw const PermissionException(
         'Your teaching assignment changed. This attendance draft can no longer be submitted.',
@@ -779,6 +786,7 @@ class AttendanceRepository {
           replayed: result.replayed,
           deviceReceiptPersisted: false,
           rejectionReason: result.rejectionReason,
+          rejectionDetail: result.rejectionDetail,
         );
       }
     }

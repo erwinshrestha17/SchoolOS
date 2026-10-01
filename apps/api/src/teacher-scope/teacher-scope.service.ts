@@ -122,6 +122,17 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function requireGrant(resolution: TeacherGrantResolution): TeacherScopeGrant {
+  if (!resolution.grant) {
+    throw createTeacherScopeDeniedException(
+      resolution.eligibilityLapsed
+        ? TEACHER_ELIGIBILITY_LAPSED_REASON
+        : undefined,
+    );
+  }
+  return resolution.grant;
+}
+
 function teacherScopeFingerprint(value: unknown): string {
   const digest = createHash('sha256')
     .update('schoolos:teacher-scope:v1\0')
@@ -133,12 +144,29 @@ function teacherScopeFingerprint(value: unknown): string {
   return BigInt(`0x${digest}`).toString(10);
 }
 
-export function createTeacherScopeDeniedException() {
+/**
+ * Detail carried inside the stable TEACHER_SCOPE_DENIED envelope. The code is
+ * unchanged so every existing client keeps treating the denial as a
+ * revocation; newer clients may use `reason` to explain it.
+ */
+export const TEACHER_ELIGIBILITY_LAPSED_REASON = 'ELIGIBILITY_LAPSED';
+const ELIGIBILITY_LAPSED_MESSAGE =
+  'Your teaching assignment is on hold because your professional eligibility (employment, qualification or licence) is no longer current.';
+
+export function createTeacherScopeDeniedException(
+  reason?: typeof TEACHER_ELIGIBILITY_LAPSED_REASON,
+) {
   return new ForbiddenException({
     statusCode: 403,
     code: TEACHER_SCOPE_DENIED_CODE,
-    message: DENIAL_MESSAGE,
+    message: reason ? ELIGIBILITY_LAPSED_MESSAGE : DENIAL_MESSAGE,
+    ...(reason ? { reason } : {}),
   });
+}
+
+interface TeacherGrantResolution {
+  grant: TeacherScopeGrant | null;
+  eligibilityLapsed: boolean;
 }
 
 /**
@@ -193,7 +221,7 @@ export class TeacherScopeService {
     params: RequireTeacherAccessParams,
     actor?: AuthContext,
   ): Promise<TeacherScopeGrant | null> {
-    return this.resolveGrant(params, actor, { audit: false });
+    return (await this.resolveGrant(params, actor, { audit: false })).grant;
   }
 
   /**
@@ -206,37 +234,35 @@ export class TeacherScopeService {
     params: Omit<RequireTeacherAccessParams, 'sectionId'>,
     actor?: AuthContext,
   ): Promise<TeacherScopeGrant | null> {
-    return this.resolveGrant(
-      { ...params, sectionId: undefined as unknown as string },
-      actor,
-      { audit: false },
-    );
+    return (
+      await this.resolveGrant(
+        { ...params, sectionId: undefined as unknown as string },
+        actor,
+        { audit: false },
+      )
+    ).grant;
   }
 
   async requireAccessAnySectionOfClass(
     params: Omit<RequireTeacherAccessParams, 'sectionId'>,
     actor?: AuthContext,
   ): Promise<TeacherScopeGrant> {
-    const grant = await this.resolveGrant(
-      { ...params, sectionId: undefined as unknown as string },
-      actor,
-      { audit: true },
+    return requireGrant(
+      await this.resolveGrant(
+        { ...params, sectionId: undefined as unknown as string },
+        actor,
+        { audit: true },
+      ),
     );
-    if (!grant) {
-      throw createTeacherScopeDeniedException();
-    }
-    return grant;
   }
 
   async requireAccess(
     params: RequireTeacherAccessParams,
     actor?: AuthContext,
   ): Promise<TeacherScopeGrant> {
-    const grant = await this.resolveGrant(params, actor, { audit: true });
-    if (!grant) {
-      throw createTeacherScopeDeniedException();
-    }
-    return grant;
+    return requireGrant(
+      await this.resolveGrant(params, actor, { audit: true }),
+    );
   }
 
   /**
@@ -314,6 +340,12 @@ export class TeacherScopeService {
     params: DenyTeacherActorAccessParams,
     actor: AuthContext,
   ): Promise<never> {
+    // Callers probe with canActorAccess and then deny. When the denied scope
+    // is still held but its professional eligibility lapsed, say so (same
+    // stable code, plus `reason`) instead of a generic no-assignment denial.
+    const eligibilityLapsed =
+      params.reason === 'no_assignment' &&
+      (await this.isEligibilityLapsedForScope(params, actor));
     await this.auditService.record({
       action: 'teacher_scope.denied',
       resource: params.capability,
@@ -323,11 +355,38 @@ export class TeacherScopeService {
       after: {
         capability: params.capability,
         staffId: null,
-        reason: params.reason,
+        reason: eligibilityLapsed ? 'eligibility' : params.reason,
         recordStatus: params.recordStatus ?? null,
       },
     });
-    throw createTeacherScopeDeniedException();
+    throw createTeacherScopeDeniedException(
+      eligibilityLapsed ? TEACHER_ELIGIBILITY_LAPSED_REASON : undefined,
+    );
+  }
+
+  private async isEligibilityLapsedForScope(
+    params: DenyTeacherActorAccessParams,
+    actor: AuthContext,
+  ): Promise<boolean> {
+    if (!params.classId) return false;
+    const staffId = await this.resolveActiveStaffId(actor);
+    if (!staffId) return false;
+    const resolution = await this.resolveGrant(
+      {
+        tenantId: actor.tenantId,
+        staffId,
+        classId: params.classId,
+        // Absent section = any section of the class, as for the legacy
+        // class-wide callers (see canAccessAnySectionOfClass).
+        sectionId: params.sectionId ?? (undefined as unknown as string),
+        subjectId: params.subjectId,
+        capability: params.capability,
+        recordStatus: params.recordStatus ?? undefined,
+      },
+      actor,
+      { audit: false },
+    );
+    return !resolution.grant && resolution.eligibilityLapsed;
   }
 
   /**
@@ -363,7 +422,8 @@ export class TeacherScopeService {
     params: RequireTeacherAccessParams,
     actor: AuthContext | undefined,
     options: { audit: boolean },
-  ): Promise<TeacherScopeGrant | null> {
+  ): Promise<TeacherGrantResolution> {
+    const denied = { grant: null, eligibilityLapsed: false };
     const rule = CAPABILITY_RULES[params.capability];
     const now = new Date();
     const effectiveOn = params.effectiveOn ?? now;
@@ -377,13 +437,13 @@ export class TeacherScopeService {
     ) {
       if (options.audit)
         await this.recordDenial(params, actor, 'missing_scope');
-      return null;
+      return denied;
     }
 
     const denial = teacherRecordDenial(params);
     if (denial) {
       if (options.audit) await this.recordDenial(params, actor, denial);
-      return null;
+      return denied;
     }
 
     // Staff-oriented callers must obey the same live employment boundary as
@@ -398,7 +458,7 @@ export class TeacherScopeService {
     });
     if (!staff) {
       if (options.audit) await this.recordDenial(params, actor, 'employment');
-      return null;
+      return denied;
     }
 
     const assignments = await this.prisma.teacherAssignment.findMany({
@@ -418,6 +478,10 @@ export class TeacherScopeService {
       },
     });
 
+    // A scope-matching assignment or delegation that fails only on live
+    // professional eligibility is still a denial, but it is reported
+    // distinctly so the teacher is told why (Phase 6 eligibility gate).
+    let eligibilityLapsed = false;
     let matchingAssignment: (typeof assignments)[number] | undefined;
     for (const assignment of assignments) {
       if (!this.matchesScope(assignment, rule, params)) continue;
@@ -434,14 +498,18 @@ export class TeacherScopeService {
         matchingAssignment = assignment;
         break;
       }
+      eligibilityLapsed = true;
     }
 
     if (matchingAssignment) {
       return {
-        source: 'ASSIGNMENT',
-        assignmentId: matchingAssignment.id,
-        componentScope: matchingAssignment.componentScope,
-        assignmentType: matchingAssignment.assignmentType,
+        eligibilityLapsed: false,
+        grant: {
+          source: 'ASSIGNMENT',
+          assignmentId: matchingAssignment.id,
+          componentScope: matchingAssignment.componentScope,
+          assignmentType: matchingAssignment.assignmentType,
+        },
       };
     }
 
@@ -480,19 +548,28 @@ export class TeacherScopeService {
         matchingDelegation = delegation;
         break;
       }
+      eligibilityLapsed = true;
     }
 
     if (matchingDelegation) {
       return {
-        source: 'DELEGATION',
-        assignmentId: matchingDelegation.id,
-        componentScope: matchingDelegation.componentScope,
-        assignmentType: null,
+        eligibilityLapsed: false,
+        grant: {
+          source: 'DELEGATION',
+          assignmentId: matchingDelegation.id,
+          componentScope: matchingDelegation.componentScope,
+          assignmentType: null,
+        },
       };
     }
 
-    if (options.audit) await this.recordDenial(params, actor, 'no_assignment');
-    return null;
+    if (options.audit)
+      await this.recordDenial(
+        params,
+        actor,
+        eligibilityLapsed ? 'eligibility' : 'no_assignment',
+      );
+    return { grant: null, eligibilityLapsed };
   }
 
   private async recordDenial(
@@ -503,7 +580,8 @@ export class TeacherScopeService {
       | 'ownership'
       | 'no_assignment'
       | 'missing_scope'
-      | 'employment',
+      | 'employment'
+      | 'eligibility',
   ) {
     await this.auditService.record({
       action: 'teacher_scope.denied',

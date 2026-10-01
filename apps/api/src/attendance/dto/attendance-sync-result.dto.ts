@@ -51,6 +51,14 @@ export class AttendanceSyncResultDto {
   })
   rejectionReason!: AttendanceSyncRejectionReason | null;
 
+  @ApiProperty({
+    nullable: true,
+    enum: ['ELIGIBILITY_LAPSED'],
+    description:
+      'Optional detail for a rejection. The rejectionReason is unchanged so existing clients keep their handling.',
+  })
+  rejectionDetail!: string | null;
+
   @ApiProperty({ format: 'date-time' })
   createdAt!: string;
 }

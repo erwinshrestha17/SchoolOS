@@ -47,6 +47,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  TEACHER_ELIGIBILITY_LAPSED_REASON,
   TEACHER_SCOPE_DENIED_CODE,
   TeacherScopeService,
 } from '../teacher-scope/teacher-scope.service';
@@ -1289,9 +1290,11 @@ export class AttendanceService {
     } catch (error) {
       if (isDeterministicAttendanceSyncRejection(error)) {
         const rejectionReason = classifyAttendanceSyncRejection(error);
+        const rejectionDetail = attendanceSyncRejectionDetail(error);
         const rejectedPayload = {
           dto,
           error: error instanceof Error ? error.message : 'Unknown error',
+          rejectionDetail,
           trustMetadata,
         } as unknown as Prisma.InputJsonValue;
         const rejection = await this.prisma.attendanceSyncSubmission.updateMany(
@@ -1331,6 +1334,7 @@ export class AttendanceService {
           after: {
             clientSubmissionId: dto.clientSubmissionId,
             rejectionReason: rejected.rejectionReason,
+            rejectionDetail,
           },
         });
 
@@ -7812,6 +7816,7 @@ function mapAttendanceSyncResult(
     serverReceivedAt: Date;
     rejectionReason: AttendanceSyncRejectionReason | null;
     createdAt: Date;
+    payload?: unknown;
   },
   replayed: boolean,
 ) {
@@ -7830,8 +7835,40 @@ function mapAttendanceSyncResult(
     serverReceivedAt: submission.serverReceivedAt.toISOString(),
     replayed,
     rejectionReason: submission.rejectionReason,
+    rejectionDetail: storedAttendanceSyncRejectionDetail(submission.payload),
     createdAt: submission.createdAt.toISOString(),
   };
+}
+
+/**
+ * Finer-grained explanation for a rejection whose reason stays one of the
+ * established values (e.g. SCOPE_REVOKED) so older clients keep their
+ * revocation handling. Only known, non-sensitive detail codes are exposed.
+ */
+const ATTENDANCE_SYNC_REJECTION_DETAILS = new Set([
+  TEACHER_ELIGIBILITY_LAPSED_REASON,
+]);
+
+function attendanceSyncRejectionDetail(error: unknown): string | null {
+  if (!(error instanceof ForbiddenException)) return null;
+  const response = error.getResponse();
+  if (typeof response !== 'object' || response === null) return null;
+  const reason = (response as { reason?: unknown }).reason;
+  return typeof reason === 'string' &&
+    ATTENDANCE_SYNC_REJECTION_DETAILS.has(reason)
+    ? reason
+    : null;
+}
+
+function storedAttendanceSyncRejectionDetail(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+  const detail = (payload as Record<string, unknown>).rejectionDetail;
+  return typeof detail === 'string' &&
+    ATTENDANCE_SYNC_REJECTION_DETAILS.has(detail)
+    ? detail
+    : null;
 }
 
 function calculateAttendancePercent(

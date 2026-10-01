@@ -1418,6 +1418,7 @@ export function AttendanceOfflineDraftsWorkspace() {
                       {getAttendanceSyncNextStep(
                         item.syncStatus,
                         item.rejectionReason,
+                        item.rejectionDetail ?? null,
                       )}
                     </TableCell>
                   </TableRow>
@@ -1461,6 +1462,7 @@ function getAttendanceSyncStatusTone(
 function getAttendanceSyncNextStep(
   status: string,
   rejectionReason: string | null,
+  rejectionDetail: string | null = null,
 ) {
   if (status === 'PROCESSING') {
     return 'Keep the device draft and check the official roster before retrying.';
@@ -1482,6 +1484,10 @@ function getAttendanceSyncNextStep(
     case 'VALIDATION_ERROR':
       return 'Review the school day and attendance entries before creating a revised draft.';
     case 'SCOPE_REVOKED':
+      if (rejectionDetail === 'ELIGIBILITY_LAPSED') {
+        return "The teacher's professional eligibility (employment, qualification or licence) is no longer current. Do not resend this draft; HR must restore eligibility first.";
+      }
+      return "This teacher's assignment changed. Do not resend this draft; create a new one only if access is restored.";
     case 'UNASSIGNED_TEACHER':
       return "This teacher's assignment changed. Do not resend this draft; create a new one only if access is restored.";
     default:

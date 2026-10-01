@@ -311,12 +311,20 @@ class TeacherAttendanceSubmitResult {
     required this.replayed,
     this.deviceReceiptPersisted = true,
     this.rejectionReason,
+    this.rejectionDetail,
   });
 
   final AttendanceServerSyncStatus serverStatus;
   final bool replayed;
   final bool deviceReceiptPersisted;
   final String? rejectionReason;
+
+  /// Optional detail for a rejection whose reason stays SCOPE_REVOKED,
+  /// e.g. `ELIGIBILITY_LAPSED`. Null from older servers.
+  final String? rejectionDetail;
+
+  bool get isEligibilityLapsed =>
+      isAuthorizationRevoked && rejectionDetail == 'ELIGIBILITY_LAPSED';
 
   bool get isRosterMismatch =>
       serverStatus == AttendanceServerSyncStatus.rejected &&

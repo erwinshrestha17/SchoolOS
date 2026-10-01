@@ -2935,6 +2935,69 @@ describe('attendance production hardening', () => {
     );
   });
 
+  it('rejects an offline draft as SCOPE_REVOKED with detail ELIGIBILITY_LAPSED when the teacher still holds the assignment but eligibility lapsed', async () => {
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      staffFindFirst: { id: 'staff-1' },
+      eligibilityLive: false,
+      canonicalAssignments: [
+        teacherAssignmentFixture({
+          id: 'homeroom-lapsed',
+          tenantId: teacherActor.tenantId,
+          academicYearId: 'ay-1',
+          staffId: 'staff-1',
+          assignmentType: TeacherAssignmentType.CLASS_TEACHER,
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: null,
+          effectiveFrom: new Date('2020-01-01T00:00:00.000Z'),
+          effectiveUntil: new Date('2099-12-31T23:59:59.999Z'),
+        }),
+      ],
+      attendanceSyncCreated: buildSyncSubmission({
+        clientSubmissionId: 'sync-lapsed',
+        sectionId: 'section-1',
+        attendanceSessionId: null,
+        submittedById: teacherActor.userId,
+      }),
+    });
+
+    await expect(
+      service.syncAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+          clientSubmissionId: 'sync-lapsed',
+          deviceTimestamp: '2026-04-28T08:00:00.000Z',
+        },
+        teacherActor,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        syncStatus: AttendanceSyncStatus.REJECTED,
+        // Unchanged reason: installed clients keep discarding, never resending.
+        rejectionReason: AttendanceSyncRejectionReason.SCOPE_REVOKED,
+        rejectionDetail: 'ELIGIBILITY_LAPSED',
+      }),
+    );
+
+    expect(prisma.attendanceSyncSubmission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          rejectionReason: AttendanceSyncRejectionReason.SCOPE_REVOKED,
+          payload: expect.objectContaining({
+            rejectionDetail: 'ELIGIBILITY_LAPSED',
+          }),
+        }),
+      }),
+    );
+  });
+
   it('records SCOPE_REVOKED when authorizationVersion does not match current scopeVersion', async () => {
     const { service, prisma } = buildService({
       attendanceSyncCreated: buildSyncSubmission({
@@ -5176,6 +5239,8 @@ function buildService(options: {
    */
   canonicalAssignments?: Record<string, unknown>[];
   canonicalDelegations?: Record<string, unknown>[];
+  /** Live professional eligibility for canonical assignments (default true). */
+  eligibilityLive?: boolean;
   scopeStaffId?: string | null;
   academicYear?: unknown;
   classroom?: unknown;
@@ -5545,7 +5610,11 @@ function buildService(options: {
           return new TeacherScopeService(
             deps.prisma as never,
             deps.audit as never,
-            { isLive: jest.fn().mockResolvedValue(true) } as never,
+            {
+              isLive: jest
+                .fn()
+                .mockResolvedValue(options.eligibilityLive ?? true),
+            } as never,
           );
         })()
       : ({

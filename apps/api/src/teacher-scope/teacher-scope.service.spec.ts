@@ -263,6 +263,159 @@ describe('TeacherScopeService — assignment-based authorization', () => {
     expect(eligibility.isLive).toHaveBeenCalled();
   });
 
+  describe('Phase 6 eligibility gate: lapsed eligibility is reported distinctly', () => {
+    async function denialBody(promise: Promise<unknown>) {
+      const error = await promise.then(
+        () => {
+          throw new Error('expected denial');
+        },
+        (caught: unknown) => caught,
+      );
+      expect(error).toBeInstanceOf(ForbiddenException);
+      return (error as ForbiddenException).getResponse() as Record<
+        string,
+        unknown
+      >;
+    }
+
+    it('keeps the stable TEACHER_SCOPE_DENIED code and adds reason ELIGIBILITY_LAPSED', async () => {
+      const { service, eligibility, auditRecord } = buildService();
+      eligibility.isLive.mockResolvedValue(false);
+
+      const body = await denialBody(
+        service.requireAccess(
+          ask(TeacherCapability.MARKS_ENTER, CLASS_1, SECTION_1A, MATHS),
+          actor,
+        ),
+      );
+
+      expect(body).toMatchObject({
+        code: 'TEACHER_SCOPE_DENIED',
+        reason: 'ELIGIBILITY_LAPSED',
+      });
+      expect(auditRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'teacher_scope.denied',
+          after: expect.objectContaining({ reason: 'eligibility' }),
+        }),
+      );
+    });
+
+    it('applies to a substitution delegation whose eligibility lapsed', async () => {
+      const delegation = {
+        id: 'deleg-lapsed',
+        classId: CLASS_2,
+        sectionId: SECTION_2A,
+        subjectId: ENGLISH,
+        componentScope: null,
+        allowedCapabilities: [TeacherCapability.MARKS_ENTER],
+        effectiveFrom: new Date('2026-04-01T00:00:00.000Z'),
+        effectiveUntil: new Date('2099-01-01T00:00:00.000Z'),
+        academicYearId: YEAR,
+      };
+      const { service, eligibility } = buildService(RAMESH_ASSIGNMENTS, [
+        delegation,
+      ]);
+      eligibility.isLive.mockResolvedValue(false);
+
+      const body = await denialBody(
+        service.requireAccess(
+          ask(TeacherCapability.MARKS_ENTER, CLASS_2, SECTION_2A, ENGLISH),
+          actor,
+        ),
+      );
+      expect(body.reason).toBe('ELIGIBILITY_LAPSED');
+    });
+
+    it('does not claim lapsed eligibility when no assignment matches the scope', async () => {
+      const { service, eligibility, auditRecord } = buildService();
+      eligibility.isLive.mockResolvedValue(false);
+
+      const body = await denialBody(
+        service.requireAccess(
+          ask(TeacherCapability.MARKS_ENTER, CLASS_1, SECTION_1A, ENGLISH),
+          actor,
+        ),
+      );
+      expect(body).toMatchObject({ code: 'TEACHER_SCOPE_DENIED' });
+      expect(body).not.toHaveProperty('reason');
+      expect(auditRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          after: expect.objectContaining({ reason: 'no_assignment' }),
+        }),
+      );
+    });
+
+    it('denyActorAccess (probe-then-deny callers) reports ELIGIBILITY_LAPSED for a held scope', async () => {
+      const { service, eligibility, auditRecord } = buildService();
+      eligibility.isLive.mockResolvedValue(false);
+
+      const body = await denialBody(
+        service.denyActorAccess(
+          {
+            capability: TeacherCapability.MARKS_ENTER,
+            classId: CLASS_1,
+            sectionId: SECTION_1A,
+            subjectId: MATHS,
+            reason: 'no_assignment',
+          },
+          actor,
+        ),
+      );
+      expect(body).toMatchObject({
+        code: 'TEACHER_SCOPE_DENIED',
+        reason: 'ELIGIBILITY_LAPSED',
+      });
+      expect(auditRecord).toHaveBeenCalledTimes(1);
+      expect(auditRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          after: expect.objectContaining({ reason: 'eligibility' }),
+        }),
+      );
+    });
+
+    it('denyActorAccess keeps the generic denial for missing_scope and unheld scopes', async () => {
+      const { service, eligibility } = buildService();
+      eligibility.isLive.mockResolvedValue(false);
+
+      const missingScope = await denialBody(
+        service.denyActorAccess(
+          {
+            capability: TeacherCapability.MARKS_ENTER,
+            reason: 'missing_scope',
+          },
+          actor,
+        ),
+      );
+      expect(missingScope).not.toHaveProperty('reason');
+
+      const unheld = await denialBody(
+        service.denyActorAccess(
+          {
+            capability: TeacherCapability.MARKS_ENTER,
+            classId: CLASS_1,
+            sectionId: SECTION_1A,
+            subjectId: ENGLISH,
+            reason: 'no_assignment',
+          },
+          actor,
+        ),
+      );
+      expect(unheld).not.toHaveProperty('reason');
+    });
+
+    it('canAccess still returns null (never throws) for lapsed eligibility', async () => {
+      const { service, eligibility } = buildService();
+      eligibility.isLive.mockResolvedValue(false);
+      await expect(
+        service.canAccess(
+          ask(TeacherCapability.MARKS_ENTER, CLASS_1, SECTION_1A, MATHS),
+          actor,
+        ),
+      ).resolves.toBeNull();
+    });
+  });
+
   describe('Subject Teacher: write is confined to the exact assignment', () => {
     it('allows marks entry for an assigned subject in an assigned section', async () => {
       const { service } = buildService();
