@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { liveTimetableVersionWhere } from '../timetable/timetable-calendar';
 import {
   ActivityCategory,
   FileStatus,
@@ -2694,8 +2695,10 @@ export class MobileService {
       where: {
         tenantId: actor.tenantId,
         classId: student.classId,
-        status: { in: ['PUBLISHED', 'LOCKED'] },
         OR: [{ sectionId: null }, { sectionId: student.sectionId }],
+        // In force today: published/locked, inside its effective window and
+        // the academic year. A future-dated or last-year version is not shown.
+        ...liveTimetableVersionWhere(),
       },
       orderBy: [{ publishedAt: 'desc' }, { effectiveFrom: 'desc' }],
     });

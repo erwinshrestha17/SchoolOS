@@ -219,13 +219,13 @@ describe('TimetableSubstitutionService', () => {
         reason: dto.reason,
       });
       (prisma.$transaction as jest.Mock).mockImplementation(
-        async (
-          fn: (tx: Record<string, Record<string, jest.Mock>>) => unknown,
-        ) =>
+        async (fn: (tx: Record<string, unknown>) => unknown) =>
           fn({
+            $executeRaw: jest.fn().mockResolvedValue(1),
             timetableSubstitution: {
               create: jest.fn().mockResolvedValue(created),
               update: jest.fn(),
+              findFirst: jest.fn().mockResolvedValue(null),
             },
             teacherDelegation: {
               create: jest.fn(),
@@ -315,13 +315,13 @@ describe('TimetableSubstitutionService', () => {
         .spyOn(lifecycleService, 'validateCandidateSlot')
         .mockResolvedValue({ valid: true, errors: [], warnings: [] });
       (prisma.$transaction as jest.Mock).mockImplementation(
-        async (
-          fn: (tx: Record<string, Record<string, jest.Mock>>) => unknown,
-        ) =>
+        async (fn: (tx: Record<string, unknown>) => unknown) =>
           fn({
+            $executeRaw: jest.fn().mockResolvedValue(1),
             timetableSubstitution: {
               create: jest.fn().mockResolvedValue(created),
               update: jest.fn(),
+              findFirst: jest.fn().mockResolvedValue(null),
             },
             teacherDelegation: {
               create: delegationCreate,

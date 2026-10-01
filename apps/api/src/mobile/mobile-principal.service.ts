@@ -1,5 +1,9 @@
 import { unrestrictedRoleAssignmentsWhere } from '../authorization/scopes/unrestricted-role-where';
 import {
+  liveTimetableSlotWhere,
+  toTimetableDayOfWeek,
+} from '../timetable/timetable-calendar';
+import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -2639,8 +2643,14 @@ export class MobilePrincipalService implements OnModuleInit {
 
   async getClassroomWalkthroughs(actor: AuthContext) {
     this.assertPrincipal(actor);
+    // Only today's in-force periods: never drafts, archived or other days.
+    const now = new Date();
     const todaySlots = await this.prisma.timetableSlot.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        dayOfWeek: toTimetableDayOfWeek(now),
+        ...liveTimetableSlotWhere(now),
+      },
       include: {
         class: { select: { name: true } },
         section: { select: { name: true } },
@@ -2648,7 +2658,7 @@ export class MobilePrincipalService implements OnModuleInit {
         staff: { select: safeStaffSelect },
         period: { select: { name: true, startsAt: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ startsAt: 'asc' }, { id: 'asc' }],
       take: 6,
     });
     return {

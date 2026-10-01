@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { liveTimetableSlotWhere } from '../timetable/timetable-calendar';
 import { getNepalSchoolDay, type StaffCoverageSummary } from '@schoolos/core';
 import {
   PayrollExceptionSeverity,
@@ -7,7 +8,6 @@ import {
   SalaryStructureStatus,
   StaffStatus,
   TimetableSubstitutionStatus,
-  TimetableVersionStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -203,19 +203,7 @@ export class HrCoverageService {
         where: {
           tenantId,
           dayOfWeek,
-          OR: [
-            { versionId: null },
-            {
-              version: {
-                status: {
-                  in: [
-                    TimetableVersionStatus.PUBLISHED,
-                    TimetableVersionStatus.LOCKED,
-                  ],
-                },
-              },
-            },
-          ],
+          ...liveTimetableSlotWhere(todayRange.gte),
         },
         select: { id: true, staffId: true },
         take: 5000,

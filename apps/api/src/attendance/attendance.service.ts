@@ -7,6 +7,7 @@ import {
   Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { liveTimetableSlotWhere } from '../timetable/timetable-calendar';
 import { createHash } from 'node:crypto';
 import {
   BS_MONTH_NAMES_EN,
@@ -40,7 +41,6 @@ import {
   StudentLifecycleStatus,
   TeacherAssignmentType,
   TimetableSubstitutionStatus,
-  TimetableVersionStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -433,21 +433,7 @@ export class AttendanceService {
                     },
                   ],
                 },
-                {
-                  OR: [
-                    { versionId: null },
-                    {
-                      version: {
-                        status: {
-                          in: [
-                            TimetableVersionStatus.PUBLISHED,
-                            TimetableVersionStatus.LOCKED,
-                          ],
-                        },
-                      },
-                    },
-                  ],
-                },
+                liveTimetableSlotWhere(date),
               ],
             },
             select: {

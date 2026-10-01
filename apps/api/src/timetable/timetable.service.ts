@@ -446,33 +446,37 @@ export class TimetableService {
     const draft = await this.findVersionOrThrow(id, actor);
     this.ensureDraftVersion(draft.status);
 
-    return this.prisma.$transaction(async (tx) => {
-      await tx.timetableSlot.deleteMany({ where: { versionId: id } });
-      const slots = source.slots.map((s) => ({
-        tenantId: actor.tenantId,
-        versionId: id,
-        academicYearId: s.academicYearId,
-        classId: s.classId,
-        sectionId: s.sectionId,
-        subjectId: s.subjectId,
-        staffId: s.staffId,
-        periodId: s.periodId,
-        roomId: s.roomId,
-        dayOfWeek: s.dayOfWeek,
-        startsAt: s.startsAt,
-        endsAt: s.endsAt,
-      }));
-      await tx.timetableSlot.createMany({ data: slots });
-      const updated = await tx.timetableVersion.update({
-        where: { id },
-        data: {
-          versionName: dto.versionName ?? `Restored from ${source.versionName}`,
-        },
-        include: { slots: { include: timetableSlotInclude() } },
-      });
-      await this.audit('restore', 'timetable_version', id, actor, updated);
-      return updated;
-    });
+    return withTimetableConstraintMapping(() =>
+      this.prisma.$transaction(async (tx) => {
+        await claimDraftVersion(tx, actor.tenantId, id);
+        await tx.timetableSlot.deleteMany({ where: { versionId: id } });
+        const slots = source.slots.map((s) => ({
+          tenantId: actor.tenantId,
+          versionId: id,
+          academicYearId: s.academicYearId,
+          classId: s.classId,
+          sectionId: s.sectionId,
+          subjectId: s.subjectId,
+          staffId: s.staffId,
+          periodId: s.periodId,
+          roomId: s.roomId,
+          dayOfWeek: s.dayOfWeek,
+          startsAt: s.startsAt,
+          endsAt: s.endsAt,
+        }));
+        await tx.timetableSlot.createMany({ data: slots });
+        const updated = await tx.timetableVersion.update({
+          where: { id },
+          data: {
+            versionName:
+              dto.versionName ?? `Restored from ${source.versionName}`,
+          },
+          include: { slots: { include: timetableSlotInclude() } },
+        });
+        await this.audit('restore', 'timetable_version', id, actor, updated);
+        return updated;
+      }),
+    );
   }
 
   async compareVersions(id1: string, id2: string, actor: AuthContext) {
@@ -606,24 +610,29 @@ export class TimetableService {
       );
     }
 
-    const slot = await this.prisma.timetableSlot.create({
-      data: {
-        tenantId: actor.tenantId,
-        versionId,
-        academicYearId: version.academicYearId,
-        classId: dto.classId,
-        sectionId: dto.sectionId ?? null,
-        subjectId: dto.subjectId,
-        staffId: dto.staffId,
-        periodId: dto.periodId ?? null,
-        roomId: dto.roomId ?? null,
-        dayOfWeek: dto.dayOfWeek,
-        startsAt: dto.startsAt,
-        endsAt: dto.endsAt,
-        room: legacyRoom ?? null,
-      },
-      include: timetableSlotInclude(),
-    });
+    const slot = await withTimetableConstraintMapping(() =>
+      this.prisma.$transaction(async (tx) => {
+        await claimDraftVersion(tx, actor.tenantId, versionId);
+        return tx.timetableSlot.create({
+          data: {
+            tenantId: actor.tenantId,
+            versionId,
+            academicYearId: version.academicYearId,
+            classId: dto.classId,
+            sectionId: dto.sectionId ?? null,
+            subjectId: dto.subjectId,
+            staffId: dto.staffId,
+            periodId: dto.periodId ?? null,
+            roomId: dto.roomId ?? null,
+            dayOfWeek: dto.dayOfWeek,
+            startsAt: dto.startsAt,
+            endsAt: dto.endsAt,
+            room: legacyRoom ?? null,
+          },
+          include: timetableSlotInclude(),
+        });
+      }),
+    );
     await this.audit('create', 'timetable_slot', slot.id, actor, {
       versionId,
       classId: slot.classId,
@@ -670,19 +679,24 @@ export class TimetableService {
         validation.errors[0]?.message ?? 'Timetable conflict',
       );
     }
-    const updated = await this.prisma.timetableSlot.update({
-      where: { id },
-      data: {
-        subjectId: updatedShape.subjectId,
-        staffId: updatedShape.staffId,
-        periodId: updatedShape.periodId,
-        roomId: updatedShape.roomId,
-        dayOfWeek: updatedShape.dayOfWeek,
-        startsAt: updatedShape.startsAt,
-        endsAt: updatedShape.endsAt,
-      },
-      include: timetableSlotInclude(),
-    });
+    const updated = await withTimetableConstraintMapping(() =>
+      this.prisma.$transaction(async (tx) => {
+        await claimDraftVersion(tx, actor.tenantId, version.id);
+        return tx.timetableSlot.update({
+          where: { id },
+          data: {
+            subjectId: updatedShape.subjectId,
+            staffId: updatedShape.staffId,
+            periodId: updatedShape.periodId,
+            roomId: updatedShape.roomId,
+            dayOfWeek: updatedShape.dayOfWeek,
+            startsAt: updatedShape.startsAt,
+            endsAt: updatedShape.endsAt,
+          },
+          include: timetableSlotInclude(),
+        });
+      }),
+    );
     await this.audit('update', 'timetable_slot', id, actor, updated);
     return updated;
   }
@@ -690,7 +704,11 @@ export class TimetableService {
   async deleteSlot(id: string, actor: AuthContext) {
     const slot = await this.findSlotOrThrow(id, actor);
     if (slot.version) this.ensureDraftVersion(slot.version.status);
-    await this.prisma.timetableSlot.delete({ where: { id } });
+    const versionId = slot.versionId;
+    await this.prisma.$transaction(async (tx) => {
+      if (versionId) await claimDraftVersion(tx, actor.tenantId, versionId);
+      await tx.timetableSlot.delete({ where: { id } });
+    });
     await this.audit('delete', 'timetable_slot', id, actor, { id });
     return { deleted: true, id };
   }
@@ -708,20 +726,32 @@ export class TimetableService {
         validation.errors[0]?.message ?? 'Timetable validation failed',
       );
     }
-    await this.ensureNoPublishedOverlap(version, actor);
-    const updated = await this.prisma.timetableVersion.update({
-      where: { id },
-      data: {
-        status: TimetableVersionStatus.PUBLISHED,
-        publishedAt: new Date(),
-        publishedById: actor.userId,
-      },
-      include: {
-        academicYear: true,
-        class: true,
-        section: true,
-        slots: { include: timetableSlotInclude() },
-      },
+    // Publishing is serialized per tenant + academic year so two versions
+    // cannot each pass the cross-version checks and publish clashing
+    // teacher/room bookings. The DRAFT claim also waits for, and then
+    // rejects after, any in-flight slot edit on this version.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const lockKey = `${actor.tenantId}:timetable-publish:${version.academicYearId}`;
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+      );
+      await claimDraftVersion(tx, actor.tenantId, id);
+      await this.ensureNoPublishedOverlap(version, actor, tx);
+      await this.ensureNoCrossVersionClashes(version, actor, tx);
+      return tx.timetableVersion.update({
+        where: { id },
+        data: {
+          status: TimetableVersionStatus.PUBLISHED,
+          publishedAt: new Date(),
+          publishedById: actor.userId,
+        },
+        include: {
+          academicYear: true,
+          class: true,
+          section: true,
+          slots: { include: timetableSlotInclude() },
+        },
+      });
     });
     await this.audit('publish', 'timetable_version', id, actor, {
       status: updated.status,
@@ -1783,8 +1813,11 @@ export class TimetableService {
   private async ensureNoPublishedOverlap(
     version: Awaited<ReturnType<TimetableService['findVersionOrThrow']>>,
     actor: AuthContext,
+    client: Prisma.TransactionClient = this.prisma,
   ) {
-    const overlapping = await this.prisma.timetableVersion.findFirst({
+    // Every published/locked version for the same class/section is checked;
+    // looking only at the first one could miss a later overlapping window.
+    const published = await client.timetableVersion.findMany({
       where: {
         tenantId: actor.tenantId,
         id: { not: version.id },
@@ -1797,11 +1830,88 @@ export class TimetableService {
           in: [TimetableVersionStatus.PUBLISHED, TimetableVersionStatus.LOCKED],
         },
       },
+      select: { id: true, effectiveFrom: true, effectiveTo: true },
     });
-    if (overlapping && dateRangesOverlap(version, overlapping)) {
+    if (published.some((other) => dateRangesOverlap(version, other))) {
       throw new ConflictException(
         'A published timetable already covers this effective date range',
       );
+    }
+  }
+
+  /**
+   * A teacher or room must not be double-booked across the in-force
+   * timetables of different classes/sections. Version status lives on
+   * another table, so this cannot be a row constraint; it runs inside the
+   * publish transaction under the per-year advisory lock.
+   */
+  private async ensureNoCrossVersionClashes(
+    version: Awaited<ReturnType<TimetableService['findVersionOrThrow']>>,
+    actor: AuthContext,
+    client: Prisma.TransactionClient,
+  ) {
+    const slots = await client.timetableSlot.findMany({
+      where: { tenantId: actor.tenantId, versionId: version.id },
+      select: {
+        id: true,
+        staffId: true,
+        roomId: true,
+        dayOfWeek: true,
+        startsAt: true,
+        endsAt: true,
+      },
+    });
+    if (slots.length === 0) return;
+    const staffIds = [...new Set(slots.map((slot) => slot.staffId))];
+    const roomIds = [
+      ...new Set(
+        slots
+          .map((slot) => slot.roomId)
+          .filter((roomId): roomId is string => Boolean(roomId)),
+      ),
+    ];
+    const others = await client.timetableSlot.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: version.academicYearId,
+        versionId: { not: version.id },
+        version: {
+          status: {
+            in: [
+              TimetableVersionStatus.PUBLISHED,
+              TimetableVersionStatus.LOCKED,
+            ],
+          },
+        },
+        OR: [
+          { staffId: { in: staffIds } },
+          ...(roomIds.length > 0 ? [{ roomId: { in: roomIds } }] : []),
+        ],
+      },
+      select: {
+        id: true,
+        staffId: true,
+        roomId: true,
+        dayOfWeek: true,
+        startsAt: true,
+        endsAt: true,
+        version: {
+          select: { id: true, effectiveFrom: true, effectiveTo: true },
+        },
+      },
+    });
+
+    const clashes = findCrossVersionClashes(version, slots, others);
+    if (clashes.length > 0) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: TIMETABLE_CROSS_VERSION_CONFLICT_CODE,
+        message:
+          clashes[0].kind === 'TEACHER'
+            ? 'A teacher in this timetable is already scheduled at the same time in another published timetable.'
+            : 'A room in this timetable is already booked at the same time in another published timetable.',
+        conflicts: clashes.slice(0, 20),
+      });
     }
   }
 
@@ -2171,7 +2281,10 @@ export function minutesBetween(startsAt: string, endsAt: string) {
 }
 
 function assertTimeRange(startsAt: string, endsAt: string) {
-  if (!/^\d{2}:\d{2}$/.test(startsAt) || !/^\d{2}:\d{2}$/.test(endsAt)) {
+  if (
+    !TIME_OF_DAY_PATTERN.test(startsAt) ||
+    !TIME_OF_DAY_PATTERN.test(endsAt)
+  ) {
     throw new ConflictException('Time must be in HH:mm format');
   }
   if (startsAt >= endsAt) {
@@ -2380,4 +2493,155 @@ function teacherMobileSubstitutionSelect() {
     absentTeacherId: true,
     substituteTeacherId: true,
   } satisfies Prisma.TimetableSubstitutionSelect;
+}
+
+/** 24-hour HH:mm, mirrored by the TimetableSlot_time_range_check constraint. */
+const TIME_OF_DAY_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export const TIMETABLE_SLOT_CONFLICT_CODE = 'TIMETABLE_SLOT_CONFLICT';
+export const TIMETABLE_CROSS_VERSION_CONFLICT_CODE =
+  'TIMETABLE_CROSS_VERSION_CONFLICT';
+export const TIMETABLE_VERSION_NOT_DRAFT_CODE = 'TIMETABLE_VERSION_NOT_DRAFT';
+
+type TimetableClashKind = 'TEACHER' | 'ROOM' | 'CLASS_SECTION';
+
+const TIMETABLE_SLOT_CONSTRAINTS: ReadonlyArray<
+  [constraint: string, kind: TimetableClashKind, message: string]
+> = [
+  [
+    'TimetableSlot_no_teacher_overlap',
+    'TEACHER',
+    'This teacher already has a period that overlaps this time.',
+  ],
+  [
+    'TimetableSlot_no_room_overlap',
+    'ROOM',
+    'This room is already booked for a period that overlaps this time.',
+  ],
+  [
+    'TimetableSlot_no_class_section_overlap',
+    'CLASS_SECTION',
+    'This class/section already has a period that overlaps this time.',
+  ],
+];
+
+function describeDatabaseError(error: unknown): string {
+  const parts: string[] = [];
+  if (error instanceof Error) parts.push(error.message);
+  if (typeof error === 'object' && error !== null && 'meta' in error) {
+    try {
+      parts.push(JSON.stringify(error.meta));
+    } catch {
+      // Non-serializable metadata is ignored; the message is still checked.
+    }
+  }
+  return parts.join(' ');
+}
+
+/**
+ * Maps the TimetableSlot EXCLUDE constraint violations (SQLSTATE 23P01) to a
+ * stable 409 instead of a generic 500. Concurrent saves that both passed the
+ * service-level check are rejected here by the database.
+ */
+async function withTimetableConstraintMapping<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const description = describeDatabaseError(error);
+    const match = TIMETABLE_SLOT_CONSTRAINTS.find(([constraint]) =>
+      description.includes(constraint),
+    );
+    if (match) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: TIMETABLE_SLOT_CONFLICT_CODE,
+        conflictType: match[1],
+        message: match[2],
+      });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Claims the version row for this transaction only while it is still DRAFT.
+ * The row lock serializes slot edits with publish/lock, so an edit can never
+ * land in a version that was published after the edit was validated.
+ */
+async function claimDraftVersion(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  versionId: string,
+) {
+  const claimed = await tx.timetableVersion.updateMany({
+    where: { id: versionId, tenantId, status: TimetableVersionStatus.DRAFT },
+    data: { updatedAt: new Date() },
+  });
+  if (claimed.count !== 1) {
+    throw new ConflictException({
+      statusCode: 409,
+      code: TIMETABLE_VERSION_NOT_DRAFT_CODE,
+      message:
+        'This timetable version is no longer a draft. Reload it before making changes.',
+    });
+  }
+}
+
+interface ClashSlot {
+  id: string;
+  staffId: string;
+  roomId: string | null;
+  dayOfWeek: number;
+  startsAt: string;
+  endsAt: string;
+}
+
+export interface CrossVersionClash {
+  kind: 'TEACHER' | 'ROOM';
+  slotId: string;
+  conflictingSlotId: string;
+  conflictingVersionId: string;
+  dayOfWeek: number;
+}
+
+export function findCrossVersionClashes(
+  version: { effectiveFrom: Date; effectiveTo: Date | null },
+  slots: ClashSlot[],
+  others: Array<
+    ClashSlot & {
+      version: {
+        id: string;
+        effectiveFrom: Date;
+        effectiveTo: Date | null;
+      } | null;
+    }
+  >,
+): CrossVersionClash[] {
+  const clashes: CrossVersionClash[] = [];
+  for (const other of others) {
+    if (!other.version || !dateRangesOverlap(version, other.version)) continue;
+    for (const slot of slots) {
+      if (slot.dayOfWeek !== other.dayOfWeek) continue;
+      if (!(slot.startsAt < other.endsAt && other.startsAt < slot.endsAt)) {
+        continue;
+      }
+      const kind =
+        slot.staffId === other.staffId
+          ? 'TEACHER'
+          : slot.roomId && slot.roomId === other.roomId
+            ? 'ROOM'
+            : null;
+      if (!kind) continue;
+      clashes.push({
+        kind,
+        slotId: slot.id,
+        conflictingSlotId: other.id,
+        conflictingVersionId: other.version.id,
+        dayOfWeek: slot.dayOfWeek,
+      });
+    }
+  }
+  return clashes;
 }

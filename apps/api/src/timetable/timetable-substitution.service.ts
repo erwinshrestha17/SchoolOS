@@ -2,6 +2,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
@@ -45,6 +46,8 @@ interface StaffLeaveApprovedEvent {
 
 @Injectable()
 export class TimetableSubstitutionService {
+  private readonly logger = new Logger(TimetableSubstitutionService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly communicationsService: CommunicationsService,
@@ -340,43 +343,66 @@ export class TimetableSubstitutionService {
       }
     }
 
-    const substitution = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.timetableSubstitution.create({
-        data: {
-          tenantId: actor.tenantId,
-          timetableSlotId: dto.timetableSlotId,
-          absentTeacherId: dto.absentTeacherId,
-          substituteTeacherId: dto.substituteTeacherId ?? null,
-          date,
-          reason: dto.reason,
-          status: dto.substituteTeacherId
-            ? TimetableSubstitutionStatus.ASSIGNED
-            : TimetableSubstitutionStatus.DRAFT,
-          createdById: actor.userId,
-          assignedAt: dto.substituteTeacherId ? new Date() : null,
-          approvedById: dto.substituteTeacherId ? actor.userId : null,
-        },
-        include: substitutionInclude(),
-      });
-
-      if (dto.substituteTeacherId && slot.sectionId) {
-        await this.createLinkedDelegation(tx, {
-          tenantId: actor.tenantId,
-          academicYearId: slot.academicYearId,
-          grantorStaffId: dto.absentTeacherId,
-          recipientStaffId: dto.substituteTeacherId,
-          classId: slot.classId,
-          sectionId: slot.sectionId,
-          subjectId: slot.subjectId,
-          substitutionId: created.id,
-          reason: created.reason,
-          date,
-          actorUserId: actor.userId,
+    const substitution = await this.prisma
+      .$transaction(async (tx) => {
+        if (dto.substituteTeacherId) {
+          await this.lockSubstituteDayAndRecheck(
+            tx,
+            actor.tenantId,
+            dto.substituteTeacherId,
+            date,
+            slot,
+          );
+        }
+        const created = await tx.timetableSubstitution.create({
+          data: {
+            tenantId: actor.tenantId,
+            timetableSlotId: dto.timetableSlotId,
+            absentTeacherId: dto.absentTeacherId,
+            substituteTeacherId: dto.substituteTeacherId ?? null,
+            date,
+            reason: dto.reason,
+            status: dto.substituteTeacherId
+              ? TimetableSubstitutionStatus.ASSIGNED
+              : TimetableSubstitutionStatus.DRAFT,
+            createdById: actor.userId,
+            assignedAt: dto.substituteTeacherId ? new Date() : null,
+            approvedById: dto.substituteTeacherId ? actor.userId : null,
+          },
+          include: substitutionInclude(),
         });
-      }
 
-      return created;
-    });
+        if (dto.substituteTeacherId && slot.sectionId) {
+          await this.createLinkedDelegation(tx, {
+            tenantId: actor.tenantId,
+            academicYearId: slot.academicYearId,
+            grantorStaffId: dto.absentTeacherId,
+            recipientStaffId: dto.substituteTeacherId,
+            classId: slot.classId,
+            sectionId: slot.sectionId,
+            subjectId: slot.subjectId,
+            substitutionId: created.id,
+            reason: created.reason,
+            date,
+            actorUserId: actor.userId,
+          });
+        }
+
+        return created;
+      })
+      .catch((error: unknown) => {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        ) {
+          // TimetableSubstitution_one_active_per_slot_day: a concurrent
+          // request created the active substitution first.
+          throw new ConflictException(
+            'An active substitution already exists for this slot and date',
+          );
+        }
+        throw error;
+      });
 
     await this.audit(
       'create',
@@ -506,6 +532,14 @@ export class TimetableSubstitutionService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      await this.lockSubstituteDayAndRecheck(
+        tx,
+        actor.tenantId,
+        dto.substituteTeacherId,
+        substitution.date,
+        slot,
+        id,
+      );
       await this.revokeLinkedDelegation(tx, id, actor.userId);
 
       const assigned = await tx.timetableSubstitution.update({
@@ -857,11 +891,13 @@ export class TimetableSubstitutionService {
       );
     }
 
-    // Check for leave/absence of the substitute teacher
+    // Check for leave/absence of the substitute teacher. Unknown
+    // availability is not treated as "available" (fail closed).
     const absenceContext = await this.getTeacherAbsenceContext(
       actor,
       substituteTeacherId,
       targetDate,
+      { failClosed: true },
     );
     if (absenceContext.isAbsent) {
       throw new ConflictException(
@@ -921,6 +957,7 @@ export class TimetableSubstitutionService {
     actor: AuthContext,
     teacherId: string,
     date: Date,
+    options: { failClosed?: boolean } = {},
   ) {
     try {
       return await this.attendanceService.getTeacherAbsenceContext(
@@ -928,9 +965,69 @@ export class TimetableSubstitutionService {
         teacherId,
         date,
       );
-    } catch {
-      // Fallback if attendance service fails or has issues
+    } catch (error) {
+      if (options.failClosed) {
+        // A substitute whose leave/absence cannot be confirmed must not be
+        // assigned as if available.
+        this.logger.warn(
+          `Substitute availability unavailable for tenant ${actor.tenantId}: ${
+            error instanceof Error ? error.message : 'unknown error'
+          }`,
+        );
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'SUBSTITUTE_AVAILABILITY_UNKNOWN',
+          message:
+            "The substitute teacher's leave and attendance could not be checked. Try again shortly.",
+        });
+      }
+      // Context-only lookups for the absent teacher degrade to "unknown".
       return { isAbsent: false, attendanceStatus: null, leaveType: null };
+    }
+  }
+
+  /**
+   * Serializes assignments for one substitute on one school day and
+   * re-checks for an overlapping ASSIGNED substitution inside the write
+   * transaction, closing the check-then-assign race between two approvers.
+   */
+  private async lockSubstituteDayAndRecheck(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    substituteTeacherId: string,
+    date: Date,
+    slot: { dayOfWeek: number; startsAt: string; endsAt: string },
+    currentSubstitutionId?: string,
+  ) {
+    const targetDate = stripTime(date);
+    const lockKey = `${tenantId}:substitute-day:${substituteTeacherId}:${targetDate.toISOString().slice(0, 10)}`;
+    await tx.$executeRaw(
+      Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+    );
+    const overlapping = await tx.timetableSubstitution.findFirst({
+      where: {
+        tenantId,
+        ...(currentSubstitutionId
+          ? { id: { not: currentSubstitutionId } }
+          : {}),
+        substituteTeacherId,
+        date: targetDate,
+        status: TimetableSubstitutionStatus.ASSIGNED,
+        timetableSlot: {
+          dayOfWeek: slot.dayOfWeek,
+          startsAt: { lt: slot.endsAt },
+          endsAt: { gt: slot.startsAt },
+        },
+      },
+      select: { id: true },
+    });
+    if (overlapping) {
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'SUBSTITUTE_DOUBLE_BOOKED',
+        message:
+          'This substitute was just assigned to another class at the same time.',
+      });
     }
   }
 
