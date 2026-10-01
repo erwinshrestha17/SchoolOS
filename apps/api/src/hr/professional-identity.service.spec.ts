@@ -598,7 +598,7 @@ describe('ProfessionalIdentityService (Phase 5J–5L)', () => {
       tx.teacherAssignment = {
         findMany: jest.fn(() =>
           Array.from({ length: 1001 }, (_, i) =>
-            assignment(`ta-${i}`, 's1', 'c9'),
+            assignment(`ta-${String(i)}`, 's1', 'c9'),
           ),
         ),
       };
