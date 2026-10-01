@@ -15,7 +15,9 @@ describe('Student 360 revalidation contract (Phase 5)', () => {
     assert.match(detail, /refetchOnMount: 'always'/);
   });
 
-  it('never renders an earlier visit\'s cached copy before the server re-authorizes', () => {
+  it(
+    'never renders an earlier visit\'s cached copy before the server re-authorizes',
+    () => {
     assert.match(
       detail,
       /const profileVerified = profileQuery\.isFetchedAfterMount;/,
@@ -25,8 +27,12 @@ describe('Student 360 revalidation contract (Phase 5)', () => {
       /profileQuery\.isLoading \|\| \(!profileVerified && profileQuery\.isFetching\)/,
     );
     // A failed re-check hides the profile rather than keeping old data.
-    assert.match(detail, /if \(profileQuery\.isError \|\| !profileQuery\.data\)/);
-  });
+    assert.match(
+      detail,
+      /if \(profileQuery\.isError \|\| !profileQuery\.data\)/,
+    );
+    },
+  );
 
   it('tells the viewer when an authorized section could not be loaded', () => {
     assert.match(detail, /profile\.unavailableSections \?\? \[\]/);
