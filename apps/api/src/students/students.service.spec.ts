@@ -5081,7 +5081,7 @@ describe('students lifecycle hardening', () => {
     );
     const { service } = buildService(prisma);
 
-    const profile = await service.getStudentProfile(
+    const profile: any = await service.getStudentProfile(
       student.id,
       {
         ...actor,
@@ -5103,7 +5103,7 @@ describe('students lifecycle hardening', () => {
     const student = buildStudent({});
     const prisma = buildPrisma({ studentFindFirstQueue: [student] });
     const { service } = buildService(prisma);
-    const profile = await service.getStudentProfile(
+    const profile: any = await service.getStudentProfile(
       student.id,
       { ...actor, permissions: ['students:read', 'homework:read'] },
       studentsEntitlement,
@@ -5178,7 +5178,7 @@ describe('students lifecycle hardening', () => {
       ],
     });
     const { service } = buildService(prisma);
-    const profile = await service.getStudentProfile(
+    const profile: any = await service.getStudentProfile(
       student.id,
       {
         ...actor,
