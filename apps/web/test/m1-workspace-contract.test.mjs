@@ -227,9 +227,7 @@ test('M1 workspaces expose real route-backed operations', () => {
   );
 });
 
-test(
-  'M1 entry creates one unified admission case for direct and review workflows',
-  () => {
+test('M1 entry creates one unified admission case for direct and review workflows', () => {
   const legacyPipeline = read('components/admissions/admissions-pipeline.tsx');
   const applicationPipelinePage = read(
     'app/dashboard/admissions/applications/page.tsx',
@@ -372,8 +370,7 @@ test(
     directWizard + reviewForm + caseApi,
     /publicUrl|objectKey/,
   );
-  },
-);
+});
 
 test('M1 high-risk workflows remain server controlled and protected', () => {
   const duplicates = read('components/m1/duplicate-candidates-workspace.tsx');
@@ -526,9 +523,7 @@ test('M1 high-risk workflows remain server controlled and protected', () => {
   );
 });
 
-test(
-  'M1 student roster uses a focused backend summary, safe filters, and paginated roster contract',
-  () => {
+test('M1 student roster uses a focused backend summary, safe filters, and paginated roster contract', () => {
   const page = read('app/dashboard/students/page.tsx');
   const directory = read('components/forms/student-directory.tsx');
 
@@ -577,23 +572,17 @@ test(
     directory,
     /value=['"]INACTIVE['"]|value=['"]WITHDRAWN['"]|value=['"]DEACTIVATED['"]|value=['"]GRADUATED['"]/,
   );
-  },
-);
+});
 
-test(
-  'M1 application queue keeps page-derived and decorative metrics out of the workspace',
-  () => {
+test('M1 application queue keeps page-derived and decorative metrics out of the workspace', () => {
   const pipeline = read('components/admissions/admissions-pipeline.tsx');
 
   assert.doesNotMatch(pipeline, /<KpiGrid|<KpiCard/);
   assert.doesNotMatch(pipeline, /No update in 7 days|Admission workflow/);
   assert.match(pipeline, /matching applications/);
-  },
-);
+});
 
-test(
-  'M1 Admissions overview shows a real, actionable, honest stage strip',
-  () => {
+test('M1 Admissions overview shows a real, actionable, honest stage strip', () => {
   const page = read('app/dashboard/admissions/page.tsx');
   const summaryCards = read('components/ui/summary-card.tsx');
 
@@ -634,13 +623,9 @@ test(
     page,
     /href=\{`\/dashboard\/admissions\?queue=\$\{stage\.queue\}`\}/,
   );
-  },
-);
+});
 
-
-test(
-  'student directory row actions use the shared keyboard-accessible ActionMenu, not a hover-only menu',
-  () => {
+test('student directory row actions use the shared keyboard-accessible ActionMenu, not a hover-only menu', () => {
   const directory = read('components/forms/student-directory.tsx');
 
   // The old pattern was a CSS group-hover dropdown with no click/focus
@@ -654,12 +639,9 @@ test(
   assert.match(directory, /label: ['"]ID Card['"]/);
   assert.match(directory, /label: ['"]Documents['"]/);
   assert.match(directory, /label: ['"]Attendance['"]/);
-  },
-);
+});
 
-test(
-  'admission case review actions have consistent visual risk hierarchy across both review surfaces',
-  () => {
+test('admission case review actions have consistent visual risk hierarchy across both review surfaces', () => {
   const caseDetail = read('components/m1/admission-case-detail.tsx');
   const reviewWorkspace = read(
     'components/m1/application-review-workspace.tsx',
@@ -685,15 +667,11 @@ test(
   // confirm dialog and the dialog's own confirm label must agree.
   assert.match(caseDetail, />\s*Do not admit\s*</);
   assert.match(caseDetail, /confirmLabel=['"]Do not admit['"]/);
-  },
-);
+});
 
-test(
-  'clear-selection and low-risk row icon buttons carry an accessible name',
-  () => {
+test('clear-selection and low-risk row icon buttons carry an accessible name', () => {
   const selector = read('components/students/student-selector.tsx');
 
   assert.match(selector, /aria-label=['"]Clear selected student['"]/);
   assert.match(selector, /title=['"]Clear selected student['"]/);
-  },
-);
+});
