@@ -3034,11 +3034,17 @@ export class AttendanceService {
       }
       if (dto.status === 'APPROVED') {
         if (request.attendanceRecordId) {
+          // Compare-and-set against the status the requester saw. If another
+          // correction (or a reopen) already changed this record, approving
+          // would silently overwrite it with a decision made on stale data.
           const updateResult = await tx.attendanceRecord.updateMany({
             where: {
               id: request.attendanceRecordId,
               tenantId: actor.tenantId,
               studentId: request.studentId,
+              ...(request.previousStatus
+                ? { status: request.previousStatus }
+                : {}),
             },
             data: {
               status: request.requestedStatus,
@@ -3046,7 +3052,20 @@ export class AttendanceService {
             },
           });
           if (updateResult.count !== 1) {
-            throw new NotFoundException('Attendance record not found.');
+            const current = await tx.attendanceRecord.findFirst({
+              where: {
+                id: request.attendanceRecordId,
+                tenantId: actor.tenantId,
+              },
+              select: { status: true },
+            });
+            if (!current) {
+              throw new NotFoundException('Attendance record not found.');
+            }
+            throw createAttendanceCorrectionStaleException(
+              request.previousStatus,
+              current.status,
+            );
           }
         } else {
           let sessionId = request.attendanceSessionId;
@@ -3090,6 +3109,26 @@ export class AttendanceService {
             }
           }
 
+          const existingRecord = await tx.attendanceRecord.findUnique({
+            where: {
+              attendanceSessionId_studentId: {
+                attendanceSessionId: sessionId,
+                studentId: request.studentId,
+              },
+            },
+            select: { status: true },
+          });
+          if (
+            existingRecord &&
+            existingRecord.status !== (request.previousStatus ?? null)
+          ) {
+            // Attendance was recorded or corrected after this request was
+            // raised; the reviewer must decide against the current value.
+            throw createAttendanceCorrectionStaleException(
+              request.previousStatus,
+              existingRecord.status,
+            );
+          }
           await tx.attendanceRecord.upsert({
             where: {
               attendanceSessionId_studentId: {
@@ -7700,6 +7739,22 @@ function buildAttendanceRosterVersion(
   ].join('\n');
 
   return createHash('sha256').update(canonicalRoster).digest('hex');
+}
+
+export const ATTENDANCE_CORRECTION_STALE_CODE = 'ATTENDANCE_CORRECTION_STALE';
+
+function createAttendanceCorrectionStaleException(
+  expected: AttendanceStatus | null,
+  current: AttendanceStatus,
+) {
+  return new ConflictException({
+    statusCode: 409,
+    code: ATTENDANCE_CORRECTION_STALE_CODE,
+    message:
+      'This attendance record changed after the correction was requested. Reject this request and raise a new one against the current value if a change is still needed.',
+    expectedStatus: expected,
+    currentStatus: current,
+  });
 }
 
 function createAttendanceScopeRevokedException() {

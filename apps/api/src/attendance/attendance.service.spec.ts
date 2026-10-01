@@ -2829,6 +2829,62 @@ describe('attendance production hardening', () => {
     expect(prisma.attendanceSyncSubmission.update).not.toHaveBeenCalled();
   });
 
+  it('rejects an offline draft as LOCKED_SESSION when the register locked while the device was offline', async () => {
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1' },
+      attendanceSession: {
+        id: 'session-locked',
+        tenantId: adminActor.tenantId,
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        sectionId: null,
+        attendanceDate: new Date('2026-04-27T00:00:00.000Z'),
+        // Locked after the device saved its draft but before it reconnected.
+        lockAt: new Date('2026-04-27T12:00:00.000Z'),
+        submittedAt: null,
+        records: [],
+      },
+      attendanceSyncCreated: buildSyncSubmission({
+        clientSubmissionId: 'sync-locked',
+        attendanceDate: new Date('2026-04-27T00:00:00.000Z'),
+      }),
+    });
+    const actor = {
+      ...adminActor,
+      permissions: adminActor.permissions.filter(
+        (permission) => permission !== 'attendance:override_lock',
+      ),
+    };
+
+    await expect(
+      service.syncAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          attendanceDate: '2026-04-27',
+          exceptions: [],
+          clientSubmissionId: 'sync-locked',
+          deviceTimestamp: '2026-04-27T08:00:00.000Z',
+        },
+        actor,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        syncStatus: AttendanceSyncStatus.REJECTED,
+        rejectionReason: AttendanceSyncRejectionReason.LOCKED_SESSION,
+      }),
+    );
+    expect(prisma.attendanceSyncSubmission.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          syncStatus: AttendanceSyncStatus.REJECTED,
+          rejectionReason: AttendanceSyncRejectionReason.LOCKED_SESSION,
+        }),
+      }),
+    );
+  });
+
   it('classifies non-working day sync rejections as validation errors', async () => {
     const { service, prisma } = buildService({
       academicYear: { id: 'ay-1' },

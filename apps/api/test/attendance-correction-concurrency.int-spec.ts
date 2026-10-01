@@ -222,6 +222,77 @@ describeDatabase('Attendance correction decisions (real PostgreSQL)', () => {
     });
   });
 
+  it('rejects approving a correction whose record was already corrected (no stale overwrite)', async () => {
+    // A second request raised against the same original ABSENT value.
+    const second = await scoped(async () => {
+      const first = await prisma.attendanceCorrectionRequest.findFirstOrThrow({
+        where: { id: requestId, tenantId },
+      });
+      return prisma.attendanceCorrectionRequest.create({
+        data: {
+          tenantId,
+          attendanceRecordId: recordId,
+          attendanceSessionId: first.attendanceSessionId,
+          studentId: first.studentId,
+          attendanceDate: first.attendanceDate,
+          requestedStatus: AttendanceStatus.LATE,
+          previousStatus: AttendanceStatus.ABSENT,
+          reason: 'Second synthetic correction on the same original value',
+          requestedById: first.requestedById,
+        },
+      });
+    });
+
+    await decide('APPROVED');
+
+    const stale = await scoped(() =>
+      service().approveCorrectionRequest(
+        second.id,
+        {
+          status: 'APPROVED',
+          reviewReason: 'Synthetic review against the original register',
+        },
+        actor,
+      ),
+    ).catch((error: unknown) => error);
+    expect(stale).toBeInstanceOf(ConflictException);
+    expect((stale as ConflictException).getResponse()).toMatchObject({
+      code: 'ATTENDANCE_CORRECTION_STALE',
+      expectedStatus: 'ABSENT',
+      currentStatus: 'PRESENT',
+    });
+
+    await scoped(async () => {
+      const record = await prisma.attendanceRecord.findFirstOrThrow({
+        where: { id: recordId, tenantId },
+      });
+      expect(record.status).toBe('PRESENT');
+      const pending = await prisma.attendanceCorrectionRequest.findFirstOrThrow(
+        { where: { id: second.id, tenantId } },
+      );
+      // The claim rolled back with the failed compare-and-set.
+      expect(pending.status).toBe('PENDING');
+    });
+
+    // Rejecting the stale request is still possible and leaves attendance alone.
+    await scoped(() =>
+      service().approveCorrectionRequest(
+        second.id,
+        {
+          status: 'REJECTED',
+          reviewReason: 'Superseded by an approved correction',
+        },
+        actor,
+      ),
+    );
+    await scoped(async () => {
+      const record = await prisma.attendanceRecord.findFirstOrThrow({
+        where: { id: recordId, tenantId },
+      });
+      expect(record.status).toBe('PRESENT');
+    });
+  });
+
   for (const status of ['APPROVED', 'REJECTED'] as const) {
     it(`rolls back ${status} and attendance when audit fails`, async () => {
       jest

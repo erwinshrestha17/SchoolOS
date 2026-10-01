@@ -934,6 +934,38 @@ void main() {
       },
     );
   }
+
+  test(
+    'eligibility-lapsed rejection is an authority revocation with its own detail',
+    () {
+      const lapsed = TeacherAttendanceSubmitResult(
+        serverStatus: AttendanceServerSyncStatus.rejected,
+        replayed: false,
+        rejectionReason: 'SCOPE_REVOKED',
+        rejectionDetail: 'ELIGIBILITY_LAPSED',
+      );
+      expect(lapsed.isAuthorizationRevoked, isTrue);
+      expect(lapsed.isEligibilityLapsed, isTrue);
+
+      // Older servers send no detail: still a revocation, never "lapsed".
+      const revoked = TeacherAttendanceSubmitResult(
+        serverStatus: AttendanceServerSyncStatus.rejected,
+        replayed: false,
+        rejectionReason: 'SCOPE_REVOKED',
+      );
+      expect(revoked.isAuthorizationRevoked, isTrue);
+      expect(revoked.isEligibilityLapsed, isFalse);
+
+      // The detail never turns a non-authority rejection into a revocation.
+      const roster = TeacherAttendanceSubmitResult(
+        serverStatus: AttendanceServerSyncStatus.rejected,
+        replayed: false,
+        rejectionReason: 'ROSTER_MISMATCH',
+        rejectionDetail: 'ELIGIBILITY_LAPSED',
+      );
+      expect(roster.isEligibilityLapsed, isFalse);
+    },
+  );
 }
 
 Future<void> _waitForLoad(TeacherAttendanceController controller) async {
