@@ -20,7 +20,10 @@ import {
 } from '../authorization/policies/domain-permission';
 import { PrismaService } from '../prisma/prisma.service';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
-import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
+import {
+  TeacherScopeService,
+  type TeacherScopeGrant,
+} from '../teacher-scope/teacher-scope.service';
 import {
   ListMarkSheetsDto,
   ReviewMarkSheetDto,
@@ -261,9 +264,12 @@ export class MarkSheetService {
         : MarkSheetAction.SUBMIT;
     const replay = await this.findReplay(sheet.id, dto.idempotencyKey, actor);
     if (replay) return this.replayResult(replay, action, actor);
-    await this.assertTeacherScope(sheet, actor);
+    const grant = await this.assertTeacherScope(sheet, actor);
     await this.assertComplete(sheet, actor);
-    return this.transition(sheet, action, dto, actor);
+    return this.transition(sheet, action, dto, actor, {
+      assignmentId: grant?.assignmentId ?? null,
+      eligibilityAssessmentId: grant?.eligibilityAssessmentId ?? null,
+    });
   }
 
   /** Reviewer returns, reviews or locks a sheet (marks:review_lock). */
@@ -335,6 +341,10 @@ export class MarkSheetService {
     action: MarkSheetAction,
     dto: { expectedVersion: number; idempotencyKey: string; reason?: string },
     actor: AuthContext,
+    authority: {
+      assignmentId: string | null;
+      eligibilityAssessmentId: string | null;
+    } = { assignmentId: null, eligibilityAssessmentId: null },
   ): Promise<MarkSheetView> {
     if (!hasDomainPermission(actor, ACTION_PERMISSION[action])) {
       throw new ForbiddenException({
@@ -474,6 +484,8 @@ export class MarkSheetService {
             reason,
             idempotencyKey: dto.idempotencyKey,
             sheetVersion: after.version,
+            assignmentId: authority.assignmentId,
+            eligibilityAssessmentId: authority.eligibilityAssessmentId,
           },
         });
         await this.auditService.record(
@@ -582,14 +594,17 @@ export class MarkSheetService {
     }
   }
 
-  private async assertTeacherScope(sheet: MarkSheet, actor: AuthContext) {
+  private async assertTeacherScope(
+    sheet: MarkSheet,
+    actor: AuthContext,
+  ): Promise<TeacherScopeGrant | null> {
     const isTeacher =
       actor.roles.includes('teacher') ||
       actor.roles.includes('subject_teacher');
     const isExempt = ['admin', 'principal'].some((role) =>
       actor.roles.includes(role),
     );
-    if (!isTeacher || isExempt) return;
+    if (!isTeacher || isExempt) return null;
     const component = await this.prisma.assessmentComponent.findFirst({
       where: { id: sheet.assessmentComponentId, tenantId: actor.tenantId },
       select: { type: true, examTerm: { select: { academicYearId: true } } },
@@ -607,7 +622,7 @@ export class MarkSheetService {
     }
     // Same eligibility-aware gate as mark entry: an assignment whose
     // professional eligibility lapsed cannot submit.
-    await this.teacherScopeService.requireActorAccess(
+    return this.teacherScopeService.requireActorAccess(
       {
         academicYearId: component.examTerm.academicYearId,
         classId: sheet.classId,

@@ -21,6 +21,12 @@ model AttendanceSession {
   records            AttendanceRecord[]
   conflicts          AttendanceConflict[]
   correctionRequests AttendanceCorrectionRequest[]
+  /// Phase 6: authority that made the submission valid at the time.
+  submittedAssignmentId            String?
+  submittedDelegationId            String?
+  submittedEligibilityAssessmentId String?
+  submittedEligibilityAssessment   TeacherEligibilityAssessment? @relation("AttendanceSubmissionEligibility", fields: [submittedEligibilityAssessmentId], references: [id], onDelete: Restrict)
+
 
   @@unique([tenantId, attendanceDate, classId, sectionId])
   @@unique([tenantId, sourceClientSubmissionId], map: "attendance_session_source_submission_key")

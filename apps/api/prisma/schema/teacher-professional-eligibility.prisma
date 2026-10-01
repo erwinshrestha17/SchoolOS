@@ -168,6 +168,9 @@ model TeacherEligibilityAssessment {
   evaluatedBy   User?                          @relation("EvaluatedTeacherEligibility", fields: [evaluatedById], references: [id], onDelete: Restrict)
   assignments   TeacherAssignment[]
   delegations   TeacherDelegation[] @relation("DelegationEligibility")
+  attendanceSubmissions AttendanceSession[]   @relation("AttendanceSubmissionEligibility")
+  markSubmissions       MarkSheetTransition[] @relation("MarkSubmissionEligibility")
+
 
   @@index([tenantId, staffId, evaluatedAt])
 }

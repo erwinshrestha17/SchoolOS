@@ -1341,6 +1341,46 @@ describe('attendance production hardening', () => {
       );
     });
 
+    it('records the assignment and eligibility assessment that authorized the submission', async () => {
+      const finalSession = buildAttendanceSession({ records: [] });
+      const { service, prisma, tx } = buildService({
+        academicYear: { id: 'ay-1' },
+        classroom: { id: 'class-1', name: 'Grade 1' },
+        section: scopeSection,
+        staffFindFirst: { id: 'staff-1' },
+        students: [buildStudent({ id: 'student-1' })],
+        finalSession,
+        canonicalAssignments: [
+          teacherAssignmentFixture({
+            id: 'homeroom-assignment',
+            tenantId: 'tenant-1',
+            staffId: 'staff-1',
+            academicYearId: 'ay-1',
+            assignmentType: 'CLASS_TEACHER',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            subjectId: null,
+            eligibilityAssessmentId: 'assessment-policy-v1',
+          }),
+        ],
+      });
+      prisma.section.findFirst
+        .mockResolvedValueOnce(scopeSection)
+        .mockResolvedValueOnce(null);
+
+      await service.submitAttendance(submitDto, teacherActor);
+
+      // A later re-assessment (e.g. under a new policy version) changes the
+      // assignment's current assessment, never this stored context.
+      expect(tx.attendanceSession.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          submittedAssignmentId: 'homeroom-assignment',
+          submittedDelegationId: null,
+          submittedEligibilityAssessmentId: 'assessment-policy-v1',
+        }),
+      });
+    });
+
     it('allows roster and monthly register reads for a subject teacher assigned to the section', async () => {
       const subjectAssignment = teacherAssignmentFixture({
         tenantId: 'tenant-1',

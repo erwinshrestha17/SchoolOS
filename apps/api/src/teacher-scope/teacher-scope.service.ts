@@ -30,6 +30,12 @@ export interface TeacherScopeGrant {
    * record to return.
    */
   assignmentType: TeacherAssignmentType | null;
+  /**
+   * The (immutable) professional-eligibility assessment that made this grant
+   * live. Authoritative writes record it so a later re-assessment or policy
+   * version change never rewrites the context of historical records.
+   */
+  eligibilityAssessmentId?: string | null;
 }
 
 export interface RequireTeacherAccessParams {
@@ -509,6 +515,7 @@ export class TeacherScopeService {
           assignmentId: matchingAssignment.id,
           componentScope: matchingAssignment.componentScope,
           assignmentType: matchingAssignment.assignmentType,
+          eligibilityAssessmentId: matchingAssignment.eligibilityAssessmentId,
         },
       };
     }
@@ -559,6 +566,7 @@ export class TeacherScopeService {
           assignmentId: matchingDelegation.id,
           componentScope: matchingDelegation.componentScope,
           assignmentType: null,
+          eligibilityAssessmentId: matchingDelegation.eligibilityAssessmentId,
         },
       };
     }

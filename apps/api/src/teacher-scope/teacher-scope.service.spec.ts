@@ -416,6 +416,15 @@ describe('TeacherScopeService — assignment-based authorization', () => {
     });
   });
 
+  it('returns the eligibility assessment that made the grant live', async () => {
+    const { service } = buildService();
+    const grant = await service.requireAccess(
+      ask(TeacherCapability.MARKS_ENTER, CLASS_1, SECTION_1A, MATHS),
+      actor,
+    );
+    expect(grant).toHaveProperty('eligibilityAssessmentId');
+  });
+
   describe('Subject Teacher: write is confined to the exact assignment', () => {
     it('allows marks entry for an assigned subject in an assigned section', async () => {
       const { service } = buildService();

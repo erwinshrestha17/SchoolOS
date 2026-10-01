@@ -710,7 +710,7 @@ export class AttendanceService {
     actor: AuthContext,
     submissionContext?: AttendanceSubmissionContext,
   ) {
-    await this.validateAttendanceScope(
+    const { grant: authorityGrant } = await this.validateAttendanceScope(
       actor,
       {
         academicYearId: dto.academicYearId,
@@ -719,6 +719,20 @@ export class AttendanceService {
       },
       'WRITE',
     );
+    // Recorded with the submission: which assignment and which immutable
+    // eligibility assessment authorized it (null for school administrators).
+    const authorityContext = {
+      submittedAssignmentId:
+        authorityGrant?.source === 'ASSIGNMENT'
+          ? authorityGrant.assignmentId
+          : null,
+      submittedDelegationId:
+        authorityGrant?.source === 'DELEGATION'
+          ? authorityGrant.assignmentId
+          : null,
+      submittedEligibilityAssessmentId:
+        authorityGrant?.eligibilityAssessmentId ?? null,
+    };
     const attendanceDate = stripTime(new Date(dto.attendanceDate));
     const today = stripTime(new Date());
 
@@ -865,6 +879,7 @@ export class AttendanceService {
                   ? {
                       academicYearId: dto.academicYearId,
                       submittedById: actor.userId,
+                      ...authorityContext,
                       sourceClientSubmissionId:
                         submissionContext?.clientSubmissionId ?? null,
                       submittedAt: new Date(),
@@ -887,6 +902,7 @@ export class AttendanceService {
                 sectionId: dto.sectionId ?? null,
                 attendanceDate,
                 submittedById: actor.userId,
+                ...authorityContext,
                 sourceClientSubmissionId:
                   submissionContext?.clientSubmissionId ?? null,
                 submittedAt: new Date(),
@@ -5847,7 +5863,7 @@ export class AttendanceService {
     }
 
     // Teacher Assignment check
-    await this.checkTeacherAssignment(
+    const grant = await this.checkTeacherAssignment(
       actor,
       scope.classId,
       scope.sectionId,
@@ -5855,7 +5871,7 @@ export class AttendanceService {
       access,
     );
 
-    return { academicYear, classroom, section };
+    return { academicYear, classroom, section, grant: grant ?? null };
   }
 
   private async checkTeacherAssignment(
@@ -5932,7 +5948,7 @@ export class AttendanceService {
         { ...base, sectionId, capability },
         actor,
       );
-      if (grant) return;
+      if (grant) return grant;
     }
 
     await this.teacherScopeService.denyActorAccess(

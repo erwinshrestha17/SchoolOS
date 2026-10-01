@@ -3321,6 +3321,12 @@ model AttendanceSession {
   records            AttendanceRecord[]
   conflicts          AttendanceConflict[]
   correctionRequests AttendanceCorrectionRequest[]
+  /// Phase 6: authority that made the submission valid at the time.
+  submittedAssignmentId            String?
+  submittedDelegationId            String?
+  submittedEligibilityAssessmentId String?
+  submittedEligibilityAssessment   TeacherEligibilityAssessment? @relation("AttendanceSubmissionEligibility", fields: [submittedEligibilityAssessmentId], references: [id], onDelete: Restrict)
+
 
   @@unique([tenantId, attendanceDate, classId, sectionId])
   @@unique([tenantId, sourceClientSubmissionId], map: "attendance_session_source_submission_key")
@@ -4967,6 +4973,11 @@ model MarkSheetTransition {
   tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   markSheet MarkSheet @relation(fields: [markSheetId], references: [id], onDelete: Cascade)
   actor     User      @relation("MarkSheetTransitionActor", fields: [actorId], references: [id], onDelete: Restrict)
+  /// Phase 6: authority that made a SUBMIT/RESUBMIT valid at the time.
+  assignmentId            String?
+  eligibilityAssessmentId String?
+  eligibilityAssessment   TeacherEligibilityAssessment? @relation("MarkSubmissionEligibility", fields: [eligibilityAssessmentId], references: [id], onDelete: Restrict)
+
 
   @@unique([tenantId, markSheetId, idempotencyKey])
   @@index([tenantId, markSheetId, createdAt])
@@ -8965,6 +8976,9 @@ model TeacherEligibilityAssessment {
   evaluatedBy   User?                          @relation("EvaluatedTeacherEligibility", fields: [evaluatedById], references: [id], onDelete: Restrict)
   assignments   TeacherAssignment[]
   delegations   TeacherDelegation[] @relation("DelegationEligibility")
+  attendanceSubmissions AttendanceSession[]   @relation("AttendanceSubmissionEligibility")
+  markSubmissions       MarkSheetTransition[] @relation("MarkSubmissionEligibility")
+
 
   @@index([tenantId, staffId, evaluatedAt])
 }

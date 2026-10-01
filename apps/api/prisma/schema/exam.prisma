@@ -399,6 +399,11 @@ model MarkSheetTransition {
   tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   markSheet MarkSheet @relation(fields: [markSheetId], references: [id], onDelete: Cascade)
   actor     User      @relation("MarkSheetTransitionActor", fields: [actorId], references: [id], onDelete: Restrict)
+  /// Phase 6: authority that made a SUBMIT/RESUBMIT valid at the time.
+  assignmentId            String?
+  eligibilityAssessmentId String?
+  eligibilityAssessment   TeacherEligibilityAssessment? @relation("MarkSubmissionEligibility", fields: [eligibilityAssessmentId], references: [id], onDelete: Restrict)
+
 
   @@unique([tenantId, markSheetId, idempotencyKey])
   @@index([tenantId, markSheetId, createdAt])
