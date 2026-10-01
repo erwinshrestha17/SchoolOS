@@ -183,7 +183,13 @@ export class TimetableSubstitutionService {
       this.prisma.timetableSubstitution.findMany({
         where,
         include: substitutionInclude(),
-        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+        // Today-first, then in period order within each day (ASTRA M6-G).
+        orderBy: [
+          { date: 'desc' },
+          { timetableSlot: { startsAt: 'asc' } },
+          { createdAt: 'desc' },
+          { id: 'asc' },
+        ],
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -1188,7 +1194,7 @@ function timetableSlotInclude() {
     class: true,
     section: true,
     subject: true,
-    staff: true,
+    staff: { select: timetableTeacherIdentitySelect },
     period: true,
     roomRef: true,
     version: true,

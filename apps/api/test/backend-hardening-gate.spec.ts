@@ -455,6 +455,14 @@ describe('backend hardening gate', () => {
     expect(missingTenantAnchor).toEqual([]);
   });
 
+  it('never returns full Staff rows (PAN, bank, citizenship) from timetable endpoints', () => {
+    const offenders = listFiles(join(API_SRC_ROOT, 'timetable'))
+      .filter((file) => !file.endsWith('.spec.ts'))
+      .filter((file) => /\bstaff:\s*true\b/.test(read(file)))
+      .map(normalizePath);
+    expect(offenders).toEqual([]);
+  });
+
   it('enforces teacher assignment at attendance, homework, marks, and file-registry writes', () => {
     expect(
       read(join(API_SRC_ROOT, 'attendance', 'attendance.service.ts')),

@@ -127,19 +127,34 @@ export function SubstitutionsList({ filters }: { filters: any }) {
       cell: (row) => formatSubstitutionDate(row.date),
     },
     {
-      id: 'slot',
-      header: 'Class / Slot',
+      id: 'period',
+      header: 'Period',
       cell: (row) => (
-        <div className="flex flex-col">
-          <span className="font-bold text-slate-900">
-            {row.timetableSlot?.subject?.name?.trim() || 'Subject not set'}
-          </span>
-          <span className="text-xs text-slate-500">
-            {row.timetableSlot?.startsAt && row.timetableSlot?.endsAt
-              ? `${row.timetableSlot.startsAt} - ${row.timetableSlot.endsAt}`
-              : 'Slot time not set'}
-          </span>
-        </div>
+        <span className="text-sm font-semibold tabular-nums text-slate-900">
+          {row.timetableSlot?.startsAt && row.timetableSlot?.endsAt
+            ? `${row.timetableSlot.startsAt}–${row.timetableSlot.endsAt}`
+            : 'Time not set'}
+        </span>
+      ),
+    },
+    {
+      id: 'class',
+      header: 'Class',
+      cell: (row) => (
+        <span className="text-sm text-slate-700">
+          {[row.timetableSlot?.class?.name, row.timetableSlot?.section?.name]
+            .filter(Boolean)
+            .join(' ') || 'Class not set'}
+        </span>
+      ),
+    },
+    {
+      id: 'subject',
+      header: 'Subject',
+      cell: (row) => (
+        <span className="text-sm font-medium text-slate-900">
+          {row.timetableSlot?.subject?.name?.trim() || 'Subject not set'}
+        </span>
       ),
     },
     {

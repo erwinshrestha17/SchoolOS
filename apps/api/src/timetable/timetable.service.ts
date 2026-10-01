@@ -51,6 +51,18 @@ import {
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
 import { TeacherScopeService } from '../teacher-scope/teacher-scope.service';
 
+/**
+ * Timetable payloads identify a teacher only. Staff rows also hold PAN,
+ * bank, citizenship, date of birth and address, which no timetable reader
+ * may receive (enforced by backend-hardening-gate.spec.ts).
+ */
+export const TIMETABLE_STAFF_IDENTITY_SELECT = {
+  id: true,
+  employeeId: true,
+  firstName: true,
+  lastName: true,
+} satisfies Prisma.StaffSelect;
+
 const TEACHER_VISIBLE_TIMETABLE_VERSION_STATUSES: readonly TimetableVersionStatus[] =
   [TimetableVersionStatus.PUBLISHED, TimetableVersionStatus.LOCKED] as const;
 
@@ -854,8 +866,7 @@ export class TimetableService {
           : {}),
       },
       include: {
-        staff: true,
-        tenant: true,
+        staff: { select: TIMETABLE_STAFF_IDENTITY_SELECT },
       },
       orderBy: [{ dayOfWeek: 'asc' }, { startsAt: 'asc' }],
       skip: (page - 1) * limit,
@@ -1001,7 +1012,7 @@ export class TimetableService {
           : {}),
       },
       include: {
-        staff: true,
+        staff: { select: TIMETABLE_STAFF_IDENTITY_SELECT },
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -2389,7 +2400,7 @@ function timetableSlotInclude() {
     class: true,
     section: true,
     subject: true,
-    staff: true,
+    staff: { select: TIMETABLE_STAFF_IDENTITY_SELECT },
     period: true,
     roomRef: true,
     version: true,

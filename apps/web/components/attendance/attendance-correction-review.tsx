@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { CheckCircle2, ClipboardCheck, XCircle } from 'lucide-react';
 import { api } from '@/lib/api';
+import { ApiRequestError } from '@/lib/api/client';
+import { schoolFacingErrorMessage } from '@/lib/school-facing-error';
 import { formatDateTime } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,6 +43,28 @@ export function AttendanceCorrectionReview({
     id: string;
     action: ReviewAction;
   } | null>(null);
+  const [reviewErrors, setReviewErrors] = useState<Record<string, string>>({});
+
+  // A refused decision (e.g. the record was already corrected, or another
+  // reviewer decided first) must unlock the card and say why.
+  const handleReviewError = (id: string, error: unknown) => {
+    setActiveReview(null);
+    setReviewErrors((current) => ({
+      ...current,
+      [id]:
+        error instanceof ApiRequestError && error.statusCode === 409
+          ? error.message
+          : schoolFacingErrorMessage(error, {
+              fallback:
+                'The decision could not be saved. Attendance was not changed.',
+              forbidden:
+                'You cannot review this correction. The requester and the original submitter cannot decide it.',
+            }),
+    }));
+    void queryClient.invalidateQueries({
+      queryKey: ['attendance-corrections'],
+    });
+  };
 
   const approveMutation = useMutation({
     mutationFn: ({ id, reviewReason }: { id: string; reviewReason: string }) =>
@@ -58,6 +82,7 @@ export function AttendanceCorrectionReview({
       });
       setActiveReview(null);
     },
+    onError: (error, variables) => handleReviewError(variables.id, error),
   });
 
   const rejectMutation = useMutation({
@@ -72,6 +97,7 @@ export function AttendanceCorrectionReview({
       });
       setActiveReview(null);
     },
+    onError: (error, variables) => handleReviewError(variables.id, error),
   });
 
   const reviewCorrection = (id: string, action: ReviewAction) => {
@@ -85,6 +111,11 @@ export function AttendanceCorrectionReview({
     }
 
     setActiveReview({ id, action });
+    setReviewErrors((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
 
     if (action === 'APPROVED') {
       approveMutation.mutate({ id, reviewReason });
@@ -203,6 +234,15 @@ export function AttendanceCorrectionReview({
                     </p>
                   ) : null}
                 </div>
+
+                {reviewErrors[correction.id] ? (
+                  <p
+                    role="alert"
+                    className="mt-4 rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700"
+                  >
+                    {reviewErrors[correction.id]}
+                  </p>
+                ) : null}
 
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
                   <Button

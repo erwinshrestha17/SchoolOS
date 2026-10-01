@@ -35,6 +35,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { ApiRequestError } from '@/lib/api/client';
+import { schoolFacingErrorMessage } from '@/lib/school-facing-error';
 import type {
   AttendanceMonthlyRegister,
   AttendanceRegisterExportSummary,
@@ -1020,6 +1022,10 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
       void queryClient.invalidateQueries({
         queryKey: ['attendance-correction', id],
       }),
+    onError: () =>
+      void queryClient.invalidateQueries({
+        queryKey: ['attendance-correction', id],
+      }),
   });
   const correction = correctionQuery.data;
   const canDecide =
@@ -1063,6 +1069,14 @@ export function AttendanceCorrectionDetailWorkspace({ id }: { id: string }) {
           ) : undefined
         }
       />
+      {approveMutation.error || rejectMutation.error ? (
+        <p
+          role="alert"
+          className="rounded-md border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700"
+        >
+          {decisionErrorMessage(approveMutation.error ?? rejectMutation.error)}
+        </p>
+      ) : null}
       {correctionQuery.isLoading ? (
         <LoadingState label="Loading correction detail..." />
       ) : correctionQuery.isError ? (
@@ -1430,6 +1444,21 @@ export function AttendanceOfflineDraftsWorkspace() {
       </div>
     </DashboardPageShell>
   );
+}
+
+/**
+ * Lifecycle refusals (already corrected, decided by someone else) carry a
+ * specific server explanation; anything else gets school-facing copy.
+ */
+function decisionErrorMessage(error: unknown) {
+  if (error instanceof ApiRequestError && error.statusCode === 409) {
+    return error.message;
+  }
+  return schoolFacingErrorMessage(error, {
+    fallback: 'The decision could not be saved. Attendance was not changed.',
+    forbidden:
+      'You cannot decide this correction. The requester and the original submitter cannot review it.',
+  });
 }
 
 function getAttendanceSyncStatusLabel(status: string) {
