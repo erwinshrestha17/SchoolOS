@@ -13,7 +13,7 @@ test('local backup rehearsal rejects source-as-target before connecting', () => 
     [
       fileURLToPath(
         new URL(
-          '../../../scripts/rehearse-backup-restore-local.mjs',
+          '../../../scripts/recovery/rehearse-backup-restore-local.mjs',
           import.meta.url,
         ),
       ),

@@ -229,7 +229,7 @@ describe('mobile production release configuration', () => {
     ]) {
       const result = spawnSync(
         process.execPath,
-        [join(repoRoot, 'scripts/check-mobile-release-config.mjs'), ...args],
+        [join(repoRoot, 'scripts/ci/check-mobile-release-config.mjs'), ...args],
         { encoding: 'utf8' },
       );
       assert.equal(result.status, 1);
