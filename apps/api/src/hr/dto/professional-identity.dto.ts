@@ -1,4 +1,4 @@
-import { StaffEmploymentType } from '@prisma/client';
+import { StaffEmploymentType, StaffResponsibilityKind } from '@prisma/client';
 import {
   IsDateString,
   IsIn,
@@ -61,6 +61,43 @@ export class ReviewProfessionalRecordDto {
 }
 
 export class EndStaffEmploymentDto {
+  @IsDateString()
+  effectiveTo!: string;
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(1000)
+  @Matches(NON_BLANK)
+  reason!: string;
+}
+
+export class CreateStaffResponsibilityDto {
+  @IsUUID()
+  employmentId!: string;
+
+  @IsIn(Object.values(StaffResponsibilityKind))
+  kind!: StaffResponsibilityKind;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  @Matches(NON_BLANK)
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  department?: string;
+
+  @IsDateString()
+  effectiveFrom!: string;
+
+  @IsOptional()
+  @IsDateString()
+  effectiveTo?: string;
+}
+
+export class EndStaffResponsibilityDto {
   @IsDateString()
   effectiveTo!: string;
 

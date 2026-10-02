@@ -13,6 +13,7 @@ model Tenant {
   nepalEducationPolicies        NepalEducationPolicyVersion[]
   nepalHrPolicies               NepalHrPolicyVersion[]
   staffEmployments              StaffEmployment[]
+  staffResponsibilities         StaffResponsibility[]
   teacherProfiles               TeacherProfile[]
   teacherQualificationEvidence  TeacherQualificationEvidence[]
   teachingLicenceEvidence       TeachingLicenceEvidence[]

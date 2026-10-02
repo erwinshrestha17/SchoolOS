@@ -23,6 +23,8 @@ function setup(
     overlap: any;
     profile: any;
     evidence: any;
+    responsibilities: any[];
+    responsibilityOverlap: any;
   }> = {},
 ) {
   const staffRow = { id: 's1', userId: 'teacher-user', tenantId: 't1' };
@@ -48,6 +50,19 @@ function setup(
           : (state.employment ?? null),
       ),
       update: jest.fn(({ data }) => ({ ...state.employment, ...data })),
+    },
+    staffResponsibility: {
+      create: jest.fn(({ data }) => ({ id: 'r-new', ...data })),
+      findFirst: jest.fn(({ where }) =>
+        typeof where.id === 'object' || where.kind
+          ? (state.responsibilityOverlap ?? null)
+          : (state.responsibilities?.[0] ?? null),
+      ),
+      findMany: jest.fn(() => state.responsibilities ?? []),
+      update: jest.fn(({ where, data }) => ({
+        ...(state.responsibilities ?? []).find((r) => r.id === where.id),
+        ...data,
+      })),
     },
     teacherProfile: {
       findFirst: jest.fn(() => state.profile ?? null),
@@ -275,6 +290,257 @@ describe('ProfessionalIdentityService (Phase 5J–5L)', () => {
         status: 'ENDED',
         endReason: 'Resigned',
       });
+    });
+  });
+
+  describe('7.1 authoritative employment and responsibilities', () => {
+    const verifiedEmployment = {
+      ...pendingEmployment,
+      status: 'VERIFIED',
+      verifiedAt: PAST,
+    };
+
+    it('verification overlap check includes ENDED history, not only VERIFIED rows', async () => {
+      const { service, tx } = setup({
+        employment: pendingEmployment,
+        overlap: { id: 'e-ended' },
+      });
+      await expect(
+        service.reviewEmployment('s1', 'e1', { decision: 'VERIFY' }, HR_B),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'EMPLOYMENT_OVERLAP' }),
+      });
+      const overlapQuery = tx.staffEmployment.findFirst.mock.calls
+        .map(([args]: any[]) => args.where)
+        .find((where: any) => typeof where.id === 'object');
+      expect(overlapQuery.status).toEqual({ in: ['VERIFIED', 'ENDED'] });
+      expect(overlapQuery.verifiedAt).toEqual({ not: null });
+    });
+
+    it('translates the database exclusion constraint into a stable 409', () => {
+      const error = translateGuardError(
+        new Error(
+          'conflicting key value violates exclusion constraint "StaffEmployment_no_authoritative_overlap"',
+        ),
+      );
+      expect((error as ConflictException).getResponse()).toMatchObject({
+        code: 'EMPLOYMENT_OVERLAP',
+      });
+      const primary = translateGuardError(
+        new Error(
+          'conflicting key value violates exclusion constraint "StaffResponsibility_one_primary_per_range"',
+        ),
+      );
+      expect((primary as ConflictException).getResponse()).toMatchObject({
+        code: 'PRIMARY_RESPONSIBILITY_OVERLAP',
+      });
+    });
+
+    it('adds a primary responsibility inside a verified employment and audits it', async () => {
+      const { service, tx, audit } = setup({ employment: verifiedEmployment });
+      await service.addResponsibility(
+        's1',
+        {
+          employmentId: 'e1',
+          kind: 'PRIMARY',
+          title: ' Class Teacher ',
+          effectiveFrom: '2025-04-14',
+        } as any,
+        HR_A,
+      );
+      expect(tx.staffResponsibility.create.mock.calls[0][0].data).toMatchObject(
+        {
+          tenantId: 't1',
+          staffId: 's1',
+          employmentId: 'e1',
+          kind: 'PRIMARY',
+          title: 'Class Teacher',
+          createdById: 'hr-a',
+        },
+      );
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'create',
+          resource: 'staff_responsibility',
+        }),
+        tx,
+      );
+    });
+
+    it('refuses a responsibility on a non-verified employment', async () => {
+      const { service, tx } = setup({ employment: pendingEmployment });
+      await expect(
+        service.addResponsibility(
+          's1',
+          {
+            employmentId: 'e1',
+            kind: 'SECONDARY',
+            title: 'Exam coordinator',
+            effectiveFrom: '2025-04-14',
+          } as any,
+          HR_A,
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'EMPLOYMENT_NOT_VERIFIED' }),
+      });
+      expect(tx.staffResponsibility.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses a responsibility that starts before the employment', async () => {
+      const { service, tx } = setup({ employment: verifiedEmployment });
+      await expect(
+        service.addResponsibility(
+          's1',
+          {
+            employmentId: 'e1',
+            kind: 'SECONDARY',
+            title: 'Exam coordinator',
+            effectiveFrom: '2020-01-01',
+          } as any,
+          HR_A,
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: 'RESPONSIBILITY_OUTSIDE_EMPLOYMENT',
+        }),
+      });
+      expect(tx.staffResponsibility.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses an overlapping primary responsibility but allows a secondary one', async () => {
+      const first = setup({
+        employment: verifiedEmployment,
+        responsibilityOverlap: { id: 'r0' },
+      });
+      await expect(
+        first.service.addResponsibility(
+          's1',
+          {
+            employmentId: 'e1',
+            kind: 'PRIMARY',
+            title: 'Vice Principal',
+            effectiveFrom: '2025-06-01',
+          } as any,
+          HR_A,
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: 'PRIMARY_RESPONSIBILITY_OVERLAP',
+          overlappingResponsibilityId: 'r0',
+        }),
+      });
+
+      const second = setup({
+        employment: verifiedEmployment,
+        responsibilityOverlap: { id: 'r0' },
+      });
+      await second.service.addResponsibility(
+        's1',
+        {
+          employmentId: 'e1',
+          kind: 'SECONDARY',
+          title: 'Sports in-charge',
+          effectiveFrom: '2025-06-01',
+        } as any,
+        HR_A,
+      );
+      expect(second.tx.staffResponsibility.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('ending an employment shortens open responsibilities and voids ones that never started', async () => {
+      const { service, tx } = setup({
+        employment: verifiedEmployment,
+        responsibilities: [
+          {
+            id: 'r-open',
+            effectiveFrom: PAST,
+            effectiveTo: null,
+            endedAt: null,
+          },
+          {
+            id: 'r-future',
+            effectiveFrom: new Date('2026-06-01T00:00:00Z'),
+            effectiveTo: null,
+            endedAt: null,
+          },
+        ],
+      });
+      await service.endEmployment(
+        's1',
+        'e1',
+        { effectiveTo: '2026-03-01', reason: 'Resigned' },
+        HR_B,
+      );
+      const updates = tx.staffResponsibility.update.mock.calls.map(
+        ([args]: any[]) => args,
+      );
+      expect(updates[0].where.id).toBe('r-open');
+      expect(updates[0].data.effectiveTo).toEqual(
+        new Date('2026-03-01T00:00:00Z'),
+      );
+      expect(updates[1].where.id).toBe('r-future');
+      expect(updates[1].data.effectiveTo).toEqual(
+        new Date('2026-06-01T00:00:00Z'),
+      );
+      expect(updates[1].data.endReason).toMatch(/Voided/);
+      // Responsibilities are closed before the employment row changes.
+      expect(
+        tx.staffResponsibility.update.mock.invocationCallOrder[1],
+      ).toBeLessThan(tx.staffEmployment.update.mock.invocationCallOrder[0]);
+    });
+
+    it('ending a responsibility requires it to be open and not extend it', async () => {
+      const { service } = setup({
+        responsibilities: [
+          {
+            id: 'r1',
+            effectiveFrom: PAST,
+            effectiveTo: new Date('2026-01-01T00:00:00Z'),
+            endedAt: null,
+          },
+        ],
+      });
+      await expect(
+        service.endResponsibility(
+          's1',
+          'r1',
+          { effectiveTo: '2027-01-01', reason: 'Reassigned' },
+          HR_A,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      const ended = setup({
+        responsibilities: [
+          { id: 'r1', effectiveFrom: PAST, effectiveTo: null, endedAt: PAST },
+        ],
+      });
+      await expect(
+        ended.service.endResponsibility(
+          's1',
+          'r1',
+          { effectiveTo: '2026-01-01', reason: 'Reassigned' },
+          HR_A,
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          code: 'RESPONSIBILITY_ALREADY_ENDED',
+        }),
+      });
+    });
+
+    it('is tenant scoped: another tenant cannot add a responsibility', async () => {
+      const { service } = setup({ employment: verifiedEmployment });
+      await expect(
+        service.addResponsibility(
+          's1',
+          {
+            employmentId: 'e1',
+            kind: 'SECONDARY',
+            title: 'Exam coordinator',
+            effectiveFrom: '2025-04-14',
+          } as any,
+          OTHER_TENANT,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 

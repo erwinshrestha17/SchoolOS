@@ -1098,6 +1098,7 @@ export const PayrollExceptionCode = {
   FISCAL_PERIOD_LOCKED: 'FISCAL_PERIOD_LOCKED',
   ACCOUNTING_POSTING_FAILED: 'ACCOUNTING_POSTING_FAILED',
   PAYSLIP_GENERATION_FAILED: 'PAYSLIP_GENERATION_FAILED',
+  MISSING_VERIFIED_EMPLOYMENT: 'MISSING_VERIFIED_EMPLOYMENT',
 } as const;
 
 export const PayrollLineStatus = {
@@ -1490,6 +1491,11 @@ export const NepalHrPolicyReviewStatus = {
   REVIEWED: 'REVIEWED',
   APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
+} as const;
+
+export const StaffResponsibilityKind = {
+  PRIMARY: 'PRIMARY',
+  SECONDARY: 'SECONDARY',
 } as const;
 
 export const StaffEmploymentStatus = {

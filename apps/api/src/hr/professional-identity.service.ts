@@ -9,20 +9,24 @@ import {
   Prisma,
   ProfessionalEvidenceStatus,
   StaffEmploymentStatus,
+  StaffResponsibilityKind,
   TeacherProfileStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { AUTHORITATIVE_EMPLOYMENT_STATUSES } from './employment-timeline';
 import { TeacherProfessionalEligibilityService } from '../teacher-scope/teacher-professional-eligibility.service';
 import type {
   CreateLicenceEvidenceDto,
   CreateQualificationEvidenceDto,
   CreateStaffEmploymentDto,
+  CreateStaffResponsibilityDto,
   CreateTeacherProfileDto,
   DeactivateTeacherProfileDto,
   EligibilityProjectionQueryDto,
   EndStaffEmploymentDto,
+  EndStaffResponsibilityDto,
   ReviewProfessionalRecordDto,
   RevokeProfessionalEvidenceDto,
 } from './dto/professional-identity.dto';
@@ -52,59 +56,68 @@ export class ProfessionalIdentityService {
 
   async getOverview(staffId: string, actor: AuthContext) {
     const staff = await this.requireStaff(this.prisma, staffId, actor);
-    const [employments, profile, assessments] = await Promise.all([
-      this.prisma.staffEmployment.findMany({
-        where: { tenantId: actor.tenantId, staffId },
-        orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
-        select: EMPLOYMENT_SELECT,
-      }),
-      this.prisma.teacherProfile.findFirst({
-        where: { tenantId: actor.tenantId, staffId },
-        select: {
-          id: true,
-          status: true,
-          effectiveFrom: true,
-          effectiveTo: true,
-          qualifications: {
-            orderBy: [{ validFrom: 'desc' }, { createdAt: 'desc' }],
-            select: {
-              ...EVIDENCE_SELECT,
-              qualification: true,
-              institution: true,
+    const [employments, responsibilities, profile, assessments] =
+      await Promise.all([
+        this.prisma.staffEmployment.findMany({
+          where: { tenantId: actor.tenantId, staffId },
+          orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
+          select: EMPLOYMENT_SELECT,
+        }),
+        this.prisma.staffResponsibility.findMany({
+          where: { tenantId: actor.tenantId, staffId },
+          orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
+          select: RESPONSIBILITY_SELECT,
+        }),
+        this.prisma.teacherProfile.findFirst({
+          where: { tenantId: actor.tenantId, staffId },
+          select: {
+            id: true,
+            status: true,
+            effectiveFrom: true,
+            effectiveTo: true,
+            qualifications: {
+              orderBy: [{ validFrom: 'desc' }, { createdAt: 'desc' }],
+              select: {
+                ...EVIDENCE_SELECT,
+                qualification: true,
+                institution: true,
+              },
+            },
+            licences: {
+              orderBy: [{ validFrom: 'desc' }, { createdAt: 'desc' }],
+              select: {
+                ...EVIDENCE_SELECT,
+                authorityCode: true,
+                externalReference: true,
+              },
             },
           },
-          licences: {
-            orderBy: [{ validFrom: 'desc' }, { createdAt: 'desc' }],
-            select: {
-              ...EVIDENCE_SELECT,
-              authorityCode: true,
-              externalReference: true,
-            },
+        }),
+        this.prisma.teacherEligibilityAssessment.findMany({
+          where: { tenantId: actor.tenantId, staffId },
+          orderBy: { evaluatedAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            outcome: true,
+            reasonCode: true,
+            evaluatedAt: true,
+            validUntil: true,
+            policyVersionId: true,
+            employmentId: true,
+            qualificationId: true,
+            licenceId: true,
           },
-        },
-      }),
-      this.prisma.teacherEligibilityAssessment.findMany({
-        where: { tenantId: actor.tenantId, staffId },
-        orderBy: { evaluatedAt: 'desc' },
-        take: 20,
-        select: {
-          id: true,
-          outcome: true,
-          reasonCode: true,
-          evaluatedAt: true,
-          validUntil: true,
-          policyVersionId: true,
-          employmentId: true,
-          qualificationId: true,
-          licenceId: true,
-        },
-      }),
-    ]);
+        }),
+      ]);
     const now = new Date();
     const currentEmployment =
       employments.find(
         (row) =>
-          row.status === StaffEmploymentStatus.VERIFIED &&
+          row.verifiedAt !== null &&
+          (AUTHORITATIVE_EMPLOYMENT_STATUSES as readonly string[]).includes(
+            row.status,
+          ) &&
           row.effectiveFrom <= now &&
           (row.effectiveTo === null || row.effectiveTo > now),
       ) ?? null;
@@ -112,6 +125,7 @@ export class ProfessionalIdentityService {
       staffId: staff.id,
       currentEmploymentId: currentEmployment?.id ?? null,
       employments,
+      responsibilities,
       teacherProfile: profile
         ? {
             ...profile,
@@ -194,7 +208,10 @@ export class ProfessionalIdentityService {
             tenantId: actor.tenantId,
             staffId,
             id: { not: employmentId },
-            status: StaffEmploymentStatus.VERIFIED,
+            // Ended history is still authoritative: a new period may not
+            // overlap it (the database EXCLUDE constraint is the backstop).
+            verifiedAt: { not: null },
+            status: { in: [...AUTHORITATIVE_EMPLOYMENT_STATUSES] },
             effectiveFrom: { lt: before.effectiveTo ?? FAR_FUTURE },
             OR: [
               { effectiveTo: null },
@@ -267,6 +284,12 @@ export class ProfessionalIdentityService {
           'Ending cannot extend a verified employment period',
         );
       }
+      await this.closeResponsibilitiesForEmploymentEnd(
+        tx,
+        actor,
+        employmentId,
+        effectiveTo,
+      );
       const after = await tx.staffEmployment.update({
         where: { id: employmentId },
         data: {
@@ -288,6 +311,193 @@ export class ProfessionalIdentityService {
       );
       return after;
     });
+  }
+
+  // ---- 7.1 responsibilities (positions) ----------------------------------
+
+  async addResponsibility(
+    staffId: string,
+    dto: CreateStaffResponsibilityDto,
+    actor: AuthContext,
+  ) {
+    const effectiveFrom = parseDate(dto.effectiveFrom, 'effectiveFrom');
+    const effectiveTo = dto.effectiveTo
+      ? parseDate(dto.effectiveTo, 'effectiveTo')
+      : null;
+    assertWindow(effectiveFrom, effectiveTo);
+    return this.write(async (tx) => {
+      await this.lockStaff(tx, staffId, actor);
+      const employment = await tx.staffEmployment.findFirst({
+        where: {
+          id: dto.employmentId,
+          tenantId: actor.tenantId,
+          staffId,
+        },
+        select: {
+          id: true,
+          status: true,
+          effectiveFrom: true,
+          effectiveTo: true,
+        },
+      });
+      if (!employment)
+        throw new NotFoundException('Employment record not found');
+      if (employment.status !== StaffEmploymentStatus.VERIFIED) {
+        throw conflict(
+          'EMPLOYMENT_NOT_VERIFIED',
+          'A responsibility requires a verified, current employment',
+        );
+      }
+      if (
+        effectiveFrom < employment.effectiveFrom ||
+        (employment.effectiveTo !== null &&
+          (effectiveTo === null || effectiveTo > employment.effectiveTo))
+      ) {
+        throw conflict(
+          'RESPONSIBILITY_OUTSIDE_EMPLOYMENT',
+          'The responsibility window must lie inside the employment window',
+        );
+      }
+      if (dto.kind === StaffResponsibilityKind.PRIMARY) {
+        const overlap = await tx.staffResponsibility.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            staffId,
+            kind: StaffResponsibilityKind.PRIMARY,
+            effectiveFrom: { lt: effectiveTo ?? FAR_FUTURE },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gt: effectiveFrom } }],
+          },
+          select: { id: true },
+        });
+        if (overlap) {
+          throw conflict(
+            'PRIMARY_RESPONSIBILITY_OVERLAP',
+            'Another primary responsibility overlaps this period; end it first',
+            { overlappingResponsibilityId: overlap.id },
+          );
+        }
+      }
+      const row = await tx.staffResponsibility.create({
+        data: {
+          tenantId: actor.tenantId,
+          staffId,
+          employmentId: employment.id,
+          kind: dto.kind,
+          title: dto.title.trim(),
+          department: dto.department?.trim() || null,
+          effectiveFrom,
+          effectiveTo,
+          createdById: actor.userId,
+        },
+        select: RESPONSIBILITY_SELECT,
+      });
+      await this.record(
+        tx,
+        actor,
+        'create',
+        'staff_responsibility',
+        row.id,
+        null,
+        row,
+      );
+      return row;
+    });
+  }
+
+  async endResponsibility(
+    staffId: string,
+    responsibilityId: string,
+    dto: EndStaffResponsibilityDto,
+    actor: AuthContext,
+  ) {
+    const effectiveTo = parseDate(dto.effectiveTo, 'effectiveTo');
+    return this.write(async (tx) => {
+      await this.lockStaff(tx, staffId, actor);
+      const before = await tx.staffResponsibility.findFirst({
+        where: { id: responsibilityId, tenantId: actor.tenantId, staffId },
+        select: RESPONSIBILITY_SELECT,
+      });
+      if (!before) throw new NotFoundException('Responsibility not found');
+      if (before.endedAt) {
+        throw conflict(
+          'RESPONSIBILITY_ALREADY_ENDED',
+          'This responsibility has already been ended',
+        );
+      }
+      if (effectiveTo <= before.effectiveFrom) {
+        throw new BadRequestException(
+          'effectiveTo must be after the responsibility start',
+        );
+      }
+      if (before.effectiveTo && effectiveTo > before.effectiveTo) {
+        throw new BadRequestException('Ending cannot extend a responsibility');
+      }
+      const after = await tx.staffResponsibility.update({
+        where: { id: responsibilityId },
+        data: {
+          effectiveTo,
+          endedAt: new Date(),
+          endReason: dto.reason.trim(),
+        },
+        select: RESPONSIBILITY_SELECT,
+      });
+      await this.record(
+        tx,
+        actor,
+        'end',
+        'staff_responsibility',
+        responsibilityId,
+        before,
+        after,
+      );
+      return after;
+    });
+  }
+
+  /**
+   * Ending an employment must not leave a position running past it. Open
+   * responsibilities are shortened to the employment end; ones that would
+   * only have started afterwards are voided (zero-length, audited).
+   */
+  private async closeResponsibilitiesForEmploymentEnd(
+    tx: Tx,
+    actor: AuthContext,
+    employmentId: string,
+    employmentEnd: Date,
+  ) {
+    const open = await tx.staffResponsibility.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        employmentId,
+        endedAt: null,
+        OR: [{ effectiveTo: null }, { effectiveTo: { gt: employmentEnd } }],
+      },
+      select: RESPONSIBILITY_SELECT,
+      orderBy: { id: 'asc' },
+    });
+    for (const before of open) {
+      const voided = before.effectiveFrom >= employmentEnd;
+      const after = await tx.staffResponsibility.update({
+        where: { id: before.id },
+        data: {
+          effectiveTo: voided ? before.effectiveFrom : employmentEnd,
+          endedAt: new Date(),
+          endReason: voided
+            ? 'Voided: employment ended before this responsibility began'
+            : 'Employment ended',
+        },
+        select: RESPONSIBILITY_SELECT,
+      });
+      await this.record(
+        tx,
+        actor,
+        'end',
+        'staff_responsibility',
+        before.id,
+        before,
+        after,
+      );
+    }
   }
 
   // ---- 5K teacher profile ------------------------------------------------
@@ -855,6 +1065,20 @@ const EMPLOYMENT_SELECT = {
   createdAt: true,
 } as const;
 
+const RESPONSIBILITY_SELECT = {
+  id: true,
+  staffId: true,
+  employmentId: true,
+  kind: true,
+  title: true,
+  department: true,
+  effectiveFrom: true,
+  effectiveTo: true,
+  endedAt: true,
+  endReason: true,
+  createdAt: true,
+} as const;
+
 const EVIDENCE_SELECT = {
   id: true,
   subjectCode: true,
@@ -983,9 +1207,24 @@ function conflict(
 
 const GUARD_MESSAGES: Array<[RegExp, string, string]> = [
   [
-    /Overlapping verified employment/,
+    /Overlapping verified employment|StaffEmployment_no_authoritative_overlap/,
     'EMPLOYMENT_OVERLAP',
     'Another verified employment period overlaps this one',
+  ],
+  [
+    /StaffResponsibility_one_primary_per_range/,
+    'PRIMARY_RESPONSIBILITY_OVERLAP',
+    'Another primary responsibility overlaps this period',
+  ],
+  [
+    /Responsibility window must lie inside|requires a verified, current employment/,
+    'RESPONSIBILITY_OUTSIDE_EMPLOYMENT',
+    'A responsibility must sit inside a verified, current employment',
+  ],
+  [
+    /responsibilities before ending the employment/,
+    'EMPLOYMENT_HAS_OPEN_RESPONSIBILITIES',
+    'End the employment’s responsibilities before ending the employment',
   ],
   [
     /must belong to the tenant|must match the tenant/,

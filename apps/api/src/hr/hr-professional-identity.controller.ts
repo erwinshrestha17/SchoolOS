@@ -19,10 +19,12 @@ import {
   CreateLicenceEvidenceDto,
   CreateQualificationEvidenceDto,
   CreateStaffEmploymentDto,
+  CreateStaffResponsibilityDto,
   CreateTeacherProfileDto,
   DeactivateTeacherProfileDto,
   EligibilityProjectionQueryDto,
   EndStaffEmploymentDto,
+  EndStaffResponsibilityDto,
   ReviewProfessionalRecordDto,
   RevokeProfessionalEvidenceDto,
 } from './dto/professional-identity.dto';
@@ -89,6 +91,27 @@ export class HrProfessionalIdentityController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.service.endEmployment(staffId, employmentId, dto, auth);
+  }
+
+  @Post('responsibilities')
+  @Permissions('hr:manage')
+  addResponsibility(
+    @Param('staffId', ParseUUIDPipe) staffId: string,
+    @Body() dto: CreateStaffResponsibilityDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.service.addResponsibility(staffId, dto, auth);
+  }
+
+  @Post('responsibilities/:responsibilityId/end')
+  @Permissions('hr:manage')
+  endResponsibility(
+    @Param('staffId', ParseUUIDPipe) staffId: string,
+    @Param('responsibilityId', ParseUUIDPipe) responsibilityId: string,
+    @Body() dto: EndStaffResponsibilityDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.service.endResponsibility(staffId, responsibilityId, dto, auth);
   }
 
   @Post('teacher-profile')

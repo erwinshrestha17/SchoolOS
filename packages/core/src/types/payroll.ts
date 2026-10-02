@@ -246,7 +246,8 @@ export type PayrollExceptionCode =
   | "MISSING_ACCOUNT_MAPPING"
   | "FISCAL_PERIOD_LOCKED"
   | "ACCOUNTING_POSTING_FAILED"
-  | "PAYSLIP_GENERATION_FAILED";
+  | "PAYSLIP_GENERATION_FAILED"
+  | "MISSING_VERIFIED_EMPLOYMENT";
 
 export type PayrollExceptionSummary = {
   id: string;

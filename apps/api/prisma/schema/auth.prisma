@@ -29,6 +29,7 @@ model User {
   verifiedTeacherQualifications TeacherQualificationEvidence[] @relation("VerifiedTeacherQualifications")
   verifiedTeachingLicences TeachingLicenceEvidence[] @relation("VerifiedTeachingLicences")
   submittedStaffEmployments StaffEmployment[] @relation("SubmittedStaffEmployments")
+  createdStaffResponsibilities StaffResponsibility[] @relation("CreatedStaffResponsibilities")
   submittedTeacherQualifications TeacherQualificationEvidence[] @relation("SubmittedTeacherQualifications")
   submittedTeachingLicences TeachingLicenceEvidence[] @relation("SubmittedTeachingLicences")
   evaluatedTeacherEligibility TeacherEligibilityAssessment[] @relation("EvaluatedTeacherEligibility")

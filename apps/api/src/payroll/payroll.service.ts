@@ -50,6 +50,12 @@ import { buildSalarySlipPdf, type PdfImage } from '../common/pdf/simple-pdf';
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { CreateStaffContractDto } from '../hr/dto/create-staff-contract.dto';
+import {
+  authoritativeEmploymentWhere,
+  calendarDaysInPeriod,
+  employedDaysInPeriod,
+  groupEmploymentsByStaff,
+} from '../hr/employment-timeline';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageOperationError } from '../storage/storage.utils';
 import { CreateSalaryStructureDto } from './dto/create-salary-structure.dto';
@@ -1034,7 +1040,9 @@ export class PayrollService {
     );
 
     if (lines.length === 0) {
-      throw new NotFoundException('No active staff contracts found to process');
+      throw new NotFoundException(
+        'No staff with a verified employment and an active contract or salary structure were found for this period',
+      );
     }
 
     let run: Prisma.PayrollRunGetPayload<{
@@ -1071,6 +1079,9 @@ export class PayrollService {
                   staffId: line.staffId,
                   contractId: line.contractId,
                   salaryStructureId: line.salaryStructureId,
+                  employmentId: line.employmentId,
+                  employmentFrom: line.employmentFrom,
+                  employmentTo: line.employmentTo,
                   basicSalary: new Prisma.Decimal(line.baseSalary),
                   earnings: new Prisma.Decimal(line.earnings),
                   grossSalary: new Prisma.Decimal(line.grossSalary),
@@ -1256,6 +1267,22 @@ export class PayrollService {
       },
     });
 
+    // Phase 7.1: StaffEmployment is the authority for "employed in this
+    // period". Contracts and salary structures only supply terms; a source
+    // without a verified employment is excluded here and reported as a
+    // BLOCKING MISSING_VERIFIED_EMPLOYMENT readiness exception.
+    const employmentRows = await this.prisma.staffEmployment.findMany({
+      where: authoritativeEmploymentWhere(actor.tenantId, period),
+      select: {
+        id: true,
+        staffId: true,
+        effectiveFrom: true,
+        effectiveTo: true,
+      },
+    });
+    const employmentsByStaff = groupEmploymentsByStaff(employmentRows);
+    const periodCalendarDays = calendarDaysInPeriod(period);
+
     const contractsByStaff = new Map(
       contracts.map((contract) => [contract.staffId, contract]),
     );
@@ -1318,7 +1345,14 @@ export class PayrollService {
         })),
     ];
 
-    const lines = payrollSources.map((source) => {
+    const employedSources = payrollSources.filter((source) =>
+      employmentsByStaff.has(source.staffId),
+    );
+
+    const lines = employedSources.map((source) => {
+      const employments = employmentsByStaff.get(source.staffId) ?? [];
+      const employment = employments[0];
+      const employedDays = employedDaysInPeriod(employments, period);
       const presentDays = attendanceByStaff.get(source.staffId) ?? 0;
       const approvedPaidLeaveDays = paidLeaveByStaff.get(source.staffId) ?? 0;
       const approvedUnpaidLeaveDays =
@@ -1334,7 +1368,19 @@ export class PayrollService {
         unpaidLeaveDays,
         approvedUnpaidLeaveDays,
       );
-      const payrollPaidDays = Math.max(0, workingDays - finalUnpaidDays);
+      // Days outside the verified employment window are never payable. For a
+      // full-period employment this cap equals workingDays and changes nothing.
+      const employedWorkingDays =
+        employedDays >= periodCalendarDays
+          ? workingDays
+          : Math.min(
+              workingDays,
+              Math.round((workingDays * employedDays) / periodCalendarDays),
+            );
+      const payrollPaidDays = Math.min(
+        employedWorkingDays,
+        Math.max(0, workingDays - finalUnpaidDays),
+      );
 
       const baseSalary = new Prisma.Decimal(source.baseSalary);
       const allowances = new Prisma.Decimal(source.allowances);
@@ -1354,6 +1400,9 @@ export class PayrollService {
         staffId: source.staffId,
         contractId: source.contractId,
         salaryStructureId: source.salaryStructureId,
+        employmentId: employment.id,
+        employmentFrom: employment.effectiveFrom,
+        employmentTo: employment.effectiveTo,
         baseSalary,
         allowances,
         earnings: calculated.earnings,
@@ -3459,6 +3508,9 @@ export class PayrollService {
                 staffId: line.staffId,
                 contractId: line.contractId,
                 salaryStructureId: line.salaryStructureId,
+                employmentId: line.employmentId,
+                employmentFrom: line.employmentFrom,
+                employmentTo: line.employmentTo,
                 basicSalary: new Prisma.Decimal(line.baseSalary),
                 earnings: new Prisma.Decimal(line.earnings),
                 grossSalary: new Prisma.Decimal(line.grossSalary),

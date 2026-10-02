@@ -51,6 +51,7 @@ model Staff {
   payslips                   Payslip[]
   qualificationsRecords      StaffQualification[]
   employments               StaffEmployment[]
+  responsibilities          StaffResponsibility[]
   teacherProfile            TeacherProfile?
   teacherEligibilityAssessments TeacherEligibilityAssessment[]
   experienceRecords          StaffExperienceRecord[]

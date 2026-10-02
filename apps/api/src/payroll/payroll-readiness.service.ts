@@ -20,6 +20,10 @@ import type {
   PayrollReadinessSummary,
 } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
+import {
+  authoritativeEmploymentWhere,
+  groupEmploymentsByStaff,
+} from '../hr/employment-timeline';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
@@ -351,6 +355,7 @@ export class PayrollReadinessService {
       attendance,
       mapping,
       fiscalPeriod,
+      employments,
     ] = await Promise.all([
       this.prisma.staff.findMany({
         where: {
@@ -459,6 +464,20 @@ export class PayrollReadinessService {
             select: { id: true, status: true },
           })
         : Promise.resolve(null),
+      this.prisma.staffEmployment.findMany({
+        where: authoritativeEmploymentWhere(actor.tenantId, {
+          startsOn: start,
+          endsOn: end,
+        }),
+        select: {
+          id: true,
+          staffId: true,
+          effectiveFrom: true,
+          effectiveTo: true,
+        },
+        orderBy: { id: 'asc' },
+        take: 20000,
+      }),
     ]);
 
     const candidates: Candidate[] = [];
@@ -468,6 +487,34 @@ export class PayrollReadinessService {
     );
     const lineStaff = new Set(lines.map((item) => item.staffId));
     const attendanceStaff = new Set(attendance.map((item) => item.staffId));
+
+    // Phase 7.1: StaffEmployment (verified through maker-checker) is the only
+    // evidence of employment. Staff with payroll terms (contract, salary
+    // structure or an existing line) but no verified employment overlapping
+    // the period are never silently dropped or paid: payroll is blocked until
+    // the employment is recorded and verified, or the terms are ended.
+    const employedStaff = groupEmploymentsByStaff(employments);
+    const termsStaff = new Set<string>([
+      ...contractStaff,
+      ...structureByStaff.keys(),
+      ...lineStaff,
+    ]);
+    const activeStaffIds = new Set(staff.map((item) => item.id));
+    for (const staffId of [...termsStaff].sort()) {
+      if (employedStaff.has(staffId)) continue;
+      if (!activeStaffIds.has(staffId) && !lineStaff.has(staffId)) continue;
+      candidates.push(
+        candidate(year, month, runId, staffId, {
+          code: PayrollExceptionCode.MISSING_VERIFIED_EMPLOYMENT,
+          severity: PayrollExceptionSeverity.BLOCKING,
+          title: 'Verified employment not found',
+          safeMessage:
+            'This staff member has payroll terms but no verified employment covering the payroll period. A contract or role alone is not employment evidence.',
+          resolutionRoute: `/dashboard/hr/staff/${staffId}`,
+          blockedActions: ['CREATE_DRAFT', 'SUBMIT_REVIEW', 'APPROVE', 'POST'],
+        }),
+      );
+    }
 
     for (const member of staff) {
       const structure = structureByStaff.get(member.id);

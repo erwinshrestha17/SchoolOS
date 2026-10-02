@@ -381,4 +381,149 @@ describeDatabase('Professional identity (real PostgreSQL)', () => {
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  const verify = async (id: string) =>
+    scoped(() =>
+      service.reviewEmployment(staffId, id, { decision: 'VERIFY' }, hrB),
+    );
+  const respons = (
+    employmentId: string,
+    kind: 'PRIMARY' | 'SECONDARY',
+    from: string,
+    to?: string,
+  ) =>
+    scoped(() =>
+      service.addResponsibility(
+        staffId,
+        {
+          employmentId,
+          kind,
+          title: kind === 'PRIMARY' ? 'Class teacher' : 'Exam coordinator',
+          effectiveFrom: from,
+          effectiveTo: to,
+        } as never,
+        hrA,
+      ),
+    );
+
+  it('a new verified period cannot overlap ENDED employment history (7.1)', async () => {
+    const first = await employment(hrA, '2025-01-01');
+    await verify(first.id);
+    await scoped(() =>
+      service.endEmployment(
+        staffId,
+        first.id,
+        { effectiveTo: '2025-12-31', reason: 'Resigned' },
+        hrB,
+      ),
+    );
+    const overlapping = await employment(hrA, '2025-06-01');
+    await expect(verify(overlapping.id)).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'EMPLOYMENT_OVERLAP',
+        overlappingEmploymentId: first.id,
+      }),
+    });
+    // Re-employment starting exactly when the previous period ended is valid.
+    const rehire = await employment(hrA, '2025-12-31');
+    await expect(verify(rehire.id)).resolves.toMatchObject({
+      status: 'VERIFIED',
+    });
+  });
+
+  it('enforces one primary responsibility, allows secondary ones, and closes them when employment ends (7.1)', async () => {
+    const row = await employment(hrA, '2025-01-01');
+    await verify(row.id);
+    const primary = await respons(row.id, 'PRIMARY', '2025-02-01');
+    await expect(
+      respons(row.id, 'PRIMARY', '2025-06-01'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'PRIMARY_RESPONSIBILITY_OVERLAP',
+        overlappingResponsibilityId: primary.id,
+      }),
+    });
+    await respons(row.id, 'SECONDARY', '2025-03-01');
+    // A future-dated responsibility that would only start after the end.
+    const future = await respons(row.id, 'SECONDARY', '2026-09-01');
+
+    // The database exclusion constraint also refuses a racing primary that
+    // slipped past the service pre-check.
+    await expect(
+      scoped(
+        () =>
+          prisma.$executeRaw`INSERT INTO "StaffResponsibility" ("id","tenantId","staffId","employmentId","kind","title","effectiveFrom")
+          VALUES (${randomUUID()}, ${tenantId}, ${staffId}, ${row.id}, 'PRIMARY', 'Racer', '2025-07-01')`,
+      ),
+    ).rejects.toThrow(/StaffResponsibility_one_primary_per_range/);
+
+    await scoped(() =>
+      service.endEmployment(
+        staffId,
+        row.id,
+        { effectiveTo: '2026-03-01', reason: 'Resigned' },
+        hrB,
+      ),
+    );
+    const rows = await scoped(() =>
+      prisma.staffResponsibility.findMany({
+        where: { tenantId, staffId },
+        orderBy: { effectiveFrom: 'asc' },
+      }),
+    );
+    expect(rows).toHaveLength(3);
+    for (const item of rows) expect(item.endedAt).not.toBeNull();
+    const shortened = rows.find((item) => item.id === primary.id);
+    if (!shortened) throw new Error('primary responsibility missing');
+    expect(shortened.effectiveTo?.toISOString()).toBe(
+      '2026-03-01T00:00:00.000Z',
+    );
+    const voided = rows.find((item) => item.id === future.id);
+    if (!voided) throw new Error('future responsibility missing');
+    expect(voided.effectiveTo?.toISOString()).toBe(
+      voided.effectiveFrom.toISOString(),
+    );
+    expect(voided.endReason).toMatch(/Voided/);
+    // Responsibilities are not editable afterwards.
+    await expect(
+      scoped(() =>
+        service.endResponsibility(
+          staffId,
+          primary.id,
+          { effectiveTo: '2026-02-01', reason: 'Late edit' },
+          hrA,
+        ),
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'RESPONSIBILITY_ALREADY_ENDED',
+      }),
+    });
+  });
+
+  it('refuses responsibilities on unverified employment and for other tenants (7.1)', async () => {
+    const pending = await employment(hrA, '2025-01-01');
+    await expect(
+      respons(pending.id, 'SECONDARY', '2025-02-01'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'EMPLOYMENT_NOT_VERIFIED' }),
+    });
+    await verify(pending.id);
+    await expect(
+      scoped(
+        () =>
+          service.addResponsibility(
+            staffId,
+            {
+              employmentId: pending.id,
+              kind: 'SECONDARY',
+              title: 'Intruder',
+              effectiveFrom: '2025-02-01',
+            } as never,
+            actor(randomUUID(), otherTenantId),
+          ),
+        otherTenantId,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
 });

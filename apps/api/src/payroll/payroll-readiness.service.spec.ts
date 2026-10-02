@@ -21,6 +21,52 @@ const actor: AuthContext = {
 };
 
 describe('PayrollReadinessService', () => {
+  it('blocks a legacy contract with no verified employment (Phase 7.1)', async () => {
+    const { service, prisma } = buildService({
+      lines: [],
+      employments: [],
+    });
+
+    const readiness = await service.getReadiness(period, actor);
+
+    expect(readiness.readinessStatus).toBe('BLOCKED');
+    expect(readiness.exceptionsByCategory.MISSING_VERIFIED_EMPLOYMENT).toBe(1);
+    expect(
+      persistedCandidates(prisma).find(
+        (item) => item.code === 'MISSING_VERIFIED_EMPLOYMENT',
+      ),
+    ).toMatchObject({
+      severity: 'BLOCKING',
+      staffId: 'staff-1',
+      blockedActions: ['CREATE_DRAFT', 'SUBMIT_REVIEW', 'APPROVE', 'POST'],
+    });
+    // Only authoritative (verified or ended) employment may count.
+    expect(prisma.staffEmployment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          verifiedAt: { not: null },
+          status: { in: ['VERIFIED', 'ENDED'] },
+        }),
+      }),
+    );
+  });
+
+  it('does not raise the employment exception when a verified employment covers the period', async () => {
+    const { service, prisma } = buildService();
+
+    const readiness = await service.getReadiness(period, actor);
+
+    expect(
+      readiness.exceptionsByCategory.MISSING_VERIFIED_EMPLOYMENT,
+    ).toBeUndefined();
+    expect(
+      persistedCandidates(prisma).some(
+        (item) => item.code === 'MISSING_VERIFIED_EMPLOYMENT',
+      ),
+    ).toBe(false);
+  });
+
   it('blocks a payroll line with zero gross pay and reports the tenant as BLOCKED', async () => {
     const { service, prisma } = buildService({
       lines: [buildLine({ grossSalary: 0 })],
@@ -121,6 +167,7 @@ function buildPrismaMock(
   options: {
     lines?: Record<string, unknown>[];
     existingExceptions?: Record<string, unknown>[];
+    employments?: Record<string, unknown>[];
   } = {},
 ) {
   const tx = {
@@ -151,6 +198,18 @@ function buildPrismaMock(
     },
     salaryStructure: {
       findMany: jest.fn().mockResolvedValue([]),
+    },
+    staffEmployment: {
+      findMany: jest.fn().mockResolvedValue(
+        options.employments ?? [
+          {
+            id: 'employment-1',
+            staffId: 'staff-1',
+            effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+            effectiveTo: null,
+          },
+        ],
+      ),
     },
     payrollLine: {
       findMany: jest.fn().mockResolvedValue(options.lines ?? []),

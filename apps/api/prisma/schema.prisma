@@ -650,6 +650,7 @@ enum PayrollExceptionCode {
   FISCAL_PERIOD_LOCKED
   ACCOUNTING_POSTING_FAILED
   PAYSLIP_GENERATION_FAILED
+  MISSING_VERIFIED_EMPLOYMENT
 }
 
 enum AccountingPeriodStatus {
@@ -3608,6 +3609,7 @@ model User {
   verifiedTeacherQualifications TeacherQualificationEvidence[] @relation("VerifiedTeacherQualifications")
   verifiedTeachingLicences TeachingLicenceEvidence[] @relation("VerifiedTeachingLicences")
   submittedStaffEmployments StaffEmployment[] @relation("SubmittedStaffEmployments")
+  createdStaffResponsibilities StaffResponsibility[] @relation("CreatedStaffResponsibilities")
   submittedTeacherQualifications TeacherQualificationEvidence[] @relation("SubmittedTeacherQualifications")
   submittedTeachingLicences TeachingLicenceEvidence[] @relation("SubmittedTeachingLicences")
   evaluatedTeacherEligibility TeacherEligibilityAssessment[] @relation("EvaluatedTeacherEligibility")
@@ -7281,6 +7283,10 @@ model PayrollLine {
   staffId           String
   contractId        String?
   salaryStructureId String?
+  // Phase 7.1: the verified employment window this line was computed against.
+  employmentId      String?
+  employmentFrom    DateTime?
+  employmentTo      DateTime?
   basicSalary       Decimal              @default(0) @db.Decimal(12, 2)
   earnings          Decimal              @default(0) @db.Decimal(12, 2)
   grossSalary       Decimal              @db.Decimal(12, 2)
@@ -7305,9 +7311,11 @@ model PayrollLine {
   staff           Staff            @relation(fields: [staffId], references: [id], onDelete: Restrict)
   contract        StaffContract?   @relation(fields: [contractId], references: [id], onDelete: SetNull)
   salaryStructure SalaryStructure? @relation(fields: [salaryStructureId], references: [id], onDelete: SetNull)
+  employment      StaffEmployment? @relation(fields: [employmentId], references: [id], onDelete: Restrict)
   payslip         Payslip?
 
   @@unique([tenantId, payrollRunId, staffId])
+  @@index([employmentId])
 }
 
 model Payslip {
@@ -7851,6 +7859,7 @@ model Staff {
   payslips                   Payslip[]
   qualificationsRecords      StaffQualification[]
   employments               StaffEmployment[]
+  responsibilities          StaffResponsibility[]
   teacherProfile            TeacherProfile?
   teacherEligibilityAssessments TeacherEligibilityAssessment[]
   experienceRecords          StaffExperienceRecord[]
@@ -8862,9 +8871,44 @@ model StaffEmployment {
   policy       NepalHrPolicyVersion?   @relation("EmploymentPolicy", fields: [policyVersionId], references: [id], onDelete: Restrict)
   localLevel   NepalLocalLevel?       @relation(fields: [localLevelId], references: [id], onDelete: Restrict)
   assessments  TeacherEligibilityAssessment[]
+  responsibilities StaffResponsibility[]
+  payrollLines     PayrollLine[]
 
   @@index([tenantId, staffId, status, effectiveFrom])
   @@index([submittedById])
+}
+
+enum StaffResponsibilityKind {
+  PRIMARY
+  SECONDARY
+}
+
+// Phase 7.1: effective-dated positions inside a verified employment. At most
+// one PRIMARY per staff at any instant is enforced by the database
+// (StaffResponsibility_one_primary_per_range EXCLUDE constraint, raw SQL).
+model StaffResponsibility {
+  id           String                  @id @default(uuid())
+  tenantId     String
+  staffId      String
+  employmentId String
+  kind         StaffResponsibilityKind
+  title        String
+  department   String?
+  effectiveFrom DateTime
+  effectiveTo  DateTime?
+  createdById  String?
+  endedAt      DateTime?
+  endReason    String?                 @db.Text
+  createdAt    DateTime                @default(now())
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff      Staff           @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  employment StaffEmployment @relation(fields: [employmentId], references: [id], onDelete: Restrict)
+  createdBy  User?           @relation("CreatedStaffResponsibilities", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, staffId, effectiveFrom])
+  @@index([employmentId])
+  @@index([createdById])
 }
 
 model TeacherProfile {
@@ -9000,6 +9044,7 @@ model Tenant {
   nepalEducationPolicies        NepalEducationPolicyVersion[]
   nepalHrPolicies               NepalHrPolicyVersion[]
   staffEmployments              StaffEmployment[]
+  staffResponsibilities         StaffResponsibility[]
   teacherProfiles               TeacherProfile[]
   teacherQualificationEvidence  TeacherQualificationEvidence[]
   teachingLicenceEvidence       TeachingLicenceEvidence[]

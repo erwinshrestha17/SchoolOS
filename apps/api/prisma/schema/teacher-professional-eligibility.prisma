@@ -54,9 +54,44 @@ model StaffEmployment {
   policy       NepalHrPolicyVersion?   @relation("EmploymentPolicy", fields: [policyVersionId], references: [id], onDelete: Restrict)
   localLevel   NepalLocalLevel?       @relation(fields: [localLevelId], references: [id], onDelete: Restrict)
   assessments  TeacherEligibilityAssessment[]
+  responsibilities StaffResponsibility[]
+  payrollLines     PayrollLine[]
 
   @@index([tenantId, staffId, status, effectiveFrom])
   @@index([submittedById])
+}
+
+enum StaffResponsibilityKind {
+  PRIMARY
+  SECONDARY
+}
+
+// Phase 7.1: effective-dated positions inside a verified employment. At most
+// one PRIMARY per staff at any instant is enforced by the database
+// (StaffResponsibility_one_primary_per_range EXCLUDE constraint, raw SQL).
+model StaffResponsibility {
+  id           String                  @id @default(uuid())
+  tenantId     String
+  staffId      String
+  employmentId String
+  kind         StaffResponsibilityKind
+  title        String
+  department   String?
+  effectiveFrom DateTime
+  effectiveTo  DateTime?
+  createdById  String?
+  endedAt      DateTime?
+  endReason    String?                 @db.Text
+  createdAt    DateTime                @default(now())
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff      Staff           @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  employment StaffEmployment @relation(fields: [employmentId], references: [id], onDelete: Restrict)
+  createdBy  User?           @relation("CreatedStaffResponsibilities", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, staffId, effectiveFrom])
+  @@index([employmentId])
+  @@index([createdById])
 }
 
 model TeacherProfile {

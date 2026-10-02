@@ -14,6 +14,7 @@ import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { PayrollService } from '../src/payroll/payroll.service';
+import { PayrollReadinessService } from '../src/payroll/payroll-readiness.service';
 import { StaffService } from '../src/staff/staff.service';
 import { StaffDocumentService } from '../src/staff/staff-document.service';
 import { FileRegistryService } from '../src/file-registry/file-registry.service';
@@ -195,6 +196,26 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
           },
         });
         staffId = staff.id;
+        // Phase 7.1: payroll only includes staff with a verified employment.
+        const employment = await prisma.staffEmployment.create({
+          data: {
+            tenantId,
+            staffId,
+            employmentType: 'PERMANENT',
+            postCategoryCode: 'TEACHER',
+            schoolTypeCode: 'INSTITUTIONAL',
+            effectiveFrom: new Date('2024-01-01'),
+            submittedById: actors.approver.userId,
+          },
+        });
+        await prisma.staffEmployment.update({
+          where: { id: employment.id },
+          data: {
+            status: 'VERIFIED',
+            verifiedById: actors.reviewer.userId,
+            verifiedAt: new Date(),
+          },
+        });
         const salary = await prisma.salaryStructure.create({
           data: {
             tenantId,
@@ -237,6 +258,7 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
       'remove only isolated Phase 2 fixtures',
       async () => {
         await prisma.auditLog.deleteMany({ where: { tenantId } });
+        await prisma.payrollException.deleteMany({ where: { tenantId } });
         await prisma.payrollRun.updateMany({
           where: { tenantId },
           data: { predecessorRunId: null },
@@ -245,14 +267,10 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
         await prisma.salaryStructure.deleteMany({ where: { tenantId } });
         await prisma.staffDocument.deleteMany({ where: { tenantId } });
         await prisma.fileAsset.deleteMany({ where: { tenantId } });
-        await prisma.staff.deleteMany({ where: { tenantId } });
-        await prisma.rolePermission.deleteMany({
-          where: { role: { tenantId } },
-        });
-        await prisma.userRole.deleteMany({ where: { tenantId } });
-        await prisma.role.deleteMany({ where: { tenantId } });
-        await prisma.user.deleteMany({ where: { tenantId } });
-        await prisma.tenant.delete({ where: { id: tenantId } });
+        // Phase 7.1: verified employment history is append-only (a database
+        // guard forbids deleting it), so the synthetic staff/user/tenant rows
+        // stay in the dedicated, disposable test database like the
+        // professional-identity suite. Each run uses a unique tenant slug.
       },
     );
   });
@@ -880,6 +898,244 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
           isSupportOverride: true,
         }),
       ).rejects.toThrow(ForbiddenException);
+    },
+  );
+
+  // Phase 7.1: StaffEmployment is the authority for "employed in this period".
+  const verifiedEmployment = async (
+    forStaffId: string,
+    effectiveFrom: string,
+    effectiveTo?: string,
+  ) => {
+    const employment = await prisma.staffEmployment.create({
+      data: {
+        tenantId,
+        staffId: forStaffId,
+        employmentType: 'PERMANENT',
+        postCategoryCode: 'TEACHER',
+        schoolTypeCode: 'INSTITUTIONAL',
+        effectiveFrom: new Date(effectiveFrom),
+        effectiveTo: effectiveTo ? new Date(effectiveTo) : null,
+        submittedById: actors.approver.userId,
+      },
+    });
+    return prisma.staffEmployment.update({
+      where: { id: employment.id },
+      data: {
+        status: 'VERIFIED',
+        verifiedById: actors.reviewer.userId,
+        verifiedAt: new Date(),
+      },
+    });
+  };
+  const required = <T>(value: T | undefined): T => {
+    if (value === undefined) throw new Error('expected value to be present');
+    return value;
+  };
+  const newStaff = async (code: string) => {
+    const user = await prisma.user.create({
+      data: {
+        tenantId,
+        email: `${code.toLowerCase()}@example.test`,
+        status: 'ACTIVE',
+      },
+    });
+    return prisma.staff.create({
+      data: {
+        tenantId,
+        userId: user.id,
+        employeeId: code,
+        firstName: 'Synthetic',
+        lastName: code,
+        dateOfBirth: new Date('1990-01-01'),
+        gender: 'FEMALE',
+        address: 'Test',
+        joiningDate: new Date('2024-01-01'),
+        contractType: 'PERMANENT',
+        status: 'ACTIVE',
+        bankAccount: 'synthetic-account',
+        panNumber: 'synthetic-pan',
+      },
+    });
+  };
+  const presentDays = (forStaffId: string, month: number, days: number) =>
+    prisma.staffAttendance.createMany({
+      data: Array.from({ length: days }, (_, index) => ({
+        tenantId,
+        staffId: forStaffId,
+        attendanceDate: new Date(Date.UTC(2026, month - 1, index + 1)),
+        status: 'PRESENT' as const,
+      })),
+    });
+
+  itTenant(
+    'generates payroll only for staff with a verified employment and limits pay to the employment window',
+    async () => {
+      const joiner = await newStaff('EMP-JOIN');
+      const unverified = await newStaff('EMP-NOEMP');
+      const pendingOnly = await newStaff('EMP-PEND');
+      for (const [member, basic] of [
+        [joiner, '30000'],
+        [unverified, '28000'],
+        [pendingOnly, '26000'],
+      ] as const) {
+        await prisma.salaryStructure.create({
+          data: {
+            tenantId,
+            staffId: member.id,
+            effectiveFrom: new Date('2024-01-01'),
+            basicSalary: basic,
+            status: 'ACTIVE',
+            paymentMethod: 'BANK',
+          },
+        });
+      }
+      // Joins mid-June 2026: only 15 of the 30 calendar days are employed.
+      const joinerEmployment = await verifiedEmployment(
+        joiner.id,
+        '2026-06-16',
+      );
+      // A PENDING employment is not authority.
+      await prisma.staffEmployment.create({
+        data: {
+          tenantId,
+          staffId: pendingOnly.id,
+          employmentType: 'PERMANENT',
+          postCategoryCode: 'TEACHER',
+          schoolTypeCode: 'INSTITUTIONAL',
+          effectiveFrom: new Date('2024-01-01'),
+          submittedById: actors.approver.userId,
+        },
+      });
+      // Attendance recorded for the whole month must not extend the window.
+      await presentDays(joiner.id, 6, 30);
+      await presentDays(staffId, 6, 30);
+      await presentDays(unverified.id, 6, 30);
+      await presentDays(pendingOnly.id, 6, 30);
+
+      await service.createPayrollRun(
+        { periodMonth: 6, periodYear: 2026 },
+        actors.preparer,
+      );
+      const run = await prisma.payrollRun.findFirstOrThrow({
+        where: { tenantId, periodMonth: 6, periodYear: 2026 },
+        include: { lines: true },
+      });
+      const byStaff = new Map(run.lines.map((line) => [line.staffId, line]));
+      expect([...byStaff.keys()].sort()).toEqual([staffId, joiner.id].sort());
+      expect(byStaff.has(unverified.id)).toBe(false);
+      expect(byStaff.has(pendingOnly.id)).toBe(false);
+
+      const joinerLine = required(byStaff.get(joiner.id));
+      expect(joinerLine.employmentId).toBe(joinerEmployment.id);
+      expect(joinerLine.employmentFrom?.toISOString()).toBe(
+        '2026-06-16T00:00:00.000Z',
+      );
+      expect(joinerLine.employmentTo).toBeNull();
+      expect(joinerLine.grossSalary.toFixed(2)).toBe('15000.00');
+      const fullLine = required(byStaff.get(staffId));
+      expect(fullLine.employmentId).not.toBeNull();
+      expect(fullLine.grossSalary.toFixed(2)).toBe('45000.00');
+    },
+  );
+
+  itTenant(
+    'limits pay to the employment window for staff who leave mid-period',
+    async () => {
+      const leaver = await newStaff('EMP-LEAVE');
+      await prisma.salaryStructure.create({
+        data: {
+          tenantId,
+          staffId: leaver.id,
+          effectiveFrom: new Date('2024-01-01'),
+          basicSalary: '30000',
+          status: 'ACTIVE',
+          paymentMethod: 'BANK',
+        },
+      });
+      // Employed 1–10 July 2026 inclusive (end is exclusive: 11 July).
+      await verifiedEmployment(leaver.id, '2024-01-01', '2026-07-11');
+      await presentDays(leaver.id, 7, 30);
+      await presentDays(staffId, 7, 30);
+
+      await service.createPayrollRun(
+        { periodMonth: 7, periodYear: 2026, workingDays: 31 },
+        actors.preparer,
+      );
+      const run = await prisma.payrollRun.findFirstOrThrow({
+        where: { tenantId, periodMonth: 7, periodYear: 2026 },
+        include: { lines: true },
+      });
+      const leaverLine = required(
+        run.lines.find((line) => line.staffId === leaver.id),
+      );
+      // 10 of 31 days employed => round(31 * 10 / 31) = 10 payable days.
+      expect(leaverLine.attendanceDays).toBe(10);
+      expect(leaverLine.employmentTo?.toISOString()).toBe(
+        '2026-07-11T00:00:00.000Z',
+      );
+      expect(leaverLine.grossSalary.toFixed(2)).toBe(
+        ((30000 * 10) / 31).toFixed(2),
+      );
+    },
+  );
+
+  itTenant(
+    'readiness blocks a legacy contract or salary structure without verified employment',
+    async () => {
+      const legacy = await newStaff('EMP-LEGACY');
+      await prisma.staffContract.create({
+        data: {
+          tenantId,
+          staffId: legacy.id,
+          contractNumber: `LEG-${randomUUID()}`,
+          position: 'Teacher',
+          startDate: new Date('2024-01-01'),
+          baseSalary: '25000',
+        },
+      });
+      const readiness = new PayrollReadinessService(prisma, audit);
+      const summary = await readiness.getReadiness(
+        { year: 2026, month: 8, page: 1, limit: 25 } as never,
+        actors.preparer,
+      );
+      expect(summary.readinessStatus).toBe('BLOCKED');
+      expect(summary.exceptionsByCategory.MISSING_VERIFIED_EMPLOYMENT).toBe(1);
+      const blocked = await prisma.payrollException.findFirstOrThrow({
+        where: {
+          tenantId,
+          staffId: legacy.id,
+          code: 'MISSING_VERIFIED_EMPLOYMENT',
+        },
+      });
+      expect(blocked).toMatchObject({
+        severity: 'BLOCKING',
+        status: 'OPEN',
+      });
+      expect(blocked.blockedActions).toEqual(
+        expect.arrayContaining(['CREATE_DRAFT', 'APPROVE', 'POST']),
+      );
+      // A fixture staff member with a verified employment is not flagged.
+      expect(
+        await prisma.payrollException.count({
+          where: {
+            tenantId,
+            staffId,
+            code: 'MISSING_VERIFIED_EMPLOYMENT',
+          },
+        }),
+      ).toBe(0);
+
+      // Once an employment is verified through the maker-checker flow the
+      // exception resolves on the next evaluation.
+      await verifiedEmployment(legacy.id, '2024-01-01');
+      const after = await readiness.getReadiness(
+        { year: 2026, month: 8, page: 1, limit: 25 } as never,
+        actors.preparer,
+      );
+      expect(
+        after.exceptionsByCategory.MISSING_VERIFIED_EMPLOYMENT,
+      ).toBeUndefined();
     },
   );
 });

@@ -141,6 +141,10 @@ model PayrollLine {
   staffId           String
   contractId        String?
   salaryStructureId String?
+  // Phase 7.1: the verified employment window this line was computed against.
+  employmentId      String?
+  employmentFrom    DateTime?
+  employmentTo      DateTime?
   basicSalary       Decimal              @default(0) @db.Decimal(12, 2)
   earnings          Decimal              @default(0) @db.Decimal(12, 2)
   grossSalary       Decimal              @db.Decimal(12, 2)
@@ -165,9 +169,11 @@ model PayrollLine {
   staff           Staff            @relation(fields: [staffId], references: [id], onDelete: Restrict)
   contract        StaffContract?   @relation(fields: [contractId], references: [id], onDelete: SetNull)
   salaryStructure SalaryStructure? @relation(fields: [salaryStructureId], references: [id], onDelete: SetNull)
+  employment      StaffEmployment? @relation(fields: [employmentId], references: [id], onDelete: Restrict)
   payslip         Payslip?
 
   @@unique([tenantId, payrollRunId, staffId])
+  @@index([employmentId])
 }
 
 model Payslip {
