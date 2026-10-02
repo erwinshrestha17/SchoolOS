@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthMethod, MarkEntryStatus } from '@prisma/client';
 import { GradeCalculatorService } from '../src/academics/grade-calculator.service';
+import { MarkSheetService } from '../src/academics/mark-sheet.service';
 import { MarksService } from '../src/academics/marks.service';
 import { AuditService } from '../src/audit/audit.service';
 import { AuthContext } from '../src/auth/auth.types';
@@ -39,6 +40,18 @@ describe('Academics Hardening (Service Layer)', () => {
               assignmentId: 'assignment-1',
               componentScope: null,
             }),
+          },
+        },
+        {
+          // Sheet lifecycle collaborator (Phase 6.3): an editable DRAFT sheet.
+          provide: MarkSheetService,
+          useValue: {
+            ensureSheet: jest.fn().mockResolvedValue({
+              id: 'sheet-1',
+              status: 'DRAFT',
+              version: 1,
+            }),
+            claimForMarkWrite: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -153,8 +166,21 @@ describe('Academics Hardening (Service Layer)', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it('handles ABSENT status by storing zero marks', async () => {
+    it('stores an absent entry as ABSENT with NULL marks, never zero', async () => {
       const p = mockValidScope();
+      // bulkUpsert writes inside an interactive transaction (Phase 6.3).
+      const tx = {
+        markEntry: {
+          create: jest.fn().mockResolvedValue({ id: 'mark-1' }),
+          updateMany: jest.fn(),
+          findUniqueOrThrow: jest.fn(),
+        },
+      };
+      p.$transaction.mockImplementation((arg: unknown) =>
+        typeof arg === 'function'
+          ? (arg as (client: unknown) => unknown)(tx)
+          : Promise.all(arg as Promise<unknown>[]),
+      );
 
       await marksService.bulkUpsert(
         {
@@ -167,14 +193,16 @@ describe('Academics Hardening (Service Layer)', () => {
         actor,
       );
 
-      expect(p.markEntry.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          create: expect.objectContaining({
-            marksObtained: expect.anything(),
-            status: MarkEntryStatus.ABSENT,
-          }),
+      // Phase 6.3 invariant: absent marks are NULL (DB CHECK), never 0.
+      expect(tx.markEntry.create).toHaveBeenCalledTimes(1);
+      expect(tx.markEntry.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          tenantId: 'tenant-a',
+          studentId: 'student-1',
+          marksObtained: null,
+          status: MarkEntryStatus.ABSENT,
         }),
-      );
+      });
     });
 
     it('prevents editing locked marks', async () => {
