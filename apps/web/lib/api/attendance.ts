@@ -11,6 +11,9 @@ import type {
   StaffAttendanceRosterPage,
   StaffAttendanceMonthlySummary,
   StaffLeaveBalanceSummary,
+  StaffLeaveCoverageStatus,
+  StaffLeaveDayPart,
+  StaffLeaveImpact,
   StaffLeaveRequestSummary,
   StaffLeaveReviewResult,
   StudentAttendanceMonthlyRegister,
@@ -378,6 +381,7 @@ export const attendanceApi = {
     startsOn: string;
     endsOn: string;
     reason: string;
+    dayPart?: StaffLeaveDayPart;
   }) =>
     request<StaffSelfLeaveRequest>('/hr/me/leave-requests', {
       method: 'POST',
@@ -395,10 +399,29 @@ export const attendanceApi = {
       json: body,
     }),
   reviewLeaveRequest: (id: string, body: JsonBody) =>
-    request<unknown>(`/hr/leave-requests/${encodeURIComponent(id)}/review`, {
-      method: 'PATCH',
-      json: body,
-    }),
+    request<StaffLeaveReviewResult>(
+      `/hr/leave-requests/${encodeURIComponent(id)}/review`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
+  getLeaveRequestImpact: (id: string) =>
+    request<StaffLeaveImpact>(
+      `/hr/leave-requests/${encodeURIComponent(id)}/impact`,
+    ),
+  getLeaveCoverage: (params: { from?: string; days?: number } = {}) =>
+    request<StaffLeaveCoverageStatus>(withQuery('/hr/leave-coverage', params)),
+  withdrawLeaveRequest: (id: string) =>
+    request<StaffLeaveRequestSummary>(
+      `/hr/leave-requests/${encodeURIComponent(id)}/withdraw`,
+      { method: 'POST' },
+    ),
+  cancelLeaveRequest: (id: string) =>
+    request<StaffLeaveRequestSummary>(
+      `/hr/leave-requests/${encodeURIComponent(id)}/cancel`,
+      { method: 'POST' },
+    ),
   adjustLeaveBalance: (body: JsonBody) =>
     request<unknown>('/hr/leave-balances/adjust', {
       method: 'POST',

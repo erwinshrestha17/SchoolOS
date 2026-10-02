@@ -153,6 +153,8 @@ model StaffLeaveRequest {
   startsOn     DateTime
   endsOn       DateTime
   days         Decimal            @db.Decimal(8, 2)
+  /// Phase 7.6 (D5): FULL_DAY, or one half of a single day.
+  dayPart      LeaveDayPart       @default(FULL_DAY)
   reason       String
   status       LeaveRequestStatus @default(PENDING)
   reviewedById String?
@@ -164,6 +166,7 @@ model StaffLeaveRequest {
   tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   staff      Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
   reviewedBy User?  @relation("ReviewedStaffLeaveRequests", fields: [reviewedById], references: [id], onDelete: SetNull)
+  substitutions TimetableSubstitution[]
 
   @@index([tenantId, staffId, status])
   @@index([tenantId, startsOn, endsOn])

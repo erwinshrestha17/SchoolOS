@@ -3,7 +3,7 @@
 import { Surface } from '@/components/schoolos';
 import { useState } from 'react';
 import { formatBsDate } from '@schoolos/core';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -30,9 +30,16 @@ export function MyLeaveRequests({ staffId }: MyLeaveRequestsProps) {
   const { hasPermissions } = useSession();
   const canRequestLeave = hasPermissions(['hr:leave:request']);
 
+  const queryClient = useQueryClient();
   const requestsQuery = useQuery({
     queryKey: ['my-leave-requests'],
     queryFn: api.listMyLeaveRequests,
+  });
+  const withdrawMutation = useMutation({
+    mutationFn: (id: string) => api.withdrawLeaveRequest(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['my-leave-requests'] });
+    },
   });
 
   if (requestsQuery.isLoading) {
@@ -64,6 +71,15 @@ export function MyLeaveRequests({ staffId }: MyLeaveRequestsProps) {
         ) : null}
       </div>
 
+      {withdrawMutation.isError ? (
+        <p role="alert" className="text-sm text-rose-700">
+          {withdrawMutation.error instanceof Error &&
+          withdrawMutation.error.message
+            ? withdrawMutation.error.message
+            : 'The leave request could not be withdrawn.'}
+        </p>
+      ) : null}
+
       <Surface padding="flush">
         <Table>
           <TableHeader>
@@ -72,14 +88,15 @@ export function MyLeaveRequests({ staffId }: MyLeaveRequestsProps) {
               <TableHead>Dates</TableHead>
               <TableHead>Days</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="pr-6">Reviewer Notes</TableHead>
+              <TableHead>Reviewer Notes</TableHead>
+              <TableHead className="pr-6 text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {requests.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="text-center text-muted-foreground py-8"
                 >
                   No leave requests found.
@@ -109,8 +126,20 @@ export function MyLeaveRequests({ staffId }: MyLeaveRequestsProps) {
                       {formatValue(request.status)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="pr-6 text-sm text-muted-foreground">
+                  <TableCell className="text-sm text-muted-foreground">
                     {request.reviewNote || '—'}
+                  </TableCell>
+                  <TableCell className="pr-6 text-right">
+                    {request.status === 'PENDING' && canRequestLeave ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => withdrawMutation.mutate(request.id)}
+                        disabled={withdrawMutation.isPending}
+                      >
+                        Withdraw
+                      </Button>
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))

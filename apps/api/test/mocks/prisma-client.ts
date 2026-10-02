@@ -277,6 +277,12 @@ export const AttendanceStatus = {
   PERIOD_ABSENT: 'PERIOD_ABSENT',
 } as const;
 
+export const LeaveDayPart = {
+  FULL_DAY: 'FULL_DAY',
+  FIRST_HALF: 'FIRST_HALF',
+  SECOND_HALF: 'SECOND_HALF',
+} as const;
+
 export const LeaveRequestStatus = {
   DRAFT: 'DRAFT',
   PENDING: 'PENDING',

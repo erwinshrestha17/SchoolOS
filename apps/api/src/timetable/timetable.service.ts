@@ -21,6 +21,8 @@ import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
+import { reconcileLeaveCoverForWindow } from './leave-coverage';
+import { getNepalSchoolDay } from '@schoolos/core';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { toTimetableDayOfWeek } from './timetable-calendar';
@@ -750,7 +752,7 @@ export class TimetableService {
       await claimDraftVersion(tx, actor.tenantId, id);
       await this.ensureNoPublishedOverlap(version, actor, tx);
       await this.ensureNoCrossVersionClashes(version, actor, tx);
-      return tx.timetableVersion.update({
+      const published = await tx.timetableVersion.update({
         where: { id },
         data: {
           status: TimetableVersionStatus.PUBLISHED,
@@ -764,6 +766,16 @@ export class TimetableService {
           slots: { include: timetableSlotInclude() },
         },
       });
+      // Phase 7.6: approved leave in the new window gets cover for the new
+      // periods (and stale leave drafts are cancelled) in this transaction.
+      await reconcileLeaveCoverForWindow(
+        tx,
+        actor.tenantId,
+        { from: published.effectiveFrom, to: published.effectiveTo },
+        new Date(`${getNepalSchoolDay().gregorianDate}T00:00:00.000Z`),
+        actor.userId,
+      );
+      return published;
     });
     await this.audit('publish', 'timetable_version', id, actor, {
       status: updated.status,

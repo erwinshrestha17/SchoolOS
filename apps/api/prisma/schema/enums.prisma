@@ -199,6 +199,14 @@ enum LeaveType {
   OTHER
 }
 
+/// Phase 7.6 (D5): half-day leave maps onto the first or second half of the
+/// school day's timetable periods. Hourly leave is not modelled.
+enum LeaveDayPart {
+  FULL_DAY
+  FIRST_HALF
+  SECOND_HALF
+}
+
 enum LeaveRequestStatus {
   DRAFT
   PENDING

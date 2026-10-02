@@ -1,3 +1,4 @@
+import { StaffLeaveWorkflow } from '../hr/staff-leave-workflow';
 import {
   BadRequestException,
   ConflictException,
@@ -1014,94 +1015,32 @@ export class StaffService {
     return this.createLeaveRequest(staff.id, dto, actor);
   }
 
+  /**
+   * Phase 7.6: HR and staff routes share the one leave workflow (employment
+   * window, live re-authorized approval, atomic balance debit, attendance,
+   * lifecycle, durable timetable cover).
+   */
+  private get leaveWorkflow(): StaffLeaveWorkflow {
+    return new StaffLeaveWorkflow(this.prisma, this.auditService);
+  }
+
   async createLeaveRequest(
     staffId: string,
     dto: CreateStaffLeaveRequestDto,
     actor: AuthContext,
   ) {
-    const staff = await this.prisma.staff.findFirst({
-      where: { id: staffId, tenantId: actor.tenantId },
-      select: { id: true, userId: true, status: true },
-    });
-
-    if (!staff) {
-      throw new NotFoundException('Staff member not found in this tenant');
-    }
-
-    if (staff.userId !== actor.userId && !canManageHr(actor)) {
-      throw new ForbiddenException(
-        'You cannot create leave requests for another staff member',
-      );
-    }
-
-    if (
-      staff.status === StaffStatus.TERMINATED ||
-      staff.status === StaffStatus.RESIGNED
-    ) {
-      throw new ConflictException('Inactive staff cannot request leave');
-    }
-
-    const startsOn = startOfDay(new Date(dto.startsOn));
-    const endsOn = startOfDay(new Date(dto.endsOn));
-    assertDateRange(
-      startsOn,
-      endsOn,
-      'Leave end date cannot be before start date',
+    return this.leaveWorkflow.create(
+      {
+        staffId,
+        leaveType: dto.leaveType,
+        startsOn: dto.startsOn,
+        endsOn: dto.endsOn,
+        reason: dto.reason,
+        dayPart: dto.dayPart,
+        isPaid: dto.isPaid,
+      },
+      actor,
     );
-    const days = getInclusiveDays(startsOn, endsOn);
-    const leaveType = normalizeLeaveType(dto.leaveType);
-    const isPaid = dto.isPaid ?? leaveType !== 'UNPAID';
-
-    const overlapping = await this.prisma.staffLeaveRequest.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        staffId,
-        status: { in: ['PENDING', 'APPROVED'] },
-        startsOn: { lte: endsOn },
-        endsOn: { gte: startsOn },
-      },
-    });
-
-    if (overlapping) {
-      throw new ConflictException(
-        'A pending or approved leave request already overlaps this date range',
-      );
-    }
-
-    if (isPaid) {
-      await this.assertLeaveBalanceAvailable(
-        staffId,
-        leaveType,
-        startsOn.getUTCFullYear(),
-        days,
-        actor,
-      );
-    }
-
-    const request = await this.prisma.staffLeaveRequest.create({
-      data: {
-        tenantId: actor.tenantId,
-        staffId,
-        leaveType,
-        isPaid,
-        startsOn,
-        endsOn,
-        days: new Prisma.Decimal(days),
-        reason: dto.reason.trim(),
-        status: 'PENDING',
-      },
-    });
-
-    await this.auditService.record({
-      action: 'create',
-      resource: 'staff_leave_request',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: request.id,
-      after: { staffId, leaveType, startsOn, endsOn, days, isPaid },
-    });
-
-    return request;
   }
 
   async reviewLeaveRequest(
@@ -1109,132 +1048,7 @@ export class StaffService {
     dto: ReviewStaffLeaveRequestDto,
     actor: AuthContext,
   ) {
-    if (dto.status !== 'APPROVED' && dto.status !== 'REJECTED') {
-      throw new BadRequestException('Leave review must approve or reject');
-    }
-
-    const request = await this.prisma.staffLeaveRequest.findFirst({
-      where: { id: leaveRequestId, tenantId: actor.tenantId },
-    });
-
-    if (!request) {
-      throw new NotFoundException('Leave request not found in this tenant');
-    }
-
-    if (request.status !== 'PENDING') {
-      throw new ConflictException(
-        `Leave request in ${request.status} status cannot be reviewed`,
-      );
-    }
-
-    if (dto.status === 'APPROVED') {
-      const staff = await this.prisma.staff.findFirst({
-        where: { id: request.staffId, tenantId: actor.tenantId },
-        select: { status: true },
-      });
-
-      if (
-        !staff ||
-        staff.status === StaffStatus.TERMINATED ||
-        staff.status === StaffStatus.RESIGNED
-      ) {
-        throw new ConflictException(
-          'Cannot approve leave for a staff member who is no longer active',
-        );
-      }
-
-      const conflictingApproved = await this.prisma.staffLeaveRequest.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: request.staffId,
-          status: 'APPROVED',
-          id: { not: request.id },
-          startsOn: { lte: request.endsOn },
-          endsOn: { gte: request.startsOn },
-        },
-        take: 1,
-      });
-
-      if (conflictingApproved.length > 0) {
-        throw new ConflictException(
-          'Another approved leave request already overlaps this date range',
-        );
-      }
-
-      await this.assertLeaveApprovalDoesNotRequirePayrollAdjustment(
-        request.startsOn,
-        request.endsOn,
-        actor,
-      );
-
-      if (request.isPaid) {
-        await this.assertLeaveBalanceAvailable(
-          request.staffId,
-          normalizeLeaveType(request.leaveType),
-          request.startsOn.getUTCFullYear(),
-          Number(request.days),
-          actor,
-        );
-      }
-    }
-
-    const reviewed = await this.prisma.$transaction(async (tx) => {
-      if (dto.status === 'APPROVED' && request.isPaid) {
-        await this.incrementLeaveUsed(
-          tx,
-          request.staffId,
-          normalizeLeaveType(request.leaveType),
-          request.startsOn.getUTCFullYear(),
-          request.days,
-          actor,
-        );
-      }
-
-      return tx.staffLeaveRequest.update({
-        where: { id: request.id },
-        data: {
-          status: dto.status,
-          reviewedById: actor.userId,
-          reviewedAt: new Date(),
-          reviewNote: dto.reviewNote ?? null,
-        },
-      });
-    });
-
-    await this.auditService.record({
-      action: dto.status === 'APPROVED' ? 'approve' : 'reject',
-      resource: 'staff_leave_request',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: reviewed.id,
-      before: { status: request.status },
-      after: {
-        status: reviewed.status,
-        reviewNote: dto.reviewNote ?? null,
-      },
-    });
-
-    if (reviewed.status === 'APPROVED') {
-      await this.lifecycleService.recordEvent(
-        reviewed.staffId,
-        StaffLifecycleEventType.ON_LEAVE,
-        actor,
-        {
-          eventDate: reviewed.startsOn,
-          reason: reviewed.reason,
-          metadata: {
-            leaveRequestId: reviewed.id,
-            leaveType: reviewed.leaveType,
-            startsOn: reviewed.startsOn,
-            endsOn: reviewed.endsOn,
-            days: Number(reviewed.days),
-            isPaid: reviewed.isPaid,
-          },
-        },
-      );
-    }
-
-    return reviewed;
+    return this.leaveWorkflow.review(leaveRequestId, dto, actor);
   }
 
   async recordMyAttendance(dto: RecordStaffAttendanceDto, actor: AuthContext) {
@@ -1324,108 +1138,6 @@ export class StaffService {
     });
 
     return attendance;
-  }
-
-  private async assertLeaveBalanceAvailable(
-    staffId: string,
-    leaveType: string,
-    year: number,
-    days: number,
-    actor: AuthContext,
-  ) {
-    const balances = await this.prisma.staffLeaveBalance.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        staffId,
-        year,
-        leaveType: { in: leaveTypeAliases(leaveType) },
-      },
-    });
-
-    const available = balances.reduce((total, balance) => {
-      return total
-        .add(balance.opening)
-        .add(balance.accrued)
-        .add(balance.allocated)
-        .add(balance.carried)
-        .add(balance.adjusted)
-        .sub(balance.used);
-    }, new Prisma.Decimal(0));
-
-    if (available.lt(days)) {
-      throw new ConflictException(
-        `Insufficient ${leaveType} leave balance for requested ${days} day(s)`,
-      );
-    }
-  }
-
-  private async assertLeaveApprovalDoesNotRequirePayrollAdjustment(
-    startsOn: Date,
-    endsOn: Date,
-    actor: AuthContext,
-  ) {
-    const periodPairs = getMonthYearPairs(startsOn, endsOn);
-    const existingRuns = await this.prisma.payrollRun.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        status: {
-          in: [
-            'GENERATED',
-            'UNDER_REVIEW',
-            'REVIEWED',
-            'APPROVED',
-            'POSTED',
-            'PAID',
-          ],
-        },
-        OR: periodPairs.map(({ month, year }) => ({
-          periodMonth: month,
-          periodYear: year,
-        })),
-      },
-      select: {
-        id: true,
-        periodMonth: true,
-        periodYear: true,
-        status: true,
-      },
-      take: 1,
-    });
-
-    if (existingRuns.length > 0) {
-      const run = existingRuns[0];
-      throw new ConflictException(
-        `Leave overlaps payroll run ${run.periodMonth}/${run.periodYear} in ${run.status} status. Reverse/regenerate payroll or post an approved adjustment instead of silently changing payroll.`,
-      );
-    }
-  }
-
-  private async incrementLeaveUsed(
-    tx: Prisma.TransactionClient,
-    staffId: string,
-    leaveType: string,
-    year: number,
-    days: Prisma.Decimal,
-    actor: AuthContext,
-  ) {
-    const balance = await tx.staffLeaveBalance.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        staffId,
-        year,
-        leaveType: { in: leaveTypeAliases(leaveType) },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
-
-    if (!balance) {
-      throw new ConflictException(`Missing ${leaveType} leave balance`);
-    }
-
-    await tx.staffLeaveBalance.update({
-      where: { id: balance.id },
-      data: { used: { increment: days } },
-    });
   }
 
   private async generateEmployeeId(actor: AuthContext) {
@@ -1554,68 +1266,6 @@ function clampPage(value: number | undefined, fallback: number, max: number) {
       ? fallback
       : Math.trunc(value);
   return Math.min(Math.max(candidate, 1), max);
-}
-
-function assertDateRange(startsOn: Date, endsOn: Date, message: string) {
-  if (Number.isNaN(startsOn.getTime()) || Number.isNaN(endsOn.getTime())) {
-    throw new BadRequestException('Invalid date');
-  }
-
-  if (endsOn < startsOn) {
-    throw new BadRequestException(message);
-  }
-}
-
-function getInclusiveDays(startsOn: Date, endsOn: Date) {
-  const start = Date.UTC(
-    startsOn.getUTCFullYear(),
-    startsOn.getUTCMonth(),
-    startsOn.getUTCDate(),
-  );
-  const end = Date.UTC(
-    endsOn.getUTCFullYear(),
-    endsOn.getUTCMonth(),
-    endsOn.getUTCDate(),
-  );
-
-  return Math.round((end - start) / 86_400_000) + 1;
-}
-
-function normalizeLeaveType(leaveType: string) {
-  return leaveType.trim().toUpperCase().replace(/\s+/g, '_');
-}
-
-function titleCaseLeaveType(leaveType: string) {
-  return leaveType
-    .toLowerCase()
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
-function leaveTypeAliases(leaveType: string) {
-  const normalized = normalizeLeaveType(leaveType);
-  return Array.from(new Set([normalized, titleCaseLeaveType(normalized)]));
-}
-
-function getMonthYearPairs(startsOn: Date, endsOn: Date) {
-  const pairs: Array<{ month: number; year: number }> = [];
-  const cursor = new Date(
-    Date.UTC(startsOn.getUTCFullYear(), startsOn.getUTCMonth(), 1),
-  );
-  const last = new Date(
-    Date.UTC(endsOn.getUTCFullYear(), endsOn.getUTCMonth(), 1),
-  );
-
-  while (cursor <= last) {
-    pairs.push({
-      month: cursor.getUTCMonth() + 1,
-      year: cursor.getUTCFullYear(),
-    });
-    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
-  }
-
-  return pairs;
 }
 
 function canManageHr(actor?: AuthContext) {

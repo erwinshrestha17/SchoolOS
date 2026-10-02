@@ -1,4 +1,4 @@
-import { StaffDocumentKind } from '@prisma/client';
+import { LeaveDayPart, StaffDocumentKind } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
@@ -80,6 +80,11 @@ export class CreateStaffLeaveRequestDto {
   @IsString()
   @IsNotEmpty()
   reason!: string;
+
+  /** Phase 7.6 (D5): FULL_DAY (default) or one half of a single day. */
+  @IsOptional()
+  @IsEnum(LeaveDayPart)
+  dayPart?: LeaveDayPart;
 }
 
 export class ReviewStaffLeaveRequestDto {

@@ -1,3 +1,4 @@
+import { availableLeaveDays } from '../hr/staff-leave-policy';
 import { resolveLiveSchoolActor } from '../authorization/scopes/live-school-actor';
 import {
   BadRequestException,
@@ -2268,7 +2269,8 @@ export class ReportsService {
             'Leave Type': b.leaveType,
             Allocated: Number(b.allocated),
             Used: Number(b.used),
-            Remaining: Number(b.allocated) + Number(b.carried) - Number(b.used),
+            // Phase 7.6: the same available-days rule approval enforces.
+            Remaining: Number(availableLeaveDays(b)),
           })),
         );
       },

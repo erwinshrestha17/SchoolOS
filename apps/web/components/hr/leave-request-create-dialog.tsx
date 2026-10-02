@@ -6,6 +6,7 @@ import {
   formatBsDateForInput,
   parseBsDateInput,
   toGregorianDateFromBs,
+  type StaffLeaveDayPart,
   type StaffLookupOption,
 } from '@schoolos/core';
 import { api } from '../../lib/api';
@@ -55,6 +56,7 @@ export function LeaveRequestCreateDialog({
     formatBsDateForInput(new Date()),
   );
   const [reason, setReason] = useState('');
+  const [dayPart, setDayPart] = useState<StaffLeaveDayPart>('FULL_DAY');
 
   const requestMutation = useMutation<
     unknown,
@@ -65,21 +67,17 @@ export function LeaveRequestCreateDialog({
       startsOn: string;
       endsOn: string;
       reason: string;
+      dayPart: StaffLeaveDayPart;
     }
   >({
-    mutationFn: (payload: {
-      staffId?: string;
-      leaveType: string;
-      startsOn: string;
-      endsOn: string;
-      reason: string;
-    }) =>
+    mutationFn: (payload) =>
       selfService
         ? api.createMyLeaveRequest({
             leaveType: payload.leaveType,
             startsOn: payload.startsOn,
             endsOn: payload.endsOn,
             reason: payload.reason,
+            dayPart: payload.dayPart,
           })
         : api.createLeaveRequest(payload),
     onSuccess: () => {
@@ -100,14 +98,18 @@ export function LeaveRequestCreateDialog({
       setStartsOnBs(formatBsDateForInput(new Date()));
       setEndsOnBs(formatBsDateForInput(new Date()));
       setReason('');
+      setDayPart('FULL_DAY');
       if (!lockedStaffId) {
         setStaffId('');
         setStaffOption(null);
       }
     },
-    onError: () => {
+    onError: (error) => {
+      // The server explains why (balance, employment dates, overlap).
       setToastError(
-        'The leave request could not be submitted. Review the details and try again.',
+        error instanceof Error && error.message
+          ? error.message
+          : 'The leave request could not be submitted. Review the details and try again.',
       );
     },
   });
@@ -145,6 +147,10 @@ export function LeaveRequestCreateDialog({
       setToastError('Leave end date cannot precede the start date.');
       return;
     }
+    if (dayPart !== 'FULL_DAY' && endsOn !== startsOn) {
+      setToastError('A half-day leave must start and end on the same day.');
+      return;
+    }
     const trimmedReason = reason.trim();
     if (!trimmedReason) {
       setToastError('Please provide a reason for the leave.');
@@ -157,6 +163,7 @@ export function LeaveRequestCreateDialog({
       startsOn,
       endsOn,
       reason: trimmedReason,
+      dayPart,
     });
   };
 
@@ -235,6 +242,21 @@ export function LeaveRequestCreateDialog({
               required
             />
           </div>
+
+          <FormField label="Duration">
+            <Select
+              value={dayPart}
+              onChange={(e) => {
+                const next = e.target.value as StaffLeaveDayPart;
+                setDayPart(next);
+                if (next !== 'FULL_DAY') setEndsOnBs(startsOnBs);
+              }}
+            >
+              <option value="FULL_DAY">Full day(s)</option>
+              <option value="FIRST_HALF">First half of the day</option>
+              <option value="SECOND_HALF">Second half of the day</option>
+            </Select>
+          </FormField>
 
           <FormField label="Reason for Leave">
             <TextArea

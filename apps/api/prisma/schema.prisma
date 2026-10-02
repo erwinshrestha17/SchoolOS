@@ -215,6 +215,14 @@ enum LeaveType {
   OTHER
 }
 
+/// Phase 7.6 (D5): half-day leave maps onto the first or second half of the
+/// school day's timetable periods. Hourly leave is not modelled.
+enum LeaveDayPart {
+  FULL_DAY
+  FIRST_HALF
+  SECOND_HALF
+}
+
 enum LeaveRequestStatus {
   DRAFT
   PENDING
@@ -3460,6 +3468,8 @@ model StaffLeaveRequest {
   startsOn     DateTime
   endsOn       DateTime
   days         Decimal            @db.Decimal(8, 2)
+  /// Phase 7.6 (D5): FULL_DAY, or one half of a single day.
+  dayPart      LeaveDayPart       @default(FULL_DAY)
   reason       String
   status       LeaveRequestStatus @default(PENDING)
   reviewedById String?
@@ -3471,6 +3481,7 @@ model StaffLeaveRequest {
   tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   staff      Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
   reviewedBy User?  @relation("ReviewedStaffLeaveRequests", fields: [reviewedById], references: [id], onDelete: SetNull)
+  substitutions TimetableSubstitution[]
 
   @@index([tenantId, staffId, status])
   @@index([tenantId, startsOn, endsOn])
@@ -9567,11 +9578,15 @@ model TimetableSubstitution {
   cancelledAt         DateTime?
   cancellationReason  String?
   completedAt         DateTime?
+  /// Phase 7.6: the approved leave this cover was created for (written in the
+  /// approval transaction; cancelled with the leave).
+  leaveRequestId      String?
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @updatedAt
 
   tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   timetableSlot     TimetableSlot @relation(fields: [timetableSlotId], references: [id], onDelete: Restrict)
+  leaveRequest      StaffLeaveRequest? @relation(fields: [leaveRequestId], references: [id], onDelete: Restrict)
   absentTeacher     Staff         @relation("AbsentTeacherSubstitutions", fields: [absentTeacherId], references: [id], onDelete: Restrict)
   substituteTeacher Staff?        @relation("SubstituteTeacherSubstitutions", fields: [substituteTeacherId], references: [id], onDelete: SetNull)
   delegation        TeacherDelegation?
@@ -9581,6 +9596,7 @@ model TimetableSubstitution {
   @@index([tenantId, absentTeacherId, date])
   @@index([tenantId, substituteTeacherId, date])
   @@index([tenantId, timetableSlotId, date])
+  @@index([tenantId, leaveRequestId])
 }
 
 

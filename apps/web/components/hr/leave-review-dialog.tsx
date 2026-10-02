@@ -15,6 +15,8 @@ import { Button } from '../ui/button';
 import { FormField, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
 import { X, ShieldAlert, CheckCircle, XCircle } from 'lucide-react';
+import type { StaffLeaveReviewResult } from '@schoolos/core';
+import { LeaveImpactPanel } from './leave-impact-panel';
 
 type LeaveReviewDialogProps = {
   isOpen: boolean;
@@ -48,7 +50,9 @@ export function LeaveReviewDialog({
   const queryClient = useQueryClient();
   const [toastError, setToastError] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState('');
-  const [anomalies, setAnomalies] = useState<any[]>([]);
+  const [anomalies, setAnomalies] = useState<
+    StaffLeaveReviewResult['overlapAnomalies']
+  >([]);
 
   const reviewMutation = useMutation({
     mutationFn: (status: 'APPROVED' | 'REJECTED') => {
@@ -60,9 +64,15 @@ export function LeaveReviewDialog({
             reviewNote: trimmedReviewNote,
           });
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: unknown) => {
+      const result = data as Partial<StaffLeaveReviewResult> | undefined;
+      void queryClient.invalidateQueries({ queryKey: ['leave-coverage'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['leave-impact', leaveRequest.id],
+      });
       // Check if backend returned overlap anomalies
-      if (data && data.overlapAnomalies && data.overlapAnomalies.length > 0) {
+      if (result?.overlapAnomalies && result.overlapAnomalies.length > 0) {
+        const data = result as StaffLeaveReviewResult;
         setAnomalies(data.overlapAnomalies);
         setToastError(
           'Review succeeded but overlap anomalies were detected. Attendance conflict logs have been updated.',
@@ -115,7 +125,7 @@ export function LeaveReviewDialog({
         if (!open) handleClose();
       }}
     >
-      <DialogContent className="max-w-md rounded-2xl">
+      <DialogContent className="max-w-2xl rounded-2xl">
         <DialogHeader className="flex justify-between items-center pr-12">
           <div>
             <DialogTitle>Review Leave Request</DialogTitle>
@@ -180,11 +190,10 @@ export function LeaveReviewDialog({
                 Conflicts Detected:
               </p>
               <ul className="list-disc pl-4 space-y-1">
-                {anomalies.map((anom, idx) => (
-                  <li key={idx}>
-                    {formatBsDate(anom.attendanceDate)}: Proposed{' '}
-                    {anom.proposedStatus} overlaps with existing{' '}
-                    {anom.existingStatus}.
+                {anomalies.map((anom) => (
+                  <li key={anom.date}>
+                    {formatBsDate(anom.date)}: existing {anom.existingStatus}{' '}
+                    attendance was kept instead of LEAVE.
                   </li>
                 ))}
               </ul>
@@ -214,6 +223,10 @@ export function LeaveReviewDialog({
                 Close & Invalidate Records
               </Button>
             </div>
+          )}
+
+          {anomalies.length === 0 && (
+            <LeaveImpactPanel leaveRequestId={leaveRequest.id} />
           )}
 
           {anomalies.length === 0 && (

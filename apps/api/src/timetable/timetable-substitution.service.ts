@@ -8,7 +8,6 @@ import {
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   AudienceType,
-  AuthMethod,
   ConsentType,
   NotificationChannel,
   TimetableSubstitutionStatus,
@@ -34,14 +33,12 @@ import {
   UpdateSubstitutionDto,
 } from './dto/timetable-setup.dto';
 import { toTimetableDayOfWeek } from './timetable-calendar';
+import { LEAVE_COVER_CANCELLED_EVENT } from './leave-coverage';
 
-interface StaffLeaveApprovedEvent {
+interface LeaveCoverCancelledEvent {
   tenantId: string;
-  leaveRequestId: string;
-  staffId: string;
-  startsOn: Date | string;
-  endsOn: Date | string;
-  reviewedById: string;
+  substitutionIds: string[];
+  actor: AuthContext;
 }
 
 @Injectable()
@@ -57,100 +54,28 @@ export class TimetableSubstitutionService {
     private readonly teacherEligibility: TeacherProfessionalEligibilityService,
   ) {}
 
-  @OnEvent('staff.leave.approved', { async: true })
-  async handleStaffLeaveApproved(event: StaffLeaveApprovedEvent) {
-    const startsOn = stripTime(parseDate(String(event.startsOn), 'startsOn'));
-    const endsOn = stripTime(parseDate(String(event.endsOn), 'endsOn'));
-
-    if (endsOn < startsOn) {
-      throw new ConflictException('Leave end date cannot be before start date');
-    }
-
-    const created: Array<
-      Prisma.TimetableSubstitutionGetPayload<{
-        include: ReturnType<typeof substitutionInclude>;
-      }>
-    > = [];
-
-    for (const date of eachDateInclusive(startsOn, endsOn)) {
-      const dayOfWeek = toTimetableDayOfWeek(date);
-      const slots = await this.prisma.timetableSlot.findMany({
-        where: {
-          tenantId: event.tenantId,
-          staffId: event.staffId,
-          dayOfWeek,
-          version: {
-            status: {
-              in: [
-                TimetableVersionStatus.PUBLISHED,
-                TimetableVersionStatus.LOCKED,
-              ],
-            },
-            effectiveFrom: { lte: date },
-            OR: [{ effectiveTo: null }, { effectiveTo: { gte: date } }],
-          },
-        },
-        include: timetableSlotInclude(),
-      });
-
-      for (const slot of slots) {
-        const existing = await this.prisma.timetableSubstitution.findFirst({
-          where: {
-            tenantId: event.tenantId,
-            timetableSlotId: slot.id,
-            date,
-            status: {
-              in: [
-                TimetableSubstitutionStatus.DRAFT,
-                TimetableSubstitutionStatus.ASSIGNED,
-              ],
-            },
-          },
-        });
-
-        if (existing) {
-          continue;
-        }
-
-        const substitution = await this.prisma.timetableSubstitution.create({
-          data: {
-            tenantId: event.tenantId,
-            timetableSlotId: slot.id,
-            absentTeacherId: event.staffId,
-            substituteTeacherId: null,
-            date,
-            reason: `Approved leave request ${event.leaveRequestId}`,
-            status: TimetableSubstitutionStatus.DRAFT,
-            createdById: event.reviewedById,
-          },
-          include: substitutionInclude(),
-        });
-
-        await this.audit(
-          'create_from_leave',
-          'timetable_substitution',
-          substitution.id,
-          {
-            tenantId: event.tenantId,
-            userId: event.reviewedById,
-            tenantSlug: '',
-            email: null,
-            authMethod: AuthMethod.PASSWORD,
-            roles: [],
-            permissions: [],
-          },
-          {
-            leaveRequestId: event.leaveRequestId,
-            timetableSlotId: slot.id,
-            date,
-          },
+  /**
+   * Phase 7.6: leave cover is created and cancelled inside the leave
+   * transaction (see `leave-coverage.ts`); only the notification to the
+   * affected teachers happens after commit, best effort.
+   */
+  @OnEvent(LEAVE_COVER_CANCELLED_EVENT, { async: true })
+  async notifyLeaveCoverCancelled(event: LeaveCoverCancelledEvent) {
+    for (const substitutionId of event.substitutionIds) {
+      try {
+        await this.notifySubstitution(
+          substitutionId,
+          'substitution_cancelled',
+          event.actor,
         );
-
-        created.push(substitution);
+      } catch (error) {
+        this.logger.warn(
+          `Could not notify cancelled leave cover ${substitutionId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       }
     }
-
-    return { createdCount: created.length, items: created };
   }
 
   async listSubstitutions(actor: AuthContext, query: SubstitutionQueryDto) {
@@ -1153,19 +1078,6 @@ function stripTime(date: Date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   return d;
-}
-
-function eachDateInclusive(startsOn: Date, endsOn: Date) {
-  const dates: Date[] = [];
-  const cursor = stripTime(startsOn);
-  const end = stripTime(endsOn);
-
-  while (cursor <= end) {
-    dates.push(new Date(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  return dates;
 }
 
 function parseDate(value: string, fieldName: string) {

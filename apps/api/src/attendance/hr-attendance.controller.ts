@@ -20,6 +20,7 @@ import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { CorrectStaffAttendanceDto } from './dto/correct-staff-attendance.dto';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
 import { ListStaffAttendanceSummaryDto } from './dto/list-staff-attendance-summary.dto';
+import { LeaveCoverageQueryDto } from './dto/leave-coverage-query.dto';
 import {
   ListStaffAttendanceRosterDto,
   StaffAttendanceRosterPageResponseDto,
@@ -159,6 +160,54 @@ export class HrAttendanceController {
   @Permissions('hr:leave:read')
   getLeaveRequest(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.attendanceService.getLeaveRequest(id, auth);
+  }
+
+  @Get('leave-requests/:id/impact')
+  @Permissions('hr:leave:approve')
+  @ApiOperation({
+    summary:
+      'Academic impact of a leave request: affected periods, current cover and free teachers',
+  })
+  getLeaveRequestImpact(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.getLeaveRequestImpact(id, auth);
+  }
+
+  @Get('leave-coverage')
+  @Permissions('hr:leave:approve')
+  @ApiOperation({
+    summary: 'Cover status of approved leave, today first',
+  })
+  getLeaveCoverage(
+    @Query() query: LeaveCoverageQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.getLeaveCoverageStatus(auth, query);
+  }
+
+  @Post('leave-requests/:id/withdraw')
+  @Permissions('hr:leave:request')
+  @ApiOperation({ summary: 'Withdraw your own pending leave request' })
+  withdrawLeaveRequest(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.cancelLeaveRequest(id, auth);
+  }
+
+  @Post('leave-requests/:id/cancel')
+  @Permissions('hr:leave:approve')
+  @ApiOperation({
+    summary:
+      'Cancel a pending or approved leave request (restores balance and cancels its cover)',
+  })
+  cancelLeaveRequest(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.cancelLeaveRequest(id, auth);
   }
 
   @Post('leaves/:id/approve')

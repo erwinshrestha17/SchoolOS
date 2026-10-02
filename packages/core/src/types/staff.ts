@@ -93,6 +93,9 @@ export type StaffDetail = StaffSummary & {
   payrollLines?: PayrollLineSummary[];
 };
 
+/** Phase 7.6 (D5): a full day, or one half of a single school day. */
+export type StaffLeaveDayPart = "FULL_DAY" | "FIRST_HALF" | "SECOND_HALF";
+
 export type StaffLeaveRequestSummary = {
   id: string;
   staffId: string;
@@ -100,6 +103,8 @@ export type StaffLeaveRequestSummary = {
   startsOn: string;
   endsOn: string;
   days: number;
+  dayPart?: StaffLeaveDayPart;
+  isPaid?: boolean;
   reason: string;
   status: string;
   reviewedAt: string | null;
@@ -119,13 +124,67 @@ export type StaffLeaveBalanceSummary = {
   staff?: StaffSummary;
 };
 
-export type StaffLeaveReviewResult = {
-  reviewed: StaffLeaveRequestSummary;
+/** Response of every leave review route (the reviewed request, flattened). */
+export type StaffLeaveReviewResult = StaffLeaveRequestSummary & {
+  /** Days where existing attendance was kept instead of being marked LEAVE. */
   overlapAnomalies: Array<{
-    attendanceDate: string;
+    date: string;
     existingStatus: string;
-    proposedStatus: string;
   }>;
+  /** Timetable cover drafts created in the approval transaction. */
+  coverage: { created: number };
+};
+
+/** One timetabled period affected by staff leave. */
+export type StaffLeaveCoverItem = {
+  date: string;
+  slotId: string;
+  startsAt: string;
+  endsAt: string;
+  className: string | null;
+  sectionName: string | null;
+  subjectName: string | null;
+  coverage: "UNCOVERED" | "DRAFT" | "ASSIGNED";
+  substitutionId: string | null;
+  substituteName: string | null;
+  /**
+   * Timetabled teachers free at that time (availability only; assigning a
+   * substitute still runs the eligibility gate). Null when not computed.
+   */
+  freeTeacherCount: number | null;
+};
+
+/** Academic-impact preview shown before a leave decision. */
+export type StaffLeaveImpact = {
+  leaveRequestId: string;
+  staffId: string;
+  status: string;
+  startsOn: string;
+  endsOn: string;
+  dayPart: StaffLeaveDayPart;
+  /** True when the leave is longer than the 31-day preview window. */
+  truncated: boolean;
+  previewEndsOn: string;
+  totals: {
+    periods: number;
+    assigned: number;
+    unresolved: number;
+    withoutFreeTeacher: number;
+  };
+  days: Array<{ date: string; periods: StaffLeaveCoverItem[] }>;
+};
+
+/** Cover status of approved leave over a window, today first. */
+export type StaffLeaveCoverageStatus = {
+  from: string;
+  to: string;
+  totals: { periods: number; assigned: number; uncovered: number };
+  items: Array<
+    StaffLeaveCoverItem & {
+      leaveRequestId: string;
+      absentTeacher: { id: string; name: string; employeeId: string };
+    }
+  >;
 };
 
 export type StaffContractSummary = {

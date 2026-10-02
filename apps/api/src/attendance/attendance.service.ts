@@ -73,6 +73,7 @@ import {
 import { ListStaffAttendanceSummaryDto } from './dto/list-staff-attendance-summary.dto';
 import { ListStaffAttendanceRosterDto } from './dto/list-staff-attendance-roster.dto';
 import { ReviewStaffLeaveRequestDto } from './dto/review-staff-leave-request.dto';
+import { StaffLeaveWorkflow } from '../hr/staff-leave-workflow';
 import { SubmitStaffAttendanceDto } from './dto/submit-staff-attendance.dto';
 import {
   AttendanceExceptionDto,
@@ -3944,87 +3945,26 @@ export class AttendanceService {
     return leave;
   }
 
+  /**
+   * Phase 7.6: every staff-leave route delegates to the one workflow
+   * (transactional approval, balance lock, employment window, durable cover).
+   */
+  private leaveWorkflowInstance?: StaffLeaveWorkflow;
+
+  private get leaveWorkflow(): StaffLeaveWorkflow {
+    this.leaveWorkflowInstance ??= new StaffLeaveWorkflow(
+      this.prisma,
+      this.auditService,
+      this.eventEmitter,
+    );
+    return this.leaveWorkflowInstance;
+  }
+
   async createLeaveRequest(
     dto: CreateStaffLeaveRequestDto,
     actor: AuthContext,
   ) {
-    const staff = await this.prisma.staff.findFirst({
-      where: {
-        id: dto.staffId,
-        tenantId: actor.tenantId,
-      },
-    });
-
-    if (!staff) {
-      throw new NotFoundException('Staff not found in this tenant');
-    }
-
-    // Confirmed gap: POST /hr/leaves and /hr/leave-requests are gated by
-    // hr:leave:request (held by base teacher for their own leave requests),
-    // with no check that dto.staffId belongs to the caller -- a teacher
-    // could file a leave request attributed to any colleague.
-    if (
-      staff.userId !== actor.userId &&
-      !this.hasLeaveManagementAccess(actor)
-    ) {
-      throw new ForbiddenException(
-        'You cannot create leave requests for another staff member',
-      );
-    }
-
-    const startsOn = new Date(dto.startsOn);
-    const endsOn = new Date(dto.endsOn);
-
-    if (endsOn < startsOn) {
-      throw new ForbiddenException(
-        'Leave end date cannot be before start date',
-      );
-    }
-
-    const overlapping = await this.prisma.staffLeaveRequest.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        staffId: staff.id,
-        status: { in: ['PENDING', 'APPROVED'] },
-        startsOn: { lte: endsOn },
-        endsOn: { gte: startsOn },
-      },
-    });
-
-    if (overlapping) {
-      throw new ConflictException(
-        'A pending or approved leave request already overlaps this date range',
-      );
-    }
-
-    const leave = await this.prisma.staffLeaveRequest.create({
-      data: {
-        tenantId: actor.tenantId,
-        staffId: staff.id,
-        leaveType: dto.leaveType,
-        isPaid: dto.leaveType.toUpperCase() !== 'UNPAID',
-        startsOn,
-        endsOn,
-        days: countInclusiveDays(startsOn, endsOn),
-        reason: dto.reason,
-      },
-    });
-
-    await this.auditService.record({
-      action: 'create',
-      resource: 'staff_leave_request',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: leave.id,
-      after: {
-        staffId: staff.id,
-        leaveType: leave.leaveType,
-        startsOn: leave.startsOn,
-        endsOn: leave.endsOn,
-      },
-    });
-
-    return leave;
+    return this.leaveWorkflow.create(dto, actor);
   }
 
   async reviewLeaveRequest(
@@ -4032,305 +3972,22 @@ export class AttendanceService {
     dto: ReviewStaffLeaveRequestDto,
     actor: AuthContext,
   ) {
-    const leave = await this.prisma.staffLeaveRequest.findFirst({
-      where: {
-        id: leaveRequestId,
-        tenantId: actor.tenantId,
-      },
-    });
-
-    if (!leave) {
-      throw new NotFoundException('Leave request not found in this tenant');
-    }
-
-    if (leave.status !== 'PENDING') {
-      throw new ConflictException(
-        'Only pending leave requests can be reviewed',
-      );
-    }
-
-    if (dto.status === 'REJECTED' && !dto.reviewNote) {
-      throw new ConflictException(
-        'A review note is required when rejecting a leave request',
-      );
-    }
-
-    if (dto.status === 'APPROVED') {
-      const staff = await this.prisma.staff.findFirst({
-        where: { id: leave.staffId, tenantId: actor.tenantId },
-        select: { status: true },
-      });
-
-      if (
-        !staff ||
-        staff.status === StaffStatus.TERMINATED ||
-        staff.status === StaffStatus.RESIGNED
-      ) {
-        throw new ConflictException(
-          'Cannot approve leave for a staff member who is no longer active',
-        );
-      }
-
-      const conflictingApproved = await this.prisma.staffLeaveRequest.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: leave.staffId,
-          status: 'APPROVED',
-          id: { not: leave.id },
-          startsOn: { lte: leave.endsOn },
-          endsOn: { gte: leave.startsOn },
-        },
-        take: 1,
-      });
-
-      if (conflictingApproved.length > 0) {
-        throw new ConflictException(
-          'Another approved leave request already overlaps this date range',
-        );
-      }
-    }
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const reviewed = await tx.staffLeaveRequest.update({
-        where: { id: leave.id },
-        data: {
-          status: dto.status,
-          reviewedById: actor.userId,
-          reviewedAt: new Date(),
-          reviewNote: dto.reviewNote ?? null,
-        },
-      });
-
-      const overlapAnomalies: Array<{
-        date: string;
-        existingStatus: AttendanceStatus;
-      }> = [];
-
-      if (dto.status === 'APPROVED' && leave.isPaid) {
-        const year = reviewed.startsOn.getFullYear();
-        const existingBalance = await tx.staffLeaveBalance.findUnique({
-          where: {
-            tenantId_staffId_leaveType_year: {
-              tenantId: actor.tenantId,
-              staffId: reviewed.staffId,
-              leaveType: reviewed.leaveType,
-              year,
-            },
-          },
-        });
-        const availableDays = Number(
-          (existingBalance?.allocated ?? new Prisma.Decimal(0))
-            .add(existingBalance?.carried ?? new Prisma.Decimal(0))
-            .sub(existingBalance?.used ?? new Prisma.Decimal(0)),
-        );
-
-        if (availableDays < Number(reviewed.days)) {
-          throw new ForbiddenException(
-            'Approving this leave request would result in a negative leave balance',
-          );
-        }
-
-        await tx.staffLeaveBalance.upsert({
-          where: {
-            tenantId_staffId_leaveType_year: {
-              tenantId: actor.tenantId,
-              staffId: reviewed.staffId,
-              leaveType: reviewed.leaveType,
-              year,
-            },
-          },
-          update: {
-            used: {
-              increment: reviewed.days,
-            },
-          },
-          create: {
-            tenantId: actor.tenantId,
-            staffId: reviewed.staffId,
-            leaveType: reviewed.leaveType,
-            year,
-            allocated: new Prisma.Decimal(0),
-            used: reviewed.days,
-          },
-        });
-
-        for (const leaveDate of eachDateInclusive(
-          reviewed.startsOn,
-          reviewed.endsOn,
-        )) {
-          const attendanceDay = stripTime(leaveDate);
-          const existingAttendance = await tx.staffAttendance.findUnique({
-            where: {
-              tenantId_staffId_attendanceDate: {
-                tenantId: actor.tenantId,
-                staffId: reviewed.staffId,
-                attendanceDate: attendanceDay,
-              },
-            },
-          });
-
-          if (!existingAttendance) {
-            await tx.staffAttendance.create({
-              data: {
-                tenantId: actor.tenantId,
-                staffId: reviewed.staffId,
-                attendanceDate: attendanceDay,
-                status: AttendanceStatus.LEAVE,
-                leaveType: reviewed.leaveType,
-                note: `Approved leave request ${reviewed.id}`,
-                approvedById: actor.userId,
-              },
-            });
-            continue;
-          }
-
-          if (existingAttendance.status === AttendanceStatus.LEAVE) {
-            await tx.staffAttendance.update({
-              where: {
-                tenantId_staffId_attendanceDate: {
-                  tenantId: actor.tenantId,
-                  staffId: reviewed.staffId,
-                  attendanceDate: attendanceDay,
-                },
-              },
-              data: {
-                leaveType: reviewed.leaveType,
-                note: `Approved leave request ${reviewed.id}`,
-              },
-            });
-          } else {
-            overlapAnomalies.push({
-              date: attendanceDay.toISOString().split('T')[0],
-              existingStatus: existingAttendance.status,
-            });
-          }
-        }
-      }
-
-      return {
-        reviewed,
-        overlapAnomalies,
-      };
-    });
-
-    await this.auditService.record({
-      action: 'review',
-      resource: 'staff_leave_request',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.reviewed.id,
-      after: {
-        status: updated.reviewed.status,
-        reviewNote: updated.reviewed.reviewNote,
-        overlapAnomalies: updated.overlapAnomalies,
-      },
-    });
-
-    if (updated.reviewed.status === 'APPROVED') {
-      this.eventEmitter.emit('staff.leave.approved', {
-        tenantId: actor.tenantId,
-        leaveRequestId: updated.reviewed.id,
-        staffId: updated.reviewed.staffId,
-        startsOn: updated.reviewed.startsOn,
-        endsOn: updated.reviewed.endsOn,
-        reviewedById: actor.userId,
-      });
-    }
-
-    return {
-      ...updated.reviewed,
-      overlapAnomalies: updated.overlapAnomalies,
-    };
+    return this.leaveWorkflow.review(leaveRequestId, dto, actor);
   }
 
   async cancelLeaveRequest(leaveRequestId: string, actor: AuthContext) {
-    const leave = await this.prisma.staffLeaveRequest.findFirst({
-      where: {
-        id: leaveRequestId,
-        tenantId: actor.tenantId,
-      },
-    });
+    return this.leaveWorkflow.cancel(leaveRequestId, actor);
+  }
 
-    if (!leave) {
-      throw new NotFoundException('Leave request not found');
-    }
+  async getLeaveRequestImpact(leaveRequestId: string, actor: AuthContext) {
+    return this.leaveWorkflow.impact(leaveRequestId, actor);
+  }
 
-    if (leave.status === 'CANCELLED') {
-      return leave;
-    }
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const cancelled = await tx.staffLeaveRequest.update({
-        where: { id: leave.id },
-        data: {
-          status: 'CANCELLED',
-        },
-      });
-
-      // Restore balance if it was approved and paid
-      if (leave.status === 'APPROVED' && leave.isPaid) {
-        const year = leave.startsOn.getFullYear();
-        await tx.staffLeaveBalance.update({
-          where: {
-            tenantId_staffId_leaveType_year: {
-              tenantId: actor.tenantId,
-              staffId: leave.staffId,
-              leaveType: leave.leaveType,
-              year,
-            },
-          },
-          data: {
-            used: {
-              decrement: leave.days,
-            },
-          },
-        });
-
-        // Revert attendance records
-        for (const leaveDate of eachDateInclusive(
-          leave.startsOn,
-          leave.endsOn,
-        )) {
-          const attendanceDay = stripTime(leaveDate);
-          const existing = await tx.staffAttendance.findUnique({
-            where: {
-              tenantId_staffId_attendanceDate: {
-                tenantId: actor.tenantId,
-                staffId: leave.staffId,
-                attendanceDate: attendanceDay,
-              },
-            },
-          });
-
-          if (
-            existing?.status === AttendanceStatus.LEAVE &&
-            existing.leaveType === leave.leaveType
-          ) {
-            // Either delete or mark as ABSENT if it was generated by leave
-            // For safety, let's just delete it if it has the specific note
-            if (existing.note?.includes(leave.id)) {
-              await tx.staffAttendance.delete({
-                where: { id: existing.id },
-              });
-            }
-          }
-        }
-      }
-
-      return cancelled;
-    });
-
-    await this.auditService.record({
-      action: 'cancel',
-      resource: 'staff_leave_request',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      before: { status: leave.status },
-      after: { status: updated.status },
-    });
-
-    return updated;
+  async getLeaveCoverageStatus(
+    actor: AuthContext,
+    query: { from?: string; days?: number },
+  ) {
+    return this.leaveWorkflow.coverageStatus(actor, query);
   }
 
   async createStudentLeaveRequest(
@@ -7635,17 +7292,6 @@ function countConsecutiveAbsences(
   }
 
   return count;
-}
-
-function countInclusiveDays(startsOn: Date, endsOn: Date) {
-  const millisecondsPerDay = 24 * 60 * 60 * 1000;
-
-  return (
-    Math.floor(
-      (stripTime(endsOn).getTime() - stripTime(startsOn).getTime()) /
-        millisecondsPerDay,
-    ) + 1
-  );
 }
 
 function stripTime(date: Date) {
