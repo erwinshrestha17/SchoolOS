@@ -43,6 +43,10 @@ import {
   requireStaffFieldWrites,
   staffFieldWritePermissions,
 } from '../authorization/policies/staff.policy';
+import {
+  allocateDocumentNumber,
+  DOCUMENT_SEQUENCE_KEYS,
+} from '../common/document-sequence';
 import { hiddenStaffDocumentKinds } from '../authorization/policies/staff-restricted.policy';
 import { projectStaffDetail } from './staff-detail.projection';
 
@@ -1425,11 +1429,21 @@ export class StaffService {
   }
 
   private async generateEmployeeId(actor: AuthContext) {
-    const count = await this.prisma.staff.count({
-      where: { tenantId: actor.tenantId },
-    });
-
-    return `${normalizeSlug(actor.tenantSlug)}-EMP-${String(count + 1).padStart(4, '0')}`;
+    // Atomic sequence; skip ids already taken by hand-typed employee ids.
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      const value = await allocateDocumentNumber(
+        this.prisma,
+        actor.tenantId,
+        DOCUMENT_SEQUENCE_KEYS.employee,
+      );
+      const candidate = `${normalizeSlug(actor.tenantSlug)}-EMP-${String(value).padStart(4, '0')}`;
+      const taken = await this.prisma.staff.findFirst({
+        where: { tenantId: actor.tenantId, employeeId: candidate },
+        select: { id: true },
+      });
+      if (!taken) return candidate;
+    }
+    throw new ConflictException('Employee ID could not be allocated safely');
   }
 
   async terminateStaff(

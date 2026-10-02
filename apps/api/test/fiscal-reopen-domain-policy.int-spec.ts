@@ -15,6 +15,7 @@ import {
   authTestDatabaseUrl,
   IsolatedAuthCls,
 } from './helpers/auth-test-isolation';
+import { purgeGuardedLedgerRows } from './helpers/ledger-fixture';
 
 const describeDatabase = authTestDatabaseUrl ? describe : describe.skip;
 describeDatabase(
@@ -177,6 +178,7 @@ describeDatabase(
       await prisma.runWithoutTenantScope(
         'remove only isolated Phase 2 fiscal fixtures',
         async () => {
+          await purgeGuardedLedgerRows(tenantId);
           await prisma.auditLog.deleteMany({ where: { tenantId } });
           await prisma.approvalRequest.deleteMany({ where: { tenantId } });
           await prisma.approvalPolicy.deleteMany({ where: { tenantId } });
@@ -344,6 +346,16 @@ describeDatabase(
           if (!account) throw new Error(`Missing synthetic account ${code}`);
           return account.id;
         };
+        // The ledger refuses postings into a closed period, so seed the posted
+        // journal while the period is open, then restore its fixture state.
+        const seededPeriod = await prisma.fiscalPeriod.findFirstOrThrow({
+          where: { id: periodId },
+          select: { status: true },
+        });
+        await prisma.fiscalPeriod.update({
+          where: { id: periodId },
+          data: { status: 'OPEN' },
+        });
         await prisma.journalEntry.create({
           data: {
             tenantId,
@@ -372,6 +384,10 @@ describeDatabase(
               })),
             },
           },
+        });
+        await prisma.fiscalPeriod.update({
+          where: { id: periodId },
+          data: { status: seededPeriod.status },
         });
         const originalRecord = audit.record.bind(audit);
         jest.spyOn(audit, 'record').mockImplementation((event, tx) => {

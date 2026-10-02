@@ -8,13 +8,17 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
+  allocateDocumentNumber,
+  DOCUMENT_SEQUENCE_KEYS,
+  type DocumentSequenceClient,
+} from '../common/document-sequence';
+import {
   createHash,
   createHmac,
   randomUUID,
   timingSafeEqual,
 } from 'node:crypto';
 import {
-  AccountingPeriodStatus,
   AudienceType,
   CashDepositStatus,
   CashierCloseStatus,
@@ -8276,7 +8280,13 @@ export class FinanceService {
     );
 
     const refundDate = dto.refundDate ? new Date(dto.refundDate) : new Date();
-    await this.ensurePostingPeriodIsOpen(actor.tenantId, refundDate);
+    // Authoritative FiscalPeriod check (open, unlocked, open year); the posting
+    // transaction re-checks it under a period lock.
+    await this.accountingPostingService.ensurePostingPeriodIsOpen(
+      this.prisma,
+      actor.tenantId,
+      refundDate,
+    );
 
     const reversedDebitLines = allocateJournalLinesForRefund(
       sourceJournal.lines.filter(
@@ -12103,15 +12113,16 @@ export class FinanceService {
   private async generateInvoiceNumber(
     tenantId: string,
     fiscalYear = resolveFiscalYear(new Date()),
-    client: Pick<Prisma.TransactionClient, 'invoice'> = this.prisma,
+    client: DocumentSequenceClient = this.prisma,
   ) {
-    const count = await client.invoice.count({
-      where: { tenantId, fiscalYear },
-    });
+    const formatted = formatFiscalYearForNumber(fiscalYear);
+    const value = await allocateDocumentNumber(
+      client,
+      tenantId,
+      DOCUMENT_SEQUENCE_KEYS.invoice(formatted),
+    );
 
-    return `INV-${formatFiscalYearForNumber(fiscalYear)}-${String(
-      count + 1,
-    ).padStart(5, '0')}`;
+    return `INV-${formatted}-${String(value).padStart(5, '0')}`;
   }
 
   private async generateReceiptNumber(
@@ -12147,52 +12158,28 @@ export class FinanceService {
 
   private async generateCashierCloseNumber(
     tenantId: string,
-    client: Pick<Prisma.TransactionClient, 'cashierClose'> = this.prisma,
+    client: DocumentSequenceClient = this.prisma,
   ) {
-    const count = await client.cashierClose.count({
-      where: { tenantId },
-    });
+    const value = await allocateDocumentNumber(
+      client,
+      tenantId,
+      DOCUMENT_SEQUENCE_KEYS.cashierClose,
+    );
 
-    return `CLS-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
+    return `CLS-${new Date().getUTCFullYear()}-${String(value).padStart(5, '0')}`;
   }
 
   private async generateRefundNumber(
     tenantId: string,
-    client: Pick<Prisma.TransactionClient, 'paymentRefund'> = this.prisma,
+    client: DocumentSequenceClient = this.prisma,
   ) {
-    const count = await client.paymentRefund.count({
-      where: { tenantId },
-    });
+    const value = await allocateDocumentNumber(
+      client,
+      tenantId,
+      DOCUMENT_SEQUENCE_KEYS.refund,
+    );
 
-    return `RFD-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
-  }
-
-  private async generateJournalEntryNumber(
-    tenantId: string,
-    client: Pick<Prisma.TransactionClient, 'journalEntry'> = this.prisma,
-  ) {
-    const count = await client.journalEntry.count({
-      where: { tenantId },
-    });
-
-    return `JE-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
-  }
-
-  private async ensurePostingPeriodIsOpen(tenantId: string, entryDate: Date) {
-    const closedPeriod = await this.prisma.accountingPeriod.findFirst({
-      where: {
-        tenantId,
-        status: AccountingPeriodStatus.CLOSED,
-        startsOn: { lte: entryDate },
-        endsOn: { gte: entryDate },
-      },
-    });
-
-    if (closedPeriod) {
-      throw new ConflictException(
-        `Cannot post refund to closed accounting period "${closedPeriod.name}"`,
-      );
-    }
+    return `RFD-${new Date().getUTCFullYear()}-${String(value).padStart(5, '0')}`;
   }
 
   private async calculateInvoiceLines(

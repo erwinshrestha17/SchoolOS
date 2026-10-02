@@ -15,6 +15,7 @@ import {
   authTestDatabaseUrl,
   IsolatedAuthCls,
 } from './helpers/auth-test-isolation';
+import { purgeGuardedLedgerRows } from './helpers/ledger-fixture';
 
 const describeDatabase = authTestDatabaseUrl ? describe : describe.skip;
 describeDatabase('Phase 2 journal duties (isolated PostgreSQL)', () => {
@@ -188,6 +189,7 @@ describeDatabase('Phase 2 journal duties (isolated PostgreSQL)', () => {
     await prisma.runWithoutTenantScope(
       'remove only isolated Phase 2 journal fixtures',
       async () => {
+        await purgeGuardedLedgerRows(tenantId);
         await prisma.auditLog.deleteMany({ where: { tenantId } });
         await prisma.journalLine.deleteMany({ where: { tenantId } });
         await prisma.journalEntry.deleteMany({ where: { tenantId } });
@@ -277,9 +279,11 @@ describeDatabase('Phase 2 journal duties (isolated PostgreSQL)', () => {
     'denies changed source lines after approval without consuming a posting number',
     async () => {
       await approved();
+      // Re-point one line at another account: shape-valid, so the database
+      // accepts it, and only the approval fingerprint can catch it.
       await prisma.journalLine.updateMany({
-        where: { tenantId, journalEntryId: journalId },
-        data: { amount: '200' },
+        where: { tenantId, journalEntryId: journalId, side: 'DEBIT' },
+        data: { chartAccountId: creditAccountId },
       });
       await expect(
         service.postApprovedManualJournal(journalId, {}, actors.poster),
@@ -293,18 +297,35 @@ describeDatabase('Phase 2 journal duties (isolated PostgreSQL)', () => {
     'rejects changed debit/credit ledger columns after approval',
     async () => {
       await approved();
-      await prisma.journalLine.updateMany({
-        where: { tenantId, journalEntryId: journalId, side: 'DEBIT' },
-        data: { debit: '200' },
-      });
-      await prisma.journalLine.updateMany({
-        where: { tenantId, journalEntryId: journalId, side: 'CREDIT' },
-        data: { credit: '200' },
+      // Phase 7.3: the inconsistent edit can no longer even be stored.
+      await expect(
+        prisma.journalLine.updateMany({
+          where: { tenantId, journalEntryId: journalId, side: 'DEBIT' },
+          data: { debit: '200' },
+        }),
+      ).rejects.toThrow(/JournalLine_amount_side_check/);
+      expect((await current()).status).toBe('APPROVED');
+      // The untouched journal still posts.
+      await expect(
+        service.postApprovedManualJournal(journalId, {}, actors.poster),
+      ).resolves.toMatchObject({ status: 'POSTED' });
+    },
+  );
+  itTenant(
+    'rejects posting when a journal account was deactivated after approval',
+    async () => {
+      await approved();
+      await prisma.chartAccount.update({
+        where: { id: debitAccountId },
+        data: { isActive: false, archivedAt: new Date() },
       });
       await expect(
         service.postApprovedManualJournal(journalId, {}, actors.poster),
-      ).rejects.toThrow('amounts are inconsistent');
+      ).rejects.toThrow('no longer active');
       expect((await current()).status).toBe('APPROVED');
+      expect(
+        await prisma.journalEntrySequence.count({ where: { tenantId } }),
+      ).toBe(0);
     },
   );
   itTenant('rejects a fiscal period closed after the form opened', async () => {

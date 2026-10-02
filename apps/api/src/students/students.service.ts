@@ -4363,6 +4363,9 @@ export class StudentsService {
           where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
         });
 
+        // Payments are immutable after insert; the database permits a student
+        // reassignment only inside this transaction, for the duplicate merge.
+        await tx.$executeRaw`SELECT set_config('schoolos.allow_payment_student_reassign', 'on', true)`;
         const [
           guardianLinks,
           documents,

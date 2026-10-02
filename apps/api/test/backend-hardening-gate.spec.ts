@@ -393,6 +393,9 @@ describe('backend hardening gate', () => {
       '/app.service.ts': 1,
       '/auth/auth-account-locks.ts': 2,
       '/auth/school-authorization-transaction.ts': 1,
+      // Phase 7.3: the one atomic document-number upsert (INSERT .. ON CONFLICT
+      // DO UPDATE .. RETURNING) keyed by the tenantId argument; type + call.
+      '/common/document-sequence.ts': 2,
       '/communications/m10-hardening.service.ts': 10,
       '/communications/notice-acknowledgement.service.ts': 2,
       '/communications/notice-unread-recipients.service.ts': 2,
@@ -408,6 +411,9 @@ describe('backend hardening gate', () => {
       '/students/student-document-access.service.ts': 1,
       '/students/student-duplicate-review.service.ts': 3,
       '/students/student-search.service.ts': 1,
+      // Phase 7.3: transaction-local opt-in letting the duplicate merge
+      // reassign Payment.studentId (payments are otherwise immutable).
+      '/students/students.service.ts': 1,
       // Phase 6.1: tenant+academic-year keyed pg_advisory_xact_lock that
       // serializes timetable publication (cross-version clash check).
       '/timetable/timetable.service.ts': 1,

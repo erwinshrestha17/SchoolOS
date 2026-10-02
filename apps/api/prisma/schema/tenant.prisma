@@ -50,6 +50,7 @@ model Tenant {
   chartAccounts                 ChartAccount[]
   journalEntries                JournalEntry[]
   journalEntrySequences         JournalEntrySequence[]
+  documentSequences             DocumentSequence[]
   journalLines                  JournalLine[]
   notices                       Notice[]
   events                        Event[]

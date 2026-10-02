@@ -111,7 +111,7 @@ model JournalEntry {
 
   tenant       Tenant         @relation(fields: [tenantId], references: [id])
   fiscalYear   FiscalYear?    @relation(fields: [fiscalYearId], references: [id], onDelete: SetNull)
-  fiscalPeriod FiscalPeriod?  @relation(fields: [fiscalPeriodId], references: [id], onDelete: SetNull)
+  fiscalPeriod FiscalPeriod?  @relation(fields: [fiscalPeriodId], references: [id], onDelete: Restrict)
   createdBy    User?          @relation("CreatedJournalEntries", fields: [createdById], references: [id])
   sourceMapping AccountingSourceMapping? @relation(fields: [sourceMappingId], references: [id], onDelete: Restrict)
   reversalOf   JournalEntry?  @relation("JournalEntryReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)

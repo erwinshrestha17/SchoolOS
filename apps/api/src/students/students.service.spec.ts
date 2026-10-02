@@ -7816,6 +7816,7 @@ function buildPrisma(options: {
         .mockResolvedValue(options.transactionInvoiceFindManyResult ?? []),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
+    $executeRaw: jest.fn().mockResolvedValue(0),
     payment: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },

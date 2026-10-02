@@ -22,6 +22,10 @@ import {
   authTestDatabaseUrl,
   IsolatedAuthCls,
 } from './helpers/auth-test-isolation';
+import {
+  purgeGuardedLedgerRows,
+  withLedgerGuardsOff,
+} from './helpers/ledger-fixture';
 
 const describeDatabase = authTestDatabaseUrl ? describe : describe.skip;
 describeDatabase('Phase 2 reconciliation duties (isolated PostgreSQL)', () => {
@@ -255,6 +259,7 @@ describeDatabase('Phase 2 reconciliation duties (isolated PostgreSQL)', () => {
     await prisma.runWithoutTenantScope(
       'remove only isolated Phase 2 reconciliation fixtures',
       async () => {
+        await purgeGuardedLedgerRows(tenantId);
         await prisma.bankReconciliationHistory.deleteMany({
           where: { tenantId },
         });
@@ -457,10 +462,14 @@ describeDatabase('Phase 2 reconciliation duties (isolated PostgreSQL)', () => {
         actors.reviewer,
       );
       await service.transition(sessionId, 'SUBMIT', undefined, actors.preparer);
-      await prisma.journalEntry.update({
-        where: { id: journalId },
-        data: { narration: 'Synthetic changed ledger source' },
-      });
+      // Posted journals are immutable in the database; simulate corruption of
+      // the ledger source with the trigger guards off for this one statement.
+      await withLedgerGuardsOff((query) =>
+        query(`UPDATE "JournalEntry" SET "narration" = $2 WHERE "id" = $1`, [
+          journalId,
+          'Synthetic changed ledger source',
+        ]),
+      );
       await expect(
         service.transition(
           sessionId,

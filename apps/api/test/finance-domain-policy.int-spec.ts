@@ -21,6 +21,10 @@ import {
   authTestDatabaseUrl,
   IsolatedAuthCls,
 } from './helpers/auth-test-isolation';
+import {
+  purgeGuardedLedgerRows,
+  withLedgerGuardsOff,
+} from './helpers/ledger-fixture';
 
 const describeDatabase = authTestDatabaseUrl ? describe : describe.skip;
 describeDatabase(
@@ -324,6 +328,7 @@ describeDatabase(
       await prisma.runWithoutTenantScope(
         'remove only isolated Phase 2 journal fixtures',
         async () => {
+          await purgeGuardedLedgerRows(tenantId);
           await prisma.auditLog.deleteMany({ where: { tenantId } });
           await prisma.cashierClose.deleteMany({ where: { tenantId } });
           await prisma.financeApprovalDecision.deleteMany({
@@ -489,10 +494,13 @@ describeDatabase(
           data: { status: 'REVERSED' },
         });
         await expect(request()).rejects.toBeInstanceOf(ConflictException);
-        await prisma.payment.update({
-          where: { id: paymentId },
-          data: { status: 'SUCCESS' },
-        });
+        // A reversed payment can never be reinstated (database guard), so the
+        // fixture simulates the pre-reversal state with the guards off.
+        await withLedgerGuardsOff((query) =>
+          query(`UPDATE "Payment" SET "status" = 'SUCCESS' WHERE "id" = $1`, [
+            paymentId,
+          ]),
+        );
         await ready();
         await service.executeApprovalRequest(requestId, actors.poster);
         await expect(request('REFUND', '60.01')).rejects.toBeInstanceOf(

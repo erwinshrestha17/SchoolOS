@@ -2015,7 +2015,7 @@ model JournalEntry {
 
   tenant       Tenant         @relation(fields: [tenantId], references: [id])
   fiscalYear   FiscalYear?    @relation(fields: [fiscalYearId], references: [id], onDelete: SetNull)
-  fiscalPeriod FiscalPeriod?  @relation(fields: [fiscalPeriodId], references: [id], onDelete: SetNull)
+  fiscalPeriod FiscalPeriod?  @relation(fields: [fiscalPeriodId], references: [id], onDelete: Restrict)
   createdBy    User?          @relation("CreatedJournalEntries", fields: [createdById], references: [id])
   sourceMapping AccountingSourceMapping? @relation(fields: [sourceMappingId], references: [id], onDelete: Restrict)
   reversalOf   JournalEntry?  @relation("JournalEntryReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
@@ -5461,6 +5461,21 @@ model ReceiptSequence {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@id([tenantId, fiscalYear])
+}
+
+/// Phase 7.3 — atomic per-tenant document numbering (invoice per fiscal-year
+/// prefix, refund, cashier close, employee). Allocated with a single
+/// INSERT .. ON CONFLICT DO UPDATE .. RETURNING inside the caller's
+/// transaction; never derived from a row count.
+model DocumentSequence {
+  tenantId    String
+  sequenceKey String
+  lastValue   Int      @default(0)
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, sequenceKey])
 }
 
 model ReceiptReprintHistory {
@@ -9087,6 +9102,7 @@ model Tenant {
   chartAccounts                 ChartAccount[]
   journalEntries                JournalEntry[]
   journalEntrySequences         JournalEntrySequence[]
+  documentSequences             DocumentSequence[]
   journalLines                  JournalLine[]
   notices                       Notice[]
   events                        Event[]

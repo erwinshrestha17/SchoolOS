@@ -137,7 +137,7 @@ describe('finance production controls', () => {
 
     expect(result).toBe(existingInvoice);
     expect(prisma.studentFeeAssignment.findMany).not.toHaveBeenCalled();
-    expect(prisma.invoice.count).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
     expect(prisma.invoice.create).not.toHaveBeenCalled();
   });
 
@@ -1643,6 +1643,58 @@ describe('finance production controls', () => {
         actor,
       ),
     ).rejects.toThrow('Adjustment would make paid amount exceed invoice total');
+  });
+
+  it('rejects a refund dated in a closed FiscalPeriod before creating anything', async () => {
+    const payment = buildPayment({
+      amount: new Prisma.Decimal(500),
+      invoice: buildInvoice({
+        status: InvoiceStatus.PAID,
+        totalAmount: new Prisma.Decimal(500),
+        paidAt: new Date('2026-04-21T00:00:00.000Z'),
+        payments: [
+          buildInvoicePayment({
+            id: 'payment-1',
+            amount: new Prisma.Decimal(500),
+          }),
+        ],
+      }),
+    });
+    const { service, prisma, accountingPostingService, approveCorrection } =
+      buildService({
+        invoice: null,
+        feeHead: null,
+        payment,
+        sourceJournal: buildPaymentJournal({ amount: new Prisma.Decimal(500) }),
+        paymentRefundCount: 0,
+      });
+    (prisma.paymentAllocation.aggregate as jest.Mock).mockResolvedValue({
+      _sum: { amount: new Prisma.Decimal(300) },
+    });
+    (
+      accountingPostingService.ensurePostingPeriodIsOpen as jest.Mock
+    ).mockRejectedValue(
+      new ConflictException('Cannot post to closed fiscal period "Baisakh"'),
+    );
+    await approveCorrection('REFUND', '200.00', 'Parent requested correction');
+
+    await expect(
+      service.refundPayment(
+        payment.id,
+        {
+          amount: '200.00',
+          reason: 'Parent requested correction',
+          refundDate: '2026-04-27',
+          idempotencyKey: 'finance-request:closed-period',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(/closed fiscal period/);
+    expect(
+      accountingPostingService.ensurePostingPeriodIsOpen,
+    ).toHaveBeenCalled();
+    expect(prisma.paymentRefund.create).not.toHaveBeenCalled();
+    expect(accountingPostingService.postPaymentRefund).not.toHaveBeenCalled();
   });
 
   it('creates a partial refund with a dedicated journal entry', async () => {
@@ -3374,13 +3426,26 @@ function buildService(options: {
     runWithTenantScope: jest.fn(
       async (_tenantId: string, work: () => Promise<unknown>) => work(),
     ),
-    $queryRaw: jest
-      .fn()
-      .mockImplementation(async (query) =>
-        String(query?.strings ?? '').includes('ReceiptSequence')
-          ? [{ lastValue: (options.receiptCount ?? 0) + 1 }]
-          : [],
-      ),
+    $queryRaw: jest.fn().mockImplementation(async (query) => {
+      const text = String(query?.strings ?? '');
+      if (text.includes('ReceiptSequence'))
+        return [{ lastValue: (options.receiptCount ?? 0) + 1 }];
+      if (text.includes('DocumentSequence')) {
+        const key = String(query?.values?.[1] ?? '');
+        if (key.startsWith('INVOICE:'))
+          return [
+            {
+              lastValue:
+                (options.invoiceCount ?? options.invoices?.length ?? 0) + 1,
+            },
+          ];
+        if (key === 'REFUND')
+          return [{ lastValue: (options.paymentRefundCount ?? 0) + 1 }];
+        if (key === 'CASHIER_CLOSE')
+          return [{ lastValue: (options.cashierCloseCount ?? 0) + 1 }];
+      }
+      return [];
+    }),
     $transaction: jest.fn(async (callback) => callback(prisma)),
   };
   const auditService = {
@@ -3391,6 +3456,7 @@ function buildService(options: {
   };
   const accountingPostingService = {
     lockPostingPeriod: jest.fn(),
+    ensurePostingPeriodIsOpen: jest.fn(),
     postFeePayment: jest
       .fn()
       .mockResolvedValue(

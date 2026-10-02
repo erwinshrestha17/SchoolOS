@@ -710,6 +710,8 @@ export function createPrismaMock() {
     },
   );
 
+  prisma.$executeRaw = jest.fn(() => Promise.resolve(0));
+
   prisma.$transaction = jest.fn(
     (
       arg: ((client: Record<string, unknown>) => unknown) | Promise<unknown>[],

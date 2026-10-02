@@ -80,6 +80,7 @@ describe('StudentsService (Duplicate Merge)', () => {
             invoice: {
               updateMany: jest.fn(),
             },
+            $executeRaw: jest.fn().mockResolvedValue(0),
             payment: {
               updateMany: jest.fn(),
             },
