@@ -1138,4 +1138,147 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
       ).toBeUndefined();
     },
   );
+
+  // Phase 7.2: restricted staff document categories.
+  const makeActor = async (name: string, granted: string[]) => {
+    const grants = await Promise.all(
+      granted.map(async (key) => {
+        const split = key.lastIndexOf(':');
+        const resource = key.slice(0, split);
+        const action = key.slice(split + 1);
+        return prisma.permission.upsert({
+          where: { resource_action: { resource, action } },
+          create: { resource, action },
+          update: {},
+        });
+      }),
+    );
+    const user = await prisma.user.create({
+      data: { tenantId, email: `${name}@example.test`, status: 'ACTIVE' },
+    });
+    const role = await prisma.role.create({
+      data: {
+        tenantId,
+        name: `restricted-${name}`,
+        rolePermissions: {
+          create: grants.map((grant) => ({ permissionId: grant.id })),
+        },
+      },
+    });
+    await prisma.userRole.create({
+      data: { tenantId, userId: user.id, roleId: role.id },
+    });
+    const familyId = randomUUID();
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        familyId,
+        tokenHash: randomUUID(),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    return {
+      userId: user.id,
+      tenantId,
+      tenantSlug: `p2-payroll-${name}`,
+      sessionFamilyId: familyId,
+      email: user.email,
+      authMethod: 'PASSWORD',
+      roles: [role.name],
+      permissions: granted,
+    } as AuthContext;
+  };
+
+  itTenant(
+    'restricted staff documents need their own permission on every access path',
+    async () => {
+      const generic = ['hr:documents:read', 'hr:documents:manage'];
+      const hr = await makeActor('generic-hr', generic);
+      const medical = await makeActor('medical-hr', [
+        ...generic,
+        'hr:medical:read',
+        'hr:medical:manage',
+      ]);
+      const medicalFile = await staffFile('staff', staffId);
+      const ordinaryFile = await staffFile('staff', staffId);
+
+      // Generic document authority cannot create a restricted document.
+      await expect(
+        documents.addDocument(
+          staffId,
+          {
+            fileId: medicalFile.id,
+            name: 'Medical certificate',
+            kind: 'MEDICAL',
+          },
+          hr,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(await prisma.staffDocument.count({ where: { tenantId } })).toBe(0);
+
+      const record = await documents.addDocument(
+        staffId,
+        {
+          fileId: medicalFile.id,
+          name: 'Medical certificate',
+          kind: 'MEDICAL',
+        },
+        medical,
+      );
+      await documents.addDocument(
+        staffId,
+        { fileId: ordinaryFile.id, name: 'Offer letter', kind: 'OFFER_LETTER' },
+        hr,
+      );
+
+      // list: restricted rows are invisible, not merely redacted.
+      const genericList = await documents.listDocuments(staffId, hr);
+      expect(genericList.items.map((item) => item.kind)).toEqual([
+        'OFFER_LETTER',
+      ]);
+      expect(genericList.meta.total).toBe(1);
+      const medicalList = await documents.listDocuments(staffId, medical);
+      expect(medicalList.items.map((item) => item.kind).sort()).toEqual([
+        'MEDICAL',
+        'OFFER_LETTER',
+      ]);
+
+      // verify / archive: indistinguishable from a missing document.
+      await expect(
+        documents.verifyDocument(record.id, 'attempt', hr),
+      ).rejects.toThrow(NotFoundException);
+      await expect(documents.deleteDocument(record.id, hr)).rejects.toThrow(
+        NotFoundException,
+      );
+
+      // signed file access is re-authorized per issuance.
+      const asset = await files.getFileMetadata(tenantId, medicalFile.id);
+      await expect(files.assertFileAccessForAuth(asset, hr)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(
+        files.assertFileAccessForAuth(asset, medical),
+      ).resolves.toBeUndefined();
+      // Platform/support never inherit the category permission.
+      await expect(
+        files.assertFileAccessForAuth(asset, {
+          ...medical,
+          securityDomain: 'PLATFORM',
+        }),
+      ).rejects.toThrow();
+      await expect(
+        files.assertFileAccessForAuth(asset, {
+          ...medical,
+          isSupportOverride: true,
+        }),
+      ).rejects.toThrow();
+      expect(
+        (
+          await prisma.staffDocument.findFirstOrThrow({
+            where: { id: record.id },
+          })
+        ).status,
+      ).toBe('ACTIVE');
+    },
+  );
 });

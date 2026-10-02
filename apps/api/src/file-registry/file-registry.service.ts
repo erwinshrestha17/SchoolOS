@@ -27,6 +27,7 @@ import {
 } from '../common/security/parent-scope';
 import { assertProtectedFileAccessAllowed } from '../common/security/support-override-file-access';
 import { requireDomainPermission } from '../authorization/policies/domain-permission';
+import { canReadStaffDocumentKind } from '../authorization/policies/staff-restricted.policy';
 import { MAX_SIGNED_URL_TTL_SECONDS } from '../storage/storage.types';
 import { buildObjectKey, isTenantObjectKey } from '../storage/storage.utils';
 import { TeacherCapability } from '../teacher-scope/teacher-capability';
@@ -448,9 +449,9 @@ export class FileRegistryService {
           status: { in: ['ACTIVE', 'VERIFIED'] },
           staff: { tenantId: auth.tenantId },
         },
-        select: { id: true, staffId: true },
+        select: { id: true, staffId: true, kind: true },
       });
-      if (!document)
+      if (!document || !canReadStaffDocumentKind(auth, document.kind))
         throw new NotFoundException('Staff document is not available');
       await this.auditService.record({
         action: 'sensitive_access',
@@ -458,7 +459,11 @@ export class FileRegistryService {
         tenantId: auth.tenantId,
         userId: auth.userId,
         resourceId: document.id,
-        after: { fileId: asset.id, staffId: document.staffId },
+        after: {
+          fileId: asset.id,
+          staffId: document.staffId,
+          kind: document.kind,
+        },
       });
       return;
     }

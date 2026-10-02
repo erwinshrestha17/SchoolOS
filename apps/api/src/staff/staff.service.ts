@@ -42,8 +42,9 @@ import { hasDomainPermission } from '../authorization/policies/domain-permission
 import {
   requireStaffFieldWrites,
   staffFieldWritePermissions,
-  projectStaffFinancialRecord,
 } from '../authorization/policies/staff.policy';
+import { hiddenStaffDocumentKinds } from '../authorization/policies/staff-restricted.policy';
+import { projectStaffDetail } from './staff-detail.projection';
 
 @Injectable()
 export class StaffService {
@@ -265,7 +266,9 @@ export class StaffService {
     }
 
     await this.auditStaffProjection(staff.id, actor);
-    return mapStaffDetail(staff, actor);
+    return projectStaffDetail(staff, actor, {
+      isSelf: staff.userId === actor.userId,
+    });
   }
 
   async getStaffDetail(staffId: string, actor: AuthContext) {
@@ -334,14 +337,16 @@ export class StaffService {
     // GET /staff/:id and GET /hr-staff/:staffId both route here and were
     // gated only by the broad staff:read/hr:staff:read permissions any
     // teacher holds, with no check that staffId belongs to the caller. Salary
-    // and PAN/bank were already masked by mapStaffDetail, but home address,
+    // and PAN/bank were already masked by the detail projection, but home address,
     // date of birth, emergency contact, and leave request reasons were not.
     if (staff.userId !== actor.userId && !canManageHr(actor)) {
       throw new ForbiddenException('You can only view your own staff profile');
     }
 
     await this.auditStaffProjection(staff.id, actor);
-    return mapStaffDetail(staff, actor);
+    return projectStaffDetail(staff, actor, {
+      isSelf: staff.userId === actor.userId,
+    });
   }
 
   async updateStaff(staffId: string, dto: UpdateStaffDto, actor: AuthContext) {
@@ -482,7 +487,9 @@ export class StaffService {
       },
     );
 
-    return mapStaffDetail(staffResult, actor);
+    return projectStaffDetail(staffResult, actor, {
+      isSelf: staffResult.userId === actor.userId,
+    });
   }
 
   async transitionStaffStatus(
@@ -893,7 +900,15 @@ export class StaffService {
           take: 50,
         }),
         this.prisma.staffDocument.findMany({
-          where: { tenantId: actor.tenantId, staffId },
+          where: {
+            tenantId: actor.tenantId,
+            staffId,
+            // Restricted kinds need their own permission; generic document
+            // access must not surface them in the timeline either.
+            ...(hiddenStaffDocumentKinds(actor).length
+              ? { kind: { notIn: hiddenStaffDocumentKinds(actor) } }
+              : {}),
+          },
           orderBy: { createdAt: 'desc' },
           take: 50,
         }),
@@ -932,7 +947,13 @@ export class StaffService {
         occurredAt: leave.startsOn,
         title: `${leave.leaveType} leave`,
         reason: leave.status,
-        notes: leave.reviewNote ?? leave.reason,
+        // Free-text leave reasons can describe medical circumstances: only
+        // the owner or a holder of hr:leave:read sees them.
+        notes:
+          staff.userId === actor.userId ||
+          hasDomainPermission(actor, 'hr:leave:read')
+            ? (leave.reviewNote ?? leave.reason)
+            : null,
         metadata: {
           startsOn: leave.startsOn,
           endsOn: leave.endsOn,
@@ -1636,173 +1657,6 @@ function buildStaffUpdateData(dto: UpdateStaffDto): Prisma.StaffUpdateInput {
     qualifications: dto.qualifications,
     experience: dto.experience,
   };
-}
-
-function mapStaffDetail(
-  staff: {
-    id: string;
-    employeeId: string;
-    staffCode?: string | null;
-    firstName: string;
-    lastName: string;
-    firstNameNp?: string | null;
-    lastNameNp?: string | null;
-    userId?: string | null;
-    photoUrl?: string | null;
-    dateOfBirth: Date;
-    gender: string;
-    address: string;
-    teacherRegistryId?: string | null;
-    citizenshipNo?: string | null;
-    panNumber?: string | null;
-    bankAccount?: string | null;
-    bankName?: string | null;
-    department?: string | null;
-    designation?: string | null;
-    employmentType?: string | null;
-    status?: string;
-    contractStatus?: string | null;
-    emergencyContactName?: string | null;
-    emergencyContactPhone?: string | null;
-    emergencyContactRelation?: string | null;
-    qualifications?: string | null;
-    experience?: string | null;
-    joiningDate: Date;
-    contractType: string;
-    probationEndDate?: Date | null;
-    user?: {
-      email?: string | null;
-      userRoles?: Array<{ role: { name: string } }>;
-    };
-    staffContracts?: unknown[];
-    salaryStructures?: unknown[];
-    attendanceRecords?: unknown[];
-    leaveBalances?: unknown[];
-    leaveRequests?: unknown[];
-    payrollLines?: unknown[];
-    qualificationsRecords?: unknown[];
-    experienceRecords?: unknown[];
-    teacherAssignments?: unknown[];
-  },
-  actor?: AuthContext,
-) {
-  const canSeeSensitive = canSeeSensitiveStaffData(actor);
-
-  const mask = (val: string | null | undefined, permission: string) => {
-    if (!val) return val;
-    if (actor && hasDomainPermission(actor, permission)) return val;
-    if (val.length <= 4) return '****';
-    return val.substring(0, 2) + '****' + val.substring(val.length - 2);
-  };
-
-  return {
-    ...staff,
-    allowedSensitiveFields: Object.fromEntries(
-      [
-        ['identityRead', 'hr:identity:read'],
-        ['identityWrite', 'hr:identity:write'],
-        ['bankRead', 'hr:bank:read'],
-        ['bankWrite', 'hr:bank:write'],
-        ['taxRead', 'hr:tax:read'],
-        ['taxWrite', 'hr:tax:write'],
-        ['documentsRead', 'hr:documents:read'],
-        ['documentsManage', 'hr:documents:manage'],
-        ['salaryRead', 'payroll:salary:read'],
-        ['disciplinaryRead', 'hr:disciplinary:read'],
-      ].map(([key, permission]) => [
-        key,
-        Boolean(actor && hasDomainPermission(actor, permission)),
-      ]),
-    ),
-    // `staff.user` (spread above) is the raw Prisma User relation, which
-    // carries passwordHash/lockedUntil/failedLoginCount -- the type
-    // annotation on this function's parameter narrows it, but that's a
-    // compile-time-only guarantee; the actual object passed in by callers
-    // (getStaffDetail, getStaffProfile, updateStaff) includes the full row.
-    // Explicitly clear it so the raw relation never survives into the
-    // response; `email`/`roles` below are the only safe derived fields.
-    user: undefined,
-    citizenshipNo: mask(staff.citizenshipNo, 'hr:identity:read'),
-    panNumber: mask(staff.panNumber, 'hr:tax:read'),
-    bankAccount: mask(staff.bankAccount, 'hr:bank:read'),
-    bankName:
-      actor && hasDomainPermission(actor, 'hr:bank:read')
-        ? staff.bankName
-        : null,
-    staffContracts: (staff.staffContracts ?? []).map((item) =>
-      projectStaffFinancialRecord(item, actor, 'CONTRACT'),
-    ),
-    qualificationsRecords:
-      actor && hasDomainPermission(actor, 'hr:documents:read')
-        ? staff.qualificationsRecords
-        : [],
-    experienceRecords:
-      actor && hasDomainPermission(actor, 'hr:documents:read')
-        ? staff.experienceRecords
-        : [],
-    salaryStructures: canSeeSensitive
-      ? staff.salaryStructures?.map((item) =>
-          projectStaffFinancialRecord(item, actor, 'SALARY'),
-        )
-      : maskSalaryStructures(staff.salaryStructures),
-    payrollLines: canSeeSensitive
-      ? staff.payrollLines?.map((item) =>
-          projectStaffFinancialRecord(item, actor, 'PAYROLL'),
-        )
-      : maskPayrollLines(staff.payrollLines),
-    email: staff.user?.email ?? null,
-    roles: staff.user?.userRoles?.map(({ role }) => role.name) ?? [],
-    personal: {
-      dateOfBirth: staff.dateOfBirth,
-      gender: staff.gender,
-      address: staff.address,
-      emergencyContact: {
-        name: staff.emergencyContactName,
-        phone: staff.emergencyContactPhone,
-        relation: staff.emergencyContactRelation,
-      },
-    },
-    employment: {
-      department: staff.department,
-      designation: staff.designation,
-      employmentType: staff.employmentType ?? staff.contractType,
-      joiningDate: staff.joiningDate,
-      contractStatus: staff.contractStatus,
-      teacherRegistryId: staff.teacherRegistryId,
-    },
-  };
-}
-
-function maskSalaryStructures(items?: unknown[]) {
-  return (items ?? []).map((item) => ({
-    id:
-      item && typeof item === 'object'
-        ? (item as Record<string, unknown>).id
-        : undefined,
-    basicSalary: null,
-    allowances: null,
-    deductions: null,
-    bankAccount: null,
-    bankName: null,
-    components: [],
-    masked: true,
-  }));
-}
-
-function maskPayrollLines(items?: unknown[]) {
-  return (items ?? []).map((item) => ({
-    id:
-      item && typeof item === 'object'
-        ? (item as Record<string, unknown>).id
-        : undefined,
-    basicSalary: null,
-    earnings: null,
-    grossSalary: null,
-    allowances: null,
-    deductions: null,
-    netSalary: null,
-    masked: true,
-  }));
 }
 
 function isInactiveStaffStatus(

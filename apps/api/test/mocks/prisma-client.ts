@@ -656,6 +656,9 @@ export const StaffDocumentKind = {
   PAN_CARD: 'PAN_CARD',
   OFFER_LETTER: 'OFFER_LETTER',
   OTHER: 'OTHER',
+  MEDICAL: 'MEDICAL',
+  DISCIPLINARY: 'DISCIPLINARY',
+  SAFEGUARDING: 'SAFEGUARDING',
 } as const;
 
 export const StaffLifecycleEventType = {

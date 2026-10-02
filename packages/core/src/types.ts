@@ -6258,6 +6258,10 @@ export type StaffDetail = StaffSummary & {
     documentsManage: boolean;
     salaryRead: boolean;
     disciplinaryRead: boolean;
+    medicalRead: boolean;
+    safeguardingRead: boolean;
+    attendanceRead: boolean;
+    leaveRead: boolean;
   };
   personal?: {
     dateOfBirth: string;

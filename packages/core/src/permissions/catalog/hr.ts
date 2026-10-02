@@ -50,6 +50,26 @@ export const hrPermissions = [
     description: "Manage restricted staff disciplinary evidence",
   },
   {
+    resource: "hr:medical",
+    action: "read",
+    description: "Read restricted staff medical documents and evidence",
+  },
+  {
+    resource: "hr:medical",
+    action: "manage",
+    description: "Manage restricted staff medical documents and evidence",
+  },
+  {
+    resource: "hr:safeguarding",
+    action: "read",
+    description: "Read restricted staff safeguarding documents and evidence",
+  },
+  {
+    resource: "hr:safeguarding",
+    action: "manage",
+    description: "Manage restricted staff safeguarding documents and evidence",
+  },
+  {
     resource: "hr",
     action: "manage",
     description: "Manage HR contracts and staff employment records",

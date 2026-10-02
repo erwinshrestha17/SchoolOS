@@ -15,6 +15,13 @@ import type { AuthContext } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
 import { requireDomainPermission } from '../authorization/policies/domain-permission';
+import {
+  canManageStaffDocumentKind,
+  hiddenStaffDocumentKinds,
+  isRestrictedStaffDocumentKind,
+  requireStaffDocumentKindManage,
+  RESTRICTED_STAFF_DOCUMENT_PERMISSIONS,
+} from '../authorization/policies/staff-restricted.policy';
 import { isFinancialTransactionConflict } from '../authorization/policies/financial-transaction-conflict';
 
 interface StaffDocumentListQuery {
@@ -33,14 +40,25 @@ export class StaffDocumentService {
   private async transaction<T>(
     actor: AuthContext,
     work: (tx: Prisma.TransactionClient) => Promise<T>,
+    kind?: StaffDocumentKind,
   ): Promise<T> {
     requireDomainPermission(actor, 'hr:documents:read');
     requireDomainPermission(actor, 'hr:documents:manage');
+    // Restricted categories add their own explicit permission, re-checked
+    // inside the authorization transaction like the generic ones.
+    const restrictedManage = kind
+      ? RESTRICTED_STAFF_DOCUMENT_PERMISSIONS[kind]?.manage
+      : undefined;
+    if (kind) requireStaffDocumentKindManage(actor, kind);
     try {
       return await withSchoolAuthorizationTransaction(
         this.prisma,
         actor,
-        ['hr:documents:read', 'hr:documents:manage'],
+        [
+          'hr:documents:read',
+          'hr:documents:manage',
+          ...(restrictedManage ? [restrictedManage] : []),
+        ],
         [],
         work,
         false,
@@ -69,64 +87,69 @@ export class StaffDocumentService {
     },
     actor: AuthContext,
   ) {
-    return this.transaction(actor, async (tx) => {
-      const staff = await tx.staff.findFirst({
-        where: { id: staffId, tenantId: actor.tenantId },
-        select: { id: true },
-      });
-      if (!staff) throw new NotFoundException('Staff not found');
-      const file = await tx.fileAsset.findFirst({
-        where: {
-          id: input.fileId,
+    return this.transaction(
+      actor,
+      async (tx) => {
+        const staff = await tx.staff.findFirst({
+          where: { id: staffId, tenantId: actor.tenantId },
+          select: { id: true },
+        });
+        if (!staff) throw new NotFoundException('Staff not found');
+        const file = await tx.fileAsset.findFirst({
+          where: {
+            id: input.fileId,
+            tenantId: actor.tenantId,
+            status: FileStatus.UPLOADED,
+            softDeletedAt: null,
+            deletedAt: null,
+          },
+        });
+        if (!file) throw new NotFoundException('Uploaded staff file not found');
+        if (
+          (file.module &&
+            !['staff', 'staff-documents'].includes(file.module)) ||
+          (file.entityId && file.entityId !== staffId) ||
+          (file.ownerId && file.ownerId !== staffId) ||
+          (!file.entityId && file.uploadedByUserId !== actor.userId)
+        )
+          throw new ConflictException(
+            'This file is not available for the staff document',
+          );
+        const document = await tx.staffDocument.create({
+          data: {
+            tenantId: actor.tenantId,
+            staffId,
+            kind: input.kind,
+            fileId: input.fileId,
+            name: input.name,
+            notes: input.notes,
+            status: StudentDocumentStatus.ACTIVE,
+          },
+        });
+        await this.fileRegistry.linkToEntityInTransaction(tx, {
           tenantId: actor.tenantId,
-          status: FileStatus.UPLOADED,
-          softDeletedAt: null,
-          deletedAt: null,
-        },
-      });
-      if (!file) throw new NotFoundException('Uploaded staff file not found');
-      if (
-        (file.module && !['staff', 'staff-documents'].includes(file.module)) ||
-        (file.entityId && file.entityId !== staffId) ||
-        (file.ownerId && file.ownerId !== staffId) ||
-        (!file.entityId && file.uploadedByUserId !== actor.userId)
-      )
-        throw new ConflictException(
-          'This file is not available for the staff document',
-        );
-      const document = await tx.staffDocument.create({
-        data: {
-          tenantId: actor.tenantId,
-          staffId,
-          kind: input.kind,
-          fileId: input.fileId,
-          name: input.name,
-          notes: input.notes,
-          status: StudentDocumentStatus.ACTIVE,
-        },
-      });
-      await this.fileRegistry.linkToEntityInTransaction(tx, {
-        tenantId: actor.tenantId,
-        assetId: input.fileId,
-        module: 'staff',
-        entityId: staffId,
-        ownerType: 'staff',
-        ownerId: staffId,
-        userId: actor.userId,
-      });
-      await this.auditService.record(
-        {
-          action: 'create',
-          resource: 'staff_document',
-          tenantId: actor.tenantId,
+          assetId: input.fileId,
+          module: 'staff',
+          entityId: staffId,
+          ownerType: 'staff',
+          ownerId: staffId,
           userId: actor.userId,
-          resourceId: document.id,
-          after: { staffId, kind: document.kind, fileId: document.fileId },
-        },
-        tx,
-      );
-      return document;
-    });
+        });
+        await this.auditService.record(
+          {
+            action: 'create',
+            resource: 'staff_document',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: document.id,
+            after: { staffId, kind: document.kind, fileId: document.fileId },
+          },
+          tx,
+        );
+        return document;
+      },
+      input.kind,
+    );
   }
 
   async listDocuments(
@@ -137,7 +160,12 @@ export class StaffDocumentService {
     requireDomainPermission(actor, 'hr:documents:read');
     const page = Math.max(Number(query.page ?? 1) || 1, 1);
     const limit = Math.min(Math.max(Number(query.limit ?? 25) || 25, 1), 100);
-    const where = { staffId, tenantId: actor.tenantId };
+    const hidden = hiddenStaffDocumentKinds(actor);
+    const where = {
+      staffId,
+      tenantId: actor.tenantId,
+      ...(hidden.length ? { kind: { notIn: hidden } } : {}),
+    };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.staffDocument.findMany({
         where,
@@ -153,7 +181,18 @@ export class StaffDocumentService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: staffId,
-      after: { documentIds: items.map((item) => item.id), page, limit },
+      after: {
+        documentIds: items.map((item) => item.id),
+        page,
+        limit,
+        restrictedKinds: [
+          ...new Set(
+            items
+              .filter((item) => isRestrictedStaffDocumentKind(item.kind))
+              .map((item) => item.kind),
+          ),
+        ],
+      },
     });
     return { items, meta: { page, limit, total } };
   }
@@ -169,7 +208,8 @@ export class StaffDocumentService {
       const document = await tx.staffDocument.findFirst({
         where: { id: documentId, tenantId: actor.tenantId },
       });
-      if (!document) throw new NotFoundException('Document not found');
+      if (!document || !canManageStaffDocumentKind(actor, document.kind))
+        throw new NotFoundException('Document not found');
       if (document.status !== StudentDocumentStatus.ACTIVE)
         throw new ConflictException(
           'Only active unverified staff documents can be verified',
@@ -218,7 +258,8 @@ export class StaffDocumentService {
       const document = await tx.staffDocument.findFirst({
         where: { id: documentId, tenantId: actor.tenantId },
       });
-      if (!document) throw new NotFoundException('Document not found');
+      if (!document || !canManageStaffDocumentKind(actor, document.kind))
+        throw new NotFoundException('Document not found');
       if (
         ![
           StudentDocumentStatus.ACTIVE,

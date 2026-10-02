@@ -130,8 +130,9 @@ describe('StaffService M7 HR hardening', () => {
 
     const detail = await service.getStaffDetail('staff-1', actor);
 
-    expect(detail.bankAccount).toBe('12****90');
-    expect(detail.panNumber).toBe('PA****56');
+    // Fixed mask; only the last four digits of a bank account may show.
+    expect(detail.bankAccount).toBe('****7890');
+    expect(detail.panNumber).toBe('****');
     expect(detail.salaryStructures).toEqual([
       expect.objectContaining({
         basicSalary: null,
@@ -151,7 +152,7 @@ describe('StaffService M7 HR hardening', () => {
     ]);
   });
 
-  it('never leaks the raw User relation (passwordHash) via mapStaffDetail, even to a self-service viewer', async () => {
+  it('never leaks the raw User relation (passwordHash) via the detail projection, even to a self-service viewer', async () => {
     const { service } = buildService({
       staff: buildStaff({
         user: {
@@ -166,7 +167,7 @@ describe('StaffService M7 HR hardening', () => {
 
     const detail = await service.getStaffDetail('staff-1', actor);
 
-    expect(detail.user).toBeUndefined();
+    expect('user' in detail).toBe(false);
     expect(JSON.stringify(detail)).not.toContain('passwordHash');
     expect(JSON.stringify(detail)).not.toContain(
       'fake-hash-should-never-be-returned',

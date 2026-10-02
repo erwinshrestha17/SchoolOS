@@ -256,6 +256,25 @@ const metadataProfiles = {
     requiresMfa: true,
     requiresApproval: false,
   },
+  // Phase 7.2: medical and safeguarding evidence. Never delegable, never part
+  // of a default template, and a reason is required wherever access policy
+  // enforces it (the runtime step-up hook itself belongs to Phase 8).
+  staff_restricted_read: {
+    riskLevel: "CRITICAL",
+    allowedScopeTypes: ["TENANT", "STAFF"],
+    delegable: false,
+    requiresReason: true,
+    requiresMfa: false,
+    requiresApproval: false,
+  },
+  staff_restricted_manage: {
+    riskLevel: "CRITICAL",
+    allowedScopeTypes: ["TENANT", "STAFF"],
+    delegable: false,
+    requiresReason: true,
+    requiresMfa: false,
+    requiresApproval: false,
+  },
   student_read: {
     riskLevel: "HIGH",
     allowedScopeTypes: ["TENANT", "STUDENT", "CLASS", "SECTION"],
@@ -917,6 +936,22 @@ const legacyPermissionMetadata = {
   "hr:tax:write": ["hr:tax:write", "staff_write", "1.0.0"],
   "hr:disciplinary:read": ["hr:disciplinary:read", "staff_read", "1.0.0"],
   "hr:disciplinary:manage": ["hr:disciplinary:manage", "staff_write", "1.0.0"],
+  "hr:medical:read": ["hr:medical:read", "staff_restricted_read", "1.0.0"],
+  "hr:medical:manage": [
+    "hr:medical:manage",
+    "staff_restricted_manage",
+    "1.0.0",
+  ],
+  "hr:safeguarding:read": [
+    "hr:safeguarding:read",
+    "staff_restricted_read",
+    "1.0.0",
+  ],
+  "hr:safeguarding:manage": [
+    "hr:safeguarding:manage",
+    "staff_restricted_manage",
+    "1.0.0",
+  ],
   "hr:staff:read": ["hr:staff:read", "staff_read", "1.0.0"],
   "hr:staff:create": ["hr:staff:create", "staff_write", "1.0.0"],
   "hr:staff:update": ["hr:staff:update", "staff_write", "1.0.0"],

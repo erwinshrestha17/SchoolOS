@@ -330,6 +330,12 @@ enum StaffDocumentKind {
   PAN_CARD
   OFFER_LETTER
   OTHER
+  // Phase 7.2: restricted categories. Each needs its own explicit permission
+  // (hr:medical:*, hr:disciplinary:*, hr:safeguarding:*) on top of the generic
+  // hr:documents:* permission.
+  MEDICAL
+  DISCIPLINARY
+  SAFEGUARDING
 }
 
 enum StaffLifecycleEventType {
