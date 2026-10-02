@@ -18,12 +18,28 @@ export class FinanceProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<{ tenantId: string }, void>): Promise<void> {
+  async process(job: Job<{ tenantId?: string }, void>): Promise<void> {
     switch (job.name) {
       case 'calculateLateFees':
-        return this.handleCalculateLateFees(job.data);
+        return this.handleCalculateLateFees(job.data as { tenantId: string });
+      case 'reconcileOnlinePaymentIntents':
+        return this.handleReconcileOnlinePaymentIntents();
       default:
         this.logger.warn(`Unknown job name: ${job.name}`);
+    }
+  }
+
+  /**
+   * Cross-tenant sweep: each intent is verified and settled under its own
+   * tenant scope inside FinanceService, so this job carries no tenant.
+   */
+  private async handleReconcileOnlinePaymentIntents() {
+    const summary =
+      await this.financeService.reconcileStaleOnlinePaymentIntents();
+    if (summary.examined > 0) {
+      this.logger.log(
+        `Online payment reconciliation: ${JSON.stringify(summary)}`,
+      );
     }
   }
 

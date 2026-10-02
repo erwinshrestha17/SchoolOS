@@ -504,6 +504,29 @@ async function main() {
         status: 'SUCCESS',
       };
       const signature = signWebhookPayload(webhookPayload);
+      // A callback is only a hint: before the gateway confirms payment, the
+      // server must not settle anything.
+      const earlyResult = await request(
+        '/payments/online/webhook/nepal_gateway',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'nepal_gateway-signature': signature,
+          },
+          body: JSON.stringify(webhookPayload),
+        },
+      );
+      const early = getData(earlyResult.body);
+      record(
+        'Online callback before provider confirmation does not settle',
+        earlyResult.status === 200 && early?.postedToLedger === false,
+        `HTTP ${earlyResult.status}, status=${early?.status}`,
+      );
+      await fetch(
+        `${mockGatewayBase}/test/pay/${encodeURIComponent(intent.providerReference)}`,
+        { method: 'POST' },
+      );
       const webhookResult = await request(
         '/payments/online/webhook/nepal_gateway',
         {

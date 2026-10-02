@@ -46,6 +46,7 @@ import {
   UpdatePlatformPlanDto,
   UpdatePlatformWebhookEndpointDto,
   UpsertProviderConfigDto,
+  UpsertTenantPaymentMerchantDto,
   UsageIncrementDto,
   OnboardingOverrideDto,
 } from './dto/platform-core.dto';
@@ -2354,6 +2355,111 @@ export class PlatformService {
     return this.toProviderSummary(provider);
   }
 
+  async listTenantPaymentMerchants(tenantId: string) {
+    await this.ensureTenant(tenantId);
+    const rows = await this.prisma.runWithoutTenantScope(
+      'platform: list a school payment merchant accounts',
+      () =>
+        this.prisma.tenantPaymentMerchant.findMany({
+          where: { tenantId },
+          orderBy: [{ provider: 'asc' }, { environment: 'asc' }],
+        }),
+    );
+    return rows.map(toTenantPaymentMerchantSummary);
+  }
+
+  /**
+   * A school collects online into its own merchant account at a
+   * platform-managed gateway. Without a row the school cannot start or verify
+   * online payments (fail closed). The merchant identifier is not a secret but
+   * is unique per gateway and environment, so one merchant never serves two
+   * schools.
+   */
+  async upsertTenantPaymentMerchant(
+    tenantId: string,
+    dto: UpsertTenantPaymentMerchantDto,
+    actorUserId: string,
+  ) {
+    await this.ensureTenant(tenantId);
+    const provider = dto.provider.trim().toUpperCase();
+    const merchantId = dto.merchantId.trim();
+    if (!provider || !merchantId) {
+      throw new BadRequestException('Provider and merchant id are required.');
+    }
+    const gateway = await this.prisma.providerConfig.findFirst({
+      where: {
+        type: 'PAYMENT_GATEWAY',
+        name: provider,
+        environment: dto.environment,
+      },
+      select: { id: true },
+    });
+    if (!gateway) {
+      throw new ConflictException(
+        `Payment gateway ${provider} (${dto.environment}) is not configured on the platform.`,
+      );
+    }
+    try {
+      const { before, row } = await this.prisma.runWithoutTenantScope(
+        'platform: configure a school payment merchant account',
+        async () => {
+          const existing = await this.prisma.tenantPaymentMerchant.findUnique({
+            where: {
+              tenantId_provider_environment: {
+                tenantId,
+                provider,
+                environment: dto.environment,
+              },
+            },
+          });
+          const saved = await this.prisma.tenantPaymentMerchant.upsert({
+            where: {
+              tenantId_provider_environment: {
+                tenantId,
+                provider,
+                environment: dto.environment,
+              },
+            },
+            update: {
+              merchantId,
+              enabled: dto.enabled,
+              updatedBy: actorUserId,
+            },
+            create: {
+              tenantId,
+              provider,
+              environment: dto.environment,
+              merchantId,
+              enabled: dto.enabled,
+              updatedBy: actorUserId,
+            },
+          });
+          return { before: existing, row: saved };
+        },
+      );
+      await this.platformAudit(
+        actorUserId,
+        'tenant_payment_merchant_updated',
+        'tenant_payment_merchant',
+        row.id,
+        before ? toTenantPaymentMerchantSummary(before) : null,
+        toTenantPaymentMerchantSummary(row),
+        tenantId,
+      );
+      return toTenantPaymentMerchantSummary(row);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'This merchant account is already assigned to another school.',
+        );
+      }
+      throw error;
+    }
+  }
+
   async updateProviderStatus(
     providerId: string,
     enabled: boolean,
@@ -3835,4 +3941,24 @@ function platformScalarString(value: unknown): string {
     return value.toString();
   }
   throw new TypeError('Platform data expected a scalar value');
+}
+
+function toTenantPaymentMerchantSummary(row: {
+  id: string;
+  tenantId: string;
+  provider: string;
+  environment: string;
+  merchantId: string;
+  enabled: boolean;
+  updatedAt: Date;
+}) {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    provider: row.provider,
+    environment: row.environment,
+    merchantId: row.merchantId,
+    enabled: row.enabled,
+    updatedAt: row.updatedAt,
+  };
 }

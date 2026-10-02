@@ -122,6 +122,26 @@ async function main() {
     },
   });
 
+  // Each school collects into its own merchant account (Phase 7.4); without
+  // this row online payments stay unavailable for the tenant.
+  await prisma.tenantPaymentMerchant.upsert({
+    where: {
+      tenantId_provider_environment: {
+        tenantId: tenant.id,
+        provider: PROVIDER_NAME,
+        environment: ProviderEnvironment.TEST,
+      },
+    },
+    update: { merchantId: 'm3-local-merchant', enabled: true },
+    create: {
+      tenantId: tenant.id,
+      provider: PROVIDER_NAME,
+      environment: ProviderEnvironment.TEST,
+      merchantId: 'm3-local-merchant',
+      enabled: true,
+    },
+  });
+
   await prisma.$transaction(async (tx) => {
     const priorIntents = await tx.onlinePaymentIntent.findMany({
       where: { tenantId: tenant.id, invoiceId: ONLINE_INVOICE_ID },

@@ -184,9 +184,12 @@ describe('FinanceService - Hardening', () => {
           .mockResolvedValue({ id: 't1', slug: 't1' }),
       },
       providerConfig: { findFirst: jest.fn() },
+      tenantPaymentMerchant: { findFirst: jest.fn().mockResolvedValue(null) },
       onlinePaymentIntent: {
         findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       financeApprovalRequest: {
         findFirst: jest.fn(
@@ -840,389 +843,353 @@ describe('FinanceService - Hardening', () => {
     });
   });
 
-  describe('handleOnlinePaymentWebhook', () => {
+  describe('handleOnlinePaymentWebhook (callback is a hint)', () => {
+    const intentRow = (overrides: Record<string, unknown> = {}) => ({
+      id: 'intent-1',
+      tenantId: actor.tenantId,
+      requestedByUserId: actor.userId,
+      invoiceId: 'invoice-1',
+      studentId: 'student-1',
+      provider: 'ESEWA',
+      providerReference: 'PR-1',
+      amount: new Prisma.Decimal(1500),
+      currency: 'NPR',
+      status: 'READY',
+      paymentId: null,
+      failureCode: null,
+      createdAt: new Date(),
+      expiresAt: null,
+      ...overrides,
+    });
+    const providerRow = {
+      id: 'prov-1',
+      name: 'ESEWA',
+      environment: 'TEST',
+      secretKeys: [],
+      configEncrypted: {
+        adapter: 'generic_json_v1',
+        webhookSecret: 'secret',
+        settlementStatusUrl: 'http://127.0.0.1:9/settlements/status',
+      },
+    };
+    const providerAnswer = (
+      body: Record<string, unknown> | null,
+      status = 200,
+    ) =>
+      (global.fetch as jest.Mock).mockResolvedValue({
+        status,
+        ok: status >= 200 && status < 300,
+        json: async () => body,
+      });
+    const verified = (overrides: Record<string, unknown> = {}) => ({
+      status: 'SUCCESS',
+      amount: '1500.00',
+      currency: 'NPR',
+      reference: 'intent-1',
+      providerReference: 'PR-1',
+      merchantId: 'merchant-t1',
+      ...overrides,
+    });
+    const callback = (payload: Record<string, unknown>) =>
+      service.handleOnlinePaymentWebhook('esewa', payload, {
+        signature: 'valid-signature',
+      });
+    const originalFetch = global.fetch;
+
     beforeEach(() => {
+      global.fetch = jest.fn();
       (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
         isActive: true,
       });
-    });
-
-    it('returns existing payment if webhook is a duplicate (idempotency)', async () => {
-      const mockPayment = {
-        id: 'p-webhook-1',
-        amount: new Prisma.Decimal(1500),
-        status: PaymentStatus.SUCCESS,
-        idempotencyKey: 'webhook:esewa:ref-123',
-      };
-
-      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
-        id: 'prov-1',
-        name: 'ESEWA',
-        configEncrypted: { webhookSecret: 'secret' },
+      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue(
+        providerRow,
+      );
+      (prisma.tenantPaymentMerchant.findFirst as jest.Mock).mockResolvedValue({
+        merchantId: 'merchant-t1',
+      });
+      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue(
+        intentRow(),
+      );
+      (prisma.onlinePaymentIntent.updateMany as jest.Mock).mockResolvedValue({
+        count: 1,
       });
       jest
         .spyOn(
           service as unknown as {
-            verifyWebhookSignature: (
-              payload: Record<string, unknown>,
-              signature: string,
-              signingSecret: string | null,
-            ) => boolean;
+            verifyWebhookSignature: () => boolean;
           },
           'verifyWebhookSignature',
         )
         .mockReturnValue(true);
-      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
-        id: 'intent-1',
-        tenantId: actor.tenantId,
-        requestedByUserId: actor.userId,
-        invoiceId: 'invoice-1',
-        provider: 'ESEWA',
-        amount: new Prisma.Decimal(1500),
-        status: 'PENDING',
-      });
-      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
+    });
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
 
-      const result = await service.handleOnlinePaymentWebhook(
-        'esewa',
-        {
-          reference: 'REF-123',
-          amount: 1500,
-          status: 'SUCCESS',
-        },
-        {
-          signature: 'valid-signature',
-          'x-tenant-id': actor.tenantId,
-        },
+    it('replays an already settled intent without calling the provider', async () => {
+      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue(
+        intentRow({ status: 'SUCCEEDED', paymentId: 'p-1' }),
       );
+
+      const result = await callback({
+        reference: 'intent-1',
+        status: 'SUCCESS',
+      });
 
       expect(result).toEqual({
+        status: 'verified',
+        postedToLedger: true,
         duplicate: true,
         message: 'Payment already processed and posted.',
-        paymentId: 'p-webhook-1',
-        postedToLedger: true,
-        status: 'verified',
+        paymentId: 'p-1',
       });
-      expect(prisma.payment.update).not.toHaveBeenCalled();
-      expect(prisma.runWithoutTenantScope).toHaveBeenCalledWith(
-        'payment webhook: resolve a signed provider callback before tenant context exists',
-        expect.any(Function),
-      );
+      expect(global.fetch).not.toHaveBeenCalled();
       expect(prisma.runWithTenantScope).toHaveBeenCalledWith(
         actor.tenantId,
         expect.any(Function),
       );
     });
 
-    it('ignores online payment webhook if invoice is already paid', async () => {
-      const mockInvoice = {
-        id: 'i-webhook-1',
-        status: InvoiceStatus.PAID,
-        totalAmount: new Prisma.Decimal(1000),
-        vatAmount: new Prisma.Decimal(130),
-        payments: [
-          {
-            amount: new Prisma.Decimal(1000),
-            refunds: [],
-          },
-        ],
-      };
-
-      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
-        id: 'prov-2',
-        name: 'KHALTI',
-        configEncrypted: { webhookSecret: 'secret' },
-      });
-      jest
-        .spyOn(
-          service as unknown as {
-            verifyWebhookSignature: (
-              payload: Record<string, unknown>,
-              signature: string,
-              signingSecret: string | null,
-            ) => boolean;
-          },
-          'verifyWebhookSignature',
-        )
-        .mockReturnValue(true);
-      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
-        id: 'intent-2',
-        tenantId: actor.tenantId,
-        invoiceId: 'i-webhook-1',
-        provider: 'KHALTI',
-        amount: new Prisma.Decimal(1000),
-        status: 'PENDING',
-      });
-      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(null);
-      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue(mockInvoice);
-
-      const result = await service.handleOnlinePaymentWebhook(
-        'khalti',
-        {
-          reference: 'REF-456',
-          amount: '1000.00',
-          status: 'SUCCESS',
-          invoiceId: 'i-webhook-1',
-        },
-        {
-          signature: 'valid-signature',
-          'x-tenant-id': actor.tenantId,
-        },
+    it('ignores a delayed failed callback after the payment succeeded', async () => {
+      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue(
+        intentRow({ status: 'SUCCEEDED', paymentId: 'p-1' }),
       );
 
-      expect(result).toEqual({
-        status: 'verified',
-        postedToLedger: false,
-        message:
-          'Invoice is already fully paid. Webhook event ignored to prevent duplicate payment.',
+      const result = await callback({
+        reference: 'intent-1',
+        status: 'FAILED',
       });
+
+      expect(result).toEqual(
+        expect.objectContaining({ status: 'ignored', duplicate: true }),
+      );
+      expect(prisma.onlinePaymentIntent.updateMany).not.toHaveBeenCalled();
     });
 
-    it('acknowledges failed or pending webhook events without posting payment', async () => {
-      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
-        id: 'prov-3',
-        name: 'ESEWA',
-        configEncrypted: { webhookSecret: 'secret' },
-      });
-      jest
-        .spyOn(
-          service as unknown as {
-            verifyWebhookSignature: (
-              payload: Record<string, unknown>,
-              signature: string,
-              signingSecret: string | null,
-            ) => boolean;
-          },
-          'verifyWebhookSignature',
-        )
-        .mockReturnValue(true);
-      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
-        id: 'intent-3',
-        tenantId: actor.tenantId,
-        invoiceId: 'invoice-3',
-        provider: 'ESEWA',
-        amount: new Prisma.Decimal(1500),
-        status: 'PENDING',
+    it('settles only from the provider answer and ignores the callback amount', async () => {
+      providerAnswer(verified());
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'p-existing',
       });
 
-      const result = await service.handleOnlinePaymentWebhook(
-        'esewa',
-        {
-          reference: 'REF-FAILED',
-          amount: 1500,
-          status: 'FAILED',
-        },
-        {
-          signature: 'valid-signature',
-          'x-tenant-id': actor.tenantId,
-        },
+      // The callback claims a different (tiny) amount; it must be ignored.
+      const result = await callback({
+        reference: 'intent-1',
+        status: 'SUCCESS',
+        amount: 1,
+      });
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const url = String((global.fetch as jest.Mock).mock.calls[0][0]);
+      expect(url).toContain('reference=intent-1');
+      expect(url).toContain('merchantId=merchant-t1');
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: 'verified',
+          paymentId: 'p-existing',
+        }),
       );
+    });
 
-      expect(result).toEqual({
-        status: 'ignored',
-        postedToLedger: false,
-        message:
-          'Webhook event failed was acknowledged without creating a payment.',
+    it('does not settle when the provider reports a different amount and records an exception', async () => {
+      providerAnswer(verified({ amount: '1400.00' }));
+
+      const result = await callback({
+        reference: 'intent-1',
+        status: 'SUCCESS',
+        amount: 1500,
       });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: 'exception',
+          postedToLedger: false,
+          code: 'EXCEPTION_AMOUNT_MISMATCH',
+        }),
+      );
       expect(prisma.payment.findFirst).not.toHaveBeenCalled();
-      expect(prisma.invoice.findFirst).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.onlinePaymentIntent.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            failureCode: 'EXCEPTION_AMOUNT_MISMATCH',
+            status: 'PENDING',
+          }),
+        }),
+      );
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'settlement_exception',
+          after: expect.objectContaining({
+            providerAmount: '1400.00',
+            expectedAmount: '1500.00',
+          }),
+        }),
+      );
     });
 
-    it('rejects successful webhook events without a payment reference', async () => {
-      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
-        id: 'prov-4',
-        name: 'ESEWA',
-        configEncrypted: { webhookSecret: 'secret' },
-      });
-      jest
-        .spyOn(
-          service as unknown as {
-            verifyWebhookSignature: (
-              payload: Record<string, unknown>,
-              signature: string,
-              signingSecret: string | null,
-            ) => boolean;
-          },
-          'verifyWebhookSignature',
-        )
-        .mockReturnValue(true);
-      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
-        id: 'intent-5',
-        tenantId: actor.tenantId,
-        invoiceId: 'invoice-5',
-        provider: 'KHALTI',
-        amount: new Prisma.Decimal(1500),
-        status: 'PENDING',
+    it.each([
+      [
+        'merchant',
+        { merchantId: 'someone-else' },
+        'EXCEPTION_MERCHANT_MISMATCH',
+      ],
+      [
+        'reference',
+        { reference: 'other-intent', providerReference: null },
+        'EXCEPTION_REFERENCE_MISMATCH',
+      ],
+      ['currency', { currency: 'USD' }, 'EXCEPTION_CURRENCY_MISMATCH'],
+      ['missing amount', { amount: null }, 'EXCEPTION_AMOUNT_MISSING'],
+    ])('refuses to settle on a %s mismatch', async (_label, override, code) => {
+      providerAnswer(verified(override));
+
+      const result = await callback({
+        reference: 'intent-1',
+        status: 'SUCCESS',
       });
 
+      expect(result).toEqual(
+        expect.objectContaining({ status: 'exception', code }),
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('keeps the intent pending verification when the provider cannot be reached', async () => {
+      (global.fetch as jest.Mock).mockRejectedValue(new Error('ECONNRESET'));
+
+      const result = await callback({
+        reference: 'intent-1',
+        status: 'SUCCESS',
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: 'pending_verification',
+          postedToLedger: false,
+        }),
+      );
+      expect(prisma.onlinePaymentIntent.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'PENDING' }),
+        }),
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('does not settle when the school has no merchant account on file', async () => {
+      (prisma.tenantPaymentMerchant.findFirst as jest.Mock).mockResolvedValue(
+        null,
+      );
+
+      const result = await callback({
+        reference: 'intent-1',
+        status: 'SUCCESS',
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({ status: 'pending_verification' }),
+      );
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('marks the intent failed only after the provider confirms failure', async () => {
+      providerAnswer(verified({ status: 'FAILED' }));
+
+      const result = await callback({
+        reference: 'intent-1',
+        status: 'FAILED',
+      });
+
+      expect(result).toEqual(expect.objectContaining({ status: 'ignored' }));
+      expect(prisma.onlinePaymentIntent.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'FAILED',
+            failureCode: 'PROVIDER_FAILED',
+          }),
+        }),
+      );
+    });
+
+    it('ignores a forged failed callback while the provider says it is pending', async () => {
+      providerAnswer(verified({ status: 'PENDING' }));
+
+      const result = await callback({
+        reference: 'intent-1',
+        status: 'FAILED',
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({ status: 'pending_verification' }),
+      );
+      expect(prisma.onlinePaymentIntent.updateMany).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'FAILED' }),
+        }),
+      );
+    });
+
+    it('rejects a callback without a payment reference', async () => {
       await expect(
-        service.handleOnlinePaymentWebhook(
-          'esewa',
-          {
-            amount: 1500,
-            status: 'SUCCESS',
-          },
-          {
-            signature: 'valid-signature',
-            'x-tenant-id': actor.tenantId,
-          },
-        ),
+        callback({ amount: 1500, status: 'SUCCESS' }),
       ).rejects.toThrow(BadRequestException);
-      expect(prisma.payment.findFirst).not.toHaveBeenCalled();
-      expect(prisma.invoice.findFirst).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
-    it('rejects successful webhook events with zero amount', async () => {
-      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
-        id: 'prov-5',
-        name: 'KHALTI',
-        configEncrypted: { webhookSecret: 'secret' },
-      });
-      jest
-        .spyOn(
-          service as unknown as {
-            verifyWebhookSignature: (
-              payload: Record<string, unknown>,
-              signature: string,
-              signingSecret: string | null,
-            ) => boolean;
-          },
-          'verifyWebhookSignature',
-        )
-        .mockReturnValue(true);
-      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
-        id: 'intent-zero',
-        tenantId: actor.tenantId,
-        invoiceId: 'invoice-zero',
-        provider: 'KHALTI',
-        amount: new Prisma.Decimal(1500),
-        status: 'PENDING',
-      });
-
-      await expect(
-        service.handleOnlinePaymentWebhook(
-          'khalti',
-          {
-            reference: 'REF-ZERO',
-            amount: 0,
-            status: 'SUCCESS',
-          },
-          {
-            signature: 'valid-signature',
-            'x-tenant-id': actor.tenantId,
-          },
-        ),
-      ).rejects.toThrow('Webhook amount must be greater than zero.');
-      expect(prisma.payment.findFirst).not.toHaveBeenCalled();
-      expect(prisma.invoice.findFirst).not.toHaveBeenCalled();
-    });
-
-    it('ignores new webhook settlement for suspended tenants without posting payment', async () => {
-      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
-        id: 'prov-suspended',
-        name: 'ESEWA',
-        configEncrypted: { webhookSecret: 'secret' },
-      });
-      jest
-        .spyOn(
-          service as unknown as {
-            verifyWebhookSignature: (
-              payload: Record<string, unknown>,
-              signature: string,
-              signingSecret: string | null,
-            ) => boolean;
-          },
-          'verifyWebhookSignature',
-        )
-        .mockReturnValue(true);
-      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
-        id: 'intent-suspended',
-        tenantId: actor.tenantId,
-        invoiceId: 'invoice-suspended',
-        provider: 'ESEWA',
-        amount: new Prisma.Decimal(1500),
-        status: 'PENDING',
-      });
+    it('does not post a settlement for a suspended school', async () => {
+      providerAnswer(verified());
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
         isActive: false,
       });
 
-      const result = await service.handleOnlinePaymentWebhook(
-        'esewa',
-        {
-          reference: 'REF-SUSPENDED',
-          amount: 1500,
-          status: 'SUCCESS',
-        },
-        {
-          signature: 'valid-signature',
-          'x-tenant-id': actor.tenantId,
-        },
-      );
-
-      expect(result).toEqual({
-        status: 'ignored',
-        postedToLedger: false,
-        message:
-          'Payment settlement was not posted because the school account is suspended.',
+      const result = await callback({
+        reference: 'intent-1',
+        status: 'SUCCESS',
       });
-      expect(auditService.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'webhook_ignored',
-          resourceId: 'intent-suspended',
-          after: expect.objectContaining({ reason: 'tenant_suspended' }),
-        }),
+
+      expect(result).toEqual(
+        expect.objectContaining({ status: 'ignored', postedToLedger: false }),
       );
-      expect(prisma.invoice.findFirst).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
-    it('ignores a delayed failed callback after payment success', async () => {
-      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
-        id: 'prov-delayed',
-        name: 'ESEWA',
-        configEncrypted: { webhookSecret: 'secret' },
-      });
-      jest
-        .spyOn(
-          service as unknown as {
-            verifyWebhookSignature: (
-              payload: Record<string, unknown>,
-              signature: string,
-              signingSecret: string | null,
-            ) => boolean;
-          },
-          'verifyWebhookSignature',
-        )
-        .mockReturnValue(true);
-      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
-        id: 'intent-succeeded',
-        tenantId: actor.tenantId,
-        invoiceId: 'invoice-1',
-        provider: 'ESEWA',
-        amount: new Prisma.Decimal(1500),
-        status: 'SUCCEEDED',
+    it('parks verified money the invoice can no longer take instead of dropping it', async () => {
+      providerAnswer(verified());
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue({
+        id: 'invoice-1',
+        totalAmount: new Prisma.Decimal(1000),
+        payments: [{ amount: new Prisma.Decimal(1000), refunds: [] }],
       });
 
-      const result = await service.handleOnlinePaymentWebhook(
-        'esewa',
-        {
-          intentId: 'intent-succeeded',
-          amount: 1500,
-          status: 'FAILED',
-        },
-        { signature: 'valid-signature' },
-      );
+      const result = await callback({
+        reference: 'intent-1',
+        status: 'SUCCESS',
+      });
 
       expect(result).toEqual(
         expect.objectContaining({
-          status: 'ignored',
-          postedToLedger: true,
-          duplicate: true,
+          status: 'exception',
+          code: 'EXCEPTION_INVOICE_ALREADY_PAID',
         }),
       );
-      expect(prisma.onlinePaymentIntent.update).not.toHaveBeenCalled();
-      expect(prisma.payment.findFirst).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects a callback whose signature does not verify', async () => {
+      jest
+        .spyOn(
+          service as unknown as { verifyWebhookSignature: () => boolean },
+          'verifyWebhookSignature',
+        )
+        .mockReturnValue(false);
+
+      await expect(
+        callback({ reference: 'intent-1', status: 'SUCCESS' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(global.fetch).not.toHaveBeenCalled();
     });
   });
 
@@ -1374,71 +1341,6 @@ describe('FinanceService - Hardening', () => {
   });
 
   describe('payment concurrency correctness', () => {
-    it('deduplicates concurrent identical webhooks to one payment id', async () => {
-      const mockPayment = {
-        id: 'p-webhook-concurrent',
-        amount: new Prisma.Decimal(1500),
-        status: PaymentStatus.SUCCESS,
-        idempotencyKey: 'payment-intent:intent-concurrent',
-      };
-
-      (prisma.providerConfig.findFirst as jest.Mock).mockResolvedValue({
-        id: 'prov-1',
-        name: 'ESEWA',
-        configEncrypted: { webhookSecret: 'secret' },
-      });
-      jest
-        .spyOn(
-          service as unknown as {
-            verifyWebhookSignature: (
-              payload: Record<string, unknown>,
-              signature: string,
-              signingSecret: string | null,
-            ) => boolean;
-          },
-          'verifyWebhookSignature',
-        )
-        .mockReturnValue(true);
-      (prisma.onlinePaymentIntent.findFirst as jest.Mock).mockResolvedValue({
-        id: 'intent-concurrent',
-        tenantId: actor.tenantId,
-        invoiceId: 'invoice-1',
-        provider: 'ESEWA',
-        amount: new Prisma.Decimal(1500),
-        status: 'SUCCEEDED',
-      });
-      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
-
-      const payload = {
-        reference: 'REF-CONCURRENT',
-        amount: 1500,
-        status: 'SUCCESS',
-      };
-      const headers = {
-        signature: 'valid-signature',
-        'x-tenant-id': actor.tenantId,
-      };
-
-      const [first, second] = await Promise.all([
-        service.handleOnlinePaymentWebhook('esewa', payload, headers),
-        service.handleOnlinePaymentWebhook('esewa', payload, headers),
-      ]);
-
-      expect(first).toEqual(
-        expect.objectContaining({
-          duplicate: true,
-          paymentId: 'p-webhook-concurrent',
-        }),
-      );
-      expect(second).toEqual(
-        expect.objectContaining({
-          duplicate: true,
-          paymentId: 'p-webhook-concurrent',
-        }),
-      );
-      expect(prisma.payment.update).not.toHaveBeenCalled();
-    });
-
     it('replays concurrent collectPayment calls with the same idempotency key', async () => {
       const existingPayment = {
         id: 'payment-existing',

@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
   Query,
   Post,
+  Put,
   Delete,
 } from '@nestjs/common';
 import { PlatformService } from './platform.service';
@@ -54,6 +55,7 @@ import {
   UpdatePlatformWebhookEndpointDto,
   UpdateProviderStatusDto,
   UpsertProviderConfigDto,
+  UpsertTenantPaymentMerchantDto,
   UsageIncrementDto,
 } from './dto/platform-core.dto';
 
@@ -368,6 +370,26 @@ export class PlatformController {
     @Req() req: AuthenticatedRequest,
   ) {
     return this.platformService.upsertProvider(body, this.requireUser(req));
+  }
+
+  @Get('tenants/:tenantId/payment-merchants')
+  @Permissions('platform:providers:read')
+  async listTenantPaymentMerchants(@Param('tenantId') tenantId: string) {
+    return this.platformService.listTenantPaymentMerchants(tenantId);
+  }
+
+  @Put('tenants/:tenantId/payment-merchants')
+  @Permissions('platform:providers:manage')
+  async upsertTenantPaymentMerchant(
+    @Param('tenantId') tenantId: string,
+    @Body() body: UpsertTenantPaymentMerchantDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.upsertTenantPaymentMerchant(
+      tenantId,
+      body,
+      this.requireUser(req),
+    );
   }
 
   @Post('providers/:id/test')

@@ -358,6 +358,20 @@ export class MobileController {
     return this.mobileService.initiateStudentPayment(studentId, dto, auth);
   }
 
+  @Post('students/:id/payment-intents/:intentId/verify')
+  @RequiredModule('fees')
+  verifyStudentPaymentIntent(
+    @Param('id') studentId: string,
+    @Param('intentId') intentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.verifyStudentPaymentIntent(
+      studentId,
+      intentId,
+      auth,
+    );
+  }
+
   @Post('students/:id/sandbox-payments/fees')
   @RequiredModule('fees')
   collectStudentSandboxFeePayment(

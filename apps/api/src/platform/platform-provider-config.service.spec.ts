@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { BadRequestException } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 
@@ -26,6 +27,13 @@ describe('PlatformService provider config hardening', () => {
       update: jest.Mock;
     };
     auditLog: { findMany: jest.Mock };
+    tenant: { findUnique: jest.Mock };
+    tenantPaymentMerchant: {
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      upsert: jest.Mock;
+    };
+    runWithoutTenantScope: jest.Mock;
   };
   let auditService: { record: jest.Mock };
   let configService: {
@@ -66,6 +74,15 @@ describe('PlatformService provider config hardening', () => {
       auditLog: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      tenant: { findUnique: jest.fn().mockResolvedValue({ id: 'tenant-1' }) },
+      tenantPaymentMerchant: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn(),
+      },
+      runWithoutTenantScope: jest.fn(
+        async (_reason: string, work: () => Promise<unknown>) => work(),
+      ),
     };
     auditService = { record: jest.fn().mockResolvedValue({}) };
     configService = {
@@ -945,5 +962,85 @@ describe('PlatformService provider config hardening', () => {
       data: expect.objectContaining({ validationStatus: 'VALID' }),
     });
     fetchSpy.mockRestore();
+  });
+
+  describe('tenant payment merchant accounts', () => {
+    const dto = {
+      provider: ' esewa ',
+      environment: 'TEST' as const,
+      merchantId: ' school-merchant-1 ',
+      enabled: true,
+    };
+    const saved = {
+      id: 'tpm-1',
+      tenantId: 'tenant-1',
+      provider: 'ESEWA',
+      environment: 'TEST',
+      merchantId: 'school-merchant-1',
+      enabled: true,
+      updatedAt: new Date('2026-10-02T00:00:00.000Z'),
+    };
+
+    it('stores the school merchant under the normalised gateway name and audits it for that school', async () => {
+      prisma.providerConfig.findFirst.mockResolvedValue({ id: 'prov-1' });
+      prisma.tenantPaymentMerchant.upsert.mockResolvedValue(saved);
+
+      await expect(
+        service.upsertTenantPaymentMerchant('tenant-1', dto, 'platform-user'),
+      ).resolves.toMatchObject({
+        provider: 'ESEWA',
+        merchantId: 'school-merchant-1',
+      });
+
+      expect(prisma.tenantPaymentMerchant.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            tenantId: 'tenant-1',
+            provider: 'ESEWA',
+            merchantId: 'school-merchant-1',
+            updatedBy: 'platform-user',
+          }),
+        }),
+      );
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'tenant_payment_merchant_updated',
+          tenantId: 'tenant-1',
+          userId: 'platform-user',
+        }),
+      );
+    });
+
+    it('refuses a merchant for a gateway the platform has not configured', async () => {
+      prisma.providerConfig.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.upsertTenantPaymentMerchant('tenant-1', dto, 'platform-user'),
+      ).rejects.toThrow('is not configured on the platform');
+      expect(prisma.tenantPaymentMerchant.upsert).not.toHaveBeenCalled();
+    });
+
+    it('refuses a merchant account already assigned to another school', async () => {
+      prisma.providerConfig.findFirst.mockResolvedValue({ id: 'prov-1' });
+      prisma.tenantPaymentMerchant.upsert.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('dup', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      );
+
+      await expect(
+        service.upsertTenantPaymentMerchant('tenant-1', dto, 'platform-user'),
+      ).rejects.toThrow('already assigned to another school');
+      expect(auditService.record).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unknown school', async () => {
+      prisma.tenant.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.upsertTenantPaymentMerchant('nope', dto, 'platform-user'),
+      ).rejects.toThrow('not found');
+    });
   });
 });

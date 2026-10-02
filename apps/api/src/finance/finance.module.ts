@@ -14,6 +14,7 @@ import { PaymentsWebhookController } from './payments-webhook.controller';
 import { BullModule } from '@nestjs/bullmq';
 import { FinanceProcessor } from './finance.processor';
 import { FinanceCron } from './finance.cron';
+import { FinanceReconciliationScheduler } from './finance-reconciliation.scheduler';
 
 import { AccountingPostingModule } from '../accounting/accounting-posting.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
@@ -44,6 +45,7 @@ import { UsageModule } from '../usage/usage.module';
     FinanceCompatService,
     FinanceProcessor,
     FinanceCron,
+    FinanceReconciliationScheduler,
   ],
   exports: [FinanceService, FinanceCompatService],
 })

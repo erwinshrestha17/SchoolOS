@@ -884,6 +884,17 @@
     ]
   },
   {
+    "controller": "MobileController",
+    "handler": "verifyStudentPaymentIntent",
+    "method": "POST",
+    "prefix": "mobile",
+    "path": "students/:id/payment-intents/:intentId/verify",
+    "guards": [
+      "JwtAuthGuard",
+      "EntitlementGuard"
+    ]
+  },
+  {
     "controller": "MobilePushTokensController",
     "handler": "register",
     "method": "POST",

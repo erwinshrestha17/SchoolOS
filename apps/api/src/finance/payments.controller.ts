@@ -99,6 +99,15 @@ export class PaymentsController {
     return this.financeService.initiateOnlinePayment(dto, auth);
   }
 
+  @Post('online/intents/:id/verify')
+  @Permissions('payments:collect')
+  verifyOnlinePaymentIntent(
+    @Param('id') intentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.verifyOnlinePaymentIntent(intentId, auth);
+  }
+
   @Get('gateway-readiness')
   @Permissions('payments:collect')
   getPaymentGatewayReadiness(@CurrentAuth() auth: AuthContext) {

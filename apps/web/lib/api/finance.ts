@@ -21,6 +21,7 @@ import type {
   InvoiceSummary,
   InvoiceSummaryPage,
   LedgerStudentSearchResponse,
+  OnlinePaymentIntentSummary,
   PaymentGatewayReadiness,
   PaymentMethodReport,
   PaymentRefundPayload,
@@ -390,6 +391,12 @@ export const financeApi = {
     }>(withQuery('/payments', params ?? {})),
   getPaymentGatewayReadiness: () =>
     request<PaymentGatewayReadiness>('/payments/gateway-readiness'),
+  /** Server-side confirmation: the API pulls the provider's state, never the client. */
+  verifyOnlinePaymentIntent: (intentId: string) =>
+    request<OnlinePaymentIntentSummary>(
+      `/payments/online/intents/${encodeURIComponent(intentId)}/verify`,
+      { method: 'POST' },
+    ),
   refundPayment: (paymentId: string, body: PaymentRefundPayload) =>
     request<PaymentRefundSummary>(
       `/payments/${encodeURIComponent(paymentId)}/refund`,

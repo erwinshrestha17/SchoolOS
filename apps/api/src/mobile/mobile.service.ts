@@ -2184,6 +2184,23 @@ export class MobileService {
     );
   }
 
+  async verifyStudentPaymentIntent(
+    studentId: string,
+    intentId: string,
+    actor: AuthContext,
+  ) {
+    await this.assertStudentAccess(
+      studentId,
+      actor,
+      GuardianCapability.FEES_PAY,
+    );
+    return this.financeService.verifyOnlinePaymentIntent(
+      intentId,
+      actor,
+      studentId,
+    );
+  }
+
   async collectStudentSandboxFeePayment(
     studentId: string,
     dto: ParentSandboxFeePaymentDto,

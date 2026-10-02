@@ -11,6 +11,8 @@ export const M3_MOCK_WEBHOOK_SECRET =
   process.env.M3_MOCK_WEBHOOK_SECRET ?? 'm3-local-webhook-secret-for-verify';
 
 const intentsByIdempotencyKey = new Map();
+/** providerReference -> what the gateway knows (the authoritative state). */
+const paymentsByProviderReference = new Map();
 
 function sendJson(res, statusCode, body) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json' });
@@ -34,9 +36,39 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === 'GET' && url.pathname.startsWith('/settlements/')) {
-    const reference = url.pathname.split('/').pop();
-    sendJson(res, 200, { reference, status: 'SETTLED' });
+  // Server-to-server status pull (generic_json_v1 `settlementStatusUrl`).
+  if (req.method === 'GET' && url.pathname === '/settlements/status') {
+    const reference = url.searchParams.get('reference');
+    const providerReference = url.searchParams.get('providerReference');
+    const payment =
+      (providerReference && paymentsByProviderReference.get(providerReference)) ||
+      [...paymentsByProviderReference.values()].find(
+        (candidate) => reference && candidate.reference === reference,
+      );
+    if (!payment) {
+      sendJson(res, 404, { message: 'Unknown payment' });
+      return;
+    }
+    sendJson(res, 200, {
+      status: payment.paid ? 'SUCCESS' : 'PENDING',
+      amount: payment.amount,
+      currency: 'NPR',
+      reference: payment.reference,
+      providerReference: payment.providerReference,
+      merchantId: payment.merchantId,
+    });
+    return;
+  }
+
+  // Test-only: the customer completes checkout at the gateway.
+  if (req.method === 'POST' && url.pathname.startsWith('/test/pay/')) {
+    const payment = paymentsByProviderReference.get(url.pathname.split('/').pop());
+    if (!payment) {
+      sendJson(res, 404, { message: 'Unknown payment' });
+      return;
+    }
+    payment.paid = true;
+    sendJson(res, 200, { status: 'SUCCESS' });
     return;
   }
 
@@ -64,6 +96,14 @@ const server = createServer(async (req, res) => {
       amount: payload.amount ?? null,
       merchantReference: payload.merchantReference ?? null,
     };
+
+    paymentsByProviderReference.set(providerReference, {
+      providerReference,
+      reference: payload.reference ?? null,
+      merchantId: payload.merchantId ?? null,
+      amount: payload.amount == null ? null : Number(payload.amount).toFixed(2),
+      paid: false,
+    });
 
     if (typeof idempotencyKey === 'string') {
       intentsByIdempotencyKey.set(idempotencyKey, response);

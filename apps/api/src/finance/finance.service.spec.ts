@@ -2712,6 +2712,7 @@ describe('finance production controls', () => {
       }),
       feeHead: null,
       gatewayProvider: provider,
+      gatewayMerchant: { merchantId: 'school-merchant' },
       createdPaymentIntent,
     });
     const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
@@ -2791,10 +2792,14 @@ describe('finance production controls', () => {
         enabled: true,
         environment: 'TEST',
         validationStatus: 'VALID',
+        secretKeys: [],
         configEncrypted: {
+          adapter: 'generic_json_v1',
           webhookSigningSecret: 'webhook-secret',
+          settlementStatusUrl: 'https://gateway.example.com/settlements',
         },
       },
+      gatewayMerchant: { merchantId: 'school-merchant' },
       existingPaymentIntent: {
         id: 'intent-1',
         tenantId: actor.tenantId,
@@ -2803,9 +2808,24 @@ describe('finance production controls', () => {
         provider: 'NEPAL_GATEWAY',
         providerReference: 'INV-001',
         amount: new Prisma.Decimal(500),
+        currency: 'NPR',
         status: 'PENDING',
+        createdAt: new Date(),
+        expiresAt: null,
       },
     });
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: async () => ({
+        status: 'SUCCESS',
+        amount: '500.00',
+        currency: 'NPR',
+        reference: 'intent-1',
+        providerReference: 'INV-001',
+        merchantId: 'school-merchant',
+      }),
+    } as Response);
 
     await expect(
       service.handleOnlinePaymentWebhook('nepal_gateway', payload, {
@@ -2817,6 +2837,8 @@ describe('finance production controls', () => {
         postedToLedger: true,
       }),
     );
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    fetchSpy.mockRestore();
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'collect',
@@ -3093,6 +3115,7 @@ function buildService(options: {
   reconciliationPaymentEntries?: unknown[];
   reconciliationRefundEntries?: unknown[];
   gatewayProvider?: unknown;
+  gatewayMerchant?: unknown;
   existingPaymentIntent?: unknown;
   createdPaymentIntent?: unknown;
   cashierClosePdfFiles?: unknown[];
@@ -3338,6 +3361,9 @@ function buildService(options: {
     providerConfig: {
       findFirst: jest.fn().mockResolvedValue(options.gatewayProvider ?? null),
       findUnique: jest.fn().mockResolvedValue(options.gatewayProvider ?? null),
+    },
+    tenantPaymentMerchant: {
+      findFirst: jest.fn().mockResolvedValue(options.gatewayMerchant ?? null),
     },
     onlinePaymentIntent: {
       findFirst: jest

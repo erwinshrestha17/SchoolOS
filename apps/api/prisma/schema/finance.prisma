@@ -217,6 +217,10 @@ model OnlinePaymentIntent {
   failureCode       String?
   failureMessage    String?
   reconciledAt      DateTime?
+  // Server-to-server verification bookkeeping (Phase 7.4). A callback is only
+  // a hint; settlement happens after the provider confirms the status.
+  verifyAttempts    Int                       @default(0)
+  lastVerifiedAt    DateTime?
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
 
@@ -228,6 +232,30 @@ model OnlinePaymentIntent {
   @@unique([provider, providerReference])
   @@index([tenantId, studentId, createdAt])
   @@index([tenantId, invoiceId, status])
+  @@index([status, updatedAt])
+}
+
+/// The school's own merchant account at a platform-managed payment gateway.
+/// The platform ProviderConfig carries endpoints and signing secrets shared by
+/// the gateway adapter; the merchant identifier is per school, so one school's
+/// collections can never be initiated or verified under another school's
+/// merchant. No row means online payments are unavailable for that school.
+model TenantPaymentMerchant {
+  id          String              @id @default(uuid())
+  tenantId    String
+  provider    String
+  environment ProviderEnvironment
+  merchantId  String
+  enabled     Boolean             @default(true)
+  updatedBy   String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider, environment])
+  @@unique([provider, environment, merchantId])
+  @@index([tenantId, enabled])
 }
 
 model PaymentRefund {

@@ -17,6 +17,7 @@ import {
   IsUrl,
   Matches,
   Max,
+  MaxLength,
   Min,
   MinLength,
   ValidateIf,
@@ -427,6 +428,26 @@ export class UpsertProviderConfigDto {
   @IsArray()
   @IsString({ each: true })
   secretKeys?: string[];
+}
+
+export class UpsertTenantPaymentMerchantDto {
+  /** Platform payment-gateway provider name, e.g. ESEWA. */
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  provider!: string;
+
+  @IsEnum(['TEST', 'PRODUCTION'])
+  environment!: 'TEST' | 'PRODUCTION';
+
+  /** The school's own merchant identifier at that gateway. */
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(128)
+  merchantId!: string;
+
+  @IsBoolean()
+  enabled!: boolean;
 }
 
 export class UpdateProviderStatusDto {

@@ -42,6 +42,7 @@ model Tenant {
   invoiceLines                  InvoiceLine[]
   payments                      Payment[]
   onlinePaymentIntents          OnlinePaymentIntent[]
+  paymentMerchants              TenantPaymentMerchant[]
   paymentRefunds                PaymentRefund[]
   cashierCloses                 CashierClose[]
   receipts                      Receipt[]

@@ -521,9 +521,39 @@ export type PaymentGatewayReadiness = {
   supportedPaymentMethods: string[];
   webhookReady: boolean;
   paymentIntentReady: boolean;
+  /** The school has its own merchant account at the gateway. */
+  merchantConfigured: boolean;
   idempotencyRequired: boolean;
   settlementTrackingReady: boolean;
   message: string;
+};
+
+/**
+ * What a parent or cashier is shown for an online payment. `PAID` only once
+ * the server has confirmed the payment with the provider and settled it; a
+ * redirect or callback alone is `PENDING_VERIFICATION`.
+ */
+export type OnlinePaymentIntentState =
+  | "AWAITING_PAYMENT"
+  | "PENDING_VERIFICATION"
+  | "PAID"
+  | "FAILED"
+  | "EXPIRED";
+
+export type OnlinePaymentIntentSummary = {
+  id: string;
+  invoiceId: string;
+  studentId: string;
+  provider: string;
+  amount: number;
+  currency: string;
+  status: string;
+  state: OnlinePaymentIntentState;
+  paid: boolean;
+  checkoutUrl: string | null;
+  expiresAt: string | Date | null;
+  paymentId: string | null;
+  message: string | null;
 };
 
 export type NotificationDelivery = {
