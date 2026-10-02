@@ -520,6 +520,10 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
     prisma.__state.invoices.push(invoice);
     (prisma.invoice.findFirst as jest.Mock).mockResolvedValue(invoice);
     (prisma.invoice.findMany as jest.Mock).mockResolvedValue([invoice]);
+    // collectPayment re-reads the guard-locked invoice inside its transaction.
+    (
+      prisma.invoice as unknown as { findUniqueOrThrow: jest.Mock }
+    ).findUniqueOrThrow = jest.fn().mockResolvedValue(invoice);
   }
 
   function mockCreatedPayment() {

@@ -17,6 +17,7 @@ import {
   formatBsDateTime,
   getNepalSchoolDay,
   NEPAL_TIME_ZONE,
+  type FinanceDashboardSummary,
 } from '@schoolos/core';
 import { useSession } from '@/components/session-provider';
 import { Button } from '@/components/ui/button';
@@ -387,6 +388,43 @@ export function FeeOverview() {
                     : 'neutral'
                 }
               />
+              <AttentionRow
+                label="Failed ledger postings"
+                value={attentionValue(summary, 'failedPostingCount')}
+                href={
+                  summary?.attention.failedPostingCount !== null &&
+                  summary?.attention.failedPostingCount !== undefined
+                    ? '/dashboard/accounting/receivables'
+                    : undefined
+                }
+                tone={
+                  summary?.attention.failedPostingCount ? 'warning' : 'neutral'
+                }
+              />
+              <AttentionRow
+                label="Open cashier sessions"
+                value={attentionValue(summary, 'openCashierSessionCount')}
+                href={
+                  summary?.attention.openCashierSessionCount !== null &&
+                  summary?.attention.openCashierSessionCount !== undefined
+                    ? '/dashboard/fees/cashier-close'
+                    : undefined
+                }
+                tone={
+                  summary?.attention.openCashierSessionCount
+                    ? 'warning'
+                    : 'neutral'
+                }
+              />
+              <AttentionRow
+                label="Online payments needing review"
+                value={attentionValue(summary, 'parkedOnlinePaymentCount')}
+                tone={
+                  summary?.attention.parkedOnlinePaymentCount
+                    ? 'warning'
+                    : 'neutral'
+                }
+              />
             </div>
           </Surface>
 
@@ -442,6 +480,19 @@ export function FeeOverview() {
       </div>
     </div>
   );
+}
+
+/**
+ * `null` from the server means the caller may not see this count (restricted);
+ * a missing summary means it could not be loaded. Neither is rendered as 0.
+ */
+function attentionValue(
+  summary: FinanceDashboardSummary | undefined,
+  key: keyof FinanceDashboardSummary['attention'],
+) {
+  if (!summary) return 'Unavailable';
+  const count = summary.attention[key];
+  return count === null ? 'Restricted' : String(count);
 }
 
 function ActivityRow({

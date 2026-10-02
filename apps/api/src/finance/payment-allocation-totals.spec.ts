@@ -1,5 +1,8 @@
+import { ConflictException } from '@nestjs/common';
 import { PaymentStatus, Prisma } from '@prisma/client';
 import {
+  isAllocationGuardViolation,
+  rethrowAllocationGuardAsConflict,
   sumInvoiceAllocationAmount,
   sumNetPaidAmount,
   sumRefundedAmount,
@@ -58,5 +61,32 @@ describe('payment allocation totals', () => {
         },
       ]).toFixed(2),
     ).toBe('374.50');
+  });
+});
+
+describe('allocation guard translation', () => {
+  it('recognises database guard refusals and nothing else', () => {
+    expect(
+      isAllocationGuardViolation(
+        new Error(
+          'schoolos_allocation_guard: allocations for invoice i would be 11 against an invoice total of 10.',
+        ),
+      ),
+    ).toBe(true);
+    expect(isAllocationGuardViolation(new Error('connection reset'))).toBe(
+      false,
+    );
+    expect(isAllocationGuardViolation('schoolos_allocation_guard')).toBe(false);
+    expect(isAllocationGuardViolation(null)).toBe(false);
+  });
+
+  it('turns a guard refusal into a 409 and rethrows other errors untouched', () => {
+    expect(() =>
+      rethrowAllocationGuardAsConflict(
+        new Error('schoolos_allocation_guard: over-allocated'),
+      ),
+    ).toThrow(ConflictException);
+    const other = new Error('deadlock detected');
+    expect(() => rethrowAllocationGuardAsConflict(other)).toThrow(other);
   });
 });

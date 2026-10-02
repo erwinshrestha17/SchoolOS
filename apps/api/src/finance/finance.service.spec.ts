@@ -3188,6 +3188,16 @@ function buildService(options: {
         .fn()
         .mockResolvedValue(options.existingIdempotentInvoice ?? null),
       findFirst: jest.fn().mockResolvedValue(options.invoice),
+      // collectPayment re-reads the (guard-locked) invoice inside its tx.
+      findUniqueOrThrow: jest.fn(({ where }: { where: { id: string } }) => {
+        const candidates = (options.invoices ??
+          (options.invoice ? [options.invoice] : [])) as {
+          id: string;
+        }[];
+        const found = candidates.find((candidate) => candidate.id === where.id);
+        if (!found) throw new Error('invoice not found');
+        return Promise.resolve(found);
+      }),
       findMany: jest
         .fn()
         .mockResolvedValue(

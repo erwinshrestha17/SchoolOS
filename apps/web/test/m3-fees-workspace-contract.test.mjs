@@ -99,6 +99,17 @@ describe('M3 fees workspace contract', () => {
     assert.match(overview, /No finance value has been replaced with zero/);
   });
 
+  it('surfaces stuck finance work from the server without turning restricted counts into zero', () => {
+    const overview = read('components/finance/fee-overview.tsx');
+
+    assert.match(overview, /Failed ledger postings/);
+    assert.match(overview, /Open cashier sessions/);
+    assert.match(overview, /Online payments needing review/);
+    assert.match(overview, /summary\.attention\[key\]/);
+    assert.match(overview, /count === null \? 'Restricted'/);
+    assert.match(overview, /\/dashboard\/accounting\/receivables/);
+  });
+
   it('uses server pagination and URL state for growing finance lists', () => {
     const financeApi = read('lib/api/finance.ts');
     const queue = read('components/finance/defaulter-queue-tab.tsx');

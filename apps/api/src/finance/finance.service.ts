@@ -129,6 +129,8 @@ import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
 import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { resolveCashAccountCode } from './finance.defaults';
 import {
+  isAllocationGuardViolation,
+  rethrowAllocationGuardAsConflict,
   sumInvoiceAllocationAmount,
   sumNetPaidAmount,
   sumRefundedAmount,
@@ -483,11 +485,9 @@ export class FinanceService {
       periodPaymentAggregate,
       periodRefundAggregate,
       outstandingInvoiceAggregate,
-      outstandingPaymentAggregate,
-      outstandingRefundAggregate,
+      outstandingAllocationAggregate,
       overdueInvoiceAggregate,
-      overduePaymentAggregate,
-      overdueRefundAggregate,
+      overdueAllocationAggregate,
       overdueStudentRows,
       pendingApprovalCount,
       receiptsIssued,
@@ -512,21 +512,15 @@ export class FinanceService {
         where: openInvoiceWhere,
         _sum: { totalAmount: true },
       }),
-      this.prisma.payment.aggregate({
+      // Allocations are the single source of truth for what an invoice has
+      // received: they include multi-invoice payments, applied advances,
+      // refunds and reversals (negative rows), none of which the legacy
+      // Payment.invoiceId link can represent.
+      this.prisma.paymentAllocation.aggregate({
         where: {
           tenantId: actor.tenantId,
-          status: PaymentStatus.SUCCESS,
+          reversedAt: null,
           invoice: openInvoiceWhere,
-        },
-        _sum: { amount: true },
-      }),
-      this.prisma.paymentRefund.aggregate({
-        where: {
-          tenantId: actor.tenantId,
-          payment: {
-            status: PaymentStatus.SUCCESS,
-            invoice: openInvoiceWhere,
-          },
         },
         _sum: { amount: true },
       }),
@@ -534,21 +528,11 @@ export class FinanceService {
         where: overdueInvoiceWhere,
         _sum: { totalAmount: true },
       }),
-      this.prisma.payment.aggregate({
+      this.prisma.paymentAllocation.aggregate({
         where: {
           tenantId: actor.tenantId,
-          status: PaymentStatus.SUCCESS,
+          reversedAt: null,
           invoice: overdueInvoiceWhere,
-        },
-        _sum: { amount: true },
-      }),
-      this.prisma.paymentRefund.aggregate({
-        where: {
-          tenantId: actor.tenantId,
-          payment: {
-            status: PaymentStatus.SUCCESS,
-            invoice: overdueInvoiceWhere,
-          },
         },
         _sum: { amount: true },
       }),
@@ -602,17 +586,17 @@ export class FinanceService {
       },
     });
 
+    const attention = await this.getFinanceAttention(actor);
+
     const grossCollected = decimalOrZero(periodPaymentAggregate._sum.amount);
     const periodRefunded = decimalOrZero(periodRefundAggregate._sum.amount);
     const outstandingAmount = calculateOutstandingAmount(
       outstandingInvoiceAggregate._sum.totalAmount,
-      outstandingPaymentAggregate._sum.amount,
-      outstandingRefundAggregate._sum.amount,
+      outstandingAllocationAggregate._sum.amount,
     );
     const overdueAmount = calculateOutstandingAmount(
       overdueInvoiceAggregate._sum.totalAmount,
-      overduePaymentAggregate._sum.amount,
-      overdueRefundAggregate._sum.amount,
+      overdueAllocationAggregate._sum.amount,
     );
     const cashierState =
       latestClose && unclosedPaymentCount === 0
@@ -650,7 +634,53 @@ export class FinanceService {
         unclosedPaymentCount,
       },
       receiptsIssued,
+      attention,
       generatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Finance work that is stuck rather than merely pending. Each count is
+   * released only to holders of the permission that can act on it; a caller
+   * without it receives `null` (restricted), never a zero that reads as
+   * "all clear".
+   */
+  private async getFinanceAttention(
+    actor: AuthContext,
+  ): Promise<FinanceDashboardSummary['attention']> {
+    const [failedPostings, openCashierSessions, parkedOnlinePayments] =
+      await Promise.all([
+        hasDomainPermission(actor, 'accounting:posting-batches:read')
+          ? this.prisma.accountingPostingBatch.count({
+              where: {
+                tenantId: actor.tenantId,
+                sourceModule: 'M3',
+                status: 'FAILED',
+              },
+            })
+          : null,
+        hasDomainPermission(actor, 'payments:close')
+          ? this.prisma.cashierClose.count({
+              where: {
+                tenantId: actor.tenantId,
+                status: { notIn: ['CLOSED', 'DEPOSITED'] },
+              },
+            })
+          : null,
+        hasDomainPermission(actor, 'fees:manage')
+          ? this.prisma.onlinePaymentIntent.count({
+              where: {
+                tenantId: actor.tenantId,
+                status: 'PENDING',
+                failureCode: { startsWith: ONLINE_PAYMENT_EXCEPTION_PREFIX },
+              },
+            })
+          : null,
+      ]);
+    return {
+      failedPostingCount: failedPostings,
+      openCashierSessionCount: openCashierSessions,
+      parkedOnlinePaymentCount: parkedOnlinePayments,
     };
   }
 
@@ -1337,70 +1367,101 @@ export class FinanceService {
       );
     }
 
+    // A month is billed once. An all-plans run and a plan-specific run for the
+    // same month would bill the same students twice, so they exclude each
+    // other here; two identical runs are excluded by the database unique key
+    // (and the partial index for the all-plans case).
+    const overlappingRun = await this.prisma.feeBillingRun.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        runMonth: dto.runMonth,
+        runYear: dto.runYear,
+        ...(dto.feePlanId
+          ? { OR: [{ feePlanId: null }, { feePlanId: dto.feePlanId }] }
+          : {}),
+      },
+      select: { id: true },
+    });
+    if (overlappingRun) {
+      throw new ConflictException(
+        'This month has already been billed for the selected fee plan scope. Void the earlier billing run before generating it again.',
+      );
+    }
+
     const dueDate = new Date(dto.dueDate);
     const fiscalYear = resolveFiscalYear(dueDate);
-    const result = await this.prisma.$transaction(async (tx) => {
-      const run = await tx.feeBillingRun.create({
-        data: {
-          tenantId: actor.tenantId,
-          academicYearId: dto.academicYearId,
-          feePlanId: dto.feePlanId ?? null,
-          runMonth: dto.runMonth,
-          runYear: dto.runYear,
-          generatedById: actor.userId,
-          notes: dto.notes ?? null,
-        },
-      });
-
-      const invoices: Array<
-        Awaited<ReturnType<typeof this.prisma.invoice.create>>
-      > = [];
-
-      for (const assignment of assignments) {
-        const invoiceNumber = await this.generateInvoiceNumber(
-          actor.tenantId,
-          fiscalYear,
-          tx,
-        );
-        const calculated = await this.calculateInvoiceLines(
-          {
-            tenantId: actor.tenantId,
-            classId: assignment.student.classId,
-            feePlanId: assignment.feePlanId,
-            items: assignment.feePlan.items,
-          },
-          tx,
-        );
-
-        const invoice = await tx.invoice.create({
+    const result = await this.prisma
+      .$transaction(async (tx) => {
+        const run = await tx.feeBillingRun.create({
           data: {
             tenantId: actor.tenantId,
-            studentId: assignment.studentId,
             academicYearId: dto.academicYearId,
-            billingRunId: run.id,
-            invoiceNumber,
-            fiscalYear,
-            billNumber: invoiceNumber,
-            dueDate,
-            subtotal: calculated.subtotal,
-            vatAmount: calculated.vatAmount,
-            totalAmount: calculated.totalAmount,
-            lines: {
-              create: calculated.lines,
-            },
-          },
-          include: {
-            student: true,
-            lines: { include: { feeHead: true } },
+            feePlanId: dto.feePlanId ?? null,
+            runMonth: dto.runMonth,
+            runYear: dto.runYear,
+            generatedById: actor.userId,
+            notes: dto.notes ?? null,
           },
         });
-        invoices.push(invoice);
 
-        await this.postInvoiceToLedger(invoice, actor, tx);
-      }
+        const invoices: Array<
+          Awaited<ReturnType<typeof this.prisma.invoice.create>>
+        > = [];
 
-      return { run, invoices };
-    });
+        for (const assignment of assignments) {
+          const invoiceNumber = await this.generateInvoiceNumber(
+            actor.tenantId,
+            fiscalYear,
+            tx,
+          );
+          const calculated = await this.calculateInvoiceLines(
+            {
+              tenantId: actor.tenantId,
+              classId: assignment.student.classId,
+              feePlanId: assignment.feePlanId,
+              items: assignment.feePlan.items,
+            },
+            tx,
+          );
+
+          const invoice = await tx.invoice.create({
+            data: {
+              tenantId: actor.tenantId,
+              studentId: assignment.studentId,
+              academicYearId: dto.academicYearId,
+              billingRunId: run.id,
+              invoiceNumber,
+              fiscalYear,
+              billNumber: invoiceNumber,
+              dueDate,
+              subtotal: calculated.subtotal,
+              vatAmount: calculated.vatAmount,
+              totalAmount: calculated.totalAmount,
+              lines: {
+                create: calculated.lines,
+              },
+            },
+            include: {
+              student: true,
+              lines: { include: { feeHead: true } },
+            },
+          });
+          invoices.push(invoice);
+
+          await this.postInvoiceToLedger(invoice, actor, tx);
+        }
+
+        return { run, invoices };
+      })
+      .catch((error: unknown) => {
+        if (isPrismaUniqueConstraintError(error)) {
+          throw new ConflictException(
+            'This month was billed by a concurrent billing run. Refresh the billing runs before retrying.',
+          );
+        }
+        throw error;
+      });
 
     await this.auditService.record({
       action: 'generate',
@@ -6775,9 +6836,17 @@ export class FinanceService {
           },
         });
 
-        const createdAllocations = await Promise.all([
-          ...allocationPlan.map(({ invoice, amount }) =>
-            tx.paymentAllocation.create({
+        // Allocations are written in a fixed (invoice id) order: the database
+        // guard locks each invoice row as it goes, so concurrent cashiers that
+        // touch overlapping invoices queue up instead of deadlocking.
+        const createdAllocations: Array<
+          Prisma.PaymentAllocationGetPayload<Record<string, never>>
+        > = [];
+        for (const { invoice, amount } of [...allocationPlan].sort((a, b) =>
+          a.invoice.id.localeCompare(b.invoice.id),
+        )) {
+          createdAllocations.push(
+            await tx.paymentAllocation.create({
               data: {
                 tenantId: actor.tenantId,
                 paymentId: payment.id,
@@ -6787,24 +6856,24 @@ export class FinanceService {
                 allocatedById: actor.userId,
               },
             }),
-          ),
-          ...(unallocatedAmount.gt(0)
-            ? [
-                tx.paymentAllocation.create({
-                  data: {
-                    tenantId: actor.tenantId,
-                    paymentId: payment.id,
-                    invoiceId: null,
-                    amount: unallocatedAmount,
-                    allocationType: dto.isAdvance
-                      ? PaymentAllocationType.ADVANCE
-                      : PaymentAllocationType.UNALLOCATED,
-                    allocatedById: actor.userId,
-                  },
-                }),
-              ]
-            : []),
-        ]);
+          );
+        }
+        if (unallocatedAmount.gt(0)) {
+          createdAllocations.push(
+            await tx.paymentAllocation.create({
+              data: {
+                tenantId: actor.tenantId,
+                paymentId: payment.id,
+                invoiceId: null,
+                amount: unallocatedAmount,
+                allocationType: dto.isAdvance
+                  ? PaymentAllocationType.ADVANCE
+                  : PaymentAllocationType.UNALLOCATED,
+                allocatedById: actor.userId,
+              },
+            }),
+          );
+        }
 
         await this.usageService.incrementUsage(
           actor.tenantId,
@@ -6812,20 +6881,33 @@ export class FinanceService {
           1,
         );
 
-        await Promise.all(
-          allocationPlan.map(({ invoice, amount, paidSoFar }) => {
-            const totalPaid = paidSoFar.add(amount);
-            return tx.invoice.update({
-              where: { id: invoice.id },
-              data: {
-                status: totalPaid.gte(invoice.totalAmount)
-                  ? InvoiceStatus.PAID
-                  : InvoiceStatus.PARTIAL,
-                paidAt: totalPaid.gte(invoice.totalAmount) ? new Date() : null,
-              },
-            });
-          }),
-        );
+        // The invoice rows are now locked by the allocation guard, so the paid
+        // amount is re-read here: a concurrent cashier's committed allocation
+        // is included, and the status never lags the real balance.
+        for (const { invoice } of [...allocationPlan].sort((a, b) =>
+          a.invoice.id.localeCompare(b.invoice.id),
+        )) {
+          const lockedInvoice = await tx.invoice.findUniqueOrThrow({
+            where: { id: invoice.id },
+            select: {
+              totalAmount: true,
+              paymentAllocations: { where: { reversedAt: null } },
+              payments: { include: { refunds: true } },
+            },
+          });
+          const totalPaid = sumInvoiceAllocationAmount(
+            lockedInvoice.paymentAllocations,
+            lockedInvoice.payments,
+          );
+          const settled = totalPaid.gte(lockedInvoice.totalAmount);
+          await tx.invoice.update({
+            where: { id: invoice.id },
+            data: {
+              status: settled ? InvoiceStatus.PAID : InvoiceStatus.PARTIAL,
+              paidAt: settled ? new Date() : null,
+            },
+          });
+        }
 
         const receivableAccount = allocatedAmount.gt(0)
           ? await tx.chartAccount.findUniqueOrThrow({
@@ -6891,6 +6973,11 @@ export class FinanceService {
         return { ...payment, allocations: createdAllocations };
       });
     } catch (error) {
+      if (isAllocationGuardViolation(error)) {
+        throw new ConflictException(
+          'An invoice balance changed while this payment was being recorded. Refresh the balances and try again.',
+        );
+      }
       if (isPrismaUniqueConstraintError(error)) {
         const concurrentPayment = await this.prisma.payment.findUnique({
           where: {
@@ -7137,141 +7224,152 @@ export class FinanceService {
     }
 
     const allocationDate = new Date();
-    const result = await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw(Prisma.sql`
+    const result = await this.prisma
+      .$transaction(async (tx) => {
+        await tx.$queryRaw(Prisma.sql`
         SELECT "id"
         FROM "Payment"
         WHERE "id" = ${payment.id}
           AND "tenantId" = ${actor.tenantId}
         FOR UPDATE
       `);
-      const concurrentReplay = await tx.paymentAllocation.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          paymentId,
-          allocationGroupId: idempotencyKey,
-        },
-        include: { invoice: { select: { invoiceNumber: true } } },
-        orderBy: [{ createdAt: 'asc' }],
-      });
-      if (concurrentReplay.length > 0) {
-        return {
-          allocations: concurrentReplay,
-          disposition: 'REPLAYED' as const,
-        };
-      }
-      const currentUnallocated = await tx.paymentAllocation.aggregate({
-        where: {
-          tenantId: actor.tenantId,
-          paymentId,
-          invoiceId: null,
-          reversedAt: null,
-        },
-        _sum: { amount: true },
-      });
-      if (decimalOrZero(currentUnallocated._sum.amount).lt(total)) {
-        throw new ConflictException(
-          'Another allocation changed the payment advance balance. Refresh before retrying.',
+        const concurrentReplay = await tx.paymentAllocation.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            paymentId,
+            allocationGroupId: idempotencyKey,
+          },
+          include: { invoice: { select: { invoiceNumber: true } } },
+          orderBy: [{ createdAt: 'asc' }],
+        });
+        if (concurrentReplay.length > 0) {
+          return {
+            allocations: concurrentReplay,
+            disposition: 'REPLAYED' as const,
+          };
+        }
+        const currentUnallocated = await tx.paymentAllocation.aggregate({
+          where: {
+            tenantId: actor.tenantId,
+            paymentId,
+            invoiceId: null,
+            reversedAt: null,
+          },
+          _sum: { amount: true },
+        });
+        if (decimalOrZero(currentUnallocated._sum.amount).lt(total)) {
+          throw new ConflictException(
+            'Another allocation changed the payment advance balance. Refresh before retrying.',
+          );
+        }
+
+        const source = await tx.paymentAllocation.create({
+          data: {
+            tenantId: actor.tenantId,
+            paymentId,
+            invoiceId: null,
+            amount: total.negated(),
+            allocationType: PaymentAllocationType.REALLOCATION,
+            allocationGroupId: idempotencyKey,
+            reason,
+            allocatedAt: allocationDate,
+            allocatedById: actor.userId,
+          },
+          include: { invoice: { select: { invoiceNumber: true } } },
+        });
+        // Fixed invoice-id order: the allocation guard locks each invoice row,
+        // so concurrent writers on overlapping invoices queue, not deadlock.
+        const targets: Array<
+          Prisma.PaymentAllocationGetPayload<{
+            include: { invoice: { select: { invoiceNumber: true } } };
+          }>
+        > = [];
+        for (const { invoice, amount } of [...targetEntries].sort((a, b) =>
+          a.invoice.id.localeCompare(b.invoice.id),
+        )) {
+          targets.push(
+            await tx.paymentAllocation.create({
+              data: {
+                tenantId: actor.tenantId,
+                paymentId,
+                invoiceId: invoice.id,
+                amount,
+                allocationType: PaymentAllocationType.REALLOCATION,
+                allocationGroupId: idempotencyKey,
+                reason,
+                allocatedAt: allocationDate,
+                allocatedById: actor.userId,
+              },
+              include: { invoice: { select: { invoiceNumber: true } } },
+            }),
+          );
+        }
+
+        const advanceAccount = await tx.chartAccount.findUniqueOrThrow({
+          where: { tenantId_code: { tenantId: actor.tenantId, code: '2250' } },
+        });
+        const receivableAccount = await tx.chartAccount.findUniqueOrThrow({
+          where: { tenantId_code: { tenantId: actor.tenantId, code: '1200' } },
+        });
+        await this.accountingPostingService.postManualJournal(
+          {
+            tenantId: actor.tenantId,
+            entryDate: allocationDate,
+            narration: `Apply student advance: ${reason}`,
+            sourceModule: 'M3',
+            sourceType: JournalSourceType.PAYMENT_ALLOCATION,
+            sourceId: idempotencyKey,
+            postingType: 'ADVANCE_REALLOCATION',
+            lines: [
+              {
+                chartAccountId: advanceAccount.id,
+                debit: total,
+                description: 'Reduce student advance liability',
+              },
+              {
+                chartAccountId: receivableAccount.id,
+                credit: total,
+                description: 'Apply advance to student receivables',
+              },
+            ],
+          },
+          actor,
+          tx,
         );
-      }
 
-      const source = await tx.paymentAllocation.create({
-        data: {
-          tenantId: actor.tenantId,
-          paymentId,
-          invoiceId: null,
-          amount: total.negated(),
-          allocationType: PaymentAllocationType.REALLOCATION,
-          allocationGroupId: idempotencyKey,
-          reason,
-          allocatedAt: allocationDate,
-          allocatedById: actor.userId,
-        },
-        include: { invoice: { select: { invoiceNumber: true } } },
-      });
-      const targets = await Promise.all(
-        targetEntries.map(({ invoice, amount }) =>
-          tx.paymentAllocation.create({
-            data: {
-              tenantId: actor.tenantId,
-              paymentId,
-              invoiceId: invoice.id,
-              amount,
-              allocationType: PaymentAllocationType.REALLOCATION,
-              allocationGroupId: idempotencyKey,
-              reason,
-              allocatedAt: allocationDate,
-              allocatedById: actor.userId,
-            },
-            include: { invoice: { select: { invoiceNumber: true } } },
+        await Promise.all(
+          invoices.map(async (invoice) => {
+            const aggregate = await tx.paymentAllocation.aggregate({
+              where: {
+                tenantId: actor.tenantId,
+                invoiceId: invoice.id,
+                reversedAt: null,
+              },
+              _sum: { amount: true },
+            });
+            const paidAmount = decimalOrZero(aggregate._sum.amount);
+            await tx.invoice.update({
+              where: { id: invoice.id },
+              data: {
+                status: resolveInvoiceStatusAfterAdjustment(
+                  invoice.status,
+                  paidAmount,
+                  invoice.totalAmount,
+                ),
+                paidAt: paidAmount.gte(invoice.totalAmount)
+                  ? allocationDate
+                  : null,
+              },
+            });
           }),
-        ),
-      );
+        );
 
-      const advanceAccount = await tx.chartAccount.findUniqueOrThrow({
-        where: { tenantId_code: { tenantId: actor.tenantId, code: '2250' } },
-      });
-      const receivableAccount = await tx.chartAccount.findUniqueOrThrow({
-        where: { tenantId_code: { tenantId: actor.tenantId, code: '1200' } },
-      });
-      await this.accountingPostingService.postManualJournal(
-        {
-          tenantId: actor.tenantId,
-          entryDate: allocationDate,
-          narration: `Apply student advance: ${reason}`,
-          sourceModule: 'M3',
-          sourceType: JournalSourceType.PAYMENT_ALLOCATION,
-          sourceId: idempotencyKey,
-          postingType: 'ADVANCE_REALLOCATION',
-          lines: [
-            {
-              chartAccountId: advanceAccount.id,
-              debit: total,
-              description: 'Reduce student advance liability',
-            },
-            {
-              chartAccountId: receivableAccount.id,
-              credit: total,
-              description: 'Apply advance to student receivables',
-            },
-          ],
-        },
-        actor,
-        tx,
-      );
-
-      await Promise.all(
-        invoices.map(async (invoice) => {
-          const aggregate = await tx.paymentAllocation.aggregate({
-            where: {
-              tenantId: actor.tenantId,
-              invoiceId: invoice.id,
-              reversedAt: null,
-            },
-            _sum: { amount: true },
-          });
-          const paidAmount = decimalOrZero(aggregate._sum.amount);
-          await tx.invoice.update({
-            where: { id: invoice.id },
-            data: {
-              status: resolveInvoiceStatusAfterAdjustment(
-                invoice.status,
-                paidAmount,
-                invoice.totalAmount,
-              ),
-              paidAt: paidAmount.gte(invoice.totalAmount)
-                ? allocationDate
-                : null,
-            },
-          });
-        }),
-      );
-
-      return {
-        allocations: [source, ...targets],
-        disposition: 'SUCCEEDED' as const,
-      };
-    });
+        return {
+          allocations: [source, ...targets],
+          disposition: 'SUCCEEDED' as const,
+        };
+      })
+      .catch(rethrowAllocationGuardAsConflict);
 
     await this.auditService.record({
       action: 'reallocate_advance',
@@ -12542,12 +12640,16 @@ export class FinanceService {
         }
       }
 
-      const cappedDiscount = discountAmount.gt(item.amount)
+      // Money is rounded to the paisa per line, before it is summed, so the
+      // invoice subtotal/VAT/total are exactly the sums of the stored lines
+      // and the ledger entry posted from them always balances.
+      const roundedDiscount = discountAmount.toDecimalPlaces(2);
+      const cappedDiscount = roundedDiscount.gt(item.amount)
         ? item.amount
-        : discountAmount;
+        : roundedDiscount;
       const discountedAmount = item.amount.sub(cappedDiscount);
       const lineVat = item.feeHead.vatApplicable
-        ? discountedAmount.mul(0.13)
+        ? discountedAmount.mul(0.13).toDecimalPlaces(2)
         : new Prisma.Decimal(0);
 
       subtotal = subtotal.add(discountedAmount);
@@ -13481,16 +13583,14 @@ function decimalOrZero(value: Prisma.Decimal | null | undefined) {
   return value ?? new Prisma.Decimal(0);
 }
 
+/** Invoice total minus the net (refund/reversal-aware) allocated amount. */
 function calculateOutstandingAmount(
   invoiceTotal: Prisma.Decimal | null | undefined,
-  paidTotal: Prisma.Decimal | null | undefined,
-  refundTotal: Prisma.Decimal | null | undefined,
+  allocatedTotal: Prisma.Decimal | null | undefined,
 ) {
   return Prisma.Decimal.max(
     new Prisma.Decimal(0),
-    decimalOrZero(invoiceTotal)
-      .sub(decimalOrZero(paidTotal))
-      .add(decimalOrZero(refundTotal)),
+    decimalOrZero(invoiceTotal).sub(decimalOrZero(allocatedTotal)),
   );
 }
 

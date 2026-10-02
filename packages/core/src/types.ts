@@ -2619,6 +2619,18 @@ export type FinanceDashboardSummary = {
     unclosedPaymentCount: number;
   };
   receiptsIssued: number;
+  /**
+   * Finance work that is stuck rather than merely pending. A count is `null`
+   * when the caller lacks the permission to act on it (restricted, not zero).
+   */
+  attention: {
+    /** Fee-ledger posting batches in FAILED state. */
+    failedPostingCount: number | null;
+    /** Cashier sessions that are not yet closed or deposited. */
+    openCashierSessionCount: number | null;
+    /** Verified online payments parked for manual review. */
+    parkedOnlinePaymentCount: number | null;
+  };
   generatedAt: string;
 };
 

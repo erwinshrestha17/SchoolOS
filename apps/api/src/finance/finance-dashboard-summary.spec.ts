@@ -23,18 +23,23 @@ function buildService() {
     payment: {
       aggregate: jest
         .fn()
-        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(1250) } })
-        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(400) } })
-        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(300) } }),
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(1250) } }),
       count: jest.fn().mockResolvedValue(2),
     },
     paymentRefund: {
       aggregate: jest
         .fn()
-        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(50) } })
-        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(25) } })
-        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(20) } }),
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(50) } }),
     },
+    // Net allocations (refunds/reversals are negative rows) per invoice scope.
+    paymentAllocation: {
+      aggregate: jest
+        .fn()
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(375) } })
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(280) } }),
+    },
+    accountingPostingBatch: { count: jest.fn().mockResolvedValue(2) },
+    onlinePaymentIntent: { count: jest.fn().mockResolvedValue(1) },
     invoice: {
       aggregate: jest
         .fn()
@@ -53,6 +58,7 @@ function buildService() {
     },
     cashierClose: {
       findFirst: jest.fn().mockResolvedValue(null),
+      count: jest.fn().mockResolvedValue(3),
     },
     $queryRaw: jest.fn().mockResolvedValue([{ studentCount: 5n }]),
   };
@@ -105,6 +111,15 @@ describe('FinanceService dashboard summary', () => {
         where: expect.objectContaining({ tenantId: actor.tenantId }),
       }),
     );
+    // Balances come from active allocations, never the legacy payment link.
+    for (const call of prisma.paymentAllocation.aggregate.mock.calls) {
+      expect(call[0].where).toEqual(
+        expect.objectContaining({
+          tenantId: actor.tenantId,
+          reversedAt: null,
+        }),
+      );
+    }
     expect(prisma.financeApprovalRequest.count).toHaveBeenCalledWith({
       where: {
         tenantId: actor.tenantId,
@@ -117,14 +132,10 @@ describe('FinanceService dashboard summary', () => {
     const { service, prisma } = buildService();
     prisma.payment.aggregate
       .mockReset()
-      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(100) } })
-      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(400) } })
-      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(300) } });
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(100) } });
     prisma.paymentRefund.aggregate
       .mockReset()
-      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(150) } })
-      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(25) } })
-      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(20) } });
+      .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal(150) } });
 
     const result = await service.getDashboardSummary(
       {
@@ -138,6 +149,65 @@ describe('FinanceService dashboard summary', () => {
       grossAmount: '100.00',
       refundedAmount: '150.00',
       netAmount: '-50.00',
+    });
+  });
+
+  it('withholds attention counts the caller cannot act on (null, never zero)', async () => {
+    const { service, prisma } = buildService();
+
+    const result = await service.getDashboardSummary(
+      { date: '2026-06-27' },
+      actor,
+    );
+
+    expect(result.attention).toEqual({
+      failedPostingCount: null,
+      openCashierSessionCount: null,
+      parkedOnlinePaymentCount: 1,
+    });
+    expect(prisma.accountingPostingBatch.count).not.toHaveBeenCalled();
+    expect(prisma.cashierClose.count).not.toHaveBeenCalled();
+  });
+
+  it('reports stuck finance work to the roles that can resolve it', async () => {
+    const { service, prisma } = buildService();
+
+    const result = await service.getDashboardSummary(
+      { date: '2026-06-27' },
+      {
+        ...actor,
+        permissions: [
+          'fees:manage',
+          'payments:close',
+          'accounting:posting-batches:read',
+        ],
+      },
+    );
+
+    expect(result.attention).toEqual({
+      failedPostingCount: 2,
+      openCashierSessionCount: 3,
+      parkedOnlinePaymentCount: 1,
+    });
+    expect(prisma.accountingPostingBatch.count).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        sourceModule: 'M3',
+        status: 'FAILED',
+      },
+    });
+    expect(prisma.cashierClose.count).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        status: { notIn: ['CLOSED', 'DEPOSITED'] },
+      },
+    });
+    expect(prisma.onlinePaymentIntent.count).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        status: 'PENDING',
+        failureCode: { startsWith: 'EXCEPTION_' },
+      },
     });
   });
 
