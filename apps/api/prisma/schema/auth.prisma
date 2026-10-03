@@ -39,6 +39,8 @@ model User {
   staff                       Staff?                       @relation("StaffUser")
   guardian                    Guardian?                    @relation("GuardianUser")
   submittedAttendanceSessions AttendanceSession[]          @relation("SubmittedAttendanceSessions")
+  requestedStaffCorrections StaffAttendanceCorrection[] @relation("StaffAttendanceCorrectionRequester")
+  approvedStaffCorrections StaffAttendanceCorrection[] @relation("StaffAttendanceCorrectionApprover")
   approvedStaffAttendance     StaffAttendance[]            @relation("ApprovedStaffAttendance")
   collectedPayments           Payment[]                    @relation("CollectedPayments")
   cashierCloseCollectorScopes CashierClose[]               @relation("CashierCloseCollector")

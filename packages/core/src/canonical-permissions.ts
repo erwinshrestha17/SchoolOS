@@ -960,6 +960,11 @@ const legacyPermissionMetadata = {
   "hr:staff:archive": ["hr:staff:archive", "staff_lifecycle", "1.0.0"],
   "hr:attendance:read": ["hr:attendance:read", "staff_read", "1.0.0"],
   "hr:attendance:write": ["hr:attendance:write", "staff_write", "1.0.0"],
+  "hr:attendance-corrections:approve": [
+    "hr:attendance-corrections:approve",
+    "staff_approval",
+    "1.0.0",
+  ],
   "hr:attendance:correct": ["hr:attendance:correct", "staff_write", "1.0.0"],
   "hr:leave:read": ["hr:leave:read", "staff_read", "1.0.0"],
   "hr:leave:request": ["hr:leave:request", "staff_read", "1.0.0"],

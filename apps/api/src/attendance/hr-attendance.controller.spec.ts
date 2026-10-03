@@ -22,7 +22,7 @@ function createController() {
   };
 
   return {
-    controller: new HrAttendanceController(service as never),
+    controller: new HrAttendanceController(service as never, {} as never),
     service,
   };
 }

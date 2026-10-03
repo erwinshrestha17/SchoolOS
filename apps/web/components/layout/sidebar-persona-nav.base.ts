@@ -703,7 +703,11 @@ export const hrNavGroups: NavGroup[] = [
         href: '/dashboard/hr/attendance',
         label: 'Attendance',
         icon: CalendarCheck,
-        permissions: ['hr:read', 'attendance:read'],
+        permissions: [
+          'hr:read',
+          'hr:attendance:read',
+          'hr:attendance-corrections:approve',
+        ],
       },
       {
         href: '/dashboard/hr/leave',

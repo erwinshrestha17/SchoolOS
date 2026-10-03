@@ -1,3 +1,5 @@
+import { PrismaService } from '../prisma/prisma.service';
+import { StaffAttendanceCorrections } from '../hr/staff-attendance-corrections';
 import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
@@ -35,6 +37,12 @@ import { TeacherScopeModule } from '../teacher-scope/teacher-scope.module';
   ],
   providers: [
     AttendanceService,
+    {
+      provide: StaffAttendanceCorrections,
+      useFactory: (prisma: PrismaService) =>
+        new StaffAttendanceCorrections(prisma),
+      inject: [PrismaService],
+    },
     AttendanceCron,
     M2AttendanceHardeningService,
     StaffLeaveQueueService,

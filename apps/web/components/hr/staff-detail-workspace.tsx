@@ -711,8 +711,10 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                                 </Badge>
                               </td>
                               <td className="px-5 py-3.5 text-slate-600 font-medium">
-                                {item.checkIn
-                                  ? formatNepalTime(item.checkIn)
+                                {(item.checkInAt ?? item.checkIn)
+                                  ? formatNepalTime(
+                                      item.checkInAt ?? item.checkIn,
+                                    )
                                   : '-'}
                               </td>
                               <td className="px-5 py-3.5 text-slate-500 max-w-xs truncate">
@@ -727,7 +729,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                                   }
                                   className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[var(--color-mod-hr-text)] border border-[var(--color-mod-hr-border)] rounded-lg hover:bg-[var(--color-mod-hr-soft)] transition-colors"
                                 >
-                                  Correct
+                                  Request correction
                                 </button>
                               </td>
                             </tr>

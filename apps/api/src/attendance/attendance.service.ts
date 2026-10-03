@@ -1,3 +1,4 @@
+import { StaffAttendanceCorrections } from '../hr/staff-attendance-corrections';
 import {
   BadRequestException,
   ConflictException,
@@ -37,6 +38,7 @@ import {
   LeaveRequestStatus,
   NotificationChannel,
   Prisma,
+  type StaffAttendance,
   StaffStatus,
   StudentLifecycleStatus,
   TeacherAssignmentType,
@@ -3717,36 +3719,70 @@ export class AttendanceService {
       throw new NotFoundException('One or more staff records were not found');
     }
 
-    const records = await this.prisma.$transaction(
-      dto.records.map((record) =>
-        this.prisma.staffAttendance.upsert({
+    const records = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT staff_attendance_tenant_lock(${actor.tenantId}::text)::text`;
+      const existing = await tx.staffAttendance.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: { in: staffIds },
+          attendanceDate,
+        },
+        select: { id: true },
+      });
+      if (
+        existing.length &&
+        attendanceDate.toISOString().slice(0, 10) !==
+          getNepalSchoolDay().gregorianDate
+      ) {
+        throw new ConflictException(
+          'Historical attendance must use a correction request',
+        );
+      }
+      if (
+        await tx.staffAttendanceCorrection.count({
           where: {
-            tenantId_staffId_attendanceDate: {
+            tenantId: actor.tenantId,
+            attendanceId: { in: existing.map((row) => row.id) },
+            status: { in: ['APPROVED', 'PENDING_PAYROLL_ADJUSTMENT'] },
+          },
+        })
+      ) {
+        throw new ConflictException(
+          'Corrected attendance must use a new correction request',
+        );
+      }
+      const results: StaffAttendance[] = [];
+      for (const record of dto.records)
+        results.push(
+          await tx.staffAttendance.upsert({
+            where: {
+              tenantId_staffId_attendanceDate: {
+                tenantId: actor.tenantId,
+                staffId: record.staffId,
+                attendanceDate,
+              },
+            },
+            update: {
+              status: record.status,
+              leaveType: record.leaveType ?? null,
+              note: record.note ?? null,
+              checkInAt: record.checkInAt ? new Date(record.checkInAt) : null,
+              approvedById: actor.userId,
+            },
+            create: {
               tenantId: actor.tenantId,
               staffId: record.staffId,
               attendanceDate,
+              status: record.status,
+              leaveType: record.leaveType ?? null,
+              note: record.note ?? null,
+              checkInAt: record.checkInAt ? new Date(record.checkInAt) : null,
+              approvedById: actor.userId,
             },
-          },
-          update: {
-            status: record.status,
-            leaveType: record.leaveType ?? null,
-            note: record.note ?? null,
-            checkInAt: record.checkInAt ? new Date(record.checkInAt) : null,
-            approvedById: actor.userId,
-          },
-          create: {
-            tenantId: actor.tenantId,
-            staffId: record.staffId,
-            attendanceDate,
-            status: record.status,
-            leaveType: record.leaveType ?? null,
-            note: record.note ?? null,
-            checkInAt: record.checkInAt ? new Date(record.checkInAt) : null,
-            approvedById: actor.userId,
-          },
-        }),
-      ),
-    );
+          }),
+        );
+      return results;
+    });
 
     await this.auditService.record({
       action: 'submit',
@@ -3772,46 +3808,11 @@ export class AttendanceService {
     dto: CorrectStaffAttendanceDto,
     actor: AuthContext,
   ) {
-    const existing = await this.prisma.staffAttendance.findFirst({
-      where: { id: attendanceId, tenantId: actor.tenantId },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Staff attendance record not found');
-    }
-
-    const corrected = await this.prisma.staffAttendance.update({
-      where: { id: existing.id },
-      data: {
-        status: dto.status,
-        leaveType: dto.leaveType ?? null,
-        note: dto.note ?? existing.note,
-        checkInAt: dto.checkInAt ? new Date(dto.checkInAt) : existing.checkInAt,
-        approvedById: actor.userId,
-      },
-      include: { staff: true, approvedBy: AttendanceService.SAFE_USER_SELECT },
-    });
-
-    await this.auditService.record({
-      action: 'correct',
-      resource: 'staff_attendance',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: corrected.id,
-      before: {
-        status: existing.status,
-        leaveType: existing.leaveType,
-        note: existing.note,
-      },
-      after: {
-        status: corrected.status,
-        leaveType: corrected.leaveType,
-        note: corrected.note,
-        reason: dto.reason,
-      },
-    });
-
-    return corrected;
+    return new StaffAttendanceCorrections(this.prisma).request(
+      attendanceId,
+      dto,
+      actor,
+    );
   }
 
   async listLeaveBalances(actor: AuthContext) {

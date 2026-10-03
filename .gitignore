@@ -103,3 +103,8 @@ tests/load/results/
 !/SCHOOLOS_WEB_DESIGN_ASTRA.md
 !/SCHOOLOS_APP_DESIGN_ASTRA.md
 !/SCHOOLOS_PHASE_WISE_IMPLEMENTATION_MASTER_PLAN_WITH_EDGE_CASES.md
+
+# Requested Phase 7 verification report (subordinate completion evidence).
+!/claude/PHASE_7_COMPLETION_REPORT.md
+# Local browser verification captures.
+/apps/web/output/playwright/

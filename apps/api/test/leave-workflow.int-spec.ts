@@ -625,7 +625,7 @@ describeDatabase('Phase 7.6 staff leave workflow (PostgreSQL)', () => {
       expect(await used(world)).toBe('0.50');
     });
 
-    it('blocks unpaid leave inside a finalized payroll period', async () => {
+    it('blocks all leave attendance writes inside a finalized payroll period', async () => {
       const world = await makeWorld();
       await withLedgerGuardsOff(async (query) => {
         await query(
@@ -643,11 +643,12 @@ describeDatabase('Phase 7.6 staff leave workflow (PostgreSQL)', () => {
       expect(errorCode(await blocked.catch((e: unknown) => e))).toBe(
         'LEAVE_PAYROLL_FINALIZED',
       );
-      // Paid leave does not change pay and is still approvable.
+      // Paid leave also writes attendance; finalized input history is immutable.
       const paid = await request(world, { startsOn: TUE, endsOn: TUE });
-      await expect(approve(world, paid.id)).resolves.toMatchObject({
-        status: 'APPROVED',
-      });
+      expect(
+        errorCode(await approve(world, paid.id).catch((e: unknown) => e)),
+      ).toBe('LEAVE_PAYROLL_FINALIZED');
+      expect(await used(world)).toBe('0.00');
     });
 
     it('keeps another school out', async () => {

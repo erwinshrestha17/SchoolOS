@@ -1,3 +1,4 @@
+import { getNepalSchoolDay } from '@schoolos/core';
 import {
   ConflictException,
   Injectable,
@@ -184,9 +185,7 @@ function resolveAttendanceDate(input?: string, fallback: Date = new Date()) {
     throw new ConflictException('attendanceDate must be a valid ISO date');
   }
 
-  const attendanceDate = new Date(source);
-  attendanceDate.setHours(0, 0, 0, 0);
-  return attendanceDate;
+  return new Date(`${getNepalSchoolDay(source).gregorianDate}T00:00:00.000Z`);
 }
 
 function earlierDate(a: Date, b: Date) {

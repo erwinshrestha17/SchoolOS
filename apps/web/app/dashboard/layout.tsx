@@ -253,6 +253,15 @@ const dashboardRouteGates: RouteGate[] = [
     permissions: ['notices:read'],
   },
   {
+    prefix: '/dashboard/hr/attendance',
+    label: 'Staff attendance',
+    permissions: [
+      'hr:attendance:read',
+      'hr:attendance:correct',
+      'hr:attendance-corrections:approve',
+    ],
+  },
+  {
     prefix: '/dashboard/hr',
     label: 'HR',
     permissions: ['hr:read', 'payroll:read', 'payroll:manage'],

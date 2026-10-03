@@ -1,3 +1,13 @@
+import { RequiredModule } from '../auth/decorators/required-module.decorator';
+import { StaffAttendanceCorrections } from '../hr/staff-attendance-corrections';
+import {
+  StaffAttendanceCorrectionsQueryDto,
+  StaffAttendanceCorrectionDecisionDto,
+  StaffAttendanceImpactQueryDto,
+  StaffAttendanceCorrectionResponseDto,
+  StaffAttendanceCorrectionPageResponseDto,
+  StaffAttendanceCorrectionImpactResponseDto,
+} from './dto/staff-attendance-corrections.dto';
 import {
   Body,
   Controller,
@@ -34,7 +44,66 @@ import { AttendanceService } from './attendance.service';
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.hr')
 export class HrAttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(
+    private readonly attendanceService: AttendanceService,
+    private readonly corrections: StaffAttendanceCorrections,
+  ) {}
+
+  @ApiOkResponse({ type: StaffAttendanceCorrectionResponseDto })
+  @Post('staff-attendance/:id/corrections')
+  @Permissions('hr:attendance:correct')
+  requestCorrection(
+    @Param('id') id: string,
+    @Body() dto: CorrectStaffAttendanceDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.corrections.request(id, dto, auth);
+  }
+
+  @ApiOkResponse({ type: StaffAttendanceCorrectionPageResponseDto })
+  @Get('staff-attendance-corrections')
+  @Permissions('hr:attendance-corrections:approve')
+  listCorrections(
+    @Query() query: StaffAttendanceCorrectionsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.corrections.list(auth, query.page, query.limit);
+  }
+
+  @Post('staff-attendance-corrections/:id/approve')
+  @Permissions('hr:attendance-corrections:approve')
+  approveCorrection(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.corrections.decide(id, 'APPROVED', auth);
+  }
+
+  @Post('staff-attendance-corrections/:id/reject')
+  @Permissions('hr:attendance-corrections:approve')
+  rejectCorrection(
+    @Param('id') id: string,
+    @Body() dto: StaffAttendanceCorrectionDecisionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.corrections.decide(id, 'REJECTED', auth, dto.reason);
+  }
+
+  @Post('staff-attendance-corrections/:id/cancel')
+  @Permissions('hr:attendance:correct')
+  cancelCorrection(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.corrections.decide(id, 'CANCELLED', auth);
+  }
+
+  @ApiOkResponse({ type: StaffAttendanceCorrectionImpactResponseDto })
+  @Get('staff-attendance-corrections/:id/payroll-impact')
+  @Permissions('hr:attendance-corrections:approve')
+  @RequiredModule('hr')
+  @Entitlement('module.payroll')
+  correctionImpact(
+    @Param('id') id: string,
+    @Query() query: StaffAttendanceImpactQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.corrections.impact(id, auth, query.workingDays);
+  }
 
   @Get('staff-attendance/roster')
   @Permissions('hr:attendance:write')

@@ -1,3 +1,7 @@
+import {
+  purgeGuardedLedgerRows,
+  closeLedgerFixturePool,
+} from './helpers/ledger-fixture';
 import 'dotenv/config';
 import { ClsService } from 'nestjs-cls';
 import {
@@ -299,12 +303,8 @@ describe('Student fee ledger bounded projection (real database)', () => {
       await prisma.paymentRefund.deleteMany({
         where: { tenantId: { in: [tenantId, otherTenantId] } },
       });
-      await prisma.receipt.deleteMany({
-        where: { tenantId: { in: [tenantId, otherTenantId] } },
-      });
-      await prisma.payment.deleteMany({
-        where: { tenantId: { in: [tenantId, otherTenantId] } },
-      });
+      for (const id of [tenantId, otherTenantId].filter(Boolean))
+        await purgeGuardedLedgerRows(id);
       await prisma.feeWaiver.deleteMany({
         where: { tenantId: { in: [tenantId, otherTenantId] } },
       });
@@ -324,6 +324,7 @@ describe('Student fee ledger bounded projection (real database)', () => {
     await prisma.tenant.deleteMany({
       where: { id: { in: [tenantId, otherTenantId].filter(Boolean) } },
     });
+    await closeLedgerFixturePool();
     await prisma.$disconnect();
   });
 

@@ -37,6 +37,7 @@ model Staff {
   tenant                     Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   user                       User                        @relation("StaffUser", fields: [userId], references: [id], onDelete: Cascade)
   attendanceRecords          StaffAttendance[]
+  attendanceCorrections StaffAttendanceCorrection[]
   teacherAssignments         SubjectTeacherAssignment[]
   timetableSlots             TimetableSlot[]
   teacherAvailabilities      TeacherAvailability[]

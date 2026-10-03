@@ -24,6 +24,12 @@ const HTTP_METHODS = new Set([
 ]);
 
 const REQUIRED_OPERATIONS = [
+  ["post", "/api/v1/hr/staff-attendance/{id}/corrections"],
+  ["get", "/api/v1/hr/staff-attendance-corrections"],
+  ["post", "/api/v1/hr/staff-attendance-corrections/{id}/approve"],
+  ["post", "/api/v1/hr/staff-attendance-corrections/{id}/reject"],
+  ["post", "/api/v1/hr/staff-attendance-corrections/{id}/cancel"],
+  ["get", "/api/v1/hr/staff-attendance-corrections/{id}/payroll-impact"],
   ["post", "/api/v1/auth/login"],
   ["post", "/api/v1/auth/refresh"],
   ["get", "/api/v1/ready"],

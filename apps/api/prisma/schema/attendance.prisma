@@ -98,6 +98,8 @@ model StaffAttendance {
   checkOutAt     DateTime?
   approvedById   String?
   createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @default(now()) @updatedAt
+  corrections    StaffAttendanceCorrection[]
 
   tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   staff      Staff  @relation(fields: [staffId], references: [id], onDelete: Restrict)
@@ -276,4 +278,47 @@ model AttendanceDraft {
   @@index([tenantId, userId, lastSavedAt])
   @@index([tenantId, academicYearId, classId, sectionId, attendanceDate])
   @@index([tenantId, expiresAt])
+}
+
+
+enum StaffAttendanceCorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  PENDING_PAYROLL_ADJUSTMENT
+}
+
+model StaffAttendanceCorrection {
+  id String @id @default(uuid())
+  tenantId String
+  staffId String
+  attendanceId String
+  attendanceDate DateTime
+  originalStatus AttendanceStatus
+  requestedStatus AttendanceStatus
+  originalCheckInAt DateTime?
+  requestedCheckInAt DateTime?
+  originalCheckOutAt DateTime?
+  requestedCheckOutAt DateTime?
+  originalLeaveType String?
+  requestedLeaveType String?
+  originalNote String?
+  requestedNote String?
+  originalUpdatedAt DateTime
+  reason String
+  requesterId String
+  approverId String?
+  decidedAt DateTime?
+  decisionReason String?
+  status StaffAttendanceCorrectionStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  attendance StaffAttendance @relation(fields: [attendanceId], references: [id], onDelete: Restrict)
+  requester User @relation("StaffAttendanceCorrectionRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  approver User? @relation("StaffAttendanceCorrectionApprover", fields: [approverId], references: [id], onDelete: Restrict)
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, staffId, attendanceDate])
 }

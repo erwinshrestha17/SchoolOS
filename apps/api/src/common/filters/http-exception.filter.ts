@@ -1,3 +1,4 @@
+import { staffAttendanceHistoryError } from '../../hr/staff-attendance-history-error';
 import { isAuthorizationDenial } from '../../authorization/authorization-denied.exception';
 import {
   ArgumentsHost,
@@ -16,6 +17,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost) {
+    exception = staffAttendanceHistoryError(exception) ?? exception;
     const ctx = host.switchToHttp();
     const request = ctx.getRequest<RequestWithId>();
     const response = ctx.getResponse<Response>();

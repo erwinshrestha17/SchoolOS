@@ -1,6 +1,9 @@
 'use client';
 
-import { formatBsDate } from '@schoolos/core';
+import {
+  formatBsDate,
+  type StaffAttendanceCorrectionRequest,
+} from '@schoolos/core';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
@@ -29,6 +32,8 @@ type StaffAttendanceCorrectionDialogProps = {
     attendanceDate: string;
     status: string;
     checkIn?: string | null;
+    checkInAt?: string | null;
+    checkOutAt?: string | null;
     note?: string | null;
     leaveType?: string | null;
   };
@@ -48,15 +53,22 @@ export function StaffAttendanceCorrectionDialog({
   const [status, setStatus] = useState(record.status);
   const [reason, setReason] = useState('');
   const [checkInTime, setCheckInTime] = useState(
-    record.checkIn
-      ? formatNepalDateTimeLocalInput(record.checkIn).slice(11, 16)
+    (record.checkInAt ?? record.checkIn)
+      ? formatNepalDateTimeLocalInput(
+          (record.checkInAt ?? record.checkIn)!,
+        ).slice(11, 16)
+      : '',
+  );
+  const [checkOutTime, setCheckOutTime] = useState(
+    record.checkOutAt
+      ? formatNepalDateTimeLocalInput(record.checkOutAt).slice(11, 16)
       : '',
   );
   const [leaveType, setLeaveType] = useState(record.leaveType ?? '');
   const [note, setNote] = useState(record.note ?? '');
 
   const correctMutation = useMutation({
-    mutationFn: (payload: any) =>
+    mutationFn: (payload: StaffAttendanceCorrectionRequest) =>
       api.correctStaffAttendance(record.id, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -68,11 +80,15 @@ export function StaffAttendanceCorrectionDialog({
       void queryClient.invalidateQueries({
         queryKey: ['staff-attendance', staffId],
       });
-      void queryClient.invalidateQueries({ queryKey: ['payroll-preview'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['staff-attendance-corrections'],
+      });
       onClose();
     },
     onError: (error: any) => {
-      setToastError(error.message || 'Failed to correct attendance record.');
+      setToastError(
+        error.message || 'Failed to request attendance correction.',
+      );
     },
   });
 
@@ -86,19 +102,21 @@ export function StaffAttendanceCorrectionDialog({
       return;
     }
 
-    // Build ISO check-in date if time is provided
-    let checkInAt: string | undefined = undefined;
-    if (checkInTime) {
-      const datePart = record.attendanceDate.slice(0, 10);
-      checkInAt = nepalDateTimeLocalInputToUtc(`${datePart}T${checkInTime}`);
-    }
+    const datePart = record.attendanceDate.slice(0, 10);
+    const checkInAt = checkInTime
+      ? nepalDateTimeLocalInputToUtc(`${datePart}T${checkInTime}`)
+      : null;
+    const checkOutAt = checkOutTime
+      ? nepalDateTimeLocalInputToUtc(`${datePart}T${checkOutTime}`)
+      : null;
 
     correctMutation.mutate({
       status,
       reason: trimmedReason,
       checkInAt,
-      leaveType: status === 'LEAVE' && leaveType ? leaveType : undefined,
-      note: note.trim() || undefined,
+      checkOutAt,
+      leaveType: status === 'LEAVE' && leaveType ? leaveType : null,
+      note: note.trim() || null,
     });
   };
 
@@ -112,16 +130,17 @@ export function StaffAttendanceCorrectionDialog({
                 size={20}
                 className="text-[var(--color-mod-hr-text)]"
               />
-              Correct Attendance Record
+              Request Attendance Correction
             </DialogTitle>
             <p className="text-xs text-slate-500 mt-1">
-              Correcting entry for {fullName} on{' '}
+              Requesting a change for {fullName} on{' '}
               {formatBsDate(record.attendanceDate)}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close correction request"
             className="absolute top-6 right-6 p-2 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
           >
             <X size={16} />
@@ -142,9 +161,9 @@ export function StaffAttendanceCorrectionDialog({
           <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4 flex gap-3 text-xs text-amber-800 leading-relaxed">
             <AlertTriangle className="shrink-0 text-amber-600" size={18} />
             <div>
-              <strong>Recalculation Alert:</strong> Correcting historical
-              attendance records may trigger salary deductions or recalculations
-              on active/pending payroll runs.
+              A different authorized approver must review this request. For a
+              finalized payroll period, approval queues an adjustment for the
+              next payroll run and preserves the original attendance.
             </div>
           </div>
 
@@ -170,6 +189,14 @@ export function StaffAttendanceCorrectionDialog({
               />
             </FormField>
           </div>
+
+          <FormField label="Check Out Time">
+            <Input
+              type="time"
+              value={checkOutTime}
+              onChange={(e) => setCheckOutTime(e.target.value)}
+            />
+          </FormField>
 
           {status === 'LEAVE' && (
             <FormField label="Leave Type">
@@ -204,6 +231,7 @@ export function StaffAttendanceCorrectionDialog({
               onChange={(e) => setReason(e.target.value)}
               placeholder="Reason for changing record (e.g. forgot to check in, late log correction)"
               rows={3}
+              maxLength={1000}
               required
             />
           </FormField>
@@ -220,7 +248,7 @@ export function StaffAttendanceCorrectionDialog({
             disabled={correctMutation.isPending}
             className="bg-[var(--color-mod-hr-accent)] hover:bg-[var(--color-mod-hr-text)]"
           >
-            Save Correction
+            Submit Request
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,4 +1,8 @@
 import type {
+  StaffAttendanceCorrectionPage,
+  StaffAttendanceCorrectionImpact,
+} from '@schoolos/core';
+import type {
   AttendanceAnalytics,
   AttendanceConflict,
   AttendanceConflictReviewResult,
@@ -393,11 +397,31 @@ export const attendanceApi = {
       method: 'POST',
       json: body,
     }),
+  listStaffAttendanceCorrections: (page = 1) =>
+    request<StaffAttendanceCorrectionPage>(
+      `/hr/staff-attendance-corrections?page=${page}&limit=25`,
+    ),
+  staffAttendanceCorrectionImpact: (id: string) =>
+    request<StaffAttendanceCorrectionImpact>(
+      `/hr/staff-attendance-corrections/${encodeURIComponent(id)}/payroll-impact`,
+    ),
+  decideStaffAttendanceCorrection: (
+    id: string,
+    decision: 'approve' | 'reject',
+    reason?: string,
+  ) =>
+    request<unknown>(
+      `/hr/staff-attendance-corrections/${encodeURIComponent(id)}/${decision}`,
+      { method: 'POST', json: { reason } },
+    ),
   correctStaffAttendance: (id: string, body: JsonBody) =>
-    request<unknown>(`/hr/staff-attendance/${encodeURIComponent(id)}/correct`, {
-      method: 'PATCH',
-      json: body,
-    }),
+    request<unknown>(
+      `/hr/staff-attendance/${encodeURIComponent(id)}/corrections`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   reviewLeaveRequest: (id: string, body: JsonBody) =>
     request<StaffLeaveReviewResult>(
       `/hr/leave-requests/${encodeURIComponent(id)}/review`,

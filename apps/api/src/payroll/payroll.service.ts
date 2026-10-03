@@ -1,3 +1,4 @@
+import { payrollDayCounts } from '../hr/payroll-day-policy';
 import {
   BadRequestException,
   ConflictException,
@@ -1358,29 +1359,16 @@ export class PayrollService {
       const approvedUnpaidLeaveDays =
         unpaidLeaveByStaff.get(source.staffId) ?? 0;
 
-      const totalEffectiveDays = Math.min(
+      const dayCounts = payrollDayCounts({
         workingDays,
-        presentDays + approvedPaidLeaveDays,
-      );
-      const unpaidLeaveDays = Math.max(0, workingDays - totalEffectiveDays);
-      // Ensure we count explicit unpaid leave if it exceeds the working day gap
-      const finalUnpaidDays = Math.max(
-        unpaidLeaveDays,
-        approvedUnpaidLeaveDays,
-      );
-      // Days outside the verified employment window are never payable. For a
-      // full-period employment this cap equals workingDays and changes nothing.
-      const employedWorkingDays =
-        employedDays >= periodCalendarDays
-          ? workingDays
-          : Math.min(
-              workingDays,
-              Math.round((workingDays * employedDays) / periodCalendarDays),
-            );
-      const payrollPaidDays = Math.min(
-        employedWorkingDays,
-        Math.max(0, workingDays - finalUnpaidDays),
-      );
+        presentDays,
+        paidLeaveDays: approvedPaidLeaveDays,
+        unpaidLeaveDays: approvedUnpaidLeaveDays,
+        employedDays,
+        periodCalendarDays,
+      });
+      const finalUnpaidDays = dayCounts.unpaidDays;
+      const payrollPaidDays = dayCounts.paidDays;
 
       const baseSalary = new Prisma.Decimal(source.baseSalary);
       const allowances = new Prisma.Decimal(source.allowances);

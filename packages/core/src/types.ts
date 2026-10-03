@@ -2553,6 +2553,55 @@ export type StudentAttendanceMonthlyRegister = {
   days: StudentAttendanceMonthlyRegisterDay[];
 };
 
+export type StaffAttendanceCorrectionStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "PENDING_PAYROLL_ADJUSTMENT";
+export type StaffAttendanceCorrectionRecord = {
+  id: string;
+  attendanceId: string;
+  staffId: string;
+  attendanceDate: string;
+  originalStatus: string;
+  requestedStatus: string;
+  originalCheckInAt: string | null;
+  requestedCheckInAt: string | null;
+  originalCheckOutAt: string | null;
+  requestedCheckOutAt: string | null;
+  reason: string;
+  requesterId: string;
+  approverId: string | null;
+  decidedAt: string | null;
+  status: StaffAttendanceCorrectionStatus;
+  staff?: { fullName: string };
+};
+export type StaffAttendanceCorrectionPage = {
+  items: StaffAttendanceCorrectionRecord[];
+  total: number;
+  page: number;
+  limit: number;
+};
+export type StaffAttendanceCorrectionImpact = {
+  correctionId: string;
+  workingDays: number;
+  paidDaysDelta: number;
+  unpaidDaysDelta: number;
+  payrollLocked: boolean;
+  basis: "CURRENT_PAYROLL_DAY_RULES";
+  provisional: boolean;
+};
+
+export type StaffAttendanceCorrectionRequest = {
+  status: string;
+  reason: string;
+  checkInAt?: string | null;
+  checkOutAt?: string | null;
+  leaveType?: string | null;
+  note?: string | null;
+};
+
 // ─── Compiled from types/auth.ts ───
 
 export type SupportOverrideScope =

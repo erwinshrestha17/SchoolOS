@@ -1,3 +1,4 @@
+import { getNepalSchoolDay } from '@schoolos/core';
 import { StaffLeaveWorkflow } from '../hr/staff-leave-workflow';
 import {
   BadRequestException,
@@ -1084,8 +1085,8 @@ export class StaffService {
       );
     }
 
-    const attendanceDate = startOfDay(
-      dto.attendanceDate ? new Date(dto.attendanceDate) : new Date(),
+    const attendanceDate = new Date(
+      `${getNepalSchoolDay(dto.attendanceDate ? new Date(dto.attendanceDate) : new Date()).gregorianDate}T00:00:00.000Z`,
     );
     const checkInAt = dto.checkInAt ? new Date(dto.checkInAt) : undefined;
     const checkOutAt = dto.checkOutAt ? new Date(dto.checkOutAt) : undefined;

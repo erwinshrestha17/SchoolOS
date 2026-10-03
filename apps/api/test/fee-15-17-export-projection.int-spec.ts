@@ -1,3 +1,7 @@
+import {
+  purgeGuardedLedgerRows,
+  closeLedgerFixturePool,
+} from './helpers/ledger-fixture';
 import 'dotenv/config';
 import { ClsService } from 'nestjs-cls';
 import { PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
@@ -194,14 +198,14 @@ describe('FEE-15 / FEE-17 export projection parity (real database)', () => {
     cls.setTenant(undefined);
     await prisma.runWithoutTenantScope('test teardown', async () => {
       await prisma.paymentRefund.deleteMany({ where: { tenantId } });
-      await prisma.receipt.deleteMany({ where: { tenantId } });
-      await prisma.payment.deleteMany({ where: { tenantId } });
+      await purgeGuardedLedgerRows(tenantId);
       await prisma.invoice.deleteMany({ where: { tenantId } });
       await prisma.student.deleteMany({ where: { tenantId } });
       await prisma.academicYear.deleteMany({ where: { tenantId } });
       await prisma.class.deleteMany({ where: { tenantId } });
     });
     await prisma.tenant.deleteMany({ where: { id: tenantId } });
+    await closeLedgerFixturePool();
     await prisma.$disconnect();
   });
 

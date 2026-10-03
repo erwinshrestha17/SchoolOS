@@ -3413,6 +3413,8 @@ model StaffAttendance {
   checkOutAt     DateTime?
   approvedById   String?
   createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @default(now()) @updatedAt
+  corrections    StaffAttendanceCorrection[]
 
   tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   staff      Staff  @relation(fields: [staffId], references: [id], onDelete: Restrict)
@@ -3594,6 +3596,49 @@ model AttendanceDraft {
 }
 
 
+enum StaffAttendanceCorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  PENDING_PAYROLL_ADJUSTMENT
+}
+
+model StaffAttendanceCorrection {
+  id String @id @default(uuid())
+  tenantId String
+  staffId String
+  attendanceId String
+  attendanceDate DateTime
+  originalStatus AttendanceStatus
+  requestedStatus AttendanceStatus
+  originalCheckInAt DateTime?
+  requestedCheckInAt DateTime?
+  originalCheckOutAt DateTime?
+  requestedCheckOutAt DateTime?
+  originalLeaveType String?
+  requestedLeaveType String?
+  originalNote String?
+  requestedNote String?
+  originalUpdatedAt DateTime
+  reason String
+  requesterId String
+  approverId String?
+  decidedAt DateTime?
+  decisionReason String?
+  status StaffAttendanceCorrectionStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  attendance StaffAttendance @relation(fields: [attendanceId], references: [id], onDelete: Restrict)
+  requester User @relation("StaffAttendanceCorrectionRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  approver User? @relation("StaffAttendanceCorrectionApprover", fields: [approverId], references: [id], onDelete: Restrict)
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, staffId, attendanceDate])
+}
+
+
 // ─── Compiled from schema/auth.prisma ───
 model User {
   id               String      @id @default(uuid())
@@ -3636,6 +3681,8 @@ model User {
   staff                       Staff?                       @relation("StaffUser")
   guardian                    Guardian?                    @relation("GuardianUser")
   submittedAttendanceSessions AttendanceSession[]          @relation("SubmittedAttendanceSessions")
+  requestedStaffCorrections StaffAttendanceCorrection[] @relation("StaffAttendanceCorrectionRequester")
+  approvedStaffCorrections StaffAttendanceCorrection[] @relation("StaffAttendanceCorrectionApprover")
   approvedStaffAttendance     StaffAttendance[]            @relation("ApprovedStaffAttendance")
   collectedPayments           Payment[]                    @relation("CollectedPayments")
   cashierCloseCollectorScopes CashierClose[]               @relation("CashierCloseCollector")
@@ -7905,6 +7952,7 @@ model Staff {
   tenant                     Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   user                       User                        @relation("StaffUser", fields: [userId], references: [id], onDelete: Cascade)
   attendanceRecords          StaffAttendance[]
+  attendanceCorrections StaffAttendanceCorrection[]
   teacherAssignments         SubjectTeacherAssignment[]
   timetableSlots             TimetableSlot[]
   teacherAvailabilities      TeacherAvailability[]
@@ -9125,6 +9173,7 @@ model Tenant {
   attendanceSessions            AttendanceSession[]
   attendanceRecords             AttendanceRecord[]
   staffAttendance               StaffAttendance[]
+  staffAttendanceCorrections StaffAttendanceCorrection[]
   feeHeads                      FeeHead[]
   feePlans                      FeePlan[]
   feePlanItems                  FeePlanItem[]

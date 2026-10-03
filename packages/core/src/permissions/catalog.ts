@@ -1096,6 +1096,11 @@ export const permissionCatalog = [
     description: "Correct staff attendance with audit reason",
   },
   {
+    resource: "hr:attendance-corrections",
+    action: "approve",
+    description: "Independently review staff attendance corrections",
+  },
+  {
     resource: "hr:leave",
     action: "read",
     description: "Read staff leave requests and balances",

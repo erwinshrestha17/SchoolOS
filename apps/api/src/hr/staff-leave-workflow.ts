@@ -86,9 +86,9 @@ export interface ReviewLeaveInput {
 }
 
 /**
- * Payroll runs whose amounts are fixed. Approving or cancelling unpaid leave
- * inside such a period would silently change finalized pay, so it must go
- * through a payroll adjustment instead.
+ * Payroll runs whose inputs are fixed. Approval and cancellation write staff
+ * attendance even for paid leave, so both must preserve finalized history.
+ * Historical changes must go through an attendance correction/adjustment.
  */
 const FIXED_PAYROLL_STATUSES: PayrollRunStatus[] = [
   PayrollRunStatus.APPROVED,
@@ -873,7 +873,6 @@ export class StaffLeaveWorkflow {
     >,
     action: 'approve' | 'cancel',
   ) {
-    if (leave.isPaid) return;
     const months: Array<{ periodMonth: number; periodYear: number }> = [];
     const cursor = new Date(
       Date.UTC(
@@ -900,7 +899,7 @@ export class StaffLeaveWorkflow {
     if (run) {
       throw leaveConflict(
         'LEAVE_PAYROLL_FINALIZED',
-        `Cannot ${action} unpaid leave inside payroll period ${run.periodMonth}/${run.periodYear}, which is ${run.status}. Record a payroll adjustment instead.`,
+        `Cannot ${action} leave inside payroll period ${run.periodMonth}/${run.periodYear}, which is ${run.status}. Record a payroll adjustment instead.`,
       );
     }
   }

@@ -394,6 +394,8 @@ describe('backend hardening gate', () => {
       // last-seat admissions; capacity is recounted under the lock.
       '/admissions/admission-cases.service.ts': 1,
       '/app.service.ts': 1,
+      // Phase 7.7: parameterized tenant advisory lock before bulk staff writes.
+      '/attendance/attendance.service.ts': 1,
       '/auth/auth-account-locks.ts': 2,
       '/auth/school-authorization-transaction.ts': 1,
       // Phase 7.3: the one atomic document-number upsert (INSERT .. ON CONFLICT
@@ -407,6 +409,9 @@ describe('backend hardening gate', () => {
       // Phase 5J: parameterized Staff row lock (FOR UPDATE) anchored on
       // "tenantId" = actor tenant; serializes employment verification.
       '/hr/professional-identity.service.ts': 1,
+      // Phase 7.7: tenant lock, tenant/date payroll lock query, transaction-local
+      // correction identity checked against the same tenant attendance by trigger.
+      '/hr/staff-attendance-corrections.ts': 3,
       '/messaging/messaging-hardening.service.ts': 1,
       '/mobile/mobile-principal.service.ts': 1,
       '/platform/platform.service.ts': 1,
