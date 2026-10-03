@@ -1344,6 +1344,8 @@ export type JournalSourceKind =
   | "PAYROLL_ACCRUAL"
   | "PAYROLL_DISBURSEMENT"
   | "CANTEEN"
+  | "VENDOR_BILL"
+  | "VENDOR_PAYMENT"
   | "MANUAL_JOURNAL"
   | "REVERSAL"
   | "CORRECTION"
@@ -2173,6 +2175,194 @@ export type ReceivablesReconciliationResponse = {
   isReconciled: boolean;
   isFullyExplained: boolean;
   generatedAt: string;
+};
+
+/** Phase 7.11c: accounts payable. Money is a decimal string in NPR. */
+export type PayablesAccountRef = { id: string; code: string; name: string };
+export type PayablesVendorRef = {
+  id: string;
+  vendorCode: string;
+  displayName: string;
+  panNumber: string | null;
+};
+
+export type PayablesMappingState =
+  | "READY"
+  | "MISSING"
+  | "AMBIGUOUS"
+  | "INVALID";
+
+export type PayablesSetup = {
+  ready: boolean;
+  accountsPayable: {
+    mappingType: "ACCOUNTS_PAYABLE";
+    state: PayablesMappingState;
+    account: PayablesAccountRef | null;
+  };
+  vatInput: {
+    mappingType: "VAT_INPUT";
+    state: PayablesMappingState;
+    account: PayablesAccountRef | null;
+  };
+  tdsPayable: {
+    mappingType: "TDS_PAYABLE";
+    state: PayablesMappingState;
+    account: PayablesAccountRef | null;
+  };
+  paymentAccounts: Array<PayablesAccountRef & { kind: "CASH" | "BANK" }>;
+  expenseAccounts: PayablesAccountRef[];
+  taxPolicy: string;
+};
+
+export type FinanceVendorView = {
+  id: string;
+  vendorCode: string;
+  legalName: string;
+  displayName: string;
+  panNumber: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  outstandingAmount: string;
+  createdAt: string;
+  updatedAt: string;
+  authorization: ResourceAuthorization<"update" | "deactivate", "contact">;
+};
+
+export type VendorBillStatus = "DRAFT" | "SUBMITTED" | "POSTED" | "REVERSED";
+
+export type VendorBillView = {
+  id: string;
+  expenseNumber: string;
+  vendor: PayablesVendorRef | null;
+  vendorBillNumber: string | null;
+  expenseDate: string;
+  dueDate: string | null;
+  description: string;
+  expenseAccount: PayablesAccountRef;
+  amount: string;
+  taxAmount: string;
+  totalAmount: string;
+  status: VendorBillStatus;
+  supportingFileAssetId: string | null;
+  fiscalYearId: string;
+  fiscalPeriodId: string | null;
+  /** What an approver signs: send it back as `expectedFingerprint`. */
+  contentFingerprint: string;
+  rejection: {
+    at: string;
+    reason: string | null;
+    actor: { id: string; name: string } | null;
+  } | null;
+  reversalReason: string | null;
+  events: AccountingActorEvent[];
+  payable: {
+    id: string;
+    payableNumber: string;
+    status: FinancePayableStatus;
+    originalAmount: string;
+    outstandingAmount: string;
+  } | null;
+  journal: { id: string; entryNumber: string } | null;
+  createdAt: string;
+  updatedAt: string;
+  authorization: ResourceAuthorization<
+    "update" | "submit" | "approve" | "reject" | "reverse",
+    "amounts" | "approvals"
+  >;
+};
+
+export type FinancePayableStatus = "OPEN" | "PARTIALLY_PAID" | "PAID" | "VOID";
+
+export type FinancePayableView = {
+  id: string;
+  payableNumber: string;
+  vendor: PayablesVendorRef | null;
+  bill: {
+    id: string;
+    expenseNumber: string;
+    vendorBillNumber: string | null;
+    description: string;
+    expenseDate: string;
+  };
+  dueDate: string;
+  originalAmount: string;
+  outstandingAmount: string;
+  paidAmount: string;
+  status: FinancePayableStatus;
+  daysOverdue: number;
+  bucket: ReceivablesAgingBucketTotal["bucket"] | null;
+  voided: { date: string; reason: string | null } | null;
+  authorization: ResourceAuthorization<"settle", "settlements">;
+};
+
+export type PayableSettlementView = {
+  id: string;
+  amount: string;
+  withheldTaxAmount: string;
+  cashAmount: string;
+  paymentAccount: PayablesAccountRef;
+  settledAt: string;
+  paymentReference: string | null;
+  journalEntryId: string | null;
+  reversalOfId: string | null;
+  reversalReason: string | null;
+  reversedBySettlementId: string | null;
+  paidBy: { id: string; name: string } | null;
+  createdAt: string;
+  authorization: ResourceAuthorization<"reverse", "amounts">;
+};
+
+export type FinancePayableDetail = FinancePayableView & {
+  settlements: PayableSettlementView[];
+};
+
+export type PayablesAgingResponse = {
+  asOfDate: string;
+  totals: {
+    buckets: Array<{
+      bucket: ReceivablesAgingBucketTotal["bucket"];
+      payableCount: number;
+      vendorCount: number;
+      outstanding: string;
+    }>;
+    totalOutstanding: string;
+    overdueOutstanding: string;
+    payableCount: number;
+    vendorCount: number;
+  };
+  byVendor: Array<{
+    vendor: PayablesVendorRef | null;
+    payableCount: number;
+    outstanding: string;
+    overdueOutstanding: string;
+    buckets: Array<{
+      bucket: ReceivablesAgingBucketTotal["bucket"];
+      outstanding: string;
+    }>;
+  }>;
+  rows: Array<{
+    payableId: string;
+    payableNumber: string;
+    vendor: PayablesVendorRef | null;
+    billNumber: string;
+    vendorBillNumber: string | null;
+    dueDate: string;
+    originalAmount: string;
+    outstanding: string;
+    daysOverdue: number;
+    bucket: ReceivablesAgingBucketTotal["bucket"];
+  }>;
+  pagination: { page: number; limit: number; total: number };
+  /** The mapped Accounts Payable account on the same day (null if unmapped). */
+  ledger: {
+    account: PayablesAccountRef;
+    balance: string;
+    subledgerTotal: string;
+    difference: string;
+    matches: boolean;
+  } | null;
 };
 
 // ─── Compiled from types/activity.ts ───

@@ -830,6 +830,9 @@ const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
       'accounting:journals:read',
       'accounting:journals:approve',
       'accounting:reports:read',
+      'accounting:expenses:read',
+      'accounting:expenses:approve',
+      'accounting:payables:read',
     ],
   },
   {
@@ -842,6 +845,8 @@ const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
       'accounting:journals:post',
       'accounting:journals:reverse',
       'accounting:reports:read',
+      'accounting:payables:read',
+      'accounting:payables:settle',
     ],
   },
   {

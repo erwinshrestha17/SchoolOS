@@ -604,6 +604,16 @@ const legacyPermissionMetadata = {
     "finance_write",
     "1.0.0",
   ],
+  "accounting:expenses:approve": [
+    "accounting:expenses:approve",
+    "finance_critical",
+    "1.0.0",
+  ],
+  "accounting:payables:settle": [
+    "accounting:payables:settle",
+    "finance_critical",
+    "1.0.0",
+  ],
   "accounting:reconciliation:read": [
     "accounting:reconciliation:read",
     "finance_read",

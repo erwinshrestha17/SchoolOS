@@ -539,3 +539,102 @@ Fresh PostgreSQL 16 database `schoolos_auth_recovery_test_711b` (migrated, no dr
 ### Next
 
 7.11c — Payables.
+
+## 7.11c — Payables
+
+**Completed locally on 3 October 2026, on `main`. Not pushed.** Third 7.11 sub-slice (plan `claude/PHASE_7_11_PLAN.md`).
+
+**Baseline:** start `8e1008df` (7.11b); end = the commit that adds this section (`git log -1 -- claude/PHASE_7_COMPLETION_REPORT.md`).
+
+### Slice
+
+Accounts payable is now a working, auditable domain. Before this slice the four P0 tables existed with no constraints, service, route or test, and the web page was locked. Now a vendor bill is prepared, approved by a different person (which posts it to Accounts Payable), and paid by a third person. Payments and bills can be reversed. Payables age on the same buckets as receivables, and the aging total is checked against the AP ledger on the same day.
+
+### Decisions applied (owner defaults)
+
+- **P2.** Accounts Payable is a required report mapping (`ACCOUNTS_PAYABLE`, new enum value), exactly one liability account. Approval is refused with `PAYABLES_MAPPING_MISSING`, `_AMBIGUOUS` or `_INVALID`. VAT input and TDS payable use the same rule. No account is ever created automatically (`ensureAccount` is not used). The mapping settings endpoint now refuses more than one AP account, or a non-liability one.
+- **P3.** Three duties with two new `finance_critical` permissions:
+  - `accounting:expenses:write` prepares;
+  - `accounting:expenses:approve` approves;
+  - `accounting:payables:settle` pays.
+
+  The approver must differ from the preparer and submitter, and the payer from all three. Reversals use `accounting:journals:reverse`: a bill reversal must differ from its approver, and a payment reversal from its payer.
+
+  Role templates: `finance_approver` v4 gains approve plus expense, vendor and payable read; `posting_authority` v3 gains settle plus the same reads. The accountant template is unchanged (it already prepares). No broad alias grants either new permission. The principal allowlist is unchanged.
+
+- **P4.** VAT (on the bill) and withheld tax (at payment) are typed in, and nothing computes a rate. The page says so.
+- **P5.** Canteen purchase bills keep their own direct posting.
+
+### Changes
+
+- **Migration `20261003210000_phase7_payables_domain`** (expand-only; the preflight refuses to run if the expense or settlement tables already have rows):
+  - New columns:
+    - bill: vendor bill number, expense account, submit/reject/reverse evidence, approved fingerprint;
+    - payable: void evidence;
+    - settlement: withheld tax, cash amount, payment account.
+  - New FKs, each with a `tenant_ref_*` trigger.
+  - CHECKs: amounts; posted evidence; independent approver; rejection reason; reversal evidence; payable status and amount consistency; settlement arithmetic and sign; PAN format.
+  - Partial uniques: an active vendor name, and a vendor bill number per vendor (case- and space-insensitive, unless reversed).
+  - Three guard triggers:
+    - **Bills.** The state machine is DRAFT → SUBMITTED → POSTED → REVERSED, with SUBMITTED → DRAFT on rejection. Content is immutable after draft, and approval evidence after posting. A bill with payments cannot be reversed. Only a draft can be deleted.
+    - **Payables.** A payable is created only for a posted bill with the same total and vendor. Its terms are immutable, it is never deleted, and it can be voided only by reversing its bill. Its balance moves only through settlements.
+    - **Settlements.** Settlements are append-only. Inserting one locks the payable, keeps the paid amount within [0, original], requires an independent payer, and requires a reversal to offset exactly one settlement of the same payable. The trigger recomputes the outstanding amount and status itself.
+- **`PayablesService` and `PayablesController`** (`module.accounting`; one duty permission per route):
+  - Vendors: list, create, update, deactivate. A vendor code comes from a sequence. Duplicate names and PANs are refused, and a vendor with pending bills cannot be deactivated.
+  - Vendor bills (`/accounting/vendor-bills`): create (idempotent), edit draft, submit, approve, reject, reverse.
+    - **Approve** checks the approver's content fingerprint. In one serializable, live-authorized transaction it then posts Dr expense (+ Dr VAT input) / Cr AP on the bill date, writes an `M11` posting batch, and opens the payable.
+  - Payables: list and detail with payments.
+    - **Pay** (`POST /accounting/payables/:id/settlements`) is idempotent. It posts Dr AP (the account the bill actually credited) / Cr cash or bank / Cr TDS payable.
+    - **Reverse a payment**: `POST /accounting/payable-settlements/:id/reverse`.
+  - `GET /accounting/payables-setup`: mapping states and the account choices.
+  - `GET /accounting/reports/payables-aging`: as of a Nepal school day, with the shared buckets, by vendor, and the AP ledger balance on that day.
+  - Every bill, payable and payment carries a canonical `authorization` projection.
+  - Database guard refusals and serialization conflicts return 409, with stable codes.
+- **Journal sources** reuse `EXPENSE_VOUCHER` and `PAYMENT_VOUCHER` with `sourceModule = 'PAYABLES'`, so no enum change was needed; consumers were checked (cash flow classifies them as operating; the AR reconciliation is unaffected). The source resolver adds `VENDOR_BILL` and `VENDOR_PAYMENT`, with prepare/submit/approve/pay evidence and the bill document. Both are `restricted` without expense or payable read.
+- **The posting engine** records `M11` batches (`recordPayablesPostingBatch`). A reversal marks the batch `REVERSED`.
+- **The OpenAPI gate** requires all 18 new operations.
+- **Web:** `/dashboard/accounting/payables` is unlocked.
+  - Tabs: Payables (aging first, with a ledger-match badge and payable detail with payments, pay and reverse), Vendor bills (record, submit, approve and post, return, reverse) and Vendors.
+  - BS dates throughout, and actions follow the server projection.
+  - A setup panel lets an accounting administrator map Accounts Payable. It keeps every other mapping, because the endpoint replaces the whole set.
+  - The M11 posting-history panel is shown below.
+
+### Deviations from the plan (recorded)
+
+- **No `APPROVED` state is used.** Approval and posting happen atomically (SUBMITTED → POSTED), and the database refuses `APPROVED`. The enum value stays for compatibility.
+- **Routes.** Vendor bills are at `/accounting/vendor-bills` (the plan said `expenses-ap`). Payment reversal is `/accounting/payable-settlements/:id/reverse`, and setup is `/accounting/payables-setup`, so no static path collides with `payables/:id`. The old `POST /accounting/expenses` direct-expense journal is unchanged and is not part of payables.
+- **Document numbers** come from tenant-wide sequences (`VEN-0001`, `BILL-000001`, `AP-000001`), not per-fiscal-year keys.
+- **No permission migration.** Permission rows come from the catalog through seeding and provisioning, as in 7.9.
+- **A vendor is required on every bill.**
+- **`FinancePayable.voidedAt`** holds the accounting date of the bill reversal, so aging as of earlier days still shows the payable.
+
+### Operational impacts
+
+- **No school can approve a bill until it maps Accounts Payable.** The page shows the setup state.
+- **VAT input mapping.** The default seed maps VAT input to the same account as VAT output (`2230`), so bill VAT posts there as a net VAT account. Schools that want a separate input-VAT asset should remap it.
+- **Role template versions changed** (`finance_approver` v4, `posting_authority` v3).
+
+### Known limitations (for 7.11d / 7.12)
+
+- The report-mapping `PUT` replaces the whole set and is not in a live-authorization transaction (existing behaviour). Payables now depend on it, so it should be hardened.
+- There is no supporting-document upload in the bill form. The API accepts a tenant file id, and the resolver links the document.
+- Payables were not added to the 7.11a report-conformance suite. The payables test asserts the ledger balances, and aging = AP ledger, directly.
+- No Chromium pass was run for this page.
+- Petty cash, purchase orders, vendor bank details, TDS certificates and returns stay out of scope.
+
+### Tests executed
+
+Fresh PostgreSQL 16 database `schoolos_auth_recovery_test_711c2` (migrated, no drift), plus the marks, timetable and admission databases with the new migration applied.
+
+| Check                                                                                                                                                                                                                                                               | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Core tests                                                                                                                                                                                                                                                          | **35 passed** (role template baseline updated)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| API unit                                                                                                                                                                                                                                                            | 317 suites, **3,705 passed** (new `payables.service.spec.ts`: fingerprint, vendor name key, guard detection; new `payables.controller.spec.ts`: guards, entitlement and exactly one duty permission per route)                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| API integration (all four DB variables)                                                                                                                                                                                                                             | 36 suites, **588 passed**. New `payables-domain-policy.int-spec.ts` (13 tests): post, pay in parts with withheld tax, replay, key reuse, overpay, pay before the bill date, a non-cash/bank payment account, and aging = AP ledger on three days; payment and bill reversals with void; a user holding every duty is still blocked as approver, payer and reverser of their own work; reject and stale fingerprint; duplicate vendor, PAN and bill number; missing AP and TDS mappings with no accounts created; locked period; two concurrent full payments where exactly one wins (409); revoked grant and ended session; tenant isolation; direct-SQL guard and CHECK tests |
+| API e2e                                                                                                                                                                                                                                                             | 45 suites, **321 passed**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Web tests                                                                                                                                                                                                                                                           | **775 passed** (new `payables-workspace-contract.test.mjs`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Typecheck (core, API, web), web production build, `verify:openapi` (1,231 paths, 1,421 operations), `db:validate`, `prisma migrate diff --exit-code`, `verify:tracked-artifacts`, `format:check`, ESLint on changed API (errors) and web (`--max-warnings=0`) files | clean                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+
+### Next
+
+7.11d — Fiscal-close preview (its close inventory now includes submitted bills and open payables).

@@ -169,6 +169,27 @@ export const AccountingReportMappingType = {
   PF_EMPLOYEE: 'PF_EMPLOYEE',
   PF_EMPLOYER: 'PF_EMPLOYER',
   PF_PAID: 'PF_PAID',
+  ACCOUNTS_PAYABLE: 'ACCOUNTS_PAYABLE',
+} as const;
+
+export const FinanceVendorStatus = {
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+} as const;
+
+export const FinanceExpenseStatus = {
+  DRAFT: 'DRAFT',
+  SUBMITTED: 'SUBMITTED',
+  APPROVED: 'APPROVED',
+  POSTED: 'POSTED',
+  REVERSED: 'REVERSED',
+} as const;
+
+export const FinancePayableStatus = {
+  OPEN: 'OPEN',
+  PARTIALLY_PAID: 'PARTIALLY_PAID',
+  PAID: 'PAID',
+  VOID: 'VOID',
 } as const;
 
 export const UserStatus = {

@@ -37,6 +37,7 @@ import { studentsApi } from './api/students';
 import { attendanceApi } from './api/attendance';
 import { financeApi } from './api/finance';
 import { accountingApi } from './api/accounting';
+import { payablesApi } from './api/payables';
 import { payrollApi } from './api/payroll';
 import { professionalIdentityApi } from './api/professional-identity';
 import { communicationsApi } from './api/communications';
@@ -92,6 +93,7 @@ export const api = {
   ...attendanceApi,
   ...financeApi,
   ...accountingApi,
+  ...payablesApi,
   ...payrollApi,
   ...professionalIdentityApi,
   ...communicationsApi,

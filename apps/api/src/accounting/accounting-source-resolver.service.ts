@@ -29,6 +29,8 @@ export type JournalSourceKind =
   | 'PAYROLL_ACCRUAL'
   | 'PAYROLL_DISBURSEMENT'
   | 'CANTEEN'
+  | 'VENDOR_BILL'
+  | 'VENDOR_PAYMENT'
   | 'MANUAL_JOURNAL'
   | 'REVERSAL'
   | 'CORRECTION'
@@ -78,6 +80,7 @@ const FINANCE_READ = [
   'payments:collect',
 ];
 const PAYROLL_READ = ['payroll:read', 'payroll:run:read'];
+const PAYABLES_READ = ['accounting:expenses:read', 'accounting:payables:read'];
 const CANTEEN_READ = [
   'canteen:reports:read',
   'canteen:pos:read',
@@ -111,6 +114,11 @@ function classify(entry: ResolvableJournal): Kind {
   )
     return 'FISCAL_YEAR_CLOSE';
   if (sourceModule === 'CANTEEN') return 'CANTEEN';
+  if (sourceModule === 'PAYABLES') {
+    if (sourceType === JournalSourceType.EXPENSE_VOUCHER) return 'VENDOR_BILL';
+    if (sourceType === JournalSourceType.PAYMENT_VOUCHER)
+      return 'VENDOR_PAYMENT';
+  }
   if (sourceModule === 'PAYROLL') {
     if (sourceType === JournalSourceType.PAYROLL_DISBURSEMENT)
       return 'PAYROLL_DISBURSEMENT';
@@ -143,6 +151,8 @@ const KIND_LABELS: Record<Kind, string> = {
   PAYROLL_ACCRUAL: 'Payroll run (approval accrual)',
   PAYROLL_DISBURSEMENT: 'Payroll run (salary payment)',
   CANTEEN: 'Canteen',
+  VENDOR_BILL: 'Vendor bill (accounts payable)',
+  VENDOR_PAYMENT: 'Vendor payment (accounts payable)',
   MANUAL_JOURNAL: 'Manual journal',
   REVERSAL: 'Reversal of a journal',
   CORRECTION: 'Correction of a journal',
@@ -164,6 +174,9 @@ function domainPermissions(kind: Kind): string[] | null {
       return PAYROLL_READ;
     case 'CANTEEN':
       return CANTEEN_READ;
+    case 'VENDOR_BILL':
+    case 'VENDOR_PAYMENT':
+      return PAYABLES_READ;
     default:
       return null;
   }
@@ -243,6 +256,8 @@ export class AccountingSourceResolverService {
       )
       .map((item) => item.entry.sourceId)
       .filter((id): id is string => Boolean(id));
+    const expenseIds = idsOf(visible, ['VENDOR_BILL']);
+    const settlementIds = idsOf(visible, ['VENDOR_PAYMENT']);
     const journalIds = idsOf(classified, ['REVERSAL', 'CORRECTION']);
     const fiscalYearIds = idsOf(classified, [
       'OPENING_BALANCE',
@@ -258,6 +273,8 @@ export class AccountingSourceResolverService {
       purchaseBills,
       journals,
       fiscalYears,
+      expenses,
+      settlements,
     ] = await Promise.all([
       when(invoiceIds.length > 0, () =>
         this.prisma.invoice.findMany({
@@ -362,6 +379,55 @@ export class AccountingSourceResolverService {
           },
         }),
       ),
+      when(expenseIds.length > 0, () =>
+        this.prisma.financeExpense.findMany({
+          where: { tenantId, id: { in: expenseIds } },
+          select: {
+            id: true,
+            expenseNumber: true,
+            vendorBillNumber: true,
+            status: true,
+            supportingFileAssetId: true,
+            createdById: true,
+            createdAt: true,
+            submittedById: true,
+            submittedAt: true,
+            approvedById: true,
+            approvedAt: true,
+            reversedById: true,
+            reversedAt: true,
+          },
+        }),
+      ),
+      when(settlementIds.length > 0, () =>
+        this.prisma.financePayableSettlement.findMany({
+          where: { tenantId, id: { in: settlementIds } },
+          select: {
+            id: true,
+            paymentReference: true,
+            createdById: true,
+            settledAt: true,
+            createdAt: true,
+            payable: {
+              select: {
+                id: true,
+                payableNumber: true,
+                status: true,
+                expense: {
+                  select: {
+                    expenseNumber: true,
+                    createdById: true,
+                    createdAt: true,
+                    approvedById: true,
+                    approvedAt: true,
+                    supportingFileAssetId: true,
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ),
     ]);
 
     const refundRequests = refunds.length
@@ -427,6 +493,21 @@ export class AccountingSourceResolverService {
     fiscalYears.forEach((fy) => {
       note(fy.closedById);
     });
+    expenses.forEach((expense) => {
+      [
+        expense.createdById,
+        expense.submittedById,
+        expense.approvedById,
+        expense.reversedById,
+      ].forEach(note);
+    });
+    settlements.forEach((settlement) => {
+      [
+        settlement.createdById,
+        settlement.payable.expense.createdById,
+        settlement.payable.expense.approvedById,
+      ].forEach(note);
+    });
     const names = await resolveActorNames(this.prisma, tenantId, [...userIds]);
     const who = (id: string | null | undefined) =>
       id ? { id, name: names.get(id) ?? 'Unknown user' } : null;
@@ -445,6 +526,8 @@ export class AccountingSourceResolverService {
     const billById = new Map(purchaseBills.map((row) => [row.id, row]));
     const journalById = new Map(journals.map((row) => [row.id, row]));
     const fiscalYearById = new Map(fiscalYears.map((row) => [row.id, row]));
+    const expenseById = new Map(expenses.map((row) => [row.id, row]));
+    const settlementById = new Map(settlements.map((row) => [row.id, row]));
     const waiverInvoiceNumbers = new Map(
       invoices.map((row) => [row.id, row.invoiceNumber]),
     );
@@ -589,6 +672,64 @@ export class AccountingSourceResolverService {
           if (bill) {
             base.reference = bill.billNumber;
             base.status = bill.isPaid ? 'PAID' : 'UNPAID';
+          }
+          break;
+        }
+        case 'VENDOR_BILL': {
+          const expense = expenseById.get(id);
+          if (expense) {
+            base.reference = expense.vendorBillNumber
+              ? `${expense.expenseNumber} (bill ${expense.vendorBillNumber})`
+              : expense.expenseNumber;
+            base.status = expense.status;
+            base.href = `/dashboard/accounting/payables?view=expenses&expenseId=${encodeURIComponent(expense.id)}`;
+            base.approvals = [
+              ...event('PREPARE', expense.createdById, expense.createdAt),
+              ...event('SUBMIT', expense.submittedById, expense.submittedAt),
+              ...event('APPROVE', expense.approvedById, expense.approvedAt),
+              ...event('REVERSE', expense.reversedById, expense.reversedAt),
+            ];
+            if (expense.supportingFileAssetId) {
+              base.documents = [
+                {
+                  label: `Vendor bill for ${expense.expenseNumber}`,
+                  fileAssetId: expense.supportingFileAssetId,
+                },
+              ];
+            }
+          }
+          break;
+        }
+        case 'VENDOR_PAYMENT': {
+          const settlement = settlementById.get(id);
+          if (settlement) {
+            const { payable } = settlement;
+            base.reference = settlement.paymentReference
+              ? `${payable.payableNumber} (${settlement.paymentReference})`
+              : payable.payableNumber;
+            base.status = payable.status;
+            base.href = `/dashboard/accounting/payables?view=payables&payableId=${encodeURIComponent(payable.id)}`;
+            base.approvals = [
+              ...event(
+                'PREPARE',
+                payable.expense.createdById,
+                payable.expense.createdAt,
+              ),
+              ...event(
+                'APPROVE',
+                payable.expense.approvedById,
+                payable.expense.approvedAt,
+              ),
+              ...event('PAY', settlement.createdById, settlement.createdAt),
+            ];
+            if (payable.expense.supportingFileAssetId) {
+              base.documents = [
+                {
+                  label: `Vendor bill for ${payable.expense.expenseNumber}`,
+                  fileAssetId: payable.expense.supportingFileAssetId,
+                },
+              ];
+            }
           }
           break;
         }

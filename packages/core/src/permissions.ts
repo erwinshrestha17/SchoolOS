@@ -439,6 +439,18 @@ export const permissionCatalog = [
     description: "Create and correct tenant-scoped payables and settlements",
   },
   {
+    resource: "accounting:expenses",
+    action: "approve",
+    description:
+      "Approve a submitted vendor bill and post it to Accounts Payable (must differ from the preparer)",
+  },
+  {
+    resource: "accounting:payables",
+    action: "settle",
+    description:
+      "Pay a posted payable from a cash or bank account (must differ from the preparer and approver)",
+  },
+  {
     resource: "accounting:reconciliation",
     action: "read",
     description: "Read bank reconciliation sessions and match evidence",
@@ -2593,6 +2605,10 @@ const reviewedSystemRolePermissions: Record<SystemRoleName, PermissionKey[]> = {
     "accounting:journals:read",
     "accounting:journals:approve",
     "accounting:journals:reject",
+    "accounting:expenses:read",
+    "accounting:expenses:approve",
+    "accounting:vendors:read",
+    "accounting:payables:read",
   ],
   posting_authority: [
     "finance:approvals:read",
@@ -2607,6 +2623,10 @@ const reviewedSystemRolePermissions: Record<SystemRoleName, PermissionKey[]> = {
     "payroll:read",
     "payroll:run:read",
     "payroll:run:post",
+    "accounting:expenses:read",
+    "accounting:vendors:read",
+    "accounting:payables:read",
+    "accounting:payables:settle",
   ],
   financial_auditor: [
     "finance:approvals:read",
@@ -2795,8 +2815,8 @@ const SYSTEM_ROLE_TEMPLATE_IDENTITIES: Record<
   finance_clerk: { displayName: "Finance Clerk", version: 2 },
   cashier: { displayName: "Cashier", version: 2 },
   accountant: { displayName: "Accountant", version: 3 },
-  finance_approver: { displayName: "Finance Approver", version: 3 },
-  posting_authority: { displayName: "Posting Authority", version: 2 },
+  finance_approver: { displayName: "Finance Approver", version: 4 },
+  posting_authority: { displayName: "Posting Authority", version: 3 },
   financial_auditor: { displayName: "Auditor", version: 2 },
   parent: { displayName: "Parent/Guardian", version: 1 },
   student: { displayName: "Student", version: 1 },

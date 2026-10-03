@@ -153,6 +153,7 @@ enum AccountingReportMappingType {
   CASH_FLOW_OPERATING
   CASH_FLOW_INVESTING
   CASH_FLOW_FINANCING
+  ACCOUNTS_PAYABLE
 }
 
 enum FiscalBudgetStatus {

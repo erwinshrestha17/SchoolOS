@@ -2138,7 +2138,7 @@ export class AccountingPostingService {
       tenantId: string;
       fiscalYearId: string;
       fiscalPeriodId?: string | null;
-      sourceModule: 'M3' | 'M7';
+      sourceModule: 'M3' | 'M7' | 'M11';
       sourceType: JournalSourceType;
       sourceBatchId: string;
       postingType: string;
@@ -2255,6 +2255,36 @@ export class AccountingPostingService {
         },
       },
     });
+  }
+
+  /**
+   * Phase 7.11c: payables (vendor bills and payments) are M11-native sources.
+   * The posting batch is written beside the journal so retries, the batch
+   * monitor and the close inventory see AP postings like M3/M7 handoffs.
+   */
+  async recordPayablesPostingBatch(
+    tx: PostingClient,
+    input: {
+      tenantId: string;
+      fiscalYearId: string;
+      fiscalPeriodId: string | null;
+      sourceType: JournalSourceType;
+      sourceBatchId: string;
+      postingType: string;
+      sourceTotal: Prisma.Decimal;
+      journalEntry: {
+        id: string;
+        lines: Array<{
+          id?: string;
+          chartAccountId: string;
+          debit?: Prisma.Decimal;
+          credit?: Prisma.Decimal;
+        }>;
+      };
+      actor: AuthContext;
+    },
+  ) {
+    return this.recordPostedSourceBatch(tx, { ...input, sourceModule: 'M11' });
   }
 
   async generateJournalEntryNumber(

@@ -23,6 +23,8 @@ import { AccountingSourceMappingService } from './accounting-source-mapping.serv
 import { AccountingBudgetController } from './accounting-budget.controller';
 import { AccountingBudgetService } from './accounting-budget.service';
 import { AdvancedOperationsModule } from '../advanced-operations/advanced-operations.module';
+import { PayablesController } from './payables.controller';
+import { PayablesService } from './payables.service';
 
 @Module({
   imports: [
@@ -45,6 +47,7 @@ import { AdvancedOperationsModule } from '../advanced-operations/advanced-operat
     AccountingReportsController,
     AccountingM9Controller,
     AccountingBudgetController,
+    PayablesController,
   ],
   providers: [
     AccountingSourceResolverService,
@@ -59,6 +62,7 @@ import { AdvancedOperationsModule } from '../advanced-operations/advanced-operat
     M9TemplateService,
     AccountingSourceMappingService,
     AccountingBudgetService,
+    PayablesService,
   ],
   exports: [
     AccountingService,

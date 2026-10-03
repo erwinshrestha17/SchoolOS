@@ -31,7 +31,7 @@ const columns: readonly ReportTableColumn[] = [
 export function SourcePostingBatchesPanel({
   sourceModule,
 }: {
-  sourceModule?: 'M3' | 'M7';
+  sourceModule?: 'M3' | 'M7' | 'M11';
 }) {
   const [page, setPage] = useState(1);
   const queryClient = useQueryClient();

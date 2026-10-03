@@ -193,6 +193,18 @@ export const accountingPermissions = [
     description: "Create and correct tenant-scoped payables and settlements",
   },
   {
+    resource: "accounting:expenses",
+    action: "approve",
+    description:
+      "Approve a submitted vendor bill and post it to Accounts Payable (must differ from the preparer)",
+  },
+  {
+    resource: "accounting:payables",
+    action: "settle",
+    description:
+      "Pay a posted payable from a cash or bank account (must differ from the preparer and approver)",
+  },
+  {
     resource: "accounting:reconciliation",
     action: "read",
     description: "Read bank reconciliation sessions and match evidence",

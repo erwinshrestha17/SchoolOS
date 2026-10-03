@@ -585,6 +585,27 @@ export class AccountingReportsService {
           'One or more accounts do not exist or belong to another tenant',
         );
       }
+      // Phase 7.11c: payables post to this account, so it must be exactly
+      // one liability account.
+      const payableMappings = dto.mappings.filter(
+        (m) => m.mappingType === AccountingReportMappingType.ACCOUNTS_PAYABLE,
+      );
+      if (payableMappings.length > 1) {
+        throw new BadRequestException(
+          'Map exactly one Accounts Payable account',
+        );
+      }
+      const payableAccount = accounts.find(
+        (account) => account.id === payableMappings[0]?.accountId,
+      );
+      if (
+        payableAccount &&
+        payableAccount.type !== ChartAccountType.LIABILITY
+      ) {
+        throw new BadRequestException(
+          'The Accounts Payable account must be a liability account',
+        );
+      }
     }
 
     await this.prisma.accountingReportAccountMapping.findMany({

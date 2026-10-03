@@ -24,6 +24,8 @@ model ChartAccount {
   sourceDebitMappings      AccountingSourceMapping[] @relation("AccountingSourceMappingDebitAccount")
   sourceCreditMappings     AccountingSourceMapping[] @relation("AccountingSourceMappingCreditAccount")
   fiscalBudgetLines        FiscalBudgetLine[]
+  financeExpenses          FinanceExpense[]                 @relation("FinanceExpenseAccount")
+  payableSettlements       FinancePayableSettlement[]       @relation("FinancePayableSettlementPaymentAccount")
 
   @@unique([tenantId, code])
   @@index([tenantId, fiscalYearId])
@@ -118,6 +120,7 @@ model JournalEntry {
   reversals    JournalEntry[] @relation("JournalEntryReversal")
   correctionOf JournalEntry?  @relation("JournalEntryCorrection", fields: [correctionOfId], references: [id], onDelete: Restrict)
   corrections  JournalEntry[] @relation("JournalEntryCorrection")
+  payableSettlements FinancePayableSettlement[]
   lines        JournalLine[]
 
   @@unique([tenantId, fiscalYearId, entryNumber])
@@ -183,6 +186,7 @@ model FiscalYear {
 
   tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   periods        FiscalPeriod[]
+  financeExpenses FinanceExpense[]
   accounts       ChartAccount[]
   journalEntries JournalEntry[]
   payrollRuns    PayrollRun[]
@@ -223,6 +227,7 @@ model FiscalPeriod {
 
   tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   fiscalYear     FiscalYear     @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  financeExpenses FinanceExpense[]
   journalEntries JournalEntry[]
   fiscalBudgetLines FiscalBudgetLine[]
   postingBatches AccountingPostingBatch[]
@@ -351,6 +356,18 @@ model FinanceExpense {
   expenseDate           DateTime
   dueDate               DateTime?
   description           String
+  /// Phase 7.11c: the vendor's own bill/invoice number (duplicate guard).
+  vendorBillNumber      String?
+  expenseAccountId      String
+  submittedById         String?
+  submittedAt           DateTime?
+  /// sha256 of the approved content; posting refuses if the row changed.
+  approvedSourceFingerprint String?
+  rejectedById          String?
+  rejectedAt            DateTime?
+  rejectionReason       String?
+  reversedById          String?
+  reversedAt            DateTime?
   amount                Decimal              @db.Decimal(18, 2)
   taxAmount             Decimal              @default(0) @db.Decimal(18, 2)
   totalAmount           Decimal              @db.Decimal(18, 2)
@@ -370,6 +387,9 @@ model FinanceExpense {
   updatedAt             DateTime             @updatedAt
 
   vendor   FinanceVendor?  @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  expenseAccount ChartAccount @relation("FinanceExpenseAccount", fields: [expenseAccountId], references: [id], onDelete: Restrict)
+  fiscalYear     FiscalYear   @relation(fields: [fiscalYearId], references: [id], onDelete: Restrict)
+  fiscalPeriod   FiscalPeriod? @relation(fields: [fiscalPeriodId], references: [id], onDelete: Restrict)
   payable  FinancePayable?
   reversalOf FinanceExpense? @relation("FinanceExpenseReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversals  FinanceExpense[] @relation("FinanceExpenseReversal")
@@ -393,6 +413,10 @@ model FinancePayable {
   originalAmount  Decimal              @db.Decimal(18, 2)
   outstandingAmount Decimal            @db.Decimal(18, 2)
   status          FinancePayableStatus @default(OPEN)
+  /// Phase 7.11c: accounting date of the bill reversal that voided it.
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
@@ -410,6 +434,11 @@ model FinancePayableSettlement {
   tenantId        String
   payableId       String
   amount          Decimal  @db.Decimal(18, 2)
+  /// Phase 7.11c: tax withheld from the vendor (typed from the bill, never computed).
+  withheldTaxAmount Decimal @default(0) @db.Decimal(18, 2)
+  /// amount - withheldTaxAmount: what left the cash/bank account.
+  cashAmount      Decimal  @db.Decimal(18, 2)
+  paymentAccountId String
   settledAt       DateTime
   paymentReference String?
   idempotencyKey  String
@@ -420,6 +449,8 @@ model FinancePayableSettlement {
   createdAt       DateTime @default(now())
 
   payable    FinancePayable @relation(fields: [payableId], references: [id], onDelete: Restrict)
+  paymentAccount ChartAccount @relation("FinancePayableSettlementPaymentAccount", fields: [paymentAccountId], references: [id], onDelete: Restrict)
+  journalEntry JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
   reversalOf FinancePayableSettlement? @relation("FinancePayableSettlementReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversals  FinancePayableSettlement[] @relation("FinancePayableSettlementReversal")
 
