@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api } from '../../lib/api';
+import { downloadProtectedFile } from '../../lib/api/client';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ import {
 import {
   formatBsDate,
   formatBsDateTime,
+  type AccountingActorEvent,
   type JournalEntryView,
 } from '@schoolos/core';
 import { cn } from '../../lib/utils';
@@ -38,9 +40,24 @@ interface JournalDetailDialogProps {
 export function JournalDetailDialog({
   isOpen,
   onClose,
-  entry,
+  entry: initialEntry,
 }: JournalDetailDialogProps) {
   const queryClient = useQueryClient();
+  // Phase 7.11a: always read the server's journal detail (actors, resolved
+  // source, posting batch, linked reversal) and allow stepping to a related
+  // journal without leaving the dialog.
+  const [viewId, setViewId] = useState<string | null>(initialEntry?.id ?? null);
+  useEffect(() => {
+    setViewId(initialEntry?.id ?? null);
+  }, [initialEntry?.id]);
+  const detailQuery = useQuery({
+    queryKey: ['journal-detail', viewId],
+    queryFn: () => api.getJournalEntry(viewId as string),
+    enabled: isOpen && Boolean(viewId),
+  });
+  const entry =
+    detailQuery.data ??
+    (initialEntry && initialEntry.id === viewId ? initialEntry : null);
   const { hasPermissions } = useSession();
   // Phase 3A: journal decisions come from the canonical server projection.
   const access = resourceAccess(entry?.authorization);
@@ -136,14 +153,14 @@ export function JournalDetailDialog({
   };
 
   if (!entry) return null;
-  const sourceDrilldown = buildSourceDrilldown(entry);
+  const source = entry.source ?? null;
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | string) => {
     return new Intl.NumberFormat('en-NP', {
       style: 'currency',
       currency: 'NPR',
       maximumFractionDigits: 2,
-    }).format(amount);
+    }).format(Number(amount));
   };
 
   const getStatusColor = (status: string) => {
@@ -322,48 +339,13 @@ export function JournalDetailDialog({
             <p className="text-sm font-semibold text-[var(--color-mod-accounting-text)]">
               {entry.narration}
             </p>
-            {entry.reference && (
-              <div className="mt-2 flex items-center gap-2 text-xs font-medium text-[var(--color-mod-accounting-text)]/80">
-                <span className="font-bold text-[var(--color-mod-accounting-text)]">
-                  REF:
-                </span>
-                {entry.reference}
-              </div>
-            )}
           </div>
 
-          <div
-            className="rounded-2xl border border-slate-200 bg-white p-4"
-            data-testid="accounting-source-drilldown"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                  Source record
-                </p>
-                <p className="mt-1 text-sm font-bold text-slate-900">
-                  {entry.sourceModule ?? 'Accounting'} / {entry.sourceType}
-                </p>
-                <p className="mt-1 break-all text-xs font-semibold text-slate-500">
-                  {entry.sourceId
-                    ? `Source ID: ${entry.sourceId}`
-                    : 'Source ID not recorded'}
-                </p>
-              </div>
-              {sourceDrilldown ? (
-                <Link
-                  href={sourceDrilldown.href}
-                  className="rounded-xl border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)] px-3 py-2 text-xs font-black text-[var(--color-mod-accounting-text)] transition hover:bg-white"
-                >
-                  Open source record
-                </Link>
-              ) : (
-                <span className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
-                  Source route unavailable
-                </span>
-              )}
-            </div>
-          </div>
+          <SourcePanel
+            entry={entry}
+            source={source}
+            onOpenJournal={(id) => setViewId(id)}
+          />
 
           <div className="space-y-3">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
@@ -393,10 +375,10 @@ export function JournalDetailDialog({
                       <td className="px-4 py-3">
                         <div className="flex flex-col">
                           <span className="font-bold text-slate-900">
-                            {line.accountName}
+                            {line.accountName ?? line.chartAccount.name}
                           </span>
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                            {line.accountCode}
+                            {line.accountCode ?? line.chartAccount.code}
                           </span>
                         </div>
                       </td>
@@ -428,26 +410,15 @@ export function JournalDetailDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-xl border border-slate-100 p-3 flex flex-col">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Posted By
-              </span>
-              <span className="text-sm font-bold text-slate-700">
-                {entry.postedBy
-                  ? `${entry.postedBy.firstName} ${entry.postedBy.lastName}`
-                  : 'Posting user not recorded'}
-              </span>
-            </div>
-            <div className="rounded-xl border border-slate-100 p-3 flex flex-col">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Entry Date
-              </span>
-              <span className="text-sm font-bold text-slate-700">
-                {formatBsDateTime(entry.entryDate)}
-              </span>
-            </div>
-          </div>
+          <EvidenceList
+            title="Journal workflow"
+            testId="accounting-journal-actors"
+            events={entry.actors ?? []}
+            empty="No workflow actors were recorded for this journal."
+          />
+          <p className="text-xs font-semibold text-slate-500">
+            Entry date {formatBsDateTime(entry.entryDate)}
+          </p>
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0 p-4 border-t bg-slate-50/50">
@@ -551,28 +522,175 @@ export function JournalDetailDialog({
   );
 }
 
-function buildSourceDrilldown(entry: JournalEntryView) {
-  if (!entry.sourceId) return null;
+const DUTY_LABELS: Record<string, string> = {
+  CREATE: 'Prepared',
+  SUBMIT: 'Submitted',
+  REVIEW: 'Reviewed',
+  APPROVE: 'Approved',
+  REJECT: 'Rejected',
+  CANCEL: 'Cancelled',
+  POST: 'Posted',
+  REVERSE: 'Reversed',
+  REQUEST: 'Requested',
+  EXECUTE: 'Executed',
+  COLLECT: 'Collected',
+  GENERATE: 'Generated',
+  VALIDATE: 'Validated',
+  FINALIZE: 'Finalized',
+  MARK_PAID: 'Marked paid',
+  CLOSE: 'Closed',
+};
 
-  const moduleName = entry.sourceModule?.toUpperCase() ?? '';
-  const sourceType = entry.sourceType.toUpperCase();
-  const sourceId = encodeURIComponent(entry.sourceId);
+function EvidenceList({
+  title,
+  events,
+  empty,
+  testId,
+}: {
+  title: string;
+  events: AccountingActorEvent[];
+  empty: string;
+  testId?: string;
+}) {
+  return (
+    <div className="space-y-2" data-testid={testId}>
+      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+        {title}
+      </p>
+      {events.length === 0 ? (
+        <p className="text-sm text-slate-500">{empty}</p>
+      ) : (
+        <ol className="divide-y divide-slate-100 rounded-xl border border-slate-100">
+          {events.map((event, index) => (
+            <li
+              key={`${event.duty}-${index}`}
+              className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+            >
+              <span className="font-bold text-slate-700">
+                {DUTY_LABELS[event.duty] ?? event.duty}
+              </span>
+              <span className="text-slate-600">
+                {event.actor?.name ?? 'Not recorded'}
+                {event.at ? ` · ${formatBsDateTime(event.at)}` : ''}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
 
-  if (moduleName === 'PAYROLL') {
-    return { href: `/dashboard/hr/payroll?runId=${sourceId}` };
-  }
-
-  if (moduleName === 'CANTEEN') {
-    return { href: `/dashboard/canteen/pos?saleId=${sourceId}` };
-  }
-
-  if (moduleName === 'LIBRARY') {
-    return { href: `/dashboard/library?fineId=${sourceId}` };
-  }
-
-  if (moduleName === 'FINANCE' || sourceType === 'INVOICE') {
-    return { href: `/dashboard/fees/collect?invoiceId=${sourceId}` };
-  }
-
-  return null;
+function SourcePanel({
+  entry,
+  source,
+  onOpenJournal,
+}: {
+  entry: JournalEntryView;
+  source: JournalEntryView['source'];
+  onOpenJournal: (id: string) => void;
+}) {
+  const related = source?.relatedJournalId ?? null;
+  return (
+    <div
+      className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4"
+      data-testid="accounting-source-drilldown"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+            Source record
+          </p>
+          <p className="mt-1 text-sm font-bold text-slate-900">
+            {source?.label ??
+              `${entry.sourceModule ?? 'Accounting'} / ${entry.sourceType}`}
+          </p>
+          {source?.restricted ? (
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              Restricted. You do not have access to this module, so the source
+              details are hidden.
+            </p>
+          ) : (
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              {source?.reference
+                ? `Reference ${source.reference}`
+                : 'No reference recorded'}
+              {source?.status ? ` · ${source.status}` : ''}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {related ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenJournal(related)}
+            >
+              Open original journal
+            </Button>
+          ) : null}
+          {entry.reversedBy ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenJournal(entry.reversedBy!.id)}
+            >
+              Open reversal {entry.reversedBy.entryNumber ?? ''}
+            </Button>
+          ) : null}
+          {entry.correctedBy ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenJournal(entry.correctedBy!.id)}
+            >
+              Open correction {entry.correctedBy.entryNumber ?? ''}
+            </Button>
+          ) : null}
+          {source?.href && !source.restricted ? (
+            <Link
+              href={source.href}
+              className="rounded-xl border border-[var(--color-mod-accounting-border)] bg-[var(--color-mod-accounting-bg)] px-3 py-2 text-xs font-black text-[var(--color-mod-accounting-text)] transition hover:bg-white"
+            >
+              Open source record
+            </Link>
+          ) : null}
+        </div>
+      </div>
+      {source && !source.restricted && source.approvals.length > 0 ? (
+        <EvidenceList
+          title="Source approvals"
+          testId="accounting-source-approvals"
+          events={source.approvals}
+          empty=""
+        />
+      ) : null}
+      {source && !source.restricted && source.documents.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {source.documents.map((document) => (
+            <Button
+              key={document.fileAssetId}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                void downloadProtectedFile(document.fileAssetId, document.label)
+              }
+            >
+              {document.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+      {entry.postingBatch ? (
+        <p className="text-xs text-slate-500">
+          Posted through batch {entry.postingBatch.postingType} for{' '}
+          {entry.postingBatch.sourceModule} ({entry.postingBatch.status}).
+        </p>
+      ) : null}
+    </div>
+  );
 }

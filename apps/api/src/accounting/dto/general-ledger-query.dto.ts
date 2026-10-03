@@ -6,9 +6,11 @@ import {
   Min,
   Max,
   IsEnum,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { JournalSourceType } from '@prisma/client';
+import { LEDGER_STAGES, type LedgerStage } from '../ledger-scope';
 
 export class GeneralLedgerQueryDto {
   @IsString()
@@ -62,4 +64,9 @@ export class GeneralLedgerQueryDto {
   @IsOptional()
   @IsString()
   sort?: string = 'entryDate:asc,entryNumber:asc';
+
+  /** POST_CLOSING (default) shows closing entries; PRE_CLOSING matches the income statement. */
+  @IsOptional()
+  @IsIn(LEDGER_STAGES)
+  stage?: LedgerStage = 'POST_CLOSING';
 }

@@ -663,15 +663,24 @@ describe('SchoolOS web production contracts', () => {
       'Reversal failed',
       'Correction failed',
       'accounting-source-drilldown',
-      'buildSourceDrilldown',
       'Open source record',
-      'Source route unavailable',
-      '/dashboard/fees/collect?invoiceId=',
-      '/dashboard/canteen/pos?saleId=',
-      '/dashboard/library?fineId=',
-      '/dashboard/hr/payroll?runId=',
+      'Open original journal',
+      'accounting-journal-actors',
     ]) {
       assert.ok(polishedSurfaces.includes(marker), `Missing marker: ${marker}`);
+    }
+    // Phase 7.11a: source links come from the server resolver. The old
+    // client-built links pointed receipts/refunds at an invoice route and
+    // payroll at a route that does not exist.
+    for (const brokenLink of [
+      '/dashboard/fees/collect?invoiceId=',
+      '/dashboard/hr/payroll?runId=',
+      '/dashboard/canteen/pos?saleId=',
+    ]) {
+      assert.ok(
+        !polishedSurfaces.includes(brokenLink),
+        `Unexpected client-built source link: ${brokenLink}`,
+      );
     }
 
     assert.doesNotMatch(polishedSurfaces, /alert\(/);

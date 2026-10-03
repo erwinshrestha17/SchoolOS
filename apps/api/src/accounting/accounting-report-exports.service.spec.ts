@@ -25,12 +25,16 @@ const defaultGeneralLedger = {
   closingBalance: new Prisma.Decimal(0),
   closingBalanceSide: JournalLineSide.DEBIT,
   totals: { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(0) },
+  pageOpeningBalance: new Prisma.Decimal(0),
+  pageOpeningBalanceSide: JournalLineSide.DEBIT,
+  stage: 'POST_CLOSING' as const,
   rows: [],
   pagination: { page: 1, limit: 1000, total: 0, totalPages: 0 },
   generatedAt: new Date('2026-01-01T00:00:00.000Z'),
 } satisfies GeneralLedgerResponse;
 
 const ledgerRowContext = {
+  entryStatus: 'POSTED',
   journalEntryId: 'entry-1',
   journalLineId: 'line-1',
   postedAt: new Date('2024-01-01'),
@@ -42,6 +46,7 @@ const ledgerRowContext = {
   correctionOfId: null,
 } satisfies Pick<
   GeneralLedgerRow,
+  | 'entryStatus'
   | 'journalEntryId'
   | 'journalLineId'
   | 'postedAt'
@@ -132,6 +137,8 @@ describe('AccountingReportExportsService', () => {
   it('exports Trial Balance CSV with expected columns and totals', async () => {
     reportsService.getTrialBalance.mockResolvedValue({
       fiscalYearId: 'fy-1',
+      stage: 'PRE_CLOSING' as const,
+      setupWarnings: [],
       totalOpeningDebit: new Prisma.Decimal('1000'),
       totalOpeningCredit: new Prisma.Decimal('0'),
       totalPeriodDebit: new Prisma.Decimal('500'),
@@ -221,6 +228,8 @@ describe('AccountingReportExportsService', () => {
   it('exports Cash Book CSV with Counterparty Account column', async () => {
     reportsService.getCashBook.mockResolvedValue({
       fiscalYearId: 'fy-1',
+      pageOpeningBalance: new Prisma.Decimal(0),
+      pageOpeningBalanceSide: JournalLineSide.DEBIT,
       generatedAt: new Date('2026-01-01T00:00:00.000Z'),
       openingBalance: new Prisma.Decimal('1000'),
       openingBalanceSide: JournalLineSide.DEBIT,
@@ -510,6 +519,8 @@ describe('AccountingReportExportsService', () => {
   it('exports Income Statement CSV with Section/Account Code/Account Name/Amount', async () => {
     reportsService.getIncomeStatement.mockResolvedValue({
       fiscalYearId: 'fy-1',
+      stage: 'PRE_CLOSING' as const,
+      comparisonSupported: false as const,
       generatedAt: new Date('2026-01-01T00:00:00.000Z'),
       sections: [
         {
@@ -558,6 +569,8 @@ describe('AccountingReportExportsService', () => {
   it('exports Balance Sheet CSV with Section/Account columns and summary', async () => {
     reportsService.getBalanceSheet.mockResolvedValue({
       fiscalYearId: 'fy-1',
+      stage: 'POST_CLOSING' as const,
+      setupWarnings: [],
       asOfDate: new Date('2026-01-01T00:00:00.000Z'),
       generatedAt: new Date('2026-01-01T00:00:00.000Z'),
       sections: [
@@ -661,6 +674,8 @@ describe('AccountingReportExportsService', () => {
   it('calls report service methods with tenantId from auth', async () => {
     reportsService.getTrialBalance.mockResolvedValue({
       fiscalYearId: 'fy-1',
+      stage: 'PRE_CLOSING' as const,
+      setupWarnings: [],
       rows: [],
       totalOpeningDebit: new Prisma.Decimal(0),
       totalOpeningCredit: new Prisma.Decimal(0),
@@ -735,6 +750,8 @@ describe('AccountingReportExportsService', () => {
     });
     reportsService.getTrialBalance.mockResolvedValue({
       fiscalYearId: 'fy-1',
+      stage: 'PRE_CLOSING' as const,
+      setupWarnings: [],
       rows: [],
       totalOpeningDebit: new Prisma.Decimal(0),
       totalOpeningCredit: new Prisma.Decimal(0),
@@ -773,6 +790,8 @@ describe('AccountingReportExportsService', () => {
     });
     reportsService.getTrialBalance.mockResolvedValue({
       fiscalYearId: 'fy-1',
+      stage: 'PRE_CLOSING' as const,
+      setupWarnings: [],
       rows: [],
       totalOpeningDebit: new Prisma.Decimal(0),
       totalOpeningCredit: new Prisma.Decimal(0),
@@ -823,6 +842,8 @@ describe('AccountingReportExportsService', () => {
   it('exports a styled Balance Sheet PDF with accounting control totals', async () => {
     reportsService.getBalanceSheet.mockResolvedValue({
       fiscalYearId: 'fy-1',
+      stage: 'POST_CLOSING' as const,
+      setupWarnings: [],
       asOfDate: new Date('2026-01-01T00:00:00.000Z'),
       generatedAt: new Date('2026-01-01T00:00:00.000Z'),
       sections: [
@@ -891,6 +912,8 @@ describe('AccountingReportExportsService', () => {
   it('returns empty CSV for reports with no data rows', async () => {
     reportsService.getIncomeStatement.mockResolvedValue({
       fiscalYearId: 'fy-1',
+      stage: 'PRE_CLOSING' as const,
+      comparisonSupported: false as const,
       generatedAt: new Date('2026-01-01T00:00:00.000Z'),
       sections: [],
       totalIncome: new Prisma.Decimal(0),

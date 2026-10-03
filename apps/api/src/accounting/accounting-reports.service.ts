@@ -56,6 +56,21 @@ import {
   PayrollExceptionStatus,
   AccountingReportMappingType,
 } from '@prisma/client';
+import {
+  CLOSING_SOURCE_TYPES,
+  dayAfter,
+  isIncomeAccountType,
+  isProfitAndLossAccountType,
+  ledgerEntryWhere,
+  normalBalanceSide,
+  presentBalance,
+  PROFIT_AND_LOSS_ACCOUNT_TYPES,
+  reportRangeEndExclusive,
+  reportRangeStart,
+  splitSigned,
+  startOfUtcDay,
+  type LedgerStage,
+} from './ledger-scope';
 
 const cashBookLineInclude = Prisma.validator<Prisma.JournalLineInclude>()({
   chartAccount: {
@@ -77,6 +92,15 @@ const cashBookLineInclude = Prisma.validator<Prisma.JournalLineInclude>()({
 type CashBookJournalLine = Prisma.JournalLineGetPayload<{
   include: typeof cashBookLineInclude;
 }>;
+
+/** Total, deterministic order so pages never overlap or skip a line. */
+const LEDGER_LINE_ORDER: Prisma.JournalLineOrderByWithRelationInput[] = [
+  { journalEntry: { entryDate: 'asc' } },
+  { journalEntry: { entryNumber: 'asc' } },
+  { journalEntryId: 'asc' },
+  { lineNumber: 'asc' },
+  { id: 'asc' },
+];
 
 @Injectable()
 export class AccountingReportsService {
@@ -104,116 +128,100 @@ export class AccountingReportsService {
       accountType,
       includeZeroBalances,
     } = query;
+    const stage: LedgerStage = query.stage ?? 'PRE_CLOSING';
 
-    const fiscalYear = await this.prisma.fiscalYear.findUnique({
-      where: { id: fiscalYearId, tenantId },
-    });
-    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
-
-    if (fiscalPeriodId) {
-      const fiscalPeriod = await this.prisma.fiscalPeriod.findUnique({
-        where: { id: fiscalPeriodId, tenantId, fiscalYearId },
-      });
-      if (!fiscalPeriod) {
-        throw new BadRequestException('Invalid fiscal period for this year');
-      }
-    }
-
-    if (fromDate && toDate && new Date(fromDate) > new Date(toDate)) {
-      throw new BadRequestException('fromDate cannot be after toDate');
-    }
-
-    const journalWhere: Prisma.JournalEntryWhereInput = {
-      tenantId,
-      status: 'POSTED',
+    const { fiscalYear, window } = await this.resolveReportWindow(tenantId, {
       fiscalYearId,
-    };
-
-    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
-    if (fromDate || toDate) {
-      journalWhere.entryDate = {};
-      if (fromDate) journalWhere.entryDate.gte = new Date(fromDate);
-      if (toDate) journalWhere.entryDate.lte = new Date(toDate);
-    }
-
-    const linesGrouped = await this.prisma.journalLine.groupBy({
-      by: ['chartAccountId'],
-      _sum: {
-        debit: true,
-        credit: true,
-      },
-      where: {
-        tenantId,
-        journalEntry: journalWhere,
-      },
+      fiscalPeriodId,
+      fromDate,
+      toDate,
     });
 
-    const accounts = await this.prisma.chartAccount.findMany({
-      where: {
-        tenantId,
-        ...(accountType ? { type: accountType } : {}),
-      },
-      orderBy: { code: 'asc' },
-    });
+    // Opening: every ledger line dated before the window, across fiscal
+    // years. Prior-year closing entries are included, so income and expense
+    // accounts open at zero once the earlier year was closed (decision R1).
+    const [openingGrouped, movementGrouped, accounts, setupWarnings] =
+      await Promise.all([
+        this.prisma.journalLine.groupBy({
+          by: ['chartAccountId'],
+          _sum: { debit: true, credit: true },
+          where: {
+            tenantId,
+            journalEntry: ledgerEntryWhere({
+              tenantId,
+              stage: 'POST_CLOSING',
+              toExclusive: window.from,
+            }),
+          },
+        }),
+        this.prisma.journalLine.groupBy({
+          by: ['chartAccountId'],
+          _sum: { debit: true, credit: true },
+          where: {
+            tenantId,
+            journalEntry: ledgerEntryWhere({
+              tenantId,
+              stage,
+              fiscalYearId,
+              fiscalPeriodId,
+              from: window.from,
+              toExclusive: window.toExclusive,
+            }),
+          },
+        }),
+        this.prisma.chartAccount.findMany({
+          where: {
+            tenantId,
+            ...(accountType ? { type: accountType } : {}),
+          },
+          orderBy: { code: 'asc' },
+        }),
+        this.openingBalanceWarnings(tenantId, fiscalYear),
+      ]);
+
+    const openingById = new Map(
+      openingGrouped.map((row) => [row.chartAccountId, row._sum]),
+    );
+    const movementById = new Map(
+      movementGrouped.map((row) => [row.chartAccountId, row._sum]),
+    );
 
     const rows: TrialBalanceRow[] = [];
-    const totalOpeningDebit = new Prisma.Decimal(0);
-    const totalOpeningCredit = new Prisma.Decimal(0);
+    let totalOpeningDebit = new Prisma.Decimal(0);
+    let totalOpeningCredit = new Prisma.Decimal(0);
     let totalPeriodDebit = new Prisma.Decimal(0);
     let totalPeriodCredit = new Prisma.Decimal(0);
     let totalClosingDebit = new Prisma.Decimal(0);
     let totalClosingCredit = new Prisma.Decimal(0);
 
-    const normalDebitTypes: ChartAccountType[] = [
-      ChartAccountType.ASSET,
-      ChartAccountType.EXPENSE,
-    ];
-
     for (const account of accounts) {
-      const lineData = linesGrouped.find(
-        (l) => l.chartAccountId === account.id,
+      const opening = openingById.get(account.id);
+      const movement = movementById.get(account.id);
+      const openingSigned = this.toDecimal(opening?.debit).minus(
+        this.toDecimal(opening?.credit),
       );
-
-      const pDebit = this.toDecimal(lineData?._sum.debit);
-      const pCredit = this.toDecimal(lineData?._sum.credit);
-
-      const net = pDebit.minus(pCredit);
-      const normalSide = normalDebitTypes.includes(account.type)
-        ? JournalLineSide.DEBIT
-        : JournalLineSide.CREDIT;
-
-      let cDebit = new Prisma.Decimal(0);
-      let cCredit = new Prisma.Decimal(0);
-
-      if (normalSide === JournalLineSide.DEBIT) {
-        if (net.gte(0)) {
-          cDebit = net;
-        } else {
-          cCredit = net.abs();
-        }
-      } else {
-        const creditNet = pCredit.minus(pDebit);
-        if (creditNet.gte(0)) {
-          cCredit = creditNet;
-        } else {
-          cDebit = creditNet.abs();
-        }
-      }
+      const pDebit = this.toDecimal(movement?.debit);
+      const pCredit = this.toDecimal(movement?.credit);
+      const closingSigned = openingSigned.plus(pDebit).minus(pCredit);
+      const openingCols = splitSigned(openingSigned);
+      const closingCols = splitSigned(closingSigned);
 
       if (
         !includeZeroBalances &&
+        openingSigned.isZero() &&
         pDebit.isZero() &&
         pCredit.isZero() &&
-        cDebit.isZero() &&
-        cCredit.isZero()
+        closingSigned.isZero()
       ) {
         continue;
       }
 
+      totalOpeningDebit = totalOpeningDebit.plus(openingCols.debit);
+      totalOpeningCredit = totalOpeningCredit.plus(openingCols.credit);
       totalPeriodDebit = totalPeriodDebit.plus(pDebit);
       totalPeriodCredit = totalPeriodCredit.plus(pCredit);
-      totalClosingDebit = totalClosingDebit.plus(cDebit);
-      totalClosingCredit = totalClosingCredit.plus(cCredit);
+      totalClosingDebit = totalClosingDebit.plus(closingCols.debit);
+      totalClosingCredit = totalClosingCredit.plus(closingCols.credit);
 
       rows.push({
         accountId: account.id,
@@ -221,20 +229,22 @@ export class AccountingReportsService {
         accountName: account.name,
         accountType: account.type,
         parentId: account.parentId,
-        openingDebit: new Prisma.Decimal(0),
-        openingCredit: new Prisma.Decimal(0),
+        openingDebit: openingCols.debit,
+        openingCredit: openingCols.credit,
         periodDebit: pDebit,
         periodCredit: pCredit,
-        closingDebit: cDebit,
-        closingCredit: cCredit,
-        netBalance: net.abs(),
-        normalBalanceSide: normalSide,
+        closingDebit: closingCols.debit,
+        closingCredit: closingCols.credit,
+        netBalance: closingSigned.abs(),
+        normalBalanceSide: normalBalanceSide(account.type),
       });
     }
 
     const imbalanceAmount = totalClosingDebit.minus(totalClosingCredit).abs();
     const isBalanced =
-      imbalanceAmount.isZero() && totalPeriodDebit.equals(totalPeriodCredit);
+      imbalanceAmount.isZero() &&
+      totalPeriodDebit.equals(totalPeriodCredit) &&
+      totalOpeningDebit.equals(totalOpeningCredit);
 
     return {
       fiscalYearId,
@@ -250,6 +260,8 @@ export class AccountingReportsService {
       isBalanced,
       imbalanceAmount,
       rows,
+      stage,
+      setupWarnings,
       generatedAt: new Date(),
     };
   }
@@ -270,32 +282,21 @@ export class AccountingReportsService {
       sourceId,
       page = 1,
       limit = 50,
-      sort,
     } = query;
-
-    const fiscalYear = await this.prisma.fiscalYear.findUnique({
-      where: { id: fiscalYearId, tenantId },
-    });
-    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
-
-    if (fiscalPeriodId) {
-      const fiscalPeriod = await this.prisma.fiscalPeriod.findUnique({
-        where: { id: fiscalPeriodId, tenantId, fiscalYearId },
-      });
-      if (!fiscalPeriod) {
-        throw new BadRequestException('Invalid fiscal period for this year');
-      }
-    }
-
-    if (fromDate && toDate && new Date(fromDate) > new Date(toDate)) {
-      throw new BadRequestException('fromDate cannot be after toDate');
-    }
+    const stage: LedgerStage = query.stage ?? 'POST_CLOSING';
 
     if (!accountId && !accountCode) {
       throw new BadRequestException(
         'accountId or accountCode is required for General Ledger',
       );
     }
+
+    const { window } = await this.resolveReportWindow(tenantId, {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+    });
 
     const account = await this.prisma.chartAccount.findFirst({
       where: {
@@ -307,139 +308,90 @@ export class AccountingReportsService {
 
     if (!account) throw new NotFoundException('Account not found');
 
-    const journalWhere: Prisma.JournalEntryWhereInput = {
+    const journalWhere = ledgerEntryWhere({
       tenantId,
-      status: 'POSTED',
+      stage,
       fiscalYearId,
-    };
-    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
-    if (fromDate || toDate) {
-      journalWhere.entryDate = {};
-      if (fromDate) journalWhere.entryDate.gte = new Date(fromDate);
-      if (toDate) journalWhere.entryDate.lte = new Date(toDate);
-    }
+      fiscalPeriodId,
+      from: window.from,
+      toExclusive: window.toExclusive,
+    });
     if (sourceModule) journalWhere.sourceModule = sourceModule;
-    if (sourceType) journalWhere.sourceType = sourceType;
+    if (sourceType) {
+      if (
+        stage === 'PRE_CLOSING' &&
+        CLOSING_SOURCE_TYPES.includes(sourceType)
+      ) {
+        journalWhere.sourceType = { in: [] };
+      } else {
+        journalWhere.sourceType = sourceType;
+      }
+    }
     if (sourceId) journalWhere.sourceId = sourceId;
 
-    const normalDebitTypes: ChartAccountType[] = [
-      ChartAccountType.ASSET,
-      ChartAccountType.EXPENSE,
-    ];
-    const normalSide = normalDebitTypes.includes(account.type)
-      ? JournalLineSide.DEBIT
-      : JournalLineSide.CREDIT;
-
-    let openingDebitTotal = new Prisma.Decimal(0);
-    let openingCreditTotal = new Prisma.Decimal(0);
-
-    if (fromDate) {
-      const priorLinesGrouped = await this.prisma.journalLine.groupBy({
-        by: ['chartAccountId'],
-        _sum: { debit: true, credit: true },
-        where: {
-          tenantId,
-          chartAccountId: account.id,
-          journalEntry: {
-            tenantId,
-            status: 'POSTED',
-            fiscalYearId,
-            entryDate: { lt: new Date(fromDate) },
-          },
-        },
-      });
-
-      if (priorLinesGrouped.length > 0) {
-        openingDebitTotal = this.toDecimal(priorLinesGrouped[0]._sum.debit);
-        openingCreditTotal = this.toDecimal(priorLinesGrouped[0]._sum.credit);
-      }
-    }
-
-    const openingNet = openingDebitTotal.minus(openingCreditTotal);
-    let openingBalance = new Prisma.Decimal(0);
-    let openingBalanceSide: JournalLineSide = normalSide;
-
-    if (normalSide === JournalLineSide.DEBIT) {
-      if (openingNet.gte(0)) {
-        openingBalance = openingNet;
-      } else {
-        openingBalance = openingNet.abs();
-        openingBalanceSide = JournalLineSide.CREDIT;
-      }
-    } else {
-      const openingCreditNet = openingCreditTotal.minus(openingDebitTotal);
-      if (openingCreditNet.gte(0)) {
-        openingBalance = openingCreditNet;
-      } else {
-        openingBalance = openingCreditNet.abs();
-        openingBalanceSide = JournalLineSide.DEBIT;
-      }
-    }
-
+    const normalSide = normalBalanceSide(account.type);
     const lineWhere: Prisma.JournalLineWhereInput = {
       tenantId,
       chartAccountId: account.id,
       journalEntry: journalWhere,
     };
-
-    const totalLines = await this.prisma.journalLine.count({
-      where: lineWhere,
-    });
-    const totalPages = Math.ceil(totalLines / limit);
     const skip = (page - 1) * limit;
 
-    const orderBy: Prisma.JournalLineOrderByWithRelationInput[] = [];
-    if (sort === 'entryDate:asc,entryNumber:asc') {
-      orderBy.push({ journalEntry: { entryDate: 'asc' } });
-      orderBy.push({ journalEntry: { entryNumber: 'asc' } });
-    } else {
-      orderBy.push({ journalEntry: { entryDate: 'asc' } });
-      orderBy.push({ journalEntry: { entryNumber: 'asc' } });
-    }
+    const [openingAgg, totalsAgg, totalLines, priorPageLines, lines] =
+      await Promise.all([
+        this.prisma.journalLine.aggregate({
+          _sum: { debit: true, credit: true },
+          where: {
+            tenantId,
+            chartAccountId: account.id,
+            journalEntry: ledgerEntryWhere({
+              tenantId,
+              stage: 'POST_CLOSING',
+              toExclusive: window.from,
+            }),
+          },
+        }),
+        this.prisma.journalLine.aggregate({
+          _sum: { debit: true, credit: true },
+          where: lineWhere,
+        }),
+        this.prisma.journalLine.count({ where: lineWhere }),
+        skip > 0
+          ? this.prisma.journalLine.findMany({
+              where: lineWhere,
+              select: { debit: true, credit: true },
+              orderBy: LEDGER_LINE_ORDER,
+              take: skip,
+            })
+          : Promise.resolve(
+              [] as Array<{ debit: Prisma.Decimal; credit: Prisma.Decimal }>,
+            ),
+        this.prisma.journalLine.findMany({
+          where: lineWhere,
+          include: { journalEntry: true },
+          orderBy: LEDGER_LINE_ORDER,
+          skip,
+          take: limit,
+        }),
+      ]);
 
-    const lines = await this.prisma.journalLine.findMany({
-      where: lineWhere,
-      include: { journalEntry: true },
-      orderBy,
-      skip,
-      take: limit,
-    });
+    const openingSigned = this.toDecimal(openingAgg._sum.debit).minus(
+      this.toDecimal(openingAgg._sum.credit),
+    );
+    const totalDebit = this.toDecimal(totalsAgg._sum.debit);
+    const totalCredit = this.toDecimal(totalsAgg._sum.credit);
+    const pageOpeningSigned = priorPageLines.reduce(
+      (sum, line) => sum.plus(line.debit).minus(line.credit),
+      openingSigned,
+    );
 
-    let runningSignedBalance = openingNet;
-    const rows: GeneralLedgerRow[] = [];
-    let pageDebitTotal = new Prisma.Decimal(0);
-    let pageCreditTotal = new Prisma.Decimal(0);
-
-    for (const line of lines) {
+    let runningSignedBalance = pageOpeningSigned;
+    const rows: GeneralLedgerRow[] = lines.map((line) => {
       runningSignedBalance = runningSignedBalance
         .plus(line.debit)
         .minus(line.credit);
-      pageDebitTotal = pageDebitTotal.plus(line.debit);
-      pageCreditTotal = pageCreditTotal.plus(line.credit);
-
-      let lineRunBalance = new Prisma.Decimal(0);
-      let lineRunSide: JournalLineSide = JournalLineSide.DEBIT;
-
-      if (normalSide === JournalLineSide.DEBIT) {
-        if (runningSignedBalance.gte(0)) {
-          lineRunBalance = runningSignedBalance;
-          lineRunSide = JournalLineSide.DEBIT;
-        } else {
-          lineRunBalance = runningSignedBalance.abs();
-          lineRunSide = JournalLineSide.CREDIT;
-        }
-      } else {
-        const creditNet = runningSignedBalance.negated();
-        if (creditNet.gte(0)) {
-          lineRunBalance = creditNet;
-          lineRunSide = JournalLineSide.CREDIT;
-        } else {
-          lineRunBalance = creditNet.abs();
-          lineRunSide = JournalLineSide.DEBIT;
-        }
-      }
-
-      rows.push({
+      const running = presentBalance(runningSignedBalance, normalSide);
+      return {
         journalEntryId: line.journalEntryId,
         journalLineId: line.id,
         entryDate: line.journalEntry.entryDate,
@@ -454,22 +406,22 @@ export class AccountingReportsService {
         sourceId: line.journalEntry.sourceId,
         debit: line.debit,
         credit: line.credit,
-        runningBalance: lineRunBalance,
-        runningBalanceSide: lineRunSide,
+        runningBalance: running.amount,
+        runningBalanceSide: running.side,
         createdById: line.journalEntry.createdById,
         postedById: line.journalEntry.postedById,
         reversalOfId: line.journalEntry.reversalOfId,
         correctionOfId: line.journalEntry.correctionOfId,
-      });
-    }
+        entryStatus: line.journalEntry.status,
+      };
+    });
 
-    let closingBalance = openingBalance;
-    let closingBalanceSide = openingBalanceSide;
-
-    if (rows.length > 0) {
-      closingBalance = rows[rows.length - 1].runningBalance;
-      closingBalanceSide = rows[rows.length - 1].runningBalanceSide;
-    }
+    const opening = presentBalance(openingSigned, normalSide);
+    const pageOpening = presentBalance(pageOpeningSigned, normalSide);
+    const closing = presentBalance(
+      openingSigned.plus(totalDebit).minus(totalCredit),
+      normalSide,
+    );
 
     return {
       fiscalYearId,
@@ -478,23 +430,116 @@ export class AccountingReportsService {
       toDate,
       accountId: account.id,
       accountCode: account.code,
-      openingBalance,
-      openingBalanceSide,
-      closingBalance,
-      closingBalanceSide,
-      totals: {
-        debit: pageDebitTotal,
-        credit: pageCreditTotal,
-      },
+      openingBalance: opening.amount,
+      openingBalanceSide: opening.side,
+      closingBalance: closing.amount,
+      closingBalanceSide: closing.side,
+      totals: { debit: totalDebit, credit: totalCredit },
+      pageOpeningBalance: pageOpening.amount,
+      pageOpeningBalanceSide: pageOpening.side,
+      stage,
       rows,
       pagination: {
         page,
         limit,
         total: totalLines,
-        totalPages,
+        totalPages: Math.ceil(totalLines / limit),
       },
       generatedAt: new Date(),
     };
+  }
+
+  /**
+   * The date window a report covers. Explicit dates win; otherwise the fiscal
+   * period, otherwise the fiscal year. Bounds are inclusive-start /
+   * exclusive-end on the UTC accounting date (see ledger-scope.ts).
+   */
+  private async resolveReportWindow(
+    tenantId: string,
+    input: {
+      fiscalYearId: string;
+      fiscalPeriodId?: string;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ) {
+    const fiscalYear = await this.prisma.fiscalYear.findUnique({
+      where: { id: input.fiscalYearId, tenantId },
+    });
+    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
+
+    const fiscalPeriod = input.fiscalPeriodId
+      ? await this.prisma.fiscalPeriod.findUnique({
+          where: {
+            id: input.fiscalPeriodId,
+            tenantId,
+            fiscalYearId: input.fiscalYearId,
+          },
+        })
+      : null;
+    if (input.fiscalPeriodId && !fiscalPeriod) {
+      throw new BadRequestException('Invalid fiscal period for this year');
+    }
+
+    const bounded = fiscalPeriod ?? fiscalYear;
+    const naturalFrom = startOfUtcDay(bounded.startDate);
+    const naturalTo = dayAfter(bounded.endDate);
+    const explicitFrom = input.fromDate
+      ? reportRangeStart(input.fromDate)
+      : undefined;
+    const explicitTo = input.toDate
+      ? reportRangeEndExclusive(input.toDate)
+      : undefined;
+    if (
+      (explicitFrom && Number.isNaN(explicitFrom.getTime())) ||
+      (explicitTo && Number.isNaN(explicitTo.getTime()))
+    ) {
+      throw new BadRequestException('Invalid report date');
+    }
+    const from =
+      explicitFrom && explicitFrom > naturalFrom ? explicitFrom : naturalFrom;
+    const toExclusive =
+      explicitTo && explicitTo < naturalTo ? explicitTo : naturalTo;
+    if (explicitFrom && explicitTo && explicitFrom >= explicitTo) {
+      throw new BadRequestException('fromDate cannot be after toDate');
+    }
+    return { fiscalYear, fiscalPeriod, window: { from, toExclusive } };
+  }
+
+  /**
+   * Balances carry forward automatically (decision R1). A later year that
+   * also has an opening-balance journal may therefore count them twice.
+   */
+  private async openingBalanceWarnings(
+    tenantId: string,
+    fiscalYear: { id: string; startDate: Date },
+  ): Promise<string[]> {
+    const [openingJournal, earlierActivity] = await Promise.all([
+      this.prisma.journalEntry.findFirst({
+        where: {
+          ...ledgerEntryWhere({
+            tenantId,
+            stage: 'POST_CLOSING',
+            fiscalYearId: fiscalYear.id,
+          }),
+          sourceType: JournalSourceType.OPENING_BALANCE,
+        },
+        select: { id: true },
+      }),
+      this.prisma.journalEntry.findFirst({
+        where: ledgerEntryWhere({
+          tenantId,
+          stage: 'POST_CLOSING',
+          toExclusive: startOfUtcDay(fiscalYear.startDate),
+        }),
+        select: { id: true },
+      }),
+    ]);
+    return openingJournal && earlierActivity
+      ? [
+          'This fiscal year has an opening-balance journal and earlier years also have ledger entries. Balances carry forward automatically, so the opening-balance journal may count them twice.',
+        ]
+      : [];
   }
 
   async getReportMappings(tenantId: string) {
@@ -584,23 +629,12 @@ export class AccountingReportsService {
       limit = 50,
     } = query;
 
-    const fiscalYear = await this.prisma.fiscalYear.findUnique({
-      where: { id: fiscalYearId, tenantId },
+    const { window } = await this.resolveReportWindow(tenantId, {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
     });
-    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
-
-    if (fiscalPeriodId) {
-      const fiscalPeriod = await this.prisma.fiscalPeriod.findUnique({
-        where: { id: fiscalPeriodId, tenantId, fiscalYearId },
-      });
-      if (!fiscalPeriod) {
-        throw new BadRequestException('Invalid fiscal period for this year');
-      }
-    }
-
-    if (fromDate && toDate && new Date(fromDate) > new Date(toDate)) {
-      throw new BadRequestException('fromDate cannot be after toDate');
-    }
 
     const mappingTypes =
       query.accountKind === CashBookAccountKind.CASH
@@ -654,18 +688,21 @@ export class AccountingReportsService {
       }
     }
 
+    const zero = new Prisma.Decimal(0);
     if (targetAccounts.length === 0) {
       return {
         fiscalYearId,
         fiscalPeriodId,
         fromDate,
         toDate,
-        openingBalance: new Prisma.Decimal(0),
+        openingBalance: zero,
         openingBalanceSide: JournalLineSide.DEBIT,
-        totalReceipts: new Prisma.Decimal(0),
-        totalPayments: new Prisma.Decimal(0),
-        closingBalance: new Prisma.Decimal(0),
+        totalReceipts: zero,
+        totalPayments: zero,
+        closingBalance: zero,
         closingBalanceSide: JournalLineSide.DEBIT,
+        pageOpeningBalance: zero,
+        pageOpeningBalanceSide: JournalLineSide.DEBIT,
         rows: [],
         pagination: { page, limit, total: 0, totalPages: 0 },
         generatedAt: new Date(),
@@ -674,108 +711,86 @@ export class AccountingReportsService {
     }
 
     const targetAccountIds = targetAccounts.map((a) => a.id);
-
-    const journalWhere: Prisma.JournalEntryWhereInput = {
-      tenantId,
-      status: 'POSTED',
-      fiscalYearId,
-    };
-    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
-    if (fromDate || toDate) {
-      journalWhere.entryDate = {};
-      if (fromDate) journalWhere.entryDate.gte = new Date(fromDate);
-      if (toDate) journalWhere.entryDate.lte = new Date(toDate);
-    }
-
-    let openingBalance = new Prisma.Decimal(0);
-
-    if (fromDate) {
-      const priorLinesGrouped = await this.prisma.journalLine.groupBy({
-        by: ['chartAccountId'],
-        _sum: { debit: true, credit: true },
-        where: {
-          tenantId,
-          chartAccountId: { in: targetAccountIds },
-          journalEntry: {
-            tenantId,
-            status: 'POSTED',
-            fiscalYearId,
-            entryDate: { lt: new Date(fromDate) },
-          },
-        },
-      });
-
-      for (const group of priorLinesGrouped) {
-        const pDebit = this.toDecimal(group._sum.debit);
-        const pCredit = this.toDecimal(group._sum.credit);
-        openingBalance = openingBalance.plus(pDebit.minus(pCredit));
-      }
-    }
-
-    let openingBalanceSide: JournalLineSide = JournalLineSide.DEBIT;
-    let absoluteOpeningBalance = openingBalance;
-    if (openingBalance.lt(0)) {
-      absoluteOpeningBalance = openingBalance.abs();
-      openingBalanceSide = JournalLineSide.CREDIT;
-    }
-
     const lineWhere: Prisma.JournalLineWhereInput = {
       tenantId,
       chartAccountId: { in: targetAccountIds },
-      journalEntry: journalWhere,
+      journalEntry: ledgerEntryWhere({
+        tenantId,
+        stage: 'POST_CLOSING',
+        fiscalYearId,
+        fiscalPeriodId,
+        from: window.from,
+        toExclusive: window.toExclusive,
+      }),
     };
-
-    const totalLines = await this.prisma.journalLine.count({
-      where: lineWhere,
-    });
-    const totalPages = Math.ceil(totalLines / limit);
     const skip = (page - 1) * limit;
 
-    const lines: CashBookJournalLine[] = await this.prisma.journalLine.findMany(
-      {
-        where: lineWhere,
-        include: cashBookLineInclude,
-        orderBy: [
-          { journalEntry: { entryDate: 'asc' } },
-          { journalEntry: { entryNumber: 'asc' } },
-        ],
-        skip,
-        take: limit,
-      },
+    const [openingAgg, totalsAgg, totalLines, priorPageLines, lines] =
+      await Promise.all([
+        this.prisma.journalLine.aggregate({
+          _sum: { debit: true, credit: true },
+          where: {
+            tenantId,
+            chartAccountId: { in: targetAccountIds },
+            journalEntry: ledgerEntryWhere({
+              tenantId,
+              stage: 'POST_CLOSING',
+              toExclusive: window.from,
+            }),
+          },
+        }),
+        this.prisma.journalLine.aggregate({
+          _sum: { debit: true, credit: true },
+          where: lineWhere,
+        }),
+        this.prisma.journalLine.count({ where: lineWhere }),
+        skip > 0
+          ? this.prisma.journalLine.findMany({
+              where: lineWhere,
+              select: { debit: true, credit: true },
+              orderBy: LEDGER_LINE_ORDER,
+              take: skip,
+            })
+          : Promise.resolve(
+              [] as Array<{ debit: Prisma.Decimal; credit: Prisma.Decimal }>,
+            ),
+        this.prisma.journalLine.findMany({
+          where: lineWhere,
+          include: cashBookLineInclude,
+          orderBy: LEDGER_LINE_ORDER,
+          skip,
+          take: limit,
+        }) as Promise<CashBookJournalLine[]>,
+      ]);
+
+    const openingSigned = this.toDecimal(openingAgg._sum.debit).minus(
+      this.toDecimal(openingAgg._sum.credit),
+    );
+    const totalReceipts = this.toDecimal(totalsAgg._sum.debit);
+    const totalPayments = this.toDecimal(totalsAgg._sum.credit);
+    const pageOpeningSigned = priorPageLines.reduce(
+      (sum, line) => sum.plus(line.debit).minus(line.credit),
+      openingSigned,
     );
 
-    let runningSignedBalance = openingBalance;
-    const rows: CashBookRow[] = [];
-    let totalReceipts = new Prisma.Decimal(0);
-    let totalPayments = new Prisma.Decimal(0);
-
-    for (const line of lines) {
+    let runningSignedBalance = pageOpeningSigned;
+    const rows: CashBookRow[] = lines.map((line) => {
       runningSignedBalance = runningSignedBalance
         .plus(line.debit)
         .minus(line.credit);
-
-      totalReceipts = totalReceipts.plus(line.debit);
-      totalPayments = totalPayments.plus(line.credit);
-
-      let lineRunBalance = runningSignedBalance;
-      let lineRunSide: JournalLineSide = JournalLineSide.DEBIT;
-
-      if (runningSignedBalance.lt(0)) {
-        lineRunBalance = runningSignedBalance.abs();
-        lineRunSide = JournalLineSide.CREDIT;
-      }
-
+      const running = presentBalance(
+        runningSignedBalance,
+        JournalLineSide.DEBIT,
+      );
       const rowAccount = targetAccounts.find(
         (a) => a.id === line.chartAccountId,
       );
-
       const otherAccount = line.journalEntry.lines.find(
         (l) => l.chartAccountId !== line.chartAccountId,
       )?.chartAccount;
-
       const displayAccount = otherAccount || rowAccount;
 
-      rows.push({
+      return {
         journalEntryId: line.journalEntryId,
         journalLineId: line.id,
         entryDate: line.journalEntry.entryDate,
@@ -790,19 +805,21 @@ export class AccountingReportsService {
         sourceId: line.journalEntry.sourceId,
         receiptAmount: line.debit,
         paymentAmount: line.credit,
-        runningBalance: lineRunBalance,
-        runningBalanceSide: lineRunSide,
+        runningBalance: running.amount,
+        runningBalanceSide: running.side,
         postedById: line.journalEntry.postedById,
-      });
-    }
+      };
+    });
 
-    let closingBalance = absoluteOpeningBalance;
-    let closingBalanceSide: JournalLineSide = openingBalanceSide;
-
-    if (rows.length > 0) {
-      closingBalance = rows[rows.length - 1].runningBalance;
-      closingBalanceSide = rows[rows.length - 1].runningBalanceSide;
-    }
+    const opening = presentBalance(openingSigned, JournalLineSide.DEBIT);
+    const pageOpening = presentBalance(
+      pageOpeningSigned,
+      JournalLineSide.DEBIT,
+    );
+    const closing = presentBalance(
+      openingSigned.plus(totalReceipts).minus(totalPayments),
+      JournalLineSide.DEBIT,
+    );
 
     return {
       fiscalYearId,
@@ -817,18 +834,20 @@ export class AccountingReportsService {
               name: targetAccounts[0].name,
             }
           : undefined,
-      openingBalance: absoluteOpeningBalance,
-      openingBalanceSide,
+      openingBalance: opening.amount,
+      openingBalanceSide: opening.side,
       totalReceipts,
       totalPayments,
-      closingBalance,
-      closingBalanceSide,
+      closingBalance: closing.amount,
+      closingBalanceSide: closing.side,
+      pageOpeningBalance: pageOpening.amount,
+      pageOpeningBalanceSide: pageOpening.side,
       rows,
       pagination: {
         page,
         limit,
         total: totalLines,
-        totalPages,
+        totalPages: Math.ceil(totalLines / limit),
       },
       generatedAt: new Date(),
       setupWarnings,
@@ -847,52 +866,40 @@ export class AccountingReportsService {
       includeZeroBalances,
     } = query;
 
-    const fiscalYear = await this.prisma.fiscalYear.findUnique({
-      where: { id: fiscalYearId, tenantId },
-    });
-    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
-
-    if (fiscalPeriodId) {
-      const fiscalPeriod = await this.prisma.fiscalPeriod.findUnique({
-        where: { id: fiscalPeriodId, tenantId, fiscalYearId },
-      });
-      if (!fiscalPeriod) {
-        throw new BadRequestException('Invalid fiscal period for this year');
-      }
-    }
-
-    const journalWhere: Prisma.JournalEntryWhereInput = {
-      tenantId,
-      status: 'POSTED',
+    const { window } = await this.resolveReportWindow(tenantId, {
       fiscalYearId,
-    };
-
-    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
-    if (fromDate || toDate) {
-      journalWhere.entryDate = {};
-      if (fromDate) journalWhere.entryDate.gte = new Date(fromDate);
-      if (toDate) journalWhere.entryDate.lte = new Date(toDate);
-    }
-
-    const linesGrouped = await this.prisma.journalLine.groupBy({
-      by: ['chartAccountId'],
-      _sum: {
-        debit: true,
-        credit: true,
-      },
-      where: {
-        tenantId,
-        journalEntry: journalWhere,
-      },
+      fiscalPeriodId,
+      fromDate,
+      toDate,
     });
 
-    const accounts = await this.prisma.chartAccount.findMany({
-      where: {
-        tenantId,
-        type: { in: [ChartAccountType.REVENUE, ChartAccountType.EXPENSE] },
-      },
-      orderBy: { code: 'asc' },
-    });
+    const [linesGrouped, accounts] = await Promise.all([
+      this.prisma.journalLine.groupBy({
+        by: ['chartAccountId'],
+        _sum: { debit: true, credit: true },
+        where: {
+          tenantId,
+          journalEntry: ledgerEntryWhere({
+            tenantId,
+            stage: 'PRE_CLOSING',
+            fiscalYearId,
+            fiscalPeriodId,
+            from: window.from,
+            toExclusive: window.toExclusive,
+          }),
+        },
+      }),
+      this.prisma.chartAccount.findMany({
+        where: {
+          tenantId,
+          type: { in: PROFIT_AND_LOSS_ACCOUNT_TYPES },
+        },
+        orderBy: { code: 'asc' },
+      }),
+    ]);
+    const sums = new Map(
+      linesGrouped.map((row) => [row.chartAccountId, row._sum]),
+    );
 
     const incomeAccounts: IncomeStatementAccount[] = [];
     const expenseAccounts: IncomeStatementAccount[] = [];
@@ -900,15 +907,13 @@ export class AccountingReportsService {
     let totalExpense = new Prisma.Decimal(0);
 
     for (const account of accounts) {
-      const lineData = linesGrouped.find(
-        (l) => l.chartAccountId === account.id,
-      );
-      const debit = this.toDecimal(lineData?._sum.debit);
-      const credit = this.toDecimal(lineData?._sum.credit);
+      const lineData = sums.get(account.id);
+      const debit = this.toDecimal(lineData?.debit);
+      const credit = this.toDecimal(lineData?.credit);
 
       if (!includeZeroBalances && debit.isZero() && credit.isZero()) continue;
 
-      if (account.type === ChartAccountType.REVENUE) {
+      if (isIncomeAccountType(account.type)) {
         const netIncome = credit.minus(debit);
         if (!includeZeroBalances && netIncome.isZero()) continue;
         incomeAccounts.push({
@@ -918,7 +923,7 @@ export class AccountingReportsService {
           amount: netIncome,
         });
         totalIncome = totalIncome.plus(netIncome);
-      } else if (account.type === ChartAccountType.EXPENSE) {
+      } else {
         const netExpense = debit.minus(credit);
         if (!includeZeroBalances && netExpense.isZero()) continue;
         expenseAccounts.push({
@@ -961,6 +966,8 @@ export class AccountingReportsService {
       totalExpense,
       netSurplusOrDeficit: netSurplusOrDeficit.abs(),
       resultType,
+      stage: 'PRE_CLOSING',
+      comparisonSupported: false,
       generatedAt: new Date(),
     };
   }
@@ -976,33 +983,64 @@ export class AccountingReportsService {
       where: { id: fiscalYearId, tenantId },
     });
     if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
-
-    const journalWhere: Prisma.JournalEntryWhereInput = {
-      tenantId,
-      status: 'POSTED',
-      fiscalYearId,
-    };
-    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
-    if (asOfDate) {
-      journalWhere.entryDate = { lte: new Date(asOfDate) };
+    const fiscalPeriod = fiscalPeriodId
+      ? await this.prisma.fiscalPeriod.findUnique({
+          where: { id: fiscalPeriodId, tenantId, fiscalYearId },
+        })
+      : null;
+    if (fiscalPeriodId && !fiscalPeriod) {
+      throw new BadRequestException('Invalid fiscal period for this year');
     }
 
-    const linesGrouped = await this.prisma.journalLine.groupBy({
-      by: ['chartAccountId'],
-      _sum: {
-        debit: true,
-        credit: true,
-      },
-      where: {
-        tenantId,
-        journalEntry: journalWhere,
-      },
-    });
+    // A balance sheet is a position: everything up to the as-of date, across
+    // fiscal years, closing entries included (decision R1). A fiscal period
+    // means "as of that period's end".
+    const asOfExclusive = asOfDate
+      ? reportRangeEndExclusive(asOfDate)
+      : dayAfter((fiscalPeriod ?? fiscalYear).endDate);
+    if (Number.isNaN(asOfExclusive.getTime())) {
+      throw new BadRequestException('Invalid asOfDate');
+    }
 
-    const accounts = await this.prisma.chartAccount.findMany({
-      where: { tenantId },
-      orderBy: { code: 'asc' },
-    });
+    const [cumulative, currentYear, accounts, setupWarnings] =
+      await Promise.all([
+        this.prisma.journalLine.groupBy({
+          by: ['chartAccountId'],
+          _sum: { debit: true, credit: true },
+          where: {
+            tenantId,
+            journalEntry: ledgerEntryWhere({
+              tenantId,
+              stage: 'POST_CLOSING',
+              toExclusive: asOfExclusive,
+            }),
+          },
+        }),
+        this.prisma.journalLine.groupBy({
+          by: ['chartAccountId'],
+          _sum: { debit: true, credit: true },
+          where: {
+            tenantId,
+            journalEntry: ledgerEntryWhere({
+              tenantId,
+              stage: 'POST_CLOSING',
+              fiscalYearId,
+              toExclusive: asOfExclusive,
+            }),
+          },
+        }),
+        this.prisma.chartAccount.findMany({
+          where: { tenantId },
+          orderBy: { code: 'asc' },
+        }),
+        this.openingBalanceWarnings(tenantId, fiscalYear),
+      ]);
+    const cumulativeById = new Map(
+      cumulative.map((row) => [row.chartAccountId, row._sum]),
+    );
+    const currentById = new Map(
+      currentYear.map((row) => [row.chartAccountId, row._sum]),
+    );
 
     const assetAccounts: BalanceSheetAccount[] = [];
     const liabilityAccounts: BalanceSheetAccount[] = [];
@@ -1011,22 +1049,21 @@ export class AccountingReportsService {
     let totalAssets = new Prisma.Decimal(0);
     let totalLiabilities = new Prisma.Decimal(0);
     let totalEquity = new Prisma.Decimal(0);
-
-    let currentYearIncome = new Prisma.Decimal(0);
-    let currentYearExpense = new Prisma.Decimal(0);
+    let unclosedResult = new Prisma.Decimal(0);
+    let currentYearResult = new Prisma.Decimal(0);
 
     for (const account of accounts) {
-      const lineData = linesGrouped.find(
-        (l) => l.chartAccountId === account.id,
-      );
-      const debit = this.toDecimal(lineData?._sum.debit);
-      const credit = this.toDecimal(lineData?._sum.credit);
+      const sums = cumulativeById.get(account.id);
+      const debit = this.toDecimal(sums?.debit);
+      const credit = this.toDecimal(sums?.credit);
 
-      if (account.type === ChartAccountType.REVENUE) {
-        currentYearIncome = currentYearIncome.plus(credit.minus(debit));
-        continue;
-      } else if (account.type === ChartAccountType.EXPENSE) {
-        currentYearExpense = currentYearExpense.plus(debit.minus(credit));
+      if (isProfitAndLossAccountType(account.type)) {
+        // Income and expense not yet closed into retained earnings.
+        unclosedResult = unclosedResult.plus(credit.minus(debit));
+        const current = currentById.get(account.id);
+        currentYearResult = currentYearResult.plus(
+          this.toDecimal(current?.credit).minus(this.toDecimal(current?.debit)),
+        );
         continue;
       }
 
@@ -1065,14 +1102,22 @@ export class AccountingReportsService {
       }
     }
 
-    const currentYearResult = currentYearIncome.minus(currentYearExpense);
-    if (currentYearResult.abs().gt(0)) {
+    if (!currentYearResult.isZero()) {
       equityAccounts.push({
         accountCode: 'CURRENT_YEAR_RESULT',
         accountName: 'Current Year Surplus / Deficit',
         amount: currentYearResult,
       });
       totalEquity = totalEquity.plus(currentYearResult);
+    }
+    const priorUnclosed = unclosedResult.minus(currentYearResult);
+    if (!priorUnclosed.isZero()) {
+      equityAccounts.push({
+        accountCode: 'PRIOR_YEARS_UNCLOSED_RESULT',
+        accountName: 'Earlier Years Surplus / Deficit (not yet closed)',
+        amount: priorUnclosed,
+      });
+      totalEquity = totalEquity.plus(priorUnclosed);
     }
 
     const totalLiabilitiesAndEquity = totalLiabilities.plus(totalEquity);
@@ -1081,7 +1126,10 @@ export class AccountingReportsService {
 
     return {
       fiscalYearId,
-      asOfDate: asOfDate ? new Date(asOfDate) : fiscalYear.endDate,
+      fiscalPeriodId,
+      asOfDate: asOfDate
+        ? new Date(asOfDate)
+        : (fiscalPeriod ?? fiscalYear).endDate,
       sections: [
         { section: 'ASSETS', total: totalAssets, accounts: assetAccounts },
         {
@@ -1097,6 +1145,8 @@ export class AccountingReportsService {
       totalLiabilitiesAndEquity,
       isBalanced,
       imbalanceAmount,
+      stage: 'POST_CLOSING',
+      setupWarnings,
       generatedAt: new Date(),
     };
   }
@@ -1113,22 +1163,20 @@ export class AccountingReportsService {
       summaryType = TaxSummaryType.ALL,
     } = query;
 
-    const fiscalYear = await this.prisma.fiscalYear.findUnique({
-      where: { id: fiscalYearId, tenantId },
-    });
-    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
-
-    const journalWhere: Prisma.JournalEntryWhereInput = {
-      tenantId,
-      status: 'POSTED',
+    const { window } = await this.resolveReportWindow(tenantId, {
       fiscalYearId,
-    };
-    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
-    if (fromDate || toDate) {
-      journalWhere.entryDate = {};
-      if (fromDate) journalWhere.entryDate.gte = new Date(fromDate);
-      if (toDate) journalWhere.entryDate.lte = new Date(toDate);
-    }
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+    });
+    const journalWhere = ledgerEntryWhere({
+      tenantId,
+      stage: 'PRE_CLOSING',
+      fiscalYearId,
+      fiscalPeriodId,
+      from: window.from,
+      toExclusive: window.toExclusive,
+    });
 
     const linesGrouped = await this.prisma.journalLine.groupBy({
       by: ['chartAccountId'],
@@ -1703,44 +1751,30 @@ export class AccountingReportsService {
     return 'OPERATING';
   }
 
+  /** Cumulative cash/bank balance before `toExclusive`, across fiscal years. */
   private async sumMappedCashBalance(
     tenantId: string,
     cashBankAccountIds: string[],
-    fiscalYearId: string,
-    boundaryDate: Date | undefined,
-    mode: 'before' | 'through',
+    toExclusive: Date,
   ): Promise<Prisma.Decimal> {
     if (cashBankAccountIds.length === 0) return new Prisma.Decimal(0);
 
-    const entryDateFilter =
-      mode === 'before' && boundaryDate
-        ? { lt: boundaryDate }
-        : boundaryDate
-          ? { lte: boundaryDate }
-          : undefined;
-
-    const grouped = await this.prisma.journalLine.groupBy({
-      by: ['chartAccountId'],
+    const totals = await this.prisma.journalLine.aggregate({
       _sum: { debit: true, credit: true },
       where: {
         tenantId,
         chartAccountId: { in: cashBankAccountIds },
-        journalEntry: {
+        journalEntry: ledgerEntryWhere({
           tenantId,
-          status: JournalEntryStatus.POSTED,
-          fiscalYearId,
-          ...(entryDateFilter ? { entryDate: entryDateFilter } : {}),
-        },
+          stage: 'POST_CLOSING',
+          toExclusive,
+        }),
       },
     });
 
-    let total = new Prisma.Decimal(0);
-    for (const row of grouped) {
-      total = total
-        .plus(this.toDecimal(row._sum.debit))
-        .minus(this.toDecimal(row._sum.credit));
-    }
-    return total;
+    return this.toDecimal(totals._sum.debit).minus(
+      this.toDecimal(totals._sum.credit),
+    );
   }
 
   async getCashFlowStatement(
@@ -1750,19 +1784,12 @@ export class AccountingReportsService {
     const { fiscalYearId, fiscalPeriodId, fromDate, toDate } = query;
     const setupWarnings: string[] = [];
 
-    const fiscalYear = await this.prisma.fiscalYear.findUnique({
-      where: { id: fiscalYearId, tenantId },
+    const { window } = await this.resolveReportWindow(tenantId, {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
     });
-    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
-
-    if (fiscalPeriodId) {
-      const fiscalPeriod = await this.prisma.fiscalPeriod.findUnique({
-        where: { id: fiscalPeriodId, tenantId, fiscalYearId },
-      });
-      if (!fiscalPeriod) {
-        throw new BadRequestException('Invalid fiscal period for this year');
-      }
-    }
 
     const mappings = await this.prisma.accountingReportAccountMapping.findMany({
       where: { tenantId },
@@ -1797,35 +1824,23 @@ export class AccountingReportsService {
       };
     }
 
-    const journalWhere: Prisma.JournalEntryWhereInput = {
+    const journalWhere = ledgerEntryWhere({
       tenantId,
-      status: JournalEntryStatus.POSTED,
+      stage: 'PRE_CLOSING',
       fiscalYearId,
-    };
-    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
-    if (fromDate || toDate) {
-      journalWhere.entryDate = {};
-      if (fromDate) journalWhere.entryDate.gte = new Date(fromDate);
-      if (toDate) journalWhere.entryDate.lte = new Date(toDate);
-    }
+      fiscalPeriodId,
+      from: window.from,
+      toExclusive: window.toExclusive,
+    });
 
-    const fromBoundary = fromDate ? new Date(fromDate) : undefined;
-    const toBoundary = toDate ? new Date(toDate) : new Date();
-
-    const openingCash = await this.sumMappedCashBalance(
-      tenantId,
-      cashBankAccountIds,
-      fiscalYearId,
-      fromBoundary,
-      'before',
-    );
-    const closingCash = await this.sumMappedCashBalance(
-      tenantId,
-      cashBankAccountIds,
-      fiscalYearId,
-      toBoundary,
-      'through',
-    );
+    const [openingCash, closingCash] = await Promise.all([
+      this.sumMappedCashBalance(tenantId, cashBankAccountIds, window.from),
+      this.sumMappedCashBalance(
+        tenantId,
+        cashBankAccountIds,
+        window.toExclusive,
+      ),
+    ]);
 
     const entries = await this.prisma.journalEntry.findMany({
       where: journalWhere,
@@ -1974,17 +1989,20 @@ export class AccountingReportsService {
       );
     }
 
-    const journalWhere: Prisma.JournalEntryWhereInput = {
-      tenantId,
-      status: JournalEntryStatus.POSTED,
+    const { window } = await this.resolveReportWindow(tenantId, {
       fiscalYearId,
-    };
-    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
-    if (fromDate || toDate) {
-      journalWhere.entryDate = {};
-      if (fromDate) journalWhere.entryDate.gte = new Date(fromDate);
-      if (toDate) journalWhere.entryDate.lte = new Date(toDate);
-    }
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+    });
+    const journalWhere = ledgerEntryWhere({
+      tenantId,
+      stage: 'PRE_CLOSING',
+      fiscalYearId,
+      fiscalPeriodId,
+      from: window.from,
+      toExclusive: window.toExclusive,
+    });
 
     const accountIds = budget.lines.map((line) => line.chartAccountId);
     const linesGrouped =
@@ -2013,10 +2031,7 @@ export class AccountingReportsService {
       const credit = this.toDecimal(grouped?._sum.credit);
       let actualAmount = new Prisma.Decimal(0);
 
-      if (
-        line.chartAccount.type === ChartAccountType.REVENUE ||
-        line.chartAccount.type === ChartAccountType.INCOME
-      ) {
+      if (isIncomeAccountType(line.chartAccount.type)) {
         actualAmount = credit.minus(debit);
       } else if (line.chartAccount.type === ChartAccountType.EXPENSE) {
         actualAmount = debit.minus(credit);

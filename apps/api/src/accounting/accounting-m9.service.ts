@@ -8,6 +8,7 @@ import {
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { AccountingSourceMappingService } from './accounting-source-mapping.service';
+import { isIncomeAccountType, ledgerEntryWhere } from './ledger-scope';
 
 type NetPositionResultType = 'SURPLUS' | 'DEFICIT' | 'BREAK_EVEN';
 
@@ -104,11 +105,12 @@ export class AccountingM9Service {
       _sum: { debit: true, credit: true },
       where: {
         tenantId,
-        journalEntry: {
+        // Same ledger definition as the income statement (Phase 7.11a).
+        journalEntry: ledgerEntryWhere({
           tenantId,
-          status: JournalEntryStatus.POSTED,
+          stage: 'PRE_CLOSING',
           fiscalYearId,
-        },
+        }),
       },
     });
 
@@ -145,7 +147,7 @@ export class AccountingM9Service {
       totalCredit = totalCredit.plus(credit);
 
       const accountType = typeByAccountId.get(row.chartAccountId);
-      if (accountType === ChartAccountType.REVENUE) {
+      if (accountType && isIncomeAccountType(accountType)) {
         totalIncome = totalIncome.plus(credit.minus(debit));
       } else if (accountType === ChartAccountType.EXPENSE) {
         totalExpense = totalExpense.plus(debit.minus(credit));

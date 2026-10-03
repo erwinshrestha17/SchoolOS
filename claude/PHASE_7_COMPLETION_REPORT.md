@@ -390,3 +390,74 @@ All run on freshly created and migrated PostgreSQL 16 databases (`..._7101`, plu
 ### Next slice
 
 7.11 — Accounting surfaces: payables, AR aging, fiscal-close preview and report drill-down.
+
+## 7.11a — Report correctness and drill-down
+
+**Completed locally on 3 October 2026, on `main`. Not pushed.** First of four 7.11 sub-slices (plan `claude/PHASE_7_11_PLAN.md`, decision P1).
+
+**Baseline:** start `99079c92` (7.10); end = the commit that adds this section (`git log -1 -- claude/PHASE_7_COMPLETION_REPORT.md`).
+
+### Slice
+
+Every accounting statement now equals the ledger, and every figure drills through to the account ledger, the journal, the business record behind it and that record's approval evidence. The report-to-ledger proof the Phase 7 plan asked for exists and runs on real PostgreSQL.
+
+### Defects fixed
+
+- **Reversed journals counted as minus themselves.** Reversing a journal marks the original `REVERSED`; reports read only `POSTED`, so the original dropped out while its reversal stayed. All reports, both close-readiness trial-balance checks, the year-end closing builder, the M9 net position and the legacy book balance now read `POSTED` and `REVERSED` (bank reconciliation already did).
+- **Closing entries were not excluded.** The income statement, budget vs actual, tax summary and the default trial balance now exclude fiscal-year closing entries; the balance sheet and ledgers include them.
+- **`INCOME` accounts were dropped** from the income statement, the balance sheet and the year-end close. `INCOME` and `REVENUE` are now one class everywhere (decision R4). The year close now closes `INCOME` accounts too.
+- **Opening balances.** Trial-balance opening columns were hard-coded to zero; the general ledger and cash book had an opening only with `fromDate`, restarted running balances on every page and totalled one page. Now: opening = everything before the window, across fiscal years; page opening = opening + all rows before the page; totals and closing cover the whole filter.
+- **Balance sheet summed one fiscal year.** It is now cumulative to the as-of date across years (decision R1). Unclosed earlier-year results show as their own equity line. A fiscal period means "as of that period's end".
+- **Same-day entries dropped.** A date-only `toDate` became midnight. Report dates now use the same accounting day as the database period guard: the whole UTC day (decision R2).
+- **Duplicate routes.** `GET /accounting/reports/{income-statement,balance-sheet,cash-book}` were declared on both controllers, and the legacy one (older shape, floats) answered first. The three legacy handlers are removed (decision R3); their service methods still feed the legacy CSV export.
+- **Journal detail.** The dialog read fields the API never returned (`accountName`, `postedBy`, `reference`) and built wrong source links (every fee entry went to an invoice route, payroll to a route that does not exist).
+
+### Changes
+
+- `accounting/ledger-scope.ts`: the single ledger definition (`ledgerEntryWhere`, stage `PRE_CLOSING`/`POST_CLOSING`, inclusive-day bounds, income/expense classes, balance presentation).
+- `AccountingReportsService`: trial balance, general ledger, cash/bank book, income statement, balance sheet, cash flow, tax summary and budget vs actual rebuilt on it. A deterministic line order (date, number, entry, line, id) keeps pages from overlapping. New response fields: `stage`, `setupWarnings` (trial balance, balance sheet: an opening-balance journal in a later year may double count), `pageOpeningBalance`, `entryStatus` on ledger rows, `comparisonSupported: false` on the income statement. `stage` query parameter on trial balance (default `PRE_CLOSING`) and general ledger (default `POST_CLOSING`).
+- `AccountingSourceResolverService` (new): batched, tenant-scoped resolution of fee invoice, adjustment, waiver, receipt and refund (with its request, review, approval decisions and execution), payroll accrual and disbursement (with its preparation-to-payment chain), canteen postings, reversal and correction originals, opening balance and fiscal-year close. A source in a domain the viewer cannot read (payroll, fees, canteen) is returned as `restricted` with kind and label only, and is never queried. Display names come from staff records, else sign-in email or phone, inside the tenant only.
+- `GET /accounting/journals/:id` now also returns per-line account code and name, the workflow actors (`{ duty, actor, at }`, never notes), the resolved source, the posting batch, and the reversal or correction that points back.
+- Web: statement rows open the account ledger with the matching stage (income statement and trial balance pre-closing, balance sheet post-closing). Ledger and cash-book rows open the journal. The ledger pages on the server and shows the brought-forward balance, totals and closing balance. The trial balance gains an opening column. The journal dialog reads the server detail, shows the workflow and source approvals, opens related journals in place, downloads source documents through the file registry, and renders "Restricted" for other domains. The ledger-account filter is now controlled so drill-down selects it.
+- Core: `JournalSourceSummary`, `AccountingActorEvent`, `AccountingLedgerStage` and the corrected report types. `JournalEntryView` drops the never-returned `reference` and `postedBy`.
+- The unit-test Prisma mock gained the `JournalSourceType` values the schema already had (`CLOSING_ENTRY`, vouchers, `OPENING_BALANCE`).
+
+### Operational impacts
+
+- **Report figures change** for any school with reversals, a closed year, `INCOME` accounts, more than one fiscal year or entries late on a report end date. This is a correction; saved PDF snapshots keep the old figures.
+- **Year-end close now includes `INCOME` accounts.** A year closed earlier left those balances open; they now appear as "Earlier Years Surplus / Deficit (not yet closed)" on the balance sheet.
+- **Close readiness** trial-balance checks now include reversed entries (both sides balance, so no new blocker is expected).
+- **Accountants without payroll, fee or canteen read access** see those journal sources as "Restricted".
+- The three removed legacy routes are served by the canonical controller, whose response the web already expected.
+
+### Not in this sub-slice
+
+Comparative columns (still unsupported, now flagged), AR aging (7.11b), payables (7.11c), the close preview and the year re-close question (7.11d). Revenue accounts with a debit balance still produce a negative closing line; the 7.11d closing builder handles signed amounts. No visual Chromium pass was run for this sub-slice (it needs the full stack with seeded ledger data); contract tests and the production build cover the web changes.
+
+### Invariants established
+
+- One definition of the ledger for every statement, check and close.
+- A reversed journal and its reversal net to zero in every report.
+- Statements of performance exclude closing entries; positions include them.
+- Trial balance, ledger, cash book and balance sheet reconcile: ledger closing = trial-balance closing; cash book closing = trial-balance cash; assets = liabilities + equity.
+- Paging a ledger never changes its totals, closing balance or running balances.
+- Accounting access does not reveal another domain's records.
+- Each method+path in the accounting module is declared once (pinned by `accounting-route-ownership.spec.ts`).
+
+### Tests executed
+
+Fresh PostgreSQL 16 database `schoolos_auth_recovery_test_711a` (migrated, no drift), plus the dedicated marks, timetable and admission databases.
+
+| Check                                                                                                                                                                                                       | Result                                                                                                                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core tests                                                                                                                                                                                                  | 32 passed                                                                                                                                                                        |
+| API unit                                                                                                                                                                                                    | 315 suites, **3,700 passed** (new: `ledger-scope.spec.ts`, `accounting-source-resolver.service.spec.ts`, `accounting-route-ownership.spec.ts`, report service correctness cases) |
+| API integration (all four DB variables)                                                                                                                                                                     | 34 suites, **562 passed** (new `accounting-report-ledger-conformance.int-spec.ts`: 10; 7 of them fail against the 7.10 report service)                                           |
+| API e2e                                                                                                                                                                                                     | 45 suites, **321 passed**                                                                                                                                                        |
+| Web tests                                                                                                                                                                                                   | **761 passed** (new `accounting-drilldown-contract.test.mjs`; `web-contracts` now forbids the old client-built source links)                                                     |
+| Typecheck (core, API, web), web production build, `verify:openapi` (1,214 paths, 1,401 operations), `db:validate`, `prisma migrate diff --exit-code`, `verify:tracked-artifacts`, Prettier on changed files | clean                                                                                                                                                                            |
+| ESLint on changed API files (errors) and web accounting files (`--max-warnings=0`)                                                                                                                          | clean                                                                                                                                                                            |
+
+### Next
+
+7.11b — receivables aging conformance and AR↔GL reconciliation.

@@ -28,6 +28,7 @@ import { Select } from '../ui/select';
 
 import {
   formatBsDateTime,
+  type AccountingLedgerStage,
   type AccountingBalanceSheetResponse,
   type AccountingCashBookResponse,
   type AccountingGeneralLedgerResponse,
@@ -162,6 +163,12 @@ export function AccountingReportsView({
   const [selectedJournalEntry, setSelectedJournalEntry] =
     useState<JournalEntryView | null>(null);
   const [journalDialogOpen, setJournalDialogOpen] = useState(false);
+  // Phase 7.11a drill-down: a statement row opens the account's ledger with
+  // the same closing stage, so the ledger reconciles to the figure clicked.
+  const [ledgerStage, setLedgerStage] = useState<
+    AccountingLedgerStage | undefined
+  >(undefined);
+  const [ledgerPage, setLedgerPage] = useState(1);
 
   useEffect(() => {
     if (reportParam && reportParam !== activeReport) {
@@ -170,14 +177,29 @@ export function AccountingReportsView({
   }, [reportParam, activeReport]);
 
   const handleReportChange = (report: ReportType) => {
+    setLedgerPage(1);
+    if (report !== 'general-ledger') setLedgerStage(undefined);
     setActiveReport(report);
     const params = new URLSearchParams(searchParams.toString());
     params.set('report', report);
     router.push(`?${params.toString()}`);
   };
 
+  const drillToLedger = (accountId: string, stage: AccountingLedgerStage) => {
+    setFilters((prev) => ({ ...prev, accountId }));
+    handleReportChange('general-ledger');
+    setLedgerStage(stage);
+  };
+
   const reportQuery = useQuery({
-    queryKey: ['accounting-report', activeReport, filters, voucherType],
+    queryKey: [
+      'accounting-report',
+      activeReport,
+      filters,
+      voucherType,
+      ledgerStage,
+      ledgerPage,
+    ],
     queryFn: () => {
       if (activeReport === 'failed-unposted') {
         return api.listFailedUnpostedTransactions();
@@ -199,10 +221,15 @@ export function AccountingReportsView({
       if (activeReport === 'balance-sheet')
         return api.listBalanceSheet(reportFilters);
       if (activeReport === 'general-ledger')
-        return api.listGeneralLedger(reportFilters);
+        return api.listGeneralLedger({
+          ...reportFilters,
+          ...(ledgerStage ? { stage: ledgerStage } : {}),
+          page: ledgerPage,
+        });
       if (activeReport === 'tax-summary')
         return api.listTaxSummary(reportFilters);
-      if (activeReport === 'bank-book') return api.listBankBook(reportFilters);
+      if (activeReport === 'bank-book')
+        return api.listBankBook({ ...reportFilters, page: ledgerPage });
       if (activeReport === 'journal-register')
         return api.listJournalRegister(reportFilters);
       if (activeReport === 'voucher-register')
@@ -214,7 +241,7 @@ export function AccountingReportsView({
         return api.listCashFlowStatement(reportFilters);
       if (activeReport === 'budget-vs-actual')
         return api.listBudgetVsActual(reportFilters);
-      return api.listCashBook(reportFilters);
+      return api.listCashBook({ ...reportFilters, page: ledgerPage });
     },
     enabled:
       activeReport === 'failed-unposted' ||
@@ -393,31 +420,48 @@ export function AccountingReportsView({
     if (activeReport === 'trial-balance') {
       const trialBalance = data as AccountingTrialBalanceResponse;
       return (
-        <ReportTable
-          columns={[
-            { id: 'code', label: 'Code', width: 120 },
-            { id: 'account', label: 'Account', width: 240 },
-            { id: 'type', label: 'Type' },
-            { id: 'periodDebit', label: 'Period Debit', align: 'right' },
-            { id: 'periodCredit', label: 'Period Credit', align: 'right' },
-            { id: 'closingBalance', label: 'Closing Balance', align: 'right' },
-          ]}
-          rows={(trialBalance.rows ?? []).map((row) => ({
-            id: row.accountId,
-            cells: {
-              code: { value: row.accountCode, bold: true },
-              account: { value: row.accountName },
-              type: { value: row.accountType },
-              periodDebit: { value: row.periodDebit, type: 'currency' },
-              periodCredit: { value: row.periodCredit, type: 'currency' },
-              closingBalance: {
-                value: row.netBalance,
-                type: 'currency',
-                bold: true,
+        <ReportFrame warnings={trialBalance.setupWarnings}>
+          <ReportTable
+            columns={[
+              { id: 'code', label: 'Code', width: 120 },
+              { id: 'account', label: 'Account', width: 240 },
+              { id: 'type', label: 'Type' },
+              { id: 'opening', label: 'Opening', align: 'right' },
+              { id: 'periodDebit', label: 'Period Debit', align: 'right' },
+              { id: 'periodCredit', label: 'Period Credit', align: 'right' },
+              {
+                id: 'closingBalance',
+                label: 'Closing Balance',
+                align: 'right',
               },
-            },
-          }))}
-        />
+            ]}
+            rows={(trialBalance.rows ?? []).map((row) => ({
+              id: row.accountId,
+              accessibleLabel: `Open ledger for ${row.accountCode} ${row.accountName}`,
+              onActivate: () =>
+                drillToLedger(
+                  row.accountId,
+                  trialBalance.stage ?? 'PRE_CLOSING',
+                ),
+              cells: {
+                code: { value: row.accountCode, bold: true },
+                account: { value: row.accountName },
+                type: { value: row.accountType },
+                opening: {
+                  value: signedColumns(row.openingDebit, row.openingCredit),
+                  type: 'currency',
+                },
+                periodDebit: { value: row.periodDebit, type: 'currency' },
+                periodCredit: { value: row.periodCredit, type: 'currency' },
+                closingBalance: {
+                  value: row.netBalance,
+                  type: 'currency',
+                  bold: true,
+                },
+              },
+            }))}
+          />
+        </ReportFrame>
       );
     }
 
@@ -440,6 +484,8 @@ export function AccountingReportsView({
       (income?.accounts ?? []).forEach((r) => {
         rows.push({
           id: r.accountId,
+          accessibleLabel: `Open ledger for ${r.accountCode} ${r.accountName}`,
+          onActivate: () => drillToLedger(r.accountId, 'PRE_CLOSING'),
           cells: {
             classification: {
               value: `${r.accountCode} - ${r.accountName}`,
@@ -467,6 +513,8 @@ export function AccountingReportsView({
       (expenses?.accounts ?? []).forEach((e) => {
         rows.push({
           id: e.accountId,
+          accessibleLabel: `Open ledger for ${e.accountCode} ${e.accountName}`,
+          onActivate: () => drillToLedger(e.accountId, 'PRE_CLOSING'),
           cells: {
             classification: {
               value: `${e.accountCode} - ${e.accountName}`,
@@ -522,6 +570,13 @@ export function AccountingReportsView({
         (section) => section.section === 'EQUITY',
       );
       const rows: ReportTableRow[] = [];
+      const ledgerDrill = (accountId: string | undefined, label: string) =>
+        accountId
+          ? {
+              accessibleLabel: `Open ledger for ${label}`,
+              onActivate: () => drillToLedger(accountId, 'POST_CLOSING'),
+            }
+          : {};
 
       rows.push({
         id: 'ast-header',
@@ -531,6 +586,7 @@ export function AccountingReportsView({
       (assets?.accounts ?? []).forEach((a) => {
         rows.push({
           id: `asset-${a.accountId ?? a.accountCode}`,
+          ...ledgerDrill(a.accountId, `${a.accountCode} ${a.accountName}`),
           cells: {
             account: {
               value: `${a.accountCode} - ${a.accountName}`,
@@ -557,6 +613,7 @@ export function AccountingReportsView({
       (liabilities?.accounts ?? []).forEach((l) => {
         rows.push({
           id: `liability-${l.accountId ?? l.accountCode}`,
+          ...ledgerDrill(l.accountId, `${l.accountCode} ${l.accountName}`),
           cells: {
             account: {
               value: `${l.accountCode} - ${l.accountName}`,
@@ -586,6 +643,7 @@ export function AccountingReportsView({
       (equity?.accounts ?? []).forEach((e) => {
         rows.push({
           id: `equity-${e.accountId ?? e.accountCode}`,
+          ...ledgerDrill(e.accountId, `${e.accountCode} ${e.accountName}`),
           cells: {
             account: {
               value: `${e.accountCode} - ${e.accountName}`,
@@ -605,44 +663,104 @@ export function AccountingReportsView({
       });
 
       return (
-        <ReportTable
-          columns={[
-            { id: 'account', label: 'Account', width: 360 },
-            { id: 'balance', label: 'Balance', align: 'right' },
-          ]}
-          rows={rows}
-        />
+        <ReportFrame warnings={bs.setupWarnings}>
+          <ReportTable
+            columns={[
+              { id: 'account', label: 'Account', width: 360 },
+              { id: 'balance', label: 'Balance', align: 'right' },
+            ]}
+            rows={rows}
+          />
+        </ReportFrame>
       );
     }
 
     if (activeReport === 'general-ledger') {
       const ledger = data as AccountingGeneralLedgerResponse;
+      const broughtForward: ReportTableRow = {
+        id: 'brought-forward',
+        isHeader: true,
+        cells: {
+          date: {
+            value:
+              ledgerPage > 1 ? 'Balance brought forward' : 'Opening balance',
+            bold: true,
+          },
+          balance: {
+            value:
+              ledgerPage > 1
+                ? (ledger.pageOpeningBalance ?? ledger.openingBalance)
+                : ledger.openingBalance,
+            type: 'currency',
+            bold: true,
+          },
+        },
+      };
       return (
-        <ReportTable
-          columns={[
-            { id: 'date', label: 'Date', width: 150 },
-            { id: 'journal', label: 'Journal', width: 150 },
-            { id: 'account', label: 'Account', width: 240 },
-            { id: 'debit', label: 'Debit', align: 'right' },
-            { id: 'credit', label: 'Credit', align: 'right' },
-            { id: 'balance', label: 'Balance', align: 'right' },
-          ]}
-          rows={(ledger.rows ?? []).map((row, index) => ({
-            id: `${row.journalEntryId}-${index}`,
-            cells: {
-              date: { value: row.entryDate, type: 'date' },
-              journal: { value: row.entryNumber ?? 'Unnumbered', bold: true },
-              account: { value: row.accountName },
-              debit: { value: row.debit, type: 'currency' },
-              credit: { value: row.credit, type: 'currency' },
-              balance: {
-                value: row.runningBalance,
-                type: 'currency',
-                bold: true,
+        <ReportFrame
+          note={
+            ledgerStage === 'PRE_CLOSING'
+              ? 'Fiscal-year closing entries are excluded so this ledger matches the statement you opened it from.'
+              : undefined
+          }
+        >
+          <ReportTable
+            columns={[
+              { id: 'date', label: 'Date', width: 150 },
+              { id: 'journal', label: 'Journal', width: 150 },
+              { id: 'account', label: 'Description', width: 240 },
+              { id: 'debit', label: 'Debit', align: 'right' },
+              { id: 'credit', label: 'Credit', align: 'right' },
+              { id: 'balance', label: 'Balance', align: 'right' },
+            ]}
+            rows={[
+              broughtForward,
+              ...(ledger.rows ?? []).map((row) => ({
+                id: row.journalLineId,
+                accessibleLabel: `Open journal ${row.entryNumber ?? row.journalEntryId}`,
+                onActivate: () => openJournalDetail(row.journalEntryId),
+                cells: {
+                  date: { value: row.entryDate, type: 'date' as const },
+                  journal: {
+                    value:
+                      row.entryStatus === 'REVERSED'
+                        ? `${row.entryNumber ?? 'Unnumbered'} (reversed)`
+                        : (row.entryNumber ?? 'Unnumbered'),
+                    bold: true,
+                  },
+                  account: { value: row.description ?? row.accountName },
+                  debit: { value: row.debit, type: 'currency' as const },
+                  credit: { value: row.credit, type: 'currency' as const },
+                  balance: {
+                    value: row.runningBalance,
+                    type: 'currency' as const,
+                    bold: true,
+                  },
+                },
+              })),
+              {
+                id: 'ledger-totals',
+                isFooter: true,
+                cells: {
+                  date: { value: 'Totals and closing balance', bold: true },
+                  debit: { value: ledger.totals.debit, type: 'currency' },
+                  credit: { value: ledger.totals.credit, type: 'currency' },
+                  balance: {
+                    value: ledger.closingBalance,
+                    type: 'currency',
+                    bold: true,
+                  },
+                },
               },
-            },
-          }))}
-        />
+            ]}
+            pagination={{
+              page: ledger.pagination.page,
+              totalPages: ledger.pagination.totalPages,
+              totalRows: ledger.pagination.total,
+              onPageChange: setLedgerPage,
+            }}
+          />
+        </ReportFrame>
       );
     }
 
@@ -658,8 +776,16 @@ export function AccountingReportsView({
             { id: 'payment', label: 'Payment', align: 'right' },
             { id: 'balance', label: 'Balance', align: 'right' },
           ]}
-          rows={(cb.rows ?? []).map((row, index) => ({
-            id: `${row.journalEntryId}-${index}`,
+          pagination={{
+            page: cb.pagination.page,
+            totalPages: cb.pagination.totalPages,
+            totalRows: cb.pagination.total,
+            onPageChange: setLedgerPage,
+          }}
+          rows={(cb.rows ?? []).map((row) => ({
+            id: row.journalLineId,
+            accessibleLabel: `Open journal ${row.entryNumber ?? row.journalEntryId}`,
+            onActivate: () => openJournalDetail(row.journalEntryId),
             cells: {
               date: { value: row.entryDate, type: 'date' },
               journal: { value: row.entryNumber ?? 'Unnumbered' },
@@ -1097,9 +1223,11 @@ export function AccountingReportsView({
           <Surface>
             {activeReport !== 'failed-unposted' && (
               <ReportFilters
-                onFilterChange={(f) =>
-                  setFilters((prev) => ({ ...prev, ...f }))
-                }
+                accountId={filters.accountId}
+                onFilterChange={(f) => {
+                  setLedgerPage(1);
+                  setFilters((prev) => ({ ...prev, ...f }));
+                }}
               />
             )}
             {activeReport === 'voucher-register' && (
@@ -1198,6 +1326,46 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
         {label}
       </p>
       <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+const isZeroAmount = (value: string) => /^-?0(\.0+)?$/.test(value.trim());
+
+/**
+ * A trial-balance opening as one signed figure (debit positive, credit
+ * negative). The server already split it into columns; no arithmetic here.
+ */
+function signedColumns(debit: string, credit: string): string {
+  return isZeroAmount(String(credit)) ? String(debit) : `-${String(credit)}`;
+}
+
+function ReportFrame({
+  warnings,
+  note,
+  children,
+}: {
+  warnings?: string[];
+  note?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-4">
+      {note ? (
+        <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          {note}
+        </p>
+      ) : null}
+      {(warnings ?? []).map((warning) => (
+        <p
+          key={warning}
+          role="note"
+          className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          {warning}
+        </p>
+      ))}
+      {children}
     </div>
   );
 }

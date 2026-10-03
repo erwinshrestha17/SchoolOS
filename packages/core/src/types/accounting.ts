@@ -1,7 +1,46 @@
 import type { ResourceAuthorization } from "../authorization-contract.js";
+export type JournalSourceKind =
+  | "FEE_INVOICE"
+  | "FEE_INVOICE_ADJUSTMENT"
+  | "FEE_WAIVER"
+  | "FEE_RECEIPT"
+  | "FEE_REFUND"
+  | "PAYROLL_ACCRUAL"
+  | "PAYROLL_DISBURSEMENT"
+  | "CANTEEN"
+  | "MANUAL_JOURNAL"
+  | "REVERSAL"
+  | "CORRECTION"
+  | "OPENING_BALANCE"
+  | "FISCAL_YEAR_CLOSE"
+  | "UNKNOWN";
+
+/** One step of approval evidence: who did it and when. Never notes. */
+export type AccountingActorEvent = {
+  duty: string;
+  actor: { id: string; name: string } | null;
+  at: string | null;
+};
+
+/**
+ * Phase 7.11a: the business record behind a journal entry. `restricted`
+ * means the viewer cannot read that domain; only kind and label are shown.
+ */
+export type JournalSourceSummary = {
+  kind: JournalSourceKind;
+  label: string;
+  reference: string | null;
+  status: string | null;
+  href: string | null;
+  relatedJournalId: string | null;
+  restricted: boolean;
+  approvals: AccountingActorEvent[];
+  documents: Array<{ label: string; fileAssetId: string }>;
+};
+
 export type JournalEntryView = {
   id: string;
-  entryNumber: string;
+  entryNumber: string | null;
   entryDate: string;
   narration: string;
   status: string;
@@ -18,25 +57,43 @@ export type JournalEntryView = {
   sourceModule?: string | null;
   sourceType: string;
   sourceId?: string | null;
-  reference?: string | null;
+  postingType?: string | null;
+  reversalOfId?: string | null;
+  correctionOfId?: string | null;
+  reversalReason?: string | null;
+  correctionReason?: string | null;
   totalDebit: number;
   totalCredit: number;
-  postedBy?: {
-    firstName: string;
-    lastName: string;
-  } | null;
   lines: Array<{
     id: string;
     side: "DEBIT" | "CREDIT";
-    amount: number;
+    /** Decimal amounts arrive as strings. */
+    amount: number | string;
+    debit?: number | string;
+    credit?: number | string;
+    lineNumber?: number;
     description: string | null;
-    accountName: string;
-    accountCode: string;
+    /** Present on the journal detail response. */
+    accountName?: string;
+    accountCode?: string;
     chartAccount: {
       code: string;
       name: string;
     };
   }>;
+  /** Journal detail only (Phase 7.11a). */
+  actors?: AccountingActorEvent[];
+  source?: JournalSourceSummary | null;
+  postingBatch?: {
+    id: string;
+    sourceModule: string;
+    sourceType: string;
+    sourceBatchId: string;
+    postingType: string;
+    status: string;
+  } | null;
+  reversedBy?: { id: string; entryNumber: string | null } | null;
+  correctedBy?: { id: string; entryNumber: string | null } | null;
 };
 
 export type AccountingPeriodSummary = {
@@ -251,12 +308,19 @@ export type AccountingReport = {
   balanced: boolean;
 };
 
+/** Phase 7.11a: PRE_CLOSING excludes fiscal-year closing entries. */
+export type AccountingLedgerStage = "PRE_CLOSING" | "POST_CLOSING";
+
 export type AccountingReportFilters = {
   fiscalYearId: string;
   fiscalPeriodId?: string;
   fromDate?: string;
   toDate?: string;
   accountId?: string;
+  /** Trial balance and general ledger only. */
+  stage?: AccountingLedgerStage;
+  page?: number;
+  limit?: number;
 };
 
 export type AccountingTrialBalanceResponse = {
@@ -287,6 +351,8 @@ export type AccountingTrialBalanceResponse = {
     netBalance: string;
     normalBalanceSide: "DEBIT" | "CREDIT";
   }>;
+  stage?: AccountingLedgerStage;
+  setupWarnings?: string[];
   generatedAt: string;
 };
 
@@ -301,7 +367,12 @@ export type AccountingGeneralLedgerResponse = {
   openingBalanceSide: "DEBIT" | "CREDIT";
   closingBalance: string;
   closingBalanceSide: "DEBIT" | "CREDIT";
+  /** Totals over every row matching the filter, not only this page. */
   totals: { debit: string; credit: string };
+  /** Balance carried into the first row of this page. */
+  pageOpeningBalance?: string;
+  pageOpeningBalanceSide?: "DEBIT" | "CREDIT";
+  stage?: AccountingLedgerStage;
   rows: Array<{
     journalEntryId: string;
     journalLineId: string;
@@ -319,6 +390,7 @@ export type AccountingGeneralLedgerResponse = {
     credit: string;
     runningBalance: string;
     runningBalanceSide: "DEBIT" | "CREDIT";
+    entryStatus?: string;
   }>;
   pagination: {
     page: number;
@@ -341,6 +413,8 @@ export type AccountingCashBookResponse = {
   totalPayments: string;
   closingBalance: string;
   closingBalanceSide: "DEBIT" | "CREDIT";
+  pageOpeningBalance?: string;
+  pageOpeningBalanceSide?: "DEBIT" | "CREDIT";
   rows: Array<{
     journalEntryId: string;
     journalLineId: string;
@@ -388,6 +462,9 @@ export type AccountingIncomeStatementResponse = {
   totalExpense: string;
   netSurplusOrDeficit: string;
   resultType: "SURPLUS" | "DEFICIT" | "BREAK_EVEN";
+  stage?: AccountingLedgerStage;
+  /** Comparative columns are not implemented. */
+  comparisonSupported?: false;
   generatedAt: string;
 };
 
@@ -410,6 +487,8 @@ export type AccountingBalanceSheetResponse = {
   totalLiabilitiesAndEquity: string;
   isBalanced: boolean;
   imbalanceAmount: string;
+  stage?: AccountingLedgerStage;
+  setupWarnings?: string[];
   generatedAt: string;
 };
 

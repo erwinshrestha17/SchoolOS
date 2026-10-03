@@ -294,29 +294,10 @@ export class AccountingController {
     return this.accountingService.getAccountLedger(accountId, auth);
   }
 
-  @Get('reports/income-statement')
-  @Permissions('accounting:reports:read')
-  incomeStatement(
-    @Query() query: ReportsQueryDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.accountingService.getIncomeStatement(auth, query);
-  }
-
-  @Get('reports/balance-sheet')
-  @Permissions('accounting:reports:read')
-  balanceSheet(
-    @Query() query: ReportsQueryDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.accountingService.getBalanceSheet(auth, query);
-  }
-
-  @Get('reports/cash-book')
-  @Permissions('accounting:reports:read')
-  cashBook(@Query() query: ReportsQueryDto, @CurrentAuth() auth: AuthContext) {
-    return this.accountingService.getCashBook(auth, query);
-  }
+  // Phase 7.11a: GET reports/income-statement, reports/balance-sheet and
+  // reports/cash-book are served only by AccountingReportsController. The
+  // legacy handlers here were registered first and shadowed the canonical
+  // ones with an older response shape.
 
   @Get('reports/vat-summary')
   @Permissions('accounting:reports:read')

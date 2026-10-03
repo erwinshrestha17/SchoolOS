@@ -3,6 +3,9 @@ import {
   type ChartAccountType,
   type JournalLineSide,
 } from '@prisma/client';
+import type { LedgerStage } from '../ledger-scope';
+
+export type { LedgerStage };
 
 export interface TrialBalanceRow {
   accountId: string;
@@ -34,6 +37,9 @@ export interface TrialBalanceResponse {
   isBalanced: boolean;
   imbalanceAmount: Prisma.Decimal;
   rows: TrialBalanceRow[];
+  /** PRE_CLOSING excludes fiscal-year closing entries from the window. */
+  stage: LedgerStage;
+  setupWarnings: string[];
   generatedAt: Date;
 }
 
@@ -58,6 +64,8 @@ export interface GeneralLedgerRow {
   postedById: string | null;
   reversalOfId: string | null;
   correctionOfId: string | null;
+  /** POSTED, or REVERSED when a later reversal offsets this entry. */
+  entryStatus: string;
 }
 
 export interface GeneralLedgerResponse {
@@ -71,10 +79,15 @@ export interface GeneralLedgerResponse {
   openingBalanceSide: JournalLineSide;
   closingBalance: Prisma.Decimal;
   closingBalanceSide: JournalLineSide;
+  /** Totals over every row matching the filter, not only this page. */
   totals: {
     debit: Prisma.Decimal;
     credit: Prisma.Decimal;
   };
+  /** Balance carried into the first row of this page. */
+  pageOpeningBalance: Prisma.Decimal;
+  pageOpeningBalanceSide: JournalLineSide;
+  stage: LedgerStage;
   rows: GeneralLedgerRow[];
   pagination: {
     page: number;
@@ -113,10 +126,13 @@ export interface CashBookResponse {
   account?: { id: string; code: string; name: string };
   openingBalance: Prisma.Decimal;
   openingBalanceSide: JournalLineSide;
+  /** Totals over every row matching the filter, not only this page. */
   totalReceipts: Prisma.Decimal;
   totalPayments: Prisma.Decimal;
   closingBalance: Prisma.Decimal;
   closingBalanceSide: JournalLineSide;
+  pageOpeningBalance: Prisma.Decimal;
+  pageOpeningBalanceSide: JournalLineSide;
   rows: CashBookRow[];
   pagination: {
     page: number;
@@ -216,6 +232,10 @@ export interface IncomeStatementResponse {
   totalExpense: Prisma.Decimal;
   netSurplusOrDeficit: Prisma.Decimal;
   resultType: 'SURPLUS' | 'DEFICIT' | 'BREAK_EVEN';
+  /** Always PRE_CLOSING: closing entries would net the year to zero. */
+  stage: LedgerStage;
+  /** Comparative columns are not implemented (Phase 7.11 out of scope). */
+  comparisonSupported: false;
   generatedAt: Date;
 }
 
@@ -234,6 +254,7 @@ export interface BalanceSheetSection {
 
 export interface BalanceSheetResponse {
   fiscalYearId: string;
+  fiscalPeriodId?: string;
   asOfDate: Date;
   sections: BalanceSheetSection[];
   totalAssets: Prisma.Decimal;
@@ -242,6 +263,9 @@ export interface BalanceSheetResponse {
   totalLiabilitiesAndEquity: Prisma.Decimal;
   isBalanced: boolean;
   imbalanceAmount: Prisma.Decimal;
+  /** Cumulative across fiscal years up to asOfDate, closing entries included. */
+  stage: LedgerStage;
+  setupWarnings: string[];
   generatedAt: Date;
 }
 

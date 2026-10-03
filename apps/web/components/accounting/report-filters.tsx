@@ -16,9 +16,14 @@ interface ReportFiltersProps {
     fiscalPeriodId?: string;
     accountId?: string;
   }) => void;
+  /** Controlled ledger account (Phase 7.11a drill-down sets it). */
+  accountId?: string;
 }
 
-export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
+export function ReportFilters({
+  onFilterChange,
+  accountId,
+}: ReportFiltersProps) {
   const fiscalYearsQuery = useQuery({
     queryKey: ['fiscal-years'],
     queryFn: () => api.listFiscalYears(),
@@ -112,7 +117,7 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
             Ledger Account
           </p>
           <Select
-            defaultValue=""
+            value={accountId ?? ''}
             onChange={(e) =>
               onFilterChange({ accountId: e.target.value || undefined })
             }

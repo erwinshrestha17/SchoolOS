@@ -41,6 +41,16 @@ import { RejectJournalDto } from './dto/reject-journal.dto';
 import { PostJournalDto } from './dto/post-journal.dto';
 import { CancelJournalDto } from './dto/cancel-journal.dto';
 import { AccountingPostingService } from './accounting-posting.service';
+import {
+  AccountingSourceResolverService,
+  resolveActorNames,
+} from './accounting-source-resolver.service';
+import {
+  isIncomeAccountType,
+  LEDGER_EFFECTIVE_STATUSES,
+  ledgerEntryWhere,
+  PROFIT_AND_LOSS_ACCOUNT_TYPES,
+} from './ledger-scope';
 import { CreateOpeningBalanceDto } from './dto/opening-balance.dto';
 import { ImportBankStatementLineDto } from './dto/import-bank-statement.dto';
 import {
@@ -95,7 +105,16 @@ export class AccountingService implements OnModuleInit {
     private readonly postingService: AccountingPostingService,
     @Optional()
     private readonly approvalWorkflowService?: ApprovalWorkflowService,
+    @Optional()
+    private readonly sourceResolverService?: AccountingSourceResolverService,
   ) {}
+
+  private get sourceResolver(): AccountingSourceResolverService {
+    return (
+      this.sourceResolverService ??
+      new AccountingSourceResolverService(this.prisma)
+    );
+  }
 
   onModuleInit() {
     this.approvalWorkflowService?.registerFinalAction(
@@ -247,7 +266,7 @@ export class AccountingService implements OnModuleInit {
       this.prisma.journalLine.aggregate({
         where: {
           tenantId: actor.tenantId,
-          journalEntry: { status: JournalEntryStatus.POSTED },
+          journalEntry: { status: { in: LEDGER_EFFECTIVE_STATUSES } },
         },
         _sum: { debit: true, credit: true },
       }),
@@ -1195,8 +1214,78 @@ export class AccountingService implements OnModuleInit {
       throw new NotFoundException('Journal entry not found in this tenant');
     }
 
+    // Phase 7.11a drill-down: who did what, the posting batch, the linked
+    // reversal/correction and the resolved business source.
+    const [sources, postingBatch, reversedBy, correctedBy] = await Promise.all([
+      this.sourceResolver.resolve(actor, [entry]),
+      this.prisma.accountingPostingBatch.findFirst({
+        where: { tenantId: actor.tenantId, journalEntryId: entry.id },
+        select: {
+          id: true,
+          sourceModule: true,
+          sourceType: true,
+          sourceBatchId: true,
+          postingType: true,
+          status: true,
+        },
+      }),
+      this.prisma.journalEntry.findFirst({
+        where: { tenantId: actor.tenantId, reversalOfId: entry.id },
+        select: { id: true, entryNumber: true },
+      }),
+      this.prisma.journalEntry.findFirst({
+        where: { tenantId: actor.tenantId, correctionOfId: entry.id },
+        select: { id: true, entryNumber: true },
+      }),
+    ]);
+    const actorIds = [
+      entry.createdById,
+      entry.submittedById,
+      entry.reviewedById,
+      entry.approvedById,
+      entry.rejectedById,
+      entry.cancelledById,
+      entry.postedById,
+      entry.reversedById,
+    ].filter((userId): userId is string => Boolean(userId));
+    const names = await resolveActorNames(this.prisma, actor.tenantId, [
+      ...new Set(actorIds),
+    ]);
+    const step = (duty: string, userId: string | null, at: Date | null) =>
+      userId
+        ? [
+            {
+              duty,
+              actor: { id: userId, name: names.get(userId) ?? 'Unknown user' },
+              at,
+            },
+          ]
+        : [];
+
     return {
       ...this.journalProjection(entry),
+      lines: entry.lines
+        .slice()
+        .sort((a, b) => a.lineNumber - b.lineNumber)
+        .map((line) => ({
+          ...line,
+          accountCode: line.chartAccount.code,
+          accountName: line.chartAccount.name,
+        })),
+      actors: [
+        ...step('CREATE', entry.createdById, entry.createdAt),
+        ...step('SUBMIT', entry.submittedById, entry.submittedAt),
+        ...step('REVIEW', entry.reviewedById, entry.reviewedAt),
+        ...step('APPROVE', entry.approvedById, entry.approvedAt),
+        ...step('REJECT', entry.rejectedById, entry.rejectedAt),
+        ...step('CANCEL', entry.cancelledById, entry.cancelledAt),
+        ...step('POST', entry.postedById, entry.postedAt),
+        ...step('REVERSE', entry.reversedById, entry.reversedAt),
+      ],
+      source: sources.get(entry.id) ?? null,
+      postingBatch,
+      reversedBy,
+      correctedBy,
       allowedActions: journalAllowedActions(actor, entry),
     };
   }
@@ -1315,7 +1404,7 @@ export class AccountingService implements OnModuleInit {
     const where: Prisma.JournalLineWhereInput = {
       tenantId: actor.tenantId,
       journalEntry: {
-        status: JournalEntryStatus.POSTED,
+        status: { in: LEDGER_EFFECTIVE_STATUSES },
       },
     };
 
@@ -1379,7 +1468,7 @@ export class AccountingService implements OnModuleInit {
     );
 
     const income = trialBalance
-      .filter((row) => row.type === ChartAccountType.REVENUE)
+      .filter((row) => isIncomeAccountType(row.type))
       .reduce(
         (sum, row) => sum.add(row.credit).sub(row.debit),
         new Prisma.Decimal(0),
@@ -1402,9 +1491,7 @@ export class AccountingService implements OnModuleInit {
         expenses: Number(expenses),
         netIncome: Number(income.sub(expenses)),
         groups: {
-          revenue: trialBalance.filter(
-            (r) => r.type === ChartAccountType.REVENUE,
-          ),
+          revenue: trialBalance.filter((r) => isIncomeAccountType(r.type)),
           expenses: trialBalance.filter(
             (r) => r.type === ChartAccountType.EXPENSE,
           ),
@@ -1796,7 +1883,7 @@ export class AccountingService implements OnModuleInit {
           journalEntry: {
             tenantId: actor.tenantId,
             fiscalPeriodId: period.id,
-            status: JournalEntryStatus.POSTED,
+            status: { in: LEDGER_EFFECTIVE_STATUSES },
           },
         },
         _sum: { debit: true, credit: true },
@@ -2186,7 +2273,7 @@ export class AccountingService implements OnModuleInit {
     const where: Prisma.JournalLineWhereInput = {
       tenantId: actor.tenantId,
       journalEntry: {
-        status: JournalEntryStatus.POSTED,
+        status: { in: LEDGER_EFFECTIVE_STATUSES },
       },
     };
 
@@ -2618,7 +2705,7 @@ export class AccountingService implements OnModuleInit {
           journalEntry: {
             tenantId: actor.tenantId,
             fiscalYearId: fiscalYear.id,
-            status: JournalEntryStatus.POSTED,
+            status: { in: LEDGER_EFFECTIVE_STATUSES },
           },
         },
         _sum: { debit: true, credit: true },
@@ -2916,18 +3003,20 @@ export class AccountingService implements OnModuleInit {
           _sum: { debit: true, credit: true },
           where: {
             tenantId: actor.tenantId,
-            journalEntry: {
+            // Reversed originals and their reversals both count (7.11a);
+            // income includes INCOME-type accounts (decision R4).
+            journalEntry: ledgerEntryWhere({
               tenantId: actor.tenantId,
-              status: JournalEntryStatus.POSTED,
+              stage: 'PRE_CLOSING',
               fiscalYearId,
-            },
+            }),
           },
         });
 
         const accounts = await tx.chartAccount.findMany({
           where: {
             tenantId: actor.tenantId,
-            type: { in: [ChartAccountType.REVENUE, ChartAccountType.EXPENSE] },
+            type: { in: PROFIT_AND_LOSS_ACCOUNT_TYPES },
           },
         });
 
@@ -2978,7 +3067,7 @@ export class AccountingService implements OnModuleInit {
 
           if (net.isZero()) continue;
 
-          if (account.type === ChartAccountType.REVENUE) {
+          if (isIncomeAccountType(account.type)) {
             // Revenue has credit balance → close by debiting
             const revenueNet = credit.minus(debit);
             closingLines.push({
@@ -3385,7 +3474,7 @@ export class AccountingService implements OnModuleInit {
       where: {
         tenantId: actor.tenantId,
         chartAccountId: accountId,
-        journalEntry: { status: JournalEntryStatus.POSTED },
+        journalEntry: { status: { in: LEDGER_EFFECTIVE_STATUSES } },
         id: { notIn: Array.from(usedJournalLineIds) },
       },
       include: { journalEntry: true },
@@ -3565,12 +3654,12 @@ export class AccountingService implements OnModuleInit {
       _sum: { debitAmount: Prisma.Decimal; creditAmount: Prisma.Decimal };
     };
 
-    // Sum up ledger amounts for this account (POSTED only)
+    // Ledger book balance: reversed originals and their reversals both count.
     const ledgerAgg = await this.prisma.journalLine.aggregate({
       where: {
         tenantId: actor.tenantId,
         chartAccountId: accountId,
-        journalEntry: { status: JournalEntryStatus.POSTED },
+        journalEntry: { status: { in: LEDGER_EFFECTIVE_STATUSES } },
       },
       _sum: { debit: true, credit: true },
     });

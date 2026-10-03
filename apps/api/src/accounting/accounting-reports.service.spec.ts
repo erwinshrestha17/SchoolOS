@@ -7,6 +7,14 @@ import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 
 const D = (value: string | number) => new Prisma.Decimal(value);
+const FY = {
+  id: 'fy1',
+  startDate: new Date('2023-01-01T00:00:00.000Z'),
+  endDate: new Date('2023-12-31T00:00:00.000Z'),
+};
+const sum = (debit: number, credit: number) => ({
+  _sum: { debit: D(debit), credit: D(credit) },
+});
 
 describe('AccountingReportsService', () => {
   let service: AccountingReportsService;
@@ -14,14 +22,19 @@ describe('AccountingReportsService', () => {
     fiscalYear: { findUnique: jest.Mock };
     fiscalPeriod: { findUnique: jest.Mock };
     chartAccount: { findMany: jest.Mock; findFirst: jest.Mock };
-    journalLine: { groupBy: jest.Mock; count: jest.Mock; findMany: jest.Mock };
+    journalLine: {
+      groupBy: jest.Mock;
+      count: jest.Mock;
+      findMany: jest.Mock;
+      aggregate: jest.Mock;
+    };
     accountingReportAccountMapping: {
       findMany: jest.Mock;
       createMany: jest.Mock;
       deleteMany: jest.Mock;
     };
     fiscalBudget: { findFirst: jest.Mock };
-    journalEntry: { findMany: jest.Mock };
+    journalEntry: { findMany: jest.Mock; findFirst: jest.Mock };
     $transaction: jest.Mock;
   };
 
@@ -34,6 +47,7 @@ describe('AccountingReportsService', () => {
         groupBy: jest.fn(),
         count: jest.fn(),
         findMany: jest.fn(),
+        aggregate: jest.fn().mockResolvedValue(sum(0, 0)),
       },
       accountingReportAccountMapping: {
         findMany: jest.fn(),
@@ -41,7 +55,10 @@ describe('AccountingReportsService', () => {
         deleteMany: jest.fn(),
       },
       fiscalBudget: { findFirst: jest.fn() },
-      journalEntry: { findMany: jest.fn() },
+      journalEntry: {
+        findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       $transaction: jest.fn((cb) => cb(prisma)),
     };
 
@@ -66,7 +83,7 @@ describe('AccountingReportsService', () => {
 
   describe('getTrialBalance', () => {
     it('returns balanced trial balance for simple posted journal', async () => {
-      prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
       prisma.chartAccount.findMany.mockResolvedValue([
         {
           id: 'a1',
@@ -83,10 +100,12 @@ describe('AccountingReportsService', () => {
           parentId: null,
         },
       ]);
-      prisma.journalLine.groupBy.mockResolvedValue([
-        { chartAccountId: 'a1', _sum: { debit: D(100), credit: D(0) } },
-        { chartAccountId: 'a2', _sum: { debit: D(0), credit: D(100) } },
-      ]);
+      prisma.journalLine.groupBy
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { chartAccountId: 'a1', _sum: { debit: D(100), credit: D(0) } },
+          { chartAccountId: 'a2', _sum: { debit: D(0), credit: D(100) } },
+        ]);
 
       const result = await service.getTrialBalance('tenant1', {
         fiscalYearId: 'fy1',
@@ -108,7 +127,7 @@ describe('AccountingReportsService', () => {
     });
 
     it('calculates asset debit balances correctly when credit exceeds debit', async () => {
-      prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
       prisma.chartAccount.findMany.mockResolvedValue([
         {
           id: 'a1',
@@ -118,9 +137,11 @@ describe('AccountingReportsService', () => {
           parentId: null,
         },
       ]);
-      prisma.journalLine.groupBy.mockResolvedValue([
-        { chartAccountId: 'a1', _sum: { debit: D(100), credit: D(150) } },
-      ]);
+      prisma.journalLine.groupBy
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { chartAccountId: 'a1', _sum: { debit: D(100), credit: D(150) } },
+        ]);
 
       const result = await service.getTrialBalance('tenant1', {
         fiscalYearId: 'fy1',
@@ -133,7 +154,7 @@ describe('AccountingReportsService', () => {
 
   describe('getGeneralLedger', () => {
     it('returns ledger rows for selected account', async () => {
-      prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
       prisma.chartAccount.findFirst.mockResolvedValue({
         id: 'a1',
         code: '1000',
@@ -141,6 +162,9 @@ describe('AccountingReportsService', () => {
         type: ChartAccountType.ASSET,
       });
       prisma.journalLine.count.mockResolvedValue(1);
+      prisma.journalLine.aggregate
+        .mockResolvedValueOnce(sum(0, 0))
+        .mockResolvedValueOnce(sum(200, 0));
       prisma.journalLine.findMany.mockResolvedValue([
         {
           id: 'l1',
@@ -149,6 +173,7 @@ describe('AccountingReportsService', () => {
           journalEntryId: 'je1',
           description: 'test',
           journalEntry: {
+            status: 'POSTED',
             entryDate: new Date('2023-01-01'),
             postedAt: new Date('2023-01-01'),
             entryNumber: 'JE-001',
@@ -168,7 +193,7 @@ describe('AccountingReportsService', () => {
     });
 
     it('rejects if no account is provided', async () => {
-      prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
       await expect(
         service.getGeneralLedger('tenant1', {
           fiscalYearId: 'fy1',
@@ -179,7 +204,7 @@ describe('AccountingReportsService', () => {
 
   describe('getCashBook', () => {
     it('returns cash receipts and payments', async () => {
-      prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
       prisma.accountingReportAccountMapping.findMany.mockResolvedValue([
         {
           accountId: 'a1',
@@ -194,6 +219,9 @@ describe('AccountingReportsService', () => {
         type: ChartAccountType.ASSET,
       });
       prisma.journalLine.count.mockResolvedValue(2);
+      prisma.journalLine.aggregate
+        .mockResolvedValueOnce(sum(0, 0))
+        .mockResolvedValueOnce(sum(200, 50));
       prisma.journalLine.findMany.mockResolvedValue([
         {
           id: 'l1',
@@ -251,7 +279,7 @@ describe('AccountingReportsService', () => {
     });
 
     it('rejects if account is not ASSET', async () => {
-      prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
       prisma.accountingReportAccountMapping.findMany.mockResolvedValue([
         {
           accountId: 'a1',
@@ -276,7 +304,7 @@ describe('AccountingReportsService', () => {
 
   describe('getIncomeStatement', () => {
     it('calculates income and expense correctly', async () => {
-      prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
       prisma.chartAccount.findMany.mockResolvedValue([
         {
           id: 'a1',
@@ -309,10 +337,7 @@ describe('AccountingReportsService', () => {
 
   describe('getBalanceSheet', () => {
     it('calculates assets, liabilities, equity, and includes surplus if unclosed', async () => {
-      prisma.fiscalYear.findUnique.mockResolvedValue({
-        id: 'fy1',
-        endDate: new Date('2023-12-31'),
-      });
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
       prisma.chartAccount.findMany.mockResolvedValue([
         { id: 'a1', code: '1000', name: 'Cash', type: ChartAccountType.ASSET },
         {
@@ -357,7 +382,7 @@ describe('AccountingReportsService', () => {
 
   describe('getTaxSummary', () => {
     it('calculates VAT and returns setup warnings if missing mappings', async () => {
-      prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
       prisma.accountingReportAccountMapping.findMany.mockResolvedValue([
         {
           accountId: 'a1',
@@ -391,7 +416,7 @@ describe('AccountingReportsService', () => {
 
   describe('getCashFlowStatement', () => {
     it('returns empty sections when cash/bank mappings are missing', async () => {
-      prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
       prisma.accountingReportAccountMapping.findMany.mockResolvedValue([]);
 
       const result = await service.getCashFlowStatement('tenant1', {
@@ -406,7 +431,7 @@ describe('AccountingReportsService', () => {
 
   describe('getBudgetVsActual', () => {
     it('throws when no approved budget exists', async () => {
-      prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
       prisma.fiscalBudget.findFirst.mockResolvedValue(null);
 
       await expect(
@@ -414,6 +439,140 @@ describe('AccountingReportsService', () => {
           fiscalYearId: 'fy1',
         } as unknown as Parameters<typeof service.getBudgetVsActual>[1]),
       ).rejects.toThrow('No approved fiscal budget found');
+    });
+  });
+
+  describe('Phase 7.11a correctness', () => {
+    it('carries opening balances into the trial balance and stays balanced', async () => {
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
+      prisma.chartAccount.findMany.mockResolvedValue([
+        {
+          id: 'cash',
+          code: '1000',
+          name: 'Cash',
+          type: ChartAccountType.ASSET,
+          parentId: null,
+        },
+        {
+          id: 'eq',
+          code: '3000',
+          name: 'Capital',
+          type: ChartAccountType.EQUITY,
+          parentId: null,
+        },
+        {
+          id: 'inc',
+          code: '4000',
+          name: 'Fees',
+          type: ChartAccountType.INCOME,
+          parentId: null,
+        },
+      ]);
+      prisma.journalLine.groupBy
+        .mockResolvedValueOnce([
+          { chartAccountId: 'cash', ...sum(1000, 0) },
+          { chartAccountId: 'eq', ...sum(0, 1000) },
+        ])
+        .mockResolvedValueOnce([
+          { chartAccountId: 'cash', ...sum(300, 0) },
+          { chartAccountId: 'inc', ...sum(0, 300) },
+        ]);
+
+      const result = await service.getTrialBalance('tenant1', {
+        fiscalYearId: 'fy1',
+      });
+
+      const cash = result.rows.find((row) => row.accountId === 'cash');
+      expect(cash?.openingDebit.toString()).toBe('1000');
+      expect(cash?.closingDebit.toString()).toBe('1300');
+      expect(result.totalOpeningDebit.toString()).toBe('1000');
+      expect(result.totalOpeningCredit.toString()).toBe('1000');
+      expect(result.isBalanced).toBe(true);
+      expect(result.stage).toBe('PRE_CLOSING');
+      // The opening query covers every year before the window.
+      const openingWhere = prisma.journalLine.groupBy.mock.calls[0][0].where;
+      expect(openingWhere.journalEntry.fiscalYearId).toBeUndefined();
+      expect(openingWhere.journalEntry.entryDate).toEqual({
+        lt: new Date('2023-01-01T00:00:00.000Z'),
+      });
+    });
+
+    it('reports INCOME accounts in the income statement and excludes closing entries', async () => {
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
+      prisma.chartAccount.findMany.mockResolvedValue([
+        {
+          id: 'inc',
+          code: '4100',
+          name: 'Other income',
+          type: ChartAccountType.INCOME,
+        },
+      ]);
+      prisma.journalLine.groupBy.mockResolvedValue([
+        { chartAccountId: 'inc', ...sum(0, 80) },
+      ]);
+
+      const result = await service.getIncomeStatement('tenant1', {
+        fiscalYearId: 'fy1',
+      });
+
+      expect(result.totalIncome.toString()).toBe('80');
+      expect(result.comparisonSupported).toBe(false);
+      const where = prisma.journalLine.groupBy.mock.calls[0][0].where;
+      expect(where.journalEntry.sourceType).toEqual({
+        notIn: ['CLOSING_ENTRY', 'CLOSING'],
+      });
+      expect(where.journalEntry.status).toEqual({ in: ['POSTED', 'REVERSED'] });
+      expect(prisma.chartAccount.findMany.mock.calls[0][0].where.type).toEqual({
+        in: ['REVENUE', 'INCOME', 'EXPENSE'],
+      });
+    });
+
+    it('continues running balances across general-ledger pages and totals the full filter', async () => {
+      prisma.fiscalYear.findUnique.mockResolvedValue(FY);
+      prisma.chartAccount.findFirst.mockResolvedValue({
+        id: 'a1',
+        code: '1000',
+        name: 'Cash',
+        type: ChartAccountType.ASSET,
+      });
+      prisma.journalLine.count.mockResolvedValue(3);
+      prisma.journalLine.aggregate
+        .mockResolvedValueOnce(sum(100, 0))
+        .mockResolvedValueOnce(sum(60, 10));
+      prisma.journalLine.findMany
+        .mockResolvedValueOnce([
+          { debit: D(50), credit: D(0) },
+          { debit: D(0), credit: D(10) },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'l3',
+            debit: D(10),
+            credit: D(0),
+            journalEntryId: 'je3',
+            description: null,
+            journalEntry: {
+              status: 'REVERSED',
+              entryDate: new Date('2023-02-01'),
+              postedAt: null,
+              entryNumber: 'JE-3',
+              narration: 'third',
+            },
+          },
+        ]);
+
+      const result = await service.getGeneralLedger('tenant1', {
+        fiscalYearId: 'fy1',
+        accountId: 'a1',
+        page: 2,
+        limit: 2,
+      });
+
+      expect(result.pageOpeningBalance.toString()).toBe('140');
+      expect(result.rows[0].runningBalance.toString()).toBe('150');
+      expect(result.rows[0].entryStatus).toBe('REVERSED');
+      expect(result.totals.debit.toString()).toBe('60');
+      expect(result.closingBalance.toString()).toBe('150');
     });
   });
 });

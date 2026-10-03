@@ -4,9 +4,11 @@ import {
   IsString,
   IsBoolean,
   IsEnum,
+  IsIn,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ChartAccountType } from '@prisma/client';
+import { LEDGER_STAGES, type LedgerStage } from '../ledger-scope';
 
 export class TrialBalanceQueryDto {
   @IsString()
@@ -41,4 +43,9 @@ export class TrialBalanceQueryDto {
   @IsOptional()
   @IsDateString()
   asOfDate?: string;
+
+  /** PRE_CLOSING (default) excludes fiscal-year closing entries. */
+  @IsOptional()
+  @IsIn(LEDGER_STAGES)
+  stage?: LedgerStage = 'PRE_CLOSING';
 }
