@@ -1185,11 +1185,13 @@ describe('PayrollService hardening boundaries', () => {
     ).resolves.toEqual([
       expect.objectContaining({
         code: 'PF',
+        ratePercent: null,
         configuredStructureCount: 1,
         source: 'salary_structure_pf_enabled',
       }),
       expect.objectContaining({
         code: 'TDS',
+        ratePercent: null,
         configuredStructureCount: 2,
         source: 'salary_structure_tds_enabled',
       }),
@@ -1294,7 +1296,18 @@ function buildService(options: {
       findMany: jest.fn().mockResolvedValue(options.salaryStructures ?? []),
       update: jest.fn().mockResolvedValue(buildSalaryStructure()),
     },
+    staffStatutoryMembership: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     payrollRun: {
+      // Phase 7.8: a run without a pinned statutory policy keeps the v1
+      // source fingerprint.
+      findFirst: jest.fn().mockResolvedValue({
+        statutoryPolicyVersionId: null,
+        periodEnd: null,
+        periodYear: 2026,
+        periodMonth: 5,
+      }),
       findFirstOrThrow: jest
         .fn()
         .mockImplementation(
@@ -1312,6 +1325,16 @@ function buildService(options: {
   };
 
   const prisma = {
+    runWithoutTenantScope: jest.fn(
+      async (_reason: string, fn: () => Promise<unknown>) => fn(),
+    ),
+    nepalHrPolicyVersion: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    staffStatutoryMembership: {
+      findMany: jest.fn().mockResolvedValue([]),
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
     staff: {
       findFirst: jest
         .fn()

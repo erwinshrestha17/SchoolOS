@@ -36,6 +36,7 @@ import {
   SalaryStructureListQueryDto,
 } from './dto/payroll-list-query.dto';
 import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
+import { StatutoryPolicyQueryDto } from './dto/statutory-membership.dto';
 import { PayrollReportQueryDto } from './dto/payroll-report-query.dto';
 import { PayslipRegenerationJobSummaryDto } from './dto/payslip-regeneration-job.dto';
 import {
@@ -61,6 +62,19 @@ export class PayrollController {
     private readonly payrollReadinessService: PayrollReadinessService,
     private readonly salarySlipService: PayrollSalarySlipService,
   ) {}
+
+  @Get('statutory-policy')
+  @Permissions('payroll:run:read')
+  @ApiOperation({
+    summary:
+      'Get the approved statutory policy version in force on a date, as calculation uses it',
+  })
+  getStatutoryPolicy(
+    @Query() query: StatutoryPolicyQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getStatutoryPolicy(query.asOf, auth);
+  }
 
   @Get('readiness')
   @Permissions('payroll:run:read')

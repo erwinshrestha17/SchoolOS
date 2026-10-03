@@ -38,6 +38,7 @@ model Staff {
   user                       User                        @relation("StaffUser", fields: [userId], references: [id], onDelete: Cascade)
   attendanceRecords          StaffAttendance[]
   attendanceCorrections StaffAttendanceCorrection[]
+  statutoryMemberships StaffStatutoryMembership[]
   teacherAssignments         SubjectTeacherAssignment[]
   timetableSlots             TimetableSlot[]
   teacherAvailabilities      TeacherAvailability[]

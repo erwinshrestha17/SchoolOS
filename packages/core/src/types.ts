@@ -5490,6 +5490,8 @@ export type PayrollRunSummary = {
   payslipCount?: number;
   journalEntryId: string | null;
   disbursementJournalEntryId?: string | null;
+  /** Approved statutory policy version the run was calculated with (null for runs before Phase 7.8). */
+  statutoryPolicyVersionId?: string | null;
   allowedActions: PayrollRunAllowedActions;
   lines?: PayrollLineSummary[];
   /** Canonical Phase 3A projection; read it instead of allowedActions. */
@@ -5721,6 +5723,53 @@ export type PayrollExceptionPage = {
   total: number;
   totalPages: number;
   readiness: PayrollReadinessSummary;
+};
+
+/** Phase 7.8 */
+export type StatutoryScheme = "SSF" | "PF";
+
+export type StatutoryMembershipView = {
+  id: string;
+  staffId: string;
+  scheme: StatutoryScheme;
+  /** Visible only to hr:tax:read holders (the endpoints require it). */
+  memberIdentifier: string | null;
+  effectiveFrom: string;
+  /** Exclusive end date; null while open. */
+  effectiveTo: string | null;
+  endReason: string | null;
+  endedById: string | null;
+  createdById: string;
+  createdAt: string;
+};
+
+export type StatutorySchemeCode = "SSF" | "PF" | "REMUNERATION_TAX";
+
+export type StatutoryPolicySchemeView = {
+  code: StatutorySchemeCode;
+  base: "BASIC" | "BASIC_PLUS_ALLOWANCES" | "GROSS";
+  method: "FLAT_RATE" | "MARGINAL_SLABS";
+  /** Decimal strings, e.g. "0.1"; null when the scheme has no such rate. */
+  employeeRate: string | null;
+  employerRate: string | null;
+  baseCap: string | null;
+  slabs: Array<{ upTo: string | null; rate: string }>;
+  requiresIdentifier: boolean;
+};
+
+/** The approved statutory policy in force on a date (null when none). */
+export type StatutoryPolicyView = {
+  asOf: string;
+  policy: {
+    versionId: string;
+    policyKey: string;
+    version: number;
+    effectiveFrom: string;
+    effectiveTo: string | null;
+    sourceTitle: string;
+    sourceChecksumSha256: string | null;
+    schemes: StatutoryPolicySchemeView[];
+  } | null;
 };
 
 // ─── Compiled from types/platform.ts ───

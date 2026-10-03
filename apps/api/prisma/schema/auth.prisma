@@ -41,6 +41,8 @@ model User {
   submittedAttendanceSessions AttendanceSession[]          @relation("SubmittedAttendanceSessions")
   requestedStaffCorrections StaffAttendanceCorrection[] @relation("StaffAttendanceCorrectionRequester")
   approvedStaffCorrections StaffAttendanceCorrection[] @relation("StaffAttendanceCorrectionApprover")
+  createdStatutoryMemberships StaffStatutoryMembership[] @relation("StaffStatutoryMembershipCreator")
+  endedStatutoryMemberships StaffStatutoryMembership[] @relation("StaffStatutoryMembershipEnder")
   approvedStaffAttendance     StaffAttendance[]            @relation("ApprovedStaffAttendance")
   collectedPayments           Payment[]                    @relation("CollectedPayments")
   cashierCloseCollectorScopes CashierClose[]               @relation("CashierCloseCollector")

@@ -4148,8 +4148,12 @@ async function upsertCanonicalSalaryStructure(
     basicSalary: new Prisma.Decimal(45000),
     allowances: new Prisma.Decimal(5000),
     deductions: new Prisma.Decimal(1500),
-    pfEnabled: true,
-    tdsEnabled: true,
+    // Phase 7.8: contribution/tax rates come only from an approved statutory
+    // policy version, and none is loaded until the owner supplies the statutory
+    // documents. With these switched on, payroll generation is (correctly)
+    // refused for want of a policy, so the demo structure leaves them off.
+    pfEnabled: false,
+    tdsEnabled: false,
     paymentMethod: PaymentMethod.BANK,
     bankAccount: staff.bankAccount,
     bankName: staff.bankName,

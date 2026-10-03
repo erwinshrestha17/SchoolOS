@@ -71,6 +71,7 @@ interface TransactionMock {
   payrollRun: {
     update: jest.Mock;
     updateMany: jest.Mock;
+    findFirst: jest.Mock;
     findFirstOrThrow: jest.Mock;
   };
 }
@@ -537,6 +538,7 @@ function buildTransactionMock(root: PayrollM9PrismaMock): TransactionMock {
       createMany: root.payslip.createMany,
     },
     payrollRun: {
+      findFirst: jest.fn(() => Promise.resolve(root.__currentRun)),
       findFirstOrThrow: jest.fn(() => Promise.resolve(root.__currentRun)),
       updateMany: jest.fn((q: { data?: Record<string, unknown> }) => {
         root.__currentRun = {

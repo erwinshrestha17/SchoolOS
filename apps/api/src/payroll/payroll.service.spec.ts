@@ -6,9 +6,27 @@ import {
   getOverlapDays,
   payrollRunLifecycle,
 } from './payroll.service';
+import { parseStatutoryPolicyPayload } from './statutory-policy';
 
 describe('payroll calculations', () => {
-  it('prorates salary by attendance and applies demo statutory deductions', () => {
+  // FIXTURE numbers only: these are not Nepal statutory rates.
+  const fixturePolicy = parseStatutoryPolicyPayload({
+    schemes: [
+      {
+        code: 'REMUNERATION_TAX',
+        base: 'GROSS',
+        employeeRate: '0.02',
+      },
+      {
+        code: 'PF',
+        base: 'BASIC',
+        employeeRate: '0.07',
+        employerRate: '0.13',
+      },
+    ],
+  });
+
+  it('prorates salary by attendance and takes statutory amounts from the policy', () => {
     expect(
       calculatePayrollLine({
         baseSalary: 40000,
@@ -16,20 +34,66 @@ describe('payroll calculations', () => {
         contractDeductions: 1000,
         attendanceDays: 15,
         workingDays: 30,
-        tdsEnabled: true,
+        policy: fixturePolicy,
+        enrollment: { retirementScheme: null, taxWithholding: true },
       }),
-    ).toEqual({
+    ).toMatchObject({
       earnings: new Prisma.Decimal(22500),
       grossSalary: new Prisma.Decimal(22500),
       allowances: new Prisma.Decimal(5000),
       leaveDeductions: new Prisma.Decimal(22500),
       pfEmployee: new Prisma.Decimal(0),
       pfEmployer: new Prisma.Decimal(0),
-      tds: new Prisma.Decimal(225),
+      tds: new Prisma.Decimal(450),
       otherDeductions: new Prisma.Decimal(1000),
-      deductions: new Prisma.Decimal(1225),
-      netSalary: new Prisma.Decimal(21275),
+      deductions: new Prisma.Decimal(1450),
+      netSalary: new Prisma.Decimal(21050),
     });
+  });
+
+  it('applies the member scheme to its own base, prorated', () => {
+    const line = calculatePayrollLine({
+      baseSalary: 40000,
+      allowances: 5000,
+      contractDeductions: 0,
+      attendanceDays: 15,
+      workingDays: 30,
+      policy: fixturePolicy,
+      enrollment: { retirementScheme: 'PF', taxWithholding: false },
+    });
+    // BASIC base is the prorated basic (20000), not gross.
+    expect(line.pfEmployee).toEqual(new Prisma.Decimal(1400));
+    expect(line.pfEmployer).toEqual(new Prisma.Decimal(2600));
+    expect(line.statutoryAmounts).toHaveLength(1);
+    expect(line.statutoryAmounts[0].baseAmount).toEqual(
+      new Prisma.Decimal(20000),
+    );
+  });
+
+  it('never computes a statutory amount without an approved policy', () => {
+    expect(() =>
+      calculatePayrollLine({
+        baseSalary: 40000,
+        allowances: 0,
+        contractDeductions: 0,
+        attendanceDays: 30,
+        workingDays: 30,
+        policy: null,
+        enrollment: { retirementScheme: null, taxWithholding: true },
+      }),
+    ).toThrow('No approved statutory policy');
+    // No enrolment, no policy needed.
+    expect(
+      calculatePayrollLine({
+        baseSalary: 40000,
+        allowances: 0,
+        contractDeductions: 0,
+        attendanceDays: 30,
+        workingDays: 30,
+        policy: null,
+        enrollment: { retirementScheme: null, taxWithholding: false },
+      }).deductions,
+    ).toEqual(new Prisma.Decimal(0));
   });
 
   it('keeps payroll totals balanced for ledger posting', () => {

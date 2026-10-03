@@ -35,6 +35,7 @@ model Tenant {
   attendanceRecords             AttendanceRecord[]
   staffAttendance               StaffAttendance[]
   staffAttendanceCorrections StaffAttendanceCorrection[]
+  staffStatutoryMemberships StaffStatutoryMembership[]
   feeHeads                      FeeHead[]
   feePlans                      FeePlan[]
   feePlanItems                  FeePlanItem[]

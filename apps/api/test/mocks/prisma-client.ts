@@ -1502,6 +1502,19 @@ export const NepalHrPolicyReviewStatus = {
   REJECTED: 'REJECTED',
 } as const;
 
+export const NepalEducationPolicyScope = {
+  NATIONAL: 'NATIONAL',
+  PROVINCE: 'PROVINCE',
+  DISTRICT: 'DISTRICT',
+  LOCAL_LEVEL: 'LOCAL_LEVEL',
+  SCHOOL: 'SCHOOL',
+} as const;
+
+export const StatutoryScheme = {
+  SSF: 'SSF',
+  PF: 'PF',
+} as const;
+
 export const StaffResponsibilityKind = {
   PRIMARY: 'PRIMARY',
   SECONDARY: 'SECONDARY',

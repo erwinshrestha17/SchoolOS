@@ -136,6 +136,180 @@ describe('PayrollReadinessService', () => {
   });
 });
 
+// FIXTURE numbers only: these are not Nepal statutory rates.
+const taxOnlyPolicy = {
+  schemes: [{ code: 'REMUNERATION_TAX', base: 'GROSS', employeeRate: '0.02' }],
+};
+const pfPolicy = {
+  schemes: [
+    { code: 'REMUNERATION_TAX', base: 'GROSS', employeeRate: '0.02' },
+    {
+      code: 'PF',
+      base: 'BASIC',
+      employeeRate: '0.07',
+      employerRate: '0.13',
+      requiresIdentifier: true,
+    },
+  ],
+};
+
+function policyVersion(payload: unknown, policyKey = 'fixture-policy') {
+  return {
+    id: `version-${policyKey}`,
+    policyKey,
+    version: 1,
+    effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+    effectiveTo: null,
+    sourceTitle: 'Fixture',
+    sourceChecksumSha256: 'a'.repeat(64),
+    payload,
+  };
+}
+
+function structure(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'structure-1',
+    staffId: 'staff-1',
+    paymentMethod: 'BANK',
+    pfEnabled: false,
+    tdsEnabled: true,
+    ...overrides,
+  };
+}
+
+function statutoryIssues(prisma: ReturnType<typeof buildPrismaMock>) {
+  return persistedCandidates(prisma).filter(
+    (item) => item.code === 'MISSING_STATUTORY_CONFIGURATION',
+  );
+}
+
+describe('PayrollReadinessService statutory configuration (Phase 7.8)', () => {
+  const blockedActions = ['CREATE_DRAFT', 'SUBMIT_REVIEW', 'APPROVE', 'POST'];
+
+  it('is satisfied when the approved policy covers what the staff owe', async () => {
+    const { service, prisma } = buildService();
+    await service.getReadiness(period, actor);
+    expect(statutoryIssues(prisma)).toEqual([]);
+  });
+
+  it('blocks the period when no approved policy covers it', async () => {
+    const { service, prisma } = buildService({ policies: [] });
+    await service.getReadiness(period, actor);
+    expect(statutoryIssues(prisma)).toEqual([
+      expect.objectContaining({
+        severity: 'BLOCKING',
+        staffId: null,
+        title: 'No approved statutory policy',
+        blockedActions,
+      }),
+    ]);
+  });
+
+  it('needs no policy when nobody owes a statutory amount', async () => {
+    const { service, prisma } = buildService({
+      policies: [],
+      structures: [structure({ tdsEnabled: false, pfEnabled: false })],
+    });
+    await service.getReadiness(period, actor);
+    expect(statutoryIssues(prisma)).toEqual([]);
+    expect(prisma.nepalHrPolicyVersion.findMany).not.toHaveBeenCalled();
+  });
+
+  it('blocks when the policy does not define a scheme that is owed', async () => {
+    const { service, prisma } = buildService({
+      policies: [
+        policyVersion({
+          schemes: [{ code: 'PF', base: 'BASIC', employeeRate: '0.1' }],
+        }),
+      ],
+    });
+    await service.getReadiness(period, actor);
+    expect(statutoryIssues(prisma)).toEqual([
+      expect.objectContaining({
+        title: 'Scheme not defined by the approved policy',
+        safeMessage: expect.stringContaining('REMUNERATION_TAX'),
+      }),
+    ]);
+  });
+
+  it('blocks a member whose provident contribution has no scheme membership', async () => {
+    const { service, prisma } = buildService({
+      policies: [policyVersion(pfPolicy)],
+      structures: [structure({ pfEnabled: true })],
+    });
+    await service.getReadiness(period, actor);
+    expect(statutoryIssues(prisma)).toEqual([
+      expect.objectContaining({
+        staffId: 'staff-1',
+        title: 'Statutory scheme membership missing',
+        blockedActions,
+      }),
+    ]);
+  });
+
+  it('blocks a required identifier that is missing and accepts one that is present', async () => {
+    const missing = buildService({
+      policies: [policyVersion(pfPolicy)],
+      structures: [structure({ pfEnabled: true })],
+      memberships: [
+        { staffId: 'staff-1', scheme: 'PF', memberIdentifier: null },
+      ],
+    });
+    await missing.service.getReadiness(period, actor);
+    expect(statutoryIssues(missing.prisma)).toEqual([
+      expect.objectContaining({
+        staffId: 'staff-1',
+        title: 'PF member identifier missing',
+      }),
+    ]);
+
+    const present = buildService({
+      policies: [policyVersion(pfPolicy)],
+      structures: [structure({ pfEnabled: true })],
+      memberships: [
+        { staffId: 'staff-1', scheme: 'PF', memberIdentifier: 'PF-1001' },
+      ],
+    });
+    await present.service.getReadiness(period, actor);
+    expect(statutoryIssues(present.prisma)).toEqual([]);
+  });
+
+  it('refuses an unusable or ambiguous policy instead of guessing', async () => {
+    const unusable = buildService({
+      policies: [policyVersion({ schemes: [{ code: 'CIT' }] })],
+    });
+    await unusable.service.getReadiness(period, actor);
+    expect(statutoryIssues(unusable.prisma)).toEqual([
+      expect.objectContaining({ title: 'Statutory policy unusable' }),
+    ]);
+
+    const ambiguous = buildService({
+      policies: [
+        policyVersion(taxOnlyPolicy, 'policy-a'),
+        policyVersion(taxOnlyPolicy, 'policy-b'),
+      ],
+    });
+    await ambiguous.service.getReadiness(period, actor);
+    expect(statutoryIssues(ambiguous.prisma)).toEqual([
+      expect.objectContaining({ title: 'Statutory policy unusable' }),
+    ]);
+  });
+
+  it('evaluates a run against the policy version it was calculated with', async () => {
+    const { service, prisma } = buildService({
+      policies: [],
+      runOverrides: { statutoryPolicyVersionId: 'version-pinned' },
+      pinnedPolicy: { payload: taxOnlyPolicy },
+    });
+    await service.getReadiness(period, actor);
+    expect(prisma.nepalHrPolicyVersion.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'version-pinned' } }),
+    );
+    expect(prisma.nepalHrPolicyVersion.findMany).not.toHaveBeenCalled();
+    expect(statutoryIssues(prisma)).toEqual([]);
+  });
+});
+
 function persistedCandidates(prisma: ReturnType<typeof buildPrismaMock>) {
   const creates = (prisma.__tx.payrollException.create as jest.Mock).mock.calls;
   return creates.map((call) => call[0].data);
@@ -168,6 +342,11 @@ function buildPrismaMock(
     lines?: Record<string, unknown>[];
     existingExceptions?: Record<string, unknown>[];
     employments?: Record<string, unknown>[];
+    structures?: Record<string, unknown>[];
+    policies?: Record<string, unknown>[];
+    pinnedPolicy?: Record<string, unknown> | null;
+    memberships?: Record<string, unknown>[];
+    runOverrides?: Record<string, unknown>;
   } = {},
 ) {
   const tx = {
@@ -186,7 +365,21 @@ function buildPrismaMock(
         periodStart: new Date('2026-05-01T00:00:00.000Z'),
         periodEnd: new Date('2026-05-31T00:00:00.000Z'),
         status: 'GENERATED',
+        statutoryPolicyVersionId: null,
+        ...options.runOverrides,
       }),
+    },
+    runWithoutTenantScope: jest.fn(
+      async (_reason: string, fn: () => Promise<unknown>) => fn(),
+    ),
+    nepalHrPolicyVersion: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.policies ?? [policyVersion(taxOnlyPolicy)]),
+      findUnique: jest.fn().mockResolvedValue(options.pinnedPolicy ?? null),
+    },
+    staffStatutoryMembership: {
+      findMany: jest.fn().mockResolvedValue(options.memberships ?? []),
     },
     staff: {
       findMany: jest.fn().mockResolvedValue([{ id: 'staff-1' }]),
@@ -197,7 +390,7 @@ function buildPrismaMock(
         .mockResolvedValue([{ id: 'contract-1', staffId: 'staff-1' }]),
     },
     salaryStructure: {
-      findMany: jest.fn().mockResolvedValue([]),
+      findMany: jest.fn().mockResolvedValue(options.structures ?? []),
     },
     staffEmployment: {
       findMany: jest.fn().mockResolvedValue(

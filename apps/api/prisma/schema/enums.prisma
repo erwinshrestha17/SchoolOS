@@ -629,6 +629,11 @@ enum PayrollExceptionStatus {
   WAIVED
 }
 
+enum StatutoryScheme {
+  SSF
+  PF
+}
+
 enum PayrollExceptionCode {
   MISSING_SALARY_STRUCTURE
   NO_EFFECTIVE_SALARY_STRUCTURE

@@ -42,6 +42,7 @@ import { LeaveReviewDialog } from './leave-review-dialog';
 import { LeaveBalanceAdjustDialog } from './leave-balance-adjust-dialog';
 import { SalaryStructureDialog } from './salary-structure-dialog';
 import { ProfessionalIdentityPanel } from './professional-identity-panel';
+import { StatutoryMembershipPanel } from './statutory-membership-panel';
 
 // The backend nulls out salary/payroll figures (with a `masked: true` flag)
 // for viewers without sensitive-HR access — never call .toLocaleString() on
@@ -918,6 +919,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
 
             {/* Tab: Payroll */}
             <TabsContent value="payroll" className="m-0 outline-none space-y-8">
+              <StatutoryMembershipPanel staffId={staffId} />
               {/* Salary Structures */}
               <section className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

@@ -339,7 +339,9 @@ export function SalaryStructureDialog({
                       PF Contribution
                     </p>
                     <p className="text-[10px] text-slate-500 mt-0.5">
-                      Enable Provident Fund deduction
+                      Staff member contributes to a statutory retirement scheme
+                      (SSF or PF). Needs an active statutory membership; the
+                      rate comes from the approved policy.
                     </p>
                   </div>
                 </label>
@@ -357,7 +359,8 @@ export function SalaryStructureDialog({
                       TDS Deduction
                     </p>
                     <p className="text-[10px] text-slate-500 mt-0.5">
-                      Enable Tax Deducted at Source
+                      Withhold remuneration tax. The rate comes from the
+                      approved statutory policy.
                     </p>
                   </div>
                 </label>

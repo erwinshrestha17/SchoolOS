@@ -71,6 +71,10 @@ model PayrollRun {
   finalizedById              String?
   finalizedAt                DateTime?
   approvedSourceFingerprint  String?
+  // Phase 7.8: the approved statutory policy version every statutory amount on
+  // this run was computed from. NULL only for runs created before 7.8 (their
+  // amounts are never recomputed).
+  statutoryPolicyVersionId   String?
   postedById                 String?
   paidById                   String?
   approvedAt                 DateTime?
@@ -88,6 +92,7 @@ model PayrollRun {
   tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   fiscalYear FiscalYear?   @relation(fields: [fiscalYearId], references: [id], onDelete: SetNull)
   reversedBy User?         @relation("ReversedPayrollRuns", fields: [reversedById], references: [id], onDelete: SetNull)
+  statutoryPolicyVersion NepalHrPolicyVersion? @relation("PayrollRunStatutoryPolicy", fields: [statutoryPolicyVersionId], references: [id], onDelete: Restrict)
   predecessor PayrollRun? @relation("PayrollRevisions", fields: [predecessorRunId], references: [id], onDelete: Restrict)
   replacement PayrollRun? @relation("PayrollRevisions")
   lines      PayrollLine[]
@@ -96,6 +101,7 @@ model PayrollRun {
 
   @@unique([tenantId, periodMonth, periodYear, revision])
   @@index([tenantId, status])
+  @@index([statutoryPolicyVersionId])
 }
 
 model PayrollException {
@@ -145,6 +151,8 @@ model PayrollLine {
   employmentId      String?
   employmentFrom    DateTime?
   employmentTo      DateTime?
+  // Phase 7.8: per-scheme bases and amounts exactly as computed (no identifiers).
+  statutoryBreakdown Json?
   basicSalary       Decimal              @default(0) @db.Decimal(12, 2)
   earnings          Decimal              @default(0) @db.Decimal(12, 2)
   grossSalary       Decimal              @db.Decimal(12, 2)
@@ -201,4 +209,31 @@ model Payslip {
   staff       Staff       @relation(fields: [staffId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, payslipNumber])
+}
+
+// Phase 7.8: which statutory retirement scheme a staff member belongs to and
+// under what identifier, for an effective window. Rates never live here; they
+// come from an approved NepalHrPolicyVersion of kind STATUTORY_SCHEME_TAX.
+// A staff member belongs to at most one scheme at any instant (database
+// EXCLUDE). Identifiers are protected under hr:tax:*.
+model StaffStatutoryMembership {
+  id               String          @id @default(uuid())
+  tenantId         String
+  staffId          String
+  scheme           StatutoryScheme
+  memberIdentifier String?
+  effectiveFrom    DateTime        @db.Date
+  effectiveTo      DateTime?       @db.Date
+  createdById      String
+  endedById        String?
+  endReason        String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @default(now()) @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff     Staff  @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  createdBy User   @relation("StaffStatutoryMembershipCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  endedBy   User?  @relation("StaffStatutoryMembershipEnder", fields: [endedById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, staffId, effectiveFrom])
 }

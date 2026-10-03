@@ -26,6 +26,18 @@ import {
 } from '../hr/employment-timeline';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  findStatutoryScheme,
+  parseStatutoryPolicyPayload,
+  StatutoryPolicyInvalidError,
+  type ResolvedStatutoryPolicy,
+  type StatutoryPolicyDefinition,
+  type StatutorySchemeCode,
+} from './statutory-policy';
+import {
+  readNationalStatutoryPolicies,
+  resolveStatutoryPolicy,
+} from './statutory-policy-resolver';
 import type {
   AcknowledgePayrollExceptionDto,
   PayrollExceptionQueryDto,
@@ -66,7 +78,6 @@ interface ReadinessLine {
   };
   salaryStructure: {
     paymentMethod: PaymentMethod;
-    bankAccount: string | null;
   } | null;
 }
 
@@ -328,6 +339,158 @@ export class PayrollReadinessService {
     }
   }
 
+  /**
+   * Phase 7.8: statutory configuration readiness. A run is blocked (never
+   * silently computed with zero or default amounts) when the period has no
+   * approved policy, the policy lacks a scheme someone owes, or a member has
+   * no scheme membership / required identifier on the period end date.
+   */
+  private async statutoryCandidates(input: {
+    year: number;
+    month: number;
+    runId: string | null;
+    end: Date;
+    pinnedPolicyVersionId: string | null;
+    employedStaff: Map<string, unknown>;
+    structureByStaff: Map<string, { pfEnabled: boolean; tdsEnabled: boolean }>;
+    contractStaff: Set<string>;
+    tenantId: string;
+  }): Promise<Candidate[]> {
+    const { year, month, runId } = input;
+    const out: Candidate[] = [];
+    const blocked: ReadinessAction[] = [
+      'CREATE_DRAFT',
+      'SUBMIT_REVIEW',
+      'APPROVE',
+      'POST',
+    ];
+    const needs = new Map<string, { retirement: boolean; tax: boolean }>();
+    for (const staffId of [...input.employedStaff.keys()].sort()) {
+      const structure = input.structureByStaff.get(staffId);
+      const retirement = structure?.pfEnabled === true;
+      const tax = structure
+        ? structure.tdsEnabled
+        : input.contractStaff.has(staffId);
+      if (!structure && !input.contractStaff.has(staffId)) continue;
+      if (retirement || tax) needs.set(staffId, { retirement, tax });
+    }
+    if (!needs.size) return out;
+
+    const run = (title: string, safeMessage: string) =>
+      candidate(year, month, runId, null, {
+        code: PayrollExceptionCode.MISSING_STATUTORY_CONFIGURATION,
+        severity: PayrollExceptionSeverity.BLOCKING,
+        title,
+        safeMessage,
+        resolutionRoute: '/dashboard/payroll/readiness',
+        blockedActions: blocked,
+      });
+
+    let policy: StatutoryPolicyDefinition | null = null;
+    try {
+      const pinnedId = input.pinnedPolicyVersionId;
+      if (pinnedId) {
+        const pinned = await readNationalStatutoryPolicies(this.prisma, () =>
+          this.prisma.nepalHrPolicyVersion.findUnique({
+            where: { id: pinnedId },
+            select: { payload: true },
+          }),
+        );
+        policy = pinned ? parseStatutoryPolicyPayload(pinned.payload) : null;
+      } else {
+        const resolved: ResolvedStatutoryPolicy | null =
+          await resolveStatutoryPolicy(this.prisma, input.end);
+        policy = resolved?.definition ?? null;
+      }
+    } catch (error) {
+      const message =
+        error instanceof StatutoryPolicyInvalidError
+          ? 'The approved statutory policy cannot be used for calculation. A corrected version must be approved.'
+          : error instanceof ConflictException
+            ? 'More than one approved statutory policy covers this payroll period, or the approved policy is unusable.'
+            : null;
+      if (!message) throw error;
+      out.push(run('Statutory policy unusable', message));
+      return out;
+    }
+    if (!policy) {
+      out.push(
+        run(
+          'No approved statutory policy',
+          'No approved statutory policy version covers this payroll period, so contributions and tax cannot be calculated.',
+        ),
+      );
+      return out;
+    }
+
+    const missingSchemes = new Set<StatutorySchemeCode>();
+    const endDay = new Date(
+      Date.UTC(
+        input.end.getUTCFullYear(),
+        input.end.getUTCMonth(),
+        input.end.getUTCDate(),
+      ),
+    );
+    const memberships = await this.prisma.staffStatutoryMembership.findMany({
+      where: {
+        tenantId: input.tenantId,
+        staffId: { in: [...needs.keys()] },
+        effectiveFrom: { lte: endDay },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gt: endDay } }],
+      },
+      select: { staffId: true, scheme: true, memberIdentifier: true },
+    });
+    const membershipByStaff = new Map(
+      memberships.map((row) => [row.staffId, row]),
+    );
+    for (const [staffId, need] of needs) {
+      if (need.tax && !findStatutoryScheme(policy, 'REMUNERATION_TAX'))
+        missingSchemes.add('REMUNERATION_TAX');
+      if (!need.retirement) continue;
+      const membership = membershipByStaff.get(staffId);
+      if (!membership) {
+        out.push(
+          candidate(year, month, runId, staffId, {
+            code: PayrollExceptionCode.MISSING_STATUTORY_CONFIGURATION,
+            severity: PayrollExceptionSeverity.BLOCKING,
+            title: 'Statutory scheme membership missing',
+            safeMessage:
+              'Provident contribution is enabled but no SSF/PF membership covers the payroll period end date.',
+            resolutionRoute: `/dashboard/hr/staff/${staffId}`,
+            blockedActions: blocked,
+          }),
+        );
+        continue;
+      }
+      const rule = findStatutoryScheme(policy, membership.scheme);
+      if (!rule) {
+        missingSchemes.add(membership.scheme);
+        continue;
+      }
+      if (rule.requiresIdentifier && !membership.memberIdentifier?.trim()) {
+        out.push(
+          candidate(year, month, runId, staffId, {
+            code: PayrollExceptionCode.MISSING_STATUTORY_CONFIGURATION,
+            severity: PayrollExceptionSeverity.BLOCKING,
+            title: `${membership.scheme} member identifier missing`,
+            safeMessage: `The ${membership.scheme} membership has no member identifier, which the approved policy requires.`,
+            resolutionRoute: `/dashboard/hr/staff/${staffId}`,
+            blockedActions: blocked,
+          }),
+        );
+      }
+    }
+    if (missingSchemes.size) {
+      out.push(
+        run(
+          'Scheme not defined by the approved policy',
+          `The approved statutory policy does not define: ${[...missingSchemes].sort().join(', ')}.`,
+        ),
+      );
+    }
+    return out;
+  }
+
   private async sync(query: PayrollExceptionQueryDto, actor: AuthContext) {
     const now = new Date();
     const year = query.year ?? now.getUTCFullYear();
@@ -337,7 +500,13 @@ export class PayrollReadinessService {
       where: query.payrollRunId
         ? { id: query.payrollRunId, tenantId: actor.tenantId }
         : { tenantId: actor.tenantId, periodYear: year, periodMonth: month },
-      select: { id: true, periodStart: true, periodEnd: true, status: true },
+      select: {
+        id: true,
+        periodStart: true,
+        periodEnd: true,
+        status: true,
+        statutoryPolicyVersionId: true,
+      },
       orderBy: query.payrollRunId ? undefined : { createdAt: 'desc' },
     });
     if (query.payrollRunId && !selectedRun) {
@@ -393,7 +562,7 @@ export class PayrollReadinessService {
           id: true,
           staffId: true,
           paymentMethod: true,
-          bankAccount: true,
+          pfEnabled: true,
           tdsEnabled: true,
         },
         orderBy: [{ effectiveFrom: 'desc' }, { id: 'asc' }],
@@ -420,7 +589,6 @@ export class PayrollReadinessService {
               salaryStructure: {
                 select: {
                   paymentMethod: true,
-                  bankAccount: true,
                 },
               },
             },
@@ -550,7 +718,6 @@ export class PayrollReadinessService {
         );
       } else if (
         structure.paymentMethod === PaymentMethod.BANK &&
-        !structure.bankAccount?.trim() &&
         !member.bankAccount?.trim()
       ) {
         candidates.push(
@@ -675,7 +842,6 @@ export class PayrollReadinessService {
       }
       if (
         line.salaryStructure?.paymentMethod === PaymentMethod.BANK &&
-        !line.salaryStructure.bankAccount?.trim() &&
         !line.staff.bankAccount?.trim()
       ) {
         candidates.push(
@@ -691,6 +857,20 @@ export class PayrollReadinessService {
         );
       }
     }
+
+    candidates.push(
+      ...(await this.statutoryCandidates({
+        year,
+        month,
+        runId,
+        end,
+        pinnedPolicyVersionId: selectedRun?.statutoryPolicyVersionId ?? null,
+        employedStaff,
+        structureByStaff,
+        contractStaff,
+        tenantId: actor.tenantId,
+      })),
+    );
 
     if (
       runId &&

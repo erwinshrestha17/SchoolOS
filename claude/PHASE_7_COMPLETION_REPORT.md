@@ -58,3 +58,101 @@ The full integration run exposed three older finance teardown paths that attempt
 ### Boundaries retained
 
 Queued adjustments are durable inputs for **7.9**. Their consumption, money calculation and idempotent posting belong to that later slice. No finalized payroll run is recalculated here. This slice does not close remaining P0 gates, establish statutory compliance, or prove staging/production readiness.
+
+---
+
+## 7.8 — Compensation & statutory configuration
+
+**Completed locally on 3 October 2026, on `main`.**
+
+**Baseline:** start `cb2dae4e`; end = the commit that adds this section (`git log -1 -- claude/PHASE_7_COMPLETION_REPORT.md`).
+
+### Slice
+
+Payroll no longer contains hard-coded contribution or tax rates. Statutory deductions come from an approved, effective-dated policy version; staff are enrolled in SSF or PF through an effective-dated membership; the policy version used is recorded on every payroll run; one active salary structure per staff member is enforced by the database; Staff is the single source of bank details.
+
+**No real Nepal rates were loaded or invented.** Everything in tests is labelled FIXTURE. Real rates need the owner-supplied statutory documents (decision D1).
+
+### Existing implementation retained
+
+- `NepalHrPolicyVersion` (kind `STATUTORY_SCHEME_TAX`) and its existing review lifecycle: draft, in review, reviewed, approved; separate reviewer and approver from the Platform authority domain; immutable history; no deletes. Reused instead of adding a parallel rate table.
+- `PayrollLine.pfEmployee` / `pfEmployer` / `tds` columns and the run totals. SSF and PF amounts use the PF columns, remuneration tax uses `tds`.
+- `SalaryStructure.pfEnabled` as the "this person contributes to a retirement scheme" switch, and `tdsEnabled` for tax withholding.
+- StaffEmployment remains authoritative for who is employed in a period; the school authorization transaction, audit service and SoD rules are unchanged.
+
+### Changes
+
+- **Database** (`20261003140000_phase7_statutory_configuration`):
+  - preflights that fail, and never edit data, on overlapping ACTIVE salary structures or an approved statutory policy that breaks the new rules;
+  - `StatutoryScheme` enum and `StaffStatutoryMembership` table: one scheme at a time per staff (EXCLUDE), date/identifier/end-evidence CHECKs, no deletes, only scheme-neutral ending of an open membership, tenant-consistency trigger, and an approved-run lock on insert and end;
+  - EXCLUDE on `SalaryStructure` preventing overlapping ACTIVE windows;
+  - CHECK that an approved statutory version is NATIONAL, carries a source checksum, payload schema 1 and at least one scheme;
+  - `PayrollRun.statutoryPolicyVersionId` with a trigger: the version must be an approved statutory version covering the period end, and is frozen once the run is APPROVED or later;
+  - `PayrollLine.statutoryBreakdown` (per-scheme base and amount, no identifiers);
+  - backfill of empty Staff bank fields from the latest ACTIVE structure (never overwrites).
+- **Policy engine** (`statutory-policy.ts`, `statutory-policy-resolver.ts`): typed payload v1 with decimal-string rates, FLAT_RATE and MARGINAL_SLABS (tax only), bases BASIC / BASIC_PLUS_ALLOWANCES / GROSS, optional base cap and `requiresIdentifier`. CIT is rejected because no ledger payable mapping exists. The resolver uses the policy in force on the period end and refuses two approved lineages covering the same date (`STATUTORY_POLICY_AMBIGUOUS`) or an unusable payload (`STATUTORY_POLICY_INVALID`).
+- **Payroll calculation** (`payroll.service.ts`): `calculatePayrollLine` takes the policy and the staff enrolment; the 10% / 1% constants and the earlier run-totals bug are gone. A missing policy, membership or identifier refuses generation with 409 `MISSING_STATUTORY_CONFIGURATION`, but only when someone actually owes a scheme. Regeneration uses the same path. The approval fingerprint for runs with a policy covers the policy id, per-line breakdowns and memberships; runs without one keep the original v1 fingerprint, so existing approvals are not invalidated.
+- **Readiness**: new BLOCKING exception `MISSING_STATUTORY_CONFIGURATION` (no policy, unusable or ambiguous policy, scheme absent from the policy, missing membership, missing required identifier). Bank checks read Staff only.
+- **Membership API** (`hr:tax:read` / `hr:tax:write`): list, create, and end a membership; the audit record carries `hasIdentifier`, never the identifier. `GET /payroll/statutory-policy?asOf=` shows the policy in force.
+- **Bank details**: salary-structure create/update write bank fields to Staff; the structure column stays null.
+- **Web**: a Statutory membership panel on the staff payroll tab (permission-gated, member number masked until revealed, one-scheme-at-a-time errors explained, no rates shown), API client methods, and clearer PF/TDS switch wording. Core types added. The demo seed leaves PF/TDS off, because no policy is loaded.
+
+### Invariants established
+
+- No rate exists outside an approved, source-checksummed, two-person-reviewed national policy version.
+- A run records the exact policy version used; that link is frozen after approval, and a later policy change never touches earlier runs.
+- A staff member belongs to at most one scheme at any date; membership history cannot be deleted or rewritten, and cannot change underneath an approved run.
+- A staff member has at most one ACTIVE salary structure at any date.
+- Identifiers are protected under `hr:tax:*` and never copied into audit logs or breakdowns.
+- Money uses decimals throughout, rounded to 2 places.
+
+### Edge cases resolved
+
+Overlapping, adjacent and open-ended windows; blank and padded identifiers; cross-tenant staff and actors; ending a membership twice; back-dating under an approved run; two approved lineages for one date; a policy that starts after the period end; a policy that omits an owed scheme; policy changes mid-year (May uses v1, August uses v2, both stored on their runs); nobody owing a scheme (no policy needed).
+
+### Defect found and fixed during the slice
+
+National policy versions have no `tenantId`, and the tenant-scope layer adds `tenantId = <school>` to every query, so a real school request would have seen "no policy" even with one approved. Reads of national statutory versions now go through the explicit, documented `runWithoutTenantScope` bypass. The real-database test caught it; unit mocks could not have.
+
+### Tests executed
+
+| Check | Result |
+| --- | --- |
+| API typecheck / Web typecheck | Passed |
+| API lint (full) / Web lint | Passed, no errors |
+| API unit | 305 suites, 3,551 tests passed |
+| API integration | 31 suites, 505 tests passed (includes 21 new in `statutory-configuration.int-spec.ts`) |
+| API e2e | 45 suites, 321 tests passed (mock of the payroll+accounting e2e gained `payrollRun.findFirst`) |
+| Web tests | 734 passed (5 new statutory-membership contract tests) |
+| Core tests | 27 passed |
+| OpenAPI contract | Passed: 1,208 paths, 1,394 operations, 502 schemas |
+| Database drift | No difference |
+| Formatting, tracked-artifact gate | Passed |
+
+The new integration suite covers the database guards, membership service authorization and audit, salary-structure overlap, run creation with and without a policy, policy change mid-year, ambiguity, freeze and lock behavior, and readiness. It is re-runnable and removes its own fixtures.
+
+### Failures
+
+Resolved during the slice: a 22-test first run (fixture rules: reviewer evidence and same-tenant employment verifier); the tenant-scope defect above; three finance teardown failures that came only from my test environment (see Known limitations); lint; and one web typography contract (`font-mono`).
+
+### Migrations
+
+`20261003140000_phase7_statutory_configuration`, applied by migrate deploy on the five local test databases and the development database; drift check clean. The preflights fail rather than repair. Manual rollback notes are in the migration header. Not applied to any staging or production database.
+
+### Known limitations
+
+- **No real rates and no in-app approval flow.** A version can only be approved through the existing Platform reviewer/approver controls at database level. An operator loader (validate, then load and approve with two distinct Platform users) is the natural next step once the owner supplies the statutory documents. An approved version also requires a source URI or evidence file.
+- CIT is unsupported; annualised tax, exemptions and rebates are not modelled; the policy is read as of period end, so a mid-period change takes effect the next period.
+- Periods are still Gregorian months (BS calendar is 7.9). Negative-net handling stays with 7.9.
+- `pfEnabled` is kept as the enrolment switch and still gates PF/SSF; a member without it is simply not charged.
+- The demo seed turns PF/TDS off so demo payroll still generates.
+- **Local test-environment note:** the finance suites (`student-fee-ledger-projection`, `fee-15-17-export-projection`, `ar-01-06-export-projection`) need `DATABASE_URL` and `SCHOOLOS_AUTH_TEST_DATABASE_URL` to point at the same database, otherwise teardown fails on the immutable-ledger guard.
+- **Leftover local fixtures.** Failed intermediate runs left approved/reviewed fixture statutory policy rows (years 2031-2033) in the shared local test database `schoolos_auth_recovery_test` and in `schoolos_auth_recovery_test_stat78`. Deleting them was blocked by the session's safety check, so they remain. On those two databases the new suite reports `STATUTORY_POLICY_AMBIGUOUS`; a fresh, migrated database (CI) is unaffected. `schoolos_auth_recovery_test_stat78b` is clean and was used for the verification above; `schoolos_stat78_test` is an empty migrated scratch database.
+
+### Blockers
+
+None for 7.8 itself. Loading real statutory rates depends on the owner's documents (D1).
+
+### Next slice
+
+**7.9 — Payroll period, readiness and run:** BS calendar periods (D2), proration by employment ∩ period, negative-net blocking, consumption of the queued attendance adjustments from 7.7, holds (D8), bank advice export (D6).

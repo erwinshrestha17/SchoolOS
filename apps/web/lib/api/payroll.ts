@@ -16,6 +16,8 @@ import type {
   StaffDetail,
   StaffLookupOption,
   StaffSummary,
+  StatutoryMembershipView,
+  StatutoryPolicyView,
 } from '@schoolos/core';
 import { getNepalSchoolDay } from '@schoolos/core';
 import {
@@ -163,6 +165,24 @@ export const payrollApi = {
     }),
   createStaff: (body: JsonBody) =>
     request<StaffSummary>('/staff', { method: 'POST', json: body }),
+  listStatutoryMemberships: (staffId: string) =>
+    request<StatutoryMembershipView[]>(
+      `/hr/staff/${encodeURIComponent(staffId)}/statutory-memberships`,
+    ),
+  createStatutoryMembership: (staffId: string, body: JsonBody) =>
+    request<StatutoryMembershipView>(
+      `/hr/staff/${encodeURIComponent(staffId)}/statutory-memberships`,
+      { method: 'POST', json: body },
+    ),
+  endStatutoryMembership: (membershipId: string, body: JsonBody) =>
+    request<StatutoryMembershipView>(
+      `/hr/statutory-memberships/${encodeURIComponent(membershipId)}/end`,
+      { method: 'POST', json: body },
+    ),
+  getStatutoryPolicy: (asOf?: string) =>
+    request<StatutoryPolicyView>(
+      withQuery('/payroll/statutory-policy', asOf ? { asOf } : {}),
+    ),
   listRoles: () => request<RoleSummary[]>('/roles'),
   listStaffContractsPage: (params?: M7ListParams) =>
     request<PaginatedResponse<StaffContractSummary>>(

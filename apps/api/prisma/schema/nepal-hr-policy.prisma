@@ -69,6 +69,7 @@ model NepalHrPolicyVersion {
   supersededBy    NepalHrPolicyVersion? @relation("NepalHrPolicyLineage")
   employments     StaffEmployment[]      @relation("EmploymentPolicy")
   teacherAssessments TeacherEligibilityAssessment[]
+  payrollRuns        PayrollRun[]           @relation("PayrollRunStatutoryPolicy")
 
   @@unique([policyKey, version])
   @@index([kind, scope, reviewStatus, effectiveFrom])
