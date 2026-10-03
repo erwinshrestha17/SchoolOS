@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import { resolvePayrollPeriod } from '@schoolos/core';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
@@ -220,18 +221,26 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
     return { staffId: staff.id, salaryId };
   }
 
+  // Attendance on every day of a Bikram Sambat payroll month (Phase 7.9).
   async function attend(
     tenantId: string,
     staffId: string,
-    year: number,
-    month: number,
-    days = 30,
+    bsYear: number,
+    bsMonth: number,
   ) {
+    const period = resolvePayrollPeriod(bsYear, bsMonth);
+    const dates: Date[] = [];
+    for (
+      let at = Date.parse(`${period.startsOn}T00:00:00.000Z`);
+      at <= Date.parse(`${period.endsOn}T00:00:00.000Z`);
+      at += 86_400_000
+    )
+      dates.push(new Date(at));
     await prisma.staffAttendance.createMany({
-      data: Array.from({ length: days }, (_, index) => ({
+      data: dates.map((attendanceDate) => ({
         tenantId,
         staffId,
-        attendanceDate: new Date(Date.UTC(year, month - 1, index + 1)),
+        attendanceDate,
         status: 'PRESENT' as const,
       })),
     });
@@ -744,14 +753,14 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
 
     const createRun = (w: World, month: number) =>
       payroll.createPayrollRun(
-        { periodMonth: month, periodYear: 2031, workingDays: 30 },
+        { periodMonth: month, periodYear: 2088, workingDays: 30 },
         w.actor,
       );
 
     it('refuses to generate when a staff member owes a scheme but no policy covers the period', async () => {
       const w = await world();
       await scope(w, async () => {
-        await attend(w.tenantId, w.staffId, 2030, 5);
+        await attend(w.tenantId, w.staffId, 2087, 1);
         await scope(w, () =>
           memberships.create(
             w.staffId,
@@ -762,7 +771,7 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
         await expect(
           scope(w, () =>
             payroll.createPayrollRun(
-              { periodMonth: 5, periodYear: 2030, workingDays: 30 },
+              { periodMonth: 1, periodYear: 2087, workingDays: 30 },
               w.actor,
             ),
           ),
@@ -778,8 +787,8 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
     it('refuses to generate when an enrolled staff member has no membership', async () => {
       const w = await world();
       await scope(w, async () => {
-        await attend(w.tenantId, w.staffId, 2031, 5);
-        await expect(scope(w, () => createRun(w, 5))).rejects.toMatchObject({
+        await attend(w.tenantId, w.staffId, 2088, 1);
+        await expect(scope(w, () => createRun(w, 1))).rejects.toMatchObject({
           response: { code: 'MISSING_STATUTORY_CONFIGURATION' },
         });
       });
@@ -788,7 +797,7 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
     it('refuses an SSF member with no identifier because the policy requires one', async () => {
       const w = await world();
       await scope(w, async () => {
-        await attend(w.tenantId, w.staffId, 2031, 5);
+        await attend(w.tenantId, w.staffId, 2088, 1);
         await scope(w, () =>
           memberships.create(
             w.staffId,
@@ -796,7 +805,7 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
             w.actor,
           ),
         );
-        await expect(scope(w, () => createRun(w, 5))).rejects.toMatchObject({
+        await expect(scope(w, () => createRun(w, 1))).rejects.toMatchObject({
           response: { code: 'MISSING_STATUTORY_CONFIGURATION' },
         });
       });
@@ -805,7 +814,7 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
     it('computes PF and tax from the policy, pins the version and stores a breakdown', async () => {
       const w = await world();
       await scope(w, async () => {
-        await attend(w.tenantId, w.staffId, 2031, 5);
+        await attend(w.tenantId, w.staffId, 2088, 1);
         await scope(w, () =>
           memberships.create(
             w.staffId,
@@ -813,9 +822,9 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
             w.actor,
           ),
         );
-        await scope(w, () => createRun(w, 5));
+        await scope(w, () => createRun(w, 1));
         const run = await prisma.payrollRun.findFirstOrThrow({
-          where: { tenantId: w.tenantId, periodMonth: 5, periodYear: 2031 },
+          where: { tenantId: w.tenantId, periodMonth: 1, periodYear: 2088 },
           include: { lines: true },
         });
         expect(run.statutoryPolicyVersionId).toBe(firstVersionId);
@@ -838,8 +847,8 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
     it('uses the new version for later periods and never touches earlier runs', async () => {
       const w = await world();
       await scope(w, async () => {
-        await attend(w.tenantId, w.staffId, 2031, 5);
-        await attend(w.tenantId, w.staffId, 2031, 8);
+        await attend(w.tenantId, w.staffId, 2088, 1);
+        await attend(w.tenantId, w.staffId, 2088, 4);
         await scope(w, () =>
           memberships.create(
             w.staffId,
@@ -847,8 +856,8 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
             w.actor,
           ),
         );
-        await scope(w, () => createRun(w, 5));
-        await scope(w, () => createRun(w, 8));
+        await scope(w, () => createRun(w, 1));
+        await scope(w, () => createRun(w, 4));
         const runs = await prisma.payrollRun.findMany({
           where: { tenantId: w.tenantId },
           include: { lines: true },
@@ -882,7 +891,7 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
     it('treats two approved lineages covering one period as ambiguous', async () => {
       const w = await world();
       await scope(w, async () => {
-        await attend(w.tenantId, w.staffId, 2033, 5);
+        await attend(w.tenantId, w.staffId, 2090, 1);
         const a = await approvePolicy({
           policyKey: `fixture.amb-a.${suffix}`,
           version: 1,
@@ -906,7 +915,7 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
         await expect(
           scope(w, () =>
             payroll.createPayrollRun(
-              { periodMonth: 5, periodYear: 2033, workingDays: 30 },
+              { periodMonth: 1, periodYear: 2090, workingDays: 30 },
               w.actor,
             ),
           ),
@@ -923,10 +932,10 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
           where: { id: w.salaryId },
           data: { tdsEnabled: false },
         });
-        await attend(w.tenantId, w.staffId, 2030, 5);
+        await attend(w.tenantId, w.staffId, 2087, 1);
         await scope(w, () =>
           payroll.createPayrollRun(
-            { periodMonth: 5, periodYear: 2030, workingDays: 30 },
+            { periodMonth: 1, periodYear: 2087, workingDays: 30 },
             w.actor,
           ),
         );
@@ -942,7 +951,7 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
     it('pins a run to a policy that applies, then freezes it once approved', async () => {
       const w = await world();
       await scope(w, async () => {
-        await attend(w.tenantId, w.staffId, 2031, 5);
+        await attend(w.tenantId, w.staffId, 2088, 1);
         await scope(w, () =>
           memberships.create(
             w.staffId,
@@ -950,7 +959,7 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
             w.actor,
           ),
         );
-        await scope(w, () => createRun(w, 5));
+        await scope(w, () => createRun(w, 1));
         const run = await prisma.payrollRun.findFirstOrThrow({
           where: { tenantId: w.tenantId },
         });
@@ -985,7 +994,7 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
     it('blocks membership changes underneath an approved run', async () => {
       const w = await world();
       await scope(w, async () => {
-        await attend(w.tenantId, w.staffId, 2031, 5);
+        await attend(w.tenantId, w.staffId, 2088, 1);
         const open = await scope(w, () =>
           memberships.create(
             w.staffId,
@@ -993,7 +1002,7 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
             w.actor,
           ),
         );
-        await scope(w, () => createRun(w, 5));
+        await scope(w, () => createRun(w, 1));
         const run = await prisma.payrollRun.findFirstOrThrow({
           where: { tenantId: w.tenantId },
         });
@@ -1031,7 +1040,7 @@ describeDatabase('Phase 7.8 statutory configuration (PostgreSQL)', () => {
       await scope(w, async () => {
         const readiness = new PayrollReadinessService(prisma, audit);
         const summary = await readiness.getReadiness(
-          { year: 2030, month: 5 } as never,
+          { year: 2087, month: 1 } as never,
           {
             ...w.actor,
             permissions: [...w.actor.permissions, 'payroll:run:read'],

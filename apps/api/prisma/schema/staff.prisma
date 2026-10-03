@@ -50,6 +50,8 @@ model Staff {
   salaryStructures           SalaryStructure[]
   payrollLines               PayrollLine[]
   payrollExceptions          PayrollException[]
+  payrollHolds               PayrollHold[]
+  payrollAdjustments         PayrollAdjustment[]
   payslips                   Payslip[]
   qualificationsRecords      StaffQualification[]
   employments               StaffEmployment[]

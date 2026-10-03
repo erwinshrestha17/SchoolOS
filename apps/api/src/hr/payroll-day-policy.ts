@@ -1,5 +1,13 @@
-/** Existing payroll day rules. Attendance contributes one day for PRESENT/LATE;
- * approved leave and employment caps remain authoritative inputs. */
+import { periodDayCounts } from '../payroll/payroll-proration';
+
+/**
+ * Existing payroll day rules. Attendance contributes one day for PRESENT/LATE;
+ * approved leave and employment caps remain authoritative inputs.
+ *
+ * Phase 7.9: partial employment is prorated exactly (two decimals) instead of
+ * being rounded to a whole day; the arithmetic lives in payroll-proration.ts
+ * so the payroll run and the 7.7 correction projection can never diverge.
+ */
 export function payrollDayCounts(input: {
   workingDays: number;
   presentDays: number;
@@ -8,30 +16,18 @@ export function payrollDayCounts(input: {
   employedDays: number;
   periodCalendarDays: number;
 }) {
-  const effective = Math.min(
-    input.workingDays,
-    input.presentDays + input.paidLeaveDays,
-  );
-  const unpaid = Math.max(
-    0,
-    input.workingDays - effective,
-    input.unpaidLeaveDays,
-  );
-  const employedWorking =
-    input.employedDays >= input.periodCalendarDays
-      ? input.workingDays
-      : Math.min(
-          input.workingDays,
-          Math.round(
-            (input.workingDays * input.employedDays) / input.periodCalendarDays,
-          ),
-        );
+  const centi = (days: number) => BigInt(Math.round(days * 100));
+  const counts = periodDayCounts({
+    divisorDays: input.workingDays,
+    presentCenti: centi(input.presentDays),
+    paidLeaveCenti: centi(input.paidLeaveDays),
+    unpaidLeaveCenti: centi(input.unpaidLeaveDays),
+    employedDays: input.employedDays,
+    periodCalendarDays: input.periodCalendarDays,
+  });
   return {
-    paidDays: Math.min(
-      employedWorking,
-      Math.max(0, input.workingDays - unpaid),
-    ),
-    unpaidDays: unpaid,
+    paidDays: Number(counts.paidCenti) / 100,
+    unpaidDays: Number(counts.unpaidCenti) / 100,
   };
 }
 

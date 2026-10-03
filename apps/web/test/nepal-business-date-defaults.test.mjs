@@ -45,7 +45,7 @@ describe('Nepal business-date defaults', () => {
 
       assert.match(
         source,
-        /getNepalSchoolDay\([^)]*\)\.gregorianDate|formatNepalDateTimeLocalInput\(\)|getNepalNow\(\)/,
+        /getNepalSchoolDay\([^)]*\)\.gregorianDate|formatNepalDateTimeLocalInput\(\)|getNepalNow\(\)|currentPayrollBsPeriod\(\)/,
       );
       assert.doesNotMatch(
         source,
@@ -53,6 +53,13 @@ describe('Nepal business-date defaults', () => {
       );
     });
   }
+
+  it('derives the current BS payroll period from the canonical Nepal school day', () => {
+    assert.match(
+      read('lib/payroll-run-view.ts'),
+      /findPayrollPeriodContaining\(getNepalSchoolDay\(\)\.gregorianDate\)/,
+    );
+  });
 
   it('converts school-entered times as Nepal civil time instead of device-local time', () => {
     const sources = [

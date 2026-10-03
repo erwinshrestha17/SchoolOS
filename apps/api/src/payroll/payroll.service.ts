@@ -1,7 +1,4 @@
-import {
-  payrollDayCounts,
-  payrollLeaveOverlapDays,
-} from '../hr/payroll-day-policy';
+import { payrollLeaveOverlapDays } from '../hr/payroll-day-policy';
 import {
   BadRequestException,
   ConflictException,
@@ -55,12 +52,6 @@ import { buildSalarySlipPdf, type PdfImage } from '../common/pdf/simple-pdf';
 import { loadSchoolLogoForPdf } from '../common/pdf/school-logo-loader';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { CreateStaffContractDto } from '../hr/dto/create-staff-contract.dto';
-import {
-  authoritativeEmploymentWhere,
-  calendarDaysInPeriod,
-  employedDaysInPeriod,
-  groupEmploymentsByStaff,
-} from '../hr/employment-timeline';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageOperationError } from '../storage/storage.utils';
 import { CreateSalaryStructureDto } from './dto/create-salary-structure.dto';
@@ -77,10 +68,26 @@ import type {
 import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
 import { PayrollReadinessService } from './payroll-readiness.service';
 import {
-  computeStatutoryForLine,
+  calculateLineFromPlan,
+  singleSourcePlan,
+} from './payroll-line-calculation';
+import {
+  calculatePeriodPayroll,
+  type PeriodPayrollLine,
+  type PricedAdjustment,
+} from './payroll-period-calculation';
+import {
+  payrollPeriodFor,
+  payrollPeriodOfRun,
+  type PayrollPeriodWindow,
+} from './payroll-period';
+import {
+  formatMinor,
+  type PayrollDivisorBasisValue,
+} from './payroll-proration';
+import {
   findStatutoryScheme,
   statutoryBreakdownJson,
-  StatutoryConfigurationError,
   type ResolvedStatutoryPolicy,
   type StatutoryAmount,
   type StatutoryEnrollment,
@@ -1025,6 +1032,9 @@ export class PayrollService {
     requireDomainPermission(actor, 'payroll:run:create');
     if (!this.payrollReadinessService)
       throw new ConflictException('Payroll readiness is unavailable');
+    // Phase 7.9: the period is a BS month; its Gregorian bounds come from the
+    // one canonical calendar and are stored on the run as authoritative.
+    const period = payrollPeriodFor(dto.periodYear, dto.periodMonth);
     await this.payrollReadinessService.assertActionAllowed(
       actor,
       'CREATE_DRAFT',
@@ -1043,20 +1053,41 @@ export class PayrollService {
       existing.status !== PayrollRunStatus.VOID &&
       existing.status !== PayrollRunStatus.CANCELLED
     )
-      throw new ConflictException(
-        'A payroll run already exists for this period. Cancel or reverse it with an audited reason before preparing a replacement.',
-      );
+      throw new ConflictException({
+        code: 'PAYROLL_PERIOD_OVERLAP',
+        message:
+          'A payroll run already exists for this period. Cancel or reverse it with an audited reason before preparing a replacement.',
+      });
+    const overlapping = await this.prisma.payrollRun.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        status: {
+          notIn: [PayrollRunStatus.VOID, PayrollRunStatus.CANCELLED],
+        },
+        periodStart: { lte: period.endsOn },
+        periodEnd: { gte: period.startsOn },
+      },
+      select: { periodYear: true, periodMonth: true, status: true },
+    });
+    if (overlapping)
+      throw new ConflictException({
+        code: 'PAYROLL_PERIOD_OVERLAP',
+        message: `Payroll period ${period.label} overlaps an existing ${overlapping.status} payroll run (${overlapping.periodMonth}/${overlapping.periodYear}). Cancel or reverse it first.`,
+      });
 
-    const workingDays = dto.workingDays ?? 30;
-
-    const { lines, totals, policy, configurationErrors } =
-      await this.calculatePeriodPayrollLines(
-        dto.periodYear,
-        dto.periodMonth,
-        workingDays,
-        actor,
-      );
-    assertNoStatutoryConfigurationErrors(configurationErrors);
+    const { divisorDays, divisorBasis } = resolvePayrollDivisor(
+      dto.workingDays,
+      period,
+    );
+    const calculation = await calculatePeriodPayroll(this.prisma, {
+      tenantId: actor.tenantId,
+      period,
+      divisorDays,
+      divisorBasis,
+    });
+    assertNoStatutoryConfigurationErrors(calculation.configurationErrors);
+    assertNoProrationErrors(calculation.prorationErrors);
+    const { lines, totals, policy } = calculation;
 
     if (lines.length === 0) {
       throw new NotFoundException(
@@ -1079,10 +1110,10 @@ export class PayrollService {
               periodYear: dto.periodYear,
               revision: (existing?.revision ?? 0) + 1,
               predecessorRunId: existing?.id ?? null,
-              periodStart: getPayrollPeriod(dto.periodYear, dto.periodMonth)
-                .startsOn,
-              periodEnd: getPayrollPeriod(dto.periodYear, dto.periodMonth)
-                .endsOn,
+              periodStart: period.startsOn,
+              periodEnd: period.endsOn,
+              divisorDays,
+              divisorBasis,
               status: PayrollRunStatus.GENERATED,
               generatedById: actor.userId,
               statutoryPolicyVersionId: statutoryVersionIdFor(lines, policy),
@@ -1107,6 +1138,12 @@ export class PayrollService {
               },
             },
           });
+          const consumed = await this.applyAdjustments(
+            tx,
+            actor,
+            created.id,
+            lines,
+          );
           await this.auditService.record(
             {
               action: 'create',
@@ -1117,7 +1154,13 @@ export class PayrollService {
               after: {
                 periodMonth: created.periodMonth,
                 periodYear: created.periodYear,
+                period: period.label,
+                periodStart: period.startsOnIso,
+                periodEnd: period.endsOnIso,
+                divisorDays,
+                divisorBasis,
                 lineCount: created.lines.length,
+                adjustmentCount: consumed,
                 netAmount: created.netAmount.toString(),
               },
             },
@@ -1128,13 +1171,7 @@ export class PayrollService {
         true,
       );
     } catch (error) {
-      const err = error as Record<string, unknown>;
-      if (err?.code === 'P2002') {
-        throw new ConflictException(
-          'A payroll run already exists for this period. Void the existing one first if a re-run is needed.',
-        );
-      }
-      throw error;
+      throw translateRunWriteError(error);
     }
 
     return serializePayrollRunSummary(
@@ -1143,22 +1180,78 @@ export class PayrollService {
     );
   }
 
+  /**
+   * Consumes the priced 7.7 corrections of the generated lines: one APPLIED
+   * row per correction (the database refuses a second one) with its lineage.
+   */
+  private async applyAdjustments(
+    tx: Prisma.TransactionClient,
+    actor: AuthContext,
+    runId: string,
+    lines: PeriodPayrollLine[],
+  ): Promise<number> {
+    const adjustments: PricedAdjustment[] = lines.flatMap(
+      (line) => line.adjustments,
+    );
+    if (!adjustments.length) return 0;
+    await tx.payrollAdjustment.createMany({
+      data: adjustments.map((item) => ({
+        tenantId: actor.tenantId,
+        payrollRunId: runId,
+        staffId: item.staffId,
+        correctionId: item.correctionId,
+        sourcePayrollRunId: item.sourcePayrollRunId,
+        attendanceDate: item.attendanceDate,
+        kind: item.kind,
+        deltaDays: new Prisma.Decimal(formatCentiDays(item.deltaCenti)),
+        dailyRate: new Prisma.Decimal(item.dailyRate),
+        amount: new Prisma.Decimal(formatMinor(item.amount)),
+        pricing: item.pricing as Prisma.InputJsonValue,
+        createdById: actor.userId,
+      })),
+    });
+    await this.auditService.record(
+      {
+        action: 'consume_adjustments',
+        resource: 'payroll_run',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: runId,
+        after: {
+          corrections: adjustments.map((item) => ({
+            correctionId: item.correctionId,
+            kind: item.kind,
+            amount: formatMinor(item.amount),
+          })),
+        },
+      },
+      tx,
+    );
+    return adjustments.length;
+  }
+
   async getPayrollPreview(
     query: PayrollPreviewQueryDto,
     actor: AuthContext,
   ): Promise<PayrollPreviewResult[]> {
+    const period = payrollPeriodFor(query.year, query.month);
+    const { divisorDays, divisorBasis } = resolvePayrollDivisor(
+      query.workingDays,
+      period,
+    );
     const {
       lines,
       staffMembers,
       contractsByStaff,
       salaryStructureByStaff,
       configurationErrors,
-    } = await this.calculatePeriodPayrollLines(
-      query.year,
-      query.month,
-      query.workingDays ?? 30,
-      actor,
-    );
+      prorationErrors,
+    } = await calculatePeriodPayroll(this.prisma, {
+      tenantId: actor.tenantId,
+      period,
+      divisorDays,
+      divisorBasis,
+    });
 
     const linesByStaff = new Map(lines.map((line) => [line.staffId, line]));
 
@@ -1176,6 +1269,13 @@ export class PayrollService {
       for (const issue of configurationErrors) {
         if (issue.staffId === staff.id) warnings.push(issue.message);
       }
+      for (const issue of prorationErrors) {
+        if (issue.staffId === staff.id) warnings.push(issue.message);
+      }
+      if (line && line.netSalary.lt(0))
+        warnings.push(
+          'Net pay is negative: deductions exceed gross pay. This line blocks the run until the source data is corrected.',
+        );
 
       return {
         staffId: staff.id,
@@ -1200,7 +1300,14 @@ export class PayrollService {
             : undefined,
         periodMonth: query.month,
         periodYear: query.year,
-        workingDays: line?.workingDays ?? query.workingDays ?? 30,
+        workingDays: line?.workingDays ?? divisorDays,
+        periodLabel: period.label,
+        periodStart: period.startsOnIso,
+        periodEnd: period.endsOnIso,
+        divisorBasis,
+        paidDays: Number(line?.paidDays ?? 0),
+        adjustmentEarnings: Number(line?.adjustmentEarnings ?? 0),
+        adjustmentDeductions: Number(line?.adjustmentDeductions ?? 0),
         presentDays: line?.presentDays ?? 0,
         approvedPaidLeaveDays: line?.approvedPaidLeaveDays ?? 0,
         unpaidLeaveDays: line?.unpaidLeaveDays ?? 0,
@@ -1212,305 +1319,6 @@ export class PayrollService {
         warnings,
       };
     });
-  }
-
-  private async calculatePeriodPayrollLines(
-    year: number,
-    month: number,
-    workingDays: number,
-    actor: AuthContext,
-  ) {
-    const period = getPayrollPeriod(year, month);
-
-    const staffMembers = await this.prisma.staff.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        status: { in: ['ACTIVE', 'ON_LEAVE'] },
-      },
-    });
-
-    const contracts = await this.prisma.staffContract.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        status: 'ACTIVE',
-        startDate: { lte: period.endsOn },
-        OR: [{ endDate: null }, { endDate: { gte: period.startsOn } }],
-        staff: {
-          status: { in: ['ACTIVE', 'ON_LEAVE'] },
-        },
-      },
-    });
-    const salaryStructures = await this.prisma.salaryStructure.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        status: SalaryStructureStatus.ACTIVE,
-        effectiveFrom: { lte: period.endsOn },
-        OR: [{ effectiveTo: null }, { effectiveTo: { gte: period.startsOn } }],
-        staff: {
-          status: { in: ['ACTIVE', 'ON_LEAVE'] },
-        },
-      },
-      include: { components: true },
-      orderBy: { effectiveFrom: 'desc' },
-    });
-
-    const attendanceRecords = await this.prisma.staffAttendance.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        attendanceDate: {
-          gte: period.startsOn,
-          lte: period.endsOn,
-        },
-        status: { in: ['PRESENT', 'LATE'] },
-      },
-    });
-
-    const leaveRequests = await this.prisma.staffLeaveRequest.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        status: 'APPROVED',
-        startsOn: { lte: period.endsOn },
-        endsOn: { gte: period.startsOn },
-      },
-    });
-
-    // Phase 7.1: StaffEmployment is the authority for "employed in this
-    // period". Contracts and salary structures only supply terms; a source
-    // without a verified employment is excluded here and reported as a
-    // BLOCKING MISSING_VERIFIED_EMPLOYMENT readiness exception.
-    const employmentRows = await this.prisma.staffEmployment.findMany({
-      where: authoritativeEmploymentWhere(actor.tenantId, period),
-      select: {
-        id: true,
-        staffId: true,
-        effectiveFrom: true,
-        effectiveTo: true,
-      },
-    });
-    const employmentsByStaff = groupEmploymentsByStaff(employmentRows);
-    const periodCalendarDays = calendarDaysInPeriod(period);
-
-    // Phase 7.8: statutory amounts come only from the approved policy version
-    // in force on the period end date, and from each member's own scheme.
-    const policy = await resolveStatutoryPolicy(this.prisma, period.endsOn);
-    const periodEndDay = new Date(
-      Date.UTC(
-        period.endsOn.getUTCFullYear(),
-        period.endsOn.getUTCMonth(),
-        period.endsOn.getUTCDate(),
-      ),
-    );
-    const membershipRows = await this.prisma.staffStatutoryMembership.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        effectiveFrom: { lte: periodEndDay },
-        OR: [{ effectiveTo: null }, { effectiveTo: { gt: periodEndDay } }],
-      },
-      select: { staffId: true, scheme: true, memberIdentifier: true },
-    });
-    const membershipByStaff = new Map(
-      membershipRows.map((row) => [row.staffId, row]),
-    );
-    const configurationErrors: Array<{
-      staffId: string;
-      code:
-        | StatutoryConfigurationError['code']
-        | 'STATUTORY_MEMBERSHIP_REQUIRED'
-        | 'STATUTORY_IDENTIFIER_REQUIRED';
-      message: string;
-    }> = [];
-
-    const contractsByStaff = new Map(
-      contracts.map((contract) => [contract.staffId, contract]),
-    );
-    const salaryStructureByStaff = new Map(
-      salaryStructures.map((structure) => [structure.staffId, structure]),
-    );
-    const attendanceByStaff = new Map<string, number>();
-    attendanceRecords.forEach((attendance) => {
-      attendanceByStaff.set(
-        attendance.staffId,
-        (attendanceByStaff.get(attendance.staffId) ?? 0) + 1,
-      );
-    });
-
-    const paidLeaveByStaff = new Map<string, number>();
-    const unpaidLeaveByStaff = new Map<string, number>();
-
-    leaveRequests.forEach((leave) => {
-      const overlap = getOverlapDays(
-        leave.startsOn,
-        leave.endsOn,
-        period.startsOn,
-        period.endsOn,
-      );
-      if (leave.isPaid) {
-        paidLeaveByStaff.set(
-          leave.staffId,
-          (paidLeaveByStaff.get(leave.staffId) ?? 0) + overlap,
-        );
-      } else {
-        unpaidLeaveByStaff.set(
-          leave.staffId,
-          (unpaidLeaveByStaff.get(leave.staffId) ?? 0) + overlap,
-        );
-      }
-    });
-
-    const payrollSources = [
-      ...salaryStructures.map((structure) => ({
-        staffId: structure.staffId,
-        contractId: null,
-        salaryStructureId: structure.id,
-        baseSalary: structure.basicSalary,
-        allowances: structure.allowances,
-        contractDeductions: structure.deductions,
-        pfEnabled: structure.pfEnabled,
-        tdsEnabled: structure.tdsEnabled,
-      })),
-      ...contracts
-        .filter((contract) => !salaryStructureByStaff.has(contract.staffId))
-        .map((contract) => ({
-          staffId: contract.staffId,
-          contractId: contract.id,
-          salaryStructureId: null,
-          baseSalary: contract.baseSalary,
-          allowances: contract.allowances,
-          contractDeductions: contract.deductions,
-          pfEnabled: false,
-          tdsEnabled: true,
-        })),
-    ];
-
-    const employedSources = payrollSources.filter((source) =>
-      employmentsByStaff.has(source.staffId),
-    );
-
-    const lines = employedSources.flatMap((source) => {
-      const employments = employmentsByStaff.get(source.staffId) ?? [];
-      const employment = employments[0];
-      const employedDays = employedDaysInPeriod(employments, period);
-      const presentDays = attendanceByStaff.get(source.staffId) ?? 0;
-      const approvedPaidLeaveDays = paidLeaveByStaff.get(source.staffId) ?? 0;
-      const approvedUnpaidLeaveDays =
-        unpaidLeaveByStaff.get(source.staffId) ?? 0;
-
-      const dayCounts = payrollDayCounts({
-        workingDays,
-        presentDays,
-        paidLeaveDays: approvedPaidLeaveDays,
-        unpaidLeaveDays: approvedUnpaidLeaveDays,
-        employedDays,
-        periodCalendarDays,
-      });
-      const finalUnpaidDays = dayCounts.unpaidDays;
-      const payrollPaidDays = dayCounts.paidDays;
-
-      const baseSalary = new Prisma.Decimal(source.baseSalary);
-      const allowances = new Prisma.Decimal(source.allowances);
-      const contractDeductions = new Prisma.Decimal(source.contractDeductions);
-
-      const membership = membershipByStaff.get(source.staffId);
-      if (source.pfEnabled && !membership) {
-        configurationErrors.push({
-          staffId: source.staffId,
-          code: 'STATUTORY_MEMBERSHIP_REQUIRED',
-          message:
-            'Provident contribution is enabled but no SSF/PF membership covers the period end date',
-        });
-        return [];
-      }
-      const retirementRule = membership
-        ? findStatutoryScheme(policy?.definition, membership.scheme)
-        : null;
-      if (
-        source.pfEnabled &&
-        retirementRule?.requiresIdentifier &&
-        !membership?.memberIdentifier
-      ) {
-        configurationErrors.push({
-          staffId: source.staffId,
-          code: 'STATUTORY_IDENTIFIER_REQUIRED',
-          message: `${membership?.scheme} membership needs a member identifier`,
-        });
-        return [];
-      }
-      let calculated: ReturnType<typeof calculatePayrollLine>;
-      try {
-        calculated = calculatePayrollLine({
-          baseSalary,
-          allowances,
-          contractDeductions,
-          attendanceDays: payrollPaidDays,
-          workingDays,
-          policy: policy?.definition ?? null,
-          enrollment: {
-            retirementScheme:
-              source.pfEnabled && membership ? membership.scheme : null,
-            taxWithholding: source.tdsEnabled,
-          },
-        });
-      } catch (error) {
-        if (error instanceof StatutoryConfigurationError) {
-          configurationErrors.push({
-            staffId: source.staffId,
-            code: error.code,
-            message: error.message,
-          });
-          return [];
-        }
-        throw error;
-      }
-
-      return [
-        {
-          staffId: source.staffId,
-          contractId: source.contractId,
-          salaryStructureId: source.salaryStructureId,
-          employmentId: employment.id,
-          employmentFrom: employment.effectiveFrom,
-          employmentTo: employment.effectiveTo,
-          baseSalary,
-          allowances,
-          earnings: calculated.earnings,
-          grossSalary: calculated.grossSalary,
-          leaveDeductions: calculated.leaveDeductions,
-          pfEmployee: calculated.pfEmployee,
-          pfEmployer: calculated.pfEmployer,
-          tds: calculated.tds,
-          otherDeductions: calculated.otherDeductions,
-          deductions: calculated.deductions,
-          netSalary: calculated.netSalary,
-          workingDays,
-          presentDays,
-          approvedPaidLeaveDays,
-          unpaidLeaveDays: finalUnpaidDays,
-          attendanceDays: payrollPaidDays,
-          statutoryAmounts: calculated.statutoryAmounts,
-        },
-      ];
-    });
-
-    const totals = calculatePayrollTotals(
-      lines.map((line) => ({
-        grossSalary: line.grossSalary,
-        deductions: line.deductions,
-        netSalary: line.netSalary,
-        pfEmployee: line.pfEmployee,
-        pfEmployer: line.pfEmployer,
-        tds: line.tds,
-      })),
-    );
-
-    return {
-      lines,
-      totals,
-      policy,
-      configurationErrors,
-      staffMembers,
-      contractsByStaff,
-      salaryStructureByStaff,
-    };
   }
 
   async validatePayrollRun(id: string, actor: AuthContext) {
@@ -1713,6 +1521,18 @@ export class PayrollService {
           message:
             'Another active salary structure already covers some of these dates for this staff member. End it before activating this one.',
         });
+      if (message.includes('PAYROLL_NEGATIVE_NET'))
+        throw new ConflictException({
+          code: 'PAYROLL_NEGATIVE_NET',
+          message:
+            'A payroll line has a negative net pay, so the run cannot advance. Correct the deductions or salary structure and regenerate the run.',
+        });
+      if (message.includes('PAYROLL_HOLD_ACTIVE'))
+        throw new ConflictException({
+          code: 'PAYROLL_HOLD_ACTIVE',
+          message:
+            'An active payment hold exists on this run. Release it before marking the run as paid.',
+        });
       if (message.includes('PAYROLL_STATUTORY_POLICY_'))
         throw new ConflictException({
           code: 'PAYROLL_STATUTORY_POLICY_REJECTED',
@@ -1725,6 +1545,15 @@ export class PayrollService {
         );
       throw error;
     }
+  }
+
+  /** The current source fingerprint, for services that bind output to an approval. */
+  currentSourceFingerprint(
+    tx: Prisma.TransactionClient,
+    runId: string,
+    tenantId: string,
+  ) {
+    return this.payrollSourceFingerprint(tx, runId, tenantId);
   }
 
   private async payrollSourceFingerprint(
@@ -1803,24 +1632,24 @@ export class PayrollService {
       where: { id: runId, tenantId },
       select: {
         statutoryPolicyVersionId: true,
+        periodStart: true,
         periodEnd: true,
-        periodYear: true,
-        periodMonth: true,
+        divisorDays: true,
+        divisorBasis: true,
       },
     });
-    if (!run?.statutoryPolicyVersionId) {
+    const divisorDays = run?.divisorDays ?? null;
+    if (!run || (!run.statutoryPolicyVersionId && divisorDays === null)) {
       return createHash('sha256')
         .update('schoolos:payroll-sources:v1\0')
         .update(JSON.stringify(lines))
         .digest('hex');
     }
-    const periodEnd =
-      run.periodEnd ?? getPayrollPeriod(run.periodYear, run.periodMonth).endsOn;
     const endDay = new Date(
       Date.UTC(
-        periodEnd.getUTCFullYear(),
-        periodEnd.getUTCMonth(),
-        periodEnd.getUTCDate(),
+        run.periodEnd.getUTCFullYear(),
+        run.periodEnd.getUTCMonth(),
+        run.periodEnd.getUTCDate(),
       ),
     );
     const breakdowns = await tx.payrollLine.findMany({
@@ -1845,14 +1674,64 @@ export class PayrollService {
         effectiveTo: true,
       },
     });
+    if (divisorDays === null) {
+      return createHash('sha256')
+        .update('schoolos:payroll-sources:v2\0')
+        .update(
+          JSON.stringify({
+            lines,
+            statutoryPolicyVersionId: run.statutoryPolicyVersionId,
+            breakdowns,
+            memberships,
+          }),
+        )
+        .digest('hex');
+    }
+    // Phase 7.9 (v3): additionally pins the period bounds, the divisor and its
+    // basis, every line's proration lineage and adjustment amounts, and the
+    // consumed adjustments, so drift in any of them invalidates an approval.
+    // Holds are payment-side and deliberately not part of the fingerprint.
+    const proration = await tx.payrollLine.findMany({
+      where: { tenantId, payrollRunId: runId },
+      orderBy: { id: 'asc' },
+      select: {
+        id: true,
+        paidDays: true,
+        unpaidDays: true,
+        prorationBreakdown: true,
+        adjustmentEarnings: true,
+        adjustmentDeductions: true,
+      },
+    });
+    const adjustments = await tx.payrollAdjustment.findMany({
+      where: { tenantId, payrollRunId: runId, status: 'APPLIED' },
+      orderBy: { id: 'asc' },
+      select: {
+        id: true,
+        correctionId: true,
+        staffId: true,
+        kind: true,
+        deltaDays: true,
+        amount: true,
+        sourcePayrollRunId: true,
+      },
+    });
     return createHash('sha256')
-      .update('schoolos:payroll-sources:v2\0')
+      .update('schoolos:payroll-sources:v3\0')
       .update(
         JSON.stringify({
           lines,
           statutoryPolicyVersionId: run.statutoryPolicyVersionId,
           breakdowns,
           memberships,
+          period: {
+            start: run.periodStart,
+            end: run.periodEnd,
+            divisorDays: run.divisorDays,
+            divisorBasis: run.divisorBasis,
+          },
+          proration,
+          adjustments,
         }),
       )
       .digest('hex');
@@ -1935,9 +1814,7 @@ export class PayrollService {
               pfEmployeeAmount: run.pfEmployeeAmount,
               pfEmployerAmount: run.pfEmployerAmount,
               tdsAmount: run.tdsAmount,
-              entryDate:
-                run.periodEnd ??
-                getPayrollPeriod(run.periodYear, run.periodMonth).endsOn,
+              entryDate: run.periodEnd,
             },
             actor,
             tx,
@@ -2260,6 +2137,22 @@ export class PayrollService {
           throw new ConflictException(
             'Payroll run changed while the action was being applied',
           );
+        // Phase 7.9: a held line is not paid. Checked after the run row is
+        // claimed, so a concurrent hold either committed first (seen here) or
+        // is refused by the database once the run is PAID.
+        const activeHolds = await tx.payrollHold.count({
+          where: {
+            tenantId: actor.tenantId,
+            payrollRunId: run.id,
+            status: 'ACTIVE',
+          },
+        });
+        if (activeHolds > 0)
+          throw new ConflictException({
+            code: 'PAYROLL_HOLD_ACTIVE',
+            message:
+              'An active payment hold exists on this run. Release it before marking the run as paid.',
+          });
 
         const journalEntry =
           await this.accountingPostingService.postPayrollDisbursement(
@@ -2270,9 +2163,7 @@ export class PayrollService {
               periodYear: run.periodYear,
               netAmount: run.netAmount,
               paymentAccountCode: dto.paymentAccountCode,
-              entryDate:
-                run.periodEnd ??
-                getPayrollPeriod(run.periodYear, run.periodMonth).endsOn,
+              entryDate: run.periodEnd,
             },
             actor,
             tx,
@@ -2463,7 +2354,15 @@ export class PayrollService {
 
   async getPayrollRun(id: string, actor: AuthContext) {
     const run = await this.getPayrollRunOrThrow(id, actor);
-    return serializePayrollRunDetail(run, actor);
+    const holds = await this.prisma.payrollHold.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        payrollRunId: run.id,
+        status: 'ACTIVE',
+      },
+      select: { id: true, staffId: true, reason: true, createdAt: true },
+    });
+    return serializePayrollRunDetail(run, actor, holds);
   }
 
   async queuePayslipRegenerationJob(
@@ -3685,84 +3584,130 @@ export class PayrollService {
       );
     }
 
-    const { lines, totals, policy, configurationErrors } =
-      await this.calculatePeriodPayrollLines(
-        run.periodYear,
-        run.periodMonth,
-        30, // Default working days, should ideally be stored in the run
+    // The run's own stored bounds and divisor are authoritative, so a
+    // regeneration reproduces the period it was prepared for.
+    const period = payrollPeriodOfRun(run);
+    const divisorDays = run.divisorDays ?? period.calendarDays;
+    const divisorBasis: PayrollDivisorBasisValue =
+      run.divisorBasis ?? 'CALENDAR_DAYS_OF_PERIOD';
+    const calculation = await calculatePeriodPayroll(this.prisma, {
+      tenantId: actor.tenantId,
+      period,
+      divisorDays,
+      divisorBasis,
+      ownRunId: run.id,
+    });
+    assertNoStatutoryConfigurationErrors(calculation.configurationErrors);
+    assertNoProrationErrors(calculation.prorationErrors);
+    const { lines, totals, policy } = calculation;
+
+    try {
+      return await this.payrollTransaction(
         actor,
-      );
-    assertNoStatutoryConfigurationErrors(configurationErrors);
-
-    return this.payrollTransaction(
-      actor,
-      'payroll:run:create',
-      async (tx) => {
-        const claimed = await tx.payrollRun.updateMany({
-          where: {
-            id: run.id,
-            tenantId: actor.tenantId,
-            status: run.status,
-            updatedAt: run.updatedAt,
-          },
-          data: {
-            status: PayrollRunStatus.GENERATED,
-            generatedById: actor.userId,
-            validatedById: null,
-            validatedAt: null,
-            reviewedById: null,
-            reviewedAt: null,
-            approvedById: null,
-            approvedAt: null,
-            approvedSourceFingerprint: null,
-          },
-        });
-        if (claimed.count !== 1)
-          throw new ConflictException(
-            'Payroll run changed while regenerating its lines',
-          );
-        await tx.payrollLine.deleteMany({
-          where: { tenantId: actor.tenantId, payrollRunId: run.id },
-        });
-
-        const updated = await tx.payrollRun.update({
-          where: { id: run.id },
-          data: {
-            grossAmount: new Prisma.Decimal(totals.grossAmount),
-            deductionAmount: new Prisma.Decimal(totals.deductionAmount),
-            netAmount: new Prisma.Decimal(totals.netAmount),
-            pfEmployeeAmount: new Prisma.Decimal(totals.pfEmployeeAmount),
-            pfEmployerAmount: new Prisma.Decimal(totals.pfEmployerAmount),
-            tdsAmount: new Prisma.Decimal(totals.tdsAmount),
-            statutoryPolicyVersionId: statutoryVersionIdFor(lines, policy),
-            status: PayrollRunStatus.GENERATED,
-            lines: {
-              create: lines.map((line) =>
-                payrollLineCreateData(actor.tenantId, line, policy),
-              ),
+        'payroll:run:create',
+        async (tx) => {
+          const claimed = await tx.payrollRun.updateMany({
+            where: {
+              id: run.id,
+              tenantId: actor.tenantId,
+              status: run.status,
+              updatedAt: run.updatedAt,
             },
-          },
-          include: {
-            lines: { include: { staff: true, payslip: true } },
-            payslips: true,
-          },
-        });
-        await this.auditService.record(
-          {
-            action: 'regenerate',
-            resource: 'payroll_run',
-            tenantId: actor.tenantId,
-            userId: actor.userId,
-            resourceId: run.id,
-            before: { status: run.status },
-            after: { status: updated.status, lineCount: lines.length },
-          },
-          tx,
-        );
-        return serializePayrollRunDetail(updated, actor);
-      },
-      true,
-    );
+            data: {
+              status: PayrollRunStatus.GENERATED,
+              generatedById: actor.userId,
+              validatedById: null,
+              validatedAt: null,
+              reviewedById: null,
+              reviewedAt: null,
+              approvedById: null,
+              approvedAt: null,
+              approvedSourceFingerprint: null,
+            },
+          });
+          if (claimed.count !== 1)
+            throw new ConflictException(
+              'Payroll run changed while regenerating its lines',
+            );
+          // Give back the corrections this run held; they are re-consumed
+          // below if they are still eligible.
+          await tx.payrollAdjustment.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              payrollRunId: run.id,
+              status: 'APPLIED',
+            },
+            data: {
+              status: 'RELEASED',
+              releasedAt: new Date(),
+              releaseReason: 'REGENERATED',
+            },
+          });
+          await tx.payrollLine.deleteMany({
+            where: { tenantId: actor.tenantId, payrollRunId: run.id },
+          });
+
+          const updated = await tx.payrollRun.update({
+            where: { id: run.id },
+            data: {
+              grossAmount: new Prisma.Decimal(totals.grossAmount),
+              deductionAmount: new Prisma.Decimal(totals.deductionAmount),
+              netAmount: new Prisma.Decimal(totals.netAmount),
+              pfEmployeeAmount: new Prisma.Decimal(totals.pfEmployeeAmount),
+              pfEmployerAmount: new Prisma.Decimal(totals.pfEmployerAmount),
+              tdsAmount: new Prisma.Decimal(totals.tdsAmount),
+              divisorDays,
+              divisorBasis,
+              statutoryPolicyVersionId: statutoryVersionIdFor(lines, policy),
+              status: PayrollRunStatus.GENERATED,
+              lines: {
+                create: lines.map((line) =>
+                  payrollLineCreateData(actor.tenantId, line, policy),
+                ),
+              },
+            },
+            include: {
+              lines: { include: { staff: true, payslip: true } },
+              payslips: true,
+            },
+          });
+          const consumed = await this.applyAdjustments(
+            tx,
+            actor,
+            run.id,
+            lines,
+          );
+          await this.auditService.record(
+            {
+              action: 'regenerate',
+              resource: 'payroll_run',
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              resourceId: run.id,
+              before: { status: run.status },
+              after: {
+                status: updated.status,
+                lineCount: lines.length,
+                adjustmentCount: consumed,
+              },
+            },
+            tx,
+          );
+          const holds = await tx.payrollHold.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              payrollRunId: run.id,
+              status: 'ACTIVE',
+            },
+            select: { id: true, staffId: true, reason: true, createdAt: true },
+          });
+          return serializePayrollRunDetail(updated, actor, holds);
+        },
+        true,
+      );
+    } catch (error) {
+      throw translateRunWriteError(error);
+    }
   }
 }
 
@@ -3778,50 +3723,33 @@ interface PayrollLineInput {
 }
 
 export function calculatePayrollLine(input: PayrollLineInput) {
-  const workingDays = new Prisma.Decimal(input.workingDays || 1);
-  const paidDays = new Prisma.Decimal(
-    Math.min(input.attendanceDays, input.workingDays || input.attendanceDays),
-  );
-  const attendanceRatio =
-    input.workingDays > 0 ? paidDays.div(workingDays) : new Prisma.Decimal(1);
-  const basicSalary = new Prisma.Decimal(input.baseSalary);
-  const allowances = new Prisma.Decimal(input.allowances);
-  const fullGross = basicSalary.add(allowances);
-  const grossSalaryDecimal = moneyDecimal(fullGross.mul(attendanceRatio));
-  const fullPeriodLeaveDeduction = fullGross.sub(grossSalaryDecimal);
-
-  // Phase 7.8: no statutory rate lives in code. Every contribution and tax
-  // amount is computed from the approved policy version's own numbers, and a
-  // line that owes a scheme the policy cannot supply fails loudly.
-  const statutory = computeStatutoryForLine(input.policy, input.enrollment, {
-    basic: moneyDecimal(basicSalary.mul(attendanceRatio)),
-    basicPlusAllowances: grossSalaryDecimal,
-    gross: grossSalaryDecimal,
+  // Pre-7.9 entry point for pricing one salary: same rules as the period
+  // engine (one calculation path), a single compensation source, fixed
+  // deductions charged in full. The net is never floored at zero.
+  const plan = singleSourcePlan({
+    baseSalary: input.baseSalary,
+    allowances: input.allowances,
+    contractDeductions: input.contractDeductions,
+    paidDays: input.attendanceDays,
+    divisorDays: input.workingDays > 0 ? input.workingDays : 1,
   });
-  const { pfEmployee, pfEmployer, tds } = statutory;
-
-  const otherDeductions = new Prisma.Decimal(input.contractDeductions);
-  const totalDeductions = moneyDecimal(
-    otherDeductions.add(pfEmployee).add(tds),
-  );
-
-  const calculatedNet = grossSalaryDecimal.sub(totalDeductions);
-  const netSalaryDecimal = calculatedNet.lt(0)
-    ? new Prisma.Decimal(0)
-    : moneyDecimal(calculatedNet);
-
+  const calculated = calculateLineFromPlan({
+    plan,
+    policy: input.policy,
+    enrollment: input.enrollment,
+  });
   return {
-    earnings: grossSalaryDecimal,
-    grossSalary: grossSalaryDecimal,
-    allowances,
-    leaveDeductions: moneyDecimal(fullPeriodLeaveDeduction),
-    pfEmployee,
-    pfEmployer,
-    tds,
-    otherDeductions,
-    deductions: totalDeductions,
-    netSalary: netSalaryDecimal,
-    statutoryAmounts: statutory.amounts,
+    earnings: calculated.earnings,
+    grossSalary: calculated.grossSalary,
+    allowances: calculated.allowances,
+    leaveDeductions: calculated.leaveDeductions,
+    pfEmployee: calculated.pfEmployee,
+    pfEmployer: calculated.pfEmployer,
+    tds: calculated.tds,
+    otherDeductions: calculated.otherDeductions,
+    deductions: calculated.deductions,
+    netSalary: calculated.netSalary,
+    statutoryAmounts: calculated.statutoryAmounts,
   };
 }
 
@@ -3885,10 +3813,31 @@ export function getPayrollRunActions(
   );
 }
 
+const HOLDABLE_STATUSES: string[] = [
+  PayrollRunStatus.GENERATED,
+  PayrollRunStatus.VALIDATED,
+  PayrollRunStatus.UNDER_REVIEW,
+  PayrollRunStatus.REVIEWED,
+  PayrollRunStatus.APPROVED,
+  PayrollRunStatus.FINALIZED,
+  PayrollRunStatus.POSTED,
+];
+const BANK_ADVICE_STATUSES: string[] = [
+  PayrollRunStatus.FINALIZED,
+  PayrollRunStatus.POSTED,
+];
+
+type RunPermission =
+  | 'payroll:run:pay'
+  | 'payroll:run:reverse'
+  | 'payroll:hold:create'
+  | 'payroll:hold:release'
+  | 'payroll:bank-advice:export';
+
 function buildPayrollRunActions(
   status: string,
   available: (duty: PayrollDuty) => boolean,
-  holds: (permission: 'payroll:run:pay' | 'payroll:run:reverse') => boolean,
+  holds: (permission: RunPermission) => boolean,
 ) {
   const editable =
     status === PayrollRunStatus.DRAFT || status === PayrollRunStatus.GENERATED;
@@ -3916,6 +3865,12 @@ function buildPayrollRunActions(
       (status === PayrollRunStatus.POSTED ||
         status === PayrollRunStatus.PAID) &&
       holds('payroll:run:reverse'),
+    canHold: HOLDABLE_STATUSES.includes(status) && holds('payroll:hold:create'),
+    canReleaseHold:
+      HOLDABLE_STATUSES.includes(status) && holds('payroll:hold:release'),
+    canExportBankAdvice:
+      BANK_ADVICE_STATUSES.includes(status) &&
+      holds('payroll:bank-advice:export'),
     isLocked: [
       PayrollRunStatus.FINALIZED,
       PayrollRunStatus.POSTED,
@@ -3976,15 +3931,6 @@ function previousDayUtc(date: Date) {
   );
   previous.setUTCDate(previous.getUTCDate() - 1);
   return previous;
-}
-
-function getPayrollPeriod(periodYear: number, periodMonth: number) {
-  const startsOn = new Date(Date.UTC(periodYear, periodMonth - 1, 1));
-  const endsOn = new Date(
-    Date.UTC(periodYear, periodMonth, 0, 23, 59, 59, 999),
-  );
-
-  return { startsOn, endsOn };
 }
 
 /**
@@ -4054,6 +4000,75 @@ function assertNoStatutoryConfigurationErrors(
   });
 }
 
+/**
+ * The proration divisor: the calendar days of the BS period unless the
+ * operator names one. Either way the basis is recorded on the run.
+ */
+function resolvePayrollDivisor(
+  workingDays: number | undefined,
+  period: Pick<PayrollPeriodWindow, 'calendarDays'>,
+): { divisorDays: number; divisorBasis: PayrollDivisorBasisValue } {
+  if (workingDays === undefined)
+    return {
+      divisorDays: period.calendarDays,
+      divisorBasis: 'CALENDAR_DAYS_OF_PERIOD',
+    };
+  if (!Number.isInteger(workingDays) || workingDays < 1 || workingDays > 32)
+    throw new BadRequestException({
+      code: 'PRORATION_DIVISOR_INVALID',
+      message: 'workingDays must be a whole number of days from 1 to 32',
+    });
+  return { divisorDays: workingDays, divisorBasis: 'OPERATOR_SUPPLIED' };
+}
+
+function assertNoProrationErrors(
+  issues: Array<{ staffId: string; code: string; message: string }>,
+) {
+  if (!issues.length) return;
+  throw new ConflictException({
+    code: 'PRORATION_INPUT_UNRESOLVED',
+    message:
+      'Payroll cannot be prorated until every employed day has an authoritative salary source.',
+    issues: issues.map(({ staffId, code, message }) => ({
+      staffId,
+      code,
+      message,
+    })),
+  });
+}
+
+function formatCentiDays(centi: bigint): string {
+  const negative = centi < 0n;
+  const abs = negative ? -centi : centi;
+  return `${negative ? '-' : ''}${abs / 100n}.${(abs % 100n).toString().padStart(2, '0')}`;
+}
+
+/** Maps database refusals on a run write to precise, machine-readable conflicts. */
+function translateRunWriteError(error: unknown): unknown {
+  const err = error as { code?: unknown; message?: unknown } | null;
+  const message = typeof err?.message === 'string' ? err.message : '';
+  if (
+    message.includes('PayrollRun_no_overlapping_live_period') ||
+    message.includes('23P01')
+  )
+    return new ConflictException({
+      code: 'PAYROLL_PERIOD_OVERLAP',
+      message:
+        'This period overlaps another live payroll run for the school. Cancel or reverse it first.',
+    });
+  if (message.includes('PayrollAdjustment_one_applied'))
+    return new ConflictException({
+      code: 'PAYROLL_ADJUSTMENT_ALREADY_APPLIED',
+      message:
+        'A payroll adjustment was consumed by another run while this one was being prepared. Retry.',
+    });
+  if (err?.code === 'P2002')
+    return new ConflictException(
+      'A payroll run already exists for this period. Void the existing one first if a re-run is needed.',
+    );
+  return error;
+}
+
 function statutoryVersionIdFor(
   lines: Array<{ statutoryAmounts: StatutoryAmount[] }>,
   policy: ResolvedStatutoryPolicy | null,
@@ -4065,29 +4080,7 @@ function statutoryVersionIdFor(
 
 function payrollLineCreateData(
   tenantId: string,
-  line: {
-    staffId: string;
-    contractId: string | null;
-    salaryStructureId: string | null;
-    employmentId: string;
-    employmentFrom: Date;
-    employmentTo: Date | null;
-    baseSalary: Prisma.Decimal | number;
-    earnings: Prisma.Decimal;
-    grossSalary: Prisma.Decimal;
-    allowances: Prisma.Decimal;
-    leaveDeductions: Prisma.Decimal;
-    pfEmployee: Prisma.Decimal;
-    pfEmployer: Prisma.Decimal;
-    tds: Prisma.Decimal;
-    otherDeductions: Prisma.Decimal;
-    deductions: Prisma.Decimal;
-    netSalary: Prisma.Decimal;
-    attendanceDays: number;
-    unpaidLeaveDays: number;
-    workingDays: number;
-    statutoryAmounts: StatutoryAmount[];
-  },
+  line: PeriodPayrollLine,
   policy: ResolvedStatutoryPolicy | null,
 ) {
   return {
@@ -4102,6 +4095,7 @@ function payrollLineCreateData(
       policy?.versionId ?? null,
       line.statutoryAmounts,
     ),
+    prorationBreakdown: line.prorationBreakdown,
     basicSalary: new Prisma.Decimal(line.baseSalary),
     earnings: new Prisma.Decimal(line.earnings),
     grossSalary: new Prisma.Decimal(line.grossSalary),
@@ -4111,17 +4105,15 @@ function payrollLineCreateData(
     pfEmployer: new Prisma.Decimal(line.pfEmployer),
     tds: new Prisma.Decimal(line.tds),
     otherDeductions: new Prisma.Decimal(line.otherDeductions),
+    adjustmentEarnings: new Prisma.Decimal(line.adjustmentEarnings),
+    adjustmentDeductions: new Prisma.Decimal(line.adjustmentDeductions),
     deductions: new Prisma.Decimal(line.deductions),
     netSalary: new Prisma.Decimal(line.netSalary),
-    paidDays: new Prisma.Decimal(line.attendanceDays),
-    unpaidDays: new Prisma.Decimal(line.unpaidLeaveDays),
+    paidDays: new Prisma.Decimal(line.paidDays),
+    unpaidDays: new Prisma.Decimal(line.unpaidDays),
     attendanceDays: line.attendanceDays,
     workingDays: line.workingDays,
   };
-}
-
-function moneyDecimal(value: Prisma.Decimal) {
-  return new Prisma.Decimal(value).toDecimalPlaces(2);
 }
 
 function moneyString(
@@ -4282,6 +4274,8 @@ function serializePayrollRunSummary(
     periodYear: number;
     periodStart?: Date | null;
     periodEnd?: Date | null;
+    divisorDays?: number | null;
+    divisorBasis?: string | null;
     status: string;
     grossAmount: Prisma.Decimal;
     deductionAmount: Prisma.Decimal;
@@ -4321,6 +4315,9 @@ function serializePayrollRunSummary(
     periodYear: run.periodYear,
     periodStart: run.periodStart,
     periodEnd: run.periodEnd,
+    ...periodPresentation(run),
+    divisorDays: run.divisorDays ?? null,
+    divisorBasis: run.divisorBasis ?? null,
     status: run.status,
     generatedById: run.generatedById,
     reviewedById: run.reviewedById,
@@ -4354,6 +4351,29 @@ function serializePayrollRunSummary(
   };
 }
 
+/** BS label and ISO bounds of a run for display; the stored bounds stay authoritative. */
+function periodPresentation(run: {
+  periodYear: number;
+  periodMonth: number;
+  periodStart?: Date | null;
+  periodEnd?: Date | null;
+}) {
+  if (!run.periodStart || !run.periodEnd) return {};
+  const window = payrollPeriodOfRun({
+    periodYear: run.periodYear,
+    periodMonth: run.periodMonth,
+    periodStart: run.periodStart,
+    periodEnd: run.periodEnd,
+  });
+  return {
+    periodLabel: window.label,
+    periodStartsOn: window.startsOnIso,
+    periodEndsOn: window.endsOnIso,
+    periodCalendar: window.bs ? 'BS' : 'GREGORIAN_LEGACY',
+    periodCalendarDays: window.calendarDays,
+  };
+}
+
 function serializePayrollRunDetail(
   run: Prisma.PayrollRunGetPayload<{
     include: {
@@ -4376,7 +4396,14 @@ function serializePayrollRunDetail(
     };
   }>,
   actor: AuthContext,
+  holds: Array<{
+    id: string;
+    staffId: string;
+    reason: string;
+    createdAt: Date;
+  }> = [],
 ) {
+  const holdByStaff = new Map(holds.map((hold) => [hold.staffId, hold]));
   return {
     ...serializePayrollRunSummary(
       {
@@ -4385,42 +4412,64 @@ function serializePayrollRunDetail(
       },
       actor,
     ),
-    lines: run.lines.map(serializePayrollLine),
+    lines: run.lines.map((line) =>
+      serializePayrollLine(line, holdByStaff.get(line.staffId) ?? null),
+    ),
     payslips: run.payslips.map((payslip) =>
       serializePayslipSummary({ ...payslip, payrollRun: run, staff: null }),
     ),
   };
 }
 
-function serializePayrollLine(line: {
-  id: string;
-  staffId: string;
-  payrollRunId: string;
-  contractId?: string | null;
-  salaryStructureId?: string | null;
-  basicSalary: Prisma.Decimal;
-  earnings: Prisma.Decimal;
-  grossSalary: Prisma.Decimal;
-  allowances: Prisma.Decimal;
-  leaveDeductions: Prisma.Decimal;
-  pfEmployee: Prisma.Decimal;
-  pfEmployer: Prisma.Decimal;
-  tds: Prisma.Decimal;
-  otherDeductions: Prisma.Decimal;
-  deductions: Prisma.Decimal;
-  netSalary: Prisma.Decimal;
-  paidDays: Prisma.Decimal;
-  unpaidDays: Prisma.Decimal;
-  attendanceDays: number;
-  workingDays: number;
-  paymentStatus: string;
-  status: string;
-  createdAt?: Date;
-  staff?: MinimalStaff | null;
-  payslip?: { payslipNumber: string } | null;
-}) {
+function serializePayrollLine(
+  line: {
+    id: string;
+    staffId: string;
+    payrollRunId: string;
+    contractId?: string | null;
+    salaryStructureId?: string | null;
+    basicSalary: Prisma.Decimal;
+    earnings: Prisma.Decimal;
+    grossSalary: Prisma.Decimal;
+    allowances: Prisma.Decimal;
+    leaveDeductions: Prisma.Decimal;
+    pfEmployee: Prisma.Decimal;
+    pfEmployer: Prisma.Decimal;
+    tds: Prisma.Decimal;
+    otherDeductions: Prisma.Decimal;
+    deductions: Prisma.Decimal;
+    netSalary: Prisma.Decimal;
+    paidDays: Prisma.Decimal;
+    unpaidDays: Prisma.Decimal;
+    attendanceDays: number;
+    workingDays: number;
+    paymentStatus: string;
+    status: string;
+    createdAt?: Date;
+    staff?: MinimalStaff | null;
+    payslip?: { payslipNumber: string } | null;
+    prorationBreakdown?: unknown;
+    adjustmentEarnings?: Prisma.Decimal;
+    adjustmentDeductions?: Prisma.Decimal;
+    statutoryBreakdown?: unknown;
+  },
+  activeHold?: { id: string; reason: string; createdAt: Date } | null,
+) {
   return {
     ...line,
+    // The per-day ledger stays server-side (it is attendance detail); the
+    // summary of how the amounts were derived is what the line exposes.
+    prorationBreakdown: publicProrationBreakdown(line.prorationBreakdown),
+    adjustmentEarnings: moneyString(line.adjustmentEarnings),
+    adjustmentDeductions: moneyString(line.adjustmentDeductions),
+    hold: activeHold
+      ? {
+          id: activeHold.id,
+          reason: activeHold.reason,
+          createdAt: activeHold.createdAt,
+        }
+      : null,
+    netNegative: line.netSalary.lt(0),
     basicSalary: moneyString(line.basicSalary),
     earnings: moneyString(line.earnings),
     grossSalary: moneyString(line.grossSalary),
@@ -4436,6 +4485,13 @@ function serializePayrollLine(line: {
     unpaidDays: moneyString(line.unpaidDays),
     staff: serializeStaff(line.staff),
   };
+}
+
+function publicProrationBreakdown(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const { ledger: _ledger, ...rest } = value as Record<string, unknown>;
+  void _ledger;
+  return rest;
 }
 
 function serializePayslipSummary(payslip: {

@@ -3,6 +3,7 @@
 import {
   formatBsDate,
   formatNepalTime,
+  formatPayrollPeriodLabel,
   type PayrollMoneyAmount,
 } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -1090,8 +1091,12 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                             className="hover:bg-slate-50/30 transition-colors"
                           >
                             <td className="px-5 py-3.5 font-bold text-slate-900">
-                              {line.payrollRun?.periodMonth}/
-                              {line.payrollRun?.periodYear}
+                              {line.payrollRun
+                                ? formatPayrollPeriodLabel(
+                                    line.payrollRun.periodYear,
+                                    line.payrollRun.periodMonth,
+                                  )
+                                : ''}
                             </td>
                             <td className="px-5 py-3.5 text-slate-600 font-medium">
                               {formatMaskableNpr(line.grossSalary)}

@@ -2,10 +2,28 @@ import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import type { PayrollExceptionQueryDto } from './dto/payroll-exception-query.dto';
 import { PayrollReadinessService } from './payroll-readiness.service';
+import { calculatePeriodPayroll } from './payroll-period-calculation';
 
+jest.mock('./payroll-period-calculation', () => ({
+  calculatePeriodPayroll: jest.fn(),
+}));
+const mockedCalculation = calculatePeriodPayroll as unknown as jest.Mock;
+
+function emptyCalculation(overrides: Record<string, unknown> = {}) {
+  return {
+    lines: [],
+    prorationErrors: [],
+    unresolvedCorrections: [],
+    configurationErrors: [],
+    ...overrides,
+  };
+}
+
+// Phase 7.9: payroll periods are Bikram Sambat months. Ashwin 2083 runs from
+// 2026-09-17 to 2026-10-17.
 const period: PayrollExceptionQueryDto = {
-  year: 2026,
-  month: 5,
+  year: 2083,
+  month: 6,
   page: 1,
   limit: 25,
 };
@@ -19,6 +37,11 @@ const actor: AuthContext = {
   permissions: ['payroll:read', 'payroll:manage'],
   authMethod: 'PASSWORD',
 };
+
+beforeEach(() => {
+  mockedCalculation.mockReset();
+  mockedCalculation.mockResolvedValue(emptyCalculation());
+});
 
 describe('PayrollReadinessService', () => {
   it('blocks a legacy contract with no verified employment (Phase 7.1)', async () => {
@@ -109,7 +132,7 @@ describe('PayrollReadinessService', () => {
       existingExceptions: [
         {
           id: 'exception-1',
-          identityKey: '2026-5:run-1:staff-1:ZERO_GROSS_PAY',
+          identityKey: '2083-6:run-1:staff-1:ZERO_GROSS_PAY',
           status: 'OPEN',
         },
       ],
@@ -126,7 +149,7 @@ describe('PayrollReadinessService', () => {
           tenantId: 'tenant-1',
           identityKey: {
             notIn: expect.not.arrayContaining([
-              '2026-5:run-1:staff-1:ZERO_GROSS_PAY',
+              '2083-6:run-1:staff-1:ZERO_GROSS_PAY',
             ]),
           },
         }),
@@ -310,6 +333,242 @@ describe('PayrollReadinessService statutory configuration (Phase 7.8)', () => {
   });
 });
 
+describe('PayrollReadinessService period, proration, adjustments and holds (Phase 7.9)', () => {
+  const find = (prisma: ReturnType<typeof buildPrismaMock>, code: string) =>
+    persistedCandidates(prisma).filter((item) => item.code === code);
+
+  it('blocks creation and approval when proration inputs are unresolved', async () => {
+    mockedCalculation.mockResolvedValue(
+      emptyCalculation({
+        prorationErrors: [
+          {
+            staffId: 'staff-1',
+            code: 'PRORATION_EMPLOYED_DAYS_WITHOUT_COMPENSATION',
+            message: 'Employed days are not covered by a salary structure',
+          },
+        ],
+      }),
+    );
+    const { service, prisma } = buildService();
+    await service.getReadiness(period, actor);
+    expect(find(prisma, 'PRORATION_INPUT_UNRESOLVED')).toEqual([
+      expect.objectContaining({
+        severity: 'BLOCKING',
+        staffId: 'staff-1',
+        blockedActions: ['CREATE_DRAFT', 'SUBMIT_REVIEW', 'APPROVE', 'POST'],
+      }),
+    ]);
+  });
+
+  it('warns, without blocking approval, about a correction that cannot be priced', async () => {
+    mockedCalculation.mockResolvedValue(
+      emptyCalculation({
+        unresolvedCorrections: [
+          {
+            correctionId: 'correction-1',
+            staffId: 'staff-1',
+            attendanceDate: '2026-09-20',
+            code: 'SOURCE_LINE_MISSING',
+            message: 'No source line',
+          },
+        ],
+      }),
+    );
+    const { service, prisma } = buildService();
+    await service.getReadiness(period, actor);
+    expect(find(prisma, 'PAYROLL_ADJUSTMENT_UNRESOLVED')).toEqual([
+      expect.objectContaining({
+        severity: 'WARNING',
+        blockedActions: ['SUBMIT_REVIEW'],
+      }),
+    ]);
+  });
+
+  it('does not re-evaluate proration for a run that is already approved', async () => {
+    const { service } = buildService({ runOverrides: { status: 'APPROVED' } });
+    await service.getReadiness(period, actor);
+    expect(mockedCalculation).not.toHaveBeenCalled();
+  });
+
+  it('uses the stored divisor of the run and its own id when evaluating', async () => {
+    const { service } = buildService();
+    await service.getReadiness(period, actor);
+    expect(mockedCalculation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        divisorDays: 31,
+        divisorBasis: 'CALENDAR_DAYS_OF_PERIOD',
+        ownRunId: 'run-1',
+        tenantId: 'tenant-1',
+      }),
+    );
+  });
+
+  it('blocks a BS-labelled run whose stored bounds are not its Nepali month', async () => {
+    const { service, prisma } = buildService({
+      runOverrides: {
+        periodStart: new Date('2026-09-01T00:00:00.000Z'),
+        periodEnd: new Date('2026-09-30T23:59:59.999Z'),
+      },
+    });
+    await service.getReadiness(period, actor);
+    expect(find(prisma, 'INVALID_PAYROLL_PERIOD')).toEqual([
+      expect.objectContaining({ severity: 'BLOCKING', staffId: null }),
+    ]);
+  });
+
+  it('does not question a legacy Gregorian-labelled run', async () => {
+    const { service, prisma } = buildService({
+      runOverrides: {
+        periodYear: 2026,
+        periodMonth: 5,
+        periodStart: new Date('2026-05-01T00:00:00.000Z'),
+        periodEnd: new Date('2026-05-31T23:59:59.999Z'),
+        divisorDays: null,
+        divisorBasis: null,
+      },
+    });
+    await service.getReadiness(
+      { year: 2026, month: 5, page: 1, limit: 25 },
+      actor,
+    );
+    expect(find(prisma, 'INVALID_PAYROLL_PERIOD')).toEqual([]);
+  });
+
+  it('blocks a line whose adjustments differ from the applied adjustment rows', async () => {
+    const { service, prisma } = buildService({
+      lines: [buildLine({ grossSalary: 45000 })],
+      appliedAdjustments: [
+        {
+          staffId: 'staff-1',
+          kind: 'ARREARS',
+          amount: new Prisma.Decimal('1000.00'),
+        },
+      ],
+    });
+    await service.getReadiness(period, actor);
+    expect(find(prisma, 'PAYROLL_ADJUSTMENT_UNRESOLVED')).toEqual([
+      expect.objectContaining({
+        severity: 'BLOCKING',
+        blockedActions: ['SUBMIT_REVIEW', 'APPROVE', 'POST', 'MARK_PAID'],
+      }),
+    ]);
+  });
+
+  it('accepts a line whose adjustments equal the applied adjustment rows', async () => {
+    const { service, prisma } = buildService({
+      lines: [
+        buildLine({
+          grossSalary: 45000,
+          adjustmentEarnings: new Prisma.Decimal('1000.00'),
+          adjustmentDeductions: new Prisma.Decimal('250.50'),
+        }),
+      ],
+      appliedAdjustments: [
+        {
+          staffId: 'staff-1',
+          kind: 'ARREARS',
+          amount: new Prisma.Decimal('400.00'),
+        },
+        {
+          staffId: 'staff-1',
+          kind: 'ARREARS',
+          amount: new Prisma.Decimal('600.00'),
+        },
+        {
+          staffId: 'staff-1',
+          kind: 'RECOVERY',
+          amount: new Prisma.Decimal('250.50'),
+        },
+      ],
+    });
+    await service.getReadiness(period, actor);
+    expect(find(prisma, 'PAYROLL_ADJUSTMENT_UNRESOLVED')).toEqual([]);
+  });
+
+  it('blocks only mark-paid for an active hold and never exposes its reason', async () => {
+    const { service, prisma } = buildService({
+      lines: [buildLine({ grossSalary: 45000 })],
+      activeHolds: [{ staffId: 'staff-1' }],
+    });
+    await service.getReadiness(period, actor);
+    const [hold] = find(prisma, 'PAYROLL_HOLD_ACTIVE');
+    expect(hold).toMatchObject({
+      severity: 'BLOCKING',
+      staffId: 'staff-1',
+      blockedActions: ['MARK_PAID'],
+    });
+    expect(prisma.payrollHold.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          status: 'ACTIVE',
+        }),
+        select: { staffId: true },
+      }),
+    );
+  });
+
+  it('blocks every advancing action for a negative net, including validation', async () => {
+    const { service, prisma } = buildService({
+      lines: [
+        buildLine({ grossSalary: 45000, netSalary: new Prisma.Decimal(-10) }),
+      ],
+    });
+    await service.getReadiness(period, actor);
+    expect(find(prisma, 'NEGATIVE_NET_PAY')).toEqual([
+      expect.objectContaining({
+        severity: 'BLOCKING',
+        blockedActions: [
+          'CREATE_DRAFT',
+          'SUBMIT_REVIEW',
+          'APPROVE',
+          'POST',
+          'MARK_PAID',
+        ],
+      }),
+    ]);
+  });
+
+  it('blocks payment when a bank-paid line has invalid bank details', async () => {
+    const { service, prisma } = buildService({
+      lines: [
+        buildLine({
+          grossSalary: 45000,
+          salaryStructure: { paymentMethod: 'BANK' },
+          staff: {
+            status: 'ACTIVE',
+            panNumber: null,
+            bankAccount: '12 ; DROP',
+            bankName: 'Fixture Bank',
+          },
+        }),
+      ],
+    });
+    await service.getReadiness(period, actor);
+    expect(find(prisma, 'INVALID_BANK_DETAILS')).toEqual([
+      expect.objectContaining({
+        severity: 'BLOCKING',
+        blockedActions: ['MARK_PAID'],
+      }),
+    ]);
+  });
+
+  it('reads a named period that has no run as a BS month and rejects a non-BS one', async () => {
+    const { service } = buildService();
+    (
+      service as unknown as { prisma: ReturnType<typeof buildPrismaMock> }
+    ).prisma.payrollRun.findFirst.mockResolvedValue(null);
+    await expect(
+      service.getReadiness({ year: 2026, month: 5, page: 1, limit: 25 }, actor),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        code: 'PAYROLL_PERIOD_YEAR_OUT_OF_RANGE',
+      }),
+    });
+  });
+});
+
 function persistedCandidates(prisma: ReturnType<typeof buildPrismaMock>) {
   const creates = (prisma.__tx.payrollException.create as jest.Mock).mock.calls;
   return creates.map((call) => call[0].data);
@@ -324,10 +583,13 @@ function buildLine(overrides: Record<string, unknown> = {}) {
     grossSalary: new Prisma.Decimal(45000),
     netSalary: new Prisma.Decimal(40000),
     tds: new Prisma.Decimal(0),
+    adjustmentEarnings: new Prisma.Decimal(0),
+    adjustmentDeductions: new Prisma.Decimal(0),
     staff: {
       status: 'ACTIVE',
       panNumber: null,
       bankAccount: null,
+      bankName: null,
     },
     salaryStructure: null,
     ...overrides,
@@ -347,6 +609,8 @@ function buildPrismaMock(
     pinnedPolicy?: Record<string, unknown> | null;
     memberships?: Record<string, unknown>[];
     runOverrides?: Record<string, unknown>;
+    appliedAdjustments?: Record<string, unknown>[];
+    activeHolds?: Record<string, unknown>[];
   } = {},
 ) {
   const tx = {
@@ -362,10 +626,14 @@ function buildPrismaMock(
     payrollRun: {
       findFirst: jest.fn().mockResolvedValue({
         id: 'run-1',
-        periodStart: new Date('2026-05-01T00:00:00.000Z'),
-        periodEnd: new Date('2026-05-31T00:00:00.000Z'),
+        periodYear: 2083,
+        periodMonth: 6,
+        periodStart: new Date('2026-09-17T00:00:00.000Z'),
+        periodEnd: new Date('2026-10-17T23:59:59.999Z'),
         status: 'GENERATED',
         statutoryPolicyVersionId: null,
+        divisorDays: 31,
+        divisorBasis: 'CALENDAR_DAYS_OF_PERIOD',
         ...options.runOverrides,
       }),
     },
@@ -406,6 +674,12 @@ function buildPrismaMock(
     },
     payrollLine: {
       findMany: jest.fn().mockResolvedValue(options.lines ?? []),
+    },
+    payrollAdjustment: {
+      findMany: jest.fn().mockResolvedValue(options.appliedAdjustments ?? []),
+    },
+    payrollHold: {
+      findMany: jest.fn().mockResolvedValue(options.activeHolds ?? []),
     },
     staffAttendance: {
       groupBy: jest.fn().mockResolvedValue([]),

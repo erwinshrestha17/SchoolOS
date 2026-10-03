@@ -1,4 +1,4 @@
-import { getNepalSchoolDay } from '@schoolos/core';
+import { formatPayrollPeriodLabel, getNepalSchoolDay } from '@schoolos/core';
 import { StaffLeaveWorkflow } from '../hr/staff-leave-workflow';
 import {
   BadRequestException,
@@ -971,7 +971,7 @@ export class StaffService {
         id: line.id,
         type: 'PAYROLL',
         occurredAt: line.createdAt,
-        title: `Payroll ${line.payrollRun.periodMonth}/${line.payrollRun.periodYear}`,
+        title: `Payroll ${formatPayrollPeriodLabel(line.payrollRun.periodYear, line.payrollRun.periodMonth)}`,
         reason: line.payrollRun.status,
         metadata: {
           payrollRunId: line.payrollRunId,

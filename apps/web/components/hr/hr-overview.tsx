@@ -2,7 +2,7 @@
 
 import { Metric } from '@/components/schoolos';
 import { useQuery } from '@tanstack/react-query';
-import { formatBsDate } from '@schoolos/core';
+import { formatBsDate, formatPayrollPeriodLabel } from '@schoolos/core';
 import { api } from '../../lib/api';
 import {
   Users,
@@ -111,7 +111,10 @@ export function HROverview() {
                 </span>
                 <span className="font-bold text-slate-950">
                   {latestPayrollRun
-                    ? `${latestPayrollRun.periodMonth}/${latestPayrollRun.periodYear}`
+                    ? formatPayrollPeriodLabel(
+                        latestPayrollRun.periodYear,
+                        latestPayrollRun.periodMonth,
+                      )
                     : 'None'}
                 </span>
               </div>

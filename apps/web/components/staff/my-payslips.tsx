@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatPayrollPeriodLabel } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import { EmptyState, ErrorState, Surface } from '@/components/schoolos';
 import { Button } from '@/components/ui/button';
@@ -107,8 +108,16 @@ export function MyPayslips() {
             <TableRow key={slip.id}>
               <TableCell className="font-medium">
                 {slip.payrollRun
-                  ? `${slip.payrollRun.periodMonth}/${slip.payrollRun.periodYear}`
-                  : `${slip.periodMonth ?? 'Period'}/${slip.periodYear ?? 'Unavailable'}`}
+                  ? formatPayrollPeriodLabel(
+                      slip.payrollRun.periodYear,
+                      slip.payrollRun.periodMonth,
+                    )
+                  : slip.periodYear && slip.periodMonth
+                    ? formatPayrollPeriodLabel(
+                        slip.periodYear,
+                        slip.periodMonth,
+                      )
+                    : 'Period unavailable'}
               </TableCell>
               <TableCell>{slip.payslipNumber}</TableCell>
               <TableCell>

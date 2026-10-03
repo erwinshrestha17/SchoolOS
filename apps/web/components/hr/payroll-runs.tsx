@@ -1,10 +1,9 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  getNepalNow,
-  type PayrollPreviewResult,
-  type PayrollRunSummary,
+import type {
+  PayrollProrationBreakdown,
+  PayrollRunSummary,
 } from '@schoolos/core';
 import {
   AlertTriangle,
@@ -27,6 +26,21 @@ import { api } from '../../lib/api';
 import { JournalEntryDialog } from '../accounting/journal-entry-dialog';
 import { cn } from '@/lib/utils';
 import { resourceAccess } from '@/lib/resource-authorization';
+import { PayrollRunHoldsPanel } from './payroll-run-holds-panel';
+import { PayrollLineProration } from './payroll-line-proration';
+import {
+  BS_MONTH_OPTIONS,
+  canExportBankAdvice,
+  canPlaceHold,
+  canReleaseHold,
+  currentPayrollBsPeriod,
+  isNegativeNet,
+  PAYROLL_HOLDABLE_STATUSES,
+  payrollBsYearOptions,
+  payrollRunPeriodLabel,
+  payrollRunPeriodRange,
+  divisorBasisLabel,
+} from '@/lib/payroll-run-view';
 import {
   PayrollActionDialog,
   PayrollActionType,
@@ -46,6 +60,11 @@ type PayrollLineView = {
     lastNameEn?: string;
   } | null;
   grossSalary?: number | string | null;
+  prorationBreakdown?: PayrollProrationBreakdown | null;
+  adjustmentEarnings?: number | string | null;
+  adjustmentDeductions?: number | string | null;
+  netNegative?: boolean;
+  hold?: { id: string; reason: string; createdAt: string } | null;
   allowances?: number | string | null;
   deductions?: number | string | null;
   netSalary?: number | string | null;
@@ -74,21 +93,6 @@ const moneyFormatter = new Intl.NumberFormat('en-NP', {
   maximumFractionDigits: 0,
 });
 
-const monthLabels = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
 function toNumber(value: number | string | null | undefined) {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -96,10 +100,6 @@ function toNumber(value: number | string | null | undefined) {
 
 function formatMoney(value: number | string | null | undefined) {
   return moneyFormatter.format(toNumber(value));
-}
-
-function formatPeriod(month: number, year: number) {
-  return `${monthLabels[month - 1] ?? `Month ${month}`} ${year}`;
 }
 
 function payrollStageRank(status: string) {
@@ -161,13 +161,12 @@ export function PayrollRuns() {
   const queryClient = useQueryClient();
   const { status, hasPermissions } = useSession();
   const canPreparePayroll = hasPermissions(['payroll:run:create']);
-  const [currentPeriod] = useState(() => getNepalNow());
-  const currentMonth = currentPeriod.month;
-  const currentYear = currentPeriod.year;
-
-  const [month, setMonth] = useState(currentMonth);
-  const [year, setYear] = useState(currentYear);
-  const [workingDays, setWorkingDays] = useState(30);
+  const [currentPeriod] = useState(() => currentPayrollBsPeriod());
+  const [month, setMonth] = useState(currentPeriod.bsMonth);
+  const [year, setYear] = useState(currentPeriod.bsYear);
+  // Optional divisor override. Empty = calendar days of the BS month.
+  const [workingDays, setWorkingDays] = useState('');
+  const divisorOverride = workingDays.trim() ? Number(workingDays) : undefined;
   const [showDraftWorkflow, setShowDraftWorkflow] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [selectedJournalId, setSelectedJournalId] = useState<string | null>(
@@ -188,8 +187,9 @@ export function PayrollRuns() {
   });
 
   const previewQuery = useQuery({
-    queryKey: ['payroll-preview', year, month, workingDays],
-    queryFn: () => api.getPayrollPreview({ year, month, workingDays }),
+    queryKey: ['payroll-preview', year, month, divisorOverride ?? null],
+    queryFn: () =>
+      api.getPayrollPreview({ year, month, workingDays: divisorOverride }),
     enabled: status === 'authenticated' && showDraftWorkflow,
   });
 
@@ -233,7 +233,7 @@ export function PayrollRuns() {
       api.createPayrollRun({
         periodMonth: month,
         periodYear: year,
-        workingDays,
+        ...(divisorOverride ? { workingDays: divisorOverride } : {}),
         notes:
           'Draft payroll run created from Payroll Runs preview. M11 posting requires a separate approval-to-post action.',
       }),
@@ -269,10 +269,10 @@ export function PayrollRuns() {
     (total, row) => total + row.warnings.length,
     0,
   );
-  const years = Array.from(
-    { length: 5 },
-    (_, index) => currentYear - 2 + index,
-  );
+  const years = payrollBsYearOptions(currentPeriod.bsYear);
+  const previewNegativeCount = previewRows.filter(
+    (row) => row.netPay < 0,
+  ).length;
 
   const runColumns: PaginatedDataTableColumn<PayrollRunView>[] = [
     {
@@ -281,7 +281,7 @@ export function PayrollRuns() {
       cell: (run) => (
         <>
           <p className="font-bold text-gray-900">
-            {formatPeriod(run.periodMonth, run.periodYear)}
+            {payrollRunPeriodLabel(run)}
           </p>
           <p className="text-[10px] text-gray-500">
             {run.lineCount ?? 0} staff lines
@@ -384,7 +384,7 @@ export function PayrollRuns() {
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <label className="grid gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-400">
-                Year
+                BS Year
                 <select
                   value={year}
                   onChange={(event) => setYear(Number(event.target.value))}
@@ -398,29 +398,28 @@ export function PayrollRuns() {
                 </select>
               </label>
               <label className="grid gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-400">
-                Month
+                BS Month
                 <select
                   value={month}
                   onChange={(event) => setMonth(Number(event.target.value))}
                   className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-hr-border)]/60"
                 >
-                  {monthLabels.map((label, index) => (
-                    <option key={label} value={index + 1}>
-                      {label}
+                  {BS_MONTH_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="grid gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-400">
-                Working Days
+                Divisor days (optional)
                 <input
                   type="number"
                   min={1}
-                  max={31}
+                  max={32}
+                  placeholder="auto"
                   value={workingDays}
-                  onChange={(event) =>
-                    setWorkingDays(Number(event.target.value))
-                  }
+                  onChange={(event) => setWorkingDays(event.target.value)}
                   className="w-28 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--color-mod-hr-border)]/60"
                 />
               </label>
@@ -442,6 +441,7 @@ export function PayrollRuns() {
                 disabled={
                   !canPreparePayroll ||
                   previewRows.length === 0 ||
+                  previewNegativeCount > 0 ||
                   createDraftMutation.isPending
                 }
                 onClick={() => createDraftMutation.mutate()}
@@ -496,6 +496,19 @@ export function PayrollRuns() {
               </p>
             </div>
           </div>
+
+          {previewNegativeCount > 0 && (
+            <p
+              role="alert"
+              className="rounded-xl bg-danger-50 px-4 py-3 text-xs font-semibold text-danger-700"
+            >
+              {previewNegativeCount} staff line
+              {previewNegativeCount === 1 ? ' has' : 's have'} deductions
+              greater than gross pay. A negative net is never hidden or floored;
+              correct the salary structure, deductions or adjustments before
+              saving.
+            </p>
+          )}
 
           <div className="overflow-x-auto rounded-2xl border border-gray-100">
             <table className="w-full border-collapse text-left text-sm">
@@ -575,8 +588,19 @@ export function PayrollRuns() {
                       <td className="px-4 py-3 text-right text-danger-600">
                         -{formatMoney(row.deductions)}
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-[var(--color-mod-hr-text)]">
+                      <td
+                        className={`px-4 py-3 text-right font-bold ${
+                          row.netPay < 0
+                            ? 'text-danger-700'
+                            : 'text-[var(--color-mod-hr-text)]'
+                        }`}
+                      >
                         {formatMoney(row.netPay)}
+                        {row.netPay < 0 && (
+                          <span className="block text-[9px] font-bold uppercase">
+                            Negative net
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center text-xs font-bold text-gray-600">
                         {row.presentDays + row.approvedPaidLeaveDays}/
@@ -670,11 +694,16 @@ export function PayrollRuns() {
             <div className="space-y-4">
               <div className="rounded-2xl bg-gray-50/70 p-4">
                 <p className="text-sm font-bold text-gray-900">
-                  {formatPeriod(
-                    selectedRun.periodMonth,
-                    selectedRun.periodYear,
-                  )}
+                  {payrollRunPeriodLabel(selectedRun)}
                 </p>
+                {payrollRunPeriodRange(selectedRun) && (
+                  <p className="text-[10px] text-gray-500">
+                    {payrollRunPeriodRange(selectedRun)}
+                    {divisorBasisLabel(selectedRun.divisorBasis)
+                      ? ` · ${divisorBasisLabel(selectedRun.divisorBasis)}`
+                      : ''}
+                  </p>
+                )}
                 <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                   <div>
                     <p className="font-semibold uppercase tracking-wider text-gray-400">
@@ -939,6 +968,28 @@ export function PayrollRuns() {
                   </div>
                 )}
 
+              {(PAYROLL_HOLDABLE_STATUSES.includes(selectedRun.status) ||
+                selectedRun.status === 'PAID') && (
+                <PayrollRunHoldsPanel
+                  runId={selectedRun.id}
+                  runStatus={selectedRun.status}
+                  lines={(selectedRun.lines ?? []).map((line) => ({
+                    staffId: line.staffId,
+                    staffName: getStaffName(line),
+                    employeeId: line.staff?.employeeId ?? null,
+                  }))}
+                  canHold={canPlaceHold(selectedRun.status, selectedRunAccess)}
+                  canReleaseHold={canReleaseHold(
+                    selectedRun.status,
+                    selectedRunAccess,
+                  )}
+                  canExportBankAdvice={canExportBankAdvice(
+                    selectedRun.status,
+                    selectedRunAccess,
+                  )}
+                />
+              )}
+
               <div className="space-y-2">
                 {(selectedRun.lines ?? []).length > 0 ? (
                   (selectedRun.lines ?? []).map((line) => (
@@ -955,11 +1006,26 @@ export function PayrollRuns() {
                             {line.staff?.employeeId ?? line.staffId}
                           </p>
                         </div>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${statusClasses(line.status ?? selectedRun.status)}`}
-                        >
-                          {line.status ?? selectedRun.status}
-                        </span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${statusClasses(line.status ?? selectedRun.status)}`}
+                          >
+                            {line.status ?? selectedRun.status}
+                          </span>
+                          {line.hold && (
+                            <span
+                              title={line.hold.reason}
+                              className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[9px] font-bold uppercase text-amber-700"
+                            >
+                              Payment on hold
+                            </span>
+                          )}
+                          {isNegativeNet(line) && (
+                            <span className="rounded-full border border-danger-200 bg-danger-50 px-2 py-0.5 text-[9px] font-bold uppercase text-danger-700">
+                              Negative net
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                         <div>
@@ -974,7 +1040,13 @@ export function PayrollRuns() {
                           <p className="font-semibold uppercase tracking-wider text-gray-400">
                             Net
                           </p>
-                          <p className="font-bold text-[var(--color-mod-hr-text)]">
+                          <p
+                            className={`font-bold ${
+                              isNegativeNet(line)
+                                ? 'text-danger-700'
+                                : 'text-[var(--color-mod-hr-text)]'
+                            }`}
+                          >
                             {formatMoney(line.netSalary)}
                           </p>
                         </div>
@@ -987,6 +1059,17 @@ export function PayrollRuns() {
                           </p>
                         </div>
                       </div>
+                      {(toNumber(line.adjustmentEarnings) > 0 ||
+                        toNumber(line.adjustmentDeductions) > 0) && (
+                        <p className="mt-2 text-[11px] font-semibold text-gray-600">
+                          Attendance adjustments: arrears +
+                          {formatMoney(line.adjustmentEarnings)} · recovery −
+                          {formatMoney(line.adjustmentDeductions)}
+                        </p>
+                      )}
+                      <PayrollLineProration
+                        breakdown={line.prorationBreakdown}
+                      />
                       {['FINALIZED', 'POSTED', 'PAID'].includes(
                         selectedRun.status,
                       ) &&
@@ -1031,10 +1114,7 @@ export function PayrollRuns() {
           isOpen={isActionDialogOpen}
           onClose={() => setIsActionDialogOpen(false)}
           runId={selectedRun.id}
-          periodText={formatPeriod(
-            selectedRun.periodMonth,
-            selectedRun.periodYear,
-          )}
+          periodText={payrollRunPeriodLabel(selectedRun)}
           actionType={actionType}
         />
       )}

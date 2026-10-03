@@ -629,8 +629,8 @@ describeDatabase('Phase 7.6 staff leave workflow (PostgreSQL)', () => {
       const world = await makeWorld();
       await withLedgerGuardsOff(async (query) => {
         await query(
-          `INSERT INTO "PayrollRun" ("id","tenantId","periodMonth","periodYear","status","updatedAt")
-           VALUES ($1,$2,11,2026,'FINALIZED',now())`,
+          `INSERT INTO "PayrollRun" ("id","tenantId","periodMonth","periodYear","periodStart","periodEnd","status","updatedAt")
+           VALUES ($1,$2,11,2026,'2026-11-01 00:00:00','2026-11-30 23:59:59.999','FINALIZED',now())`,
           [randomUUID(), world.tenantId],
         );
       });

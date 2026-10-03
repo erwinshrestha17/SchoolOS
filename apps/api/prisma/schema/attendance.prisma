@@ -319,6 +319,7 @@ model StaffAttendanceCorrection {
   attendance StaffAttendance @relation(fields: [attendanceId], references: [id], onDelete: Restrict)
   requester User @relation("StaffAttendanceCorrectionRequester", fields: [requesterId], references: [id], onDelete: Restrict)
   approver User? @relation("StaffAttendanceCorrectionApprover", fields: [approverId], references: [id], onDelete: Restrict)
+  payrollAdjustments PayrollAdjustment[]
   @@index([tenantId, status, createdAt])
   @@index([tenantId, staffId, attendanceDate])
 }

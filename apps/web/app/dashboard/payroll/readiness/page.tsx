@@ -6,7 +6,11 @@ import type {
   PayrollExceptionStatus,
   PayrollExceptionSummary,
 } from '@schoolos/core';
-import { getNepalNow } from '@schoolos/core';
+import { BS_MONTH_NAMES_EN } from '@schoolos/core';
+import {
+  currentPayrollBsPeriod,
+  payrollBlockerCopy,
+} from '@/lib/payroll-run-view';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -52,9 +56,9 @@ const severityTone: Record<
 export default function PayrollReadinessPage() {
   const queryClient = useQueryClient();
   const payrollCaps = usePayrollCapabilities();
-  const [initialPeriod] = useState(() => getNepalNow());
-  const [year, setYear] = useState(initialPeriod.year);
-  const [month, setMonth] = useState(initialPeriod.month);
+  const [initialPeriod] = useState(() => currentPayrollBsPeriod());
+  const [year, setYear] = useState(initialPeriod.bsYear);
+  const [month, setMonth] = useState(initialPeriod.bsMonth);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [severity, setSeverity] = useState<PayrollExceptionSeverity | ''>('');
@@ -142,7 +146,7 @@ export default function PayrollReadinessPage() {
         className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-[130px_150px_minmax(220px,1fr)_170px_170px_auto]"
       >
         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-          Year
+          BS year
           <Input
             className="mt-1"
             type="number"
@@ -153,7 +157,7 @@ export default function PayrollReadinessPage() {
           />
         </label>
         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
-          Month
+          BS month
           <Select
             className="mt-1"
             value={month}
@@ -162,7 +166,7 @@ export default function PayrollReadinessPage() {
             {Array.from({ length: 12 }, (_, index) => index + 1).map(
               (value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {BS_MONTH_NAMES_EN[value - 1]}
                 </option>
               ),
             )}
@@ -335,6 +339,11 @@ export default function PayrollReadinessPage() {
                     <p className="mt-1 text-sm leading-6 text-slate-600">
                       {exception.safeMessage}
                     </p>
+                    {payrollBlockerCopy(exception.code) ? (
+                      <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                        {payrollBlockerCopy(exception.code)}
+                      </p>
+                    ) : null}
                     <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
                       <span>
                         Staff: {exception.staffName ?? 'Run-level issue'}

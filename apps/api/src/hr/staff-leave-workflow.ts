@@ -16,7 +16,7 @@ import {
   TimetableSubstitutionStatus,
   type StaffLeaveRequest,
 } from '@prisma/client';
-import { getNepalSchoolDay } from '@schoolos/core';
+import { formatPayrollPeriodLabel, getNepalSchoolDay } from '@schoolos/core';
 import type { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
@@ -873,33 +873,26 @@ export class StaffLeaveWorkflow {
     >,
     action: 'approve' | 'cancel',
   ) {
-    const months: Array<{ periodMonth: number; periodYear: number }> = [];
-    const cursor = new Date(
-      Date.UTC(
-        leave.startsOn.getUTCFullYear(),
-        leave.startsOn.getUTCMonth(),
-        1,
-      ),
-    );
-    while (cursor <= leave.endsOn) {
-      months.push({
-        periodMonth: cursor.getUTCMonth() + 1,
-        periodYear: cursor.getUTCFullYear(),
-      });
-      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
-    }
+    // Phase 7.9: overlap is decided by the run's stored period bounds, never
+    // by its label, so Nepali (BS) months and legacy Gregorian runs are both
+    // correct.
     const run = await tx.payrollRun.findFirst({
       where: {
         tenantId: leave.tenantId,
         status: { in: FIXED_PAYROLL_STATUSES },
-        OR: months,
+        periodStart: { lte: leave.endsOn },
+        periodEnd: { gte: leave.startsOn },
       },
-      select: { periodMonth: true, periodYear: true, status: true },
+      select: {
+        periodMonth: true,
+        periodYear: true,
+        status: true,
+      },
     });
     if (run) {
       throw leaveConflict(
         'LEAVE_PAYROLL_FINALIZED',
-        `Cannot ${action} leave inside payroll period ${run.periodMonth}/${run.periodYear}, which is ${run.status}. Record a payroll adjustment instead.`,
+        `Cannot ${action} leave inside payroll period ${formatPayrollPeriodLabel(run.periodYear, run.periodMonth)}, which is ${run.status}. Record a payroll adjustment instead.`,
       );
     }
   }

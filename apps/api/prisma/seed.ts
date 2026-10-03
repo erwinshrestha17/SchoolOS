@@ -751,6 +751,7 @@ const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
       'payroll:payslip:generate',
       'payroll:reports:read',
       'payroll:exports:create',
+      'payroll:hold:create',
     ],
   },
   {
@@ -772,6 +773,8 @@ const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
       'payroll:read',
       'payroll:run:read',
       'payroll:run:approve',
+      'payroll:hold:release',
+      'payroll:bank-advice:export',
       'payroll:payslip:read',
     ],
   },

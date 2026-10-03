@@ -1,8 +1,9 @@
 'use client';
 
-import type {
-  PayslipRegenerationJobSummary,
-  PayslipSummary,
+import {
+  formatPayrollPeriodLabel,
+  type PayslipRegenerationJobSummary,
+  type PayslipSummary,
 } from '@schoolos/core';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ApiRequestError, api } from '../../lib/api';
@@ -169,7 +170,9 @@ export function PayslipList() {
       header: 'Period',
       cell: (payslip) => (
         <span className="text-slate-600">
-          {payslip.periodMonth}/{payslip.periodYear}
+          {payslip.periodYear && payslip.periodMonth
+            ? formatPayrollPeriodLabel(payslip.periodYear, payslip.periodMonth)
+            : '—'}
         </span>
       ),
     },

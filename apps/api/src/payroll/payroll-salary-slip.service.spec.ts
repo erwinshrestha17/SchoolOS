@@ -27,6 +27,25 @@ describe('payroll salary slip PDFs', () => {
     );
   });
 
+  it('labels a Nepali payroll period by its BS month name (Phase 7.9)', () => {
+    const lines = buildApprovedSalarySlipLines({
+      schoolName: 'Sunrise Academy',
+      staffName: 'Sita Sharma',
+      employeeId: 'EMP-001',
+      periodMonth: 6,
+      periodYear: 2083,
+      grossSalary: 42000,
+      allowances: 5000,
+      deductions: 1420,
+      netSalary: 40580,
+      attendanceDays: 27,
+      workingDays: 31,
+      approvedAt: new Date(Date.UTC(2026, 9, 17)),
+      status: 'Payroll Approved',
+    });
+    expect(lines).toContain('Payroll Period: Ashwin 2083');
+  });
+
   it('builds approved salary slip lines with payroll and staff details', () => {
     const lines = buildApprovedSalarySlipLines({
       schoolName: 'Sunrise Academy',
@@ -49,7 +68,7 @@ describe('payroll salary slip PDFs', () => {
     expect(lines).toContain('Status: Payroll Approved');
     expect(lines).toContain('Employee: Sita Sharma');
     expect(lines).toContain('Employee ID: EMP-001');
-    expect(lines).toContain('Payroll Period: 5/2026');
+    expect(lines).toContain('Payroll Period: 2026-05');
     expect(lines).toContain('Gross Salary: Rs 42000.00');
     expect(lines).toContain('Allowances: Rs 5000.00');
     expect(lines).toContain('Deductions: Rs 1420.00');

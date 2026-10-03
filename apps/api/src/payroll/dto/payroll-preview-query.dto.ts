@@ -1,10 +1,11 @@
+import { PAYROLL_BS_MAX_YEAR, PAYROLL_BS_MIN_YEAR } from '@schoolos/core';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PayrollPreviewQueryDto {
   @IsInt()
-  @Min(2000)
-  @Max(2100)
+  @Min(PAYROLL_BS_MIN_YEAR)
+  @Max(PAYROLL_BS_MAX_YEAR)
   @Type(() => Number)
   year!: number;
 

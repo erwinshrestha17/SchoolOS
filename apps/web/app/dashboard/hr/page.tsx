@@ -3,7 +3,7 @@
 import { Surface } from '@/components/schoolos';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { formatBsDate } from '@schoolos/core';
+import { formatBsDate, formatPayrollPeriodLabel } from '@schoolos/core';
 import {
   AlertCircle,
   ArrowRight,
@@ -375,7 +375,10 @@ export default function HRDashboardPage() {
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <span className="text-sm font-bold text-slate-900">
                         {latestRun
-                          ? `${latestRun.periodMonth}/${latestRun.periodYear}`
+                          ? formatPayrollPeriodLabel(
+                              latestRun.periodYear,
+                              latestRun.periodMonth,
+                            )
                           : 'No runs'}
                       </span>
                       <StatusBadge
@@ -406,7 +409,10 @@ export default function HRDashboardPage() {
                         >
                           <div>
                             <p className="font-bold text-slate-900">
-                              {run.periodMonth}/{run.periodYear}
+                              {formatPayrollPeriodLabel(
+                                run.periodYear,
+                                run.periodMonth,
+                              )}
                             </p>
                             <p className="text-xs text-slate-500">
                               {run.postingReadiness.accountingJournalId
@@ -506,7 +512,7 @@ export default function HRDashboardPage() {
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 {coverage.payrollReadiness.available
-                  ? `Period ${coverage.payrollReadiness.periodMonth}/${coverage.payrollReadiness.periodYear}`
+                  ? `Period ${coverage.payrollReadiness.periodYear && coverage.payrollReadiness.periodMonth ? formatPayrollPeriodLabel(coverage.payrollReadiness.periodYear, coverage.payrollReadiness.periodMonth) : 'unavailable'}`
                   : coverage.payrollReadiness.reason}
               </p>
             </Link>

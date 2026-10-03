@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, type StaffAttendanceCorrection } from '@prisma/client';
+import { toBsDateFromGregorian } from '@schoolos/core';
+import { payrollPeriodFor } from '../payroll/payroll-period';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { AuthContext } from '../auth/auth.types';
 import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
@@ -242,7 +244,7 @@ export class StaffAttendanceCorrections {
     );
   }
 
-  async impact(id: string, actor: AuthContext, workingDays = 30) {
+  async impact(id: string, actor: AuthContext, workingDays?: number) {
     this.requireRead(actor);
     const c = await this.prisma.staffAttendanceCorrection.findFirst({
       where: { id, tenantId: actor.tenantId },
@@ -262,25 +264,36 @@ export class StaffAttendanceCorrections {
   private async project(
     tx: Prisma.TransactionClient,
     c: StaffAttendanceCorrection,
-    workingDays: number,
+    requestedWorkingDays: number | undefined,
   ) {
     const date = c.attendanceDate;
-    const period = {
-      startsOn: new Date(
-        Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1),
-      ),
-      endsOn: new Date(
-        Date.UTC(
-          date.getUTCFullYear(),
-          date.getUTCMonth() + 1,
-          0,
-          23,
-          59,
-          59,
-          999,
+    // Phase 7.9: the period is the Nepali (BS) payroll month containing the
+    // date and the default divisor is its calendar-day count, exactly as the
+    // payroll run itself resolves them. A date outside the BS payroll calendar
+    // (legacy data) falls back to its Gregorian month.
+    let period: { startsOn: Date; endsOn: Date };
+    try {
+      const window = payrollPeriodFor(...bsYearMonthOf(date));
+      period = { startsOn: window.startsOn, endsOn: window.endsOn };
+    } catch {
+      period = {
+        startsOn: new Date(
+          Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1),
         ),
-      ),
-    };
+        endsOn: new Date(
+          Date.UTC(
+            date.getUTCFullYear(),
+            date.getUTCMonth() + 1,
+            0,
+            23,
+            59,
+            59,
+            999,
+          ),
+        ),
+      };
+    }
+    const workingDays = requestedWorkingDays ?? calendarDaysInPeriod(period);
     const [attendance, leaves, employments] = await Promise.all([
       tx.staffAttendance.findMany({
         where: {
@@ -369,4 +382,9 @@ export class StaffAttendanceCorrections {
       },
     });
   }
+}
+
+function bsYearMonthOf(date: Date): [number, number] {
+  const bs = toBsDateFromGregorian(date);
+  return [bs.year, bs.month];
 }

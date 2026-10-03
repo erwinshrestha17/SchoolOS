@@ -5472,13 +5472,32 @@ export type PayrollRunAllowedActions = {
   canPost: boolean;
   canPay: boolean;
   canReverse: boolean;
+  /** Phase 7.9: payment holds and the bank payment advice export. */
+  canHold: boolean;
+  canReleaseHold: boolean;
+  canExportBankAdvice: boolean;
   isLocked: boolean;
 };
+
+export type PayrollPeriodCalendar = "BS" | "GREGORIAN_LEGACY";
+export type PayrollDivisorBasis =
+  | "CALENDAR_DAYS_OF_PERIOD"
+  | "OPERATOR_SUPPLIED";
 
 export type PayrollRunSummary = {
   id: string;
   periodMonth: number;
   periodYear: number;
+  /** Phase 7.9: authoritative period bounds and their BS presentation. */
+  periodStart?: string;
+  periodEnd?: string;
+  periodLabel?: string;
+  periodStartsOn?: string;
+  periodEndsOn?: string;
+  periodCalendar?: PayrollPeriodCalendar;
+  periodCalendarDays?: number;
+  divisorDays?: number | null;
+  divisorBasis?: PayrollDivisorBasis | null;
   status: string;
   grossAmount: PayrollMoneyAmount;
   deductionAmount: PayrollMoneyAmount;
@@ -5498,10 +5517,54 @@ export type PayrollRunSummary = {
   authorization?: ResourceAuthorization;
 };
 
+export type PayrollProrationSegment = {
+  sourceKind: "SALARY_STRUCTURE" | "CONTRACT";
+  sourceId: string;
+  from: string;
+  to: string;
+  days: number;
+  paidDays: string;
+  monthlyBasic: string;
+  monthlyAllowances: string;
+  monthlyFixedDeductions: string;
+  gross: string;
+  basic: string;
+  fixedDeductions: string;
+};
+
+/** Phase 7.9: how a line's amounts were derived (the per-day ledger stays server-side). */
+export type PayrollProrationBreakdown = {
+  schemaVersion: number;
+  period: { label: string; startsOn: string; endsOn: string };
+  divisor: { days: number; basis: PayrollDivisorBasis };
+  periodCalendarDays: number;
+  employedDays: number;
+  presentDays: number;
+  paidLeaveDays: string;
+  unpaidLeaveDays: string;
+  overlappingRecordDays: number;
+  paidDays: string;
+  unpaidDays: string;
+  segments: PayrollProrationSegment[];
+};
+
+export type PayrollLineHold = {
+  id: string;
+  reason: string;
+  createdAt: string;
+};
+
 export type PayrollLineSummary = {
   id: string;
   staffId: string;
   grossSalary: PayrollMoneyAmount;
+  /** Phase 7.9 */
+  prorationBreakdown?: PayrollProrationBreakdown | null;
+  adjustmentEarnings?: PayrollMoneyAmount;
+  adjustmentDeductions?: PayrollMoneyAmount;
+  /** True when deductions exceed gross; such a line blocks its run. */
+  netNegative?: boolean;
+  hold?: PayrollLineHold | null;
   basicSalary?: PayrollMoneyAmount;
   earnings?: PayrollMoneyAmount;
   allowances?: PayrollMoneyAmount;
@@ -5549,6 +5612,53 @@ export type PayrollPreviewResult = {
   deductions: number;
   netPay: number;
   warnings: string[];
+  /** Phase 7.9 */
+  periodLabel?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  divisorBasis?: PayrollDivisorBasis;
+  paidDays?: number;
+  adjustmentEarnings?: number;
+  adjustmentDeductions?: number;
+};
+
+/** Phase 7.9: payment holds. */
+export type PayrollHoldStatus = "ACTIVE" | "RELEASED";
+export type PayrollHoldSummary = {
+  id: string;
+  payrollRunId: string;
+  staffId: string;
+  staffName: string | null;
+  employeeId: string | null;
+  status: PayrollHoldStatus;
+  reason: string;
+  createdAt: string;
+  createdById: string;
+  releasedAt: string | null;
+  releasedById: string | null;
+  releaseReason: string | null;
+};
+
+/** Phase 7.9: bank payment advice export evidence (never the bank details themselves). */
+export type PayrollBankAdviceExportSummary = {
+  id: string;
+  sequence: number;
+  exportedAt: string;
+  exportedById: string;
+  lineCount: number;
+  heldLineCount: number;
+  totalAmount: PayrollMoneyAmount;
+  contentSha256: string;
+  reExportReason: string | null;
+};
+
+export type PayrollBankAdviceStatus = {
+  payrollRunId: string;
+  exportable: boolean;
+  /** Lines that would be exported / withheld by an active hold. */
+  payableLineCount: number;
+  heldLineCount: number;
+  exports: PayrollBankAdviceExportSummary[];
 };
 
 export type PayslipSummary = {
@@ -5679,7 +5789,12 @@ export type PayrollExceptionCode =
   | "FISCAL_PERIOD_LOCKED"
   | "ACCOUNTING_POSTING_FAILED"
   | "PAYSLIP_GENERATION_FAILED"
-  | "MISSING_VERIFIED_EMPLOYMENT";
+  | "MISSING_VERIFIED_EMPLOYMENT"
+  | "INVALID_PAYROLL_PERIOD"
+  | "PRORATION_INPUT_UNRESOLVED"
+  | "PAYROLL_ADJUSTMENT_UNRESOLVED"
+  | "PAYROLL_HOLD_ACTIVE"
+  | "INVALID_BANK_DETAILS";
 
 export type PayrollExceptionSummary = {
   id: string;

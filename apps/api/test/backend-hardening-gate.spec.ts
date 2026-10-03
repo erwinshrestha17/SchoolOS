@@ -414,6 +414,7 @@ describe('backend hardening gate', () => {
       '/hr/staff-attendance-corrections.ts': 3,
       '/messaging/messaging-hardening.service.ts': 1,
       '/mobile/mobile-principal.service.ts': 1,
+      '/payroll/payroll-bank-advice.service.ts': 1,
       '/platform/platform.service.ts': 1,
       '/settings/settings-domain-mutation.service.ts': 1,
       '/students/student-document-access.service.ts': 1,

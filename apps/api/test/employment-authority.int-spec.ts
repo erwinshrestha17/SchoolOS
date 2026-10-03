@@ -370,7 +370,7 @@ describeDatabase('Employment authority (database invariants)', () => {
     it('requires the employment window to be recorded together', async () => {
       const run = randomUUID();
       await db.query(
-        `INSERT INTO "PayrollRun" ("id","tenantId","periodMonth","periodYear","status","updatedAt") VALUES ($1,$2,3,2060,'GENERATED',now())`,
+        `INSERT INTO "PayrollRun" ("id","tenantId","periodMonth","periodYear","periodStart","periodEnd","status","updatedAt") VALUES ($1,$2,3,2060,'2060-03-01 00:00:00','2060-03-31 23:59:59.999','GENERATED',now())`,
         [run, tenantId],
       );
       const employmentId = await employment(

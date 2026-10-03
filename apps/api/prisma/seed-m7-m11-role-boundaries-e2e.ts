@@ -30,6 +30,7 @@ const roleSeeds = [
       'payroll:payslip:generate',
       'payroll:reports:read',
       'payroll:exports:create',
+      'payroll:hold:create',
     ],
   },
   {
@@ -49,6 +50,8 @@ const roleSeeds = [
       'payroll:read',
       'payroll:run:read',
       'payroll:run:approve',
+      'payroll:hold:release',
+      'payroll:bank-advice:export',
       'payroll:payslip:read',
     ],
   },

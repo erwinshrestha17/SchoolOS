@@ -85,4 +85,22 @@ export const payrollPermissions = [
     action: "create",
     description: "Create payroll exports",
   },
+  {
+    resource: "payroll:hold",
+    action: "create",
+    description:
+      "Place a reason-bound payment hold on one staff member's payroll line",
+  },
+  {
+    resource: "payroll:hold",
+    action: "release",
+    description:
+      "Release a payroll payment hold (must differ from the person who placed it)",
+  },
+  {
+    resource: "payroll:bank-advice",
+    action: "export",
+    description:
+      "Export the bank payment advice for a finalized payroll run (exposes staff bank details)",
+  },
 ] as const;

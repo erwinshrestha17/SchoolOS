@@ -220,7 +220,14 @@ describeDatabase(
           },
         });
         const run = await db.payrollRun.create({
-          data: { tenantId, periodMonth: 1, periodYear: 2083 },
+          data: {
+            tenantId,
+            periodMonth: 1,
+            periodYear: 2083,
+            // Baisakh 2083 (BS): 2026-04-14 .. 2026-05-14.
+            periodStart: new Date('2026-04-14T00:00:00.000Z'),
+            periodEnd: new Date('2026-05-14T23:59:59.999Z'),
+          },
         });
         const account = await db.chartAccount.create({
           data: { tenantId, code: 'PHASE1', name: 'Synthetic', type: 'ASSET' },

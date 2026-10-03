@@ -1026,6 +1026,13 @@ const legacyPermissionMetadata = {
     "protected_export",
     "1.0.0",
   ],
+  "payroll:hold:create": ["payroll:hold:create", "finance_write", "1.0.0"],
+  "payroll:hold:release": ["payroll:hold:release", "finance_critical", "1.0.0"],
+  "payroll:bank-advice:export": [
+    "payroll:bank-advice:export",
+    "protected_export",
+    "1.0.0",
+  ],
   "tenants:manage": ["platform:tenants:manage", "platform_manage", "1.0.0"],
   "tenants:read": ["settings:tenant_profile:read", "school_read", "1.0.0"],
   "platform:read": ["platform:control_plane:read", "platform_read", "1.0.0"],

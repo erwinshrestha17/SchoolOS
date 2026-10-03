@@ -19,7 +19,8 @@ describe('Payroll day projection uses payroll rules', () => {
     });
   });
   it('caps days by verified employment and never treats a half day as full', () => {
-    expect(payrollDayCounts({ ...full, employedDays: 10 }).paidDays).toBe(10);
+    // 30 × 10 / 31 = 9.677… → 9.68 (exact to two decimals, no whole-day rounding)
+    expect(payrollDayCounts({ ...full, employedDays: 10 }).paidDays).toBe(9.68);
     expect(attendancePaidContribution('HALF_DAY')).toBe(0);
     expect(attendancePaidContribution('LATE')).toBe(1);
   });

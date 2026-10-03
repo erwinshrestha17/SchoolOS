@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   StreamableFile,
   UseGuards,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -44,6 +46,13 @@ import {
   PayrollExceptionQueryDto,
 } from './dto/payroll-exception-query.dto';
 import { UpdateSalaryStructureDto } from './dto/update-salary-structure.dto';
+import { ExportPayrollBankAdviceDto } from './dto/payroll-bank-advice.dto';
+import {
+  CreatePayrollHoldDto,
+  ReleasePayrollHoldDto,
+} from './dto/payroll-hold.dto';
+import { PayrollBankAdviceService } from './payroll-bank-advice.service';
+import { PayrollHoldService } from './payroll-hold.service';
 import { PayrollReadinessService } from './payroll-readiness.service';
 import { PayrollSalarySlipService } from './payroll-salary-slip.service';
 import { PayrollService } from './payroll.service';
@@ -61,6 +70,8 @@ export class PayrollController {
     private readonly payrollService: PayrollService,
     private readonly payrollReadinessService: PayrollReadinessService,
     private readonly salarySlipService: PayrollSalarySlipService,
+    private readonly holdService: PayrollHoldService,
+    private readonly bankAdviceService: PayrollBankAdviceService,
   ) {}
 
   @Get('statutory-policy')
@@ -356,6 +367,62 @@ export class PayrollController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.payrollService.markPayrollRunPaid(id, dto, auth);
+  }
+
+  @Get('runs/:id/holds')
+  @Permissions('payroll:run:read')
+  listHolds(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.holdService.list(id, auth);
+  }
+
+  @Post('runs/:id/holds')
+  @Permissions('payroll:hold:create')
+  createHold(
+    @Param('id') id: string,
+    @Body() dto: CreatePayrollHoldDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.holdService.create(id, dto, auth);
+  }
+
+  @Post('runs/:id/holds/:holdId/release')
+  @Permissions('payroll:hold:release')
+  releaseHold(
+    @Param('id') id: string,
+    @Param('holdId') holdId: string,
+    @Body() dto: ReleasePayrollHoldDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.holdService.release(id, holdId, dto, auth);
+  }
+
+  @Get('runs/:id/bank-advice')
+  @Permissions('payroll:run:read')
+  getBankAdviceStatus(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.bankAdviceService.status(id, auth);
+  }
+
+  @Post('runs/:id/bank-advice/export')
+  @Permissions('payroll:bank-advice:export')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="payroll-bank-advice.csv"',
+  )
+  @Header('Cache-Control', 'no-store')
+  async exportBankAdvice(
+    @Param('id') id: string,
+    @Body() dto: ExportPayrollBankAdviceDto,
+    @CurrentAuth() auth: AuthContext,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.bankAdviceService.export(id, dto, auth);
+    response.setHeader('X-Bank-Advice-Sequence', String(result.sequence));
+    response.setHeader('X-Content-SHA256', result.contentSha256);
+    return result.csv;
   }
 
   @Post('runs/:id/reverse')

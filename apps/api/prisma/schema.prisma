@@ -670,6 +670,31 @@ enum PayrollExceptionCode {
   ACCOUNTING_POSTING_FAILED
   PAYSLIP_GENERATION_FAILED
   MISSING_VERIFIED_EMPLOYMENT
+  INVALID_PAYROLL_PERIOD
+  PRORATION_INPUT_UNRESOLVED
+  PAYROLL_ADJUSTMENT_UNRESOLVED
+  PAYROLL_HOLD_ACTIVE
+  INVALID_BANK_DETAILS
+}
+
+enum PayrollDivisorBasis {
+  CALENDAR_DAYS_OF_PERIOD
+  OPERATOR_SUPPLIED
+}
+
+enum PayrollAdjustmentKind {
+  ARREARS
+  RECOVERY
+}
+
+enum PayrollAdjustmentStatus {
+  APPLIED
+  RELEASED
+}
+
+enum PayrollHoldStatus {
+  ACTIVE
+  RELEASED
 }
 
 enum AccountingPeriodStatus {
@@ -3639,6 +3664,7 @@ model StaffAttendanceCorrection {
   attendance StaffAttendance @relation(fields: [attendanceId], references: [id], onDelete: Restrict)
   requester User @relation("StaffAttendanceCorrectionRequester", fields: [requesterId], references: [id], onDelete: Restrict)
   approver User? @relation("StaffAttendanceCorrectionApprover", fields: [approverId], references: [id], onDelete: Restrict)
+  payrollAdjustments PayrollAdjustment[]
   @@index([tenantId, status, createdAt])
   @@index([tenantId, staffId, attendanceDate])
 }
@@ -3690,6 +3716,10 @@ model User {
   approvedStaffCorrections StaffAttendanceCorrection[] @relation("StaffAttendanceCorrectionApprover")
   createdStatutoryMemberships StaffStatutoryMembership[] @relation("StaffStatutoryMembershipCreator")
   endedStatutoryMemberships StaffStatutoryMembership[] @relation("StaffStatutoryMembershipEnder")
+  createdPayrollHolds PayrollHold[] @relation("PayrollHoldCreator")
+  releasedPayrollHolds PayrollHold[] @relation("PayrollHoldReleaser")
+  createdPayrollAdjustments PayrollAdjustment[] @relation("PayrollAdjustmentCreator")
+  exportedPayrollBankAdvice PayrollBankAdviceExport[] @relation("PayrollBankAdviceExporter")
   approvedStaffAttendance     StaffAttendance[]            @relation("ApprovedStaffAttendance")
   collectedPayments           Payment[]                    @relation("CollectedPayments")
   cashierCloseCollectorScopes CashierClose[]               @relation("CashierCloseCollector")
@@ -7310,8 +7340,17 @@ model PayrollRun {
   periodYear                 Int
   revision                   Int              @default(1)
   predecessorRunId           String?          @unique
-  periodStart                DateTime?
-  periodEnd                  DateTime?
+  // Phase 7.9: authoritative period bounds, always set. For runs created from
+  // 7.9 they are the Gregorian bounds of the BS month named by
+  // periodYear/periodMonth (see packages/core payroll-period.ts); earlier runs
+  // keep the Gregorian-month bounds they were generated with. periodEnd is the
+  // last day at 23:59:59.999 UTC (Nepal-local business date semantics).
+  periodStart                DateTime
+  periodEnd                  DateTime
+  // Phase 7.9: the proration divisor this run used and where it came from, so
+  // regeneration reproduces it. NULL only for runs created before 7.9.
+  divisorDays                Int?
+  divisorBasis               PayrollDivisorBasis?
   status                     PayrollRunStatus @default(DRAFT)
   grossAmount                Decimal          @default(0) @db.Decimal(12, 2)
   deductionAmount            Decimal          @default(0) @db.Decimal(12, 2)
@@ -7355,6 +7394,10 @@ model PayrollRun {
   lines      PayrollLine[]
   payslips   Payslip[]
   exceptions PayrollException[]
+  holds      PayrollHold[]
+  adjustments PayrollAdjustment[] @relation("PayrollAdjustmentTargetRun")
+  adjustmentsSourced PayrollAdjustment[] @relation("PayrollAdjustmentSourceRun")
+  bankAdviceExports PayrollBankAdviceExport[]
 
   @@unique([tenantId, periodMonth, periodYear, revision])
   @@index([tenantId, status])
@@ -7410,6 +7453,14 @@ model PayrollLine {
   employmentTo      DateTime?
   // Phase 7.8: per-scheme bases and amounts exactly as computed (no identifiers).
   statutoryBreakdown Json?
+  // Phase 7.9: the persisted proration lineage (divisor, employment and salary
+  // structure segments, day counts) the amounts were derived from.
+  prorationBreakdown Json?
+  // Phase 7.9: consumed 7.7 payroll adjustments, already included in
+  // grossSalary / deductions respectively (never in a statutory basis other
+  // than the policy-defined gross).
+  adjustmentEarnings   Decimal            @default(0) @db.Decimal(12, 2)
+  adjustmentDeductions Decimal            @default(0) @db.Decimal(12, 2)
   basicSalary       Decimal              @default(0) @db.Decimal(12, 2)
   earnings          Decimal              @default(0) @db.Decimal(12, 2)
   grossSalary       Decimal              @db.Decimal(12, 2)
@@ -7493,6 +7544,94 @@ model StaffStatutoryMembership {
   endedBy   User?  @relation("StaffStatutoryMembershipEnder", fields: [endedById], references: [id], onDelete: Restrict)
 
   @@index([tenantId, staffId, effectiveFrom])
+}
+
+// Phase 7.9: a reason-bound payment hold on one staff member in one payroll
+// run. The calculation is kept; the hold only withholds payment (bank advice
+// and mark-paid). History is append-only: a hold is released, never deleted,
+// and the releaser must differ from the person who placed it.
+model PayrollHold {
+  id            String            @id @default(uuid())
+  tenantId      String
+  payrollRunId  String
+  staffId       String
+  status        PayrollHoldStatus @default(ACTIVE)
+  reason        String
+  createdById   String
+  createdAt     DateTime          @default(now())
+  releasedById  String?
+  releasedAt    DateTime?
+  releaseReason String?
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Restrict)
+  staff      Staff      @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  createdBy  User       @relation("PayrollHoldCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  releasedBy User?      @relation("PayrollHoldReleaser", fields: [releasedById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, payrollRunId, status])
+  @@index([tenantId, staffId])
+}
+
+// Phase 7.9: consumption of one approved-but-locked 7.7 attendance correction
+// (StaffAttendanceCorrection.status = PENDING_PAYROLL_ADJUSTMENT) by exactly one
+// payroll run. The correction itself stays immutable; this row is the lineage.
+// A correction can be APPLIED to at most one run at a time (partial unique
+// index); the row is RELEASED when its run is regenerated, voided or cancelled.
+model PayrollAdjustment {
+  id                   String                  @id @default(uuid())
+  tenantId             String
+  payrollRunId         String
+  staffId              String
+  correctionId         String
+  sourcePayrollRunId   String
+  attendanceDate       DateTime                @db.Date
+  kind                 PayrollAdjustmentKind
+  status               PayrollAdjustmentStatus @default(APPLIED)
+  // Signed paid-day change the correction causes (+ arrears, - recovery).
+  deltaDays            Decimal                 @db.Decimal(8, 2)
+  // Pricing basis taken from the source run's line, persisted for audit.
+  dailyRate            Decimal                 @db.Decimal(14, 4)
+  amount               Decimal                 @db.Decimal(12, 2)
+  pricing              Json
+  createdById          String
+  createdAt            DateTime                @default(now())
+  releasedAt           DateTime?
+  releaseReason        String?
+
+  tenant           Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  payrollRun       PayrollRun                 @relation("PayrollAdjustmentTargetRun", fields: [payrollRunId], references: [id], onDelete: Restrict)
+  sourcePayrollRun PayrollRun                 @relation("PayrollAdjustmentSourceRun", fields: [sourcePayrollRunId], references: [id], onDelete: Restrict)
+  staff            Staff                      @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  correction       StaffAttendanceCorrection  @relation(fields: [correctionId], references: [id], onDelete: Restrict)
+  createdBy        User                       @relation("PayrollAdjustmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, payrollRunId, status])
+  @@index([tenantId, correctionId])
+}
+
+// Phase 7.9: append-only record of every bank payment advice export, with the
+// snapshot identity (approved source fingerprint + content hash) it was built
+// from. The first export is sequence 1; any later one needs a stated reason.
+model PayrollBankAdviceExport {
+  id                String   @id @default(uuid())
+  tenantId          String
+  payrollRunId      String
+  sequence          Int
+  exportedById      String
+  exportedAt        DateTime @default(now())
+  lineCount         Int
+  heldLineCount     Int
+  totalAmount       Decimal  @db.Decimal(14, 2)
+  sourceFingerprint String
+  contentSha256     String
+  reExportReason    String?
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Restrict)
+  exportedBy User       @relation("PayrollBankAdviceExporter", fields: [exportedById], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, payrollRunId, sequence])
 }
 
 
@@ -8008,6 +8147,8 @@ model Staff {
   salaryStructures           SalaryStructure[]
   payrollLines               PayrollLine[]
   payrollExceptions          PayrollException[]
+  payrollHolds               PayrollHold[]
+  payrollAdjustments         PayrollAdjustment[]
   payslips                   Payslip[]
   qualificationsRecords      StaffQualification[]
   employments               StaffEmployment[]
@@ -9307,6 +9448,9 @@ model Tenant {
   staffExperienceRecords        StaffExperienceRecord[]
   payrollRuns                   PayrollRun[]
   payrollExceptions             PayrollException[]
+  payrollHolds                  PayrollHold[]
+  payrollAdjustments            PayrollAdjustment[]
+  payrollBankAdviceExports      PayrollBankAdviceExport[]
   payrollLines                  PayrollLine[]
   payslips                      Payslip[]
   salaryStructures              SalaryStructure[]

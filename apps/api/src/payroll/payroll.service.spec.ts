@@ -134,6 +134,9 @@ describe('payroll calculations', () => {
       canPost: false,
       canPay: false,
       canReverse: false,
+      canHold: false,
+      canReleaseHold: false,
+      canExportBankAdvice: false,
       isLocked: false,
     });
     expect(payrollRunLifecycle('VALIDATED')).toMatchObject({
@@ -169,6 +172,21 @@ describe('payroll calculations', () => {
       canReject: false,
       canCancelFinalized: true,
     });
+  });
+
+  it('offers holds only on live runs and bank advice only once finalized or posted (Phase 7.9)', () => {
+    const flags = (status: string) => {
+      const a = payrollRunLifecycle(status);
+      return [a.canHold, a.canReleaseHold, a.canExportBankAdvice];
+    };
+    expect(flags('DRAFT')).toEqual([false, false, false]);
+    expect(flags('GENERATED')).toEqual([true, true, false]);
+    expect(flags('APPROVED')).toEqual([true, true, false]);
+    expect(flags('FINALIZED')).toEqual([true, true, true]);
+    expect(flags('POSTED')).toEqual([true, true, true]);
+    expect(flags('PAID')).toEqual([false, false, false]);
+    expect(flags('VOID')).toEqual([false, false, false]);
+    expect(flags('CANCELLED')).toEqual([false, false, false]);
   });
 
   it('never advertises actor-facing actions the actor does not hold', () => {

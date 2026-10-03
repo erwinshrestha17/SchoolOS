@@ -6,7 +6,9 @@ import { AuthModule } from '../auth/auth.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { HrContractsController } from '../hr/hr-contracts.controller';
 import { HrStatutoryMembershipController } from '../hr/hr-statutory-membership.controller';
+import { PayrollBankAdviceService } from './payroll-bank-advice.service';
 import { PayrollController } from './payroll.controller';
+import { PayrollHoldService } from './payroll-hold.service';
 import { PayrollProcessor } from './payroll.processor';
 import { PayrollReadinessService } from './payroll-readiness.service';
 import { PayrollSalarySlipService } from './payroll-salary-slip.service';
@@ -32,6 +34,8 @@ import { StatutoryMembershipService } from './statutory-membership.service';
     PayrollService,
     PayrollReadinessService,
     PayrollSalarySlipService,
+    PayrollHoldService,
+    PayrollBankAdviceService,
     PayrollProcessor,
     StatutoryMembershipService,
   ],
@@ -39,6 +43,8 @@ import { StatutoryMembershipService } from './statutory-membership.service';
     PayrollService,
     PayrollReadinessService,
     PayrollSalarySlipService,
+    PayrollHoldService,
+    PayrollBankAdviceService,
     StatutoryMembershipService,
   ],
 })

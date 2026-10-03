@@ -56,15 +56,29 @@ function createController() {
     acknowledge: jest.fn(),
   };
 
+  const holdService = {
+    list: jest.fn(),
+    create: jest.fn(),
+    release: jest.fn(),
+  };
+  const bankAdviceService = {
+    status: jest.fn(),
+    export: jest.fn(),
+  };
+
   return {
     controller: new PayrollController(
       payrollService as never,
       payrollReadinessService as never,
       salarySlipService as never,
+      holdService as never,
+      bankAdviceService as never,
     ),
     payrollService,
     payrollReadinessService,
     salarySlipService,
+    holdService,
+    bankAdviceService,
   };
 }
 
@@ -406,6 +420,61 @@ describe('PayrollController M7 contracts', () => {
     expect(payrollService.exportPayrollTdsCsv).toHaveBeenCalledWith(
       actor,
       query,
+    );
+  });
+});
+
+describe('PayrollController Phase 7.9 contracts', () => {
+  const auth = { tenantId: 'tenant-1', userId: 'user-1' } as never;
+
+  it('delegates hold listing, placement and release with the run id and the actor', () => {
+    const { controller, holdService } = createController();
+    controller.listHolds('run-1', auth);
+    controller.createHold('run-1', { staffId: 's', reason: 'dispute' }, auth);
+    controller.releaseHold('run-1', 'hold-1', { reason: 'cleared' }, auth);
+    expect(holdService.list).toHaveBeenCalledWith('run-1', auth);
+    expect(holdService.create).toHaveBeenCalledWith(
+      'run-1',
+      { staffId: 's', reason: 'dispute' },
+      auth,
+    );
+    expect(holdService.release).toHaveBeenCalledWith(
+      'run-1',
+      'hold-1',
+      { reason: 'cleared' },
+      auth,
+    );
+  });
+
+  it('streams the bank advice as CSV and exposes sequence and content hash headers', async () => {
+    const { controller, bankAdviceService } = createController();
+    bankAdviceService.export.mockResolvedValue({
+      csv: 'a,b\r\n',
+      sequence: 2,
+      contentSha256: 'f'.repeat(64),
+      lineCount: 1,
+    });
+    const headers: Record<string, string> = {};
+    const response = {
+      setHeader: (name: string, value: string) => {
+        headers[name] = value;
+      },
+    };
+    const body = await controller.exportBankAdvice(
+      'run-1',
+      { reExportReason: 'bank rejected the file' },
+      auth,
+      response as never,
+    );
+    expect(body).toBe('a,b\r\n');
+    expect(headers).toEqual({
+      'X-Bank-Advice-Sequence': '2',
+      'X-Content-SHA256': 'f'.repeat(64),
+    });
+    expect(bankAdviceService.export).toHaveBeenCalledWith(
+      'run-1',
+      { reExportReason: 'bank rejected the file' },
+      auth,
     );
   });
 });

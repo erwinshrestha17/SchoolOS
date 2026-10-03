@@ -1,3 +1,4 @@
+import { formatPayrollPeriodLabel } from '@schoolos/core';
 import {
   ConflictException,
   Injectable,
@@ -96,7 +97,7 @@ export function buildApprovedSalarySlipLines(input: SalarySlipPdfInput) {
     `Status: ${input.status}`,
     `Employee: ${input.staffName}`,
     `Employee ID: ${input.employeeId}`,
-    `Payroll Period: ${input.periodMonth}/${input.periodYear}`,
+    `Payroll Period: ${formatPayrollPeriodLabel(input.periodYear, input.periodMonth)}`,
     `Gross Salary: Rs ${input.grossSalary.toFixed(2)}`,
     `Allowances: Rs ${input.allowances.toFixed(2)}`,
     `Deductions: Rs ${input.deductions.toFixed(2)}`,

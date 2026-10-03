@@ -529,6 +529,39 @@ export async function downloadCsv(path: string, fileName: string) {
   document.body.removeChild(a);
 }
 
+/**
+ * POST-driven file download (CSRF-protected). Used where producing the file is
+ * itself an audited action (e.g. the payroll bank advice export), so it cannot
+ * be a GET link. Returns the evidence headers so callers can show the export
+ * sequence.
+ */
+export async function downloadPostFile(
+  path: string,
+  body: JsonBody,
+  fileName: string,
+) {
+  assertOnlineForMutation('POST');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Request-Id': createRequestId(),
+  };
+  const csrfToken =
+    getCookie('__Host-schoolos_csrf') ?? getCookie('schoolos_csrf');
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
+  }
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers,
+    body: JSON.stringify(body),
+  });
+  const sequence = response.headers.get('x-bank-advice-sequence');
+  const contentSha256 = response.headers.get('x-content-sha256');
+  await downloadBlob(response, fileName);
+  return { sequence: sequence ? Number(sequence) : null, contentSha256 };
+}
+
 export async function downloadReport(
   reportKey: string,
   payload: ReportExportRequest,

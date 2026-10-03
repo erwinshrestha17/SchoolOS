@@ -230,8 +230,11 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
         const run = await prisma.payrollRun.create({
           data: {
             tenantId,
-            periodMonth: 5,
-            periodYear: 2026,
+            // Phase 7.9: Ashwin 2083 (BS), 2026-09-17 .. 2026-10-17.
+            periodMonth: 6,
+            periodYear: 2083,
+            periodStart: new Date('2026-09-17T00:00:00.000Z'),
+            periodEnd: new Date('2026-10-17T23:59:59.999Z'),
             status: 'GENERATED',
             generatedById: actors.preparer.userId,
             grossAmount: '45000',
@@ -709,7 +712,7 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
         actors.finalizer,
       );
       const replacement = await service.createPayrollRun(
-        { periodMonth: 5, periodYear: 2026 },
+        { periodMonth: 6, periodYear: 2083 },
         actors.preparer,
       );
       expect(replacement).toMatchObject({
@@ -728,7 +731,14 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
       await expect(
         scope(() =>
           prisma.payrollRun.create({
-            data: { tenantId, periodMonth: 5, periodYear: 2026, revision: 3 },
+            data: {
+              tenantId,
+              periodMonth: 6,
+              periodYear: 2083,
+              periodStart: new Date('2026-09-17T00:00:00.000Z'),
+              periodEnd: new Date('2026-10-17T23:59:59.999Z'),
+              revision: 3,
+            },
           }),
         ),
       ).rejects.toMatchObject({ code: 'P2002' });
@@ -816,9 +826,17 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
           },
         });
       };
-      const baseline = systemRolePermissions.payroll_preparer.filter(
-        (key) => key !== 'payroll:run:validate',
-      );
+      // The reviewed Phase 2 (v1) baseline the migration upgrades from — a
+      // frozen list, not the current template, which later phases extend.
+      const baseline = [
+        'hr:attendance:read',
+        'hr:leave:read',
+        'hr:staff:read',
+        'payroll:run:create',
+        'payroll:run:read',
+        'payroll:salary:read',
+        'settings:read_public',
+      ];
       const preparer = await createRole('payroll_preparer', true, baseline);
       const modified = await createRole('payroll_approver', true, [
         ...systemRolePermissions.payroll_approver.filter(
@@ -958,15 +976,24 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
       },
     });
   };
-  const presentDays = (forStaffId: string, month: number, days: number) =>
-    prisma.staffAttendance.createMany({
-      data: Array.from({ length: days }, (_, index) => ({
+  // Attendance for every Gregorian date in [from, to] inclusive.
+  const presentBetween = (forStaffId: string, from: string, to: string) => {
+    const dates: Date[] = [];
+    for (
+      let at = Date.parse(`${from}T00:00:00.000Z`);
+      at <= Date.parse(`${to}T00:00:00.000Z`);
+      at += 86_400_000
+    )
+      dates.push(new Date(at));
+    return prisma.staffAttendance.createMany({
+      data: dates.map((attendanceDate) => ({
         tenantId,
         staffId: forStaffId,
-        attendanceDate: new Date(Date.UTC(2026, month - 1, index + 1)),
+        attendanceDate,
         status: 'PRESENT' as const,
       })),
     });
+  };
 
   itTenant(
     'generates payroll only for staff with a verified employment and limits pay to the employment window',
@@ -990,10 +1017,11 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
           },
         });
       }
-      // Joins mid-June 2026: only 15 of the 30 calendar days are employed.
+      // Kartik 2083 is 2026-10-18 .. 2026-11-16 (30 days). Joining on
+      // 2026-11-02 employs the last 15 of them.
       const joinerEmployment = await verifiedEmployment(
         joiner.id,
-        '2026-06-16',
+        '2026-11-02',
       );
       // A PENDING employment is not authority.
       await prisma.staffEmployment.create({
@@ -1008,17 +1036,15 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
         },
       });
       // Attendance recorded for the whole month must not extend the window.
-      await presentDays(joiner.id, 6, 30);
-      await presentDays(staffId, 6, 30);
-      await presentDays(unverified.id, 6, 30);
-      await presentDays(pendingOnly.id, 6, 30);
+      for (const id of [joiner.id, staffId, unverified.id, pendingOnly.id])
+        await presentBetween(id, '2026-10-18', '2026-11-16');
 
       await service.createPayrollRun(
-        { periodMonth: 6, periodYear: 2026 },
+        { periodMonth: 7, periodYear: 2083 },
         actors.preparer,
       );
       const run = await prisma.payrollRun.findFirstOrThrow({
-        where: { tenantId, periodMonth: 6, periodYear: 2026 },
+        where: { tenantId, periodMonth: 7, periodYear: 2083 },
         include: { lines: true },
       });
       const byStaff = new Map(run.lines.map((line) => [line.staffId, line]));
@@ -1029,7 +1055,7 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
       const joinerLine = required(byStaff.get(joiner.id));
       expect(joinerLine.employmentId).toBe(joinerEmployment.id);
       expect(joinerLine.employmentFrom?.toISOString()).toBe(
-        '2026-06-16T00:00:00.000Z',
+        '2026-11-02T00:00:00.000Z',
       );
       expect(joinerLine.employmentTo).toBeNull();
       expect(joinerLine.grossSalary.toFixed(2)).toBe('15000.00');
@@ -1053,26 +1079,28 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
           paymentMethod: 'BANK',
         },
       });
-      // Employed 1–10 July 2026 inclusive (end is exclusive: 11 July).
-      await verifiedEmployment(leaver.id, '2024-01-01', '2026-07-11');
-      await presentDays(leaver.id, 7, 30);
-      await presentDays(staffId, 7, 30);
+      // Kartik 2083 = 2026-10-18 .. 2026-11-16. Employed through 27 October
+      // (the end date is exclusive: 28 October) = the first 10 days.
+      await verifiedEmployment(leaver.id, '2024-01-01', '2026-10-28');
+      await presentBetween(leaver.id, '2026-10-18', '2026-11-16');
+      await presentBetween(staffId, '2026-10-18', '2026-11-16');
 
       await service.createPayrollRun(
-        { periodMonth: 7, periodYear: 2026, workingDays: 31 },
+        { periodMonth: 7, periodYear: 2083, workingDays: 31 },
         actors.preparer,
       );
       const run = await prisma.payrollRun.findFirstOrThrow({
-        where: { tenantId, periodMonth: 7, periodYear: 2026 },
+        where: { tenantId, periodMonth: 7, periodYear: 2083 },
         include: { lines: true },
       });
       const leaverLine = required(
         run.lines.find((line) => line.staffId === leaver.id),
       );
-      // 10 of 31 days employed => round(31 * 10 / 31) = 10 payable days.
+      // 10 employed days against an operator-supplied divisor of 31: the 10
+      // present days are paid at 1/31 of the monthly salary each.
       expect(leaverLine.attendanceDays).toBe(10);
       expect(leaverLine.employmentTo?.toISOString()).toBe(
-        '2026-07-11T00:00:00.000Z',
+        '2026-10-28T00:00:00.000Z',
       );
       expect(leaverLine.grossSalary.toFixed(2)).toBe(
         ((30000 * 10) / 31).toFixed(2),
@@ -1096,7 +1124,7 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
       });
       const readiness = new PayrollReadinessService(prisma, audit);
       const summary = await readiness.getReadiness(
-        { year: 2026, month: 8, page: 1, limit: 25 } as never,
+        { year: 2083, month: 9, page: 1, limit: 25 } as never,
         actors.preparer,
       );
       expect(summary.readinessStatus).toBe('BLOCKED');
@@ -1130,7 +1158,7 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
       // exception resolves on the next evaluation.
       await verifiedEmployment(legacy.id, '2024-01-01');
       const after = await readiness.getReadiness(
-        { year: 2026, month: 8, page: 1, limit: 25 } as never,
+        { year: 2083, month: 9, page: 1, limit: 25 } as never,
         actors.preparer,
       );
       expect(

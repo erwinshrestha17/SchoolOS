@@ -1356,6 +1356,24 @@ export const permissionCatalog = [
     action: "create",
     description: "Create payroll exports",
   },
+  {
+    resource: "payroll:hold",
+    action: "create",
+    description:
+      "Place a reason-bound payment hold on one staff member's payroll line",
+  },
+  {
+    resource: "payroll:hold",
+    action: "release",
+    description:
+      "Release a payroll payment hold (must differ from the person who placed it)",
+  },
+  {
+    resource: "payroll:bank-advice",
+    action: "export",
+    description:
+      "Export the bank payment advice for a finalized payroll run (exposes staff bank details)",
+  },
 
   // ─── Compiled from catalog/platform.ts ───
   {
@@ -2668,6 +2686,7 @@ const reviewedSystemRolePermissions: Record<SystemRoleName, PermissionKey[]> = {
   ],
   payroll_preparer: [
     "payroll:run:validate",
+    "payroll:hold:create",
     "settings:read_public",
     "hr:staff:read",
     "hr:attendance:read",
@@ -2687,6 +2706,8 @@ const reviewedSystemRolePermissions: Record<SystemRoleName, PermissionKey[]> = {
   ],
   payroll_approver: [
     "payroll:run:finalize",
+    "payroll:hold:release",
+    "payroll:bank-advice:export",
     "settings:read_public",
     "payroll:salary:read",
     "payroll:run:read",
@@ -2768,9 +2789,9 @@ const SYSTEM_ROLE_TEMPLATE_IDENTITIES: Record<
   subject_teacher: { displayName: "Subject Teacher", version: 1 },
   support_staff: { displayName: "Support Staff", version: 1 },
   hr_manager: { displayName: "HR Manager", version: 2 },
-  payroll_preparer: { displayName: "Payroll Preparer", version: 2 },
+  payroll_preparer: { displayName: "Payroll Preparer", version: 3 },
   payroll_reviewer: { displayName: "Payroll Reviewer", version: 1 },
-  payroll_approver: { displayName: "Payroll Approver", version: 2 },
+  payroll_approver: { displayName: "Payroll Approver", version: 3 },
   finance_clerk: { displayName: "Finance Clerk", version: 2 },
   cashier: { displayName: "Cashier", version: 2 },
   accountant: { displayName: "Accountant", version: 3 },

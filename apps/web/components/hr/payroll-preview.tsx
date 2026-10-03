@@ -4,38 +4,29 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Calculator, AlertTriangle, Loader2 } from 'lucide-react';
-import { getNepalNow, type PayrollPreviewResult } from '@schoolos/core';
+import type { PayrollPreviewResult } from '@schoolos/core';
+import {
+  BS_MONTH_OPTIONS,
+  currentPayrollBsPeriod,
+  payrollBsYearOptions,
+} from '../../lib/payroll-run-view';
 
 export function PayrollPreview() {
-  const [currentPeriod] = useState(() => getNepalNow());
-  const currentMonth = currentPeriod.month;
-  const currentYear = currentPeriod.year;
-
-  const [month, setMonth] = useState(currentMonth);
-  const [year, setYear] = useState(currentYear);
-  const [workingDays, setWorkingDays] = useState(30);
+  const [currentPeriod] = useState(() => currentPayrollBsPeriod());
+  const [month, setMonth] = useState(currentPeriod.bsMonth);
+  const [year, setYear] = useState(currentPeriod.bsYear);
+  // Optional divisor override. Empty = calendar days of the BS month.
+  const [workingDays, setWorkingDays] = useState<string>('');
+  const divisorOverride = workingDays.trim() ? Number(workingDays) : undefined;
 
   const previewQuery = useQuery({
-    queryKey: ['payroll-preview', year, month, workingDays],
-    queryFn: () => api.getPayrollPreview({ year, month, workingDays }),
+    queryKey: ['payroll-preview', year, month, divisorOverride ?? null],
+    queryFn: () =>
+      api.getPayrollPreview({ year, month, workingDays: divisorOverride }),
   });
 
-  const months = [
-    { value: 1, label: 'January' },
-    { value: 2, label: 'February' },
-    { value: 3, label: 'March' },
-    { value: 4, label: 'April' },
-    { value: 5, label: 'May' },
-    { value: 6, label: 'June' },
-    { value: 7, label: 'July' },
-    { value: 8, label: 'August' },
-    { value: 9, label: 'September' },
-    { value: 10, label: 'October' },
-    { value: 11, label: 'November' },
-    { value: 12, label: 'December' },
-  ];
-
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+  const months = BS_MONTH_OPTIONS;
+  const years = payrollBsYearOptions(currentPeriod.bsYear);
 
   return (
     <div className="space-y-6">
@@ -82,15 +73,16 @@ export function PayrollPreview() {
 
           <div className="grid gap-1.5">
             <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider ml-1">
-              Working Days
+              Divisor days (optional)
             </label>
             <div className="px-3 py-2 rounded-xl border border-gray-200 bg-white">
               <input
                 type="number"
                 min={1}
-                max={31}
+                max={32}
+                placeholder="auto"
                 value={workingDays}
-                onChange={(e) => setWorkingDays(Number(e.target.value))}
+                onChange={(e) => setWorkingDays(e.target.value)}
                 className="text-sm font-semibold text-gray-700 focus:outline-none bg-transparent w-16"
               />
             </div>
@@ -270,9 +262,20 @@ export function PayrollPreview() {
                       -{row.deductions.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <span className="text-lg font-bold text-[var(--color-mod-hr-text)]">
+                      <span
+                        className={`text-lg font-bold ${
+                          row.netPay < 0
+                            ? 'text-danger-700'
+                            : 'text-[var(--color-mod-hr-text)]'
+                        }`}
+                      >
                         {row.netPay.toLocaleString()}
                       </span>
+                      {row.netPay < 0 && (
+                        <p className="text-[9px] font-bold uppercase text-danger-700">
+                          Negative net — blocks the run
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ))

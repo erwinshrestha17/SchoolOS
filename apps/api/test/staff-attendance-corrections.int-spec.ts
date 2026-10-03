@@ -162,8 +162,11 @@ import { AuditService } from '../src/audit/audit.service';
         prisma.payrollRun.create({
           data: {
             tenantId: w.tenantId,
+            // Legacy Gregorian label: bounds are authoritative.
             periodMonth: 11,
             periodYear: 2026,
+            periodStart: new Date('2026-11-01T00:00:00.000Z'),
+            periodEnd: new Date('2026-11-30T23:59:59.999Z'),
             status: 'FINALIZED',
             finalizedAt: new Date(),
           },
@@ -538,6 +541,8 @@ import { AuditService } from '../src/audit/audit.service';
               tenantId: w.tenantId,
               periodMonth: 11,
               periodYear: 2026,
+              periodStart: new Date('2026-11-01T00:00:00.000Z'),
+              periodEnd: new Date('2026-11-30T23:59:59.999Z'),
               status: 'FINALIZED',
             },
           });

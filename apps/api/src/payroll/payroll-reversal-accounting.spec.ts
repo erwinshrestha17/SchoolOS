@@ -171,6 +171,44 @@ describe('PayrollService reversal accounting reconciliation', () => {
     ).not.toHaveBeenCalled();
   });
 
+  it('refuses to mark a run paid while a payment hold is active (Phase 7.9)', async () => {
+    const postedRun = buildPayrollRun({ status: PayrollRunStatus.POSTED });
+    const { service, tx, accountingPostingService } = buildService({
+      payrollRun: postedRun,
+      activeHolds: 1,
+    });
+
+    await expect(
+      service.markPayrollRunPaid(
+        postedRun.id,
+        { paymentAccountCode: '1010' },
+        actor as never,
+      ),
+    ).rejects.toMatchObject({ response: { code: 'PAYROLL_HOLD_ACTIVE' } });
+
+    expect(tx.payrollHold.count).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1', payrollRunId: 'run-1', status: 'ACTIVE' },
+    });
+    expect(
+      accountingPostingService.postPayrollDisbursement,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('translates a database negative-net refusal into a stable conflict code', async () => {
+    const postedRun = buildPayrollRun({ status: PayrollRunStatus.POSTED });
+    const { service, tx } = buildService({ payrollRun: postedRun });
+    tx.payrollRun.updateMany.mockRejectedValueOnce(
+      new Error('PAYROLL_NEGATIVE_NET'),
+    );
+    await expect(
+      service.markPayrollRunPaid(
+        postedRun.id,
+        { paymentAccountCode: '1010' },
+        actor as never,
+      ),
+    ).rejects.toMatchObject({ response: { code: 'PAYROLL_NEGATIVE_NET' } });
+  });
+
   it('prevents regenerating locked posted payroll lines', async () => {
     const postedRun = buildPayrollRun({ status: PayrollRunStatus.POSTED });
     const { service, tx } = buildService({ payrollRun: postedRun });
@@ -186,8 +224,12 @@ describe('PayrollService reversal accounting reconciliation', () => {
 function buildService(options: {
   payrollRun?: unknown;
   journalEntries?: Record<string, unknown>;
+  activeHolds?: number;
 }) {
   const tx = {
+    payrollHold: {
+      count: jest.fn().mockResolvedValue(options.activeHolds ?? 0),
+    },
     payslip: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     journalEntry: {
       findUnique: jest.fn(

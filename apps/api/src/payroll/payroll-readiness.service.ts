@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -11,13 +12,14 @@ import {
   PayrollExceptionStatus,
   PayrollRunStatus,
   SalaryStructureStatus,
+  Prisma,
   StaffStatus,
-  type Prisma,
 } from '@prisma/client';
-import type {
-  PayrollExceptionPage,
-  PayrollExceptionSummary,
-  PayrollReadinessSummary,
+import {
+  toBsDateFromGregorian,
+  type PayrollExceptionPage,
+  type PayrollExceptionSummary,
+  type PayrollReadinessSummary,
 } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import {
@@ -26,6 +28,9 @@ import {
 } from '../hr/employment-timeline';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { validateBankDetails } from './payroll-bank-details';
+import { calculatePeriodPayroll } from './payroll-period-calculation';
+import { payrollPeriodFor, payrollPeriodOfRun } from './payroll-period';
 import {
   findStatutoryScheme,
   parseStatutoryPolicyPayload,
@@ -71,10 +76,13 @@ interface ReadinessLine {
   grossSalary: Prisma.Decimal;
   netSalary: Prisma.Decimal;
   tds: Prisma.Decimal;
+  adjustmentEarnings: Prisma.Decimal;
+  adjustmentDeductions: Prisma.Decimal;
   staff: {
     status: StaffStatus;
     panNumber: string | null;
     bankAccount: string | null;
+    bankName: string | null;
   };
   salaryStructure: {
     paymentMethod: PaymentMethod;
@@ -491,31 +499,264 @@ export class PayrollReadinessService {
     return out;
   }
 
-  private async sync(query: PayrollExceptionQueryDto, actor: AuthContext) {
-    const now = new Date();
-    const year = query.year ?? now.getUTCFullYear();
-    const month = query.month ?? now.getUTCMonth() + 1;
-    const period = getPayrollPeriod(year, month);
-    const selectedRun = await this.prisma.payrollRun.findFirst({
-      where: query.payrollRunId
-        ? { id: query.payrollRunId, tenantId: actor.tenantId }
-        : { tenantId: actor.tenantId, periodYear: year, periodMonth: month },
-      select: {
-        id: true,
-        periodStart: true,
-        periodEnd: true,
-        status: true,
-        statutoryPolicyVersionId: true,
-      },
-      orderBy: query.payrollRunId ? undefined : { createdAt: 'desc' },
-    });
-    if (query.payrollRunId && !selectedRun) {
-      throw new NotFoundException('Payroll run not found in this tenant');
+  /**
+   * Phase 7.9 readiness: period integrity, proration inputs, 7.7 adjustment
+   * consumption and payment holds. Everything here is re-derived from the
+   * stored run and the live inputs; nothing is cached on the exception row.
+   */
+  private async periodIntegrityCandidates(input: {
+    year: number;
+    month: number;
+    runId: string | null;
+    tenantId: string;
+    period: ReturnType<typeof payrollPeriodOfRun>;
+    selectedRun: {
+      status: PayrollRunStatus;
+      divisorDays: number | null;
+      divisorBasis: 'CALENDAR_DAYS_OF_PERIOD' | 'OPERATOR_SUPPLIED' | null;
+    } | null;
+    lines: ReadinessLine[];
+  }): Promise<Candidate[]> {
+    const { year, month, runId, tenantId, period, selectedRun } = input;
+    const out: Candidate[] = [];
+
+    // A BS-labelled run must still cover exactly its BS month.
+    if (selectedRun && period.bs) {
+      let expected: ReturnType<typeof payrollPeriodFor> | null = null;
+      try {
+        expected = payrollPeriodFor(year, month);
+      } catch {
+        expected = null;
+      }
+      if (
+        !expected ||
+        expected.startsOnIso !== period.startsOnIso ||
+        expected.endsOnIso !== period.endsOnIso
+      ) {
+        out.push(
+          candidate(year, month, runId, null, {
+            code: PayrollExceptionCode.INVALID_PAYROLL_PERIOD,
+            severity: PayrollExceptionSeverity.BLOCKING,
+            title: 'Payroll period does not match its Nepali month',
+            safeMessage:
+              'The stored period bounds of this run do not equal the Bikram Sambat month it is labelled with. Cancel the run and create it again.',
+            resolutionRoute: '/dashboard/payroll/runs',
+            blockedActions: [
+              'CREATE_DRAFT',
+              'SUBMIT_REVIEW',
+              'APPROVE',
+              'POST',
+              'MARK_PAID',
+            ],
+          }),
+        );
+      }
     }
 
+    // Proration inputs and unconsumed 7.7 corrections only matter while the
+    // run can still be regenerated; an approved run is immutable.
+    const editable =
+      !selectedRun ||
+      (
+        [
+          PayrollRunStatus.DRAFT,
+          PayrollRunStatus.GENERATED,
+          PayrollRunStatus.VALIDATED,
+          PayrollRunStatus.UNDER_REVIEW,
+          PayrollRunStatus.REVIEWED,
+        ] as PayrollRunStatus[]
+      ).includes(selectedRun.status);
+    if (editable) {
+      try {
+        const calculation = await calculatePeriodPayroll(this.prisma, {
+          tenantId,
+          period,
+          divisorDays: selectedRun?.divisorDays ?? period.calendarDays,
+          divisorBasis: selectedRun?.divisorBasis ?? 'CALENDAR_DAYS_OF_PERIOD',
+          ownRunId: runId ?? undefined,
+        });
+        for (const issue of calculation.prorationErrors) {
+          out.push(
+            candidate(year, month, runId, issue.staffId, {
+              code: PayrollExceptionCode.PRORATION_INPUT_UNRESOLVED,
+              severity: PayrollExceptionSeverity.BLOCKING,
+              title: 'Payroll proration inputs unresolved',
+              safeMessage: issue.message,
+              resolutionRoute: `/dashboard/hr/staff/${issue.staffId}`,
+              blockedActions: [
+                'CREATE_DRAFT',
+                'SUBMIT_REVIEW',
+                'APPROVE',
+                'POST',
+              ],
+            }),
+          );
+        }
+        for (const issue of calculation.unresolvedCorrections) {
+          out.push(
+            candidate(year, month, runId, issue.staffId, {
+              code: PayrollExceptionCode.PAYROLL_ADJUSTMENT_UNRESOLVED,
+              severity: PayrollExceptionSeverity.WARNING,
+              title: 'Attendance correction cannot be priced',
+              safeMessage: `An approved attendance correction awaiting payroll adjustment could not be priced (${issue.code}). It stays pending and is not paid until it can be priced.`,
+              resolutionRoute: '/dashboard/hr/attendance',
+              blockedActions: ['SUBMIT_REVIEW'],
+            }),
+          );
+        }
+      } catch (error) {
+        // Period/configuration problems are reported by their own checks; a
+        // readiness sync must never fail because a calculation could not run.
+        if (
+          error instanceof BadRequestException ||
+          error instanceof ConflictException
+        )
+          out.push(
+            candidate(year, month, runId, null, {
+              code: PayrollExceptionCode.PRORATION_INPUT_UNRESOLVED,
+              severity: PayrollExceptionSeverity.BLOCKING,
+              title: 'Payroll proration could not be evaluated',
+              safeMessage:
+                'The payroll calculation inputs for this period could not be evaluated. Check the period, salary structures and employment records.',
+              resolutionRoute: '/dashboard/payroll/runs',
+              blockedActions: [
+                'CREATE_DRAFT',
+                'SUBMIT_REVIEW',
+                'APPROVE',
+                'POST',
+              ],
+            }),
+          );
+        else throw error;
+      }
+    }
+
+    if (!runId) return out;
+
+    // Consumed adjustments must equal the amounts carried on the lines.
+    const applied = await this.prisma.payrollAdjustment.findMany({
+      where: { tenantId, payrollRunId: runId, status: 'APPLIED' },
+      select: { staffId: true, kind: true, amount: true },
+      take: 20000,
+    });
+    const appliedByStaff = new Map<
+      string,
+      { arrears: Prisma.Decimal; recoveries: Prisma.Decimal }
+    >();
+    for (const row of applied) {
+      const entry = appliedByStaff.get(row.staffId) ?? {
+        arrears: new Prisma.Decimal(0),
+        recoveries: new Prisma.Decimal(0),
+      };
+      if (row.kind === 'ARREARS')
+        entry.arrears = entry.arrears.plus(row.amount);
+      else entry.recoveries = entry.recoveries.plus(row.amount);
+      appliedByStaff.set(row.staffId, entry);
+    }
+    const lineByStaff = new Map(
+      input.lines.map((line) => [line.staffId, line]),
+    );
+    const staffToCheck = new Set([
+      ...appliedByStaff.keys(),
+      ...input.lines
+        .filter(
+          (line) =>
+            !line.adjustmentEarnings.isZero() ||
+            !line.adjustmentDeductions.isZero(),
+        )
+        .map((line) => line.staffId),
+    ]);
+    for (const staffId of [...staffToCheck].sort()) {
+      const line = lineByStaff.get(staffId);
+      const expected = appliedByStaff.get(staffId);
+      const arrears = expected?.arrears ?? new Prisma.Decimal(0);
+      const recoveries = expected?.recoveries ?? new Prisma.Decimal(0);
+      if (
+        line &&
+        line.adjustmentEarnings.equals(arrears) &&
+        line.adjustmentDeductions.equals(recoveries)
+      )
+        continue;
+      out.push(
+        candidate(year, month, runId, staffId, {
+          code: PayrollExceptionCode.PAYROLL_ADJUSTMENT_UNRESOLVED,
+          severity: PayrollExceptionSeverity.BLOCKING,
+          title: 'Consumed adjustments do not match the payroll line',
+          safeMessage:
+            'The attendance-correction adjustments recorded as applied to this run do not equal the arrears and recoveries on the payroll line. Regenerate the run.',
+          resolutionRoute: '/dashboard/payroll/runs',
+          blockedActions: ['SUBMIT_REVIEW', 'APPROVE', 'POST', 'MARK_PAID'],
+        }),
+      );
+    }
+
+    // Active holds withhold payment only. The reason is never put in the
+    // exception text: it can be sensitive and exceptions are widely readable.
+    const holds = await this.prisma.payrollHold.findMany({
+      where: { tenantId, payrollRunId: runId, status: 'ACTIVE' },
+      select: { staffId: true },
+      take: 5000,
+    });
+    for (const hold of holds) {
+      out.push(
+        candidate(year, month, runId, hold.staffId, {
+          code: PayrollExceptionCode.PAYROLL_HOLD_ACTIVE,
+          severity: PayrollExceptionSeverity.BLOCKING,
+          title: 'Payment held',
+          safeMessage:
+            'Payment for this staff member is on hold. Release the hold before the run is marked paid; held lines are left out of the bank advice.',
+          resolutionRoute: '/dashboard/payroll/runs',
+          blockedActions: ['MARK_PAID'],
+        }),
+      );
+    }
+    return out;
+  }
+
+  private async sync(query: PayrollExceptionQueryDto, actor: AuthContext) {
+    const runSelect = {
+      id: true,
+      periodYear: true,
+      periodMonth: true,
+      periodStart: true,
+      periodEnd: true,
+      status: true,
+      statutoryPolicyVersionId: true,
+      divisorDays: true,
+      divisorBasis: true,
+    } as const;
+    const byId = query.payrollRunId
+      ? await this.prisma.payrollRun.findFirst({
+          where: { id: query.payrollRunId, tenantId: actor.tenantId },
+          select: runSelect,
+        })
+      : null;
+    if (query.payrollRunId && !byId) {
+      throw new NotFoundException('Payroll run not found in this tenant');
+    }
+    // Phase 7.9: the default period is the current BS month; a named run is
+    // always read at its own label and stored bounds.
+    const today = toBsDateFromGregorian(new Date());
+    const year = byId?.periodYear ?? query.year ?? today.year;
+    const month = byId?.periodMonth ?? query.month ?? today.month;
+    const selectedRun =
+      byId ??
+      (await this.prisma.payrollRun.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          periodYear: year,
+          periodMonth: month,
+        },
+        select: runSelect,
+        orderBy: { createdAt: 'desc' },
+      }));
+    const period = selectedRun
+      ? payrollPeriodOfRun(selectedRun)
+      : payrollPeriodFor(year, month);
+
     const runId = selectedRun?.id ?? null;
-    const start = selectedRun?.periodStart ?? period.startsOn;
-    const end = selectedRun?.periodEnd ?? period.endsOn;
+    const start = period.startsOn;
+    const end = period.endsOn;
     const [
       staff,
       contracts,
@@ -536,6 +777,7 @@ export class PayrollReadinessService {
           employeeId: true,
           panNumber: true,
           bankAccount: true,
+          bankName: true,
         },
         orderBy: { id: 'asc' },
         take: 5000,
@@ -579,11 +821,14 @@ export class PayrollReadinessService {
               grossSalary: true,
               netSalary: true,
               tds: true,
+              adjustmentEarnings: true,
+              adjustmentDeductions: true,
               staff: {
                 select: {
                   status: true,
                   panNumber: true,
                   bankAccount: true,
+                  bankName: true,
                 },
               },
               salaryStructure: {
@@ -801,9 +1046,17 @@ export class PayrollReadinessService {
             code: PayrollExceptionCode.NEGATIVE_NET_PAY,
             severity: PayrollExceptionSeverity.BLOCKING,
             title: 'Negative net pay',
-            safeMessage: 'This payroll line has a negative net-pay amount.',
+            safeMessage:
+              'Deductions exceed gross pay for this payroll line. The net is never clamped to zero or reduced by dropping a deduction: correct the salary structure, deductions or attendance and regenerate the run.',
             resolutionRoute: `/dashboard/payroll/runs`,
-            blockedActions: ['SUBMIT_REVIEW', 'APPROVE', 'POST'],
+            // CREATE_DRAFT here is the readiness action behind VALIDATE.
+            blockedActions: [
+              'CREATE_DRAFT',
+              'SUBMIT_REVIEW',
+              'APPROVE',
+              'POST',
+              'MARK_PAID',
+            ],
           }),
         );
       }
@@ -842,6 +1095,23 @@ export class PayrollReadinessService {
       }
       if (
         line.salaryStructure?.paymentMethod === PaymentMethod.BANK &&
+        line.staff.bankAccount?.trim() &&
+        validateBankDetails(line.staff).length
+      ) {
+        candidates.push(
+          candidate(year, month, runId, line.staffId, {
+            code: PayrollExceptionCode.INVALID_BANK_DETAILS,
+            severity: PayrollExceptionSeverity.BLOCKING,
+            title: 'Bank payment details invalid',
+            safeMessage:
+              'The staff member’s bank account or bank name is not valid for a payment instruction. Correct the staff record.',
+            resolutionRoute: `/dashboard/hr/staff/${line.staffId}`,
+            blockedActions: ['MARK_PAID'],
+          }),
+        );
+      }
+      if (
+        line.salaryStructure?.paymentMethod === PaymentMethod.BANK &&
         !line.staff.bankAccount?.trim()
       ) {
         candidates.push(
@@ -869,6 +1139,18 @@ export class PayrollReadinessService {
         structureByStaff,
         contractStaff,
         tenantId: actor.tenantId,
+      })),
+    );
+
+    candidates.push(
+      ...(await this.periodIntegrityCandidates({
+        year,
+        month,
+        runId,
+        tenantId: actor.tenantId,
+        period,
+        selectedRun,
+        lines,
       })),
     );
 
@@ -1199,11 +1481,4 @@ function nextActionForStatus(status: PayrollRunStatus): string | null {
     default:
       return null;
   }
-}
-
-function getPayrollPeriod(periodYear: number, periodMonth: number) {
-  return {
-    startsOn: new Date(Date.UTC(periodYear, periodMonth - 1, 1)),
-    endsOn: new Date(Date.UTC(periodYear, periodMonth, 0, 23, 59, 59, 999)),
-  };
 }

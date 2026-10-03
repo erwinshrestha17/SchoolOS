@@ -495,9 +495,11 @@
   },
   "payroll_approver": {
     "displayName": "Payroll Approver",
-    "version": 2,
+    "version": 3,
     "securityDomain": "SCHOOL",
     "permissions": [
+      "payroll:bank-advice:export",
+      "payroll:hold:release",
       "payroll:run:approve",
       "payroll:run:finalize",
       "payroll:run:read",
@@ -507,12 +509,13 @@
   },
   "payroll_preparer": {
     "displayName": "Payroll Preparer",
-    "version": 2,
+    "version": 3,
     "securityDomain": "SCHOOL",
     "permissions": [
       "hr:attendance:read",
       "hr:leave:read",
       "hr:staff:read",
+      "payroll:hold:create",
       "payroll:run:create",
       "payroll:run:read",
       "payroll:run:validate",

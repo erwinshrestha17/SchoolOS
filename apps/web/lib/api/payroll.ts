@@ -3,7 +3,9 @@ import type {
   RemoteLookupPage,
   PayrollDashboardSummary,
   PayrollExceptionPage,
+  PayrollBankAdviceStatus,
   PayrollExceptionSummary,
+  PayrollHoldSummary,
   PayrollPreviewResult,
   PayrollReadinessSummary,
   PayrollRunSummary,
@@ -25,6 +27,7 @@ import {
   JsonBody,
   StaffLifecycleHistoryEvent,
   downloadCsv,
+  downloadPostFile,
   openPdfBlob,
   request,
   withQuery,
@@ -237,6 +240,33 @@ export const payrollApi = {
   },
   getPayrollRun: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${encodeURIComponent(id)}`),
+  listPayrollHolds: (runId: string) =>
+    request<PayrollHoldSummary[]>(
+      `/payroll/runs/${encodeURIComponent(runId)}/holds`,
+    ),
+  createPayrollHold: (
+    runId: string,
+    body: { staffId: string; reason: string },
+  ) =>
+    request<PayrollHoldSummary>(
+      `/payroll/runs/${encodeURIComponent(runId)}/holds`,
+      { method: 'POST', json: body },
+    ),
+  releasePayrollHold: (runId: string, holdId: string, reason: string) =>
+    request<PayrollHoldSummary>(
+      `/payroll/runs/${encodeURIComponent(runId)}/holds/${encodeURIComponent(holdId)}/release`,
+      { method: 'POST', json: { reason } },
+    ),
+  getPayrollBankAdviceStatus: (runId: string) =>
+    request<PayrollBankAdviceStatus>(
+      `/payroll/runs/${encodeURIComponent(runId)}/bank-advice`,
+    ),
+  exportPayrollBankAdvice: (runId: string, reExportReason?: string) =>
+    downloadPostFile(
+      `/payroll/runs/${encodeURIComponent(runId)}/bank-advice/export`,
+      reExportReason ? { reExportReason } : {},
+      `payroll-bank-advice-${runId}-${getNepalSchoolDay().gregorianDate}.csv`,
+    ),
   previewPayrollRun: (body: JsonBody) =>
     request<PayrollPreviewResult[]>('/payroll/runs/preview', {
       method: 'POST',

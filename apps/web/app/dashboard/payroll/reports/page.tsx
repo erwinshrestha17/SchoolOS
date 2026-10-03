@@ -13,7 +13,8 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useSession } from '../../../../components/session-provider';
-import { getNepalNow } from '@schoolos/core';
+import { BS_MONTH_NAMES_EN, formatPayrollPeriodLabel } from '@schoolos/core';
+import { currentPayrollBsPeriod } from '@/lib/payroll-run-view';
 import { PermissionDenied } from '../../../../components/ui/permission-denied';
 import { api } from '../../../../lib/api';
 import { cn } from '../../../../lib/utils';
@@ -66,20 +67,7 @@ type PayrollLeaveSummary = {
   unpaidDays: number;
 };
 
-const monthLabels = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+const monthLabels = BS_MONTH_NAMES_EN;
 
 const statusOptions = [
   'DRAFT',
@@ -101,7 +89,7 @@ const moneyFormatter = new Intl.NumberFormat('en-NP', {
 
 export default function PayrollReportsPage() {
   const { status, hasPermissions } = useSession();
-  const currentYear = getNepalNow().year;
+  const currentYear = currentPayrollBsPeriod().bsYear;
   const [filters, setFilters] = useState<PayrollReportFilters>({
     year: currentYear,
   });
@@ -276,7 +264,7 @@ export default function PayrollReportsPage() {
               <option value="">All runs</option>
               {(runsQuery.data ?? []).map((run) => (
                 <option key={run.id} value={run.id}>
-                  {monthLabels[run.periodMonth - 1]} {run.periodYear} -{' '}
+                  {formatPayrollPeriodLabel(run.periodYear, run.periodMonth)} -{' '}
                   {run.status}
                 </option>
               ))}
@@ -513,7 +501,10 @@ export default function PayrollReportsPage() {
                   >
                     <div>
                       <p className="text-sm font-bold">
-                        {monthLabels[run.periodMonth - 1]} {run.periodYear}
+                        {formatPayrollPeriodLabel(
+                          run.periodYear,
+                          run.periodMonth,
+                        )}
                       </p>
                       <p className="text-[10px] text-slate-500">
                         Journal: {run.journalEntryId ?? 'Not linked'}
@@ -594,7 +585,10 @@ export default function PayrollReportsPage() {
                     className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-sm text-amber-900"
                   >
                     <p className="font-bold">
-                      {monthLabels[row.periodMonth - 1]} {row.periodYear}
+                      {formatPayrollPeriodLabel(
+                        row.periodYear,
+                        row.periodMonth,
+                      )}
                     </p>
                     <p className="mt-1 text-xs">{row.issues.join(' ')}</p>
                   </div>
