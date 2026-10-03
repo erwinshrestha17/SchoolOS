@@ -175,6 +175,26 @@ describe('AccountingService - Slices 2-5', () => {
       },
       $transaction: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'fy-1', count: 0 }]),
+      // Phase 7.11d: the operational close inventory; all empty here.
+      ...{
+        accountingPostingBatch: { count: jest.fn().mockResolvedValue(0) },
+        financeApprovalRequest: { count: jest.fn().mockResolvedValue(0) },
+        cashierClose: { count: jest.fn().mockResolvedValue(0) },
+        cashDeposit: { count: jest.fn().mockResolvedValue(0) },
+        onlinePaymentIntent: { count: jest.fn().mockResolvedValue(0) },
+        invoice: { count: jest.fn().mockResolvedValue(0) },
+        feeWaiver: { count: jest.fn().mockResolvedValue(0) },
+        financeExpense: {
+          aggregate: jest
+            .fn()
+            .mockResolvedValue({ _count: { _all: 0 }, _sum: {} }),
+        },
+        financePayable: {
+          aggregate: jest
+            .fn()
+            .mockResolvedValue({ _count: { _all: 0 }, _sum: {} }),
+        },
+      },
     };
     prisma.$transaction.mockImplementation(async (input: unknown) =>
       typeof input === 'function'
@@ -497,6 +517,34 @@ describe('AccountingService - Slices 2-5', () => {
 
   describe('closeFiscalYear', () => {
     const closeDto = { reason: 'End of fiscal year close-out' };
+    // Phase 7.11d: closes present the reviewed preview's fingerprint.
+    const closeFromPreview = async () => {
+      const preview = await service.getFiscalYearClosePreview('fy-1', actor);
+      return service.closeFiscalYear(
+        'fy-1',
+        {
+          ...closeDto,
+          expectedPreviewFingerprint: preview.previewFingerprint,
+          acknowledgedWarningCodes: preview.requiredAcknowledgements,
+        },
+        actor,
+      );
+    };
+
+    it('refuses a close that does not present the preview fingerprint', async () => {
+      prisma.fiscalYear.findFirst.mockResolvedValue({
+        id: 'fy-1',
+        tenantId: 'tenant-1',
+        name: 'FY 2026',
+        status: 'OPEN',
+        startDate: new Date('2026-04-01'),
+        endDate: new Date('2027-03-31'),
+        periods: [{ id: 'p-1', status: 'CLOSED' }],
+      });
+      await expect(
+        service.closeFiscalYear('fy-1', closeDto, actor),
+      ).rejects.toThrow('close preview');
+    });
 
     it('should reject closing when periods are still open', async () => {
       prisma.fiscalYear.findFirst.mockResolvedValue({
@@ -512,9 +560,7 @@ describe('AccountingService - Slices 2-5', () => {
         ],
       });
 
-      await expect(
-        service.closeFiscalYear('fy-1', closeDto, actor),
-      ).rejects.toThrow('OPEN_PERIODS');
+      await expect(closeFromPreview()).rejects.toThrow('OPEN_PERIODS');
     });
 
     it('should reject closing an already closed fiscal year', async () => {
@@ -548,9 +594,7 @@ describe('AccountingService - Slices 2-5', () => {
         accountId: 're-1',
       });
 
-      await expect(
-        service.closeFiscalYear('fy-1', closeDto, actor),
-      ).rejects.toThrow('No revenue or expense balances to close');
+      await expect(closeFromPreview()).rejects.toThrow('NOTHING_TO_CLOSE');
     });
 
     it('should throw when retained earnings account not found', async () => {
@@ -573,9 +617,9 @@ describe('AccountingService - Slices 2-5', () => {
       prisma.accountingReportAccountMapping.findFirst.mockResolvedValue(null);
       prisma.chartAccount.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.closeFiscalYear('fy-1', closeDto, actor),
-      ).rejects.toThrow('Retained Earnings account not found');
+      await expect(closeFromPreview()).rejects.toThrow(
+        'RETAINED_EARNINGS_MISSING',
+      );
     });
   });
 

@@ -7,6 +7,12 @@ import { api } from '../../lib/api';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import { Button } from '../ui/button';
 import { useSession } from '../session-provider';
+import { resourceAccess } from '../../lib/resource-authorization';
+import {
+  allWarningsAcknowledged,
+  closeRequestFromPreview,
+  FiscalClosePreviewPanel,
+} from './fiscal-close-preview-panel';
 
 interface FiscalPeriodActionsProps {
   periodId: string;
@@ -33,11 +39,14 @@ export function FiscalPeriodActions({
   const [error, setError] = useState<string | null>(null);
   const [reopenRequestId, setReopenRequestId] = useState<string | null>(null);
 
-  const readinessQuery = useQuery({
-    queryKey: ['fiscal-period-close-readiness', periodId],
-    queryFn: () => api.getFiscalPeriodCloseReadiness(periodId),
+  const [acknowledged, setAcknowledged] = useState<Set<string>>(new Set());
+  // Phase 7.11d: the close is bound to this preview's fingerprint.
+  const previewQuery = useQuery({
+    queryKey: ['fiscal-period-close-preview', periodId],
+    queryFn: () => api.getFiscalPeriodClosePreview(periodId),
     enabled: isConfirmOpen && actionType === 'close',
   });
+  const preview = previewQuery.data;
 
   const mutation = useMutation({
     mutationFn: async (data: {
@@ -56,13 +65,16 @@ export function FiscalPeriodActions({
             reason: data.reason,
           }),
         };
-      if (data.type === 'close')
+      if (data.type === 'close') {
+        if (!preview) throw new Error('Open the close preview first.');
         return {
           type: 'other' as const,
-          result: await api.closeFiscalPeriod(periodId, {
-            reason: data.reason,
-          }),
+          result: await api.closeFiscalPeriod(
+            periodId,
+            closeRequestFromPreview(preview, data.reason, acknowledged),
+          ),
         };
+      }
       return {
         type: 'reopen' as const,
         result: await api.reopenFiscalPeriod(periodId, { reason: data.reason }),
@@ -80,17 +92,25 @@ export function FiscalPeriodActions({
       setIsConfirmOpen(false);
       setReason('');
       setError(null);
+      setAcknowledged(new Set());
     },
-    onError: (mutationError: Error) =>
+    onError: (mutationError: Error) => {
       setError(
         mutationError.message ||
           'The fiscal period action could not be completed.',
-      ),
+      );
+      // A stale or changed preview must be reviewed again.
+      if (actionType === 'close') {
+        setAcknowledged(new Set());
+        void previewQuery.refetch();
+      }
+    },
   });
 
   const handleAction = (type: 'lock' | 'unlock' | 'close' | 'reopen') => {
     setActionType(type);
     setError(null);
+    setAcknowledged(new Set());
     setIsConfirmOpen(true);
   };
 
@@ -186,41 +206,38 @@ export function FiscalPeriodActions({
         confirmDisabled={
           reason.trim().length < (actionType === 'reopen' ? 10 : 5) ||
           (actionType === 'close' &&
-            (readinessQuery.isPending ||
-              readinessQuery.isError ||
-              !readinessQuery.data?.readyToClose))
+            (previewQuery.isPending ||
+              previewQuery.isError ||
+              !resourceAccess<'close', 'inventory'>(preview?.authorization).can(
+                'close',
+              ) ||
+              !allWarningsAcknowledged(preview, acknowledged)))
         }
       >
         <div className="mt-4 space-y-2">
-          {actionType === 'close' && readinessQuery.isPending && (
-            <p className="text-xs font-semibold text-slate-500">
-              Checking period-close readiness...
-            </p>
+          {actionType === 'close' && (
+            <FiscalClosePreviewPanel
+              preview={preview}
+              isLoading={previewQuery.isPending}
+              isError={previewQuery.isError}
+              isFetching={previewQuery.isFetching}
+              acknowledged={acknowledged}
+              onAcknowledge={(code, checked) =>
+                setAcknowledged((current) => {
+                  const next = new Set(current);
+                  if (checked) next.add(code);
+                  else next.delete(code);
+                  return next;
+                })
+              }
+              onRecompute={() => {
+                setAcknowledged(new Set());
+                void previewQuery.refetch();
+              }}
+            />
           )}
-          {actionType === 'close' && readinessQuery.data && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
-              <p className="font-bold text-slate-800">
-                {readinessQuery.data.readyToClose
-                  ? 'This period is ready to close'
-                  : `${readinessQuery.data.blockers.length} blocker(s) must be resolved`}
-              </p>
-              {readinessQuery.data.blockers.map((blocker) => (
-                <p key={blocker.code} className="mt-1 text-rose-700">
-                  {blocker.safeMessage} ({blocker.count})
-                </p>
-              ))}
-              <p className="mt-2 text-amber-700">
-                Posting-failure and required-snapshot policy checks remain
-                explicitly unavailable.
-              </p>
-            </div>
-          )}
-          {(error || readinessQuery.isError) && (
-            <p className="text-xs font-semibold text-rose-700">
-              {error ||
-                readinessQuery.error?.message ||
-                'Readiness checks failed.'}
-            </p>
+          {error && (
+            <p className="text-xs font-semibold text-rose-700">{error}</p>
           )}
           <label
             htmlFor={`fiscal-period-reason-${periodId}`}

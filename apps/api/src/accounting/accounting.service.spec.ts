@@ -255,7 +255,7 @@ describe('fiscal period lifecycle management', () => {
 
     await service.lockFiscalPeriod('p1', { reason: 'Month end review' }, actor);
 
-    expect(prisma.fiscalPeriod.update).toHaveBeenCalledWith(
+    expect(prisma.fiscalPeriod.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           status: 'LOCKED',
@@ -288,7 +288,7 @@ describe('fiscal period lifecycle management', () => {
       actor,
     );
 
-    expect(prisma.fiscalPeriod.update).toHaveBeenCalledWith(
+    expect(prisma.fiscalPeriod.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           status: 'OPEN',
@@ -298,31 +298,53 @@ describe('fiscal period lifecycle management', () => {
     );
   });
 
-  it('closes a LOCKED fiscal period', async () => {
+  it('closes a LOCKED fiscal period only with the reviewed preview fingerprint', async () => {
     const period = {
       id: 'p1',
       status: 'LOCKED',
       label: '2026-04',
       periodNumber: 1,
+      fiscalYearId: 'fy-1',
+      startDate: new Date('2026-04-01'),
+      endDate: new Date('2026-04-30'),
+      fiscalYear: { name: 'FY 2026', status: 'OPEN' },
     };
     const { service, prisma } = buildService({
       fiscalPeriod: period,
     });
+    // Neighbouring periods (looked up by periodNumber) do not exist.
+    (prisma.fiscalPeriod.findFirst as jest.Mock).mockImplementation(
+      ({ where }: { where: { periodNumber?: number } }) =>
+        Promise.resolve(where.periodNumber === undefined ? period : null),
+    );
 
-    // Mock findFirst to return the current period, readiness projection, then prior period.
-    (prisma.fiscalPeriod.findFirst as jest.Mock)
-      .mockResolvedValueOnce(period)
-      .mockResolvedValueOnce({
-        ...period,
-        fiscalYearId: 'fy-1',
-        periodNumber: 1,
-        startDate: new Date('2026-04-01'),
-        endDate: new Date('2026-04-30'),
-        fiscalYear: { name: 'FY 2026' },
-      })
-      .mockResolvedValueOnce(null);
+    await expect(
+      service.closeFiscalPeriod('p1', { reason: 'Audited' }, actor),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'CLOSE_PREVIEW_REQUIRED' }),
+    });
+    await expect(
+      service.closeFiscalPeriod(
+        'p1',
+        { reason: 'Audited', expectedPreviewFingerprint: '0'.repeat(64) },
+        actor,
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'CLOSE_PREVIEW_STALE' }),
+    });
+    expect(prisma.fiscalPeriod.updateMany).not.toHaveBeenCalled();
 
-    await service.closeFiscalPeriod('p1', { reason: 'Audited' }, actor);
+    const preview = await service.getFiscalPeriodClosePreview('p1', actor);
+    expect(preview.readyToClose).toBe(true);
+    await service.closeFiscalPeriod(
+      'p1',
+      {
+        reason: 'Audited',
+        expectedPreviewFingerprint: preview.previewFingerprint,
+        acknowledgedWarningCodes: preview.requiredAcknowledgements,
+      },
+      actor,
+    );
 
     expect(prisma.fiscalPeriod.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -554,6 +576,26 @@ function buildOriginalJournal() {
   };
 }
 
+/** Phase 7.11d: the operational close inventory reads these; all empty. */
+function emptyCloseInventoryDelegates() {
+  const empty = {
+    _count: { _all: 0 },
+    _sum: { totalAmount: null, outstandingAmount: null },
+  };
+  return {
+    accountingPostingBatch: { count: jest.fn().mockResolvedValue(0) },
+    payrollRun: { count: jest.fn().mockResolvedValue(0) },
+    financeApprovalRequest: { count: jest.fn().mockResolvedValue(0) },
+    cashierClose: { count: jest.fn().mockResolvedValue(0) },
+    cashDeposit: { count: jest.fn().mockResolvedValue(0) },
+    onlinePaymentIntent: { count: jest.fn().mockResolvedValue(0) },
+    invoice: { count: jest.fn().mockResolvedValue(0) },
+    feeWaiver: { count: jest.fn().mockResolvedValue(0) },
+    financeExpense: { aggregate: jest.fn().mockResolvedValue(empty) },
+    financePayable: { aggregate: jest.fn().mockResolvedValue(empty) },
+  };
+}
+
 function buildService(options: {
   original?: unknown;
   existingReversal?: unknown;
@@ -608,6 +650,7 @@ function buildService(options: {
     },
     bankReconciliationSession: { findMany: jest.fn().mockResolvedValue([]) },
     chartAccount: { count: jest.fn().mockResolvedValue(2) },
+    ...emptyCloseInventoryDelegates(),
     $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
     $transaction: jest.fn(),
   };

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatBsDateTime } from '@schoolos/core';
 import { api } from '../../lib/api';
 import {
   Dialog,
@@ -12,8 +11,13 @@ import {
   DialogFooter,
 } from '../ui/dialog';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Lock, Unlock, RefreshCcw } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { AlertTriangle, Lock, Unlock } from 'lucide-react';
+import { resourceAccess } from '../../lib/resource-authorization';
+import {
+  allWarningsAcknowledged,
+  closeRequestFromPreview,
+  FiscalClosePreviewPanel,
+} from './fiscal-close-preview-panel';
 
 interface FiscalYearCloseDialogProps {
   isOpen: boolean;
@@ -32,29 +36,39 @@ export function FiscalYearCloseDialog({
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [reopenRequestId, setReopenRequestId] = useState<string | null>(null);
+  const [acknowledged, setAcknowledged] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (isOpen) {
       setReason('');
       setError(null);
       setReopenRequestId(null);
+      setAcknowledged(new Set());
     }
   }, [isOpen, fiscalYear?.id, mode]);
 
-  const readinessQuery = useQuery({
-    queryKey: ['fiscal-year-close-readiness', fiscalYear?.id],
-    queryFn: () => api.getFiscalYearCloseReadiness(fiscalYear.id),
+  // Phase 7.11d: the close is bound to this preview's fingerprint.
+  const previewQuery = useQuery({
+    queryKey: ['fiscal-year-close-preview', fiscalYear?.id],
+    queryFn: () => api.getFiscalYearClosePreview(fiscalYear.id),
     enabled: isOpen && mode === 'CLOSE' && Boolean(fiscalYear?.id),
   });
+  const preview = previewQuery.data;
 
   const mutation = useMutation({
-    mutationFn: () => {
-      if (mode === 'CLOSE')
-        return api.closeFiscalYear(fiscalYear.id, { reason: reason.trim() });
+    mutationFn: async () => {
+      if (mode === 'CLOSE') {
+        if (!preview) throw new Error('Open the close preview first.');
+        await api.closeFiscalYear(
+          fiscalYear.id,
+          closeRequestFromPreview(preview, reason.trim(), acknowledged),
+        );
+        return null;
+      }
       return api.reopenFiscalYear(fiscalYear.id, { reason: reason.trim() });
     },
     onSuccess: (result) => {
-      if (mode === 'REOPEN') {
+      if (result) {
         setReopenRequestId(result.id);
         void queryClient.invalidateQueries({
           queryKey: ['principal-approval-centre'],
@@ -63,23 +77,30 @@ export function FiscalYearCloseDialog({
       }
       void queryClient.invalidateQueries({ queryKey: ['fiscal-years'] });
       void queryClient.invalidateQueries({
-        queryKey: ['fiscal-year-close-readiness', fiscalYear?.id],
+        queryKey: ['fiscal-year-close-preview', fiscalYear?.id],
       });
       onClose();
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       setError(err.message || `Failed to ${mode.toLowerCase()} fiscal year`);
+      // A stale or changed preview must be reviewed again.
+      if (mode === 'CLOSE') {
+        setAcknowledged(new Set());
+        void previewQuery.refetch();
+      }
     },
   });
 
-  const readiness = readinessQuery.data;
   const minimumReasonLength = mode === 'REOPEN' ? 10 : 5;
   const reasonTooShort = reason.trim().length < minimumReasonLength;
   const closeBlockedByReadiness =
     mode === 'CLOSE' &&
-    (readinessQuery.isLoading ||
-      readinessQuery.isError ||
-      !readiness?.readyToClose);
+    (previewQuery.isLoading ||
+      previewQuery.isError ||
+      !resourceAccess<'close', 'inventory'>(preview?.authorization).can(
+        'close',
+      ) ||
+      !allWarningsAcknowledged(preview, acknowledged));
   const confirmDisabled =
     reasonTooShort ||
     closeBlockedByReadiness ||
@@ -95,7 +116,7 @@ export function FiscalYearCloseDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-xl">
         <DialogHeader>
           <div className="mx-auto h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mb-4">
             {mode === 'CLOSE' ? <Lock size={24} /> : <Unlock size={24} />}
@@ -107,7 +128,7 @@ export function FiscalYearCloseDialog({
           </DialogTitle>
           <p className="text-center text-sm text-slate-500 mt-2">
             {mode === 'CLOSE'
-              ? `Are you sure you want to close ${fiscalYear?.name}? This will generate closing entries for all revenue and expense accounts and transfer net income to Retained Earnings.`
+              ? `Review what closing ${fiscalYear?.name} depends on and the exact closing entry it will post. Closing moves every open income and expense balance into retained earnings.`
               : `Request reopening ${fiscalYear?.name}. The year stays closed until an independent approver applies the request. Provide a reason for the audit trail.`}
           </p>
         </DialogHeader>
@@ -136,74 +157,25 @@ export function FiscalYearCloseDialog({
         {!reopenRequestId && (
           <form onSubmit={handleSubmit} className="space-y-4 py-4">
             {mode === 'CLOSE' && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Fiscal-year close readiness
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void readinessQuery.refetch()}
-                    disabled={readinessQuery.isFetching}
-                    isLoading={readinessQuery.isFetching}
-                    className="gap-1.5 text-[11px] font-bold"
-                  >
-                    <RefreshCcw size={12} />
-                    Recompute
-                  </Button>
-                </div>
-
-                {readinessQuery.isLoading && (
-                  <p className="text-xs font-semibold text-slate-500">
-                    Checking fiscal-year close readiness...
-                  </p>
-                )}
-                {readinessQuery.isError && (
-                  <p className="text-xs font-semibold text-rose-700">
-                    Readiness could not be checked. Confirm your fiscal
-                    permission and try again.
-                  </p>
-                )}
-                {readiness && (
-                  <div className="space-y-2">
-                    <p
-                      className={cn(
-                        'text-xs font-bold',
-                        readiness.readyToClose
-                          ? 'text-emerald-700'
-                          : 'text-rose-700',
-                      )}
-                    >
-                      {readiness.readyToClose
-                        ? 'No blocking issues. This fiscal year can be closed.'
-                        : `${readiness.blockingIssueCount} blocking issue(s) must be resolved before closing.`}
-                    </p>
-                    {readiness.issues
-                      .filter((issue) => issue.severity === 'BLOCKING')
-                      .map((issue) => (
-                        <p key={issue.code} className="text-xs text-rose-700">
-                          {issue.safeMessage} ({issue.count})
-                        </p>
-                      ))}
-                    {readiness.issues
-                      .filter((issue) => issue.severity === 'WARNING')
-                      .map((issue) => (
-                        <p key={issue.code} className="text-xs text-amber-700">
-                          Warning: {issue.safeMessage} ({issue.count})
-                        </p>
-                      ))}
-                    <p className="text-[10px] text-slate-400">
-                      Last calculated{' '}
-                      {formatBsDateTime(readiness.lastCalculatedAt)}.
-                      Posting-failure, report-snapshot, export-job,
-                      fee-reconciliation, and warning-acknowledgement checks
-                      remain explicitly unavailable in this release.
-                    </p>
-                  </div>
-                )}
-              </div>
+              <FiscalClosePreviewPanel
+                preview={preview}
+                isLoading={previewQuery.isLoading}
+                isError={previewQuery.isError}
+                isFetching={previewQuery.isFetching}
+                acknowledged={acknowledged}
+                onAcknowledge={(code, checked) =>
+                  setAcknowledged((current) => {
+                    const next = new Set(current);
+                    if (checked) next.add(code);
+                    else next.delete(code);
+                    return next;
+                  })
+                }
+                onRecompute={() => {
+                  setAcknowledged(new Set());
+                  void previewQuery.refetch();
+                }}
+              />
             )}
 
             <div className="space-y-2">

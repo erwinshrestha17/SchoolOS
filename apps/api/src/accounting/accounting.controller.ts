@@ -269,6 +269,15 @@ export class AccountingController {
     return this.accountingService.getFiscalPeriodCloseReadiness(id, auth);
   }
 
+  @Get('fiscal-periods/:id/close-preview')
+  @Permissions('accounting:reports:read')
+  getFiscalPeriodClosePreview(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.getFiscalPeriodClosePreview(id, auth);
+  }
+
   @Post('fiscal-periods/:id/reopen')
   @Permissions('accounting:fiscal:reopen')
   reopenFiscalPeriod(
@@ -543,6 +552,15 @@ export class AccountingController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.accountingService.getFiscalYearCloseReadiness(id, auth);
+  }
+
+  @Get('fiscal-years/:id/close-preview')
+  @Permissions('accounting:reports:read')
+  getFiscalYearClosePreview(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.getFiscalYearClosePreview(id, auth);
   }
 
   @Post('fiscal-years/:id/close-year')

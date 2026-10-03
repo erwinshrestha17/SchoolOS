@@ -27,6 +27,8 @@ import type {
   FiscalPeriodSummary,
   FiscalPeriodCloseReadiness,
   FiscalYearCloseReadiness,
+  FiscalPeriodClosePreview,
+  FiscalYearClosePreview,
   FiscalYearSummary,
   FinancialAuditLogSummary,
   JournalEntryView,
@@ -42,6 +44,13 @@ import {
   request,
   withQuery,
 } from './client';
+
+/** Phase 7.11d: a close presents the reviewed preview and its acknowledgements. */
+export type FiscalCloseRequest = {
+  reason: string;
+  expectedPreviewFingerprint: string;
+  acknowledgedWarningCodes: string[];
+};
 
 export const accountingApi = {
   getAccountingDashboardSummary: () =>
@@ -128,7 +137,11 @@ export const accountingApi = {
     request<FiscalPeriodCloseReadiness>(
       `/accounting/fiscal-periods/${encodeURIComponent(id)}/close-readiness`,
     ),
-  closeFiscalPeriod: (id: string, body: JsonBody) =>
+  getFiscalPeriodClosePreview: (id: string) =>
+    request<FiscalPeriodClosePreview>(
+      `/accounting/fiscal-periods/${encodeURIComponent(id)}/close-preview`,
+    ),
+  closeFiscalPeriod: (id: string, body: FiscalCloseRequest) =>
     request<FiscalPeriodSummary>(
       `/accounting/fiscal-periods/${encodeURIComponent(id)}/close`,
       { method: 'POST', json: body },
@@ -330,11 +343,15 @@ export const accountingApi = {
     request<FiscalYearCloseReadiness>(
       `/accounting/fiscal-years/${encodeURIComponent(id)}/close-readiness`,
     ),
-  closeFiscalYear: (id: string, body: JsonBody) =>
-    request<any>(`/accounting/fiscal-years/${id}/close-year`, {
-      method: 'POST',
-      json: body,
-    }),
+  getFiscalYearClosePreview: (id: string) =>
+    request<FiscalYearClosePreview>(
+      `/accounting/fiscal-years/${encodeURIComponent(id)}/close-preview`,
+    ),
+  closeFiscalYear: (id: string, body: FiscalCloseRequest) =>
+    request<{ fiscalYear: FiscalYearSummary; closingEntry: unknown }>(
+      `/accounting/fiscal-years/${encodeURIComponent(id)}/close-year`,
+      { method: 'POST', json: body },
+    ),
   reopenFiscalYear: (id: string, body: JsonBody) =>
     request<ApprovalRequestSummary>(
       `/accounting/fiscal-years/${encodeURIComponent(id)}/reopen-year`,

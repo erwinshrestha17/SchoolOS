@@ -74,7 +74,7 @@ test('M11 fiscal controls enforce backend readiness, lock, close, and reasoned r
   expect(readiness.data.readyToClose).toBeTruthy();
   expect(readiness.data.blockers).toHaveLength(0);
   expect(readiness.data.unavailableChecks).toContain(
-    'NEEDS_POSTING_FAILURE_CONTRACT',
+    'NEEDS_REPORT_SNAPSHOT_POLICY',
   );
 
   const page = await fiscalController.context.newPage();
@@ -120,12 +120,11 @@ test('M11 fiscal controls enforce backend readiness, lock, close, and reasoned r
 
   await periodCard.getByTitle('Close Period').click();
   dialog = page.getByRole('dialog');
-  await expect(
-    dialog.getByText('Backend checks are ready to close'),
-  ).toBeVisible();
-  await expect(
-    dialog.getByText(/Posting-failure.*remain explicitly unavailable/),
-  ).toBeVisible();
+  // Phase 7.11d: the close preview; every warning must be acknowledged.
+  await expect(dialog.getByText('Nothing blocks this close.')).toBeVisible();
+  for (const warning of await dialog.getByRole('checkbox').all()) {
+    await warning.check();
+  }
   await dialog
     .getByLabel('Reason for action')
     .fill('E2E verified close with backend readiness');

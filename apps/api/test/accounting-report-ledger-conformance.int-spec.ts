@@ -309,9 +309,18 @@ describeDatabase('Accounting reports equal the ledger (Phase 7.11a)', () => {
         data: { status: 'CLOSED', closedAt: new Date() },
       }),
     );
-    await scope(() =>
-      accounting.closeFiscalYear(fy1, { reason: 'Year end 2030' }, actor),
-    );
+    await scope(async () => {
+      const preview = await accounting.getFiscalYearClosePreview(fy1, actor);
+      await accounting.closeFiscalYear(
+        fy1,
+        {
+          reason: 'Year end 2030',
+          expectedPreviewFingerprint: preview.previewFingerprint,
+          acknowledgedWarningCodes: preview.requiredAcknowledgements,
+        },
+        actor,
+      );
+    });
 
     // FY 2031
     await scope(async () => {

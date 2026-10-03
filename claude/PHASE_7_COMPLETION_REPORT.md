@@ -638,3 +638,103 @@ Fresh PostgreSQL 16 database `schoolos_auth_recovery_test_711c2` (migrated, no d
 ### Next
 
 7.11d — Fiscal-close preview (its close inventory now includes submitted bills and open payables).
+
+## 7.11d — Fiscal-close preview
+
+**Completed locally on 3 October 2026, on `main`. Not pushed.** Fourth and last 7.11 sub-slice (plan `claude/PHASE_7_11_PLAN.md`).
+
+**Baseline:** start `d6cf5bbe` (7.11c); end = the commit that adds this section (`git log -1 -- claude/PHASE_7_COMPLETION_REPORT.md`).
+
+### Slice
+
+A period or year is now closed from a preview. The preview lists everything unfinished that the close depends on (graded as blocking or warning), says in plain language what closing will mean, and, for a year, shows the exact closing lines. The close must present the fingerprint of that preview and acknowledge every warning. If anything changed in between, the close is refused and the user reviews again.
+
+### Defect confirmed and fixed (decision F2)
+
+**A reopened fiscal year could never be closed again.** A probe on real PostgreSQL closed a year, reopened it, posted NPR 30 of revenue and closed again. The second close failed with a raw Prisma unique-key error on the closing entry's source key.
+
+The closing builder now reads income and expense balances _after_ any earlier closing entry of the same year. As a result:
+
+- a re-close posts a supplementary closing entry (`FISCAL_YEAR_CLOSE:2`, `:3`, …) for the change only;
+- a re-close with no change closes without posting an entry.
+
+The preview shows that the entry is supplementary and lists the earlier closing entries.
+
+The same builder also fixes the defect recorded in 7.11b: an income account with a debit balance produced a negative closing line, so the close failed. Each account is now closed by the opposite of its net balance.
+
+### Changes
+
+- **`accounting/fiscal-close-inventory.ts`** (new). One inventory, read by period readiness, year readiness, both previews and both closes. Each item carries a code, a severity, a count, an amount (when it is money), a message, a consequence and a link to where it is resolved.
+  - **Blocking** (new):
+    - reviewed journals;
+    - posting batches that are draft, ready, posting or failed;
+    - approved or finalized payroll runs whose posting date (the period end date) is in range;
+    - approved or processing refund/reversal requests;
+    - cashier sessions not closed or deposited;
+    - vendor bills awaiting approval (count and NPR).
+  - **Warnings** (new):
+    - pending online payments;
+    - draft invoices;
+    - pending waivers;
+    - unfinished cash deposits;
+    - draft vendor bills;
+    - payroll posted but not paid;
+    - open payables due in range (count and NPR).
+  - **Unchanged blocking items:** draft, submitted and approved journals; posted source journals without mapping evidence; reconciliations; unreconciled bank items; unbalanced journals; trial balance.
+  - **State items in the previews:**
+    - period: not locked, already closed, previous period not closed, fiscal year closed;
+    - year: open periods, already closed, nothing to close, retained-earnings account missing, and the opening-balance warning.
+  - **Restricted counts.** A count is shown only to someone with the permission to act on it. Anyone else sees the item and its severity as `restricted`, never a zero. A restricted item adds only its code and severity to the fingerprint, so the fingerprint cannot be used to recover the hidden count.
+- **Pure closing builder** (`buildClosingLines`, `closingPostingType`), shared by the preview and the close.
+- **Routes:**
+  - `GET /accounting/fiscal-periods/:id/close-preview` and `GET /accounting/fiscal-years/:id/close-preview` (`accounting:reports:read`). Each returns blockers, warnings, consequences, `requiredAcknowledgements`, `previewFingerprint` and a canonical `authorization` projection. The year preview adds the closing lines, net result, retained-earnings account and entry date (BS and Gregorian).
+  - The close DTOs gain `expectedPreviewFingerprint` and `acknowledgedWarningCodes`. The close recomputes the preview inside its serializable, live-authorized transaction, and refuses with 409 and one of these codes:
+    - `CLOSE_PREVIEW_REQUIRED`;
+    - `CLOSE_PREVIEW_STALE`;
+    - `CLOSE_BLOCKED`;
+    - `CLOSE_WARNINGS_NOT_ACKNOWLEDGED`.
+
+    The audit record stores the fingerprint and the acknowledged codes.
+
+- **Lock and unlock (D5).** Both now run in the journal transaction: the live session and grant are re-checked, the status change is a compare-and-set, and the audit is written in the same transaction. Locking an already locked period returns it unchanged. No new separation of duties was added (F4).
+- **Readiness responses** keep their shape and codes. Items now carry `restricted`, `amount` and `consequence`; journal counts include `reviewed`; period readiness lists warnings. The posting-failure and warning-acknowledgement checks are now real, so they were removed from `unavailableChecks`.
+- **Backend hardening gate:** the period and year unbalanced-journal checks now share one tenant-anchored query. The `accounting.service.ts` raw-SQL count goes from 5 to 4, updated deliberately.
+- **OpenAPI gate** requires both preview operations.
+- **Web (ASTRA M11-H).** A shared `FiscalClosePreviewPanel` serves the period-close and year-close dialogs. It shows:
+  - blockers with resolve links;
+  - warnings, each needing a ticked acknowledgement;
+  - `Restricted` in place of hidden counts;
+  - consequences;
+  - the closing-lines table and net result for a year.
+
+  The close is sent with the fingerprint. A refused close clears the ticks and re-reads the preview.
+
+- **Playwright specs** `m11-fiscal-controls` and `m11-fiscal-year-close` are updated for the preview-bound close. Both had already drifted from the dialog copy. I did not run them (they need the full running stack).
+
+### Operational impacts
+
+- **Closes are stricter.** These now block a close that passed before: reviewed journals, failed or waiting posting batches, open cashier sessions, approved but unexecuted refunds, payroll runs dated in the period, and submitted vendor bills.
+- **Old clients get 409 `CLOSE_PREVIEW_REQUIRED`.** A client that closes without a preview (scripts, older web builds) is refused and must preview first. This is an additive DTO change.
+- **A reopened year can now be closed again.** The re-close posts a supplementary closing entry dated the year end. Balance sheets include it; income statements exclude it, like every closing entry.
+
+### Not done (recorded)
+
+- The "Close blockers" column in the fiscal-period grid (D6) needs a per-period inventory for every row. It is left for 7.12; blockers show when the close dialog opens.
+- **F3:** fiscal periods are still Gregorian months; the previews show BS dates.
+- **Pending approved refunds are tenant-wide.** Approved but unexecuted refund requests created before the end of the period block it, even though they will post on their execution date.
+
+### Tests executed
+
+Fresh PostgreSQL 16 database `schoolos_auth_recovery_test_711d` (migrated, no drift), plus the marks, timetable and admission databases.
+
+| Check                                                                                                                                                                                                                                                | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| API unit                                                                                                                                                                                                                                             | 318 suites, **3,713 passed**. New `fiscal-close-inventory.spec.ts` covers: income/expense close, a debit-balance income account closes without a negative line, nothing left to close, supplementary posting types, restricted counts, a fingerprint that hides restricted counts, and close acceptance codes. The period and year close unit tests were rewritten for the preview-bound close                                                                                                                                                                                 |
+| API integration (all four DB variables)                                                                                                                                                                                                              | 37 suites, **592 passed**. New `fiscal-close-preview.int-spec.ts` (4 tests) covers: the inventory with restricted views; a period close refused without a fingerprint, without acknowledgement and after a change, then closed with the fingerprint audited; closing lines equal what the year close posts; re-close after reopen posts a supplementary entry for the change only; re-close with no change posts nothing; lock re-checks the live grant, and a failed audit rolls back the lock. The fiscal-reopen and report-conformance suites now close through the preview |
+| API e2e                                                                                                                                                                                                                                              | 45 suites, **321 passed**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Web tests                                                                                                                                                                                                                                            | **778 passed** (new `fiscal-close-preview-contract.test.mjs`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Typecheck (core, API, web), web production build, `verify:openapi` (1,233 paths, 1,423 operations), `prisma migrate diff --exit-code`, `verify:tracked-artifacts`, `format:check`, ESLint on changed API (errors) and web (`--max-warnings=0`) files | clean                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+
+### Next
+
+Phase 7.11 is complete (a–d). 7.12 picks up the items recorded above: the fee collection report's period `totalOutstanding`, the report-mapping update transaction, and the close-blockers grid column.

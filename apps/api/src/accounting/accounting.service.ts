@@ -17,10 +17,9 @@ import {
   JournalEntryStatus,
   JournalLineSide,
   JournalSourceType,
-  PayrollRunStatus,
   Prisma,
 } from '@prisma/client';
-import { formatBsDate } from '@schoolos/core';
+import { buildResourceAuthorization, formatBsDate } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -69,6 +68,19 @@ import {
 } from '../finance/finance.defaults';
 import { ApprovalWorkflowService } from '../advanced-operations/approval-workflow.service';
 import { ListPostingBatchesQueryDto } from './dto/list-posting-batches.query.dto';
+import {
+  assertClosePreviewAccepted,
+  buildClosingLines,
+  closePreviewFingerprint,
+  closingPostingType,
+  loadOperationalCloseItems,
+  projectCloseItems,
+  scopeJournalWhere,
+  toReadinessIssue,
+  type CloseItem,
+  type CloseScope,
+  type ProfitAndLossBalance,
+} from './fiscal-close-inventory';
 import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
 import {
   hasDomainPermission,
@@ -1656,45 +1668,63 @@ export class AccountingService implements OnModuleInit {
     });
   }
 
+  /**
+   * Phase 7.11d: lock and unlock run in the live-authorized serializable
+   * journal transaction, as a compare-and-set on the period status, with the
+   * audit record in the same transaction.
+   */
   async lockFiscalPeriod(
     id: string,
     dto: LockFiscalPeriodDto,
     actor: AuthContext,
   ) {
-    const period = await this.prisma.fiscalPeriod.findFirst({
-      where: { id, tenantId: actor.tenantId },
-    });
-
-    if (!period) {
-      throw new NotFoundException('Fiscal period not found');
-    }
-
-    if (period.status === AccountingPeriodStatus.CLOSED) {
-      throw new ConflictException('Cannot lock a closed fiscal period');
-    }
-
-    const updated = await this.prisma.fiscalPeriod.update({
-      where: { id: period.id },
-      data: {
-        status: AccountingPeriodStatus.LOCKED,
-        lockedAt: new Date(),
-        lockedById: actor.userId,
-        lockReason: dto.reason,
-        reopenedWarning: false,
+    return this.journalTransaction(
+      actor,
+      'accounting:fiscal:manage',
+      async (tx) => {
+        const period = await tx.fiscalPeriod.findFirst({
+          where: { id, tenantId: actor.tenantId },
+        });
+        if (!period) throw new NotFoundException('Fiscal period not found');
+        if (period.status === AccountingPeriodStatus.CLOSED)
+          throw new ConflictException('Cannot lock a closed fiscal period');
+        if (period.status === AccountingPeriodStatus.LOCKED) return period;
+        const claim = await tx.fiscalPeriod.updateMany({
+          where: {
+            id: period.id,
+            tenantId: actor.tenantId,
+            status: AccountingPeriodStatus.OPEN,
+          },
+          data: {
+            status: AccountingPeriodStatus.LOCKED,
+            lockedAt: new Date(),
+            lockedById: actor.userId,
+            lockReason: dto.reason,
+            reopenedWarning: false,
+          },
+        });
+        if (claim.count !== 1)
+          throw new ConflictException('Fiscal period changed before lock');
+        await this.auditService.record(
+          {
+            action: 'lock',
+            resource: 'fiscal_period',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: period.id,
+            before: { status: period.status },
+            after: {
+              status: AccountingPeriodStatus.LOCKED,
+              reason: dto.reason,
+            },
+          },
+          tx,
+        );
+        return tx.fiscalPeriod.findFirstOrThrow({
+          where: { id: period.id, tenantId: actor.tenantId },
+        });
       },
-    });
-
-    await this.auditService.record({
-      action: 'lock',
-      resource: 'fiscal_period',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      before: { status: period.status },
-      after: { status: updated.status, reason: dto.reason },
-    });
-
-    return updated;
+    );
   }
 
   async unlockFiscalPeriod(
@@ -1702,45 +1732,57 @@ export class AccountingService implements OnModuleInit {
     dto: UnlockFiscalPeriodDto,
     actor: AuthContext,
   ) {
-    const period = await this.prisma.fiscalPeriod.findFirst({
-      where: { id, tenantId: actor.tenantId },
-    });
-
-    if (!period) {
-      throw new NotFoundException('Fiscal period not found');
-    }
-
-    if (period.status === AccountingPeriodStatus.CLOSED) {
-      throw new ConflictException('Cannot unlock a closed fiscal period');
-    }
-
-    if (period.status === AccountingPeriodStatus.OPEN) {
-      return period;
-    }
-
-    const updated = await this.prisma.fiscalPeriod.update({
-      where: { id: period.id },
-      data: {
-        status: AccountingPeriodStatus.OPEN,
-        unlockedAt: new Date(),
-        unlockedById: actor.userId,
-        unlockReason: dto.reason,
+    return this.journalTransaction(
+      actor,
+      'accounting:fiscal:manage',
+      async (tx) => {
+        const period = await tx.fiscalPeriod.findFirst({
+          where: { id, tenantId: actor.tenantId },
+        });
+        if (!period) throw new NotFoundException('Fiscal period not found');
+        if (period.status === AccountingPeriodStatus.CLOSED)
+          throw new ConflictException('Cannot unlock a closed fiscal period');
+        if (period.status === AccountingPeriodStatus.OPEN) return period;
+        const claim = await tx.fiscalPeriod.updateMany({
+          where: {
+            id: period.id,
+            tenantId: actor.tenantId,
+            status: AccountingPeriodStatus.LOCKED,
+          },
+          data: {
+            status: AccountingPeriodStatus.OPEN,
+            unlockedAt: new Date(),
+            unlockedById: actor.userId,
+            unlockReason: dto.reason,
+          },
+        });
+        if (claim.count !== 1)
+          throw new ConflictException('Fiscal period changed before unlock');
+        await this.auditService.record(
+          {
+            action: 'unlock',
+            resource: 'fiscal_period',
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            resourceId: period.id,
+            before: { status: period.status },
+            after: { status: AccountingPeriodStatus.OPEN, reason: dto.reason },
+          },
+          tx,
+        );
+        return tx.fiscalPeriod.findFirstOrThrow({
+          where: { id: period.id, tenantId: actor.tenantId },
+        });
       },
-    });
-
-    await this.auditService.record({
-      action: 'unlock',
-      resource: 'fiscal_period',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: updated.id,
-      before: { status: period.status },
-      after: { status: updated.status, reason: dto.reason },
-    });
-
-    return updated;
+    );
   }
 
+  /**
+   * Phase 7.11d: closing a period requires the fingerprint of the preview the
+   * user reviewed and an acknowledgement of every warning in it. The preview
+   * is recomputed inside the close transaction, so what was reviewed is what
+   * is closed.
+   */
   async closeFiscalPeriod(
     id: string,
     dto: CloseFiscalPeriodDto,
@@ -1760,6 +1802,8 @@ export class AccountingService implements OnModuleInit {
           throw new ConflictException(
             'Fiscal period must be LOCKED before closing.',
           );
+        const preview = await this.getFiscalPeriodClosePreview(id, actor, tx);
+        assertClosePreviewAccepted(preview, dto);
         const claim = await tx.fiscalPeriod.updateMany({
           where: {
             id,
@@ -1775,29 +1819,6 @@ export class AccountingService implements OnModuleInit {
         });
         if (claim.count !== 1)
           throw new ConflictException('Fiscal period changed before close');
-        const readiness = await this.getFiscalPeriodCloseReadiness(
-          id,
-          actor,
-          tx,
-        );
-        if (!readiness.readyToClose)
-          throw new ConflictException(
-            `Fiscal period cannot be closed until these blockers are resolved: ${readiness.blockers.map((blocker) => blocker.code).join(', ')}`,
-          );
-        const previousPeriod = await tx.fiscalPeriod.findFirst({
-          where: {
-            tenantId: actor.tenantId,
-            fiscalYearId: period.fiscalYearId,
-            periodNumber: period.periodNumber - 1,
-          },
-        });
-        if (
-          previousPeriod &&
-          previousPeriod.status !== AccountingPeriodStatus.CLOSED
-        )
-          throw new ConflictException(
-            `Previous fiscal period "${previousPeriod.label}" must be closed first.`,
-          );
         const updated = await tx.fiscalPeriod.findFirstOrThrow({
           where: { id, tenantId: actor.tenantId },
         });
@@ -1809,7 +1830,12 @@ export class AccountingService implements OnModuleInit {
             userId: actor.userId,
             resourceId: updated.id,
             before: { status: period.status },
-            after: { status: updated.status, reason: dto.reason },
+            after: {
+              status: updated.status,
+              reason: dto.reason,
+              previewFingerprint: preview.previewFingerprint,
+              acknowledgedWarningCodes: preview.requiredAcknowledgements,
+            },
           },
           tx,
         );
@@ -1818,19 +1844,15 @@ export class AccountingService implements OnModuleInit {
     );
   }
 
-  async getFiscalPeriodCloseReadiness(
-    id: string,
+  /**
+   * The ledger checks plus the shared operational inventory for one scope.
+   * Codes keep their established period/year spellings.
+   */
+  private async collectCloseState(
+    client: Prisma.TransactionClient | PrismaService,
     actor: AuthContext,
-    client: Prisma.TransactionClient | PrismaService = this.prisma,
+    scope: CloseScope,
   ) {
-    const period = await client.fiscalPeriod.findFirst({
-      where: { id, tenantId: actor.tenantId },
-      include: { fiscalYear: { select: { name: true } } },
-    });
-    if (!period) {
-      throw new NotFoundException('Fiscal period not found');
-    }
-
     const sourceTypes = [
       JournalSourceType.INVOICE,
       JournalSourceType.FEE_PAYMENT,
@@ -1840,26 +1862,29 @@ export class AccountingService implements OnModuleInit {
       JournalSourceType.PAYROLL_DISBURSEMENT,
       JournalSourceType.ADJUSTMENT,
     ];
+    const year = scope.kind === 'YEAR';
+    const journalScope = scopeJournalWhere(scope);
+    const reconciliation = new BankReconciliationService(
+      this.prisma,
+      this.auditService,
+      this.postingService,
+    );
     const [
-      journalStatuses,
+      operational,
+      postedJournals,
       postedSourceWithoutMapping,
       unreconciledBankItems,
       unresolvedReconciliations,
       trialBalance,
       unbalancedRows,
     ] = await Promise.all([
-      client.journalEntry.groupBy({
-        by: ['status'],
-        where: {
-          tenantId: actor.tenantId,
-          fiscalPeriodId: period.id,
-        },
-        _count: { _all: true },
+      loadOperationalCloseItems(client, scope),
+      client.journalEntry.count({
+        where: { ...journalScope, status: JournalEntryStatus.POSTED },
       }),
       client.journalEntry.count({
         where: {
-          tenantId: actor.tenantId,
-          fiscalPeriodId: period.id,
+          ...journalScope,
           status: JournalEntryStatus.POSTED,
           sourceType: { in: sourceTypes },
           sourceMappingId: null,
@@ -1869,20 +1894,19 @@ export class AccountingService implements OnModuleInit {
         where: {
           tenantId: actor.tenantId,
           isReconciled: false,
-          statementDate: { gte: period.startDate, lte: period.endDate },
+          statementDate: { gte: scope.start, lte: scope.end },
         },
       }),
-      new BankReconciliationService(
-        this.prisma,
-        this.auditService,
-        this.postingService,
-      ).unresolvedForPeriodClose(period.id, actor, client),
+      Promise.all(
+        scope.periodIds.map((periodId) =>
+          reconciliation.unresolvedForPeriodClose(periodId, actor, client),
+        ),
+      ).then((counts) => counts.reduce((sum, count) => sum + count, 0)),
       client.journalLine.aggregate({
         where: {
           tenantId: actor.tenantId,
           journalEntry: {
-            tenantId: actor.tenantId,
-            fiscalPeriodId: period.id,
+            ...journalScope,
             status: { in: LEDGER_EFFECTIVE_STATUSES },
           },
         },
@@ -1897,91 +1921,125 @@ export class AccountingService implements OnModuleInit {
             ON line."journalEntryId" = journal."id"
             AND line."tenantId" = ${actor.tenantId}
           WHERE journal."tenantId" = ${actor.tenantId}
-            AND journal."fiscalPeriodId" = ${period.id}
             AND journal."status" = ${JournalEntryStatus.POSTED}::"JournalEntryStatus"
+            AND (
+              ${year}::boolean AND journal."fiscalYearId" = ${scope.fiscalYearId}
+              OR NOT ${year}::boolean AND journal."fiscalPeriodId" = ANY(${scope.periodIds}::text[])
+            )
           GROUP BY journal."id"
           HAVING COALESCE(SUM(line."debit"), 0) <> COALESCE(SUM(line."credit"), 0)
         ) AS unbalanced
       `),
     ]);
-
-    const statusCount = (status: JournalEntryStatus) =>
-      journalStatuses.find((row) => row.status === status)?._count._all ?? 0;
     const debit = new Prisma.Decimal(trialBalance._sum.debit ?? 0);
     const credit = new Prisma.Decimal(trialBalance._sum.credit ?? 0);
     const unbalancedPosted = unbalancedRows[0]?.count ?? 0;
-    const blockers: Array<{
-      code:
-        | 'DRAFT_JOURNALS'
-        | 'SUBMITTED_JOURNALS'
-        | 'APPROVED_UNPOSTED_JOURNALS'
-        | 'POSTED_SOURCE_WITHOUT_MAPPING'
-        | 'UNRECONCILED_BANK_ITEMS'
-        | 'UNFINALIZED_RECONCILIATIONS'
-        | 'UNBALANCED_POSTED_JOURNALS'
-        | 'UNBALANCED_TRIAL_BALANCE';
-      count: number;
-      safeMessage: string;
-      resolutionRoute: string;
-    }> = [];
-    const addBlocker = (
-      code: (typeof blockers)[number]['code'],
-      count: number,
-      safeMessage: string,
-      resolutionRoute: string,
-    ) => {
-      if (count > 0) {
-        blockers.push({ code, count, safeMessage, resolutionRoute });
-      }
+    const label = year ? 'fiscal year' : 'period';
+    const ledger: CloseItem[] = [];
+    const add = (item: Omit<CloseItem, 'amount'>) => {
+      if (item.count > 0) ledger.push({ amount: null, ...item });
     };
-    addBlocker(
-      'DRAFT_JOURNALS',
-      statusCount(JournalEntryStatus.DRAFT),
-      'Draft journals must be completed or cancelled.',
-      '/dashboard/accounting/journals?status=DRAFT',
-    );
-    addBlocker(
-      'SUBMITTED_JOURNALS',
-      statusCount(JournalEntryStatus.SUBMITTED),
-      'Submitted journals are still awaiting a decision.',
-      '/dashboard/accounting/journals?status=SUBMITTED',
-    );
-    addBlocker(
-      'APPROVED_UNPOSTED_JOURNALS',
-      statusCount(JournalEntryStatus.APPROVED),
-      'Approved journals must be posted or returned through the approved workflow.',
-      '/dashboard/accounting/journals?status=APPROVED',
-    );
-    addBlocker(
-      'POSTED_SOURCE_WITHOUT_MAPPING',
-      postedSourceWithoutMapping,
-      'Posted source journals without mapping evidence require review.',
-      '/dashboard/accounting/source-mappings',
-    );
-    addBlocker(
-      'UNFINALIZED_RECONCILIATIONS',
-      unresolvedReconciliations,
-      'Reconciliation sessions must be independently reviewed, finalized, and current before period close.',
-      '/dashboard/accounting/reconciliation',
-    );
-    addBlocker(
-      'UNRECONCILED_BANK_ITEMS',
-      unreconciledBankItems,
-      'Bank statement items in this period remain unreconciled.',
-      '/dashboard/accounting/reconciliation',
-    );
-    addBlocker(
-      'UNBALANCED_POSTED_JOURNALS',
-      unbalancedPosted,
-      'One or more posted journals are unbalanced.',
-      '/dashboard/accounting/journals?status=POSTED',
-    );
-    addBlocker(
-      'UNBALANCED_TRIAL_BALANCE',
-      debit.equals(credit) ? 0 : 1,
-      'The period trial balance is not balanced.',
-      '/dashboard/accounting/reports?report=trial-balance',
-    );
+    add({
+      code: year ? 'MISSING_SOURCE_MAPPINGS' : 'POSTED_SOURCE_WITHOUT_MAPPING',
+      severity: 'BLOCKING',
+      count: postedSourceWithoutMapping,
+      message:
+        'Posted source journals without mapping evidence require review.',
+      consequence: `The ${label} would close with postings whose account mapping was never evidenced.`,
+      resolutionRoute: '/dashboard/accounting/source-mappings',
+      readPermissions: null,
+    });
+    add({
+      code: 'UNFINALIZED_RECONCILIATIONS',
+      severity: 'BLOCKING',
+      count: unresolvedReconciliations,
+      message: `Reconciliation sessions must be independently reviewed, finalized, and current before ${year ? 'year' : 'period'} close.`,
+      consequence:
+        'Bank balances would be closed without a finalized reconciliation.',
+      resolutionRoute: '/dashboard/accounting/reconciliation',
+      readPermissions: null,
+    });
+    add({
+      code: 'UNRECONCILED_BANK_ITEMS',
+      severity: 'BLOCKING',
+      count: unreconciledBankItems,
+      message: `Bank statement items in this ${label} remain unreconciled.`,
+      consequence:
+        'Unmatched bank activity would be left outside the closed books.',
+      resolutionRoute: '/dashboard/accounting/reconciliation',
+      readPermissions: null,
+    });
+    add({
+      code: year ? 'UNBALANCED_JOURNALS' : 'UNBALANCED_POSTED_JOURNALS',
+      severity: 'BLOCKING',
+      count: unbalancedPosted,
+      message: 'One or more posted journals are unbalanced.',
+      consequence: 'Statements for this period would not balance.',
+      resolutionRoute: '/dashboard/accounting/journals?status=POSTED',
+      readPermissions: null,
+    });
+    add({
+      code: year ? 'TRIAL_BALANCE_NOT_READY' : 'UNBALANCED_TRIAL_BALANCE',
+      severity: 'BLOCKING',
+      count: debit.equals(credit) ? 0 : 1,
+      message: `The ${label} trial balance is not balanced.`,
+      consequence: 'Statements for this period would not balance.',
+      resolutionRoute: '/dashboard/accounting/reports?report=trial-balance',
+      readPermissions: null,
+    });
+    const items = [...ledger, ...operational];
+    const countOf = (code: string) =>
+      items.find((item) => item.code === code)?.count ?? 0;
+    return {
+      items,
+      facts: {
+        journals: {
+          draft: countOf('DRAFT_JOURNALS'),
+          submitted: countOf('SUBMITTED_JOURNALS'),
+          reviewed: countOf('REVIEWED_JOURNALS'),
+          approvedUnposted: countOf('APPROVED_UNPOSTED_JOURNALS'),
+          posted: postedJournals,
+          postedSourceWithoutMapping,
+          unbalancedPosted,
+        },
+        unreconciledBankItems,
+        trialBalance: {
+          debit: debit.toFixed(2),
+          credit: credit.toFixed(2),
+          balanced: debit.equals(credit),
+        },
+        payrollApprovedUnposted: countOf('PAYROLL_POSTING_INCOMPLETE'),
+      },
+    };
+  }
+
+  async getFiscalPeriodCloseReadiness(
+    id: string,
+    actor: AuthContext,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const period = await client.fiscalPeriod.findFirst({
+      where: { id, tenantId: actor.tenantId },
+      include: { fiscalYear: { select: { name: true } } },
+    });
+    if (!period) {
+      throw new NotFoundException('Fiscal period not found');
+    }
+    const { items, facts } = await this.collectCloseState(client, actor, {
+      kind: 'PERIOD',
+      tenantId: actor.tenantId,
+      fiscalYearId: period.fiscalYearId,
+      periodIds: [period.id],
+      start: period.startDate,
+      end: period.endDate,
+    });
+    const views = projectCloseItems(items, actor);
+    const blockers = views
+      .filter((item) => item.severity === 'BLOCKING')
+      .map(toReadinessIssue);
+    const warnings = views
+      .filter((item) => item.severity === 'WARNING')
+      .map(toReadinessIssue);
 
     return {
       checkedAt: new Date().toISOString(),
@@ -1995,26 +2053,147 @@ export class AccountingService implements OnModuleInit {
         endDate: period.endDate,
         status: period.status,
       },
-      journals: {
-        draft: statusCount(JournalEntryStatus.DRAFT),
-        submitted: statusCount(JournalEntryStatus.SUBMITTED),
-        approvedUnposted: statusCount(JournalEntryStatus.APPROVED),
-        posted: statusCount(JournalEntryStatus.POSTED),
-        postedSourceWithoutMapping,
-        unbalancedPosted,
-      },
-      unreconciledBankItems,
-      trialBalance: {
-        debit: debit.toFixed(2),
-        credit: credit.toFixed(2),
-        balanced: debit.equals(credit),
-      },
+      journals: facts.journals,
+      unreconciledBankItems: facts.unreconciledBankItems,
+      trialBalance: facts.trialBalance,
       blockers,
-      unavailableChecks: [
-        'NEEDS_POSTING_FAILURE_CONTRACT' as const,
-        'NEEDS_REPORT_SNAPSHOT_POLICY' as const,
-      ],
+      warnings,
+      unavailableChecks: ['NEEDS_REPORT_SNAPSHOT_POLICY' as const],
       readyToClose: blockers.length === 0,
+    };
+  }
+
+  /**
+   * Phase 7.11d: everything a period close depends on, what closing will
+   * mean, and the fingerprint the close must present.
+   */
+  async getFiscalPeriodClosePreview(
+    id: string,
+    actor: AuthContext,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const period = await client.fiscalPeriod.findFirst({
+      where: { id, tenantId: actor.tenantId },
+      include: { fiscalYear: { select: { name: true, status: true } } },
+    });
+    if (!period) throw new NotFoundException('Fiscal period not found');
+    const [previous, next] = await Promise.all([
+      client.fiscalPeriod.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          fiscalYearId: period.fiscalYearId,
+          periodNumber: period.periodNumber - 1,
+        },
+        select: { id: true, label: true, status: true },
+      }),
+      client.fiscalPeriod.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          fiscalYearId: period.fiscalYearId,
+          periodNumber: period.periodNumber + 1,
+        },
+        select: { id: true, label: true, status: true },
+      }),
+    ]);
+    const { items } = await this.collectCloseState(client, actor, {
+      kind: 'PERIOD',
+      tenantId: actor.tenantId,
+      fiscalYearId: period.fiscalYearId,
+      periodIds: [period.id],
+      start: period.startDate,
+      end: period.endDate,
+    });
+    const state: CloseItem[] = [];
+    const stateItem = (
+      code: string,
+      message: string,
+      consequence: string,
+      route = '/dashboard/accounting/fiscal-periods',
+    ) =>
+      state.push({
+        code,
+        severity: 'BLOCKING',
+        count: 1,
+        amount: null,
+        message,
+        consequence,
+        resolutionRoute: route,
+        readPermissions: null,
+      });
+    if (period.status === AccountingPeriodStatus.CLOSED)
+      stateItem(
+        'PERIOD_ALREADY_CLOSED',
+        'This period is already closed.',
+        'Nothing to do.',
+      );
+    else if (period.status !== AccountingPeriodStatus.LOCKED)
+      stateItem(
+        'PERIOD_NOT_LOCKED',
+        'Lock the period before closing it.',
+        'Locking stops new postings so the figures you review stay fixed.',
+      );
+    if (previous && previous.status !== AccountingPeriodStatus.CLOSED)
+      stateItem(
+        'PREVIOUS_PERIOD_NOT_CLOSED',
+        `Close the previous period "${previous.label}" first.`,
+        'Periods close in order.',
+      );
+    if (period.fiscalYear.status === 'CLOSED')
+      stateItem(
+        'FISCAL_YEAR_CLOSED',
+        'The fiscal year is closed.',
+        'Reopen the fiscal year through approval first.',
+      );
+    const views = projectCloseItems([...state, ...items], actor);
+    const blockers = views.filter((item) => item.severity === 'BLOCKING');
+    const warnings = views.filter((item) => item.severity === 'WARNING');
+    const previewFingerprint = closePreviewFingerprint({
+      kind: 'PERIOD',
+      targetId: period.id,
+      status: period.status,
+      items: views,
+    });
+    const readyToClose = blockers.length === 0;
+    const range = `${formatBsDate(period.startDate)} – ${formatBsDate(period.endDate)} BS (${period.startDate.toISOString().slice(0, 10)} – ${period.endDate.toISOString().slice(0, 10)})`;
+    return {
+      kind: 'PERIOD' as const,
+      checkedAt: new Date().toISOString(),
+      period: {
+        id: period.id,
+        fiscalYearId: period.fiscalYearId,
+        fiscalYearName: period.fiscalYear.name,
+        label: period.label,
+        periodNumber: period.periodNumber,
+        startDate: period.startDate,
+        endDate: period.endDate,
+        bsStartDate: formatBsDate(period.startDate),
+        bsEndDate: formatBsDate(period.endDate),
+        status: period.status,
+      },
+      previousPeriod: previous,
+      nextPeriod: next,
+      blockers,
+      warnings,
+      consequences: [
+        `After close, nothing dated ${range} can post: fee, payroll, vendor bill and manual journals for these dates are refused.`,
+        'Correcting a closed period needs an approved reopen request.',
+        next
+          ? `The next period, "${next.label}", is ${next.status.toLowerCase()} and stays as it is.`
+          : 'This is the last period of the fiscal year; the year can be closed once every period is closed.',
+      ],
+      requiredAcknowledgements: warnings.map((item) => item.code),
+      readyToClose,
+      previewFingerprint,
+      authorization: buildResourceAuthorization({
+        actions: {
+          close:
+            readyToClose &&
+            hasDomainPermission(actor, 'accounting:fiscal:manage'),
+        },
+        sections: { inventory: true },
+        lifecycleState: period.status,
+        entitlementState: { module: 'accounting', state: 'ENABLED' },
+      }),
     };
   }
 
@@ -2649,230 +2828,12 @@ export class AccountingService implements OnModuleInit {
     if (!fiscalYear) {
       throw new NotFoundException('Fiscal year not found');
     }
-
-    const sourceTypes = [
-      JournalSourceType.INVOICE,
-      JournalSourceType.FEE_PAYMENT,
-      JournalSourceType.PAYMENT_REFUND,
-      JournalSourceType.PAYROLL,
-      JournalSourceType.PAYROLL_RUN,
-      JournalSourceType.PAYROLL_DISBURSEMENT,
-      JournalSourceType.ADJUSTMENT,
-    ];
-    const [
-      journalStatuses,
-      postedSourceWithoutMapping,
-      unreconciledBankItems,
-      unresolvedReconciliations,
-      trialBalance,
-      unbalancedRows,
-      approvedUnpostedPayrollRuns,
-      openingBalanceEntry,
-    ] = await Promise.all([
-      client.journalEntry.groupBy({
-        by: ['status'],
-        where: { tenantId: actor.tenantId, fiscalYearId: fiscalYear.id },
-        _count: { _all: true },
-      }),
-      client.journalEntry.count({
-        where: {
-          tenantId: actor.tenantId,
-          fiscalYearId: fiscalYear.id,
-          status: JournalEntryStatus.POSTED,
-          sourceType: { in: sourceTypes },
-          sourceMappingId: null,
-        },
-      }),
-      client.bankStatement.count({
-        where: {
-          tenantId: actor.tenantId,
-          isReconciled: false,
-          statementDate: { gte: fiscalYear.startDate, lte: fiscalYear.endDate },
-        },
-      }),
-      Promise.all(
-        fiscalYear.periods.map((period) =>
-          new BankReconciliationService(
-            this.prisma,
-            this.auditService,
-            this.postingService,
-          ).unresolvedForPeriodClose(period.id, actor, client),
-        ),
-      ).then((counts) => counts.reduce((sum, count) => sum + count, 0)),
-      client.journalLine.aggregate({
-        where: {
-          tenantId: actor.tenantId,
-          journalEntry: {
-            tenantId: actor.tenantId,
-            fiscalYearId: fiscalYear.id,
-            status: { in: LEDGER_EFFECTIVE_STATUSES },
-          },
-        },
-        _sum: { debit: true, credit: true },
-      }),
-      client.$queryRaw<Array<{ count: number }>>(Prisma.sql`
-        SELECT COUNT(*)::INTEGER AS "count"
-        FROM (
-          SELECT journal."id"
-          FROM "JournalEntry" AS journal
-          INNER JOIN "JournalLine" AS line
-            ON line."journalEntryId" = journal."id"
-            AND line."tenantId" = ${actor.tenantId}
-          WHERE journal."tenantId" = ${actor.tenantId}
-            AND journal."fiscalYearId" = ${fiscalYear.id}
-            AND journal."status" = ${JournalEntryStatus.POSTED}::"JournalEntryStatus"
-          GROUP BY journal."id"
-          HAVING COALESCE(SUM(line."debit"), 0) <> COALESCE(SUM(line."credit"), 0)
-        ) AS unbalanced
-      `),
-      client.payrollRun.count({
-        where: {
-          tenantId: actor.tenantId,
-          fiscalYearId: fiscalYear.id,
-          status: {
-            in: [PayrollRunStatus.APPROVED, PayrollRunStatus.FINALIZED],
-          },
-        },
-      }),
-      client.journalEntry.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          sourceType: 'OPENING_BALANCE',
-          sourceId: fiscalYear.id,
-        },
-        select: { status: true },
-      }),
-    ]);
-
-    const statusCount = (status: JournalEntryStatus) =>
-      journalStatuses.find((row) => row.status === status)?._count._all ?? 0;
-    const debit = new Prisma.Decimal(trialBalance._sum.debit ?? 0);
-    const credit = new Prisma.Decimal(trialBalance._sum.credit ?? 0);
-    const unbalancedPosted = unbalancedRows[0]?.count ?? 0;
-    const periodsByStatus = {
-      open: fiscalYear.periods.filter(
-        (p) => p.status === AccountingPeriodStatus.OPEN,
-      ).length,
-      locked: fiscalYear.periods.filter(
-        (p) => p.status === AccountingPeriodStatus.LOCKED,
-      ).length,
-      closed: fiscalYear.periods.filter(
-        (p) => p.status === AccountingPeriodStatus.CLOSED,
-      ).length,
-    };
-
-    type IssueSeverity = 'BLOCKING' | 'WARNING' | 'INFO';
-    type IssueCode =
-      | 'OPEN_PERIODS'
-      | 'DRAFT_JOURNALS'
-      | 'SUBMITTED_JOURNALS'
-      | 'APPROVED_UNPOSTED_JOURNALS'
-      | 'MISSING_SOURCE_MAPPINGS'
-      | 'UNRECONCILED_BANK_ITEMS'
-      | 'UNFINALIZED_RECONCILIATIONS'
-      | 'UNBALANCED_JOURNALS'
-      | 'TRIAL_BALANCE_NOT_READY'
-      | 'OPENING_BALANCE_INCOMPLETE'
-      | 'PAYROLL_POSTING_INCOMPLETE';
-    const issues: Array<{
-      code: IssueCode;
-      severity: IssueSeverity;
-      count: number;
-      safeMessage: string;
-      resolutionRoute: string;
-    }> = [];
-    const addIssue = (
-      code: IssueCode,
-      severity: IssueSeverity,
-      count: number,
-      safeMessage: string,
-      resolutionRoute: string,
-    ) => {
-      if (count > 0) {
-        issues.push({ code, severity, count, safeMessage, resolutionRoute });
-      }
-    };
-
-    addIssue(
-      'OPEN_PERIODS',
-      'BLOCKING',
-      periodsByStatus.open + periodsByStatus.locked,
-      'All fiscal periods must be closed before the fiscal year can be closed.',
-      '/dashboard/accounting/fiscal-periods',
-    );
-    addIssue(
-      'DRAFT_JOURNALS',
-      'BLOCKING',
-      statusCount(JournalEntryStatus.DRAFT),
-      'Draft journals must be completed or cancelled.',
-      '/dashboard/accounting/journals?status=DRAFT',
-    );
-    addIssue(
-      'SUBMITTED_JOURNALS',
-      'BLOCKING',
-      statusCount(JournalEntryStatus.SUBMITTED),
-      'Submitted journals are still awaiting a decision.',
-      '/dashboard/accounting/journals?status=SUBMITTED',
-    );
-    addIssue(
-      'APPROVED_UNPOSTED_JOURNALS',
-      'BLOCKING',
-      statusCount(JournalEntryStatus.APPROVED),
-      'Approved journals must be posted or returned through the approved workflow.',
-      '/dashboard/accounting/journals?status=APPROVED',
-    );
-    addIssue(
-      'MISSING_SOURCE_MAPPINGS',
-      'BLOCKING',
-      postedSourceWithoutMapping,
-      'Posted source journals without mapping evidence require review.',
-      '/dashboard/accounting/source-mappings',
-    );
-    addIssue(
-      'UNFINALIZED_RECONCILIATIONS',
-      'BLOCKING',
-      unresolvedReconciliations,
-      'Reconciliation sessions must be independently reviewed, finalized, and current before year close.',
-      '/dashboard/accounting/reconciliation',
-    );
-    addIssue(
-      'UNRECONCILED_BANK_ITEMS',
-      'BLOCKING',
-      unreconciledBankItems,
-      'Bank statement items in this fiscal year remain unreconciled.',
-      '/dashboard/accounting/reconciliation',
-    );
-    addIssue(
-      'UNBALANCED_JOURNALS',
-      'BLOCKING',
-      unbalancedPosted,
-      'One or more posted journals are unbalanced.',
-      '/dashboard/accounting/journals?status=POSTED',
-    );
-    addIssue(
-      'TRIAL_BALANCE_NOT_READY',
-      'BLOCKING',
-      debit.equals(credit) ? 0 : 1,
-      'The fiscal year trial balance is not balanced.',
-      '/dashboard/accounting/reports?report=trial-balance',
-    );
-    addIssue(
-      'PAYROLL_POSTING_INCOMPLETE',
-      'BLOCKING',
-      approvedUnpostedPayrollRuns,
-      'Approved or finalized payroll runs in this fiscal year have not been posted to the ledger.',
-      '/dashboard/payroll/runs',
-    );
-    addIssue(
-      'OPENING_BALANCE_INCOMPLETE',
-      'WARNING',
-      openingBalanceEntry?.status === JournalEntryStatus.POSTED ? 0 : 1,
-      openingBalanceEntry
-        ? 'The opening balance entry has not been posted.'
-        : 'No opening balance entry has been recorded for this fiscal year.',
-      '/dashboard/accounting/opening-balance',
-    );
-
+    const { items, facts, periodsByStatus, openingBalanceEntry } =
+      await this.collectYearCloseState(client, actor, fiscalYear);
+    const issues = projectCloseItems(items, actor).map((item) => ({
+      ...toReadinessIssue(item),
+      severity: item.severity,
+    }));
     const blockingCount = issues.filter(
       (issue) => issue.severity === 'BLOCKING',
     ).length;
@@ -2917,26 +2878,15 @@ export class AccountingService implements OnModuleInit {
         total: fiscalYear.periods.length,
         ...periodsByStatus,
       },
-      journals: {
-        draft: statusCount(JournalEntryStatus.DRAFT),
-        submitted: statusCount(JournalEntryStatus.SUBMITTED),
-        approvedUnposted: statusCount(JournalEntryStatus.APPROVED),
-        posted: statusCount(JournalEntryStatus.POSTED),
-        postedSourceWithoutMapping,
-        unbalancedPosted,
-      },
-      unreconciledBankItems,
-      trialBalance: {
-        debit: debit.toFixed(2),
-        credit: credit.toFixed(2),
-        balanced: debit.equals(credit),
-      },
+      journals: facts.journals,
+      unreconciledBankItems: facts.unreconciledBankItems,
+      trialBalance: facts.trialBalance,
       openingBalance: {
         exists: Boolean(openingBalanceEntry),
         status: openingBalanceEntry?.status ?? null,
       },
       payroll: {
-        approvedUnposted: approvedUnpostedPayrollRuns,
+        approvedUnposted: facts.payrollApprovedUnposted,
       },
       issues,
       blockingIssueCount: blockingCount,
@@ -2944,16 +2894,297 @@ export class AccountingService implements OnModuleInit {
       readinessStatus,
       allowedActions,
       unavailableChecks: [
-        'NEEDS_POSTING_FAILURE_CONTRACT' as const,
         'NEEDS_REPORT_SNAPSHOT_POLICY' as const,
         'NEEDS_EXPORT_JOB_SCOPE_CONFIRMATION' as const,
         'NEEDS_FEE_POSTING_RECONCILIATION_CONTRACT' as const,
-        'NEEDS_WARNING_ACKNOWLEDGEMENT_CONTRACT' as const,
       ],
       readyToClose,
     };
   }
 
+  private async collectYearCloseState(
+    client: Prisma.TransactionClient | PrismaService,
+    actor: AuthContext,
+    fiscalYear: {
+      id: string;
+      startDate: Date;
+      endDate: Date;
+      periods: Array<{ id: string; status: AccountingPeriodStatus }>;
+    },
+  ) {
+    const [state, openingBalanceEntry] = await Promise.all([
+      this.collectCloseState(client, actor, {
+        kind: 'YEAR',
+        tenantId: actor.tenantId,
+        fiscalYearId: fiscalYear.id,
+        periodIds: fiscalYear.periods.map((period) => period.id),
+        start: fiscalYear.startDate,
+        end: fiscalYear.endDate,
+      }),
+      client.journalEntry.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          sourceType: JournalSourceType.OPENING_BALANCE,
+          sourceId: fiscalYear.id,
+        },
+        select: { status: true },
+      }),
+    ]);
+    const periodsByStatus = {
+      open: fiscalYear.periods.filter(
+        (p) => p.status === AccountingPeriodStatus.OPEN,
+      ).length,
+      locked: fiscalYear.periods.filter(
+        (p) => p.status === AccountingPeriodStatus.LOCKED,
+      ).length,
+      closed: fiscalYear.periods.filter(
+        (p) => p.status === AccountingPeriodStatus.CLOSED,
+      ).length,
+    };
+    const extra: CloseItem[] = [];
+    if (periodsByStatus.open + periodsByStatus.locked > 0)
+      extra.push({
+        code: 'OPEN_PERIODS',
+        severity: 'BLOCKING',
+        count: periodsByStatus.open + periodsByStatus.locked,
+        amount: null,
+        message:
+          'All fiscal periods must be closed before the fiscal year can be closed.',
+        consequence: 'Each period is reviewed and closed on its own first.',
+        resolutionRoute: '/dashboard/accounting/fiscal-periods',
+        readPermissions: null,
+      });
+    if (openingBalanceEntry?.status !== JournalEntryStatus.POSTED)
+      extra.push({
+        code: 'OPENING_BALANCE_INCOMPLETE',
+        severity: 'WARNING',
+        count: 1,
+        amount: null,
+        message: openingBalanceEntry
+          ? 'The opening balance entry has not been posted.'
+          : 'No opening balance entry has been recorded for this fiscal year.',
+        consequence:
+          'Balances carry forward from earlier years automatically; record an opening balance only for a first year in SchoolOS.',
+        resolutionRoute: '/dashboard/accounting/opening-balance',
+        readPermissions: null,
+      });
+    return {
+      items: [...extra, ...state.items],
+      facts: state.facts,
+      periodsByStatus,
+      openingBalanceEntry,
+    };
+  }
+
+  /**
+   * The closing entry a year close would post now: every income and expense
+   * balance still open after any earlier closing entry of the year (a re-close
+   * after reopening closes only the change), into retained earnings.
+   */
+  private async planYearClose(
+    client: Prisma.TransactionClient | PrismaService,
+    actor: AuthContext,
+    fiscalYear: { id: string; endDate: Date },
+  ) {
+    const [grouped, accounts, retainedMapping, previous] = await Promise.all([
+      client.journalLine.groupBy({
+        by: ['chartAccountId'],
+        _sum: { debit: true, credit: true },
+        where: {
+          tenantId: actor.tenantId,
+          journalEntry: ledgerEntryWhere({
+            tenantId: actor.tenantId,
+            stage: 'POST_CLOSING',
+            fiscalYearId: fiscalYear.id,
+          }),
+        },
+      }),
+      client.chartAccount.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          type: { in: PROFIT_AND_LOSS_ACCOUNT_TYPES },
+        },
+        select: { id: true, code: true, name: true, type: true },
+      }),
+      client.accountingReportAccountMapping.findFirst({
+        where: { tenantId: actor.tenantId, mappingType: 'RETAINED_EARNINGS' },
+        include: { account: { select: { id: true, code: true, name: true } } },
+      }),
+      client.journalEntry.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          sourceType: JournalSourceType.CLOSING_ENTRY,
+          sourceId: fiscalYear.id,
+        },
+        select: {
+          id: true,
+          entryNumber: true,
+          postingType: true,
+          status: true,
+          postedAt: true,
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
+    ]);
+    const retainedEarnings =
+      retainedMapping?.account ??
+      (await client.chartAccount.findFirst({
+        where: { tenantId: actor.tenantId, code: '3100' },
+        select: { id: true, code: true, name: true },
+      }));
+    const byAccount = new Map(grouped.map((row) => [row.chartAccountId, row]));
+    const balances: ProfitAndLossBalance[] = accounts.flatMap((account) => {
+      const row = byAccount.get(account.id);
+      return row
+        ? [
+            {
+              accountId: account.id,
+              code: account.code,
+              name: account.name,
+              type: account.type,
+              debit: new Prisma.Decimal(row._sum.debit ?? 0),
+              credit: new Prisma.Decimal(row._sum.credit ?? 0),
+            },
+          ]
+        : [];
+    });
+    const { lines, netResult } = retainedEarnings
+      ? buildClosingLines(balances, retainedEarnings)
+      : buildClosingLines(balances, { id: '', code: '', name: '' });
+    return {
+      lines,
+      netResult,
+      retainedEarnings,
+      previous,
+      postingType: closingPostingType(previous.length),
+      entryDate: fiscalYear.endDate,
+    };
+  }
+
+  /**
+   * Phase 7.11d: everything a year close depends on, the exact closing lines
+   * it will post, and the fingerprint the close must present.
+   */
+  async getFiscalYearClosePreview(
+    fiscalYearId: string,
+    actor: AuthContext,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const fiscalYear = await client.fiscalYear.findFirst({
+      where: { id: fiscalYearId, tenantId: actor.tenantId },
+      include: { periods: true },
+    });
+    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
+    const [{ items }, plan] = await Promise.all([
+      this.collectYearCloseState(client, actor, fiscalYear),
+      this.planYearClose(client, actor, fiscalYear),
+    ]);
+    const state: CloseItem[] = [];
+    const blocker = (code: string, message: string, consequence: string) =>
+      state.push({
+        code,
+        severity: 'BLOCKING',
+        count: 1,
+        amount: null,
+        message,
+        consequence,
+        resolutionRoute: '/dashboard/accounting/fiscal-periods',
+        readPermissions: null,
+      });
+    if (fiscalYear.status === 'CLOSED')
+      blocker(
+        'FISCAL_YEAR_ALREADY_CLOSED',
+        'This fiscal year is already closed.',
+        'Nothing to do.',
+      );
+    if (plan.lines.length === 0 && plan.previous.length === 0)
+      blocker(
+        'NOTHING_TO_CLOSE',
+        'No revenue or expense balances to close for this fiscal year.',
+        'A year with no income or expense activity has nothing to transfer to retained earnings.',
+      );
+    if (plan.lines.length > 0 && !plan.retainedEarnings)
+      blocker(
+        'RETAINED_EARNINGS_MISSING',
+        'Retained Earnings account not found. Configure RETAINED_EARNINGS mapping or create account with code 3100.',
+        'The year result has no account to go to.',
+      );
+    const views = projectCloseItems([...state, ...items], actor);
+    const blockers = views.filter((item) => item.severity === 'BLOCKING');
+    const warnings = views.filter((item) => item.severity === 'WARNING');
+    const closingLines = plan.lines.map((line) => ({
+      chartAccountId: line.chartAccountId,
+      code: line.code,
+      name: line.name,
+      debit: line.debit.toFixed(2),
+      credit: line.credit.toFixed(2),
+      description: line.description,
+    }));
+    const previewFingerprint = closePreviewFingerprint({
+      kind: 'YEAR',
+      targetId: fiscalYear.id,
+      status: fiscalYear.status,
+      items: views,
+      closing: { postingType: plan.postingType, lines: closingLines },
+    });
+    const readyToClose = blockers.length === 0;
+    return {
+      kind: 'YEAR' as const,
+      checkedAt: new Date().toISOString(),
+      fiscalYear: {
+        id: fiscalYear.id,
+        name: fiscalYear.name,
+        status: fiscalYear.status,
+        startDate: fiscalYear.startDate,
+        endDate: fiscalYear.endDate,
+        bsStartDate: formatBsDate(fiscalYear.startDate),
+        bsEndDate: formatBsDate(fiscalYear.endDate),
+      },
+      blockers,
+      warnings,
+      closing: {
+        postingType: plan.postingType,
+        supplementary: plan.previous.length > 0,
+        previousClosingEntries: plan.previous,
+        entryDate: plan.entryDate.toISOString().slice(0, 10),
+        bsEntryDate: formatBsDate(plan.entryDate),
+        lines: closingLines,
+        netResult: plan.netResult.toFixed(2),
+        resultType: plan.netResult.gt(0)
+          ? ('SURPLUS' as const)
+          : plan.netResult.lt(0)
+            ? ('DEFICIT' as const)
+            : ('NONE' as const),
+        retainedEarningsAccount: plan.retainedEarnings,
+      },
+      consequences: [
+        plan.lines.length > 0
+          ? `A ${plan.previous.length > 0 ? 'supplementary ' : ''}closing entry dated ${formatBsDate(plan.entryDate)} BS (${plan.entryDate.toISOString().slice(0, 10)}) moves the lines below into retained earnings.`
+          : 'The income and expense accounts are already closed; no new closing entry is needed.',
+        'After close, nothing dated in this fiscal year can post, and the year needs an approved reopen request to change.',
+      ],
+      requiredAcknowledgements: warnings.map((item) => item.code),
+      readyToClose,
+      previewFingerprint,
+      authorization: buildResourceAuthorization({
+        actions: {
+          close:
+            readyToClose &&
+            hasDomainPermission(actor, 'accounting:fiscal:manage'),
+        },
+        sections: { inventory: true, closingLines: true },
+        lifecycleState: fiscalYear.status,
+        entitlementState: { module: 'accounting', state: 'ENABLED' },
+      }),
+    };
+  }
+
+  /**
+   * Phase 7.11d: the year close posts exactly the closing lines of the
+   * reviewed preview (fingerprint-bound, every warning acknowledged). After
+   * a reopen it posts a supplementary closing entry for the change only; if
+   * nothing changed it closes without a new entry.
+   */
   async closeFiscalYear(
     fiscalYearId: string,
     dto: CloseFiscalYearDto,
@@ -2972,170 +3203,46 @@ export class AccountingService implements OnModuleInit {
           throw new NotFoundException('Fiscal year not found');
         const fiscalYear = await tx.fiscalYear.findFirst({
           where: { id: fiscalYearId, tenantId: actor.tenantId },
-          include: { periods: true },
         });
-
-        if (!fiscalYear) {
-          throw new NotFoundException('Fiscal year not found');
-        }
-
-        if (fiscalYear.status === 'CLOSED') {
+        if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
+        if (fiscalYear.status === 'CLOSED')
           throw new ConflictException('Fiscal year is already closed');
-        }
 
-        const readiness = await this.getFiscalYearCloseReadiness(
+        const preview = await this.getFiscalYearClosePreview(
           fiscalYearId,
           actor,
           tx,
         );
-        if (!readiness.readyToClose) {
-          throw new ConflictException(
-            `Fiscal year cannot be closed until these issues are resolved: ${readiness.issues
-              .filter((issue) => issue.severity === 'BLOCKING')
-              .map((issue) => issue.code)
-              .join(', ')}`,
-          );
-        }
+        assertClosePreviewAccepted(preview, dto);
 
-        // Calculate net Revenue and Expense balances
-        const linesGrouped = await tx.journalLine.groupBy({
-          by: ['chartAccountId'],
-          _sum: { debit: true, credit: true },
-          where: {
-            tenantId: actor.tenantId,
-            // Reversed originals and their reversals both count (7.11a);
-            // income includes INCOME-type accounts (decision R4).
-            journalEntry: ledgerEntryWhere({
-              tenantId: actor.tenantId,
-              stage: 'PRE_CLOSING',
-              fiscalYearId,
-            }),
-          },
-        });
+        const closingEntry =
+          preview.closing.lines.length > 0
+            ? await this.postingService.postManualJournal(
+                {
+                  tenantId: actor.tenantId,
+                  entryDate: fiscalYear.endDate,
+                  narration: preview.closing.supplementary
+                    ? `Supplementary closing entries for fiscal year ${fiscalYear.name}`
+                    : `Closing entries for fiscal year ${fiscalYear.name}`,
+                  sourceModule: 'ACCOUNTING',
+                  sourceType: JournalSourceType.CLOSING_ENTRY,
+                  sourceId: fiscalYearId,
+                  postingType: preview.closing.postingType,
+                  lines: preview.closing.lines.map((line) => ({
+                    chartAccountId: line.chartAccountId,
+                    debit: line.debit,
+                    credit: line.credit,
+                    description: line.description,
+                  })),
+                  // Every period is closed by now (a blocker otherwise), so
+                  // the closing entry itself posts into a closed period.
+                  allowClosedPeriod: true,
+                },
+                actor,
+                tx,
+              )
+            : null;
 
-        const accounts = await tx.chartAccount.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            type: { in: PROFIT_AND_LOSS_ACCOUNT_TYPES },
-          },
-        });
-
-        // Find retained earnings account via mapping
-        const retainedEarningsMapping =
-          await tx.accountingReportAccountMapping.findFirst({
-            where: {
-              tenantId: actor.tenantId,
-              // RETAINED_EARNINGS added to schema; after prisma generate this cast becomes redundant
-              mappingType: 'RETAINED_EARNINGS',
-            },
-          });
-
-        let retainedEarningsAccountId: string;
-        if (retainedEarningsMapping) {
-          retainedEarningsAccountId = retainedEarningsMapping.accountId;
-        } else {
-          // Fallback: use code 3100 (Retained Surplus/Deficit from default chart)
-          const retainedAccount = await tx.chartAccount.findFirst({
-            where: { tenantId: actor.tenantId, code: '3100' },
-          });
-          if (!retainedAccount) {
-            throw new ConflictException(
-              'Retained Earnings account not found. Configure RETAINED_EARNINGS mapping or create account with code 3100.',
-            );
-          }
-          retainedEarningsAccountId = retainedAccount.id;
-        }
-
-        const closingLines: Array<{
-          chartAccountId: string;
-          debit?: Prisma.Decimal | number;
-          credit?: Prisma.Decimal | number;
-          description?: string;
-        }> = [];
-
-        let netResult = new Prisma.Decimal(0);
-
-        for (const account of accounts) {
-          const lineData = linesGrouped.find(
-            (l) => l.chartAccountId === account.id,
-          );
-          if (!lineData) continue;
-
-          const debit = new Prisma.Decimal(lineData._sum.debit ?? 0);
-          const credit = new Prisma.Decimal(lineData._sum.credit ?? 0);
-          const net = debit.minus(credit);
-
-          if (net.isZero()) continue;
-
-          if (isIncomeAccountType(account.type)) {
-            // Revenue has credit balance → close by debiting
-            const revenueNet = credit.minus(debit);
-            closingLines.push({
-              chartAccountId: account.id,
-              debit: revenueNet,
-              credit: 0,
-              description: `Close revenue: ${account.name}`,
-            });
-            netResult = netResult.plus(revenueNet);
-          } else if (account.type === ChartAccountType.EXPENSE) {
-            // Expense has debit balance → close by crediting
-            const expenseNet = debit.minus(credit);
-            closingLines.push({
-              chartAccountId: account.id,
-              debit: 0,
-              credit: expenseNet,
-              description: `Close expense: ${account.name}`,
-            });
-            netResult = netResult.minus(expenseNet);
-          }
-        }
-
-        if (closingLines.length === 0) {
-          throw new ConflictException(
-            'No revenue or expense balances to close for this fiscal year',
-          );
-        }
-
-        // Add retained earnings line for the net result
-        if (netResult.gt(0)) {
-          // Surplus → credit retained earnings
-          closingLines.push({
-            chartAccountId: retainedEarningsAccountId,
-            debit: 0,
-            credit: netResult,
-            description: `Net surplus transferred to retained earnings`,
-          });
-        } else if (netResult.lt(0)) {
-          // Deficit → debit retained earnings
-          closingLines.push({
-            chartAccountId: retainedEarningsAccountId,
-            debit: netResult.abs(),
-            credit: 0,
-            description: `Net deficit transferred to retained earnings`,
-          });
-        }
-
-        // Post the closing entry via posting service
-        const closingEntry = await this.postingService.postManualJournal(
-          {
-            tenantId: actor.tenantId,
-            entryDate: fiscalYear.endDate,
-            narration: `Closing entries for fiscal year ${fiscalYear.name}`,
-            sourceModule: 'ACCOUNTING',
-            sourceType: 'CLOSING_ENTRY',
-            sourceId: fiscalYearId,
-            postingType: 'FISCAL_YEAR_CLOSE',
-            lines: closingLines,
-            // All fiscal periods are required to be CLOSED before this point
-            // (enforced by readiness), so the closing entry itself must be
-            // allowed to post into an already-closed period.
-            allowClosedPeriod: true,
-          },
-          actor,
-          tx,
-        );
-
-        // Update fiscal year status
         const claim = await tx.fiscalYear.updateMany({
           where: { id: fiscalYearId, tenantId: actor.tenantId, status: 'OPEN' },
           data: {
@@ -3159,10 +3266,15 @@ export class AccountingService implements OnModuleInit {
             after: {
               status: 'CLOSED',
               reason: dto.reason,
-              closingEntryId: closingEntry.id,
-              closingEntryNumber: closingEntry.entryNumber,
-              netResult: netResult.toString(),
-              retainedEarningsAccountId,
+              closingEntryId: closingEntry?.id ?? null,
+              closingEntryNumber: closingEntry?.entryNumber ?? null,
+              postingType: closingEntry ? preview.closing.postingType : null,
+              supplementary: preview.closing.supplementary,
+              netResult: preview.closing.netResult,
+              retainedEarningsAccountId:
+                preview.closing.retainedEarningsAccount?.id ?? null,
+              previewFingerprint: preview.previewFingerprint,
+              acknowledgedWarningCodes: preview.requiredAcknowledgements,
             },
           },
           tx,

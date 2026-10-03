@@ -1503,57 +1503,60 @@ export type AccountingPostingBatchSummary = {
   createdAt: string;
 };
 
+/**
+ * Phase 7.11d: one item of the close inventory. `restricted` means the viewer
+ * cannot act on it: the item and its severity are shown, the count is not.
+ */
+export type FiscalCloseItem = {
+  code: string;
+  severity: "BLOCKING" | "WARNING";
+  count: number | null;
+  amount: string | null;
+  restricted: boolean;
+  message: string;
+  consequence: string;
+  resolutionRoute: string;
+};
+
+export type FiscalCloseReadinessIssue = {
+  code: string;
+  count: number | null;
+  restricted: boolean;
+  amount: string | null;
+  safeMessage: string;
+  consequence: string;
+  resolutionRoute: string;
+};
+
+export type FiscalCloseJournalCounts = {
+  draft: number;
+  submitted: number;
+  reviewed: number;
+  approvedUnposted: number;
+  posted: number;
+  postedSourceWithoutMapping: number;
+  unbalancedPosted: number;
+};
+
 export type FiscalPeriodCloseReadiness = {
   checkedAt: string;
   period: FiscalPeriodSummary & { fiscalYearName: string };
-  journals: {
-    draft: number;
-    submitted: number;
-    approvedUnposted: number;
-    posted: number;
-    postedSourceWithoutMapping: number;
-    unbalancedPosted: number;
-  };
+  journals: FiscalCloseJournalCounts;
   unreconciledBankItems: number;
   trialBalance: {
     debit: string;
     credit: string;
     balanced: boolean;
   };
-  blockers: Array<{
-    code:
-      | "DRAFT_JOURNALS"
-      | "SUBMITTED_JOURNALS"
-      | "APPROVED_UNPOSTED_JOURNALS"
-      | "POSTED_SOURCE_WITHOUT_MAPPING"
-      | "UNRECONCILED_BANK_ITEMS"
-      | "UNFINALIZED_RECONCILIATIONS"
-      | "UNBALANCED_POSTED_JOURNALS"
-      | "UNBALANCED_TRIAL_BALANCE";
-    count: number;
-    safeMessage: string;
-    resolutionRoute: string;
-  }>;
-  unavailableChecks: Array<
-    "NEEDS_POSTING_FAILURE_CONTRACT" | "NEEDS_REPORT_SNAPSHOT_POLICY"
-  >;
+  blockers: FiscalCloseReadinessIssue[];
+  warnings: FiscalCloseReadinessIssue[];
+  unavailableChecks: Array<"NEEDS_REPORT_SNAPSHOT_POLICY">;
   readyToClose: boolean;
 };
 
 export type FiscalCloseIssueSeverity = "BLOCKING" | "WARNING" | "INFO";
 
-export type FiscalYearCloseIssueCode =
-  | "OPEN_PERIODS"
-  | "UNFINALIZED_RECONCILIATIONS"
-  | "DRAFT_JOURNALS"
-  | "SUBMITTED_JOURNALS"
-  | "APPROVED_UNPOSTED_JOURNALS"
-  | "MISSING_SOURCE_MAPPINGS"
-  | "UNRECONCILED_BANK_ITEMS"
-  | "UNBALANCED_JOURNALS"
-  | "TRIAL_BALANCE_NOT_READY"
-  | "OPENING_BALANCE_INCOMPLETE"
-  | "PAYROLL_POSTING_INCOMPLETE";
+export type FiscalYearCloseIssueCode = string;
 
 export type FiscalYearCloseReadiness = {
   checkedAt: string;
@@ -1574,14 +1577,7 @@ export type FiscalYearCloseReadiness = {
     locked: number;
     closed: number;
   };
-  journals: {
-    draft: number;
-    submitted: number;
-    approvedUnposted: number;
-    posted: number;
-    postedSourceWithoutMapping: number;
-    unbalancedPosted: number;
-  };
+  journals: FiscalCloseJournalCounts;
   unreconciledBankItems: number;
   trialBalance: {
     debit: string;
@@ -1595,25 +1591,86 @@ export type FiscalYearCloseReadiness = {
   payroll: {
     approvedUnposted: number;
   };
-  issues: Array<{
-    code: FiscalYearCloseIssueCode;
-    severity: FiscalCloseIssueSeverity;
-    count: number;
-    safeMessage: string;
-    resolutionRoute: string;
-  }>;
+  issues: Array<
+    FiscalCloseReadinessIssue & { severity: FiscalCloseIssueSeverity }
+  >;
   blockingIssueCount: number;
   warningCount: number;
   readinessStatus: "READY" | "NEEDS_ACKNOWLEDGEMENT" | "BLOCKED" | "CLOSED";
   allowedActions: Array<"CLOSE" | "REOPEN">;
   unavailableChecks: Array<
-    | "NEEDS_POSTING_FAILURE_CONTRACT"
     | "NEEDS_REPORT_SNAPSHOT_POLICY"
     | "NEEDS_EXPORT_JOB_SCOPE_CONFIRMATION"
     | "NEEDS_FEE_POSTING_RECONCILIATION_CONTRACT"
-    | "NEEDS_WARNING_ACKNOWLEDGEMENT_CONTRACT"
   >;
   readyToClose: boolean;
+};
+
+/** Phase 7.11d: what a period close depends on and will mean. */
+export type FiscalPeriodClosePreview = {
+  kind: "PERIOD";
+  checkedAt: string;
+  period: {
+    id: string;
+    fiscalYearId: string;
+    fiscalYearName: string;
+    label: string;
+    periodNumber: number;
+    startDate: string;
+    endDate: string;
+    bsStartDate: string;
+    bsEndDate: string;
+    status: string;
+  };
+  previousPeriod: { id: string; label: string; status: string } | null;
+  nextPeriod: { id: string; label: string; status: string } | null;
+  blockers: FiscalCloseItem[];
+  warnings: FiscalCloseItem[];
+  consequences: string[];
+  /** Every warning code; the close must acknowledge each one. */
+  requiredAcknowledgements: string[];
+  readyToClose: boolean;
+  /** Send back as `expectedPreviewFingerprint` when closing. */
+  previewFingerprint: string;
+  authorization: ResourceAuthorization<"close", "inventory">;
+};
+
+/** Phase 7.11d: the year preview, including the exact closing lines. */
+export type FiscalYearClosePreview = {
+  kind: "YEAR";
+  checkedAt: string;
+  fiscalYear: FiscalYearCloseReadiness["fiscalYear"];
+  blockers: FiscalCloseItem[];
+  warnings: FiscalCloseItem[];
+  closing: {
+    postingType: string;
+    supplementary: boolean;
+    previousClosingEntries: Array<{
+      id: string;
+      entryNumber: string;
+      postingType: string | null;
+      status: string;
+      postedAt: string | null;
+    }>;
+    entryDate: string;
+    bsEntryDate: string;
+    lines: Array<{
+      chartAccountId: string;
+      code: string;
+      name: string;
+      debit: string;
+      credit: string;
+      description: string;
+    }>;
+    netResult: string;
+    resultType: "SURPLUS" | "DEFICIT" | "NONE";
+    retainedEarningsAccount: { id: string; code: string; name: string } | null;
+  };
+  consequences: string[];
+  requiredAcknowledgements: string[];
+  readyToClose: boolean;
+  previewFingerprint: string;
+  authorization: ResourceAuthorization<"close", "inventory" | "closingLines">;
 };
 
 export type AccountingReport = {

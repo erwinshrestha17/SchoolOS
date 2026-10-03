@@ -79,11 +79,26 @@ test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting
   expect(initialReadiness.allowedActions).toEqual([]);
 
   // --- Attempted close blocked by the backend even with a valid reason. ---
-  const blockedClose = await fiscalController.context.request.post(
+  // Phase 7.11d: a close without the reviewed preview is refused outright,
+  // and a preview-bound close is refused while a blocker remains.
+  const unpreviewedClose = await fiscalController.context.request.post(
     `${API_BASE_URL}/accounting/fiscal-years/${fiscalYearId}/close-year`,
     {
       headers: csrfHeaders(fiscalController.state),
       data: { reason: 'Attempting close while a period is still open.' },
+    },
+  );
+  expect(unpreviewedClose.status()).toBe(409);
+  expect(await unpreviewedClose.text()).toContain('CLOSE_PREVIEW_REQUIRED');
+  const blockedClose = await fiscalController.context.request.post(
+    `${API_BASE_URL}/accounting/fiscal-years/${fiscalYearId}/close-year`,
+    {
+      headers: csrfHeaders(fiscalController.state),
+      data: await previewBoundClose(
+        fiscalController,
+        `${API_BASE_URL}/accounting/fiscal-years/${fiscalYearId}/close-preview`,
+        'Attempting close while a period is still open.',
+      ),
     },
   );
   expect(blockedClose.status()).toBe(409);
@@ -173,7 +188,11 @@ test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting
       `${API_BASE_URL}/accounting/fiscal-periods/${id}/close`,
       {
         headers: csrfHeaders(fiscalController.state),
-        data: { reason: 'E2E fiscal-year close verification period close' },
+        data: await previewBoundClose(
+          fiscalController,
+          `${API_BASE_URL}/accounting/fiscal-periods/${id}/close-preview`,
+          'E2E fiscal-year close verification period close',
+        ),
       },
     );
     expect(closePeriod.ok()).toBeTruthy();
@@ -193,11 +212,13 @@ test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting
   await yearCard.getByRole('button', { name: 'Close Year' }).click();
 
   const dialog = page.getByRole('dialog');
-  await expect(
-    dialog.getByText('No blocking issues. This fiscal year can be closed.'),
-  ).toBeVisible({
+  await expect(dialog.getByText('Nothing blocks this close.')).toBeVisible({
     timeout: 20_000,
   });
+  await expect(dialog.getByTestId('fiscal-close-lines')).toBeVisible();
+  for (const warning of await dialog.getByRole('checkbox').all()) {
+    await warning.check();
+  }
   const confirmClose = dialog.getByRole('button', { name: 'Confirm Close' });
   await expect(confirmClose).toBeDisabled();
   await dialog
@@ -362,4 +383,27 @@ function csrfHeaders(state: StorageState) {
     throw new Error('Authenticated E2E state is missing its CSRF cookie.');
   }
   return { 'X-CSRF-Token': csrfCookie.value };
+}
+
+/** Phase 7.11d: read the close preview and build the request it authorizes. */
+async function previewBoundClose(
+  role: {
+    context: {
+      request: {
+        get: (url: string) => Promise<{ json: () => Promise<unknown> }>;
+      };
+    };
+  },
+  previewUrl: string,
+  reason: string,
+) {
+  const response = await role.context.request.get(previewUrl);
+  const preview = (await response.json()) as {
+    data: { previewFingerprint: string; requiredAcknowledgements: string[] };
+  };
+  return {
+    reason,
+    expectedPreviewFingerprint: preview.data.previewFingerprint,
+    acknowledgedWarningCodes: preview.data.requiredAcknowledgements,
+  };
 }

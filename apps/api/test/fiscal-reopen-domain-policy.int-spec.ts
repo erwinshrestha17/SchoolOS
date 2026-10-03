@@ -283,12 +283,17 @@ describeDatabase(
           .mockRejectedValueOnce(
             new Error('Synthetic fiscal close audit failure'),
           );
+        const periodPreview = await accounting.getFiscalPeriodClosePreview(
+          periodId,
+          actors.requester,
+        );
+        const periodClose = {
+          reason: 'Close period after reconciliation review',
+          expectedPreviewFingerprint: periodPreview.previewFingerprint,
+          acknowledgedWarningCodes: periodPreview.requiredAcknowledgements,
+        };
         await expect(
-          accounting.closeFiscalPeriod(
-            periodId,
-            { reason: 'Close period after reconciliation review' },
-            actors.requester,
-          ),
+          accounting.closeFiscalPeriod(periodId, periodClose, actors.requester),
         ).rejects.toThrow('Synthetic fiscal close audit failure');
         expect((await period()).status).toBe('LOCKED');
         jest.restoreAllMocks();
@@ -296,7 +301,7 @@ describeDatabase(
           (
             await accounting.closeFiscalPeriod(
               periodId,
-              { reason: 'Close period after reconciliation review' },
+              periodClose,
               actors.requester,
             )
           ).status,
@@ -395,12 +400,17 @@ describeDatabase(
             throw new Error('Synthetic year close audit failure');
           return originalRecord(event, tx);
         });
+        const yearPreview = await accounting.getFiscalYearClosePreview(
+          yearId,
+          actors.requester,
+        );
+        const yearClose = {
+          reason: 'Close the year after reviewed financial results',
+          expectedPreviewFingerprint: yearPreview.previewFingerprint,
+          acknowledgedWarningCodes: yearPreview.requiredAcknowledgements,
+        };
         await expect(
-          accounting.closeFiscalYear(
-            yearId,
-            { reason: 'Close the year after reviewed financial results' },
-            actors.requester,
-          ),
+          accounting.closeFiscalYear(yearId, yearClose, actors.requester),
         ).rejects.toThrow('Synthetic year close audit failure');
         expect((await year()).status).toBe('OPEN');
         expect(
@@ -411,11 +421,11 @@ describeDatabase(
         jest.restoreAllMocks();
         const result = await accounting.closeFiscalYear(
           yearId,
-          { reason: 'Close the year after reviewed financial results' },
+          yearClose,
           actors.requester,
         );
         expect(result.fiscalYear.status).toBe('CLOSED');
-        expect(result.closingEntry.sourceType).toBe('CLOSING_ENTRY');
+        expect(result.closingEntry?.sourceType).toBe('CLOSING_ENTRY');
         expect(
           await prisma.journalEntry.count({
             where: { tenantId, sourceType: 'CLOSING_ENTRY' },

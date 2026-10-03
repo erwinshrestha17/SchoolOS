@@ -61,6 +61,8 @@ const REQUIRED_OPERATIONS = [
   ["post", "/api/v1/accounting/payables/{id}/settlements"],
   ["post", "/api/v1/accounting/payable-settlements/{id}/reverse"],
   ["get", "/api/v1/accounting/reports/payables-aging"],
+  ["get", "/api/v1/accounting/fiscal-periods/{id}/close-preview"],
+  ["get", "/api/v1/accounting/fiscal-years/{id}/close-preview"],
   ["post", "/api/v1/auth/login"],
   ["post", "/api/v1/auth/refresh"],
   ["get", "/api/v1/ready"],

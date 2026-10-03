@@ -389,7 +389,8 @@ describe('backend hardening gate', () => {
     const expectedInventory = {
       // Phase 2 adds the tenant-anchored fiscal period/year lock for manual journal transitions.
       '/accounting/accounting-posting.service.ts': 2,
-      '/accounting/accounting.service.ts': 5,
+      // Phase 7.11d: the period and year unbalanced-journal checks share one query.
+      '/accounting/accounting.service.ts': 4,
       // Phase 5: tenant-anchored Section lock (FOR UPDATE) serializing
       // last-seat admissions; capacity is recounted under the lock.
       '/admissions/admission-cases.service.ts': 1,
