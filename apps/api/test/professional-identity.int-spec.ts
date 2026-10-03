@@ -27,6 +27,7 @@ describeDatabase('Professional identity (real PostgreSQL)', () => {
   let teacherUserId: string;
   let hrA: AuthContext;
   let hrB: AuthContext;
+  let teacherActor: AuthContext;
   const scoped = <T>(fn: () => Promise<T>, tenant = tenantId) =>
     prisma.runWithTenantScope(tenant, fn);
   const actor = (userId: string, tenant = tenantId) =>
@@ -59,6 +60,20 @@ describeDatabase('Professional identity (real PostgreSQL)', () => {
       })
     ).id;
     await scoped(async () => {
+      // Phase 7.10: decisions re-check the live session and `hr:manage`
+      // grant, so every acting user holds a real role and an active session.
+      const permission = await prisma.permission.upsert({
+        where: { resource_action: { resource: 'hr', action: 'manage' } },
+        create: { resource: 'hr', action: 'manage' },
+        update: {},
+      });
+      const role = await prisma.role.create({
+        data: {
+          tenantId,
+          name: `pi-hr-${randomUUID().slice(0, 8)}`,
+          rolePermissions: { create: [{ permissionId: permission.id }] },
+        },
+      });
       const user = (email: string) =>
         prisma.user.create({
           data: {
@@ -68,9 +83,35 @@ describeDatabase('Professional identity (real PostgreSQL)', () => {
             status: 'ACTIVE',
           },
         });
-      teacherUserId = (await user('teacher@example.invalid')).id;
-      hrA = actor((await user('hr-a@example.invalid')).id);
-      hrB = actor((await user('hr-b@example.invalid')).id);
+      const live = async (email: string): Promise<AuthContext> => {
+        const created = await user(email);
+        await prisma.userRole.create({
+          data: { tenantId, userId: created.id, roleId: role.id },
+        });
+        const familyId = randomUUID();
+        await prisma.refreshToken.create({
+          data: {
+            userId: created.id,
+            familyId,
+            tokenHash: randomUUID(),
+            expiresAt: new Date(Date.now() + 600_000),
+          },
+        });
+        return {
+          tenantId,
+          tenantSlug: 'synthetic',
+          userId: created.id,
+          email,
+          sessionFamilyId: familyId,
+          authMethod: 'PASSWORD',
+          roles: [role.name],
+          permissions: ['hr:manage'],
+        } as unknown as AuthContext;
+      };
+      teacherActor = await live('teacher@example.invalid');
+      teacherUserId = teacherActor.userId;
+      hrA = await live('hr-a@example.invalid');
+      hrB = await live('hr-b@example.invalid');
       staffId = (
         await prisma.staff.create({
           data: {
@@ -163,7 +204,7 @@ describeDatabase('Professional identity (real PostgreSQL)', () => {
           staffId,
           row.id,
           { decision: 'VERIFY' },
-          actor(teacherUserId),
+          teacherActor,
         ),
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);

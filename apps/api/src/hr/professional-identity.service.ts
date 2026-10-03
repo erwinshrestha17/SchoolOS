@@ -14,9 +14,14 @@ import {
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { hasDomainPermission } from '../authorization/policies/domain-permission';
+import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
 import { PrismaService } from '../prisma/prisma.service';
 import { AUTHORITATIVE_EMPLOYMENT_STATUSES } from './employment-timeline';
-import { TeacherProfessionalEligibilityService } from '../teacher-scope/teacher-professional-eligibility.service';
+import {
+  eligibilityResourceKey,
+  TeacherProfessionalEligibilityService,
+} from '../teacher-scope/teacher-professional-eligibility.service';
 import type {
   CreateLicenceEvidenceDto,
   CreateQualificationEvidenceDto,
@@ -111,6 +116,7 @@ export class ProfessionalIdentityService {
         }),
       ]);
     const now = new Date();
+    const canReadReferences = hasDomainPermission(actor, 'hr:documents:read');
     const currentEmployment =
       employments.find(
         (row) =>
@@ -129,8 +135,15 @@ export class ProfessionalIdentityService {
       teacherProfile: profile
         ? {
             ...profile,
-            qualifications: profile.qualifications.map(withEvidenceState(now)),
-            licences: profile.licences.map(withEvidenceState(now)),
+            // Phase 7.10: evidence references stay with the HR-documents
+            // category (7.2). Status and dates remain visible to `hr:read`.
+            referencesRedacted: !canReadReferences,
+            qualifications: profile.qualifications
+              .map(withEvidenceState(now))
+              .map(redactEvidenceReferences(canReadReferences)),
+            licences: profile.licences
+              .map(withEvidenceState(now))
+              .map(redactEvidenceReferences(canReadReferences)),
           }
         : null,
       recentAssessments: assessments,
@@ -188,7 +201,7 @@ export class ProfessionalIdentityService {
     dto: ReviewProfessionalRecordDto,
     actor: AuthContext,
   ) {
-    return this.write(async (tx) => {
+    return this.authorizedWrite(actor, async (tx) => {
       const staff = await this.lockStaff(tx, staffId, actor);
       const before = await tx.staffEmployment.findFirst({
         where: { id: employmentId, tenantId: actor.tenantId, staffId },
@@ -260,7 +273,7 @@ export class ProfessionalIdentityService {
     actor: AuthContext,
   ) {
     const effectiveTo = parseDate(dto.effectiveTo, 'effectiveTo');
-    return this.write(async (tx) => {
+    return this.authorizedWrite(actor, async (tx) => {
       const staff = await this.lockStaff(tx, staffId, actor);
       const before = await tx.staffEmployment.findFirst({
         where: { id: employmentId, tenantId: actor.tenantId, staffId },
@@ -284,33 +297,106 @@ export class ProfessionalIdentityService {
           'Ending cannot extend a verified employment period',
         );
       }
-      await this.closeResponsibilitiesForEmploymentEnd(
+      return this.applyEmploymentEnd(
         tx,
         actor,
-        employmentId,
-        effectiveTo,
-      );
-      const after = await tx.staffEmployment.update({
-        where: { id: employmentId },
-        data: {
-          status: StaffEmploymentStatus.ENDED,
-          effectiveTo,
-          endedAt: new Date(),
-          endReason: dto.reason.trim(),
-        },
-        select: EMPLOYMENT_SELECT,
-      });
-      await this.record(
-        tx,
-        actor,
-        'end',
-        'staff_employment',
-        employmentId,
         before,
-        after,
+        effectiveTo,
+        dto.reason.trim(),
       );
-      return after;
     });
+  }
+
+  /**
+   * Phase 7.10: terminating a staff member ends their open authoritative
+   * employment in the same transaction, so a terminated person can never keep
+   * a live employment window (and therefore teaching eligibility). The
+   * caller holds the staff row lock and the termination permission; this does
+   * not weaken maker-checker — a person cannot terminate themselves.
+   *
+   * Returns the ended employment ids. Refuses (stable code) when the
+   * termination date does not fall after a verified employment's start,
+   * because a window cannot end before it begins.
+   */
+  async endEmploymentsForTermination(
+    tx: Tx,
+    staffId: string,
+    terminationDate: Date,
+    reason: string,
+    actor: AuthContext,
+  ): Promise<string[]> {
+    const staff = await this.lockStaff(tx, staffId, actor);
+    const open = await tx.staffEmployment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        staffId,
+        status: StaffEmploymentStatus.VERIFIED,
+        verifiedAt: { not: null },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gt: terminationDate } }],
+      },
+      select: EMPLOYMENT_SELECT,
+      orderBy: [{ effectiveFrom: 'asc' }, { id: 'asc' }],
+    });
+    if (open.length === 0) return [];
+    assertIndependentReviewer(actor, null, staff.userId);
+    for (const employment of open) {
+      if (terminationDate <= employment.effectiveFrom) {
+        throw conflict(
+          'TERMINATION_BEFORE_EMPLOYMENT_START',
+          'The termination date must be after the verified employment start; correct or reject that employment first',
+          { employmentId: employment.id },
+        );
+      }
+    }
+    const ended: string[] = [];
+    for (const employment of open) {
+      await this.applyEmploymentEnd(
+        tx,
+        actor,
+        employment,
+        terminationDate,
+        `Staff terminated: ${reason.trim()}`.slice(0, 500),
+      );
+      ended.push(employment.id);
+    }
+    return ended;
+  }
+
+  private async applyEmploymentEnd(
+    tx: Tx,
+    actor: AuthContext,
+    before: Prisma.StaffEmploymentGetPayload<{
+      select: typeof EMPLOYMENT_SELECT;
+    }>,
+    effectiveTo: Date,
+    reason: string,
+  ) {
+    await this.closeResponsibilitiesForEmploymentEnd(
+      tx,
+      actor,
+      before.id,
+      effectiveTo,
+    );
+    const after = await tx.staffEmployment.update({
+      where: { id: before.id },
+      data: {
+        status: StaffEmploymentStatus.ENDED,
+        effectiveTo,
+        endedAt: new Date(),
+        endReason: reason,
+      },
+      select: EMPLOYMENT_SELECT,
+    });
+    await this.record(
+      tx,
+      actor,
+      'end',
+      'staff_employment',
+      before.id,
+      before,
+      after,
+    );
+    return after;
   }
 
   // ---- 7.1 responsibilities (positions) ----------------------------------
@@ -508,7 +594,7 @@ export class ProfessionalIdentityService {
     actor: AuthContext,
   ) {
     const effectiveFrom = parseDate(dto.effectiveFrom, 'effectiveFrom');
-    return this.write(async (tx) => {
+    return this.authorizedWrite(actor, async (tx) => {
       await this.lockStaff(tx, staffId, actor);
       const existing = await tx.teacherProfile.findFirst({
         where: { tenantId: actor.tenantId, staffId },
@@ -556,7 +642,7 @@ export class ProfessionalIdentityService {
     actor: AuthContext,
   ) {
     const effectiveTo = parseDate(dto.effectiveTo, 'effectiveTo');
-    return this.write(async (tx) => {
+    return this.authorizedWrite(actor, async (tx) => {
       await this.lockStaff(tx, staffId, actor);
       const before = await tx.teacherProfile.findFirst({
         where: { tenantId: actor.tenantId, staffId },
@@ -689,7 +775,7 @@ export class ProfessionalIdentityService {
     dto: ReviewProfessionalRecordDto,
     actor: AuthContext,
   ) {
-    return this.write(async (tx) => {
+    return this.authorizedWrite(actor, async (tx) => {
       const staff = await this.lockStaff(tx, staffId, actor);
       const before = await this.findEvidence(
         tx,
@@ -744,7 +830,7 @@ export class ProfessionalIdentityService {
     dto: RevokeProfessionalEvidenceDto,
     actor: AuthContext,
   ) {
-    return this.write(async (tx) => {
+    return this.authorizedWrite(actor, async (tx) => {
       const staff = await this.lockStaff(tx, staffId, actor);
       const before = await this.findEvidence(
         tx,
@@ -840,25 +926,27 @@ export class ProfessionalIdentityService {
     const truncated = assignments.length > EXCEPTION_SCAN_LIMIT;
     const scanned = assignments.slice(0, EXCEPTION_SCAN_LIMIT);
 
-    const cache = new Map<
-      string,
-      Awaited<
-        ReturnType<TeacherProfessionalEligibilityService['projectEligibility']>
-      >
-    >();
+    // Phase 7.10: one batched evaluation (facts and policy catalogue loaded
+    // once) instead of a projection per staff/class/subject.
+    const decisions = await this.eligibility.evaluateMany({
+      tenantId: actor.tenantId,
+      now,
+      resources: scanned.map((assignment) => ({
+        staffId: assignment.staffId,
+        classId: assignment.classId,
+        subjectId: assignment.subjectId,
+      })),
+    });
     const items: EligibilityExceptionItem[] = [];
     for (const assignment of scanned) {
-      const key = `${assignment.staffId}|${assignment.classId}|${assignment.subjectId ?? ''}`;
-      let projection = cache.get(key);
-      if (!projection) {
-        projection = await this.eligibility.projectEligibility({
-          tenantId: actor.tenantId,
+      const projection = decisions.get(
+        eligibilityResourceKey({
           staffId: assignment.staffId,
           classId: assignment.classId,
           subjectId: assignment.subjectId,
-        });
-        cache.set(key, projection);
-      }
+        }),
+      );
+      if (!projection) continue;
       if (projection.outcome === 'ELIGIBLE') continue;
       items.push({
         assignmentId: assignment.id,
@@ -881,6 +969,28 @@ export class ProfessionalIdentityService {
   }
 
   // ---- helpers -----------------------------------------------------------
+
+  /**
+   * Phase 7.10: professional-record decisions re-check the actor's live
+   * session, account state and `hr:manage` grant inside the decision
+   * transaction, so a revoked session or grant cannot verify, end or revoke
+   * anything. Independent-reviewer rules and audit stay in the same
+   * transaction; no new permission is introduced.
+   */
+  private authorizedWrite<T>(
+    actor: AuthContext,
+    fn: (tx: Tx) => Promise<T>,
+  ): Promise<T> {
+    return withSchoolAuthorizationTransaction(
+      this.prisma,
+      actor,
+      'hr:manage',
+      [],
+      (tx) => fn(tx),
+    ).catch((error: unknown) => {
+      throw translateGuardError(error);
+    });
+  }
 
   private write<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
     return this.prisma.$transaction(fn).catch((error: unknown) => {
@@ -1105,7 +1215,7 @@ interface EvidenceRow {
  * Read-side state for UI. `effectiveState` is what eligibility would see:
  * only VERIFIED evidence inside its validity window counts.
  */
-function withEvidenceState(now: Date) {
+export function withEvidenceState(now: Date) {
   return <T extends EvidenceRow>(row: T) => ({
     ...row,
     effectiveState:
@@ -1117,6 +1227,22 @@ function withEvidenceState(now: Date) {
             ? ('EXPIRED' as const)
             : ('CURRENT' as const),
   });
+}
+
+/**
+ * Removes document and source references for viewers without
+ * `hr:documents:read`. Works on any evidence row shape; absent fields stay
+ * absent.
+ */
+export function redactEvidenceReferences(mayReadReferences: boolean) {
+  return <T extends object>(row: T): T => {
+    if (mayReadReferences) return row;
+    const copy = { ...row } as Record<string, unknown>;
+    for (const key of ['documentId', 'sourceUri', 'externalReference']) {
+      if (key in copy) copy[key] = null;
+    }
+    return copy as T;
+  };
 }
 
 function evidenceWindow(dto: {

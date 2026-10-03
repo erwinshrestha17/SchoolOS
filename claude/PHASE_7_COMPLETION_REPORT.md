@@ -116,18 +116,18 @@ National policy versions have no `tenantId`, and the tenant-scope layer adds `te
 
 ### Tests executed
 
-| Check | Result |
-| --- | --- |
-| API typecheck / Web typecheck | Passed |
-| API lint (full) / Web lint | Passed, no errors |
-| API unit | 305 suites, 3,551 tests passed |
-| API integration | 31 suites, 505 tests passed (includes 21 new in `statutory-configuration.int-spec.ts`) |
-| API e2e | 45 suites, 321 tests passed (mock of the payroll+accounting e2e gained `payrollRun.findFirst`) |
-| Web tests | 734 passed (5 new statutory-membership contract tests) |
-| Core tests | 27 passed |
-| OpenAPI contract | Passed: 1,208 paths, 1,394 operations, 502 schemas |
-| Database drift | No difference |
-| Formatting, tracked-artifact gate | Passed |
+| Check                             | Result                                                                                         |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| API typecheck / Web typecheck     | Passed                                                                                         |
+| API lint (full) / Web lint        | Passed, no errors                                                                              |
+| API unit                          | 305 suites, 3,551 tests passed                                                                 |
+| API integration                   | 31 suites, 505 tests passed (includes 21 new in `statutory-configuration.int-spec.ts`)         |
+| API e2e                           | 45 suites, 321 tests passed (mock of the payroll+accounting e2e gained `payrollRun.findFirst`) |
+| Web tests                         | 734 passed (5 new statutory-membership contract tests)                                         |
+| Core tests                        | 27 passed                                                                                      |
+| OpenAPI contract                  | Passed: 1,208 paths, 1,394 operations, 502 schemas                                             |
+| Database drift                    | No difference                                                                                  |
+| Formatting, tracked-artifact gate | Passed                                                                                         |
 
 The new integration suite covers the database guards, membership service authorization and audit, salary-structure overlap, run creation with and without a policy, policy change mid-year, ambiguity, freeze and lock behavior, and readiness. It is re-runnable and removes its own fixtures.
 
@@ -250,17 +250,17 @@ BS months of 29, 30, 31 and 32 days; a period that straddles a Gregorian month a
 
 All run on a freshly created and migrated PostgreSQL 16 database. The finance integration suites need `DATABASE_URL` equal to `SCHOOLOS_AUTH_TEST_DATABASE_URL`, and a name matching `schoolos_auth_recovery_test*`.
 
-| Check | Result |
-| --- | --- |
-| Core tests | 32 passed (new `payroll-period.test.mjs`) |
-| API unit | 311 suites, **3,620 passed** |
-| API integration (fresh DB, all four DB variables set) | 32 suites, **532 passed** (new `payroll-periods-holds-bank-advice.int-spec.ts`: 27) |
-| API e2e | 45 suites, **321 passed** |
-| Web tests | 745 passed (new `payroll-phase79-contract.test.mjs`) |
-| API / Web typecheck, API lint on changed files (errors), Web lint (`--max-warnings=0`), `pnpm format:check` | clean |
-| `pnpm db:validate`, `pnpm verify:openapi`, `pnpm verify:tracked-artifacts` | pass (1,212 paths, 1,399 operations, 505 schemas) |
-| `prisma migrate deploy` on a fresh DB, then `prisma migrate diff --exit-code` | applied; no difference |
-| `pnpm --filter @schoolos/web build` | pass |
+| Check                                                                                                       | Result                                                                              |
+| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Core tests                                                                                                  | 32 passed (new `payroll-period.test.mjs`)                                           |
+| API unit                                                                                                    | 311 suites, **3,620 passed**                                                        |
+| API integration (fresh DB, all four DB variables set)                                                       | 32 suites, **532 passed** (new `payroll-periods-holds-bank-advice.int-spec.ts`: 27) |
+| API e2e                                                                                                     | 45 suites, **321 passed**                                                           |
+| Web tests                                                                                                   | 745 passed (new `payroll-phase79-contract.test.mjs`)                                |
+| API / Web typecheck, API lint on changed files (errors), Web lint (`--max-warnings=0`), `pnpm format:check` | clean                                                                               |
+| `pnpm db:validate`, `pnpm verify:openapi`, `pnpm verify:tracked-artifacts`                                  | pass (1,212 paths, 1,399 operations, 505 schemas)                                   |
+| `prisma migrate deploy` on a fresh DB, then `prisma migrate diff --exit-code`                               | applied; no difference                                                              |
+| `pnpm --filter @schoolos/web build`                                                                         | pass                                                                                |
 
 The new integration suite covers the database guards directly (period bounds and overlap, divisor, negative-net trigger, hold uniqueness and separation of duties, hold history, run-to-PAID refusal, adjustment consumption and release, bank export log), proration across structure changes and employment windows, adjustment consumption, readiness, hold and bank-advice authorization and audit content, and cross-tenant refusal.
 
@@ -311,3 +311,82 @@ None for 7.9. Loading real rates and a ruling on arrears depend on the owner's s
 **7.10 — Teacher eligibility workspace** (7L), per the plan: employment, required evidence, policy version, outcome, reason codes, current assignments and blocking changes, reusing the Phase 5 projection. No eligibility override in Phase 7 unless the owner decides otherwise (D4).
 
 Carried forward from earlier slices and still open: aligning the database teacher-eligibility function with a recorded employment end date (7.1), ending `StaffEmployment` when a staff member is terminated (7.1), and the remaining Staff 360 UI (7.2). Payroll report screens now use BS labels; the report queries themselves still filter by the run's period label.
+
+## 7.10 — Teacher eligibility workspace
+
+**Completed locally on 3 October 2026, on `main`. Not pushed.**
+
+**Baseline:** start `9e4b5bc2` (7.9); end = the commit that adds this section (`git log -1 -- claude/PHASE_7_COMPLETION_REPORT.md`).
+
+### Slice
+
+HR can now see, for every teacher, whether they may be assigned to teach today and what is about to change. The answer comes from one decision procedure that the assignment preflight, the exceptions report, the database function and the new workspace all share. There is **no eligibility override** in Phase 7 (decision D4/O1).
+
+### Existing implementation retained
+
+- The policy model, the append-only employment, profile, evidence and assessment history, the assignment preflight and its snapshots, the school authorization transaction, and the 5J–5M professional-identity panel.
+- A Teacher role is still not evidence. Nothing in this slice grants, revokes or overrides eligibility.
+
+### Changes
+
+- **One decision procedure** (`teacher-scope/teacher-eligibility-decision.ts`, pure, 46 unit tests)
+  - Fixed refusal order: staff inactive, employment, profile, class, subject, catalogue limit, policy unavailable, policy conflict, evidence.
+  - `evaluate()` (preflight) is now `loadFacts` plus this procedure. `evaluateMany` runs a whole population in a fixed number of queries. A test proves batch and single results are identical.
+  - The exceptions report now uses `evaluateMany` (same response shape).
+- **Ended employment keeps its window** (migration `20261003190000_phase7_eligibility_employment_window`)
+  - Authoritative employment is `status IN (VERIFIED, ENDED)` with `verifiedAt` set, over the half-open window `[effectiveFrom, effectiveTo)`. The service, the SQL function `schoolos_teacher_eligibility_live` and the assessment guard trigger use the same predicate.
+  - Before this, ending an employment made the function treat the whole window as not employed, including days already worked.
+- **Termination ends employment** (7.1 carry-over, O2). `StaffService.terminateStaff` now ends every open employment in the same transaction through `endEmploymentsForTermination`. A termination date before an employment start is refused (`TERMINATION_BEFORE_EMPLOYMENT_START`). Reviewing an employment still needs an independent reviewer when something is open.
+- **Workspace and summary endpoints** (read-only, `hr:read`)
+  - `GET /hr/professional/eligibility-workspace` and `GET /hr/staff/:staffId/professional/eligibility-summary`.
+  - States: ELIGIBLE, NEEDS_REVIEW, INELIGIBLE, plus an `atRisk` flag. The stored outcome stays ELIGIBLE or INELIGIBLE. NEEDS_REVIEW means a policy conflict, missing policy or catalogue limit, or that every unmet requirement is PENDING_REVIEW.
+  - Evidence statuses: MATCHED, PENDING_REVIEW, NOT_YET_VALID, EXPIRED, REVOKED, MISSING.
+  - Blocking changes inside a horizon of 1 to 180 days (default 30, O4): employment ending, profile ending, evidence expiring, policy ending, and a future policy revision of the same lineage or of equal or higher scope.
+  - Filters (state, at-risk, search), pagination, totals computed before filtering.
+- **Decisions run under live authorization.** Employment review, end, profile create and deactivate, and evidence review and revoke now use `withSchoolAuthorizationTransaction` with an `hr:manage` re-check (revoked session or grant is refused). Concurrent verification of the same evidence has exactly one winner (`EVIDENCE_NOT_PENDING`).
+- **Evidence references are redacted** (O3) for users without `hr:documents:read`: `documentId`, `sourceUri` and licence `externalReference`, in the workspace summary and in the existing professional overview. The response says so (`referencesRedacted`).
+- **Web.** New HR tab "Teacher Eligibility" (`/dashboard/hr/teacher-eligibility`, gated on `hr:read`): summary buttons, search, horizon and state filters, paginated table, and a drawer with blocking changes, per-assignment requirements, an evidence checklist and recent decisions. Dates are Bikram Sambat first. Links added from the exceptions card and the staff professional panel. The page is read-only and says so.
+- **API surface (+2 operations):** the OpenAPI gate requires both.
+
+### Operational impacts
+
+- The database function and assessment guard changed meaning: a teacher whose employment ended is eligible for the days inside the window and not after. This is deliberate, and it is a replace-in-place migration with no data change.
+- Termination now writes employment history. Existing terminated staff are not back-filled.
+- Evidence references vanish from API responses for HR users who lack `hr:documents:read`. The staff panel shows "Reference hidden".
+- Employment, profile and evidence decisions need a live session and a current `hr:manage` grant. Callers that held only a token are refused.
+
+### Deviations and limits
+
+- **Population.** The plan listed active teachers. The workspace shows active staff with a teacher profile, plus anyone, in any status, who still has a current or future active assignment, so an inactive person who is still teaching cannot hide.
+- **Cap.** One evaluation covers at most 2,000 people by name (`truncated: true` beyond that; search narrows). Filters and paging run in memory over that bundle.
+- **NOT_YET_VALID** was added to the plan's evidence status list, because evidence that starts in the future is neither missing nor expired.
+- The Project copy of this report does not carry the 7.9 or 7.10 sections; the repository copy is authoritative.
+
+### Out of scope (not started)
+
+Any override or exception model, a bulk revoke of assignments, notifications about expiring evidence, Phase 8 work, and mobile.
+
+### Invariants established
+
+- Eligibility has one definition: the preflight, the report, the workspace and the database function cannot disagree about employment.
+- A teacher with no current assignment still gets an honest state (`NO_CURRENT_ASSIGNMENTS`), never a silent pass.
+- History is append-only; nothing in this slice deletes or rewrites it.
+- A user without the document permission never receives an evidence reference through any eligibility route.
+
+### Tests executed
+
+All run on freshly created and migrated PostgreSQL 16 databases (`..._7101`, plus the dedicated marks, timetable and admission databases those suites require).
+
+| Check                                                                                                                                                                                                             | Result                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Core tests                                                                                                                                                                                                        | 32 passed                                                                       |
+| API unit                                                                                                                                                                                                          | 312 suites, **3,682 passed** (new decision spec: 46)                            |
+| API integration (all four DB variables set)                                                                                                                                                                       | 33 suites, **552 passed** (new `teacher-eligibility-workspace.int-spec.ts`: 20) |
+| API e2e                                                                                                                                                                                                           | 45 suites, **321 passed**                                                       |
+| Web tests                                                                                                                                                                                                         | 754 passed (new `teacher-eligibility-workspace-contract.test.mjs`)              |
+| Typecheck (core, API, web), web build, `verify:openapi` (1,214 paths, 1,401 operations), `db:validate`, `prisma migrate diff --exit-code` (no drift), `verify:tracked-artifacts`, `format:check` on changed files | clean                                                                           |
+| ESLint on changed API files (errors) and web files (`--max-warnings=0`)                                                                                                                                           | clean                                                                           |
+
+### Next slice
+
+7.11 — Accounting surfaces: payables, AR aging, fiscal-close preview and report drill-down.

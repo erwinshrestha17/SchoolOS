@@ -393,6 +393,7 @@ import { AuditService } from '../src/audit/audit.service';
         {} as never,
         {} as never,
         {} as never,
+        {} as never,
       );
       await expect(
         scope(w, () =>

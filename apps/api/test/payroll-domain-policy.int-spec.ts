@@ -100,6 +100,7 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
     files = new FileRegistryService(
       prisma,

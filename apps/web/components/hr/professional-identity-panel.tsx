@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { formatBsDate } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { GraduationCap, ShieldCheck, Briefcase, Plus } from 'lucide-react';
@@ -196,6 +197,20 @@ export function ProfessionalIdentityPanel({ staffId }: { staffId: string }) {
         ) : (
           <Empty>No teacher profile.</Empty>
         )}
+        {profile?.referencesRedacted && (
+          <p className="mt-2 text-xs text-slate-500">
+            Document and source references are hidden because they need HR
+            documents access. Status and dates remain visible.
+          </p>
+        )}
+        <p className="mt-2 text-xs">
+          <Link
+            href={`/dashboard/hr/teacher-eligibility?staff=${encodeURIComponent(staffId)}`}
+            className="font-semibold text-slate-700 underline"
+          >
+            See this teacher&apos;s eligibility result and upcoming changes
+          </Link>
+        </p>
       </Section>
 
       {profile &&
@@ -444,7 +459,9 @@ function EvidenceTable({
             <td className="py-2">
               {kind === 'qualifications'
                 ? `${row.qualification}${row.institution ? ` · ${row.institution}` : ''}`
-                : `${row.authorityCode} · ${row.externalReference}`}
+                : `${row.authorityCode} · ${
+                    row.externalReference ?? 'Reference hidden'
+                  }`}
               {row.revocationReason && (
                 <div className="text-xs text-red-700">
                   Revoked: {row.revocationReason}

@@ -1,5 +1,7 @@
 import { StaffEmploymentType, StaffResponsibilityKind } from '@prisma/client';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsIn,
   IsInt,
@@ -8,7 +10,9 @@ import {
   IsUrl,
   IsUUID,
   Matches,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -194,4 +198,58 @@ export class EligibilityProjectionQueryDto {
   @IsOptional()
   @IsUUID()
   subjectId?: string;
+}
+
+const WORKSPACE_STATES = ['ELIGIBLE', 'NEEDS_REVIEW', 'INELIGIBLE'] as const;
+
+/** Phase 7.10: HR teacher-eligibility workspace filters (read-only). */
+export class EligibilityWorkspaceQueryDto {
+  @IsOptional()
+  @IsIn(WORKSPACE_STATES)
+  status?: (typeof WORKSPACE_STATES)[number];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  search?: string;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'true' || value === true
+      ? true
+      : value === 'false' || value === false
+        ? false
+        : value,
+  )
+  @IsBoolean()
+  atRiskOnly?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(180)
+  horizonDays?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 25;
+}
+
+export class EligibilitySummaryQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(180)
+  horizonDays?: number;
 }

@@ -1,3 +1,7 @@
+import type {
+  TeacherEligibilitySummary,
+  TeacherEligibilityWorkspace,
+} from '@schoolos/core';
 import { request, type JsonBody } from './client';
 
 /** Phase 5J–5M professional identity (server: /hr/staff/:id/professional). */
@@ -42,7 +46,8 @@ export interface ProfessionalEvidenceRecord {
   qualification?: string;
   institution?: string | null;
   authorityCode?: string;
-  externalReference?: string;
+  /** Null when the viewer lacks `hr:documents:read` (Phase 7.10). */
+  externalReference?: string | null;
 }
 
 export interface ProfessionalIdentityOverview {
@@ -54,6 +59,8 @@ export interface ProfessionalIdentityOverview {
     status: 'ACTIVE' | 'INACTIVE';
     effectiveFrom: string;
     effectiveTo: string | null;
+    /** True when evidence references are hidden from this viewer. */
+    referencesRedacted?: boolean;
     qualifications: ProfessionalEvidenceRecord[];
     licences: ProfessionalEvidenceRecord[];
   } | null;
@@ -90,10 +97,39 @@ export interface EligibilityExceptionsReport {
 
 export type EvidenceKind = 'qualifications' | 'licences';
 
+export interface EligibilityWorkspaceQuery {
+  status?: 'ELIGIBLE' | 'NEEDS_REVIEW' | 'INELIGIBLE';
+  search?: string;
+  atRiskOnly?: boolean;
+  horizonDays?: number;
+  page?: number;
+  limit?: number;
+}
+
 const base = (staffId: string) =>
   `/hr/staff/${encodeURIComponent(staffId)}/professional`;
 
 export const professionalIdentityApi = {
+  /** Phase 7.10: read-only school-wide eligibility workspace. */
+  getEligibilityWorkspace: (query: EligibilityWorkspaceQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.status) params.set('status', query.status);
+    if (query.search) params.set('search', query.search);
+    if (query.atRiskOnly) params.set('atRiskOnly', 'true');
+    if (query.horizonDays) params.set('horizonDays', String(query.horizonDays));
+    if (query.page) params.set('page', String(query.page));
+    if (query.limit) params.set('limit', String(query.limit));
+    const suffix = params.size > 0 ? `?${params.toString()}` : '';
+    return request<TeacherEligibilityWorkspace>(
+      `/hr/professional/eligibility-workspace${suffix}`,
+    );
+  },
+  getEligibilitySummary: (staffId: string, horizonDays?: number) =>
+    request<TeacherEligibilitySummary>(
+      `${base(staffId)}/eligibility-summary${
+        horizonDays ? `?horizonDays=${String(horizonDays)}` : ''
+      }`,
+    ),
   getEligibilityExceptions: () =>
     request<EligibilityExceptionsReport>(
       '/hr/professional/eligibility-exceptions',

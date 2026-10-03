@@ -22,10 +22,10 @@ export interface TeacherEligibilityFixture {
   profileId: string;
 }
 
-const SYNTHETIC_SCHOOL_TYPE = 'SYNTHETIC_TEST_SCHOOL';
+export const SYNTHETIC_SCHOOL_TYPE = 'SYNTHETIC_TEST_SCHOOL';
 const POLICY_EFFECTIVE_FROM = new Date('2024-01-01T00:00:00.000Z');
 
-async function resolveLocalLevelId(
+export async function resolveLocalLevelId(
   prisma: PrismaService,
   suffix: string,
 ): Promise<number> {
@@ -238,4 +238,82 @@ export async function retireEligibilityTenant(
     where: { id: tenantId },
     data: { isActive: false },
   });
+}
+
+/**
+ * Phase 7.10: one reviewed-and-approved school-scoped eligibility policy
+ * version through the real review workflow (two distinct reviewers). Use this
+ * when several teachers of one tenant must share a single policy; calling
+ * `establishTeacherEligibility` per teacher would create equally specific
+ * policies that conflict.
+ */
+export async function approveSchoolEligibilityPolicy(
+  prisma: PrismaService,
+  input: {
+    tenantId: string;
+    localLevelId: number;
+    suffix: string;
+    policyKey?: string;
+    version?: number;
+    supersedesId?: string;
+    effectiveFrom?: Date;
+    requiresQualification?: boolean;
+    requiresLicence?: boolean;
+  },
+): Promise<string> {
+  const [reviewer, approver] = await Promise.all(
+    ['reviewer', 'approver'].map((role) =>
+      prisma.user.create({
+        data: {
+          tenantId: input.tenantId,
+          email: `policy-${role}-${input.suffix}-${String(input.version ?? 1)}@example.test`,
+          passwordHash: 'x',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      }),
+    ),
+  );
+  const policy = await prisma.nepalHrPolicyVersion.create({
+    data: {
+      policyKey:
+        input.policyKey ?? `synthetic.teacher-eligibility.${input.suffix}`,
+      version: input.version ?? 1,
+      kind: 'TEACHER_PROFESSIONAL_ELIGIBILITY',
+      scope: 'SCHOOL',
+      tenantId: input.tenantId,
+      localLevelId: input.localLevelId,
+      schoolTypeCode: SYNTHETIC_SCHOOL_TYPE,
+      requiresQualification: input.requiresQualification ?? true,
+      requiresLicence: input.requiresLicence ?? true,
+      minimumMonthlyNpr: '10000000.00',
+      payload: {},
+      effectiveFrom: input.effectiveFrom ?? POLICY_EFFECTIVE_FROM,
+      supersedesId: input.supersedesId,
+      sourceTitle: 'Synthetic integration-test policy',
+      sourceUri: 'https://example.test/synthetic-teacher-policy',
+    },
+    select: { id: true },
+  });
+  await prisma.nepalHrPolicyVersion.update({
+    where: { id: policy.id },
+    data: { reviewStatus: 'IN_REVIEW' },
+  });
+  await prisma.nepalHrPolicyVersion.update({
+    where: { id: policy.id },
+    data: {
+      reviewStatus: 'REVIEWED',
+      reviewedById: reviewer.id,
+      reviewedAt: new Date(),
+    },
+  });
+  await prisma.nepalHrPolicyVersion.update({
+    where: { id: policy.id },
+    data: {
+      reviewStatus: 'APPROVED',
+      approvedById: approver.id,
+      approvedAt: new Date(),
+    },
+  });
+  return policy.id;
 }

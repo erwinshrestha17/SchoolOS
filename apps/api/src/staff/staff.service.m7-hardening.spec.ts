@@ -386,6 +386,7 @@ function buildService(
     { recordEvent: jest.fn() } as never,
     { checkLimit: jest.fn(), incrementUsage: jest.fn() } as never,
     { upsertAddress: jest.fn(), assertLocalLevelExists: jest.fn() } as never,
+    { endEmploymentsForTermination: jest.fn() } as never,
   );
 
   return { service, prisma };

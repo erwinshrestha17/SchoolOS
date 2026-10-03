@@ -3,11 +3,18 @@ import {
   NepalHrPolicyKind,
   NepalHrPolicyReviewStatus,
   Prisma,
-  StaffEmploymentStatus,
   TeacherEligibilityOutcome,
   TeacherProfileStatus,
 } from '@prisma/client';
+import { AUTHORITATIVE_EMPLOYMENT_STATUSES } from '../hr/employment-timeline';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  decideEligibility,
+  type EligibilityDecision,
+  type EmploymentFacts,
+  type EvidenceFacts,
+  type PolicyFacts,
+} from './teacher-eligibility-decision';
 
 interface AssignmentContext {
   tenantId: string;
@@ -15,6 +22,92 @@ interface AssignmentContext {
   classId: string;
   subjectId?: string | null;
   actorId?: string;
+}
+
+const POLICY_CATALOG_LIMIT = 1000;
+
+export interface EligibilityResourceRequest {
+  staffId: string;
+  classId: string;
+  subjectId: string | null;
+}
+
+export function eligibilityResourceKey(
+  resource: EligibilityResourceRequest,
+): string {
+  return `${resource.staffId}|${resource.classId}|${resource.subjectId ?? ''}`;
+}
+
+/** Everything the pure decision needs, loaded once for a bounded staff set. */
+export interface EligibilityFacts {
+  tenantId: string;
+  now: Date;
+  activeStaff: Set<string>;
+  employments: Map<string, EmploymentFacts>;
+  profiles: Map<string, { id: string; effectiveTo: Date | null }>;
+  /** Keyed by teacher profile id. */
+  qualifications: Map<string, EvidenceFacts[]>;
+  licences: Map<string, EvidenceFacts[]>;
+  classLevels: Map<string, number>;
+  subjects: Map<string, { code: string; classId: string }>;
+  catalogue: PolicyFacts[];
+  catalogueLimitReached: boolean;
+  futurePolicies: PolicyFacts[];
+}
+
+const EVIDENCE_FACT_SELECT = {
+  id: true,
+  status: true,
+  subjectCode: true,
+  levelCode: true,
+  validFrom: true,
+  validUntil: true,
+} as const;
+
+function toPolicyFacts(row: {
+  id: string;
+  policyKey: string;
+  version: number;
+  scope: PolicyFacts['scope'];
+  tenantId: string | null;
+  provinceId: number | null;
+  districtId: number | null;
+  localLevelId: number | null;
+  schoolTypeCode: string | null;
+  employmentType: string | null;
+  postCategoryCode: string | null;
+  classLevelMin: number | null;
+  classLevelMax: number | null;
+  subjectCode: string | null;
+  isMandatoryBaseline: boolean;
+  requiresQualification: boolean | null;
+  requiresLicence: boolean | null;
+  effectiveFrom: Date;
+  effectiveTo: Date | null;
+  sourceTitle: string;
+}): PolicyFacts {
+  return {
+    id: row.id,
+    policyKey: row.policyKey,
+    version: row.version,
+    scope: row.scope,
+    tenantId: row.tenantId,
+    provinceId: row.provinceId,
+    districtId: row.districtId,
+    localLevelId: row.localLevelId,
+    schoolTypeCode: row.schoolTypeCode,
+    employmentType: row.employmentType,
+    postCategoryCode: row.postCategoryCode,
+    classLevelMin: row.classLevelMin,
+    classLevelMax: row.classLevelMax,
+    subjectCode: row.subjectCode,
+    isMandatoryBaseline: row.isMandatoryBaseline,
+    requiresQualification: row.requiresQualification,
+    requiresLicence: row.requiresLicence,
+    effectiveFrom: row.effectiveFrom,
+    effectiveTo: row.effectiveTo,
+    sourceTitle: row.sourceTitle,
+  };
 }
 
 const PRECONDITION_MESSAGE =
@@ -143,248 +236,296 @@ export class TeacherProfessionalEligibilityService {
     db: Prisma.TransactionClient | PrismaService,
     now: Date,
   ): Promise<EligibilityEvaluation> {
-    const staff = await db.staff.findFirst({
-      where: {
-        id: input.staffId,
-        tenantId: input.tenantId,
-        status: 'ACTIVE',
-        joiningDate: { lte: now },
-      },
-      select: { id: true },
+    const facts = await this.loadFacts(db, {
+      tenantId: input.tenantId,
+      staffIds: [input.staffId],
+      classIds: [input.classId],
+      subjectIds: input.subjectId ? [input.subjectId] : [],
+      now,
     });
-    if (!staff) reject('EMPLOYMENT_INACTIVE');
+    const decision = this.decideFor(
+      facts,
+      input.staffId,
+      input.classId,
+      input.subjectId ?? null,
+    );
+    if (decision.structural) reject(decision.reasonCode);
+    const { profileId, employmentId, policyVersionId } = decision;
+    if (!profileId || !employmentId || !policyVersionId)
+      throw new Error(
+        'Non-structural eligibility decision lacks its authoritative references',
+      );
+    return {
+      profileId,
+      employmentId,
+      policyVersionId,
+      qualificationId: decision.qualificationId,
+      licenceId: decision.licenceId,
+      outcome: decision.outcome,
+      reasonCode: decision.reasonCode,
+      validUntil: decision.validUntil,
+    };
+  }
 
-    const employment = await db.staffEmployment.findFirst({
-      where: {
-        tenantId: input.tenantId,
-        staffId: input.staffId,
-        status: StaffEmploymentStatus.VERIFIED,
-        effectiveFrom: { lte: now },
-        OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
-      },
-      include: { localLevel: { include: { district: true } } },
-      orderBy: [{ effectiveFrom: 'desc' }, { id: 'desc' }],
+  /**
+   * Phase 7.10 batch evaluation: loads the school's facts and the policy
+   * catalogue once, then decides every requested (staff, class, subject)
+   * with the same pure procedure as the single-assignment preflight. Never
+   * persists anything. Callers keep the staff set bounded.
+   */
+  async evaluateMany(input: {
+    tenantId: string;
+    resources: readonly EligibilityResourceRequest[];
+    now?: Date;
+  }): Promise<Map<string, EligibilityDecision>> {
+    const now = input.now ?? new Date();
+    const facts = await this.loadFacts(this.prisma, {
+      tenantId: input.tenantId,
+      staffIds: [...new Set(input.resources.map((item) => item.staffId))],
+      classIds: [...new Set(input.resources.map((item) => item.classId))],
+      subjectIds: [
+        ...new Set(
+          input.resources
+            .map((item) => item.subjectId)
+            .filter((value): value is string => value !== null),
+        ),
+      ],
+      now,
     });
-    if (!employment) reject('EMPLOYMENT_UNVERIFIED');
+    const decisions = new Map<string, EligibilityDecision>();
+    for (const resource of input.resources) {
+      if (decisions.has(eligibilityResourceKey(resource))) continue;
+      decisions.set(
+        eligibilityResourceKey(resource),
+        this.decideFor(
+          facts,
+          resource.staffId,
+          resource.classId,
+          resource.subjectId,
+        ),
+      );
+    }
+    return decisions;
+  }
 
-    const profile = await db.teacherProfile.findFirst({
-      where: {
-        tenantId: input.tenantId,
-        staffId: input.staffId,
-        status: TeacherProfileStatus.ACTIVE,
-        effectiveFrom: { lte: now },
-        OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+  /** Decide one resource from already loaded facts (pure, no I/O). */
+  decideFor(
+    facts: EligibilityFacts,
+    staffId: string,
+    classId: string,
+    subjectId: string | null,
+  ): EligibilityDecision {
+    const classLevel = facts.classLevels.get(classId);
+    const subject = subjectId ? facts.subjects.get(subjectId) : undefined;
+    const profile = facts.profiles.get(staffId) ?? null;
+    return decideEligibility({
+      now: facts.now,
+      staffActive: facts.activeStaff.has(staffId),
+      employment: facts.employments.get(staffId) ?? null,
+      profile,
+      resource: {
+        classFound: classLevel !== undefined,
+        classLevel: classLevel ?? 0,
+        subjectRequested: subjectId !== null,
+        subjectFound: Boolean(subject && subject.classId === classId),
+        subjectCode:
+          subject && subject.classId === classId ? subject.code : null,
       },
-      select: { id: true, effectiveTo: true },
+      catalogue: facts.catalogue,
+      catalogueLimitReached: facts.catalogueLimitReached,
+      qualifications: profile
+        ? (facts.qualifications.get(profile.id) ?? [])
+        : [],
+      licences: profile ? (facts.licences.get(profile.id) ?? []) : [],
     });
-    if (!profile) reject('TEACHER_PROFILE_MISSING');
+  }
 
-    const schoolClass = await db.class.findFirst({
-      where: { id: input.classId, tenantId: input.tenantId },
-      select: { level: true },
-    });
-    if (!schoolClass) reject('CLASS_NOT_FOUND');
-    const subject = input.subjectId
-      ? await db.subject.findFirst({
+  /**
+   * Bounded, tenant-anchored fact loading shared by the single preflight, the
+   * read-only projection, the exceptions report and the workspace. Callers cap
+   * the staff set; every query filters by tenant.
+   */
+  async loadFacts(
+    db: Prisma.TransactionClient | PrismaService,
+    input: {
+      tenantId: string;
+      staffIds: string[];
+      classIds: string[];
+      subjectIds: string[];
+      now: Date;
+      /** When set, also loads approved policies that start before this. */
+      horizonEnd?: Date;
+    },
+  ): Promise<EligibilityFacts> {
+    const { tenantId, now } = input;
+    const [staffRows, employmentRows, profileRows, classRows, subjectRows] =
+      await Promise.all([
+        db.staff.findMany({
           where: {
-            id: input.subjectId,
-            tenantId: input.tenantId,
-            classId: input.classId,
+            id: { in: input.staffIds },
+            tenantId,
+            status: 'ACTIVE',
+            joiningDate: { lte: now },
           },
-          select: { code: true },
-        })
-      : null;
-    if (input.subjectId && !subject) reject('SUBJECT_NOT_FOUND');
+          select: { id: true },
+        }),
+        db.staffEmployment.findMany({
+          where: {
+            tenantId,
+            staffId: { in: input.staffIds },
+            // Phase 7.10: authoritative = verified (current) or ended
+            // (historical); an ended employment stays valid until effectiveTo.
+            status: { in: [...AUTHORITATIVE_EMPLOYMENT_STATUSES] },
+            verifiedAt: { not: null },
+            effectiveFrom: { lte: now },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+          },
+          include: { localLevel: { include: { district: true } } },
+          orderBy: [{ effectiveFrom: 'desc' }, { id: 'desc' }],
+        }),
+        db.teacherProfile.findMany({
+          where: {
+            tenantId,
+            staffId: { in: input.staffIds },
+            status: TeacherProfileStatus.ACTIVE,
+            effectiveFrom: { lte: now },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+          },
+          select: { id: true, staffId: true, effectiveTo: true },
+        }),
+        input.classIds.length > 0
+          ? db.class.findMany({
+              where: { id: { in: input.classIds }, tenantId },
+              select: { id: true, level: true },
+            })
+          : Promise.resolve([] as Array<{ id: string; level: number }>),
+        input.subjectIds.length > 0
+          ? db.subject.findMany({
+              where: { id: { in: input.subjectIds }, tenantId },
+              select: { id: true, code: true, classId: true },
+            })
+          : Promise.resolve(
+              [] as Array<{ id: string; code: string; classId: string }>,
+            ),
+      ]);
 
+    const employments = new Map<string, EmploymentFacts>();
+    for (const row of employmentRows) {
+      if (employments.has(row.staffId)) continue;
+      employments.set(row.staffId, {
+        id: row.id,
+        localLevelId: row.localLevelId,
+        districtId: row.localLevel?.districtId ?? null,
+        provinceId: row.localLevel?.district.provinceId ?? null,
+        schoolTypeCode: row.schoolTypeCode,
+        employmentType: row.employmentType,
+        postCategoryCode: row.postCategoryCode,
+        effectiveFrom: row.effectiveFrom,
+        effectiveTo: row.effectiveTo,
+      });
+    }
+    const profiles = new Map<
+      string,
+      { id: string; effectiveTo: Date | null }
+    >();
+    for (const row of profileRows)
+      profiles.set(row.staffId, { id: row.id, effectiveTo: row.effectiveTo });
+
+    const localLevelIds = new Set<number>();
+    const districtIds = new Set<number>();
+    const provinceIds = new Set<number>();
+    for (const employment of employments.values()) {
+      if (employment.localLevelId !== null)
+        localLevelIds.add(employment.localLevelId);
+      if (employment.districtId !== null)
+        districtIds.add(employment.districtId);
+      if (employment.provinceId !== null)
+        provinceIds.add(employment.provinceId);
+    }
     const scope: Prisma.NepalHrPolicyVersionWhereInput[] = [
       { scope: 'NATIONAL' },
-      { scope: 'SCHOOL', tenantId: input.tenantId },
+      { scope: 'SCHOOL', tenantId },
     ];
-    if (employment.localLevelId) {
+    if (localLevelIds.size > 0)
       scope.push({
         scope: 'LOCAL_LEVEL',
-        localLevelId: employment.localLevelId,
+        localLevelId: { in: [...localLevelIds] },
       });
-      scope.push({
-        scope: 'DISTRICT',
-        districtId: employment.localLevel?.districtId,
-      });
-      scope.push({
-        scope: 'PROVINCE',
-        provinceId: employment.localLevel?.district.provinceId,
-      });
-    }
-    const candidates = await db.nepalHrPolicyVersion.findMany({
-      where: {
-        kind: NepalHrPolicyKind.TEACHER_PROFESSIONAL_ELIGIBILITY,
-        reviewStatus: NepalHrPolicyReviewStatus.APPROVED,
-        effectiveFrom: { lte: now },
-        AND: [
-          { OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }] },
-          { OR: scope },
-        ],
-      },
-      take: 1000,
-    });
-    if (candidates.length === 1000)
-      reject('TEACHER_POLICY_CATALOG_LIMIT_REACHED');
-    const matching = candidates.filter(
-      (policy) =>
-        (policy.scope !== 'SCHOOL' ||
-          policy.localLevelId === employment.localLevelId) &&
-        (policy.schoolTypeCode === null ||
-          policy.schoolTypeCode === employment.schoolTypeCode) &&
-        (policy.employmentType === null ||
-          policy.employmentType === employment.employmentType) &&
-        (policy.postCategoryCode === null ||
-          policy.postCategoryCode === employment.postCategoryCode) &&
-        (policy.classLevelMin === null ||
-          policy.classLevelMin <= schoolClass.level) &&
-        (policy.classLevelMax === null ||
-          policy.classLevelMax >= schoolClass.level) &&
-        (policy.subjectCode === null || policy.subjectCode === subject?.code),
-    );
-    const latestByKey = new Map<string, (typeof matching)[number]>();
-    for (const policy of matching) {
-      const prior = latestByKey.get(policy.policyKey);
-      if (
-        !prior ||
-        policy.effectiveFrom > prior.effectiveFrom ||
-        (policy.effectiveFrom.getTime() === prior.effectiveFrom.getTime() &&
-          policy.version > prior.version)
-      )
-        latestByKey.set(policy.policyKey, policy);
-    }
-    const applicable = [...latestByKey.values()];
-    if (applicable.length === 0) reject('TEACHER_POLICY_UNAVAILABLE');
-
-    const scopeRank = {
-      NATIONAL: 0,
-      PROVINCE: 1,
-      DISTRICT: 2,
-      LOCAL_LEVEL: 3,
-      SCHOOL: 4,
+    if (districtIds.size > 0)
+      scope.push({ scope: 'DISTRICT', districtId: { in: [...districtIds] } });
+    if (provinceIds.size > 0)
+      scope.push({ scope: 'PROVINCE', provinceId: { in: [...provinceIds] } });
+    const baseWhere = {
+      kind: NepalHrPolicyKind.TEACHER_PROFESSIONAL_ELIGIBILITY,
+      reviewStatus: NepalHrPolicyReviewStatus.APPROVED,
     } as const;
-    const specificity = (policy: (typeof applicable)[number]) =>
-      Number(policy.schoolTypeCode !== null) +
-      Number(policy.employmentType !== null) +
-      Number(policy.postCategoryCode !== null) +
-      Number(policy.classLevelMin !== null || policy.classLevelMax !== null) +
-      Number(policy.subjectCode !== null);
-    applicable.sort(
-      (left, right) =>
-        scopeRank[right.scope] - scopeRank[left.scope] ||
-        specificity(right) - specificity(left) ||
-        +right.effectiveFrom - +left.effectiveFrom ||
-        right.version - left.version,
-    );
-    const policy = applicable[0];
-    if (applicable.length > 1) {
-      const peer = applicable[1];
-      if (
-        peer.policyKey !== policy.policyKey &&
-        scopeRank[peer.scope] === scopeRank[policy.scope] &&
-        specificity(peer) === specificity(policy) &&
-        +peer.effectiveFrom === +policy.effectiveFrom
-      ) {
-        reject('TEACHER_POLICY_CONFLICT');
+    const profileIds = [...profiles.values()].map((item) => item.id);
+    const [candidates, future, qualificationRows, licenceRows] =
+      await Promise.all([
+        db.nepalHrPolicyVersion.findMany({
+          where: {
+            ...baseWhere,
+            effectiveFrom: { lte: now },
+            AND: [
+              { OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }] },
+              { OR: scope },
+            ],
+          },
+          take: POLICY_CATALOG_LIMIT,
+        }),
+        input.horizonEnd
+          ? db.nepalHrPolicyVersion.findMany({
+              where: {
+                ...baseWhere,
+                effectiveFrom: { gt: now, lte: input.horizonEnd },
+                OR: scope,
+              },
+              take: POLICY_CATALOG_LIMIT,
+            })
+          : Promise.resolve([]),
+        profileIds.length > 0
+          ? db.teacherQualificationEvidence.findMany({
+              where: { tenantId, profileId: { in: profileIds } },
+              select: { ...EVIDENCE_FACT_SELECT, profileId: true },
+            })
+          : Promise.resolve([]),
+        profileIds.length > 0
+          ? db.teachingLicenceEvidence.findMany({
+              where: { tenantId, profileId: { in: profileIds } },
+              select: { ...EVIDENCE_FACT_SELECT, profileId: true },
+            })
+          : Promise.resolve([]),
+      ]);
+
+    const groupEvidence = (
+      rows: Array<EvidenceFacts & { profileId: string }>,
+    ) => {
+      const grouped = new Map<string, EvidenceFacts[]>();
+      for (const { profileId, ...row } of rows) {
+        const list = grouped.get(profileId) ?? [];
+        list.push(row);
+        grouped.set(profileId, list);
       }
-    }
-
-    // Mandatory baselines remain in force even when a school policy is more
-    // specific. The review trigger also prevents a school override that
-    // explicitly weakens a currently approved mandatory requirement.
-    const requiresQualification = applicable.some(
-      (item) =>
-        (item.id === policy.id || item.isMandatoryBaseline) &&
-        item.requiresQualification === true,
-    );
-    const requiresLicence = applicable.some(
-      (item) =>
-        (item.id === policy.id || item.isMandatoryBaseline) &&
-        item.requiresLicence === true,
-    );
-
-    const qualification = requiresQualification
-      ? await db.teacherQualificationEvidence.findFirst({
-          where: {
-            tenantId: input.tenantId,
-            profileId: profile.id,
-            status: 'VERIFIED',
-            validFrom: { lte: now },
-            OR: [{ validUntil: null }, { validUntil: { gt: now } }],
-            AND: [
-              {
-                OR: [
-                  { subjectCode: null },
-                  { subjectCode: subject?.code ?? null },
-                ],
-              },
-              {
-                OR: [
-                  { levelCode: null },
-                  { levelCode: String(schoolClass.level) },
-                ],
-              },
-            ],
-          },
-          orderBy: [{ validFrom: 'desc' }, { id: 'desc' }],
-        })
-      : null;
-    const licence = requiresLicence
-      ? await db.teachingLicenceEvidence.findFirst({
-          where: {
-            tenantId: input.tenantId,
-            profileId: profile.id,
-            status: 'VERIFIED',
-            validFrom: { lte: now },
-            OR: [{ validUntil: null }, { validUntil: { gt: now } }],
-            AND: [
-              {
-                OR: [
-                  { subjectCode: null },
-                  { subjectCode: subject?.code ?? null },
-                ],
-              },
-              {
-                OR: [
-                  { levelCode: null },
-                  { levelCode: String(schoolClass.level) },
-                ],
-              },
-            ],
-          },
-          orderBy: [{ validFrom: 'desc' }, { id: 'desc' }],
-        })
-      : null;
-    const reason =
-      requiresQualification && !qualification
-        ? 'QUALIFICATION_UNVERIFIED'
-        : requiresLicence && !licence
-          ? 'TEACHING_LICENCE_UNVERIFIED'
-          : 'POLICY_REQUIREMENTS_SATISFIED';
-    const endDates = [
-      employment.effectiveTo,
-      profile.effectiveTo,
-      policy.effectiveTo,
-      qualification?.validUntil,
-      licence?.validUntil,
-    ].filter((value): value is Date => value instanceof Date);
+      return grouped;
+    };
     return {
-      profileId: profile.id,
-      employmentId: employment.id,
-      policyVersionId: policy.id,
-      qualificationId: qualification?.id ?? null,
-      licenceId: licence?.id ?? null,
-      outcome:
-        reason === 'POLICY_REQUIREMENTS_SATISFIED'
-          ? TeacherEligibilityOutcome.ELIGIBLE
-          : TeacherEligibilityOutcome.INELIGIBLE,
-      reasonCode: reason,
-      validUntil:
-        endDates.length > 0
-          ? new Date(Math.min(...endDates.map((value) => +value)))
-          : null,
+      tenantId,
+      now,
+      activeStaff: new Set(staffRows.map((row) => row.id)),
+      employments,
+      profiles,
+      qualifications: groupEvidence(qualificationRows),
+      licences: groupEvidence(licenceRows),
+      classLevels: new Map(classRows.map((row) => [row.id, row.level])),
+      subjects: new Map(
+        subjectRows.map((row) => [
+          row.id,
+          { code: row.code, classId: row.classId },
+        ]),
+      ),
+      catalogue: candidates.map(toPolicyFacts),
+      catalogueLimitReached: candidates.length === POLICY_CATALOG_LIMIT,
+      futurePolicies: future.map(toPolicyFacts),
     };
   }
 

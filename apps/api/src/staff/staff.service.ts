@@ -51,6 +51,7 @@ import {
 } from '../common/document-sequence';
 import { hiddenStaffDocumentKinds } from '../authorization/policies/staff-restricted.policy';
 import { projectStaffDetail } from './staff-detail.projection';
+import { ProfessionalIdentityService } from '../hr/professional-identity.service';
 
 @Injectable()
 export class StaffService {
@@ -61,6 +62,7 @@ export class StaffService {
     private readonly lifecycleService: StaffLifecycleService,
     private readonly usageService: UsageService,
     private readonly addressService: AddressService,
+    private readonly professionalIdentity: ProfessionalIdentityService,
   ) {}
 
   async createStaff(dto: CreateStaffDto, actor: AuthContext) {
@@ -1177,6 +1179,15 @@ export class StaffService {
       : new Date();
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Phase 7.10: end the open authoritative employment atomically so the
+      // terminated person cannot keep a live employment window.
+      await this.professionalIdentity.endEmploymentsForTermination(
+        tx,
+        staff.id,
+        effectiveDate,
+        dto.reason,
+        actor,
+      );
       // Deactivate user if effective date is today or in the past
       if (effectiveDate <= new Date()) {
         await tx.user.update({

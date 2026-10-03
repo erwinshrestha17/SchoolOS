@@ -5,10 +5,26 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import { eligibilityResourceKey } from '../teacher-scope/teacher-professional-eligibility.service';
 import {
   ProfessionalIdentityService,
   translateGuardError,
 } from './professional-identity.service';
+
+// Decisions run inside withSchoolAuthorizationTransaction (live session and
+// grant re-check, covered by the integration suite). Here it is a pass-through
+// so the unit cases keep exercising the domain rules.
+jest.mock('../auth/school-authorization-transaction', () => ({
+  withSchoolAuthorizationTransaction: jest.fn(
+    (
+      prisma: any,
+      _actor: unknown,
+      _permission: unknown,
+      _targets: unknown,
+      work: (tx: unknown) => unknown,
+    ) => prisma.$transaction(work),
+  ),
+}));
 
 const HR_A = { tenantId: 't1', userId: 'hr-a' } as any;
 const HR_B = { tenantId: 't1', userId: 'hr-b' } as any;
@@ -94,6 +110,18 @@ function setup(
   const audit = { record: jest.fn() };
   const eligibility = {
     projectEligibility: jest.fn(() => ({ outcome: 'INELIGIBLE' })),
+    evaluateMany: jest.fn<
+      Promise<Map<string, unknown>>,
+      [
+        {
+          resources: {
+            staffId: string;
+            classId: string;
+            subjectId: string | null;
+          }[];
+        },
+      ]
+    >(() => Promise.resolve(new Map<string, unknown>())),
   };
   return {
     service: new ProfessionalIdentityService(
@@ -813,7 +841,7 @@ describe('ProfessionalIdentityService (Phase 5J–5L)', () => {
       eligibilityAssessment: snapshot,
     });
 
-    it('lists only assignments that would fail eligibility today, with the creation snapshot, and memoizes', async () => {
+    it('lists only assignments that would fail eligibility today, with the creation snapshot, in one batched evaluation', async () => {
       const { service, tx, eligibility } = setup();
       const snapshot = {
         id: 'a1',
@@ -829,22 +857,37 @@ describe('ProfessionalIdentityService (Phase 5J–5L)', () => {
           assignment('ta-3', 's2', 'c9'),
         ]),
       };
-      (eligibility.projectEligibility as jest.Mock).mockImplementation(
-        ({ staffId }: { staffId: string }) =>
-          staffId === 's1'
-            ? {
-                outcome: 'INELIGIBLE',
-                reasonCode: 'TEACHING_LICENCE_UNVERIFIED',
-              }
-            : {
-                outcome: 'ELIGIBLE',
-                reasonCode: 'POLICY_REQUIREMENTS_SATISFIED',
-              },
+      eligibility.evaluateMany.mockImplementation(
+        ({
+          resources,
+        }: {
+          resources: {
+            staffId: string;
+            classId: string;
+            subjectId: string | null;
+          }[];
+        }) =>
+          Promise.resolve(
+            new Map(
+              resources.map((resource) => [
+                eligibilityResourceKey(resource),
+                resource.staffId === 's1'
+                  ? {
+                      outcome: 'INELIGIBLE',
+                      reasonCode: 'TEACHING_LICENCE_UNVERIFIED',
+                    }
+                  : {
+                      outcome: 'ELIGIBLE',
+                      reasonCode: 'POLICY_REQUIREMENTS_SATISFIED',
+                    },
+              ]),
+            ),
+          ),
       );
 
       const report: any = await service.listEligibilityExceptions(HR_A);
 
-      expect(eligibility.projectEligibility).toHaveBeenCalledTimes(2);
+      expect(eligibility.evaluateMany).toHaveBeenCalledTimes(1);
       expect(report.items.map((i: any) => i.assignmentId)).toEqual([
         'ta-1',
         'ta-2',
@@ -872,10 +915,17 @@ describe('ProfessionalIdentityService (Phase 5J–5L)', () => {
           ),
         ),
       };
-      eligibility.projectEligibility = jest.fn(() => ({
-        outcome: 'ELIGIBLE',
-        reasonCode: 'OK',
-      }));
+      eligibility.evaluateMany.mockImplementation(
+        ({ resources }: { resources: any[] }) =>
+          Promise.resolve(
+            new Map(
+              resources.map((resource) => [
+                eligibilityResourceKey(resource),
+                { outcome: 'ELIGIBLE', reasonCode: 'OK' },
+              ]),
+            ),
+          ),
+      );
       const report: any = await service.listEligibilityExceptions(HR_A);
       expect(report).toMatchObject({
         truncated: true,

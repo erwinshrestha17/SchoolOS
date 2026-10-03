@@ -23,12 +23,15 @@ import {
   CreateTeacherProfileDto,
   DeactivateTeacherProfileDto,
   EligibilityProjectionQueryDto,
+  EligibilitySummaryQueryDto,
+  EligibilityWorkspaceQueryDto,
   EndStaffEmploymentDto,
   EndStaffResponsibilityDto,
   ReviewProfessionalRecordDto,
   RevokeProfessionalEvidenceDto,
 } from './dto/professional-identity.dto';
 import { ProfessionalIdentityService } from './professional-identity.service';
+import { TeacherEligibilityWorkspaceService } from './teacher-eligibility-workspace.service';
 
 /**
  * Phase 5J–5M professional identity. Reads need `hr:read`; every write needs
@@ -40,7 +43,10 @@ import { ProfessionalIdentityService } from './professional-identity.service';
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.hr')
 export class HrProfessionalIdentityController {
-  constructor(private readonly service: ProfessionalIdentityService) {}
+  constructor(
+    private readonly service: ProfessionalIdentityService,
+    private readonly workspace: TeacherEligibilityWorkspaceService,
+  ) {}
 
   @Get()
   @Permissions('hr:read')
@@ -59,6 +65,16 @@ export class HrProfessionalIdentityController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.service.projectEligibility(staffId, query, auth);
+  }
+
+  @Get('eligibility-summary')
+  @Permissions('hr:read')
+  eligibilitySummary(
+    @Param('staffId', ParseUUIDPipe) staffId: string,
+    @Query() query: EligibilitySummaryQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.workspace.getSummary(staffId, query.horizonDays, auth);
   }
 
   @Post('employments')
@@ -228,7 +244,20 @@ export class HrProfessionalIdentityController {
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.hr')
 export class HrProfessionalReportsController {
-  constructor(private readonly service: ProfessionalIdentityService) {}
+  constructor(
+    private readonly service: ProfessionalIdentityService,
+    private readonly workspace: TeacherEligibilityWorkspaceService,
+  ) {}
+
+  /** Phase 7.10 (7L): read-only school-wide eligibility workspace. */
+  @Get('eligibility-workspace')
+  @Permissions('hr:read')
+  eligibilityWorkspace(
+    @Query() query: EligibilityWorkspaceQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.workspace.getWorkspace(query, auth);
+  }
 
   @Get('eligibility-exceptions')
   @Permissions('hr:read')

@@ -22,6 +22,14 @@ export function EligibilityExceptionsSurface() {
     <Surface
       title="Teaching eligibility exceptions"
       description="Active assignments whose teacher would not pass the professional-eligibility check today, for example after a licence expired or employment ended."
+      actions={
+        <Link
+          href="/dashboard/hr/teacher-eligibility"
+          className="text-sm font-semibold text-primary-700 hover:underline"
+        >
+          Open eligibility workspace
+        </Link>
+      }
     >
       {report.isLoading ? (
         <p className="text-sm text-slate-500">Checking assignments…</p>

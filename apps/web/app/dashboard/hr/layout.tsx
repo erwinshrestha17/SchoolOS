@@ -8,6 +8,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   FileText,
+  ShieldCheck,
 } from 'lucide-react';
 import { useSession } from '../../../components/session-provider';
 import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
@@ -15,7 +16,7 @@ import { ModuleTabs } from '../../../components/dashboard/module-tabs';
 import { PageHeader } from '../../../components/ui/page-header';
 
 export default function HRLayout({ children }: { children: ReactNode }) {
-  const { session } = useSession();
+  const { session, hasPermissions } = useSession();
   const pathname = usePathname();
 
   const navItems = [
@@ -32,6 +33,15 @@ export default function HRLayout({ children }: { children: ReactNode }) {
       icon: CalendarDays,
     },
     { href: '/dashboard/hr/contracts', label: 'Contracts', icon: FileText },
+    ...(hasPermissions(['hr:read'])
+      ? [
+          {
+            href: '/dashboard/hr/teacher-eligibility',
+            label: 'Teacher Eligibility',
+            icon: ShieldCheck,
+          },
+        ]
+      : []),
   ];
 
   const tabs = (

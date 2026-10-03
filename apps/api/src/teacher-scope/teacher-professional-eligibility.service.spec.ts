@@ -19,6 +19,7 @@ const EMPLOYMENT: Row = {
   tenantId: 't1',
   staffId: 's1',
   status: 'VERIFIED',
+  verifiedAt: PAST,
   employmentType: 'PERMANENT',
   postCategoryCode: 'TEACHER',
   schoolTypeCode: 'INSTITUTIONAL',
@@ -92,53 +93,52 @@ function world(overrides: Partial<Record<string, Row[]>> = {}) {
     ...overrides,
   };
   const created: Row[] = [];
-  const find = (rows: Row[], pred: (row: Row) => boolean) =>
-    rows.find(pred) ?? null;
+  const inIds = (value: any, id: string) => value?.in?.includes(id) ?? false;
   const prisma = {
     staff: {
-      findFirst: jest.fn(({ where }) =>
-        find(
-          data.staff,
+      findMany: jest.fn(({ where }) =>
+        data.staff.filter(
           (r) =>
-            r.id === where.id &&
+            inIds(where.id, r.id) &&
             r.tenantId === where.tenantId &&
             r.status === 'ACTIVE',
         ),
       ),
     },
     staffEmployment: {
-      findFirst: jest.fn(({ where }) =>
-        find(
-          data.employment,
+      findMany: jest.fn(({ where }) => {
+        // The service must only ask for authoritative (verified/ended,
+        // reviewed) employment; the fake enforces what it asked for.
+        expect(where.verifiedAt).toEqual({ not: null });
+        return data.employment.filter(
           (r) =>
             r.tenantId === where.tenantId &&
-            r.staffId === where.staffId &&
-            r.status === 'VERIFIED' &&
+            inIds(where.staffId, r.staffId) &&
+            where.status.in.includes(r.status) &&
+            r.verifiedAt !== null &&
             activeWindow(r, 'effectiveFrom', 'effectiveTo'),
-        ),
-      ),
+        );
+      }),
     },
     teacherProfile: {
-      findFirst: jest.fn(({ where }) =>
-        find(
-          data.profile,
+      findMany: jest.fn(({ where }) =>
+        data.profile.filter(
           (r) =>
             r.tenantId === where.tenantId &&
-            r.staffId === where.staffId &&
+            inIds(where.staffId, r.staffId) &&
             r.status === 'ACTIVE' &&
             activeWindow(r, 'effectiveFrom', 'effectiveTo'),
         ),
       ),
     },
     class: {
-      findFirst: jest.fn(({ where }) =>
-        find(
-          data.classes,
-          (r) => r.id === where.id && r.tenantId === where.tenantId,
+      findMany: jest.fn(({ where }) =>
+        data.classes.filter(
+          (r) => inIds(where.id, r.id) && r.tenantId === where.tenantId,
         ),
       ),
     },
-    subject: { findFirst: jest.fn(() => null) },
+    subject: { findMany: jest.fn(() => []) },
     nepalHrPolicyVersion: {
       findMany: jest.fn(() =>
         data.policies.filter(
@@ -149,27 +149,27 @@ function world(overrides: Partial<Record<string, Row[]>> = {}) {
       ),
     },
     teacherQualificationEvidence: {
-      findFirst: jest.fn(({ where }) =>
-        find(
-          data.qualifications,
-          (r) =>
-            r.tenantId === where.tenantId &&
-            r.profileId === where.profileId &&
-            r.status === 'VERIFIED' &&
-            activeWindow(r, 'validFrom', 'validUntil'),
-        ),
+      findMany: jest.fn(({ where }) =>
+        data.qualifications
+          .filter(
+            (r) =>
+              r.tenantId === where.tenantId &&
+              inIds(where.profileId, r.profileId),
+          )
+          // Real rows always carry the nullable scope columns.
+          .map((r) => ({ subjectCode: null, levelCode: null, ...r })),
       ),
     },
     teachingLicenceEvidence: {
-      findFirst: jest.fn(({ where }) =>
-        find(
-          data.licences,
-          (r) =>
-            r.tenantId === where.tenantId &&
-            r.profileId === where.profileId &&
-            r.status === 'VERIFIED' &&
-            activeWindow(r, 'validFrom', 'validUntil'),
-        ),
+      findMany: jest.fn(({ where }) =>
+        data.licences
+          .filter(
+            (r) =>
+              r.tenantId === where.tenantId &&
+              inIds(where.profileId, r.profileId),
+          )
+          // Real rows always carry the nullable scope columns.
+          .map((r) => ({ subjectCode: null, levelCode: null, ...r })),
       ),
     },
     teacherEligibilityAssessment: {
@@ -366,5 +366,116 @@ describe('TeacherProfessionalEligibilityService (Phase 5M)', () => {
         licenceId: 'l1',
       });
     });
+  });
+});
+
+describe('Phase 7.10 employment window and batch equivalence', () => {
+  const endedInFuture: Row = {
+    ...EMPLOYMENT,
+    status: 'ENDED',
+    effectiveTo: SOON,
+  };
+
+  it('an ended employment still counts until its end date', async () => {
+    const { service } = world({ employment: [endedInFuture] });
+    await expect(service.preflightAssignment(ctx)).resolves.toBe('a1');
+  });
+
+  it('an ended employment whose end date has passed does not count', async () => {
+    const { service } = world({
+      employment: [{ ...endedInFuture, effectiveTo: EXPIRED }],
+    });
+    expect(await reasonOf(service.preflightAssignment(ctx))).toBe(
+      'EMPLOYMENT_UNVERIFIED',
+    );
+  });
+
+  it.each([
+    ['pending', { status: 'PENDING', verifiedAt: null }],
+    ['rejected', { status: 'REJECTED', verifiedAt: PAST }],
+    ['ended but never verified', { status: 'ENDED', verifiedAt: null }],
+  ])('%s employment is never authoritative', async (_label, patch) => {
+    const { service } = world({ employment: [{ ...EMPLOYMENT, ...patch }] });
+    expect(await reasonOf(service.preflightAssignment(ctx))).toBe(
+      'EMPLOYMENT_UNVERIFIED',
+    );
+  });
+
+  const scenarios: [string, Partial<Record<string, Row[]>>][] = [
+    ['eligible', {}],
+    ['no employment', { employment: [] }],
+    ['no profile', { profile: [] }],
+    ['no policy', { policies: [] }],
+    ['no licence', { licences: [] }],
+    ['no qualification', { qualifications: [] }],
+    ['inactive staff', { staff: [] }],
+    ['ended in future', { employment: [endedInFuture] }],
+    [
+      'expired licence',
+      {
+        licences: [
+          {
+            id: 'l1',
+            tenantId: 't1',
+            profileId: 'p1',
+            status: 'VERIFIED',
+            validFrom: PAST,
+            validUntil: EXPIRED,
+          },
+        ],
+      },
+    ],
+    [
+      'pending licence',
+      {
+        licences: [
+          {
+            id: 'l1',
+            tenantId: 't1',
+            profileId: 'p1',
+            status: 'PENDING',
+            validFrom: PAST,
+            validUntil: null,
+          },
+        ],
+      },
+    ],
+  ];
+
+  it.each(scenarios)(
+    'batch evaluation agrees with the single projection: %s',
+    async (_label, overrides) => {
+      const { service } = world(overrides);
+      const single = await service.projectEligibility({
+        tenantId: 't1',
+        staffId: 's1',
+        classId: 'c1',
+      });
+      const batch = await service.evaluateMany({
+        tenantId: 't1',
+        resources: [{ staffId: 's1', classId: 'c1', subjectId: null }],
+      });
+      const decision = batch.get('s1|c1|');
+      expect(decision).toBeDefined();
+      expect(decision?.outcome).toBe(single.outcome);
+      expect(decision?.reasonCode).toBe(single.reasonCode);
+      expect(decision?.qualificationId).toBe(single.qualificationId);
+      expect(decision?.licenceId).toBe(single.licenceId);
+      expect(decision?.policyVersionId).toBe(single.policyVersionId);
+      expect(decision?.validUntil).toEqual(single.validUntil);
+    },
+  );
+
+  it('evaluates many resources with one fact load and one catalogue read', async () => {
+    const { service, prisma } = world();
+    await service.evaluateMany({
+      tenantId: 't1',
+      resources: [
+        { staffId: 's1', classId: 'c1', subjectId: null },
+        { staffId: 's1', classId: 'c1', subjectId: null },
+      ],
+    });
+    expect(prisma.nepalHrPolicyVersion.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.staff.findMany).toHaveBeenCalledTimes(1);
   });
 });

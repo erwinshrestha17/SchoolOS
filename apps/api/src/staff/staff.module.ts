@@ -19,6 +19,7 @@ import {
   HrProfessionalReportsController,
 } from '../hr/hr-professional-identity.controller';
 import { ProfessionalIdentityService } from '../hr/professional-identity.service';
+import { TeacherEligibilityWorkspaceService } from '../hr/teacher-eligibility-workspace.service';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ProfessionalIdentityService } from '../hr/professional-identity.service
     StaffLeaveAccrualService,
     HrCoverageService,
     ProfessionalIdentityService,
+    TeacherEligibilityWorkspaceService,
   ],
   controllers: [
     StaffController,
