@@ -108,3 +108,6 @@ tests/load/results/
 !/claude/PHASE_7_COMPLETION_REPORT.md
 # Local browser verification captures.
 /apps/web/output/playwright/
+
+# Local delivery bundles used while moving work between environments.
+/.phase7-transfer/
