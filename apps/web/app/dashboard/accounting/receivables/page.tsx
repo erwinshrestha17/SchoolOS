@@ -1,5 +1,6 @@
 import { AccountantDestinationWorkspace } from '@/components/accounting/accountant-destination-workspace';
 import { SourcePostingBatchesPanel } from '@/components/accounting/source-posting-batches-panel';
+import { ReceivablesAgingWorkspace } from '@/components/accounting/receivables-aging-workspace';
 
 export default function AccountingReceivablesPage() {
   return (
@@ -31,6 +32,7 @@ export default function AccountingReceivablesPage() {
       ]}
     >
       <div className="space-y-5">
+        <ReceivablesAgingWorkspace />
         <SourcePostingBatchesPanel sourceModule="M3" />
       </div>
     </AccountantDestinationWorkspace>

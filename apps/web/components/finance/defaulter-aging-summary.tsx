@@ -7,11 +7,20 @@ import { Clock, ChevronRight, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/loading-state';
+import { useSession } from '@/components/session-provider';
+import {
+  getNepalSchoolDay,
+  RECEIVABLES_AGING_BUCKET_LABELS,
+  formatBsDate,
+} from '@schoolos/core';
 
 export function DefaulterAgingSummary() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { hasPermissions } = useSession();
+  // The export endpoint needs both keys; hide the control rather than fail.
+  const canExport = hasPermissions(['reports:export', 'ledger:read']);
   const defaultersQuery = useQuery({
     queryKey: ['defaulters'],
     queryFn: () => api.listDefaulters(),
@@ -27,9 +36,10 @@ export function DefaulterAgingSummary() {
   };
   const exportMutation = useMutation({
     mutationFn: () =>
+      // Phase 7.11b: the report is "as of" a Nepal school day; send today's.
       api.downloadReport('defaulter-aging-report', {
         format: 'csv',
-        filters: {},
+        filters: { asOfDate: getNepalSchoolDay(new Date()).gregorianDate },
       }),
   });
 
@@ -53,7 +63,7 @@ export function DefaulterAgingSummary() {
 
   const bucketData = [
     {
-      label: '0-30 days',
+      label: RECEIVABLES_AGING_BUCKET_LABELS['0-30'],
       severity: 'Recent',
       key: '0-30',
       color: 'text-emerald-700',
@@ -61,7 +71,7 @@ export function DefaulterAgingSummary() {
       border: 'border-emerald-100',
     },
     {
-      label: '31-60 days',
+      label: RECEIVABLES_AGING_BUCKET_LABELS['31-60'],
       severity: 'Follow-up',
       key: '31-60',
       color: 'text-amber-700',
@@ -69,7 +79,7 @@ export function DefaulterAgingSummary() {
       border: 'border-amber-100',
     },
     {
-      label: '61-90 days',
+      label: RECEIVABLES_AGING_BUCKET_LABELS['61-90'],
       severity: 'High priority',
       key: '61-90',
       color: 'text-orange-700',
@@ -77,7 +87,7 @@ export function DefaulterAgingSummary() {
       border: 'border-orange-100',
     },
     {
-      label: '90+ days',
+      label: RECEIVABLES_AGING_BUCKET_LABELS['90+'],
       severity: 'Critical',
       key: '90+',
       color: 'text-rose-700',
@@ -95,20 +105,26 @@ export function DefaulterAgingSummary() {
           </h2>
           <p className="mt-1 text-sm font-medium text-slate-500">
             Official aging buckets for collection follow-up and guardian
-            reminders.
+            reminders. Counts and amounts cover every overdue invoice
+            {defaultersQuery.data?.asOfDate
+              ? ` as of ${formatBsDate(defaultersQuery.data.asOfDate)}`
+              : ''}
+            .
           </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={exportMutation.isPending}
-          onClick={() => exportMutation.mutate()}
-          data-testid="finance-defaulter-aging-csv-export"
-        >
-          <Download size={14} />
-          {exportMutation.isPending ? 'Exporting...' : 'Export Summary'}
-        </Button>
+        {canExport ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={exportMutation.isPending}
+            onClick={() => exportMutation.mutate()}
+            data-testid="finance-defaulter-aging-csv-export"
+          >
+            <Download size={14} />
+            {exportMutation.isPending ? 'Exporting...' : 'Export Summary'}
+          </Button>
+        ) : null}
       </div>
 
       {exportMutation.error ? (

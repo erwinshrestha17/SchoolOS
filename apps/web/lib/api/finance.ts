@@ -159,6 +159,8 @@ export type DefaultersResponse = {
   limit: number;
   hasNextPage: boolean;
   totalOutstanding: string;
+  /** Nepal school day the aging is computed for (Phase 7.11b). */
+  asOfDate?: string;
   segments: Array<{
     agingBucket: string;
     count: number;

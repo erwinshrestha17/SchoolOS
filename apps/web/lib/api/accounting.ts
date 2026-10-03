@@ -6,6 +6,8 @@ import type {
   AccountingIncomeStatementResponse,
   AccountingReportFilters,
   AccountingTrialBalanceResponse,
+  ReceivablesAgingResponse,
+  ReceivablesReconciliationResponse,
   BankReconciliationSuggestion,
   BankReconciliationSessionView,
   PrepareBankReconciliation,
@@ -138,6 +140,21 @@ export const accountingApi = {
     ),
   listAccountingReports: (params?: JsonBody) =>
     request<AccountingReport>(withQuery('/accounting/reports', params ?? {})),
+  getReceivablesAging: (params: {
+    asOfDate?: string;
+    bucket?: string;
+    classId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    request<ReceivablesAgingResponse>(
+      withQuery('/accounting/reports/receivables-aging', params),
+    ),
+  getReceivablesReconciliation: (params: { asOfDate?: string }) =>
+    request<ReceivablesReconciliationResponse>(
+      withQuery('/accounting/reports/receivables-reconciliation', params),
+    ),
   listTrialBalance: (params: AccountingReportFilters) =>
     request<AccountingTrialBalanceResponse>(
       withQuery('/accounting/reports/trial-balance', params ?? {}),

@@ -39,6 +39,10 @@ import { BalanceSheetQueryDto } from './dto/balance-sheet-query.dto';
 import { TaxSummaryQueryDto } from './dto/tax-summary-query.dto';
 import { BudgetVsActualQueryDto } from './dto/budget-vs-actual-query.dto';
 import { UpdateAccountingReportMappingsDto } from './dto/report-account-mapping.dto';
+import {
+  ReceivablesAgingQueryDto,
+  ReceivablesReconciliationQueryDto,
+} from './dto/receivables-query.dto';
 
 @ApiTags('Accounting Reports')
 @ApiBearerAuth()
@@ -262,6 +266,34 @@ export class AccountingReportsController {
     @Query() query: BudgetVsActualQueryDto,
   ) {
     return this.reportsService.getBudgetVsActual(auth.tenantId, query);
+  }
+
+  @Get('receivables-aging')
+  @ApiOperation({
+    summary: 'Receivables aging as of a Nepal school day (Phase 7.11b)',
+  })
+  @Permissions('accounting:reports:read', 'accounting:read')
+  async getReceivablesAging(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: ReceivablesAgingQueryDto,
+  ) {
+    return this.reportsService.getReceivablesAging(auth.tenantId, query);
+  }
+
+  @Get('receivables-reconciliation')
+  @ApiOperation({
+    summary:
+      'Fee receivables subledger compared with the ledger control account (Phase 7.11b)',
+  })
+  @Permissions('accounting:reports:read', 'accounting:read')
+  async getReceivablesReconciliation(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: ReceivablesReconciliationQueryDto,
+  ) {
+    return this.reportsService.getReceivablesReconciliation(
+      auth.tenantId,
+      query,
+    );
   }
 
   @Get('income-statement')

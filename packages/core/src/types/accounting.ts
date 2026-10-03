@@ -757,3 +757,84 @@ export type PrepareBankReconciliation = {
   closingBankBalance: string;
   statementReference: string;
 };
+
+/** Phase 7.11b: receivables aging as of a Nepal school day. */
+export type ReceivablesAgingBucketTotal = {
+  bucket: "CURRENT" | "0-30" | "31-60" | "61-90" | "90+";
+  invoiceCount: number;
+  studentCount: number;
+  outstanding: string;
+};
+
+export type ReceivablesAgingResponse = {
+  asOfDate: string;
+  totals: {
+    buckets: ReceivablesAgingBucketTotal[];
+    totalOutstanding: string;
+    overdueOutstanding: string;
+    invoiceCount: number;
+    studentCount: number;
+  };
+  advancesHeld: string;
+  byClass: Array<{
+    classId: string | null;
+    className: string;
+    invoiceCount: number;
+    studentCount: number;
+    outstanding: string;
+    overdueOutstanding: string;
+  }>;
+  rows: Array<{
+    invoiceId: string;
+    invoiceNumber: string;
+    studentId: string;
+    studentName: string;
+    studentSystemId: string;
+    className: string;
+    sectionName: string | null;
+    dueDate: string;
+    totalAmount: string;
+    received: string;
+    outstanding: string;
+    daysOverdue: number;
+    bucket: ReceivablesAgingBucketTotal["bucket"];
+    ledgerHref: string;
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  basis: string;
+  generatedAt: string;
+};
+
+export type ReceivablesReconciliationCause =
+  | "INVOICE_NOT_POSTED"
+  | "VOID_NOT_REVERSED"
+  | "LATE_FEE_NOT_POSTED"
+  | "WAIVER_WITHOUT_INVOICE"
+  | "OPENING_BALANCE"
+  | "MANUAL_JOURNAL";
+
+export type ReceivablesReconciliationResponse = {
+  asOfDate: string;
+  controlAccounts: Array<{ id: string; code: string; name: string }>;
+  subledgerTotal: string;
+  ledgerBalance: string;
+  /** Ledger minus subledger. */
+  difference: string;
+  items: Array<{
+    cause: ReceivablesReconciliationCause;
+    label: string;
+    count: number;
+    /** Contribution to the difference (ledger minus subledger). */
+    effect: string;
+    examples: Array<{ reference: string; amount: string }>;
+  }>;
+  unexplained: string;
+  isReconciled: boolean;
+  isFullyExplained: boolean;
+  generatedAt: string;
+};

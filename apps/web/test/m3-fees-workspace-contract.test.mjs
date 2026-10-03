@@ -90,7 +90,12 @@ describe('M3 fees workspace contract', () => {
     const overview = read('components/finance/fee-overview.tsx');
 
     assert.match(overview, /\/dashboard\/fees\/collect/);
-    assert.match(overview, /\/dashboard\/fees\/invoices\?outstanding=true/);
+    // Phase 7.11b: the link target must be a parameter the page reads.
+    assert.match(overview, /\/dashboard\/fees\/invoices\?ledgerOutstanding=1/);
+    assert.match(
+      read('components/finance/ledger-section.tsx'),
+      /searchParams\.get\('ledgerOutstanding'\)/,
+    );
     assert.match(overview, /\/dashboard\/fees\/adjustments\?status=PENDING/);
     assert.match(overview, /\/dashboard\/fees\/cashier-close/);
     assert.match(overview, /Unavailable/);

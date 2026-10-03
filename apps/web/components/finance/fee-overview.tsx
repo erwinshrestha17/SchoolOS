@@ -97,7 +97,9 @@ export function FeeOverview() {
           icon={<Wallet className="h-5 w-5" />}
           tone="module"
           href={
-            canManage ? '/dashboard/fees/invoices?outstanding=true' : undefined
+            canManage
+              ? '/dashboard/fees/invoices?ledgerOutstanding=1'
+              : undefined
           }
           description="Official outstanding balance."
         />
@@ -113,9 +115,7 @@ export function FeeOverview() {
           loading={canManage && summaryQuery.isLoading}
           icon={<AlertTriangle className="h-5 w-5" />}
           tone={summary?.overdue.studentCount ? 'warning' : 'module'}
-          href={
-            canManage ? '/dashboard/fees/reports?agingBucket=all' : undefined
-          }
+          href={canManage ? '/dashboard/fees/reports?report=aging' : undefined}
           description={
             summary
               ? `${summary.overdue.studentCount} students.`
@@ -240,7 +240,7 @@ export function FeeOverview() {
             actions={
               canManage ? (
                 <Link
-                  href="/dashboard/fees/reports?agingBucket=all"
+                  href="/dashboard/fees/reports?report=aging"
                   className="text-sm font-semibold text-[var(--color-mod-fees-text)] hover:underline"
                 >
                   View overdue queue
@@ -350,9 +350,7 @@ export function FeeOverview() {
                       : 'Restricted'
                 }
                 href={
-                  canManage
-                    ? '/dashboard/fees/reports?agingBucket=all'
-                    : undefined
+                  canManage ? '/dashboard/fees/reports?report=aging' : undefined
                 }
                 tone={summary?.overdue.studentCount ? 'warning' : 'neutral'}
               />

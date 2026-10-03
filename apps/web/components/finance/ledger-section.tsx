@@ -28,6 +28,8 @@ export function LedgerSection({
   const searchParams = useSearchParams();
   const search = searchParams.get('ledgerSearch') ?? '';
   const status = searchParams.get('ledgerStatus') ?? '';
+  // Phase 7.11b: Fees Home links here for "invoices with a balance".
+  const outstandingOnly = searchParams.get('ledgerOutstanding') === '1';
   const page = Math.max(1, Number(searchParams.get('ledgerPage') ?? '1') || 1);
   const pageSize = 25;
   const ledgerSortByParam = searchParams.get('ledgerSortBy');
@@ -57,6 +59,7 @@ export function LedgerSection({
       page,
       search,
       status,
+      outstandingOnly,
       sort?.columnId,
       sort?.direction,
     ],
@@ -66,6 +69,7 @@ export function LedgerSection({
         limit: pageSize,
         search: search || undefined,
         status: status || undefined,
+        ...(outstandingOnly ? { outstandingOnly: true } : {}),
         sortBy: sort?.columnId,
         sortDirection: sort?.direction,
       }),

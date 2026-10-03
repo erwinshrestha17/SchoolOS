@@ -55,7 +55,17 @@ import {
   PayrollExceptionCode,
   PayrollExceptionStatus,
   AccountingReportMappingType,
+  InvoiceStatus,
 } from '@prisma/client';
+import {
+  loadReceivables,
+  resolveAgingAsOf,
+  summarizeAging,
+} from '../finance/receivables-aging';
+import {
+  ReceivablesAgingQueryDto,
+  ReceivablesReconciliationQueryDto,
+} from './dto/receivables-query.dto';
 import {
   CLOSING_SOURCE_TYPES,
   dayAfter,
@@ -2071,6 +2081,435 @@ export class AccountingReportsService {
       totalBudget,
       totalActual,
       totalVariance: totalActual.minus(totalBudget),
+      generatedAt: new Date(),
+    };
+  }
+
+  /**
+   * Phase 7.11b: receivables aging as of a Nepal school day, from the shared
+   * loader. Totals and class summaries cover the whole filtered set; only
+   * the invoice rows are paged.
+   */
+  async getReceivablesAging(tenantId: string, query: ReceivablesAgingQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+    const search = query.search?.trim();
+    const asOf = resolveAgingAsOf(query.asOfDate);
+    const load = await loadReceivables(this.prisma, tenantId, asOf, {
+      includeAdvances: true,
+      where: {
+        ...(query.classId ? { student: { classId: query.classId } } : {}),
+        ...(search
+          ? {
+              AND: [
+                {
+                  OR: [
+                    {
+                      invoiceNumber: { contains: search, mode: 'insensitive' },
+                    },
+                    {
+                      student: {
+                        is: {
+                          OR: [
+                            {
+                              firstNameEn: {
+                                contains: search,
+                                mode: 'insensitive',
+                              },
+                            },
+                            {
+                              lastNameEn: {
+                                contains: search,
+                                mode: 'insensitive',
+                              },
+                            },
+                            {
+                              studentSystemId: {
+                                contains: search,
+                                mode: 'insensitive',
+                              },
+                            },
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                },
+              ],
+            }
+          : {}),
+      },
+    });
+
+    const byClassMap = new Map<
+      string,
+      {
+        classId: string | null;
+        className: string;
+        invoiceCount: number;
+        students: Set<string>;
+        outstanding: Prisma.Decimal;
+        overdueOutstanding: Prisma.Decimal;
+      }
+    >();
+    for (const row of load.rows) {
+      const key = row.classId ?? row.className;
+      const entry = byClassMap.get(key) ?? {
+        classId: row.classId,
+        className: row.className,
+        invoiceCount: 0,
+        students: new Set<string>(),
+        outstanding: new Prisma.Decimal(0),
+        overdueOutstanding: new Prisma.Decimal(0),
+      };
+      entry.invoiceCount += 1;
+      entry.students.add(row.studentId);
+      entry.outstanding = entry.outstanding.plus(row.outstanding);
+      if (row.bucket !== 'CURRENT')
+        entry.overdueOutstanding = entry.overdueOutstanding.plus(
+          row.outstanding,
+        );
+      byClassMap.set(key, entry);
+    }
+
+    const filtered = query.bucket
+      ? load.rows.filter((row) => row.bucket === query.bucket)
+      : load.rows;
+    const ordered = [...filtered].sort(
+      (a, b) =>
+        b.daysOverdue - a.daysOverdue ||
+        a.studentName.localeCompare(b.studentName) ||
+        a.invoiceId.localeCompare(b.invoiceId),
+    );
+    const rows = ordered.slice((page - 1) * limit, page * limit).map((row) => ({
+      invoiceId: row.invoiceId,
+      invoiceNumber: row.invoiceNumber,
+      studentId: row.studentId,
+      studentName: row.studentName,
+      studentSystemId: row.studentSystemId,
+      className: row.className,
+      sectionName: row.sectionName,
+      dueDate: row.dueDate,
+      totalAmount: row.totalAmount.toFixed(2),
+      received: row.received.toFixed(2),
+      outstanding: row.outstanding.toFixed(2),
+      daysOverdue: row.daysOverdue,
+      bucket: row.bucket,
+      ledgerHref: `/dashboard/fees/ledgers/${encodeURIComponent(row.studentId)}`,
+    }));
+
+    return {
+      asOfDate: asOf.asOfDate,
+      totals: summarizeAging(load.rows),
+      advancesHeld: load.advancesHeld.toFixed(2),
+      byClass: [...byClassMap.values()]
+        .map((entry) => ({
+          classId: entry.classId,
+          className: entry.className,
+          invoiceCount: entry.invoiceCount,
+          studentCount: entry.students.size,
+          outstanding: entry.outstanding.toFixed(2),
+          overdueOutstanding: entry.overdueOutstanding.toFixed(2),
+        }))
+        .sort((a, b) => a.className.localeCompare(b.className)),
+      rows,
+      pagination: {
+        page,
+        limit,
+        total: ordered.length,
+        totalPages: Math.ceil(ordered.length / limit),
+      },
+      basis:
+        'Invoices issued by the end of the as-of day, not draft or void. Received amounts are allocations active on that day; invoice totals are current.',
+      generatedAt: new Date(),
+    };
+  }
+
+  /**
+   * Phase 7.11b: does the fee subledger (invoices minus what was received)
+   * equal the general-ledger receivable control account? Read-only. The
+   * difference is explained by known causes; anything left is "unexplained".
+   */
+  async getReceivablesReconciliation(
+    tenantId: string,
+    query: ReceivablesReconciliationQueryDto,
+  ) {
+    const asOf = resolveAgingAsOf(query.asOfDate);
+    const zero = () => new Prisma.Decimal(0);
+
+    const [defaultControl, feeMapping] = await Promise.all([
+      this.prisma.chartAccount.findFirst({
+        where: { tenantId, code: '1200' },
+        select: { id: true, code: true, name: true },
+      }),
+      this.prisma.accountingSourceMapping.findFirst({
+        where: {
+          tenantId,
+          sourceModule: { in: ['FINANCE', 'FEES'] },
+          sourceType: 'FEE_PAYMENT',
+          isActive: true,
+          archivedAt: null,
+        },
+        orderBy: { effectiveFrom: 'desc' },
+        select: {
+          creditAccount: { select: { id: true, code: true, name: true } },
+        },
+      }),
+    ]);
+    const controlAccounts = [
+      ...new Map(
+        [defaultControl, feeMapping?.creditAccount]
+          .filter((account): account is NonNullable<typeof account> =>
+            Boolean(account),
+          )
+          .map((account) => [account.id, account]),
+      ).values(),
+    ];
+    const controlIds = controlAccounts.map((account) => account.id);
+    const journalScope = ledgerEntryWhere({
+      tenantId,
+      stage: 'POST_CLOSING',
+      toExclusive: asOf.asOfExclusive,
+    });
+
+    const [load, ledger] = await Promise.all([
+      loadReceivables(this.prisma, tenantId, asOf),
+      controlIds.length
+        ? this.prisma.journalLine.aggregate({
+            _sum: { debit: true, credit: true },
+            where: {
+              tenantId,
+              chartAccountId: { in: controlIds },
+              journalEntry: journalScope,
+            },
+          })
+        : Promise.resolve({ _sum: { debit: null, credit: null } }),
+    ]);
+    const subledgerTotal = load.rows.reduce(
+      (sum, row) => sum.plus(row.outstanding),
+      zero(),
+    );
+    const ledgerBalance = this.toDecimal(ledger._sum.debit).minus(
+      this.toDecimal(ledger._sum.credit),
+    );
+    const difference = ledgerBalance.minus(subledgerTotal);
+
+    interface Item {
+      cause: string;
+      label: string;
+      count: number;
+      effect: Prisma.Decimal;
+      examples: Array<{ reference: string; amount: string }>;
+    }
+    const items: Item[] = [];
+    const push = (
+      cause: string,
+      label: string,
+      rows: Array<{ reference: string; amount: Prisma.Decimal }>,
+    ) => {
+      if (rows.length === 0) return;
+      items.push({
+        cause,
+        label,
+        count: rows.length,
+        effect: rows.reduce((sum, row) => sum.plus(row.amount), zero()),
+        examples: rows.slice(0, 5).map((row) => ({
+          reference: row.reference,
+          amount: row.amount.toFixed(2),
+        })),
+      });
+    };
+
+    // 1. Invoices in the subledger with no posted billing journal.
+    const [issuedInvoices, postedBilling] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where: {
+          tenantId,
+          issuedAt: { lt: asOf.asOfExclusive },
+          status: { notIn: [InvoiceStatus.DRAFT, InvoiceStatus.VOID] },
+        },
+        select: { id: true, invoiceNumber: true, totalAmount: true },
+      }),
+      this.prisma.journalEntry.findMany({
+        where: {
+          ...journalScope,
+          status: JournalEntryStatus.POSTED,
+          sourceModule: 'FINANCE',
+          sourceType: JournalSourceType.INVOICE,
+          postingType: 'BILLING',
+        },
+        select: { sourceId: true },
+      }),
+    ]);
+    const billed = new Set(postedBilling.map((row) => row.sourceId));
+    push(
+      'INVOICE_NOT_POSTED',
+      'Invoices with no posted billing journal',
+      issuedInvoices
+        .filter((invoice) => !billed.has(invoice.id))
+        .map((invoice) => ({
+          reference: invoice.invoiceNumber,
+          amount: invoice.totalAmount.negated(),
+        })),
+    );
+
+    // Control-account movement of selected journals, keyed by journal.
+    const controlNet = async (where: Prisma.JournalEntryWhereInput) => {
+      if (controlIds.length === 0) return new Map<string, Prisma.Decimal>();
+      const grouped = await this.prisma.journalLine.groupBy({
+        by: ['journalEntryId'],
+        _sum: { debit: true, credit: true },
+        where: {
+          tenantId,
+          chartAccountId: { in: controlIds },
+          journalEntry: { ...journalScope, ...where },
+        },
+      });
+      return new Map(
+        grouped.map((row) => [
+          row.journalEntryId,
+          this.toDecimal(row._sum.debit).minus(this.toDecimal(row._sum.credit)),
+        ]),
+      );
+    };
+
+    // 2. Void invoices whose billing journal was never reversed.
+    const voidInvoices = await this.prisma.invoice.findMany({
+      where: { tenantId, status: InvoiceStatus.VOID },
+      select: { id: true, invoiceNumber: true },
+    });
+    if (voidInvoices.length) {
+      const numbers = new Map(
+        voidInvoices.map((row) => [row.id, row.invoiceNumber]),
+      );
+      const journals = await this.prisma.journalEntry.findMany({
+        where: {
+          ...journalScope,
+          status: JournalEntryStatus.POSTED,
+          sourceModule: 'FINANCE',
+          sourceType: JournalSourceType.INVOICE,
+          postingType: 'BILLING',
+          sourceId: { in: [...numbers.keys()] },
+        },
+        select: { id: true, sourceId: true },
+      });
+      const nets = await controlNet({
+        id: { in: journals.map((row) => row.id) },
+      });
+      push(
+        'VOID_NOT_REVERSED',
+        'Void invoices whose billing journal was not reversed',
+        journals.map((row) => ({
+          reference: numbers.get(row.sourceId ?? '') ?? row.id,
+          amount: nets.get(row.id) ?? zero(),
+        })),
+      );
+    }
+
+    // 3. Late fees added to invoices without a posting.
+    const lateFeeLines = await this.prisma.invoiceLine.findMany({
+      where: {
+        tenantId,
+        description: { startsWith: 'Automatic late fee' },
+        createdAt: { lt: asOf.asOfExclusive },
+        invoice: {
+          status: { notIn: [InvoiceStatus.DRAFT, InvoiceStatus.VOID] },
+        },
+      },
+      select: {
+        id: true,
+        totalAmount: true,
+        invoice: { select: { invoiceNumber: true } },
+      },
+    });
+    if (lateFeeLines.length) {
+      const posted = new Set(
+        (
+          await this.prisma.journalEntry.findMany({
+            where: {
+              ...journalScope,
+              sourceType: JournalSourceType.ADJUSTMENT,
+              postingType: 'ADJUSTMENT',
+              sourceId: { in: lateFeeLines.map((line) => line.id) },
+            },
+            select: { sourceId: true },
+          })
+        ).map((row) => row.sourceId),
+      );
+      push(
+        'LATE_FEE_NOT_POSTED',
+        'Late fees added to invoices without a ledger posting',
+        lateFeeLines
+          .filter((line) => !posted.has(line.id))
+          .map((line) => ({
+            reference: line.invoice.invoiceNumber,
+            amount: line.totalAmount.negated(),
+          })),
+      );
+    }
+
+    // 4. Waivers posted against receivables but linked to no invoice.
+    const unlinkedWaivers = await this.prisma.feeWaiver.findMany({
+      where: { tenantId, invoiceId: null },
+      select: { id: true },
+    });
+    if (unlinkedWaivers.length) {
+      const nets = await controlNet({
+        sourceType: JournalSourceType.ADJUSTMENT,
+        postingType: 'WAIVER',
+        sourceId: { in: unlinkedWaivers.map((row) => row.id) },
+      });
+      push(
+        'WAIVER_WITHOUT_INVOICE',
+        'Waivers posted to receivables without an invoice',
+        [...nets.entries()].map(([id, amount]) => ({ reference: id, amount })),
+      );
+    }
+
+    // 5. Opening balances and manual journals on the control account.
+    const opening = await controlNet({
+      sourceType: JournalSourceType.OPENING_BALANCE,
+    });
+    push(
+      'OPENING_BALANCE',
+      'Opening-balance journals on the receivable account',
+      [...opening.entries()].map(([id, amount]) => ({ reference: id, amount })),
+    );
+    const manual = await controlNet({
+      sourceType: {
+        in: [
+          JournalSourceType.MANUAL,
+          JournalSourceType.EXPENSE_VOUCHER,
+          JournalSourceType.PAYMENT_VOUCHER,
+          JournalSourceType.RECEIPT_VOUCHER,
+          JournalSourceType.CONTRA_VOUCHER,
+        ],
+      },
+    });
+    push(
+      'MANUAL_JOURNAL',
+      'Manual journals and vouchers on the receivable account',
+      [...manual.entries()].map(([id, amount]) => ({ reference: id, amount })),
+    );
+
+    const explained = items.reduce(
+      (sum, item) => sum.plus(item.effect),
+      zero(),
+    );
+    const unexplained = difference.minus(explained);
+    return {
+      asOfDate: asOf.asOfDate,
+      controlAccounts,
+      subledgerTotal: subledgerTotal.toFixed(2),
+      ledgerBalance: ledgerBalance.toFixed(2),
+      difference: difference.toFixed(2),
+      items: items.map((item) => ({
+        ...item,
+        effect: item.effect.toFixed(2),
+      })),
+      unexplained: unexplained.toFixed(2),
+      isReconciled: difference.isZero(),
+      isFullyExplained: unexplained.isZero(),
       generatedAt: new Date(),
     };
   }

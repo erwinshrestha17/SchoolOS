@@ -209,10 +209,26 @@ export class AccountingSourceResolverService {
     };
     const visible = classified.filter((item) => allowed(item.kind));
 
-    const invoiceIds = idsOf(visible, [
-      'FEE_INVOICE',
-      'FEE_INVOICE_ADJUSTMENT',
-    ]);
+    // Adjustments posted since Phase 7.11b carry their invoice line id; older
+    // ones carry the invoice id. Resolve lines to their invoice first.
+    const adjustmentSourceIds = idsOf(visible, ['FEE_INVOICE_ADJUSTMENT']);
+    const adjustmentLines = adjustmentSourceIds.length
+      ? await this.prisma.invoiceLine.findMany({
+          where: { tenantId, id: { in: adjustmentSourceIds } },
+          select: { id: true, invoiceId: true },
+        })
+      : [];
+    const invoiceIdByLineId = new Map(
+      adjustmentLines.map((line) => [line.id, line.invoiceId]),
+    );
+    const invoiceIds = [
+      ...new Set([
+        ...idsOf(visible, ['FEE_INVOICE', 'FEE_INVOICE_ADJUSTMENT']).filter(
+          (id) => !invoiceIdByLineId.has(id),
+        ),
+        ...invoiceIdByLineId.values(),
+      ]),
+    ];
     const waiverIds = idsOf(visible, ['FEE_WAIVER']);
     const paymentIds = idsOf(visible, ['FEE_RECEIPT']);
     const refundIds = idsOf(visible, ['FEE_REFUND']);
@@ -466,7 +482,7 @@ export class AccountingSourceResolverService {
       switch (kind) {
         case 'FEE_INVOICE':
         case 'FEE_INVOICE_ADJUSTMENT': {
-          const invoice = invoiceById.get(id);
+          const invoice = invoiceById.get(invoiceIdByLineId.get(id) ?? id);
           if (invoice) {
             base.reference = invoice.invoiceNumber;
             base.status = invoice.status;

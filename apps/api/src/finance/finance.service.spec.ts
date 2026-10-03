@@ -1408,42 +1408,67 @@ describe('finance production controls', () => {
     ).rejects.toThrow('Receipt not found for this student');
   });
 
-  it('segments defaulters by overdue bucket with server-side due-date bounds', async () => {
-    const invoice = buildDefaulterInvoice({
-      id: 'invoice-overdue-1',
-      invoiceNumber: 'INV-2026-OVERDUE',
-      dueDate: new Date(Date.now() - 45 * 86_400_000),
-      totalAmount: new Prisma.Decimal(1000),
-      payments: [
-        buildInvoicePayment({
-          amount: new Prisma.Decimal(250),
-          refunds: [],
+  // Phase 7.11b: defaulters come from the shared aging loader (Nepal school
+  // day, allocation basis, filters before paging, whole-set totals).
+  const agingInvoice = (overrides: Record<string, unknown>) => ({
+    status: InvoiceStatus.ISSUED,
+    issuedAt: new Date(Date.now() - 120 * 86_400_000),
+    studentId: 'student-1',
+    reportCardBlocked: false,
+    hallTicketBlocked: false,
+    student: {
+      firstNameEn: 'Erwin',
+      lastNameEn: 'Shrestha',
+      studentSystemId: 'STU-1',
+      classId: 'class-1',
+      class: { name: 'Class 1' },
+      sectionRef: { name: 'A' },
+    },
+    ...overrides,
+  });
+  const wireAging = (
+    prisma: Record<string, Record<string, jest.Mock | undefined>>,
+    invoices: unknown[],
+    legacyPayments: unknown[],
+  ) => {
+    prisma.invoice.findMany = jest.fn().mockResolvedValue(invoices);
+    prisma.paymentAllocation.groupBy = jest.fn().mockResolvedValue([]);
+    prisma.payment.findMany = jest.fn().mockResolvedValue(legacyPayments);
+  };
+
+  it('segments defaulters by overdue bucket over the whole filtered set', async () => {
+    const { service, prisma } = buildService({ invoice: null, feeHead: null });
+    wireAging(
+      prisma as never,
+      [
+        agingInvoice({
+          id: 'invoice-overdue-1',
+          invoiceNumber: 'INV-2026-OVERDUE',
+          dueDate: new Date(Date.now() - 45 * 86_400_000),
+          totalAmount: new Prisma.Decimal(1000),
+        }),
+        agingInvoice({
+          id: 'invoice-overdue-old',
+          invoiceNumber: 'INV-2026-OLDER',
+          dueDate: new Date(Date.now() - 100 * 86_400_000),
+          totalAmount: new Prisma.Decimal(400),
         }),
       ],
-    });
-    const { service, prisma } = buildService({
-      invoice: null,
-      feeHead: null,
-      invoices: [invoice],
-    });
+      [
+        {
+          invoiceId: 'invoice-overdue-1',
+          amount: new Prisma.Decimal(250),
+          status: PaymentStatus.SUCCESS,
+          reversedAt: null,
+          refunds: [],
+        },
+      ],
+    );
 
     const result = await service.listDefaulters(actor, {
       agingBucket: '31-60',
     });
 
-    expect(prisma.invoice.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          tenantId: actor.tenantId,
-          dueDate: expect.objectContaining({
-            lt: expect.any(Date),
-            lte: expect.any(Date),
-            gte: expect.any(Date),
-          }),
-          status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
-        }),
-      }),
-    );
     expect(result.filters.agingBucket).toBe('31-60');
     expect(result.total).toBe(1);
     expect(result.totalOutstanding).toBe('750.00');
@@ -1454,30 +1479,40 @@ describe('finance production controls', () => {
         agingBucket: '31-60',
       }),
     );
+    // Segments show every bucket, not only the filtered one or one page.
     expect(result.segments).toContainEqual({
       agingBucket: '31-60',
       count: 1,
       outstanding: '750.00',
     });
+    expect(result.segments).toContainEqual({
+      agingBucket: '90+',
+      count: 1,
+      outstanding: '400.00',
+    });
   });
 
   it('sends segmented overdue reminders with child-scoped delivery records and audit context', async () => {
-    const invoice = buildDefaulterInvoice({
-      id: 'invoice-overdue-2',
-      invoiceNumber: 'INV-2026-OLD',
-      dueDate: new Date(Date.now() - 95 * 86_400_000),
-      totalAmount: new Prisma.Decimal(1200),
-      payments: [],
-    });
     const communicationsService = {
       recordDeliveryRecords: jest.fn().mockResolvedValue({ count: 2 }),
     };
-    const { service, auditService } = buildService({
+    const { service, auditService, prisma } = buildService({
       invoice: null,
       feeHead: null,
-      invoices: [invoice],
       communicationsService,
     });
+    wireAging(
+      prisma as never,
+      [
+        agingInvoice({
+          id: 'invoice-overdue-2',
+          invoiceNumber: 'INV-2026-OLD',
+          dueDate: new Date(Date.now() - 95 * 86_400_000),
+          totalAmount: new Prisma.Decimal(1200),
+        }),
+      ],
+      [],
+    );
 
     const result = await service.sendDefaulterReminders(
       {
@@ -1517,13 +1552,29 @@ describe('finance production controls', () => {
     );
   });
 
-  it('voids unpaid invoices with an audit trail', async () => {
-    const invoice = buildInvoice({ payments: [] });
+  it('voids unpaid invoices with an audit trail and reverses their journals', async () => {
+    const invoice = {
+      ...buildInvoice({ payments: [] }),
+      paymentAllocations: [],
+    };
     const { service, prisma, auditService } = buildService({
       invoice,
       feeHead: buildFeeHead(),
-      updatedInvoice: { ...invoice, status: InvoiceStatus.VOID },
     });
+    const mocks = prisma as unknown as Record<
+      string,
+      Record<string, jest.Mock>
+    >;
+    mocks.invoice.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    mocks.invoice.findUniqueOrThrow = jest
+      .fn()
+      .mockResolvedValue({ ...invoice, status: InvoiceStatus.VOID });
+    mocks.paymentAllocation.aggregate = jest
+      .fn()
+      .mockResolvedValue({ _sum: { amount: null } });
+    mocks.invoiceLine.findMany = jest.fn().mockResolvedValue([]);
+    mocks.feeWaiver.findMany = jest.fn().mockResolvedValue([]);
+    mocks.journalEntry.findMany = jest.fn().mockResolvedValue([]);
 
     const result = await service.voidInvoice(
       invoice.id,
@@ -1532,8 +1583,12 @@ describe('finance production controls', () => {
     );
 
     expect(result.status).toBe(InvoiceStatus.VOID);
-    expect(prisma.invoice.update).toHaveBeenCalledWith({
-      where: { id: invoice.id },
+    expect(mocks.invoice.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: invoice.id,
+        tenantId: actor.tenantId,
+        status: { not: InvoiceStatus.VOID },
+      },
       data: {
         status: InvoiceStatus.VOID,
         reportCardBlocked: false,
@@ -1545,7 +1600,10 @@ describe('finance production controls', () => {
         action: 'void',
         resource: 'invoice',
         resourceId: invoice.id,
-        after: expect.objectContaining({ reason: 'Duplicate bill' }),
+        after: expect.objectContaining({
+          reason: 'Duplicate bill',
+          reversedJournalIds: [],
+        }),
       }),
     );
   });
@@ -2964,20 +3022,6 @@ function buildInvoice(overrides: Record<string, unknown> = {}) {
     paymentAllocations: [],
     ...overrides,
   };
-}
-
-function buildDefaulterInvoice(overrides: Record<string, unknown> = {}) {
-  return buildInvoice({
-    student: {
-      id: 'student-1',
-      firstNameEn: 'Erwin',
-      lastNameEn: 'Shrestha',
-      class: { name: 'Class 1' },
-      sectionRef: { name: 'A' },
-    },
-    payments: [],
-    ...overrides,
-  });
 }
 
 function buildInvoicePayment(overrides: Record<string, unknown> = {}) {

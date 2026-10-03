@@ -9,6 +9,7 @@ export * from "./validation.js";
 export * from "./entitlements.js";
 export * from "./nepal-date.js";
 export * from "./payroll-period.js";
+export * from "./receivables-aging.js";
 export * from "./operational-summary.js";
 export * from "./dashboard-persona.js";
 export * from "./home-persona.js";

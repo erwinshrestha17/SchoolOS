@@ -25,6 +25,7 @@ import {
   CashierCloseStatus,
   ConsentType,
   InvoiceStatus,
+  JournalEntryStatus,
   JournalLineSide,
   JournalSourceType,
   NotificationChannel,
@@ -143,6 +144,7 @@ import { FeeAgingBucket, ListDefaultersDto } from './dto/list-defaulters.dto';
 import { FinanceDashboardSummaryQueryDto } from './dto/finance-dashboard-summary-query.dto';
 import { FinanceReportQueryDto } from './dto/finance-report-query.dto';
 import { StudentFeeLedgerQueryDto } from './dto/student-fee-ledger-query.dto';
+import { loadReceivables, resolveAgingAsOf } from './receivables-aging';
 import {
   CashDepositTransitionDto,
   ListCashDepositsDto,
@@ -174,6 +176,8 @@ import {
   resolveFinancialReportClassification,
   resolveProfessionalVerificationStatus,
   zonedNepalDateTimeToUtc,
+  agingBucketForDays,
+  daysOverdueOn,
   type FinanceDashboardSummary,
   type FinancialReportEnvelope,
   type FinancialReportId,
@@ -928,6 +932,8 @@ export class FinanceService {
     const page = query.page || 1;
     const limit = query.limit || 50;
     const skip = (page - 1) * limit;
+    // Phase 7.11b: buckets and overdue status use the shared Nepal-day aging.
+    const agingAsOf = resolveAgingAsOf();
 
     const where: Prisma.InvoiceWhereInput = {
       tenantId: actor.tenantId,
@@ -1037,7 +1043,9 @@ export class FinanceService {
           }
 
           const outstanding = linePayable.sub(linePaid);
-          const agingBucket = getAgingBucket(invoice.dueDate);
+          const agingBucket = agingBucketForDays(
+            daysOverdueOn(invoice.dueDate, agingAsOf.asOfDate),
+          );
 
           return {
             studentId: invoice.studentId,
@@ -1060,7 +1068,7 @@ export class FinanceService {
             paidAmount: linePaid.toFixed(2),
             remainingDue: outstanding.toFixed(2),
             status: resolveDuesRowStatus(
-              invoice.dueDate,
+              daysOverdueOn(invoice.dueDate, agingAsOf.asOfDate),
               linePaid,
               outstanding,
             ),
@@ -2642,7 +2650,7 @@ export class FinanceService {
   async getDefaulterAgingReportRows(
     actor: AuthContext,
     filters: {
-      asOfDate: string;
+      asOfDate?: string;
       academicYearId?: string;
       classId?: string;
       sectionId?: string;
@@ -2652,17 +2660,16 @@ export class FinanceService {
       agingBucket?: string;
     },
   ) {
-    const asOf = new Date(filters.asOfDate);
-    if (isNaN(asOf.getTime())) {
-      throw new BadRequestException('asOfDate must be a valid date');
-    }
-
-    const invoices = await this.prisma.invoice.findMany({
+    // Phase 7.11b: the shared aging basis. Allocations (not the legacy
+    // Payment.invoiceId link) and no second subtraction of waivers that
+    // already reduced the invoice total. asOfDate defaults to today (Nepal).
+    const asOfInput =
+      filters.asOfDate && filters.asOfDate !== 'undefined'
+        ? filters.asOfDate.slice(0, 10)
+        : undefined;
+    const asOf = resolveAgingAsOf(asOfInput);
+    const load = await loadReceivables(this.prisma, actor.tenantId, asOf, {
       where: {
-        tenantId: actor.tenantId,
-        issuedAt: { lte: asOf },
-        dueDate: { lt: asOf },
-        status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
         ...(filters.studentId ? { studentId: filters.studentId } : {}),
         ...(filters.academicYearId
           ? { academicYearId: filters.academicYearId }
@@ -2676,119 +2683,110 @@ export class FinanceService {
             }
           : {}),
         ...(filters.feeHeadId
-          ? {
-              lines: {
-                some: { feeHeadId: filters.feeHeadId },
-              },
-            }
+          ? { lines: { some: { feeHeadId: filters.feeHeadId } } }
           : {}),
       },
-      include: {
-        student: {
-          include: {
-            class: true,
-            sectionRef: true,
-            guardianLinks: {
-              include: { guardian: true },
-              orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+    });
+    const overdue = load.rows.filter(
+      (row) =>
+        row.daysOverdue >= 1 &&
+        (!filters.minOutstanding ||
+          row.outstanding.gte(filters.minOutstanding)) &&
+        (!filters.agingBucket || row.bucket === filters.agingBucket),
+    );
+
+    const details = overdue.length
+      ? await this.prisma.invoice.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            id: { in: overdue.map((row) => row.invoiceId) },
+          },
+          select: {
+            id: true,
+            lines: { select: { feeHead: { select: { name: true } } } },
+            student: {
+              select: {
+                guardianLinks: {
+                  select: {
+                    guardian: {
+                      select: { fullName: true, primaryPhone: true },
+                    },
+                  },
+                  orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+                  take: 1,
+                },
+              },
+            },
+            paymentAllocations: {
+              where: {
+                allocatedAt: { lt: asOf.asOfExclusive },
+                amount: { gt: 0 },
+              },
+              select: { allocatedAt: true },
+              orderBy: { allocatedAt: 'desc' },
+              take: 1,
+            },
+            payments: {
+              where: { paidAt: { lt: asOf.asOfExclusive } },
+              select: { paidAt: true },
+              orderBy: { paidAt: 'desc' },
+              take: 1,
             },
           },
-        },
-        lines: {
-          include: { feeHead: true },
-        },
-        payments: {
-          include: { refunds: true },
-          where: { paidAt: { lte: asOf } },
-        },
-      },
+        })
+      : [];
+    const detailById = new Map(details.map((row) => [row.id, row]));
+
+    const rows = overdue.map((row) => {
+      const detail = detailById.get(row.invoiceId);
+      const guardian = detail?.student.guardianLinks[0]?.guardian;
+      const lastAllocation = detail?.paymentAllocations[0]?.allocatedAt ?? null;
+      const lastLegacy = detail?.payments[0]?.paidAt ?? null;
+      const lastPayment =
+        lastAllocation && lastLegacy
+          ? lastAllocation > lastLegacy
+            ? lastAllocation
+            : lastLegacy
+          : (lastAllocation ?? lastLegacy);
+      return {
+        studentSystemId: row.studentSystemId,
+        studentName: row.studentName,
+        className: row.className,
+        sectionName: row.sectionName ?? '-',
+        guardianName: guardian?.fullName || '-',
+        guardianPhone: guardian?.primaryPhone || '-',
+        invoiceNumber: row.invoiceNumber,
+        feeHeadName:
+          detail?.lines.length === 1 ? detail.lines[0].feeHead.name : null,
+        dueDate: row.dueDate,
+        invoiceAmount: Number(row.totalAmount),
+        paidAmount: Number(row.received),
+        // Waivers already reduced the invoice total; nothing to subtract.
+        waiverAmount: 0,
+        refundAmount: 0,
+        outstandingAmount: Number(row.outstanding),
+        daysOverdue: row.daysOverdue,
+        agingBucket: row.bucket,
+        lastPaymentDate: lastPayment,
+        status: row.status,
+      } satisfies DefaulterAgingReportRow;
     });
 
-    const waivers = await this.prisma.feeWaiver.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        createdAt: { lte: asOf },
-        invoiceId: { in: invoices.map((i) => i.id) },
-      },
-    });
-
-    const waiverMap = new Map<string, Prisma.Decimal>();
-    for (const w of waivers) {
-      if (w.invoiceId) {
-        const current = waiverMap.get(w.invoiceId) || new Prisma.Decimal(0);
-        waiverMap.set(w.invoiceId, current.add(w.amount));
-      }
-    }
-
-    const rows = invoices
-      .map((invoice) => {
-        const paidAmount = sumNetPaidAmount(invoice.payments);
-        const waiverAmount = waiverMap.get(invoice.id) || new Prisma.Decimal(0);
-        const outstandingAmount = invoice.totalAmount
-          .sub(paidAmount)
-          .sub(waiverAmount);
-
-        if (outstandingAmount.lte(0)) return null;
-        if (
-          filters.minOutstanding &&
-          outstandingAmount.lt(filters.minOutstanding)
-        )
-          return null;
-
-        const daysOverdue = Math.floor(
-          (asOf.getTime() - invoice.dueDate.getTime()) / 86_400_000,
-        );
-        const bucket = this.calculateAgingBucket(daysOverdue);
-
-        if (filters.agingBucket && bucket !== filters.agingBucket) return null;
-
-        const primaryGuardianLink = invoice.student.guardianLinks[0];
-        const guardian = primaryGuardianLink?.guardian;
-
-        const lastPayment =
-          invoice.payments.length > 0
-            ? invoice.payments[invoice.payments.length - 1].paidAt
-            : null;
-
-        return {
-          studentSystemId: invoice.student.studentSystemId,
-          studentName: formatStudentName(invoice.student),
-          className: invoice.student.class.name,
-          sectionName: invoice.student.sectionRef?.name || '-',
-          guardianName: guardian?.fullName || '-',
-          guardianPhone: guardian?.primaryPhone || '-',
-          invoiceNumber: invoice.invoiceNumber,
-          feeHeadName:
-            invoice.lines.length === 1 ? invoice.lines[0].feeHead.name : null,
-          dueDate: invoice.dueDate,
-          invoiceAmount: Number(invoice.totalAmount),
-          paidAmount: Number(paidAmount),
-          waiverAmount: Number(waiverAmount),
-          refundAmount: 0,
-          outstandingAmount: Number(outstandingAmount),
-          daysOverdue,
-          agingBucket: bucket,
-          lastPaymentDate: lastPayment,
-          status: invoice.status,
-        } satisfies DefaulterAgingReportRow;
-      })
-      .filter((r): r is DefaulterAgingReportRow => r !== null);
-
+    const bucketTotal = (bucket: string) =>
+      overdue
+        .filter((row) => row.bucket === bucket)
+        .reduce((sum, row) => sum.add(row.outstanding), new Prisma.Decimal(0))
+        .toNumber();
     const summary = {
+      asOfDate: asOf.asOfDate,
       totalDefaulters: new Set(rows.map((r) => r.studentSystemId)).size,
-      totalOutstanding: rows.reduce((sum, r) => sum + r.outstandingAmount, 0),
-      bucket0To30Total: rows
-        .filter((r) => r.agingBucket === '0-30')
-        .reduce((sum, r) => sum + r.outstandingAmount, 0),
-      bucket31To60Total: rows
-        .filter((r) => r.agingBucket === '31-60')
-        .reduce((sum, r) => sum + r.outstandingAmount, 0),
-      bucket61To90Total: rows
-        .filter((r) => r.agingBucket === '61-90')
-        .reduce((sum, r) => sum + r.outstandingAmount, 0),
-      bucket90PlusTotal: rows
-        .filter((r) => r.agingBucket === '90+')
-        .reduce((sum, r) => sum + r.outstandingAmount, 0),
+      totalOutstanding: overdue
+        .reduce((sum, row) => sum.add(row.outstanding), new Prisma.Decimal(0))
+        .toNumber(),
+      bucket0To30Total: bucketTotal('0-30'),
+      bucket31To60Total: bucketTotal('31-60'),
+      bucket61To90Total: bucketTotal('61-90'),
+      bucket90PlusTotal: bucketTotal('90+'),
       classBreakdown: this.groupBySimple(
         rows,
         'className',
@@ -3865,13 +3863,6 @@ export class FinanceService {
           }
         : {}),
     };
-  }
-
-  private calculateAgingBucket(daysOverdue: number) {
-    if (daysOverdue <= 30) return '0-30';
-    if (daysOverdue <= 60) return '31-60';
-    if (daysOverdue <= 90) return '61-90';
-    return '90+';
   }
 
   private groupBySimple<T>(rows: T[], key: keyof T, sumKey: keyof T) {
@@ -5713,7 +5704,10 @@ export class FinanceService {
   ) {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, tenantId: actor.tenantId },
-      include: { payments: { include: { refunds: true } } },
+      include: {
+        payments: { include: { refunds: true } },
+        paymentAllocations: { where: { reversedAt: null } },
+      },
     });
 
     if (!invoice) {
@@ -5724,7 +5718,10 @@ export class FinanceService {
       throw new ConflictException('Invoice is already void');
     }
 
-    const paidAmount = sumNetPaidAmount(invoice.payments);
+    const paidAmount = sumInvoiceAllocationAmount(
+      invoice.paymentAllocations,
+      invoice.payments,
+    );
 
     if (paidAmount.gt(0)) {
       throw new ConflictException(
@@ -5732,14 +5729,52 @@ export class FinanceService {
       );
     }
 
-    const voided = await this.prisma.invoice.update({
-      where: { id: invoice.id },
-      data: {
-        status: InvoiceStatus.VOID,
-        reportCardBlocked: false,
-        hallTicketBlocked: false,
+    // Phase 7.11b: voiding removes the invoice from receivables, so the same
+    // transaction reverses every posted journal that put it there (billing,
+    // adjustments and invoice-linked waivers). A void in a closed or locked
+    // period is refused rather than leaving the ledger out of step.
+    const { voided, reversedJournalIds } = await this.prisma.$transaction(
+      async (tx) => {
+        const claim = await tx.invoice.updateMany({
+          where: {
+            id: invoice.id,
+            tenantId: actor.tenantId,
+            status: { not: InvoiceStatus.VOID },
+          },
+          data: {
+            status: InvoiceStatus.VOID,
+            reportCardBlocked: false,
+            hallTicketBlocked: false,
+          },
+        });
+        if (claim.count !== 1) {
+          throw new ConflictException('Invoice changed before it was voided');
+        }
+        const allocated = await tx.paymentAllocation.aggregate({
+          where: {
+            tenantId: actor.tenantId,
+            invoiceId: invoice.id,
+            reversedAt: null,
+          },
+          _sum: { amount: true },
+        });
+        if (decimalOrZero(allocated._sum.amount).gt(0)) {
+          throw new ConflictException(
+            'A payment was allocated to this invoice. Refresh before voiding.',
+          );
+        }
+        const reversed = await this.reverseInvoiceJournals(
+          tx,
+          invoice,
+          dto.reason,
+          actor,
+        );
+        const updated = await tx.invoice.findUniqueOrThrow({
+          where: { id: invoice.id },
+        });
+        return { voided: updated, reversedJournalIds: reversed };
       },
-    });
+    );
 
     await this.auditService.record({
       action: 'void',
@@ -5755,10 +5790,87 @@ export class FinanceService {
         status: voided.status,
         reason: dto.reason,
         approvedBy: dto.approvedBy ?? actor.userId,
+        reversedJournalIds,
       },
     });
 
     return voided;
+  }
+
+  /**
+   * Reverse every posted journal that put a voided invoice into receivables:
+   * its billing journal, its adjustments (keyed by the invoice or by one of
+   * its lines) and the journals of waivers linked to it.
+   */
+  private async reverseInvoiceJournals(
+    tx: Prisma.TransactionClient,
+    invoice: { id: string; invoiceNumber: string },
+    reason: string | undefined,
+    actor: AuthContext,
+  ): Promise<string[]> {
+    const [lines, waivers] = await Promise.all([
+      tx.invoiceLine.findMany({
+        where: { tenantId: actor.tenantId, invoiceId: invoice.id },
+        select: { id: true },
+      }),
+      tx.feeWaiver.findMany({
+        where: { tenantId: actor.tenantId, invoiceId: invoice.id },
+        select: { id: true },
+      }),
+    ]);
+    const journals = await tx.journalEntry.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        sourceModule: 'FINANCE',
+        status: JournalEntryStatus.POSTED,
+        OR: [
+          {
+            sourceType: JournalSourceType.INVOICE,
+            postingType: 'BILLING',
+            sourceId: invoice.id,
+          },
+          {
+            sourceType: JournalSourceType.ADJUSTMENT,
+            postingType: 'ADJUSTMENT',
+            sourceId: { in: [invoice.id, ...lines.map((line) => line.id)] },
+          },
+          {
+            sourceType: JournalSourceType.ADJUSTMENT,
+            postingType: 'WAIVER',
+            sourceId: { in: waivers.map((waiver) => waiver.id) },
+          },
+        ],
+      },
+      include: { lines: { orderBy: { lineNumber: 'asc' } } },
+      orderBy: { entryDate: 'asc' },
+    });
+    const reversedIds: string[] = [];
+    const when = new Date();
+    const why = reason?.trim() || 'Invoice voided';
+    for (const journal of journals) {
+      await this.accountingPostingService.postReversal(
+        {
+          tenantId: actor.tenantId,
+          originalEntryId: journal.id,
+          reversalDate: when,
+          narration: `Void of invoice ${invoice.invoiceNumber}`,
+          reason: why,
+          lines: journal.lines.map((line) => ({
+            chartAccountId: line.chartAccountId,
+            side:
+              line.side === JournalLineSide.DEBIT
+                ? JournalLineSide.CREDIT
+                : JournalLineSide.DEBIT,
+            amount: line.amount,
+            description: `Void of invoice ${invoice.invoiceNumber}`,
+          })),
+        },
+        actor,
+        tx,
+      );
+      reversedIds.push(journal.id);
+    }
+    return reversedIds;
   }
 
   async createInvoiceAdjustment(
@@ -5775,7 +5887,10 @@ export class FinanceService {
 
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, tenantId: actor.tenantId },
-      include: { payments: { include: { refunds: true } } },
+      include: {
+        payments: { include: { refunds: true } },
+        paymentAllocations: { where: { reversedAt: null } },
+      },
     });
 
     if (!invoice) {
@@ -5800,7 +5915,11 @@ export class FinanceService {
       throw new NotFoundException('Fee head not found in this tenant');
     }
 
-    const paidAmount = sumNetPaidAmount(invoice.payments);
+    // Phase 7.11b: allocation basis (multi-invoice receipts, advances).
+    const paidAmount = sumInvoiceAllocationAmount(
+      invoice.paymentAllocations,
+      invoice.payments,
+    );
     const adjustmentAmount = new Prisma.Decimal(dto.amount);
     const adjustmentVat = new Prisma.Decimal(dto.vatAmount ?? 0);
     const signedSubtotal =
@@ -5872,6 +5991,7 @@ export class FinanceService {
           feeHeadCode: feeHead.code,
           amount: signedSubtotal.add(signedVat),
           reason,
+          adjustmentLineId: line.id,
         },
         actor,
         tx,
@@ -5938,75 +6058,112 @@ export class FinanceService {
         : typeof graceSetting?.value === 'string'
           ? Math.max(Math.floor(Number(graceSetting.value)), 0) || 0
           : 0;
-    const cutoff = startOfToday();
-    cutoff.setDate(cutoff.getDate() - graceDays);
 
-    const overdueInvoices = await this.prisma.invoice.findMany({
-      where: {
-        tenantId,
-        dueDate: { lt: cutoff },
-        status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
-      },
-      include: {
-        lines: true,
-        payments: { include: { refunds: true } },
-      },
-      orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
-      take: 500,
-    });
+    // Phase 7.11b: overdue is measured on the Nepal school day with the
+    // shared allocation basis, and every late fee posts to the ledger in the
+    // same transaction (receivables and the GL move together). An invoice is
+    // charged once it is more than `graceDays` days overdue.
+    const asOf = resolveAgingAsOf();
+    const load = await loadReceivables(this.prisma, tenantId, asOf);
+    const candidates = load.rows
+      .filter(
+        (row) =>
+          row.daysOverdue > graceDays &&
+          (row.status === InvoiceStatus.ISSUED ||
+            row.status === InvoiceStatus.PARTIAL),
+      )
+      .slice(0, LATE_FEE_BATCH_LIMIT);
+    const alreadyCharged = new Set(
+      (
+        await this.prisma.invoiceLine.findMany({
+          where: {
+            tenantId,
+            feeHeadId: lateFeeHead.id,
+            invoiceId: { in: candidates.map((row) => row.invoiceId) },
+            description: { startsWith: 'Automatic late fee' },
+          },
+          select: { invoiceId: true },
+        })
+      ).map((line) => line.invoiceId),
+    );
 
     let applied = 0;
     let skipped = 0;
+    let postingRefused = 0;
     const amount = new Prisma.Decimal(lateFeeHead.defaultAmount);
+    const systemActor = lateFeeSystemActor(tenantId);
 
-    for (const invoice of overdueInvoices) {
-      const paidAmount = sumNetPaidAmount(invoice.payments);
-      if (invoice.totalAmount.sub(paidAmount).lte(0)) {
+    for (const row of candidates) {
+      if (alreadyCharged.has(row.invoiceId)) {
         skipped += 1;
         continue;
       }
 
-      const alreadyApplied = invoice.lines.some(
-        (line) =>
-          line.feeHeadId === lateFeeHead.id &&
-          line.description.startsWith('Automatic late fee'),
-      );
-      if (alreadyApplied) {
-        skipped += 1;
-        continue;
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const invoice = await tx.invoice.findFirstOrThrow({
+            where: { id: row.invoiceId, tenantId },
+            include: {
+              payments: { include: { refunds: true } },
+              paymentAllocations: { where: { reversedAt: null } },
+            },
+          });
+          const paidAmount = sumInvoiceAllocationAmount(
+            invoice.paymentAllocations,
+            invoice.payments,
+          );
+          const line = await tx.invoiceLine.create({
+            data: {
+              tenantId,
+              invoiceId: invoice.id,
+              feeHeadId: lateFeeHead.id,
+              description: `Automatic late fee for overdue invoice ${invoice.invoiceNumber}`,
+              quantity: 1,
+              unitAmount: amount,
+              vatAmount: new Prisma.Decimal(0),
+              totalAmount: amount,
+            },
+          });
+
+          const newSubtotal = invoice.subtotal.add(amount);
+          const newTotal = invoice.totalAmount.add(amount);
+          await tx.invoice.update({
+            where: { id: invoice.id },
+            data: {
+              subtotal: newSubtotal,
+              totalAmount: newTotal,
+              status: resolveInvoiceStatusAfterAdjustment(
+                invoice.status,
+                paidAmount,
+                newTotal,
+              ),
+            },
+          });
+
+          await this.accountingPostingService.postInvoiceAdjustment(
+            {
+              tenantId,
+              invoiceId: invoice.id,
+              invoiceNumber: invoice.invoiceNumber,
+              feeHeadId: lateFeeHead.id,
+              feeHeadCode: lateFeeHead.code,
+              amount,
+              reason: 'Automatic late fee',
+              adjustmentLineId: line.id,
+            },
+            systemActor,
+            tx,
+          );
+        });
+        applied += 1;
+      } catch (error) {
+        // No open fiscal period (or another posting refusal): the late fee
+        // is not added, so receivables never move without the ledger.
+        this.logger.warn(
+          `Late fee not applied to invoice ${row.invoiceId}: ${(error as Error).message}`,
+        );
+        postingRefused += 1;
       }
-
-      await this.prisma.$transaction(async (tx) => {
-        await tx.invoiceLine.create({
-          data: {
-            tenantId,
-            invoiceId: invoice.id,
-            feeHeadId: lateFeeHead.id,
-            description: `Automatic late fee for overdue invoice ${invoice.invoiceNumber}`,
-            quantity: 1,
-            unitAmount: amount,
-            vatAmount: new Prisma.Decimal(0),
-            totalAmount: amount,
-          },
-        });
-
-        const newSubtotal = invoice.subtotal.add(amount);
-        const newTotal = invoice.totalAmount.add(amount);
-        await tx.invoice.update({
-          where: { id: invoice.id },
-          data: {
-            subtotal: newSubtotal,
-            totalAmount: newTotal,
-            status: resolveInvoiceStatusAfterAdjustment(
-              invoice.status,
-              paidAmount,
-              newTotal,
-            ),
-          },
-        });
-      });
-
-      applied += 1;
     }
 
     await this.auditService.record({
@@ -6017,192 +6174,73 @@ export class FinanceService {
       after: {
         applied,
         skipped,
+        postingRefused,
         graceDays,
-        cutoff: cutoff.toISOString(),
+        asOfDate: asOf.asOfDate,
         lateFeeHeadId: lateFeeHead.id,
         amount: Number(amount),
       },
     });
 
-    return { disabled: false, applied, skipped };
+    return { disabled: false, applied, skipped, postingRefused };
   }
 
   async listDefaulters(actor: AuthContext, filters: ListDefaultersDto = {}) {
-    const today = new Date();
-    const overdueFilter = resolveDefaulterOverdueFilter(filters, today);
+    // Phase 7.11b: one aging definition (Nepal school day, allocation basis).
+    // Filters apply before paging, totals and segments cover the whole set.
     const pagination = resolveFinancePagination(filters);
-    const search = filters.search?.trim();
-    const where: Prisma.InvoiceWhereInput = {
-      tenantId: actor.tenantId,
-      dueDate: overdueFilter,
-      status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
-      ...(filters.classId
-        ? {
-            student: {
-              classId: filters.classId,
-            },
-          }
-        : {}),
-      ...(filters.feeHeadId
-        ? {
-            lines: {
-              some: {
-                feeHeadId: filters.feeHeadId,
-              },
-            },
-          }
-        : {}),
-      ...(search
-        ? {
-            OR: [
-              {
-                invoiceNumber: {
-                  contains: search,
-                  mode: 'insensitive',
-                },
-              },
-              {
-                student: {
-                  is: {
-                    OR: [
-                      {
-                        firstNameEn: {
-                          contains: search,
-                          mode: 'insensitive',
-                        },
-                      },
-                      {
-                        lastNameEn: {
-                          contains: search,
-                          mode: 'insensitive',
-                        },
-                      },
-                      {
-                        studentSystemId: {
-                          contains: search,
-                          mode: 'insensitive',
-                        },
-                      },
-                    ],
-                  },
-                },
-              },
-            ],
-          }
-        : {}),
-    };
-    const orderBy: Prisma.InvoiceOrderByWithRelationInput[] =
-      filters.sortBy === 'studentName'
-        ? [
-            {
-              student: {
-                firstNameEn: filters.sortDirection ?? 'asc',
-              },
-            },
-            { id: 'asc' },
-          ]
-        : [
-            {
-              [filters.sortBy === 'outstanding' ? 'totalAmount' : 'dueDate']:
-                filters.sortDirection ?? 'asc',
-            },
-            { id: 'asc' },
-          ];
-    const [
-      invoices,
-      total,
-      invoiceAmountAggregate,
-      allocationAmountAggregate,
-      paymentAmountAggregate,
-      refundAmountAggregate,
-    ] = await Promise.all([
-      this.prisma.invoice.findMany({
-        where,
-        include: {
-          student: {
-            include: {
-              class: true,
-              sectionRef: true,
-            },
+    const { overdue, segmentBase } = await this.loadOverdueReceivables(
+      actor,
+      filters,
+    );
+    const direction = filters.sortDirection === 'desc' ? -1 : 1;
+    const sorted = [...overdue].sort((a, b) => {
+      let order = 0;
+      if (filters.sortBy === 'studentName')
+        order = a.studentName.localeCompare(b.studentName);
+      else if (filters.sortBy === 'outstanding')
+        order = a.outstanding.comparedTo(b.outstanding);
+      else order = a.dueDate.getTime() - b.dueDate.getTime();
+      return order === 0
+        ? a.invoiceId.localeCompare(b.invoiceId)
+        : order * direction;
+    });
+    const page = sorted.slice(
+      pagination.skip,
+      pagination.skip + pagination.limit,
+    );
+    const blockedInvoices = page.length
+      ? await this.prisma.invoice.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            id: { in: page.map((row) => row.invoiceId) },
           },
-          payments: {
-            include: { refunds: true },
+          select: {
+            id: true,
+            reportCardBlocked: true,
+            hallTicketBlocked: true,
           },
-          paymentAllocations: { where: { reversedAt: null } },
-        },
-        orderBy,
-        skip: pagination.skip,
-        take: pagination.limit,
-      }),
-      this.prisma.invoice.count({ where }),
-      this.prisma.invoice.aggregate({
-        where,
-        _sum: { totalAmount: true },
-      }),
-      this.prisma.paymentAllocation.aggregate({
-        where: {
-          tenantId: actor.tenantId,
-          reversedAt: null,
-          invoice: { is: where },
-        },
-        _sum: { amount: true },
-      }),
-      this.prisma.payment.aggregate({
-        where: {
-          tenantId: actor.tenantId,
-          status: PaymentStatus.SUCCESS,
-          invoice: where,
-          allocations: { none: {} },
-        },
-        _sum: { amount: true },
-      }),
-      this.prisma.paymentRefund.aggregate({
-        where: {
-          tenantId: actor.tenantId,
-          payment: {
-            status: PaymentStatus.SUCCESS,
-            invoice: where,
-            allocations: { none: {} },
-          },
-        },
-        _sum: { amount: true },
-      }),
-    ]);
-
-    const items = invoices
-      .map((invoice) => {
-        const paidAmount = sumInvoiceAllocationAmount(
-          invoice.paymentAllocations,
-          invoice.payments,
-        );
-        const outstanding = Prisma.Decimal.max(
-          new Prisma.Decimal(0),
-          invoice.totalAmount.sub(paidAmount),
-        );
-        const daysOverdue = Math.max(
-          0,
-          Math.floor(
-            (today.getTime() - invoice.dueDate.getTime()) / 86_400_000,
-          ),
-        );
-
-        return {
-          invoiceId: invoice.id,
-          invoiceNumber: invoice.invoiceNumber,
-          studentId: invoice.studentId,
-          studentName:
-            `${invoice.student.firstNameEn} ${invoice.student.lastNameEn}`.trim(),
-          className: invoice.student.class.name,
-          sectionName: invoice.student.sectionRef?.name ?? null,
-          dueDate: invoice.dueDate,
-          outstanding: outstanding.toFixed(2),
-          daysOverdue,
-          agingBucket: getAgingBucket(daysOverdue),
-          reportCardBlocked: invoice.reportCardBlocked || outstanding.gt(0),
-          hallTicketBlocked: invoice.hallTicketBlocked || outstanding.gt(0),
-        };
-      })
-      .filter((defaulter) => new Prisma.Decimal(defaulter.outstanding).gt(0));
+        })
+      : [];
+    const blockedById = new Map(blockedInvoices.map((row) => [row.id, row]));
+    const items = page.map((row) => ({
+      invoiceId: row.invoiceId,
+      invoiceNumber: row.invoiceNumber,
+      studentId: row.studentId,
+      studentName: row.studentName,
+      className: row.className,
+      sectionName: row.sectionName,
+      dueDate: row.dueDate,
+      outstanding: row.outstanding.toFixed(2),
+      daysOverdue: row.daysOverdue,
+      agingBucket: row.bucket,
+      reportCardBlocked:
+        (blockedById.get(row.invoiceId)?.reportCardBlocked ?? false) ||
+        row.outstanding.gt(0),
+      hallTicketBlocked:
+        (blockedById.get(row.invoiceId)?.hallTicketBlocked ?? false) ||
+        row.outstanding.gt(0),
+    }));
 
     return {
       filters: {
@@ -6212,19 +6250,100 @@ export class FinanceService {
         minDaysOverdue: filters.minDaysOverdue ?? null,
         maxDaysOverdue: filters.maxDaysOverdue ?? null,
       },
-      total,
+      total: sorted.length,
       page: pagination.page,
       limit: pagination.limit,
-      hasNextPage: pagination.skip + items.length < total,
-      totalOutstanding: Prisma.Decimal.max(
-        new Prisma.Decimal(0),
-        decimalOrZero(invoiceAmountAggregate._sum.totalAmount)
-          .sub(decimalOrZero(allocationAmountAggregate._sum.amount))
-          .sub(decimalOrZero(paymentAmountAggregate._sum.amount))
-          .add(decimalOrZero(refundAmountAggregate._sum.amount)),
-      ).toFixed(2),
-      segments: buildDefaulterSegmentSummary(items),
+      hasNextPage: pagination.skip + items.length < sorted.length,
+      totalOutstanding: sorted
+        .reduce((sum, row) => sum.add(row.outstanding), new Prisma.Decimal(0))
+        .toFixed(2),
+      asOfDate: segmentBase.asOfDate,
+      segments: buildDefaulterSegmentSummary(
+        segmentBase.rows.map((row) => ({
+          agingBucket: row.bucket,
+          outstanding: row.outstanding.toFixed(2),
+        })),
+      ),
       items,
+    };
+  }
+
+  /**
+   * Overdue receivables for the defaulter list and reminders. `overdue`
+   * honours every filter; `segmentBase` ignores the bucket and day-range
+   * filters so the segment cards always show every bucket.
+   */
+  private async loadOverdueReceivables(
+    actor: AuthContext,
+    filters: Pick<
+      ListDefaultersDto,
+      | 'classId'
+      | 'feeHeadId'
+      | 'agingBucket'
+      | 'minDaysOverdue'
+      | 'maxDaysOverdue'
+      | 'search'
+    >,
+  ) {
+    const range = resolveDefaulterDayRange(filters);
+    const search = filters.search?.trim();
+    const where: Prisma.InvoiceWhereInput = {
+      ...(filters.classId ? { student: { classId: filters.classId } } : {}),
+      ...(filters.feeHeadId
+        ? { lines: { some: { feeHeadId: filters.feeHeadId } } }
+        : {}),
+      ...(search
+        ? {
+            AND: [
+              {
+                OR: [
+                  { invoiceNumber: { contains: search, mode: 'insensitive' } },
+                  {
+                    student: {
+                      is: {
+                        OR: [
+                          {
+                            firstNameEn: {
+                              contains: search,
+                              mode: 'insensitive',
+                            },
+                          },
+                          {
+                            lastNameEn: {
+                              contains: search,
+                              mode: 'insensitive',
+                            },
+                          },
+                          {
+                            studentSystemId: {
+                              contains: search,
+                              mode: 'insensitive',
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          }
+        : {}),
+    };
+    const load = await loadReceivables(
+      this.prisma,
+      actor.tenantId,
+      resolveAgingAsOf(),
+      { where },
+    );
+    const overdueRows = load.rows.filter((row) => row.daysOverdue >= 1);
+    return {
+      overdue: overdueRows.filter(
+        (row) =>
+          row.daysOverdue >= range.min &&
+          (range.max === undefined || row.daysOverdue <= range.max),
+      ),
+      segmentBase: { asOfDate: load.asOf.asOfDate, rows: overdueRows },
     };
   }
 
@@ -6232,21 +6351,42 @@ export class FinanceService {
     dto: SendDefaulterRemindersDto,
     actor: AuthContext,
   ) {
-    const defaulterResult = await this.listDefaulters(actor, {
+    // Phase 7.11b: selected invoices are matched against the whole filtered
+    // overdue set, not only its first page. Without a selection the oldest
+    // REMINDER_BATCH_LIMIT overdue invoices are reminded, as before.
+    const defaulterFilters = {
       classId: dto.classId,
       feeHeadId: dto.feeHeadId,
       agingBucket: dto.agingBucket,
       minDaysOverdue: dto.minDaysOverdue,
       maxDaysOverdue: dto.maxDaysOverdue,
-      page: 1,
-      limit: 100,
-    });
-    const defaulters = defaulterResult.items;
+    };
+    const { overdue } = await this.loadOverdueReceivables(
+      actor,
+      defaulterFilters,
+    );
+    const defaulters = overdue.map((row) => ({
+      invoiceId: row.invoiceId,
+      invoiceNumber: row.invoiceNumber,
+      studentId: row.studentId,
+      outstanding: row.outstanding.toFixed(2),
+      daysOverdue: row.daysOverdue,
+      agingBucket: row.bucket,
+    }));
+    const defaulterResult = {
+      filters: {
+        classId: dto.classId ?? null,
+        feeHeadId: dto.feeHeadId ?? null,
+        agingBucket: dto.agingBucket ?? null,
+        minDaysOverdue: dto.minDaysOverdue ?? null,
+        maxDaysOverdue: dto.maxDaysOverdue ?? null,
+      },
+    };
     const selectedDefaulters = dto.invoiceIds?.length
       ? defaulters.filter((defaulter) =>
           dto.invoiceIds?.includes(defaulter.invoiceId),
         )
-      : defaulters;
+      : defaulters.slice(0, REMINDER_BATCH_LIMIT);
     const channels = dto.channels?.length
       ? dto.channels
       : [
@@ -6308,7 +6448,9 @@ export class FinanceService {
     });
 
     return {
-      requested: dto.invoiceIds?.length ?? defaulters.length,
+      requested:
+        dto.invoiceIds?.length ??
+        Math.min(defaulters.length, REMINDER_BATCH_LIMIT),
       reminded: selectedDefaulters.length,
       filters: defaulterResult.filters,
       segments: buildDefaulterSegmentSummary(selectedDefaulters),
@@ -12822,60 +12964,52 @@ function ledgerEventOrder(
   return orders[type] || 99;
 }
 
-function getAgingBucket(
-  dueDateOrDays: Date | number,
-  asOf: Date = new Date(),
-): FeeAgingBucket | '0' {
-  const diffDays =
-    dueDateOrDays instanceof Date
-      ? Math.ceil(
-          (asOf.getTime() - dueDateOrDays.getTime()) / (1000 * 60 * 60 * 24),
-        )
-      : dueDateOrDays;
-  if (diffDays <= 0) return '0';
-  if (diffDays <= 30) return '0-30';
-  if (diffDays <= 60) return '31-60';
-  if (diffDays <= 90) return '61-90';
-  return '90+';
+const REMINDER_BATCH_LIMIT = 100;
+const LATE_FEE_BATCH_LIMIT = 500;
+
+/**
+ * The scheduled late-fee job has no signed-in user. Postings record no
+ * creator (createdById is nullable) and the audit row has no user.
+ */
+function lateFeeSystemActor(tenantId: string): AuthContext {
+  return {
+    userId: null as unknown as string,
+    tenantId,
+    tenantSlug: '',
+    email: null,
+    authMethod: 'PASSWORD',
+    roles: [],
+    permissions: [],
+  };
 }
 
-function resolveDefaulterOverdueFilter(
+/** Inclusive day range selected by a bucket and/or explicit day filters. */
+function resolveDefaulterDayRange(
   filters: Pick<
     ListDefaultersDto,
     'agingBucket' | 'minDaysOverdue' | 'maxDaysOverdue'
   >,
-  today: Date,
-): Prisma.DateTimeFilter {
+): { min: number; max: number | undefined } {
   const bucketRange = filters.agingBucket
     ? getAgingBucketRange(filters.agingBucket)
     : null;
-  const minDaysOverdue = Math.max(
+  const min = Math.max(
     filters.minDaysOverdue ?? bucketRange?.min ?? 1,
     bucketRange?.min ?? 1,
   );
-  const maxDaysOverdue =
+  const max =
     filters.maxDaysOverdue === undefined
       ? bucketRange?.max
       : bucketRange?.max === undefined
         ? filters.maxDaysOverdue
         : Math.min(filters.maxDaysOverdue, bucketRange.max);
 
-  if (maxDaysOverdue !== undefined && minDaysOverdue > maxDaysOverdue) {
+  if (max !== undefined && min > max) {
     throw new BadRequestException(
       'minDaysOverdue cannot be greater than maxDaysOverdue for the selected aging segment.',
     );
   }
-
-  const dueDateFilter: Prisma.DateTimeFilter = {
-    lt: today,
-    lte: dateDaysAgo(today, minDaysOverdue),
-  };
-
-  if (maxDaysOverdue !== undefined) {
-    dueDateFilter.gte = dateDaysAgo(today, maxDaysOverdue + 1);
-  }
-
-  return dueDateFilter;
+  return { min, max };
 }
 
 function getAgingBucketRange(bucket: FeeAgingBucket) {
@@ -12889,10 +13023,6 @@ function getAgingBucketRange(bucket: FeeAgingBucket) {
     case '90+':
       return { min: 91, max: undefined };
   }
-}
-
-function dateDaysAgo(date: Date, days: number) {
-  return new Date(date.getTime() - days * 86_400_000);
 }
 
 function buildDefaulterSegmentSummary(
@@ -13374,7 +13504,7 @@ function buildCashierActiveSessionKey(input: {
 }
 
 function resolveDuesRowStatus(
-  dueDate: Date,
+  daysOverdue: number,
   paidAmount: Prisma.Decimal,
   outstandingAmount: Prisma.Decimal,
 ) {
@@ -13386,7 +13516,7 @@ function resolveDuesRowStatus(
     return 'partial';
   }
 
-  return dueDate < new Date() ? 'overdue' : 'unpaid';
+  return daysOverdue >= 1 ? 'overdue' : 'unpaid';
 }
 
 function buildCashierCloseWindowKey(input: {
@@ -13476,12 +13606,6 @@ function isParentPaymentSandboxEnabled() {
     (process.env.NODE_ENV !== 'production' &&
       process.env.DEPLOY_ENV !== 'production')
   );
-}
-
-function startOfToday() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today;
 }
 
 function resolveOptionalFinanceReportPeriod(query: FinanceReportQueryDto) {

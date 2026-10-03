@@ -105,6 +105,9 @@ function fakePrisma() {
       },
     ]),
     canteenPurchaseBill: delegate('canteenPurchaseBill', []),
+    invoiceLine: delegate('invoiceLine', [
+      { id: 'line-adj-1', invoiceId: 'inv-1' },
+    ]),
     journalEntry: delegate('journalEntry', [
       { id: 'je-orig', entryNumber: 'JE-2026-000010', status: 'REVERSED' },
     ]),
@@ -135,6 +138,13 @@ const entries = [
     sourceType: JournalSourceType.INVOICE,
     sourceId: 'inv-1',
     postingType: 'BILLING',
+  },
+  {
+    id: 'je-adjustment',
+    sourceModule: 'FINANCE',
+    sourceType: JournalSourceType.ADJUSTMENT,
+    sourceId: 'line-adj-1',
+    postingType: 'ADJUSTMENT',
   },
   {
     id: 'je-receipt',
@@ -183,6 +193,11 @@ describe('AccountingSourceResolverService (Phase 7.11a)', () => {
       reference: 'INV-2083-0001',
       href: '/dashboard/fees/ledgers/stu-1',
       restricted: false,
+    });
+    // Adjustments keyed by their invoice line resolve to the invoice.
+    expect(result.get('je-adjustment')).toMatchObject({
+      kind: 'FEE_INVOICE_ADJUSTMENT',
+      reference: 'INV-2083-0001',
     });
     const receipt = result.get('je-receipt');
     expect(receipt?.reference).toBe('RCP-0009');

@@ -461,3 +461,81 @@ Fresh PostgreSQL 16 database `schoolos_auth_recovery_test_711a` (migrated, no dr
 ### Next
 
 7.11b — receivables aging conformance and AR↔GL reconciliation.
+
+## 7.11b — Receivables aging and AR-to-ledger reconciliation
+
+**Completed locally on 3 October 2026, on `main`. Not pushed.** Second 7.11 sub-slice (plan `claude/PHASE_7_11_PLAN.md`).
+
+**Baseline:** start `5ee40616` (7.11a); end = the commit that adds this section (`git log -1 -- claude/PHASE_7_COMPLETION_REPORT.md`).
+
+### Slice
+
+Receivables now have one aging definition used everywhere, and a read-only check shows whether the fee subledger equals the receivable account in the general ledger, with the difference explained by cause.
+
+### Defects fixed
+
+- **Several aging definitions.** Server time, Nepal day, `ceil` and `floor` were all in use. Now: days overdue are counted in Nepal calendar dates (the Nepal date of the due date against the Nepal school day), and an invoice due today is not overdue.
+- **Defaulter list.** Bucket totals covered the current page only, filtering happened after paging (so `total` was wrong), and "sort by outstanding" sorted by invoice total. Filters now apply first, totals and segments cover the whole set, and outstanding sorts by outstanding. Segment cards ignore the bucket filter so every bucket stays visible.
+- **Reminders** only considered the first 100 overdue invoices, so a selected invoice on a later page was silently skipped. Selected invoices are now matched against the whole filtered set. Without a selection, the oldest 100 are reminded, as before.
+- **Defaulter aging report** used the legacy `Payment.invoiceId` link (ignoring multi-invoice receipts and applied advances) and subtracted invoice-linked waivers a second time. It now uses the shared basis, `asOfDate` defaults to today, and waivers are not subtracted again.
+- **Dues table** bucket and overdue status now use the shared Nepal-day basis. A not-yet-due bucket now reads `CURRENT` instead of `0`.
+- **Void and late fees changed receivables without the ledger.**
+  - Voiding now reverses every posted journal that put the invoice into receivables (billing, adjustments, invoice-linked waivers) in the same transaction. A void in a closed or locked period is refused. The paid check uses allocations, and a payment allocated during the void is refused.
+  - Late fees now post as an invoice adjustment in the same transaction. If posting is refused (for example, no open period), the late fee is not added. Overdue is measured on the Nepal school day with the allocation basis.
+- **A second adjustment on one invoice failed outright.** Every adjustment journal used the invoice id as its source key, which is unique, so the second one hit the database constraint and rolled back. Adjustments now use their own invoice line as the source key; the journal source resolver handles both forms.
+- **Fees Home links** pointed at parameters no page read. The outstanding link now opens the invoice list filtered to invoices with a balance (`ledgerOutstanding=1`), and the aging link opens the aging report (`report=aging`).
+- **Aging export** sent no `asOfDate`, so the server refused it. It now sends today's Nepal date, and the button only shows for users holding `reports:export` and `ledger:read`.
+
+### Changes
+
+- `packages/core/src/receivables-aging.ts`: bucket keys and labels (`CURRENT`, `0-30` = 1–30 days, `31-60`, `61-90`, `90+`), `daysOverdueOn`, `nepalDateOf`, `daysBetweenGregorianDates`.
+- `apps/api/src/finance/receivables-aging.ts`: `loadReceivables` (as of a Nepal school day; invoices issued by then, not draft or void; allocations active on the day; per-invoice legacy fallback; advances reported once as a school-wide credit), `summarizeAging`, `resolveAgingAsOf`. Batched, no N+1.
+- `GET /accounting/reports/receivables-aging` (`accounting:reports:read` + `accounting:read`): bucket totals, class summary, unapplied advances, paged invoice rows with a link to the student ledger.
+- `GET /accounting/reports/receivables-reconciliation`: subledger total, control-account balance (code 1200, plus the fee-payment mapping's credit account if different), difference, and reconciling items. The causes are:
+  - invoice not posted;
+  - void not reversed;
+  - late fee not posted;
+  - waiver without an invoice;
+  - opening balance;
+  - manual journal.
+
+  Anything left over is reported as "unexplained".
+
+- The OpenAPI gate requires both new operations.
+- Web: `/dashboard/accounting/receivables` is now aging-first (ASTRA M11-G): an as-of date (BS shown), bucket strip, totals, unapplied advances, receivables-vs-ledger panel, class table, and searchable paged invoices linked to the student ledger. The fees aging summary shows whole-set totals and the as-of date.
+
+### Verified unchanged
+
+- The principal mobile aging counts and the operational summary already used Nepal-day bounds that match the shared buckets (more than 90 days; 31–90 days), so they were left as they are.
+- Fees Home outstanding already used allocations (7.5).
+
+### Operational impacts
+
+- **Defaulter totals, counts and buckets change**, generally upward where earlier figures were page-limited or legacy-based. The defaulter aging report stops double-counting waivers.
+- **Voiding a posted invoice now writes reversal journals**, and is refused in a closed or locked period.
+- **Late fees post to the ledger.** Invoices are skipped (counted as `postingRefused`) when no open period exists.
+- **Historical gaps are not back-filled.** Earlier unposted late fees and unreversed voids appear as reconciling items.
+- **As-of reports use current invoice totals.** A later waiver, adjustment or late fee already shows in an earlier as-of day's figures; this is noted on the page.
+
+### Not in this sub-slice
+
+- Payables (7.11c) and the close preview (7.11d).
+- The fee collection report's `totalOutstanding` is a period flow figure: billed minus collected in the period, and it includes draft and void invoices. It is recorded for 7.12.
+- The defaulter list still evaluates the open-invoice population in memory, which is fine for a school's scale; there is no cap.
+
+### Tests executed
+
+Fresh PostgreSQL 16 database `schoolos_auth_recovery_test_711b` (migrated, no drift), plus the dedicated marks, timetable and admission databases.
+
+| Check                                                                                                                                                                                                                                                                          | Result                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core tests                                                                                                                                                                                                                                                                     | **35 passed** (new `receivables-aging.test.mjs`)                                                                                                                                                                                                                                                                                                                                                                           |
+| API unit                                                                                                                                                                                                                                                                       | 315 suites, **3,700 passed** (defaulter, reminder and void unit tests rewritten for the shared loader; resolver covers line-keyed adjustments)                                                                                                                                                                                                                                                                             |
+| API integration (all four DB variables)                                                                                                                                                                                                                                        | 35 suites, **575 passed** (new `receivables-aging-conformance.int-spec.ts`: 13 — multi-invoice receipt, applied advance, waiver counted once, whole-set totals and paging, reminder off the first page, past as-of day, AR = GL, two adjustments on one invoice, late fee posted and charged once, void reverses journals, void refused after payment and in a locked period, unposted invoice reported, tenant isolation) |
+| API e2e                                                                                                                                                                                                                                                                        | 45 suites, **321 passed**                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Web tests                                                                                                                                                                                                                                                                      | **768 passed** (new `receivables-aging-contract.test.mjs`; the Fees Home contract now checks that its link target is read)                                                                                                                                                                                                                                                                                                 |
+| Typecheck (core, API, web), web production build, `verify:openapi` (1,216 paths, 1,403 operations), `db:validate`, `prisma migrate diff --exit-code`, `verify:tracked-artifacts`, Prettier on changed files, ESLint on changed API (errors) and web (`--max-warnings=0`) files | clean                                                                                                                                                                                                                                                                                                                                                                                                                      |
+
+### Next
+
+7.11c — Payables.

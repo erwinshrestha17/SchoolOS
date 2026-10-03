@@ -41,6 +41,8 @@ const REQUIRED_OPERATIONS = [
   ["post", "/api/v1/payroll/runs/{id}/bank-advice/export"],
   ["get", "/api/v1/hr/professional/eligibility-workspace"],
   ["get", "/api/v1/hr/staff/{staffId}/professional/eligibility-summary"],
+  ["get", "/api/v1/accounting/reports/receivables-aging"],
+  ["get", "/api/v1/accounting/reports/receivables-reconciliation"],
   ["post", "/api/v1/auth/login"],
   ["post", "/api/v1/auth/refresh"],
   ["get", "/api/v1/ready"],

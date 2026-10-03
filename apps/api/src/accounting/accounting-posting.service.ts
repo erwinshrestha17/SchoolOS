@@ -1252,6 +1252,12 @@ export class AccountingPostingService {
       feeHeadCode: string;
       amount: Prisma.Decimal;
       reason: string;
+      /**
+       * Phase 7.11b: the adjustment's own invoice line. It is the journal
+       * source id, so every adjustment of one invoice posts (the source key
+       * is unique). Older journals used the invoice id.
+       */
+      adjustmentLineId?: string;
     },
     actor: AuthContext,
     tx: Prisma.TransactionClient = this.prisma,
@@ -1352,7 +1358,7 @@ export class AccountingPostingService {
         narration: `Invoice ${input.invoiceNumber} adjustment: ${input.reason}`,
         sourceModule: 'FINANCE',
         sourceType: JournalSourceType.ADJUSTMENT,
-        sourceId: input.invoiceId,
+        sourceId: input.adjustmentLineId ?? input.invoiceId,
         postingType: 'ADJUSTMENT',
         createdById: actor.userId,
         postedAt: new Date(),
