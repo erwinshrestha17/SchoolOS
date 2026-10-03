@@ -16,7 +16,7 @@
 - `hr:attendance-corrections:approve` is a separate default-deny permission. No role receives it automatically; `hr:manage` does not imply it. Reasons and impact are restricted to correction request/review authority. The review API requires the approval permission; payroll impact also requires both HR and payroll entitlements.
 - The payroll-impact endpoint returns only provisional paid/unpaid-day deltas. It shares the existing payroll day-count calculation, including approved paid/unpaid leave and verified employment caps. It reports its working-day assumption explicitly (default 30); it does not calculate money or certify statutory payroll.
 - Shared core types, validated DTOs, documented responses and six correction API operations are included. The OpenAPI gate now requires those operations.
-- Web direct-edit wording is replaced with a correction request. The request captures status, check-in/out, leave type, note and reason. The review queue shows the original/requested values and times, reason, provisional impact, independent review controls, errors and queued-adjustment state. The attendance route/navigation accepts explicit correction approval grants. Dates/times use Nepal/BS presentation.
+- Web direct-edit wording is replaced with a correction request. The request captures status, check-in/out, leave type, note and reason. The review queue shows the original/requested values and times, reason, provisional impact, independent review controls, errors and queued-adjustment state. The attendance route/navigation accepts explicit correction approval grants. Queue caches are school/user scoped; denied reads hide previously loaded protected details. Dates/times use Nepal/BS presentation.
 
 ### Migrations and database verification
 
@@ -31,26 +31,27 @@
 
 ### Verification results
 
-| Check | Result |
-| --- | --- |
-| Repository typecheck | Passed for core, API and Web |
-| API lint | Passed with existing repository warnings; no errors |
-| Web lint | Passed, zero warnings |
-| API unit suite | 304 suites, 3,520 tests passed |
-| API integration suite | 30 suites, 484 tests passed; all four database environment variables explicitly configured |
-| API e2e suite | 45 suites, 321 tests passed |
-| Web tests | 729 passed |
-| Core tests | 27 passed |
-| Focused 7.7 PostgreSQL suite | 13 passed, included above |
-| Chromium correction workflow | 3 passed with controlled API fixtures |
-| OpenAPI contract | Passed: 1,205 paths, 1,390 operations, 500 schemas |
-| Database drift | No difference on all four isolated test databases |
-| Tracked-artifact gate | Passed |
-| Formatting and diff whitespace | Passed |
+| Check                               | Result                                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------ |
+| Repository typecheck                | Passed for core, API and Web                                                               |
+| API lint                            | Passed with existing repository warnings; no errors                                        |
+| Web lint                            | Passed, zero warnings                                                                      |
+| API unit suite                      | 304 suites, 3,520 tests passed                                                             |
+| API integration suite               | 30 suites, 484 tests passed; all four database environment variables explicitly configured |
+| API e2e suite                       | 45 suites, 321 tests passed                                                                |
+| Web tests                           | 729 passed                                                                                 |
+| Core tests                          | 27 passed                                                                                  |
+| Focused 7.7 PostgreSQL suite        | 13 passed, included above and rechecked after final projection changes                     |
+| Focused payroll/day-rule regression | 3 suites, 40 tests passed after sharing the exact leave-overlap rule                       |
+| Chromium correction workflow        | 4 passed with controlled API fixtures                                                      |
+| OpenAPI contract                    | Passed: 1,205 paths, 1,390 operations, 500 schemas                                         |
+| Database drift                      | No difference on all four isolated test databases                                          |
+| Tracked-artifact gate               | Passed                                                                                     |
+| Formatting and diff whitespace      | Passed                                                                                     |
 
 Focused PostgreSQL cases cover open approval, fixed-period queueing, rejection/cancellation, self-approval, permission denial, cross-tenant IDs, ended sessions, revoked persisted grants, concurrent/double decisions, duplicate requests, stale snapshots, direct SQL update/delete, protected inserts/upserts, staff service, time-clock check-in/out, day projection, next-period boundary and a SQL writer racing payroll finalization. The leave regression suite verifies paid and unpaid leave attendance writes are blocked in fixed periods.
 
-Chromium exercised the actual Web rendering at desktop and 768px widths, original/requested details, day impact, keyboard approval, queued state, self-review denial and reason-required rejection. Those API fixtures are synthetic UI evidence; PostgreSQL tests separately establish persistence and session/authorization behavior. The Impeccable mechanical scan reported no findings, and rendered screenshots were inspected.
+Chromium exercised the actual Web rendering at desktop and 768px widths, original/requested details, day impact, keyboard approval, queued state, self-review denial, reason-required rejection and removal of cached protected details after a denied refresh. Those API fixtures are synthetic UI evidence; PostgreSQL tests separately establish persistence and session/authorization behavior. The Impeccable mechanical scan reported no findings, and rendered screenshots were inspected.
 
 The full integration run exposed three older finance teardown paths that attempted to delete immutable financial records introduced by prior Phase 7 migrations. Their teardown now uses the existing isolated, transaction-local ledger fixture helper. Production guards and test assertions were preserved.
 

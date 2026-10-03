@@ -70,13 +70,13 @@ function Review({
       {impact.isPending && <p role="status">Loading payroll day impact…</p>}
       {impact.isError && (
         <p role="status">
-          Payroll impact unavailable. Payroll must be enabled.{' '}
+          Payroll impact unavailable. Check payroll access or retry.{' '}
           <Button variant="outline" onClick={() => void impact.refetch()}>
             Retry
           </Button>
         </p>
       )}
-      {impact.data && (
+      {impact.data && !impact.isError && (
         <p className="text-sm">
           Provisional impact ({impact.data.workingDays} working days): paid days{' '}
           {impact.data.paidDaysDelta > 0 ? '+' : ''}
@@ -148,7 +148,12 @@ export function StaffAttendanceCorrectionQueue() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
   const query = useQuery({
-    queryKey: ['staff-attendance-corrections', page],
+    queryKey: [
+      'staff-attendance-corrections',
+      session?.tenant.id,
+      session?.user.id,
+      page,
+    ],
     queryFn: () => api.listStaffAttendanceCorrections(page),
     enabled: canReview,
   });
@@ -169,7 +174,7 @@ export function StaffAttendanceCorrectionQueue() {
         </p>
       )}
       {query.data?.items.length === 0 && <p>No correction requests.</p>}
-      {query.data && (
+      {query.data && !query.isError && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead>
@@ -221,7 +226,7 @@ export function StaffAttendanceCorrectionQueue() {
           </table>
         </div>
       )}
-      {query.data && (
+      {query.data && !query.isError && (
         <div className="flex items-center gap-3">
           <Button
             variant="outline"

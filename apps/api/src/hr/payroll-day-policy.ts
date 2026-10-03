@@ -38,3 +38,26 @@ export function payrollDayCounts(input: {
 export function attendancePaidContribution(status: string) {
   return status === 'PRESENT' || status === 'LATE' ? 1 : 0;
 }
+
+/** Same inclusive UTC calendar-day overlap used by payroll preparation. */
+export function payrollLeaveOverlapDays(
+  start1: Date,
+  end1: Date,
+  start2: Date,
+  end2: Date,
+): number {
+  const start = new Date(Math.max(start1.getTime(), start2.getTime()));
+  const end = new Date(Math.min(end1.getTime(), end2.getTime()));
+  if (start > end) return 0;
+  const first = Date.UTC(
+    start.getUTCFullYear(),
+    start.getUTCMonth(),
+    start.getUTCDate(),
+  );
+  const last = Date.UTC(
+    end.getUTCFullYear(),
+    end.getUTCMonth(),
+    end.getUTCDate(),
+  );
+  return Math.round((last - first) / 86400000) + 1;
+}

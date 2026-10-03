@@ -22,6 +22,7 @@ import {
 import {
   attendancePaidContribution,
   payrollDayCounts,
+  payrollLeaveOverlapDays,
 } from './payroll-day-policy';
 
 export const STAFF_CORRECTION_APPROVE = 'hr:attendance-corrections:approve';
@@ -269,7 +270,15 @@ export class StaffAttendanceCorrections {
         Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1),
       ),
       endsOn: new Date(
-        Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0),
+        Date.UTC(
+          date.getUTCFullYear(),
+          date.getUTCMonth() + 1,
+          0,
+          23,
+          59,
+          59,
+          999,
+        ),
       ),
     };
     const [attendance, leaves, employments] = await Promise.all([
@@ -299,12 +308,12 @@ export class StaffAttendanceCorrections {
     let paidLeaveDays = 0,
       unpaidLeaveDays = 0;
     for (const leave of leaves) {
-      const overlap =
-        Math.floor(
-          (Math.min(leave.endsOn.getTime(), period.endsOn.getTime()) -
-            Math.max(leave.startsOn.getTime(), period.startsOn.getTime())) /
-            86400000,
-        ) + 1;
+      const overlap = payrollLeaveOverlapDays(
+        leave.startsOn,
+        leave.endsOn,
+        period.startsOn,
+        period.endsOn,
+      );
       if (leave.isPaid) paidLeaveDays += overlap;
       else unpaidLeaveDays += overlap;
     }

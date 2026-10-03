@@ -18,7 +18,11 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+} from '@nestjs/swagger';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -49,7 +53,7 @@ export class HrAttendanceController {
     private readonly corrections: StaffAttendanceCorrections,
   ) {}
 
-  @ApiOkResponse({ type: StaffAttendanceCorrectionResponseDto })
+  @ApiCreatedResponse({ type: StaffAttendanceCorrectionResponseDto })
   @Post('staff-attendance/:id/corrections')
   @Permissions('hr:attendance:correct')
   requestCorrection(
@@ -70,12 +74,14 @@ export class HrAttendanceController {
     return this.corrections.list(auth, query.page, query.limit);
   }
 
+  @ApiCreatedResponse({ type: StaffAttendanceCorrectionResponseDto })
   @Post('staff-attendance-corrections/:id/approve')
   @Permissions('hr:attendance-corrections:approve')
   approveCorrection(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.corrections.decide(id, 'APPROVED', auth);
   }
 
+  @ApiCreatedResponse({ type: StaffAttendanceCorrectionResponseDto })
   @Post('staff-attendance-corrections/:id/reject')
   @Permissions('hr:attendance-corrections:approve')
   rejectCorrection(
@@ -86,6 +92,7 @@ export class HrAttendanceController {
     return this.corrections.decide(id, 'REJECTED', auth, dto.reason);
   }
 
+  @ApiCreatedResponse({ type: StaffAttendanceCorrectionResponseDto })
   @Post('staff-attendance-corrections/:id/cancel')
   @Permissions('hr:attendance:correct')
   cancelCorrection(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {

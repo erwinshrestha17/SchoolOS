@@ -1,4 +1,7 @@
-import { payrollDayCounts } from '../hr/payroll-day-policy';
+import {
+  payrollDayCounts,
+  payrollLeaveOverlapDays,
+} from '../hr/payroll-day-policy';
 import {
   BadRequestException,
   ConflictException,
@@ -4255,19 +4258,5 @@ export function getOverlapDays(
   start2: Date,
   end2: Date,
 ): number {
-  const start = new Date(Math.max(start1.getTime(), start2.getTime()));
-  const end = new Date(Math.min(end1.getTime(), end2.getTime()));
-
-  if (start > end) return 0;
-
-  const s = Date.UTC(
-    start.getUTCFullYear(),
-    start.getUTCMonth(),
-    start.getUTCDate(),
-  );
-  const e = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
-
-  const diffTime = Math.abs(e - s);
-  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  return diffDays;
+  return payrollLeaveOverlapDays(start1, end1, start2, end2);
 }

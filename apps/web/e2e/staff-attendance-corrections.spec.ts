@@ -178,3 +178,31 @@ test('rejection requires a reason and refreshes the decided state', async ({
   await reject.click();
   await expect(page.getByText('REJECTED', { exact: true })).toBeVisible();
 });
+
+test('a denied refresh removes previously loaded protected correction details', async ({
+  page,
+}) => {
+  await prepare(page);
+  await page.getByRole('button', { name: 'Review request' }).click();
+  await expect(page.getByText('Verified missing check-in')).toBeVisible();
+  await page.route('**/api/v1/hr/staff-attendance-corrections**', (route) =>
+    route.fulfill({
+      status: 403,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        data: null,
+        message: 'Correction access denied',
+      }),
+    }),
+  );
+  await page.getByRole('button', { name: 'Approve', exact: true }).click();
+  await page.getByRole('button', { name: 'Refresh queue' }).click();
+  await expect(
+    page.getByText('Unable to load correction requests.'),
+  ).toBeVisible();
+  await expect(page.getByText('Verified missing check-in')).toHaveCount(0);
+  await expect(page.getByText('Synthetic Staff', { exact: true })).toHaveCount(
+    0,
+  );
+});
