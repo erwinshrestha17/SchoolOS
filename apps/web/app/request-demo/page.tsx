@@ -1,4 +1,5 @@
 import * as React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
   School,
@@ -9,6 +10,25 @@ import {
 } from 'lucide-react';
 
 import { RequestDemoForm } from '../../components/forms/request-demo-form';
+import {
+  marketingCanonical,
+  marketingRobots,
+} from '../../lib/marketing-publication';
+
+export const metadata: Metadata = {
+  title: 'Request a demo | SchoolOS',
+  description:
+    'Tell the SchoolOS team about your Nepal school and the workflows you want to improve. Request a guided product demo.',
+  robots: marketingRobots(),
+  alternates: marketingCanonical('/request-demo')
+    ? { canonical: marketingCanonical('/request-demo') }
+    : undefined,
+  openGraph: {
+    title: 'Request a demo | SchoolOS',
+    description: 'See SchoolOS in the context of your school.',
+    type: 'website',
+  },
+};
 
 export default function RequestDemoPage() {
   return (
@@ -24,7 +44,7 @@ export default function RequestDemoPage() {
               <span className="text-base font-black tracking-tight leading-none text-slate-900">
                 SchoolOS
               </span>
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+              <span className="text-[11px] text-slate-600 font-bold uppercase tracking-wider mt-0.5">
                 School operating system for Nepal
               </span>
             </div>
@@ -118,7 +138,7 @@ export default function RequestDemoPage() {
 
           {/* Process Timeline */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
-            <h4 className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
+            <h4 className="text-[11px] font-black uppercase text-slate-600 tracking-wider">
               Process Roadmap
             </h4>
             <div className="relative pl-6 space-y-4 text-[11px] font-bold text-slate-650">

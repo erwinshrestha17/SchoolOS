@@ -17,7 +17,7 @@ test.describe('Public route smoke', () => {
       page.getByRole('banner').getByRole('link', { name: /^Sign in$/i }),
     ).toBeVisible();
     await expect(
-      page.getByRole('banner').getByRole('link', { name: /^Request Demo$/i }),
+      page.getByRole('banner').getByRole('link', { name: /^Request a demo$/i }),
     ).toBeVisible();
     await expect(
       page.getByRole('banner').getByRole('link', { name: /Register school/i }),
@@ -26,30 +26,34 @@ test.describe('Public route smoke', () => {
     // Assert the hero heading
     await expect(
       page.getByRole('heading', {
-        name: /Run your school from one connected operating system/i,
+        name: /One connected place to run your school/i,
       }),
     ).toBeVisible();
-
-    // Assert navbar items exist
+    await expect(page.locator('h1')).toHaveCount(1);
     await expect(
-      page.getByRole('navigation').getByRole('link', { name: /^Product$/i }),
+      page.getByText('Illustrative product preview', { exact: false }),
     ).toBeVisible();
+
+    // The public navigation points to substantive routes and the demo flow.
     await expect(
-      page.getByRole('navigation').getByRole('link', { name: /^Modules$/i }),
+      page
+        .getByRole('navigation', { name: 'Main navigation' })
+        .getByRole('link', { name: /^Product$/i }),
     ).toBeVisible();
     await expect(
       page
-        .getByRole('navigation')
-        .getByRole('link', { name: /^For Schools$/i }),
+        .getByRole('navigation', { name: 'Main navigation' })
+        .getByRole('link', { name: /^Solutions$/i }),
     ).toBeVisible();
     await expect(
-      page.getByRole('navigation').getByRole('link', { name: /^Onboarding$/i }),
+      page
+        .getByRole('navigation', { name: 'Main navigation' })
+        .getByRole('link', { name: /^How it works$/i }),
     ).toBeVisible();
     await expect(
-      page.getByRole('navigation').getByRole('link', { name: /^Security$/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('navigation').getByRole('link', { name: /^Plans$/i }),
+      page
+        .getByRole('navigation', { name: 'Main navigation' })
+        .getByRole('link', { name: /^Security$/i }),
     ).toBeVisible();
 
     // Assert forbidden keywords do not exist in navbar/banner
@@ -62,6 +66,239 @@ test.describe('Public route smoke', () => {
     await expect(
       page.getByRole('banner').getByRole('link', { name: /^Schools$/i }),
     ).not.toBeVisible();
+  });
+
+  test('marketing pages have meaningful routes, active navigation, and metadata', async ({
+    page,
+  }) => {
+    const routes = [
+      {
+        path: '/product',
+        nav: 'Product',
+        heading: 'Bring the school day into focus.',
+      },
+      {
+        path: '/solutions',
+        nav: 'Solutions',
+        heading: 'The right view for every part of the school.',
+      },
+      {
+        path: '/security',
+        nav: 'Security',
+        heading: 'Access should follow responsibility.',
+      },
+    ];
+
+    for (const route of routes) {
+      await page.goto(route.path);
+      await expect(page.locator('h1')).toHaveText(route.heading);
+      await expect(page.getByRole('main')).toBeVisible();
+      await expect(
+        page
+          .getByRole('navigation', { name: 'Main navigation' })
+          .getByRole('link', { name: route.nav }),
+      ).toHaveAttribute('aria-current', 'page');
+      await expect(page).toHaveTitle(/SchoolOS/);
+      await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+        'content',
+        /SchoolOS/i,
+      );
+      await expect(
+        page
+          .getByRole('contentinfo')
+          .getByRole('link', { name: 'Request a demo' }),
+      ).toHaveAttribute('href', '/request-demo');
+    }
+
+    await page.goto('/solutions');
+    await page.getByRole('link', { name: 'Parents & guardians' }).click();
+    await expect(page).toHaveURL(/\/solutions#parents$/);
+    await expect(
+      page.getByRole('heading', { name: 'Know what matters for your child.' }),
+    ).toBeVisible();
+  });
+
+  test('mobile navigation and landing layout remain usable across widths', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+
+    const menu = page.getByRole('button', { name: 'Open menu' });
+    await expect(menu).toBeVisible();
+    await menu.click();
+    await expect(
+      page.getByRole('navigation', { name: 'Mobile navigation' }),
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(
+      page.getByRole('navigation', { name: 'Mobile navigation' }),
+    ).not.toBeVisible();
+    await page.getByRole('button', { name: 'Open menu' }).click();
+    await page
+      .getByRole('navigation', { name: 'Mobile navigation' })
+      .getByRole('link', { name: 'Solutions' })
+      .click();
+    await expect(page).toHaveURL(/\/solutions$/);
+    await expect(
+      page.getByRole('navigation', { name: 'Mobile navigation' }),
+    ).not.toBeVisible();
+
+    for (const path of [
+      '/',
+      '/product',
+      '/solutions',
+      '/security',
+      '/privacy',
+      '/terms',
+      '/request-demo',
+    ]) {
+      await page.goto(path);
+      for (const width of [320, 390, 768, 1024, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        const documentWidth = await page.evaluate(
+          () => document.documentElement.scrollWidth,
+        );
+        expect(
+          documentWidth,
+          `horizontal overflow on ${path} at ${width}px`,
+        ).toBeLessThanOrEqual(width);
+      }
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Open menu' }).click();
+    await page
+      .getByRole('navigation', { name: 'Mobile navigation' })
+      .getByRole('link', { name: 'Request a demo' })
+      .click();
+    await expect(page).toHaveURL(/\/request-demo(?:$|[?#])/);
+  });
+
+  test('marketing entrances respect reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/product');
+
+    const heading = page.getByRole('heading', {
+      name: 'Bring the school day into focus.',
+    });
+    await expect(heading).toBeVisible();
+    expect(
+      await heading.evaluate(
+        (element) => getComputedStyle(element.parentElement!).animationName,
+      ),
+    ).toBe('none');
+  });
+
+  test('keyboard users can skip the shared marketing navigation', async ({
+    page,
+  }) => {
+    await page.goto('/product');
+    await page.keyboard.press('Tab');
+    await expect(
+      page.getByRole('link', { name: 'Skip to content' }),
+    ).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('main')).toBeFocused();
+  });
+
+  test('legal drafts and indexing stay closed until launch configuration is approved', async ({
+    page,
+    request,
+  }) => {
+    for (const path of ['/privacy', '/terms']) {
+      await page.goto(path);
+      await expect(page.locator('h1')).toHaveCount(1);
+      await expect(page.getByRole('note')).toContainText('Draft for review');
+      await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+        'content',
+        /noindex/,
+      );
+    }
+
+    const robots = await request.get('/robots.txt');
+    expect(robots.ok()).toBeTruthy();
+    expect(await robots.text()).toContain('Disallow: /');
+
+    const sitemap = await request.get('/sitemap.xml');
+    expect(sitemap.ok()).toBeTruthy();
+    expect(await sitemap.text()).not.toContain('/product');
+
+    const missing = await page.goto('/a-page-that-does-not-exist');
+    expect(missing?.status()).toBe(404);
+    await expect(
+      page.getByRole('heading', { name: 'This page isn’t here.' }),
+    ).toBeVisible();
+  });
+
+  test('public assets and baseline response headers are present', async ({
+    request,
+  }) => {
+    const homepage = await request.get('/');
+    expect(homepage.headers()['x-content-type-options']).toBe('nosniff');
+    expect(homepage.headers()['referrer-policy']).toBe(
+      'strict-origin-when-cross-origin',
+    );
+    expect(homepage.headers()['strict-transport-security']).toContain(
+      'max-age=',
+    );
+    expect(homepage.headers()['content-security-policy']).toContain(
+      "object-src 'none'",
+    );
+
+    const icon = await request.get('/icon.svg');
+    expect(icon.ok()).toBeTruthy();
+    expect(icon.headers()['content-type']).toMatch(/image\/svg\+xml/);
+
+    const social = await request.get('/opengraph-image');
+    expect(social.ok()).toBeTruthy();
+    expect(social.headers()['content-type']).toMatch(/image\/png/);
+  });
+
+  test('public marketing links resolve to live routes and fragments', async ({
+    page,
+    request,
+  }) => {
+    await page.goto('/');
+    const origin = new URL(page.url()).origin;
+    const links = new Set<string>();
+    for (const path of [
+      '/',
+      '/product',
+      '/solutions',
+      '/security',
+      '/privacy',
+      '/terms',
+      '/request-demo',
+    ]) {
+      await page.goto(path);
+      const hrefs = await page
+        .locator('a[href]')
+        .evaluateAll((elements) =>
+          elements.map((element) => element.getAttribute('href')!),
+        );
+      for (const href of hrefs) {
+        const url = new URL(href, origin + path);
+        if (url.origin === origin) links.add(url.pathname + url.hash);
+      }
+    }
+
+    for (const href of links) {
+      const url = new URL(href, origin);
+      const response = await request.get(url.pathname);
+      expect(response.status(), `broken marketing link: ${href}`).toBeLessThan(
+        400,
+      );
+      if (url.hash) {
+        await page.goto(url.pathname);
+        const id = decodeURIComponent(url.hash.slice(1));
+        await expect(
+          page.locator(`[id="${id}"]`),
+          `missing fragment: ${href}`,
+        ).toHaveCount(1);
+      }
+    }
   });
 
   test('login page renders expected UI', async ({ page }) => {

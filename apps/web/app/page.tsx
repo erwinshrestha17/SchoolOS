@@ -1,1748 +1,473 @@
-'use client';
-
-import { Card } from '@/components/schoolos';
-import * as React from 'react';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import {
-  MapPin,
-  CheckCircle2,
-  AlertCircle,
-  Activity,
   ArrowRight,
-  Lock,
-  Award,
-  FileSpreadsheet,
-  Settings,
-  Layers,
-  BookOpen,
+  ArrowUpRight,
+  Bell,
+  Check,
+  CircleHelp,
   ClipboardCheck,
-  WalletCards,
-  Megaphone,
-  UserRoundCheck,
-  Building,
   GraduationCap,
-  Calendar,
+  LockKeyhole,
+  Megaphone,
   ShieldCheck,
-  Users,
-  Bus,
-  PlusCircle,
-  Clock,
-  ChevronRight,
-  TrendingUp,
-  FileText,
+  WalletCards,
 } from 'lucide-react';
-
-import { Badge } from '../components/ui/badge';
+import { MarketingCta } from '../components/marketing/marketing-cta';
+import { MarketingShell } from '../components/marketing/marketing-shell';
 import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from '../components/ui/tabs';
-import { Progress } from '../components/ui/progress';
+  getMarketingPublication,
+  marketingCanonical,
+  marketingRobots,
+} from '../lib/marketing-publication';
+import {
+  DashboardPreview,
+  ParentPreview,
+  TeacherPreview,
+} from '../components/marketing/landing-previews';
+import styles from './landing.module.css';
 
-import { DotPattern } from '../components/marketing/dot-pattern';
-import { BorderBeam } from '../components/marketing/border-beam';
-import { NumberTicker } from '../components/marketing/number-ticker';
-import { BlurFade } from '../components/marketing/blur-fade';
-import { MarketingSectionHeader } from '../components/marketing/section-header';
-import { MarketingCard } from '../components/marketing/marketing-card';
-import { MetricCard } from '../components/marketing/metric-card';
+export const metadata: Metadata = {
+  title: 'SchoolOS | One connected place to run your school',
+  description:
+    'SchoolOS connects daily operations, attendance, academics, fees, and school communication for Nepal schools.',
+  robots: marketingRobots(),
+  alternates: marketingCanonical('/')
+    ? { canonical: marketingCanonical('/') }
+    : undefined,
+  openGraph: {
+    title: 'SchoolOS | One connected place to run your school',
+    description:
+      'Daily school operations, attendance, academics, fees, and communication in one connected platform for Nepal schools.',
+    type: 'website',
+  },
+};
 
-// ── DATA STRUCTURES ──
-
-const painPoints = [
+const workflowItems = [
   {
-    problem: 'Attendance scattered in registers',
-    solution: 'Digital daily attendance with reports and parent alerts',
-    desc: 'Traditional paper logs are prone to errors and leave parents in the dark. SchoolOS digitizes daily check-ins instantly.',
     icon: ClipboardCheck,
+    title: 'Attendance',
+    description: 'Assigned rosters, daily records, and controlled corrections.',
   },
   {
-    problem: 'Fees tracked manually',
-    solution:
-      'Fee dues, receipts, collections, cashier close, and ledger-ready records',
-    desc: 'SchoolOS keeps fee records, receipts, cashier controls, and reviewed accounting handoffs connected without making the browser the source of financial truth.',
-    icon: WalletCards,
-  },
-  {
-    problem: 'Parents miss updates',
-    solution:
-      'Official notices, personal alerts, delivery status, and parent mobile access',
-    desc: 'SchoolOS keeps formal school notices separate from personal notification and delivery status.',
-    icon: Megaphone,
-  },
-  {
-    problem: 'Student records are fragmented',
-    solution:
-      'One student profile with guardians, documents, attendance, fees, academics, and activity',
-    desc: 'Academic, financial, and administrative records live in separate silos. SchoolOS aggregates everything under a single unified ID.',
-    icon: UserRoundCheck,
-  },
-];
-
-const operatingLayers = [
-  {
-    title: 'Admin Command Center',
-    desc: 'A role-scoped hub for administrative oversight, student lifecycle work, and guided school operations.',
-    bullets: [
-      'Interactive school stats feed',
-      'Unified student lifecycle & approvals',
-      'Institution-wide notices & alerts',
-    ],
-    icon: ShieldCheck,
-    visual: 'activity',
-  },
-  {
-    title: 'Finance & Accounts',
-    desc: 'A robust financial system designed specifically for tuition fees, ledger entries, and audit-ready bookkeeping.',
-    bullets: [
-      'NPR fee billing customisation',
-      'Cashier day-end closing audits',
-      'Controlled accounting postings',
-    ],
-    icon: WalletCards,
-    visual: 'progress',
-  },
-  {
-    title: 'Academics & Attendance',
-    desc: 'Tools designed for teachers to map schedules, mark attendance, and manage continuous assessment grading.',
-    bullets: [
-      'Clear attendance register workflow',
-      'Timetables & substitution tracking',
-      'CAS and terminal report cards',
-    ],
     icon: GraduationCap,
-    visual: 'chips',
-  },
-  {
-    title: 'Family & Campus Services',
-    desc: 'Enabled services connect linked guardians with school notices, transport status, library records, and canteen activity.',
-    bullets: [
-      'Linked-child parent mobile access',
-      'Timestamped transport updates',
-      'Canteen meal planning & wallets where enabled',
-    ],
-    icon: Bus,
-    visual: 'list',
-  },
-];
-
-const modulesList = [
-  {
-    initials: 'AD',
-    title: 'Admissions',
-    desc: 'Applicant intake, documentation, and enrollment workflows.',
-    tag: 'Core',
-  },
-  {
-    initials: 'SD',
-    title: 'Students',
-    desc: 'Centralized profile database, sibling linking, and active files.',
-    tag: 'Core',
-  },
-  {
-    initials: 'AT',
-    title: 'Smart Attendance',
-    desc: 'Assigned-roster attendance, corrections, registers, and time-bound summaries.',
-    tag: 'Core',
-  },
-  {
-    initials: 'FR',
-    title: 'Fees & Receipts',
-    desc: 'Invoices, automated receipts, waivers, and dues tracking.',
-    tag: 'Finance',
-  },
-  {
-    initials: 'NA',
-    title: 'Notices & Announcements',
-    desc: 'Official drafts, audience preview, review, publication, and read follow-up.',
-    tag: 'Core',
-  },
-  {
-    initials: 'ND',
-    title: 'Notifications & Delivery',
-    desc: 'Personal inboxes and honest channel status when delivery providers are enabled.',
-    tag: 'Core',
-  },
-  {
-    initials: 'AC',
     title: 'Academics',
-    desc: 'Exam configurations, marks cards, and continuous grading.',
-    tag: 'Academic',
+    description: 'Classwork, timetables, assessments, and results workflows.',
   },
   {
-    initials: 'TT',
-    title: 'Timetable',
-    desc: 'Class schedules, teacher allotments, and substitution views.',
-    tag: 'Academic',
+    icon: WalletCards,
+    title: 'Fees & receipts',
+    description: 'Dues, collections, receipts, and reviewed finance handoffs.',
   },
   {
-    initials: 'HP',
-    title: 'HR & Payroll',
-    desc: 'Staff directory, salary processing, and expense records.',
-    tag: 'Finance',
-  },
-  {
-    initials: 'GL',
-    title: 'Accounting',
-    desc: 'Double-entry books, charts of accounts, and audit reports.',
-    tag: 'Finance',
-  },
-  {
-    initials: 'TR',
-    title: 'Transport',
-    desc: 'Route configurations, vehicles, and student logs.',
-    tag: 'Operations',
-  },
-  {
-    initials: 'LB',
-    title: 'Library',
-    desc: 'Catalog system, barcode scans, and overdue fees tracking.',
-    tag: 'Operations',
-  },
-  {
-    initials: 'CN',
-    title: 'Canteen',
-    desc: 'Menu setups, student wallet cards, and inventory levels.',
-    tag: 'Operations',
-  },
-  {
-    initials: 'RP',
-    title: 'Reports',
-    desc: 'Financial collections, enrollment graphs, and marks summaries.',
-    tag: 'Core',
-  },
-  {
-    initials: 'PM',
-    title: 'Parent Mobile Companion',
-    desc: 'Linked-child visibility through the SchoolOS mobile app.',
-    tag: 'Companion',
+    icon: Megaphone,
+    title: 'Notices & Announcements',
+    description:
+      'Official school communication with audience and review controls.',
   },
 ];
 
-const nepalReadiness = [
+const steps = [
   {
-    title: 'NPR fee workflows',
-    desc: 'Tailored specifically for local currency billing, cash collection receipts, and custom tax headers.',
+    number: '01',
+    title: 'Tell us about your school',
+    description:
+      'Share your school context and the daily workflows you want to improve.',
   },
   {
-    title: 'Nepali calendar readiness',
-    desc: 'Supports both BS (Bikram Sambat) and AD calendars for class schedules, exams, and attendance.',
+    number: '02',
+    title: 'See the relevant workflows',
+    description:
+      'We walk through the product with your leadership and operations team.',
   },
   {
-    title: 'Configurable delivery channels',
-    desc: 'Supports in-app delivery and channel-ready SMS, email, or push modes when providers are configured and verified.',
-  },
-  {
-    title: 'Local school roles',
-    desc: 'Pre-configured roles matching Nepalese schools, including Principal, Accountant, and Section Coordinator.',
-  },
-  {
-    title: 'Guided school setup',
-    desc: 'School structure, roles, enabled modules, and data-import needs are reviewed during onboarding.',
-  },
-  {
-    title: 'Parent-first communication',
-    desc: 'Linked guardians use the mobile companion for school notices, alerts, and enabled child records.',
-  },
-  {
-    title: 'School-level data separation',
-    desc: 'Ensures each institution operates in a distinct, protected workspace safeguarding student privacy.',
-  },
-  {
-    title: 'Audit trail design',
-    desc: 'Built-in audit logging tracks every financial edit, invoice override, and grade change for accountability.',
+    number: '03',
+    title: 'Plan a careful rollout',
+    description:
+      'Scope, access, data, and readiness are reviewed before a controlled pilot.',
   },
 ];
 
-const differentiators = [
-  {
-    title: 'School-level data separation',
-    desc: 'School data is handled through tenant-scoped queries, role checks, module entitlements, and protected-file access.',
-  },
-  {
-    title: 'Finance-connected operations',
-    desc: 'Approved source records can create controlled accounting entries. Reconciliation remains a reviewed school-finance workflow, and salary settlement occurs outside SchoolOS.',
-  },
-  {
-    title: 'Role-aware access',
-    desc: 'Staff use role-scoped web workspaces, linked guardians use the mobile companion, and students only enter controlled Learning sessions when that module is enabled.',
-  },
-  {
-    title: 'Guided onboarding',
-    desc: 'No public school self-registration. Each workspace receives reviewed setup, role mapping, and an agreed data-import plan.',
-  },
-  {
-    title: 'Full student lifecycle',
-    desc: 'From primary admission interviews to graduation certificates, student files gather fees, grades, and attendance logs under one profile.',
-  },
-];
-
-const onboardingSteps = [
-  {
-    step: '01',
-    title: 'Request Demo',
-    desc: 'Tell us about your school, student count, and priority modules. We review the intake parameters.',
-    icon: FileText,
-  },
-  {
-    step: '02',
-    title: 'Verification & Planning',
-    desc: 'Our team verifies school details and coordinates a custom product demo, mapping out the rollout scope.',
-    icon: Calendar,
-  },
-  {
-    step: '03',
-    title: 'School Workspace Setup',
-    desc: 'We configure academic year, classes, sections, roles, and local fee structures.',
-    icon: Settings,
-  },
-  {
-    step: '04',
-    title: 'Readiness Review',
-    desc: 'We agree the controlled-pilot scope only after the required configuration, data, access, and workflow checks.',
-    icon: CheckCircle2,
-  },
-];
-
-const plansList = [
-  {
-    name: 'Foundation scope',
-    desc: 'For a controlled rollout focused on essential student, attendance, notice, and fee workflows.',
-    features: [
-      'Student database & files',
-      'Admissions pipeline',
-      'Daily attendance logs',
-      'School notices & announcements',
-      'Core fee invoicing & collections',
-    ],
-  },
-  {
-    name: 'Extended operations',
-    desc: 'Additional academic, HR, payroll, accounting, and reporting modules after their readiness gates are met.',
-    features: [
-      'Foundation workflows where enabled',
-      'Terminal exam builder & marks cards',
-      'Subject timetables & substitutions',
-      'HR profiles & payroll calculations',
-      'Double-entry accounting ledger',
-      'Detailed billing & collections reports',
-    ],
-    highlighted: true,
-  },
-  {
-    name: 'Enabled campus services',
-    desc: 'Optional parent mobile, transport, library, and canteen workflows selected during onboarding.',
-    features: [
-      'Approved operational modules',
-      'Linked-child parent mobile access',
-      'Library cataloguing & QR issue logs',
-      'Transport routes & student mapping',
-      'Canteen menus & prepaid student wallets',
-      'Custom role-based permissions & audit feeds',
-    ],
-  },
-];
-
-const securityCards = [
-  {
-    title: 'Staff authentication',
-    desc: 'Uses role-scoped sessions, password controls, and access checks.',
-  },
-  {
-    title: 'Role-based access',
-    desc: 'Allows coordinators, accountants, and teachers to see only data assigned to their roles.',
-  },
-  {
-    title: 'School-level data separation',
-    desc: 'School records use tenant-scoped query, job, file, and cache boundaries.',
-  },
-  {
-    title: 'Audit trail design',
-    desc: 'Sensitive workflows retain actor, time, state, and reason evidence where the workflow requires it.',
-  },
-  {
-    title: 'Protected documents',
-    desc: 'Private school files use authenticated, role-scoped access paths.',
-  },
-  {
-    title: 'Controlled onboarding',
-    desc: 'School workspaces are set up through guided onboarding; public self-service setup is not available.',
-  },
-];
-
-export default function RedesignedLandingPage() {
+function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-primary-500 selection:text-white">
-      {/* ── 1. Navbar ── */}
-      <header className="sticky top-0 z-50 border-b border-slate-200/60 bg-white/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500 text-sm font-black text-white shadow-sm">
-              S
-            </span>
-            <div className="flex flex-col">
-              <span className="text-lg font-black tracking-tight leading-none text-slate-900">
-                SchoolOS
-              </span>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-                School operating system for Nepal
+    <span className={styles.eyebrow}>
+      <span aria-hidden="true" />
+      {children}
+    </span>
+  );
+}
+
+function SectionHeading({
+  id,
+  eyebrow,
+  title,
+  description,
+}: {
+  id: string;
+  eyebrow: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className={styles.sectionHeading}>
+      <Eyebrow>{eyebrow}</Eyebrow>
+      <h2 id={id}>{title}</h2>
+      {description && <p>{description}</p>}
+    </div>
+  );
+}
+
+function TextLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link className={styles.textLink} href={href}>
+      {children}
+      <ArrowUpRight size={17} aria-hidden="true" />
+    </Link>
+  );
+}
+
+export default function LandingPage() {
+  const publication = getMarketingPublication();
+  const structuredData = publication.isPublicLaunchReady
+    ? JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'SchoolOS',
+        applicationCategory: 'EducationalApplication',
+        operatingSystem: 'Web',
+        url: publication.siteUrl?.toString(),
+        publisher: {
+          '@type': 'Organization',
+          name: publication.operatorName,
+        },
+      }).replace(/</g, '\\u003c')
+    : null;
+
+  return (
+    <MarketingShell>
+      {structuredData && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: structuredData }}
+        />
+      )}
+      <section className={styles.hero} aria-labelledby="hero-title">
+        <div className={`${styles.container} ${styles.heroGrid}`}>
+          <div className={styles.heroCopy}>
+            <Eyebrow>School operating system for Nepal</Eyebrow>
+            <h1 id="hero-title">
+              One connected place to <span>run your school.</span>
+            </h1>
+            <p>
+              SchoolOS brings daily operations, attendance, academics, fees, and
+              school communication together for leadership, teachers, and
+              families.
+            </p>
+            <div className={styles.heroActions}>
+              <Link className={styles.primaryButton} href="/request-demo">
+                Request a demo <ArrowUpRight size={19} aria-hidden="true" />
+              </Link>
+              <Link className={styles.secondaryButton} href="/product">
+                Explore the product <ArrowRight size={18} aria-hidden="true" />
+              </Link>
+            </div>
+            <div className={styles.heroNote}>
+              <ShieldCheck size={17} aria-hidden="true" />
+              <span>
+                Guided setup for Nepal schools. Availability is confirmed during
+                onboarding.
               </span>
             </div>
           </div>
-          <nav className="hidden lg:flex items-center gap-8 text-sm font-semibold text-slate-500">
-            <a
-              href="#product"
-              className="hover:text-primary-500 transition-colors"
-            >
-              Product
-            </a>
-            <a
-              href="#modules"
-              className="hover:text-primary-500 transition-colors"
-            >
-              Modules
-            </a>
-            <a
-              href="#for-schools"
-              className="hover:text-primary-500 transition-colors"
-            >
-              For Schools
-            </a>
-            <a
-              href="#onboarding"
-              className="hover:text-primary-500 transition-colors"
-            >
-              Onboarding
-            </a>
-            <a
-              href="#security"
-              className="hover:text-primary-500 transition-colors"
-            >
-              Security
-            </a>
-            <a
-              href="#plans"
-              className="hover:text-primary-500 transition-colors"
-            >
-              Plans
-            </a>
-          </nav>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors px-3 py-2"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/request-demo"
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 shadow-sm h-9 px-4 active:scale-[0.98] transition-all"
-            >
-              Request Demo
-            </Link>
+          <div className={styles.heroSideNote}>
+            <span className={styles.heroSideRule} />
+            <span>FROM THE SCHOOL DAY TO THE BIG PICTURE</span>
+            <p>Clarity for the people who keep a school moving.</p>
           </div>
         </div>
-      </header>
+        <div className={`${styles.container} ${styles.heroPreview}`}>
+          <DashboardPreview />
+        </div>
+      </section>
 
-      {/* ── 2. Hero Section ── */}
+      <section
+        className={styles.introStrip}
+        aria-label="SchoolOS connects school workflows"
+      >
+        <div className={styles.container}>
+          <span>ONE SCHOOL. ONE SHARED VIEW.</span>
+          <p>
+            Leadership sees what needs attention. Teachers can focus on their
+            classes. Families stay informed through the mobile companion.
+          </p>
+          <ArrowRight size={22} aria-hidden="true" />
+        </div>
+      </section>
+
       <section
         id="product"
-        className="relative overflow-hidden bg-slate-950 px-6 py-20 lg:py-28 text-white"
+        className={styles.productSection}
+        aria-labelledby="product-title"
       >
-        {/* Subtle grid pattern background */}
-        <DotPattern className="opacity-15" width={24} height={24} />
-
-        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-primary-500 opacity-20 blur-3xl" />
-        <div className="absolute -left-32 -bottom-32 h-96 w-96 rounded-full bg-indigo-600 opacity-15 blur-3xl" />
-
-        <div className="relative mx-auto max-w-6xl grid lg:grid-cols-[1.15fr_0.85fr] gap-12 lg:gap-16 items-center">
-          {/* Left Column: Headline and CTAs */}
-          <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-4 py-1.5 text-xs font-semibold tracking-wider text-primary-300 uppercase">
-              🇳🇵 Built for Nepal schools · Grade 1 to Grade 12
+        <div className={styles.container}>
+          <div className={styles.productIntro}>
+            <div>
+              <Eyebrow>Connected operations</Eyebrow>
+              <h2 id="product-title">
+                The work of a school,
+                <br />
+                <em>working together.</em>
+              </h2>
             </div>
-
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] text-white">
-              Run your school from one connected operating system.
-            </h1>
-
-            <p className="text-base sm:text-lg leading-relaxed text-slate-400 max-w-2xl">
-              SchoolOS brings admissions, attendance, fees, academics, notices,
-              staff, accounting, transport, library, canteen, and parent
-              communication into one tenant-scoped system for Nepal-based
-              schools.
-            </p>
-
-            <div className="flex flex-wrap items-center gap-4 pt-2">
-              <Link
-                href="/request-demo"
-                className="inline-flex items-center justify-center whitespace-nowrap rounded-3xl text-base font-bold bg-primary-500 hover:bg-primary-600 shadow-lg shadow-primary-500/25 text-white h-13 px-10 active:scale-[0.98] transition-all"
-              >
-                Request Demo
-              </Link>
-              <a
-                href="#modules"
-                className="inline-flex items-center justify-center whitespace-nowrap rounded-3xl text-base font-bold border-2 border-slate-700 bg-slate-900/40 text-slate-300 hover:border-slate-500 hover:text-white h-13 px-10 active:scale-[0.98] transition-all"
-              >
-                View Modules
-              </a>
-            </div>
-
-            <p className="text-xs text-slate-500 font-medium">
-              School workspaces are created after verification and guided
-              onboarding.
+            <p>
+              Move between student records, classroom work, communication, and
+              finance with a consistent school context. Each workflow keeps its
+              own controls and approvals.
             </p>
           </div>
-
-          {/* Right Column: Custom Product Preview UI */}
-          <div className="relative lg:mt-0" id="for-schools">
-            <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-indigo-500 transform rotate-1 rounded-3xl opacity-20 blur-xl" />
-
-            {/* Desktop Window Shell */}
-            <div className="relative bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-              {/* BorderBeam overlay */}
-              <BorderBeam
-                colorFrom="#2563EB"
-                colorTo="#168C8C"
-                duration={6}
-                borderWidth={2}
-              />
-
-              {/* Window Controls */}
-              <div className="bg-slate-950/80 border-b border-slate-800 px-6 py-3.5 flex items-center justify-between">
-                <div className="flex gap-2">
-                  <span className="h-3 w-3 rounded-full bg-slate-700" />
-                  <span className="h-3 w-3 rounded-full bg-slate-700" />
-                  <span className="h-3 w-3 rounded-full bg-slate-700" />
-                </div>
-                <div className="text-[10px] text-slate-500 tracking-widest uppercase">
-                  Illustrative product preview
-                </div>
-                <div className="h-2 w-8 bg-transparent" />
+          <div className={styles.workflowGrid}>
+            {workflowItems.map((item, index) => (
+              <div className={styles.workflowItem} key={item.title}>
+                <span className={styles.workflowNumber}>0{index + 1}</span>
+                <item.icon size={25} strokeWidth={1.6} aria-hidden="true" />
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
               </div>
+            ))}
+          </div>
+          <div className={styles.productFootnote}>
+            <span>
+              <Bell size={18} aria-hidden="true" /> Notifications & Delivery
+              keeps personal alerts and channel status distinct from official
+              notices.
+            </span>
+            <span>
+              Modules depend on school setup, permissions, and release
+              readiness.
+            </span>
+          </div>
+          <div className={styles.productMore}>
+            <TextLink href="/product">Explore the product</TextLink>
+          </div>
+        </div>
+      </section>
 
-              {/* Main Preview Shell Layout */}
-              <div className="flex min-h-[380px] text-slate-300">
-                {/* Visual Sidebar */}
-                <div className="w-[80px] sm:w-[120px] bg-slate-950/40 border-r border-slate-800/80 p-3 hidden sm:flex flex-col gap-4 text-[10px] font-bold text-slate-500">
-                  <div className="space-y-1">
-                    <span className="text-[8px] uppercase tracking-wider block text-slate-600 px-2">
-                      Core
-                    </span>
-                    <div className="p-2 rounded-lg bg-primary-950/40 text-primary-400 border border-primary-900/30 flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary-500" />
-                      <span>Console</span>
-                    </div>
-                    <div className="p-2 rounded-lg hover:text-slate-300 transition-colors">
-                      Students
-                    </div>
-                    <div className="p-2 rounded-lg hover:text-slate-300 transition-colors">
-                      Attendance
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[8px] uppercase tracking-wider block text-slate-600 px-2">
-                      Finance
-                    </span>
-                    <div className="p-2 rounded-lg hover:text-slate-300 transition-colors">
-                      Fees Desk
-                    </div>
-                    <div className="p-2 rounded-lg hover:text-slate-300 transition-colors">
-                      Ledger
-                    </div>
-                  </div>
+      <section
+        id="for-schools"
+        className={styles.personaSection}
+        aria-labelledby="persona-title"
+      >
+        <div className={styles.container}>
+          <SectionHeading
+            id="persona-title"
+            eyebrow="Built around your people"
+            title="A clearer day for everyone at school."
+            description="Shared information becomes useful when each person sees the work that belongs to them."
+          />
+          <div className={styles.leadershipBlock}>
+            <div className={styles.leadershipCopy}>
+              <span className={styles.personaIndex}>
+                01 / SCHOOL LEADERSHIP
+              </span>
+              <h3>See what needs your attention. Then act with context.</h3>
+              <p>
+                School leaders can review attendance completion, follow
+                operational work, and see decisions that need a closer look, all
+                within their authorized school workspace.
+              </p>
+              <ul>
+                <li>
+                  <Check size={16} /> School-wide operational overview
+                </li>
+                <li>
+                  <Check size={16} /> Review queues and follow-up
+                </li>
+                <li>
+                  <Check size={16} /> Student and staff context
+                </li>
+              </ul>
+              <TextLink href="/solutions#schools">
+                For school leadership
+              </TextLink>
+            </div>
+            <div className={styles.leadershipVisual}>
+              <div className={styles.leadershipVisualHeader}>
+                <span>School day status</span>
+                <span>Example Secondary School</span>
+              </div>
+              <div className={styles.leadershipVisualMain}>
+                <div>
+                  <small>ATTENDANCE</small>
+                  <strong>
+                    18 <span>/ 25 classes</span>
+                  </strong>
+                  <p>Registers submitted today</p>
                 </div>
-
-                {/* Main Content Dashboard Area */}
-                <div className="flex-1 p-5 md:p-6 space-y-5">
-                  {/* Dashboard Header */}
-                  <div className="flex justify-between items-start border-b border-slate-800/60 pb-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-sm font-black tracking-tight text-white">
-                          Example Secondary School
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-slate-500 text-[11px] font-semibold">
-                        <MapPin
-                          size={11}
-                          className="text-primary-500 shrink-0"
-                        />
-                        <span>Example district, Nepal</span>
-                      </div>
-                    </div>
-                    <Badge
-                      variant="success"
-                      className="text-[9px] font-bold py-0.5 px-2 flex items-center gap-1 shrink-0"
-                    >
-                      <CheckCircle2 size={10} />
-                      Example data
-                    </Badge>
-                  </div>
-
-                  {/* KPI Cards Grid */}
-                  <div className="grid grid-cols-2 gap-3.5">
-                    <MetricCard label="Students" value={1248} />
-                    <MetricCard
-                      label="Attendance"
-                      value={93.6}
-                      formatter={(val) => val.toFixed(1) + '%'}
-                      textColor="text-emerald-400"
-                    />
-                    <MetricCard
-                      label="Fee Collected"
-                      value={3245600}
-                      prefix="NPR "
-                    />
-                    <MetricCard
-                      label="Outstanding"
-                      value={742850}
-                      prefix="NPR "
-                      textColor="text-amber-400"
-                    />
-                  </div>
-
-                  {/* Layout split: Chart and Recent Activity */}
-                  <div className="grid grid-cols-1 md:grid-cols-[1.1fr_0.9fr] gap-4">
-                    {/* SVG Mini Chart (Collections Trend) */}
-                    <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3.5 space-y-2">
-                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">
-                        Monthly Fee Inflow
-                      </span>
-                      <div className="h-20 w-full flex items-end">
-                        <svg className="w-full h-full" viewBox="0 0 160 80">
-                          <defs>
-                            <linearGradient
-                              id="chartGrad"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="0%"
-                                stopColor="#2563EB"
-                                stopOpacity="0.4"
-                              />
-                              <stop
-                                offset="100%"
-                                stopColor="#2563EB"
-                                stopOpacity="0"
-                              />
-                            </linearGradient>
-                          </defs>
-                          <path
-                            d="M 10,70 L 35,55 L 60,60 L 85,35 L 110,40 L 135,15 L 150,10"
-                            fill="none"
-                            stroke="#2563EB"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                          />
-                          <path
-                            d="M 10,70 L 35,55 L 60,60 L 85,35 L 110,40 L 135,15 L 150,10 L 150,80 L 10,80 Z"
-                            fill="url(#chartGrad)"
-                          />
-                          <circle
-                            cx="135"
-                            cy="15"
-                            r="3.5"
-                            fill="#2563EB"
-                            stroke="#17324D"
-                            strokeWidth="1.5"
-                          />
-                          <circle
-                            cx="150"
-                            cy="10"
-                            r="3.5"
-                            fill="#27875A"
-                            stroke="#17324D"
-                            strokeWidth="1.5"
-                          />
-                        </svg>
-                      </div>
-                      <div className="flex justify-between text-[8px] text-slate-500 font-bold px-1">
-                        <span>Poush</span>
-                        <span>Magh</span>
-                        <span>Falgun</span>
-                        <span>Chaitra</span>
-                      </div>
-                    </div>
-
-                    {/* Recent Activity Logs */}
-                    <div className="bg-slate-950/40 border border-slate-800/60 rounded-2xl p-3.5 space-y-2.5 text-[11px]">
-                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">
-                        Workspace Feed
-                      </span>
-                      <div className="space-y-2 text-slate-300">
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1.5 truncate">
-                            <span className="h-1.5 w-1.5 rounded-full bg-primary-500 shrink-0" />
-                            <span className="truncate">
-                              Admission approved (Class 5)
-                            </span>
-                          </span>
-                          <span className="text-[9px] text-slate-500 font-medium shrink-0 ml-1">
-                            Just now
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1.5 truncate">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            <span className="truncate">
-                              Attendance marked (Class 10B)
-                            </span>
-                          </span>
-                          <span className="text-[9px] text-slate-500 font-medium shrink-0 ml-1">
-                            4m ago
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1.5 truncate">
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-                            <span className="truncate">
-                              Receipt posted (#1245)
-                            </span>
-                          </span>
-                          <span className="text-[9px] text-slate-500 font-medium shrink-0 ml-1">
-                            12m ago
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1.5 truncate">
-                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />
-                            <span className="truncate">
-                              PTM notice published
-                            </span>
-                          </span>
-                          <span className="text-[9px] text-slate-500 font-medium shrink-0 ml-1">
-                            1h ago
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <div className={styles.leadershipMiniBars} aria-hidden="true">
+                  <span style={{ height: '46%' }} />
+                  <span style={{ height: '68%' }} />
+                  <span style={{ height: '58%' }} />
+                  <span style={{ height: '83%' }} />
+                  <span style={{ height: '71%' }} />
+                  <span style={{ height: '92%' }} />
+                  <span style={{ height: '76%' }} />
                 </div>
               </div>
+              <div className={styles.leadershipVisualFooter}>
+                <span>
+                  <span className={styles.smallPulse} /> 2 items require review
+                </span>
+                <ArrowUpRight size={16} />
+              </div>
+              <span className={styles.previewCaption}>
+                Illustrative preview · Example data
+              </span>
+            </div>
+          </div>
+          <div className={styles.personaGrid}>
+            <article className={styles.teacherCard}>
+              <div className={styles.personaCardCopy}>
+                <span className={styles.personaIndex}>02 / TEACHERS</span>
+                <h3>Less admin between teaching moments.</h3>
+                <p>
+                  Open assigned classes, take attendance, and keep the
+                  day&apos;s classroom work in view.
+                </p>
+                <TextLink href="/solutions#teachers">For teachers</TextLink>
+              </div>
+              <TeacherPreview />
+            </article>
+            <article className={styles.parentCard}>
+              <div className={styles.personaCardCopy}>
+                <span className={styles.personaIndex}>
+                  03 / PARENTS & GUARDIANS
+                </span>
+                <h3>Closer to the school day.</h3>
+                <p>
+                  Linked guardians can follow their child&apos;s available
+                  records, official notices, and important updates in the Parent
+                  Mobile Companion.
+                </p>
+                <TextLink href="/solutions#parents">For parents</TextLink>
+              </div>
+              <ParentPreview />
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className={styles.nepalSection} aria-labelledby="nepal-title">
+        <div className={`${styles.container} ${styles.nepalGrid}`}>
+          <div>
+            <Eyebrow>Made for Nepal schools</Eyebrow>
+            <h2 id="nepal-title">
+              Grounded in how schools here actually operate.
+            </h2>
+          </div>
+          <div>
+            <p>
+              From NPR fee records to Nepali and English text, Nepal time, and
+              BS date presentation, SchoolOS is designed around the context
+              schools work in every day.
+            </p>
+            <div className={styles.nepalDetails}>
+              <span>NEPAL TIME</span>
+              <span>NPR RECORDS</span>
+              <span>BS + AD DATES</span>
+              <span>ENGLISH + NEPALI</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── 3. Interactive Role Preview ── */}
-      <section className="py-20 px-6 max-w-6xl mx-auto border-b border-slate-200/50">
-        <BlurFade delay={0.1}>
-          <MarketingSectionHeader
-            tag="Workspace Customization"
-            title="Every role gets the right workspace."
-            description="SchoolOS maps features directly to user roles. Staff and guardians see only the controls they need."
-            className="mb-12"
-          />
-        </BlurFade>
-
-        <BlurFade delay={0.2}>
-          <Tabs defaultValue="admin" className="w-full">
-            <div className="flex justify-center mb-8">
-              <TabsList className="bg-slate-100 p-1 border border-slate-200/50 rounded-2xl">
-                <TabsTrigger
-                  value="admin"
-                  className="px-5 py-2 text-xs font-bold rounded-xl data-[state=active]:bg-white data-[state=active]:text-slate-950"
-                >
-                  Admin
-                </TabsTrigger>
-                <TabsTrigger
-                  value="teacher"
-                  className="px-5 py-2 text-xs font-bold rounded-xl data-[state=active]:bg-white data-[state=active]:text-slate-950"
-                >
-                  Teacher
-                </TabsTrigger>
-                <TabsTrigger
-                  value="accountant"
-                  className="px-5 py-2 text-xs font-bold rounded-xl data-[state=active]:bg-white data-[state=active]:text-slate-950"
-                >
-                  Accountant
-                </TabsTrigger>
-                <TabsTrigger
-                  value="parent"
-                  className="px-5 py-2 text-xs font-bold rounded-xl data-[state=active]:bg-white data-[state=active]:text-slate-950"
-                >
-                  Parent
-                </TabsTrigger>
-                <TabsTrigger
-                  value="operations"
-                  className="px-5 py-2 text-xs font-bold rounded-xl data-[state=active]:bg-white data-[state=active]:text-slate-950"
-                >
-                  Operations
-                </TabsTrigger>
-              </TabsList>
+      <section
+        id="trust"
+        className={styles.trustSection}
+        aria-labelledby="trust-title"
+      >
+        <div className={`${styles.container} ${styles.trustGrid}`}>
+          <div>
+            <Eyebrow>Trust by design</Eyebrow>
+            <h2 id="trust-title">
+              School records deserve thoughtful boundaries.
+            </h2>
+            <p>
+              SchoolOS treats identity, permissions, and sensitive records as
+              part of daily operations, not an afterthought.
+            </p>
+            <div className={styles.trustMore}>
+              <TextLink href="/security">How access works</TextLink>
             </div>
-
-            {/* TAB CONTENT: ADMIN */}
-            <TabsContent
-              value="admin"
-              className="grid lg:grid-cols-[1.1fr_0.9fr] gap-8 focus-visible:ring-0"
-            >
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-black text-slate-900">
-                    Admin Command Center
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    Role-scoped oversight of institutional structure, student
-                    files, notice boards, and staff assignments.
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Core Focus Areas
-                  </h4>
-                  <ul className="space-y-3">
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>Student lifecycle tracking & documentation</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>School-wide notice publication & broadcast</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>
-                        Time-bound reports, exceptions, & audit history
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white space-y-6 shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-primary-500 opacity-10 blur-2xl" />
-                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <span className="text-xs font-bold uppercase text-slate-500">
-                    Illustrative preview · Example data
-                  </span>
-                  <Badge variant="phase2">Admin role</Badge>
-                </div>
-                {/* 3 KPI Cards */}
-                <div className="grid grid-cols-3 gap-3">
-                  <MetricCard
-                    label="Total Students"
-                    value={1248}
-                    className="p-3 text-xs"
-                  />
-                  <MetricCard
-                    label="Active Staff"
-                    value={84}
-                    className="p-3 text-xs"
-                  />
-                  <MetricCard
-                    label="Open Requests"
-                    value={3}
-                    textColor="text-amber-400"
-                    className="p-3 text-xs"
-                  />
-                </div>
-                {/* Mini Panel */}
-                <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-2xl space-y-3">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block tracking-wider">
-                    Recent Registrations
-                  </span>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center text-xs p-2 bg-slate-900 border border-slate-800/50 rounded-xl">
-                      <span className="font-semibold">
-                        Example Student A (Class 3A)
-                      </span>
-                      <span className="text-[9px] text-slate-500 font-bold bg-slate-800 px-1.5 py-0.5 rounded uppercase">
-                        Pending Approval
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs p-2 bg-slate-900 border border-slate-800/50 rounded-xl">
-                      <span className="font-semibold">
-                        Example Student B (Class 8B)
-                      </span>
-                      <span className="text-[9px] text-emerald-500 font-bold bg-emerald-950/40 border border-emerald-900/30 px-1.5 py-0.5 rounded uppercase font-bold">
-                        Approved
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* TAB CONTENT: TEACHER */}
-            <TabsContent
-              value="teacher"
-              className="grid lg:grid-cols-[1.1fr_0.9fr] gap-8 focus-visible:ring-0"
-            >
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-black text-slate-900">
-                    Teacher Workspace
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    Designed for fast classroom management, easy attendance
-                    tracking, and marksheet entry.
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Core Focus Areas
-                  </h4>
-                  <ul className="space-y-3">
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>Assigned-roster daily attendance</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>Class homework assignment & syllabus tracking</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>
-                        Direct exam entry & continuous assessment logs
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white space-y-6 shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-primary-500 opacity-10 blur-2xl" />
-                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <span className="text-xs font-bold uppercase text-slate-500">
-                    Illustrative preview · Example data
-                  </span>
-                  <Badge variant="phase2">Teacher role</Badge>
-                </div>
-                {/* 3 KPI Cards */}
-                <div className="grid grid-cols-3 gap-3">
-                  <MetricCard
-                    label="Attendance today"
-                    value={95.2}
-                    formatter={(val) => val.toFixed(1) + '%'}
-                    textColor="text-emerald-400"
-                    className="p-3 text-xs"
-                  />
-                  <MetricCard
-                    label="Unmarked Classes"
-                    value={0}
-                    className="p-3 text-xs"
-                  />
-                  <MetricCard
-                    label="Today's Periods"
-                    value={4}
-                    className="p-3 text-xs"
-                  />
-                </div>
-                {/* Mini Panel */}
-                <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-2xl space-y-3">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block tracking-wider">
-                    Class 10A Attendance Check
-                  </span>
-                  <div className="flex justify-between items-center text-xs p-2 bg-slate-900 border border-slate-800/50 rounded-xl">
-                    <span className="font-semibold">
-                      All 32 Students Marked
-                    </span>
-                    <span className="text-[9px] text-emerald-500 font-bold bg-emerald-950/40 border border-emerald-900/30 px-1.5 py-0.5 rounded uppercase font-bold">
-                      Submitted
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* TAB CONTENT: ACCOUNTANT */}
-            <TabsContent
-              value="accountant"
-              className="grid lg:grid-cols-[1.1fr_0.9fr] gap-8 focus-visible:ring-0"
-            >
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-black text-slate-900">
-                    Accountant Dashboard
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    Robust tools built for double-entry school ledgers, cashier
-                    day-ends, and custom NPR invoices.
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Core Focus Areas
-                  </h4>
-                  <ul className="space-y-3">
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>
-                        Custom NPR fee structuring & invoice schedules
-                      </span>
-                    </li>
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>
-                        Fee receipt logs with partial waiver allocation
-                      </span>
-                    </li>
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>
-                        Cashier end-of-day close out checks & audit books
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white space-y-6 shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-primary-500 opacity-10 blur-2xl" />
-                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <span className="text-xs font-bold uppercase text-slate-500">
-                    Illustrative preview · Example data
-                  </span>
-                  <Badge variant="phase2">Accountant role</Badge>
-                </div>
-                {/* 3 KPI Cards */}
-                <div className="grid grid-cols-3 gap-3">
-                  <MetricCard
-                    label="Collected Today"
-                    value={45200}
-                    prefix="NPR "
-                    formatter={(val) => (val / 1000).toFixed(1) + 'K'}
-                    className="p-3 text-xs"
-                  />
-                  <MetricCard
-                    label="Ledger Status"
-                    value="Reconciled"
-                    textColor="text-emerald-400"
-                    className="p-3 text-xs"
-                  />
-                  <MetricCard
-                    label="Pending overrides"
-                    value={0}
-                    className="p-3 text-xs"
-                  />
-                </div>
-                {/* Mini Panel */}
-                <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-2xl space-y-3">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block tracking-wider">
-                    Fee Receipt Feed
-                  </span>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center text-xs p-2 bg-slate-900 border border-slate-800/50 rounded-xl">
-                      <span className="font-semibold">
-                        Example receipt #10425
-                      </span>
-                      <span className="text-[10px] text-slate-300 font-bold">
-                        NPR 12,500
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* TAB CONTENT: PARENT */}
-            <TabsContent
-              value="parent"
-              className="grid lg:grid-cols-[1.1fr_0.9fr] gap-8 focus-visible:ring-0"
-            >
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-black text-slate-900">
-                    Parent Mobile Companion
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    A linked-child mobile view for enabled school records,
-                    notices, and alerts.
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Core Focus Areas
-                  </h4>
-                  <ul className="space-y-3">
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>School notices & personal alerts</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>
-                        Daily attendance calendar & academic report cards
-                      </span>
-                    </li>
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>
-                        Fee summary & timestamped trip updates where enabled
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white space-y-6 shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-primary-500 opacity-10 blur-2xl" />
-                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <span className="text-xs font-bold uppercase text-slate-500">
-                    Illustrative preview · Example data
-                  </span>
-                  <Badge variant="phase2">Parent view</Badge>
-                </div>
-                {/* 3 KPI Cards */}
-                <div className="grid grid-cols-3 gap-3">
-                  <MetricCard
-                    label="Attendance Rate"
-                    value={98.4}
-                    formatter={(val) => val.toFixed(1) + '%'}
-                    textColor="text-emerald-400"
-                    className="p-3 text-xs"
-                  />
-                  <MetricCard
-                    label="Pending Fees"
-                    value="NPR 0"
-                    className="p-3 text-xs"
-                  />
-                  <MetricCard
-                    label="Latest Trip Update"
-                    value="Recorded"
-                    className="p-3 text-xs"
-                  />
-                </div>
-                {/* Mini Panel */}
-                <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-2xl space-y-3">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block tracking-wider">
-                    Latest School Notice
-                  </span>
-                  <div className="text-xs p-3 bg-slate-900 border border-slate-800/50 rounded-xl space-y-1">
-                    <p className="font-bold text-white">
-                      First Terminal Exams Schedule
-                    </p>
-                    <p className="text-[10px] text-slate-400">
-                      Exams start from next Sunday (Ashadh 15).
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* TAB CONTENT: OPERATIONS */}
-            <TabsContent
-              value="operations"
-              className="grid lg:grid-cols-[1.1fr_0.9fr] gap-8 focus-visible:ring-0"
-            >
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-black text-slate-900">
-                    Operations Control
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    Coordinates campus services: student transit tracking,
-                    libraries, canteens, and HR operations.
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Core Focus Areas
-                  </h4>
-                  <ul className="space-y-3">
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>
-                        Transport fleet route logging & dispatch schedules
-                      </span>
-                    </li>
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>
-                        Canteen meal configurations & prepaid student wallets
-                      </span>
-                    </li>
-                    <li className="flex items-center gap-3 text-sm text-slate-700 font-semibold bg-white p-3.5 border border-slate-100 rounded-2xl shadow-sm">
-                      <CheckCircle2
-                        size={16}
-                        className="text-emerald-500 shrink-0"
-                      />
-                      <span>
-                        Library barcode book tracking & issues catalog
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white space-y-6 shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 h-40 w-40 rounded-full bg-primary-500 opacity-10 blur-2xl" />
-                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <span className="text-xs font-bold uppercase text-slate-500">
-                    Illustrative preview · Example data
-                  </span>
-                  <Badge variant="phase2">Operations role</Badge>
-                </div>
-                {/* 3 KPI Cards */}
-                <div className="grid grid-cols-3 gap-3">
-                  <MetricCard
-                    label="Active Routes"
-                    value={6}
-                    className="p-3 text-xs"
-                  />
-                  <MetricCard
-                    label="Books Issued"
-                    value={320}
-                    className="p-3 text-xs"
-                  />
-                  <MetricCard
-                    label="Wallet Cards"
-                    value={450}
-                    textColor="text-indigo-400"
-                    className="p-3 text-xs"
-                  />
-                </div>
-                {/* Mini Panel */}
-                <div className="bg-slate-950/40 border border-slate-800 p-4 rounded-2xl space-y-3">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block tracking-wider">
-                    Latest Transport Update
-                  </span>
-                  <div className="flex justify-between items-center text-xs p-2 bg-slate-900 border border-slate-800/50 rounded-xl">
-                    <span className="font-semibold">
-                      Bus Route 2 (Prithvi Chowk)
-                    </span>
-                    <span className="text-[9px] text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-900/30 px-1.5 py-0.5 rounded uppercase font-bold">
-                      Recorded
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </BlurFade>
-      </section>
-
-      {/* ── 4. Why SchoolOS Section ── */}
-      <section className="py-20 px-6 max-w-6xl mx-auto">
-        <BlurFade delay={0.1}>
-          <MarketingSectionHeader
-            tag="Operation Scoping"
-            title="Schools need more than separate tools."
-            description="SchoolOS connects daily operations, academic records, finance, and parent communication so administrators can run the school from one place."
-          />
-        </BlurFade>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {painPoints.map((item, idx) => (
-            <BlurFade key={idx} delay={0.1 * idx} className="h-full">
-              <div className="rounded-3xl border border-slate-200/60 bg-white p-6 shadow-sm flex flex-col justify-between h-full hover:shadow-md hover:border-slate-350 transition-all duration-300">
-                <div className="space-y-4">
-                  {/* Problem row */}
-                  <div className="flex gap-3 bg-rose-50/50 border border-rose-100/50 rounded-2xl p-4">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 mt-0.5">
-                      <AlertCircle size={15} />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-black text-rose-800 uppercase tracking-wide block">
-                        The Problem
-                      </span>
-                      <p className="text-sm font-semibold text-slate-700 mt-1">
-                        {item.problem}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Solution row */}
-                  <div className="flex gap-3 bg-primary-50/50 border border-primary-100/30 rounded-2xl p-4">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-primary-105 text-primary-600 mt-0.5">
-                      <item.icon size={15} />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-black text-primary-800 uppercase tracking-wide block">
-                        SchoolOS Solution
-                      </span>
-                      <p className="text-sm font-bold text-slate-900 mt-1">
-                        {item.solution}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-500 mt-5 px-1 leading-relaxed">
-                  {item.desc}
+          </div>
+          <div className={styles.trustList}>
+            <div>
+              <LockKeyhole size={24} />
+              <div>
+                <h3>Access follows responsibility</h3>
+                <p>
+                  Staff workspaces use role and resource checks. Guardian access
+                  is tied to a verified, active relationship with a child.
                 </p>
               </div>
-            </BlurFade>
-          ))}
-        </div>
-      </section>
-
-      {/* ── 5. Bento Feature Grid ── */}
-      <section className="bg-slate-900 text-white py-20 px-6">
-        <div className="max-w-6xl mx-auto space-y-16">
-          <BlurFade delay={0.1}>
-            <MarketingSectionHeader
-              tag="System Blueprint"
-              title="One SchoolOS, four operating layers."
-              description="SchoolOS groups daily work into role-scoped operational areas with role-based access and module controls."
-              dark
-            />
-          </BlurFade>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            {operatingLayers.map((layer, idx) => (
-              <BlurFade key={idx} delay={0.1 * idx} className="h-full">
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/60 p-8 space-y-6 hover:border-slate-700 transition-all duration-300 flex flex-col justify-between h-full">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 border border-slate-800 text-primary-400">
-                        <layer.icon size={20} />
-                      </div>
-                      <h3 className="text-xl font-bold text-white">
-                        {layer.title}
-                      </h3>
-                    </div>
-
-                    <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                      {layer.desc}
-                    </p>
-
-                    <div className="border-t border-slate-850 pt-4 space-y-2">
-                      {layer.bullets.map((bullet, bIdx) => (
-                        <div
-                          key={bIdx}
-                          className="flex items-center gap-2 text-xs text-slate-300"
-                        >
-                          <span className="h-1 w-1.5 rounded bg-primary-500 shrink-0" />
-                          <span>{bullet}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Bento Mini visual detail */}
-                  <div className="pt-2">
-                    {layer.visual === 'activity' && (
-                      <div className="bg-slate-900/60 border border-slate-800 p-3 rounded-2xl space-y-2">
-                        <div className="flex items-center justify-between text-[10px]">
-                          <span className="text-slate-500 font-bold uppercase">
-                            Illustrative service state
-                          </span>
-                          <span className="text-emerald-400 font-bold">
-                            Available
-                          </span>
-                        </div>
-                        <div className="flex gap-1 h-3">
-                          {Array.from({ length: 24 }).map((_, i) => (
-                            <span
-                              key={i}
-                              className="flex-1 bg-emerald-500/90 rounded-sm"
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {layer.visual === 'progress' && (
-                      <div className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl space-y-2">
-                        <div className="flex justify-between items-center text-[10px]">
-                          <span className="text-slate-500 font-bold uppercase">
-                            Example collection view
-                          </span>
-                          <span className="text-primary-400 font-bold">
-                            81.4%
-                          </span>
-                        </div>
-                        <Progress value={81.4} className="h-2 bg-slate-800" />
-                      </div>
-                    )}
-
-                    {layer.visual === 'chips' && (
-                      <div className="flex flex-wrap gap-1.5">
-                        <Badge
-                          variant="later"
-                          className="bg-slate-900 border-slate-800 text-slate-400 font-semibold"
-                        >
-                          Class 10-B
-                        </Badge>
-                        <Badge
-                          variant="later"
-                          className="bg-slate-900 border-slate-800 text-slate-400 font-semibold"
-                        >
-                          Class 9-A
-                        </Badge>
-                        <Badge
-                          variant="later"
-                          className="bg-slate-900 border-slate-800 text-slate-400 font-semibold"
-                        >
-                          Class 8-C
-                        </Badge>
-                      </div>
-                    )}
-
-                    {layer.visual === 'list' && (
-                      <div className="text-[10px] text-slate-500 space-y-1 font-semibold">
-                        <div className="flex justify-between bg-slate-900/40 p-1 px-2 border border-slate-800/40 rounded-lg">
-                          <span>Primary Bus Route</span>
-                          <span className="text-emerald-500 font-bold">
-                            On Schedule
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </BlurFade>
-            ))}
+            </div>
+            <div>
+              <ShieldCheck size={24} />
+              <div>
+                <h3>School context stays scoped</h3>
+                <p>
+                  School records are accessed within authenticated tenant and
+                  permission boundaries.
+                </p>
+              </div>
+            </div>
+            <div>
+              <CircleHelp size={24} />
+              <div>
+                <h3>Changes leave a trail</h3>
+                <p>
+                  Controlled workflows retain history and review evidence where
+                  needed.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── 6. Modules Section ── */}
-      <section id="modules" className="py-20 px-6 max-w-6xl mx-auto">
-        <BlurFade delay={0.1}>
-          <MarketingSectionHeader
-            tag="Integrated Capabilities"
-            title="Modules built around real school workflows."
-            description="Enabled modules are selected during guided onboarding and remain permission- and entitlement-gated for each role."
-          />
-        </BlurFade>
-
-        <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {modulesList.map((m, idx) => (
-            <BlurFade key={m.title} delay={0.05 * idx} className="h-full">
-              <MarketingCard
-                title={m.title}
-                description={m.desc}
-                initials={m.initials}
-                badge={m.tag}
-                badgeVariant={
-                  m.tag === 'Finance'
-                    ? 'warning'
-                    : m.tag === 'Academic'
-                      ? 'info'
-                      : m.tag === 'Operations'
-                        ? 'neutral'
-                        : m.tag === 'Companion'
-                          ? 'success'
-                          : 'default'
-                }
-              />
-            </BlurFade>
-          ))}
-        </div>
-      </section>
-
-      {/* ── 7. Nepal Readiness Section ── */}
-      <section className="bg-white border-y border-slate-200/50 py-20 px-6">
-        <div className="max-w-6xl mx-auto space-y-16">
-          <BlurFade delay={0.1}>
-            <MarketingSectionHeader
-              tag="Local Integration"
-              title="Designed for Nepal-school operations."
-              description="SchoolOS supports Nepal school context, NPR records, BS-date presentation, and Grade 1–12 operational workflows."
-            />
-          </BlurFade>
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {nepalReadiness.map((item, idx) => (
-              <BlurFade key={idx} delay={0.08 * idx} className="h-full">
-                <div className="rounded-2xl border border-slate-200/60 bg-[#F8FAFC] p-5 shadow-sm hover:border-slate-300 transition-all duration-300 space-y-2 h-full">
-                  <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 font-semibold">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary-500 animate-pulse" />
-                    {item.title}
-                  </h3>
-                  <p className="text-[11px] leading-relaxed text-slate-500">
-                    {item.desc}
-                  </p>
-                </div>
-              </BlurFade>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── 8. Product Differentiation Section ── */}
-      <section className="py-20 px-6 max-w-6xl mx-auto">
-        <div className="max-w-6xl mx-auto space-y-16">
-          <BlurFade delay={0.1}>
-            <MarketingSectionHeader
-              tag="Key Distinctions"
-              title="What makes SchoolOS different?"
-              description="SchoolOS connects role-scoped operations, protected records, controlled finance workflows, and audit evidence in one system."
-            />
-          </BlurFade>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {differentiators.map((d, idx) => (
-              <BlurFade key={idx} delay={0.1 * idx} className="h-full">
-                <MarketingCard title={d.title} description={d.desc} />
-              </BlurFade>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── 9. Guided Onboarding Section ── */}
       <section
-        id="onboarding"
-        className="bg-[#F8FAFC] border-y border-slate-200/50 py-20 px-6"
+        id="how-it-works"
+        className={styles.processSection}
+        aria-labelledby="process-title"
       >
-        <div className="max-w-6xl mx-auto space-y-16">
-          <BlurFade delay={0.1}>
-            <MarketingSectionHeader
-              tag="Deployment Roadmap"
-              title="From demo to controlled-pilot planning."
-              description="We review setup, data-import needs, role mapping, and required readiness checks before agreeing a pilot scope."
-            />
-          </BlurFade>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 relative">
-            {onboardingSteps.map((step, idx) => (
-              <BlurFade key={idx} delay={0.1 * idx} className="h-full">
-                <Card className="relative flex h-full flex-col justify-between space-y-3 p-6">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-3xl font-black text-primary-500/25 block">
-                        {step.step}
-                      </span>
-                      <div className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-650 font-bold">
-                        <step.icon size={16} />
-                      </div>
-                    </div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      {step.title}
-                    </h3>
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      {step.desc}
-                    </p>
-                  </div>
-                </Card>
-              </BlurFade>
-            ))}
-          </div>
-
-          <BlurFade delay={0.3} className="text-center">
-            <Link
-              href="/request-demo"
-              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-3xl text-base font-bold bg-slate-900 text-white hover:bg-slate-800 shadow-sm h-13 px-10 active:scale-[0.98] transition-all"
-            >
-              <span>Request Demo</span>
-              <ArrowRight size={15} />
-            </Link>
-          </BlurFade>
-        </div>
-      </section>
-
-      {/* ── 10. Plans Section ── */}
-      <section id="plans" className="bg-slate-950 text-white py-20 px-6">
-        <div className="max-w-6xl mx-auto space-y-16">
-          <BlurFade delay={0.1}>
-            <MarketingSectionHeader
-              tag="Guided Scope"
-              title="Configure the right operational scope."
-              description="Module availability is confirmed during onboarding and depends on entitlements, permissions, and release readiness."
-              dark
-            />
-          </BlurFade>
-
-          <div className="grid gap-8 lg:grid-cols-3">
-            {plansList.map((plan, idx) => (
-              <BlurFade key={idx} delay={0.1 * idx} className="h-full">
-                <div
-                  className={`rounded-3xl p-8 border flex flex-col justify-between h-full ${
-                    plan.highlighted
-                      ? 'border-primary-500 bg-slate-900 shadow-xl'
-                      : 'border-slate-800 bg-slate-900/40'
-                  }`}
-                >
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-xl font-bold text-white">
-                        {plan.name}
-                      </h3>
-                      <p className="text-slate-400 mt-2 text-xs leading-relaxed">
-                        {plan.desc}
-                      </p>
-                    </div>
-                    <ul className="space-y-3 text-xs text-slate-300 font-semibold">
-                      {plan.features.map((feat, fIdx) => (
-                        <li key={fIdx} className="flex gap-2.5 items-center">
-                          <CheckCircle2
-                            size={14}
-                            className="text-primary-500 shrink-0"
-                          />
-                          <span>{feat}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="pt-8">
-                    <Link
-                      href="/request-demo"
-                      className={`inline-flex items-center justify-center w-full rounded-2xl font-bold h-11 px-6 py-2.5 text-xs transition-all active:scale-[0.98] ${
-                        plan.highlighted
-                          ? 'bg-primary-500 text-white hover:bg-primary-600 shadow-md shadow-primary-500/10'
-                          : 'bg-slate-800 text-white hover:bg-slate-700'
-                      }`}
-                    >
-                      Discuss this scope
-                    </Link>
-                  </div>
-                </div>
-              </BlurFade>
+        <div className={styles.container}>
+          <SectionHeading
+            id="process-title"
+            eyebrow="A considered start"
+            title="Start with a conversation. Roll out with care."
+            description="SchoolOS workspaces are created through guided onboarding, with scope and readiness reviewed for each school."
+          />
+          <div className={styles.stepGrid}>
+            {steps.map((step) => (
+              <div key={step.number} className={styles.step}>
+                <span>{step.number}</span>
+                <h3>{step.title}</h3>
+                <p>{step.description}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── 11. Security Section ── */}
-      <section id="security" className="py-20 px-6 max-w-6xl mx-auto">
-        <div className="grid lg:grid-cols-[0.8fr_1.2fr] gap-12 items-center">
-          <BlurFade delay={0.1} className="space-y-4">
-            <span className="text-xs font-bold uppercase tracking-wider text-primary-500">
-              Security Parameters
-            </span>
-            <h2 className="text-3xl font-black tracking-tight text-slate-900 leading-tight">
-              Built with school data boundaries in mind.
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
-              SchoolOS uses tenant-scoped access controls, role-aware staff
-              authentication, and protected-file paths for school records.
-            </p>
-          </BlurFade>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {securityCards.map((sec, idx) => (
-              <BlurFade key={idx} delay={0.08 * idx}>
-                <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm space-y-1 hover:border-slate-350 transition-all duration-300">
-                  <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5 font-semibold">
-                    <Lock
-                      size={12}
-                      className="text-primary-500 shrink-0 mt-0.5"
-                    />
-                    {sec.title}
-                  </h3>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    {sec.desc}
-                  </p>
-                </div>
-              </BlurFade>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── 12. Final CTA Section ── */}
-      <section className="bg-primary-50/50 border-y border-primary-100/30 px-6 py-20 text-center">
-        <BlurFade delay={0.1} className="mx-auto max-w-3xl space-y-6">
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 leading-tight">
-            Ready to bring SchoolOS to your school?
-          </h2>
-          <p className="text-sm text-slate-500 max-w-lg mx-auto">
-            Request a demo and the SchoolOS team will help assess fit, setup
-            needs, and the checks required before a controlled pilot.
-          </p>
-          <div className="flex flex-wrap justify-center gap-4 pt-2">
-            <Link
-              href="/request-demo"
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-3xl text-base font-bold bg-primary-500 hover:bg-primary-600 text-white shadow-md h-13 px-10 active:scale-[0.98] transition-all"
-            >
-              Request Demo
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-3xl text-base font-bold border-2 border-slate-200 bg-white hover:bg-slate-50 text-slate-700 h-13 px-10 active:scale-[0.98] transition-all"
-            >
-              Sign in
-            </Link>
-          </div>
-        </BlurFade>
-      </section>
-
-      {/* ── 13. Footer ── */}
-      <footer className="bg-slate-950 px-6 py-12 border-t border-slate-900 text-slate-500 text-xs">
-        <div className="mx-auto max-w-6xl flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded bg-primary-500 text-[10px] font-black text-white">
-              S
-            </span>
-            <span className="font-bold text-white">SchoolOS</span>
-            <span className="text-slate-650 font-medium">
-              · School operating system for Nepal
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-6 font-semibold">
-            <a href="#product" className="hover:text-white transition-colors">
-              Product
-            </a>
-            <a href="#modules" className="hover:text-white transition-colors">
-              Modules
-            </a>
-            <Link
-              href="/request-demo"
-              className="hover:text-white transition-colors"
-            >
-              Request Demo
-            </Link>
-            <Link href="/login" className="hover:text-white transition-colors">
-              Login
-            </Link>
-            <a
-              href="mailto:support@schoolos.com.np"
-              className="hover:text-white transition-colors"
-            >
-              Contact
-            </a>
-          </div>
-        </div>
-      </footer>
-    </div>
+      <MarketingCta
+        title="A more connected school day starts here."
+        description="Tell us what matters to your team. We'll show you the workflows that fit and discuss a practical rollout."
+      />
+    </MarketingShell>
   );
 }

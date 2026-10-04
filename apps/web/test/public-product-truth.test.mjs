@@ -10,10 +10,13 @@ const read = (path) => readFileSync(join(webRoot, path), 'utf8');
 describe('public SchoolOS product truth', () => {
   it('labels static previews as illustrative and avoids unsupported release claims', () => {
     const landing = read('app/page.tsx');
+    const previews = read('components/marketing/landing-previews.tsx');
+    const publicCopy = `${landing}\n${previews}`;
 
-    assert.match(landing, /Illustrative product preview/);
-    assert.match(landing, /Illustrative preview · Example data/);
-    assert.match(landing, /Example Secondary School/);
+    assert.match(landing, /landing-previews/);
+    assert.match(previews, /Illustrative product preview/);
+    assert.match(previews, /Illustrative preview · Example data/);
+    assert.match(publicCopy, /Example Secondary School/);
 
     for (const unsupported of [
       /School ERP for Nepal/i,
@@ -30,7 +33,7 @@ describe('public SchoolOS product truth', () => {
       /Request Pricing/i,
       /href=["']#["']/,
     ]) {
-      assert.doesNotMatch(landing, unsupported);
+      assert.doesNotMatch(publicCopy, unsupported);
     }
   });
 
@@ -41,7 +44,7 @@ describe('public SchoolOS product truth', () => {
 
     assert.match(landing, /Notices & Announcements/);
     assert.match(landing, /Notifications & Delivery/);
-    assert.match(landing, /Parent Mobile Companion/);
+    assert.match(landing, /Parent\s+Mobile Companion/);
     assert.match(
       login,
       /Parents & Guardians: Please use the SchoolOS mobile app/,

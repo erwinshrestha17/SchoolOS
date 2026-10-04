@@ -193,13 +193,13 @@ export function RequestDemoForm() {
 
         <div className="rounded-xl bg-slate-50 p-5 text-left border border-slate-100 space-y-3 text-xs">
           <div className="flex justify-between border-b border-slate-200/50 pb-2">
-            <span className="text-slate-400 font-semibold">School Name:</span>
+            <span className="text-slate-600 font-semibold">School Name:</span>
             <span className="text-slate-900 font-bold">
               {formData.schoolName}
             </span>
           </div>
           <div className="flex justify-between border-b border-slate-200/50 pb-2">
-            <span className="text-slate-400 font-semibold">
+            <span className="text-slate-600 font-semibold">
               Contact Person:
             </span>
             <span className="text-slate-900 font-bold">
@@ -207,7 +207,7 @@ export function RequestDemoForm() {
             </span>
           </div>
           <div className="flex justify-between border-b border-slate-200/50 pb-2">
-            <span className="text-slate-400 font-semibold">
+            <span className="text-slate-600 font-semibold">
               Preferred Contact:
             </span>
             <span className="text-slate-900 font-bold">
@@ -217,7 +217,7 @@ export function RequestDemoForm() {
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-400 font-semibold">
+            <span className="text-slate-600 font-semibold">
               Expected Timeline:
             </span>
             <span className="text-slate-900 font-bold">
@@ -226,7 +226,7 @@ export function RequestDemoForm() {
           </div>
           {submittedRequestId && (
             <div className="flex justify-between border-t border-slate-200/50 pt-2">
-              <span className="text-slate-400 font-semibold">Request ID:</span>
+              <span className="text-slate-600 font-semibold">Request ID:</span>
               <span className="text-slate-900 font-bold">
                 {submittedRequestId}
               </span>
@@ -681,9 +681,19 @@ export function RequestDemoForm() {
             >
               Submit Demo Request
             </Button>
-            <p className="text-center text-[10px] text-slate-400 font-semibold leading-relaxed">
+            <p className="text-center text-xs text-slate-600 font-semibold leading-relaxed">
               Submitting this form does not create a school workspace
               automatically.
+            </p>
+            <p className="text-center text-xs text-slate-500 leading-relaxed">
+              Learn how your request is handled in our{' '}
+              <Link
+                href="/privacy"
+                className="font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+              >
+                Privacy Policy
+              </Link>
+              .
             </p>
           </div>
         </form>
