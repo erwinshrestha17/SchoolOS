@@ -356,7 +356,7 @@ function PayablesView({
         description="What the school owes vendors, by how long it is overdue, as of a Nepal school day. Payments and reversals count from their accounting dates."
         actions={
           <label className="flex items-center gap-2 text-sm text-slate-600">
-            As of
+            <span className="whitespace-nowrap">As of</span>
             <input
               type="date"
               value={asOfDate}
@@ -368,7 +368,7 @@ function PayablesView({
               className="rounded-lg border border-[var(--line)] px-2 py-1 text-sm"
               aria-label="As of date"
             />
-            <span className="text-xs text-slate-500">
+            <span className="whitespace-nowrap text-xs text-slate-500">
               {formatBsDate(asOfDate)} BS
             </span>
           </label>

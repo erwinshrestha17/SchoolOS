@@ -790,10 +790,6 @@ export class AccountingReportsController {
     @CurrentAuth() auth: AuthContext,
     @Body() dto: UpdateAccountingReportMappingsDto,
   ) {
-    return this.reportsService.updateReportMappings(
-      auth.tenantId,
-      auth.userId,
-      dto,
-    );
+    return this.reportsService.updateReportMappings(auth, dto);
   }
 }

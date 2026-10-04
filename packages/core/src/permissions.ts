@@ -2620,7 +2620,8 @@ const reviewedSystemRolePermissions: Record<SystemRoleName, PermissionKey[]> = {
     "accounting:journals:post",
     "accounting:payroll-handoff:read",
     "accounting:payroll-handoff:post",
-    "payroll:read",
+    // Phase 7.12: no broad payroll:read. Posting needs the run and the post
+    // duty only; payroll:read implied salary structures and every payslip.
     "payroll:run:read",
     "payroll:run:post",
     "accounting:expenses:read",
@@ -2816,7 +2817,7 @@ const SYSTEM_ROLE_TEMPLATE_IDENTITIES: Record<
   cashier: { displayName: "Cashier", version: 2 },
   accountant: { displayName: "Accountant", version: 3 },
   finance_approver: { displayName: "Finance Approver", version: 4 },
-  posting_authority: { displayName: "Posting Authority", version: 3 },
+  posting_authority: { displayName: "Posting Authority", version: 4 },
   financial_auditor: { displayName: "Auditor", version: 2 },
   parent: { displayName: "Parent/Guardian", version: 1 },
   student: { displayName: "Student", version: 1 },

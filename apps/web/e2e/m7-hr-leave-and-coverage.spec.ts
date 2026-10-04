@@ -1,5 +1,6 @@
 import { formatBsDateForInput } from '@schoolos/core';
 import { expect, test } from './fixtures/auth';
+import { paceCredentialAttempt } from './fixtures/credential-pacing';
 
 const API_BASE_URL =
   process.env.SCHOOLOS_E2E_API_BASE_URL ??
@@ -35,6 +36,8 @@ test.describe
   test('a teacher submits a leave request through self-service', async ({
     browser,
   }) => {
+    // A direct sign-in shares the real 5-per-minute limit with the fixture.
+    await paceCredentialAttempt();
     const context = await browser.newContext({ baseURL: WEB_BASE_URL });
     const page = await context.newPage();
 
@@ -170,6 +173,8 @@ test.describe
   test('staff cannot approve or reject their own leave request via a direct API call', async ({
     browser,
   }) => {
+    // A direct sign-in shares the real 5-per-minute limit with the fixture.
+    await paceCredentialAttempt();
     const context = await browser.newContext({ baseURL: WEB_BASE_URL });
     const page = await context.newPage();
 
@@ -219,7 +224,9 @@ test.describe
     const coverage = page.getByText('Staffing Coverage', { exact: true });
     await expect(coverage).toBeVisible();
     // Must render a real backend as-of date, not the permission/error state.
-    await expect(page.getByText(/Backend-owned, as of/)).toBeVisible();
+    await expect(
+      page.getByText(/^As of [A-Za-z]+ \d{1,2}, \d{4}/),
+    ).toBeVisible();
     await expect(page.getByText('Staffing coverage unavailable')).toHaveCount(
       0,
     );

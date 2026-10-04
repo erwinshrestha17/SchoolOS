@@ -1985,8 +1985,11 @@ export class FinanceService {
   ) {
     assertFinancePermission(actor, 'fees:manage');
     const period = resolveOptionalFinanceReportPeriod(query);
+    // Phase 7.12: only issued invoices are billed. A DRAFT was never sent and
+    // a VOID was cancelled; neither is money owed or billed.
     const invoiceWhere: Prisma.InvoiceWhereInput = {
       tenantId: actor.tenantId,
+      status: { notIn: [InvoiceStatus.DRAFT, InvoiceStatus.VOID] },
       ...(period
         ? {
             issuedAt: {
@@ -2040,6 +2043,10 @@ export class FinanceService {
     const invoiceDateSql = period
       ? Prisma.sql`AND i."issuedAt" >= ${period.startUtc} AND i."issuedAt" < ${period.endExclusiveUtc}`
       : Prisma.empty;
+    // Outstanding is a balance, not a flow: what is still owed on issued
+    // invoices at the end of the period (or today), from the one receivables
+    // loader (allocations as of the day; waivers already in invoice totals).
+    const outstandingAsOf = resolveAgingAsOf(period?.toDate ?? null);
     const [
       invoiceAggregate,
       paymentAggregate,
@@ -2049,6 +2056,7 @@ export class FinanceService {
       refundTrendRows,
       classWiseRows,
       feeHeadWiseRows,
+      receivables,
     ] = await Promise.all([
       this.prisma.invoice.aggregate({
         where: invoiceWhere,
@@ -2097,6 +2105,7 @@ export class FinanceService {
         JOIN "Student" s ON s."id" = i."studentId" AND s."tenantId" = i."tenantId"
         JOIN "Class" c ON c."id" = s."classId" AND c."tenantId" = i."tenantId"
         WHERE i."tenantId" = ${actor.tenantId}
+          AND i."status" NOT IN ('DRAFT', 'VOID')
         ${invoiceDateSql}
         GROUP BY c."id", c."name"
         ORDER BY c."name" ASC
@@ -2110,10 +2119,12 @@ export class FinanceService {
         JOIN "Invoice" i ON i."id" = l."invoiceId" AND i."tenantId" = l."tenantId"
         JOIN "FeeHead" f ON f."id" = l."feeHeadId" AND f."tenantId" = l."tenantId"
         WHERE l."tenantId" = ${actor.tenantId}
+          AND i."status" NOT IN ('DRAFT', 'VOID')
         ${invoiceDateSql}
         GROUP BY f."id", f."name"
         ORDER BY f."name" ASC
       `),
+      loadReceivables(this.prisma, actor.tenantId, outstandingAsOf),
     ]);
     const totalBilled = decimalOrZero(invoiceAggregate._sum.totalAmount);
     const totalCollected = decimalOrZero(paymentAggregate._sum.amount);
@@ -2128,10 +2139,10 @@ export class FinanceService {
       totalCollected: totalCollected.toFixed(2),
       totalRefunded: totalRefunded.toFixed(2),
       netCollected: totalCollected.sub(totalRefunded).toFixed(2),
-      totalOutstanding: Prisma.Decimal.max(
-        new Prisma.Decimal(0),
-        totalBilled.sub(totalCollected).add(totalRefunded),
-      ).toFixed(2),
+      totalOutstanding: receivables.rows
+        .reduce((sum, row) => sum.add(row.outstanding), new Prisma.Decimal(0))
+        .toFixed(2),
+      outstandingAsOf: outstandingAsOf.asOfDate,
       totalWaived: totalWaived.toFixed(2),
       collectionTrend: collectionTrendRows.map((row) => ({
         month: row.month,

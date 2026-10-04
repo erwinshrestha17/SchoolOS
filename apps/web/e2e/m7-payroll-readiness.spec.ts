@@ -22,10 +22,14 @@ test.describe.serial('M7 payroll readiness and exception workflow', () => {
         name: 'Payroll readiness and exceptions',
       }),
     ).toBeVisible();
-    await expect(page.getByText('Backend-owned readiness')).toBeVisible();
+    // Phase 7.12: periods are BS months since 7.9; the page opens on the
+    // current BS payroll period, which the seed populates with exceptions.
+    await expect(
+      page.getByText('Calculated from the current payroll records'),
+    ).toBeVisible();
     await expect(page.getByText('Exception queue and history')).toBeVisible();
+    await expect(page.getByLabel('BS month')).toBeVisible();
 
-    await page.getByLabel('Month').selectOption('9');
     await page.getByRole('button', { name: 'Apply period' }).click();
     await page.getByLabel('Severity').selectOption('WARNING');
 
@@ -66,7 +70,6 @@ test.describe.serial('M7 payroll readiness and exception workflow', () => {
 
     await page.reload();
     await expect(page.getByText('Exception queue and history')).toBeVisible();
-    await page.getByLabel('Month').selectOption('9');
     await page.getByRole('button', { name: 'Apply period' }).click();
     await page.getByLabel('Severity').selectOption('WARNING');
     await page.getByLabel('Status').selectOption('ACKNOWLEDGED');

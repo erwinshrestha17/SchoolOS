@@ -145,12 +145,30 @@ let refreshPromise: Promise<boolean> | null = null;
 export class ApiRequestError extends Error {
   statusCode: number;
   requestId?: string;
+  /** Stable server reason code (`meta.code`), e.g. `CLOSE_PREVIEW_STALE`. */
+  code?: string;
 
-  constructor(message: string, statusCode: number, requestId?: string) {
+  constructor(
+    message: string,
+    statusCode: number,
+    requestId?: string,
+    code?: string,
+  ) {
     super(message);
     this.name = 'ApiRequestError';
     this.statusCode = statusCode;
     this.requestId = requestId;
+    this.code = code;
+  }
+}
+
+/** Phase 7.12: the stable reason code the API sends as `meta.code`. */
+export function parseApiErrorCode(text: string): string | undefined {
+  try {
+    const code = (JSON.parse(text) as { meta?: { code?: unknown } }).meta?.code;
+    return typeof code === 'string' ? code : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -320,6 +338,7 @@ export async function request<T>(path: string, init?: RequestOptions) {
         `Request failed with status ${response.status}`,
       response.status,
       responseRequestId,
+      parseApiErrorCode(text),
     );
   }
 

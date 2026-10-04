@@ -14,6 +14,7 @@ import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { PayrollService } from '../src/payroll/payroll.service';
+import { AccountingPostingService } from '../src/accounting/accounting-posting.service';
 import { PayrollReadinessService } from '../src/payroll/payroll-readiness.service';
 import { StaffService } from '../src/staff/staff.service';
 import { StaffDocumentService } from '../src/staff/staff-document.service';
@@ -795,6 +796,132 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
   );
 
   itTenant(
+    'Phase 7.12: refuses to post payroll into a closed fiscal period and keeps the run finalized',
+    async () => {
+      await approve();
+      await service.finalizePayrollRun(runId, actors.finalizer);
+      const run = await dbRun();
+      const day = (value: Date, shift: number) =>
+        new Date(
+          Date.UTC(
+            value.getUTCFullYear(),
+            value.getUTCMonth(),
+            value.getUTCDate() + shift,
+          ),
+        );
+      const year = await prisma.fiscalYear.create({
+        data: {
+          tenantId,
+          name: 'Synthetic closed payroll year',
+          startDate: day(run.periodStart, -1),
+          endDate: day(run.periodEnd, 1),
+        },
+      });
+      await prisma.fiscalPeriod.create({
+        data: {
+          tenantId,
+          fiscalYearId: year.id,
+          label: 'Synthetic closed payroll period',
+          periodNumber: 1,
+          startDate: day(run.periodStart, -1),
+          endDate: day(run.periodEnd, 1),
+          status: 'CLOSED',
+          closedAt: new Date(),
+        },
+      });
+      // The real posting engine for this one call (the suite otherwise
+      // doubles accounting): payroll posts on the period end date.
+      const realPosting = new AccountingPostingService(prisma, audit);
+      accounting.postPayrollAccrual.mockImplementationOnce(
+        (...args: Parameters<AccountingPostingService['postPayrollAccrual']>) =>
+          realPosting.postPayrollAccrual(...args),
+      );
+      await expect(
+        service.postPayrollRun(runId, actors.posting),
+      ).rejects.toThrow(/closed fiscal period/i);
+      expect((await dbRun()).status).toBe('FINALIZED');
+      expect(await prisma.journalEntry.count({ where: { tenantId } })).toBe(0);
+    },
+  );
+
+  itTenant(
+    'Phase 7.12: removes payroll:read from system posting-authority roles only, with an audit record',
+    async () => {
+      const role = async (name: string, isSystem: boolean) => {
+        const grants = await Promise.all(
+          ['payroll:read', 'payroll:run:read', 'payroll:run:post'].map(
+            (key) => {
+              const split = key.lastIndexOf(':');
+              const resource = key.slice(0, split);
+              const action = key.slice(split + 1);
+              return prisma.permission.upsert({
+                where: { resource_action: { resource, action } },
+                create: { resource, action },
+                update: {},
+              });
+            },
+          ),
+        );
+        return prisma.role.create({
+          data: {
+            tenantId,
+            name,
+            isSystem,
+            rolePermissions: {
+              create: grants.map((grant) => ({ permissionId: grant.id })),
+            },
+          },
+        });
+      };
+      const system = await role('posting_authority', true);
+      const custom = await role('posting-authority-custom', false);
+      const pool = new Pool({ connectionString: authTestDatabaseUrl });
+      try {
+        const migration = readFileSync(
+          join(
+            __dirname,
+            '../prisma/migrations/20261003230000_phase7_posting_authority_payroll_read/migration.sql',
+          ),
+          'utf8',
+        );
+        await pool.query(migration);
+        await pool.query(migration);
+      } finally {
+        await pool.end();
+      }
+      const keys = async (roleId: string) =>
+        (
+          await prisma.rolePermission.findMany({
+            where: { roleId },
+            include: { permission: true },
+          })
+        )
+          .map(
+            ({ permission }) => `${permission.resource}:${permission.action}`,
+          )
+          .sort();
+      expect(await keys(system.id)).toEqual([
+        'payroll:run:post',
+        'payroll:run:read',
+      ]);
+      expect(await keys(custom.id)).toEqual([
+        'payroll:read',
+        'payroll:run:post',
+        'payroll:run:read',
+      ]);
+      expect(
+        await prisma.auditLog.count({
+          where: {
+            tenantId,
+            resourceId: system.id,
+            resource: 'system_role_template',
+          },
+        }),
+      ).toBe(1);
+    },
+  );
+
+  itTenant(
     'upgrades only the exact reviewed system template and preserves modified duty grants',
     async () => {
       const createRole = async (
@@ -890,6 +1017,70 @@ describeDatabase('Phase 2 payroll duties (isolated PostgreSQL)', () => {
       expect((await keys(posting.id)).sort()).toEqual(
         [...domainTemplateV1.posting_authority].sort(),
       );
+    },
+  );
+
+  itTenant(
+    'Phase 7.12: Staff 360 stays inside its school, and accountant grants see no sensitive section',
+    async () => {
+      const otherTenantId = randomUUID();
+      const foreign = {
+        ...actors.preparer,
+        tenantId: otherTenantId,
+        permissions: [
+          ...permissions,
+          'hr:medical:read',
+          'hr:safeguarding:read',
+          'hr:disciplinary:read',
+        ],
+      };
+      const denied = async (work: () => Promise<unknown>) => {
+        const error = await prisma
+          .runWithTenantScope(otherTenantId, work)
+          .then((value) => ({ resolved: value }))
+          .catch((caught: unknown) => caught);
+        // Denied outright, or answered as if the record does not exist.
+        const empty =
+          !(error instanceof Error) &&
+          JSON.stringify(error) ===
+            JSON.stringify({
+              resolved: { items: [], meta: { page: 1, limit: 25, total: 0 } },
+            });
+        expect(
+          empty ||
+            error instanceof NotFoundException ||
+            error instanceof ForbiddenException ||
+            error instanceof UnauthorizedException,
+        ).toBe(true);
+      };
+      await denied(() => staffService.getStaffDetail(staffId, foreign));
+      await denied(() => documents.listDocuments(staffId, foreign));
+      await denied(() => service.getActiveSalaryStructure(staffId, foreign));
+
+      // Every accountant-template grant together: no bank, tax, identity,
+      // salary or document section of a staff record.
+      const accountant = {
+        ...actors.preparer,
+        permissions: systemRolePermissions.accountant,
+      };
+      const detail = await staffService.getStaffDetail(staffId, accountant);
+      expect(detail.allowedSensitiveFields).toMatchObject({
+        bankRead: false,
+        salaryRead: false,
+      });
+      expect(JSON.stringify(detail)).not.toMatch(
+        /synthetic-account|synthetic-pan/,
+      );
+      for (const structure of detail.salaryStructures ?? []) {
+        expect(structure).toMatchObject({ basicSalary: null, masked: true });
+      }
+      const documentsError = await documents
+        .listDocuments(staffId, accountant)
+        .then((result) => result.items.length)
+        .catch((caught: unknown) => caught);
+      expect(
+        documentsError instanceof ForbiddenException || documentsError === 0,
+      ).toBe(true);
     },
   );
 

@@ -5,6 +5,7 @@ import {
   type SchoolE2eRole,
   type StorageState,
 } from './fixtures/auth';
+import { paceCredentialAttempt } from './fixtures/credential-pacing';
 
 const API_BASE_URL =
   process.env.SCHOOLOS_E2E_API_BASE_URL ??
@@ -15,6 +16,10 @@ const WEB_BASE_URL =
   `http://localhost:${process.env.SCHOOLOS_WEB_E2E_PORT ?? '3101'}`;
 
 test.describe.serial('M7/M11 role and tenant boundaries', () => {
+  // Each test signs in several identities, paced 13 s apart (see
+  // credential-pacing), which exceeds the default 45 s timeout.
+  test.describe.configure({ timeout: 180_000 });
+
   test('separates payroll preparation, review, approval, and posting permissions', async ({
     authStateFor,
     browser,
@@ -170,6 +175,8 @@ test.describe.serial('M7/M11 role and tenant boundaries', () => {
     browser,
   }) => {
     const password = requiredEnvironmentValue('SCHOOLOS_E2E_PASSWORD');
+    // A direct sign-in shares the real 5-per-minute limit with the fixture.
+    await paceCredentialAttempt();
     const context = await browser.newContext({ baseURL: WEB_BASE_URL });
     const page = await context.newPage();
     await page.goto('/login');

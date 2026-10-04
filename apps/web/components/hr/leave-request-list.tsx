@@ -116,7 +116,7 @@ export function LeaveRequestList() {
                     Duration
                   </p>
                   <p className="text-sm font-black text-[var(--color-mod-hr-text)] mt-1">
-                    {request.days} Day{request.days !== 1 ? 's' : ''}
+                    {request.days} Day{Number(request.days) === 1 ? '' : 's'}
                   </p>
                 </div>
               </div>

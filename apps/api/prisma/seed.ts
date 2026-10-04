@@ -746,6 +746,7 @@ const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
       'payroll:salary:read',
       'payroll:salary:write',
       'payroll:run:create',
+      'payroll:run:validate',
       'payroll:run:read',
       'payroll:payslip:read',
       'payroll:payslip:generate',
@@ -773,6 +774,7 @@ const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
       'payroll:read',
       'payroll:run:read',
       'payroll:run:approve',
+      'payroll:run:finalize',
       'payroll:hold:release',
       'payroll:bank-advice:export',
       'payroll:payslip:read',
@@ -786,6 +788,8 @@ const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
       'payroll:read',
       'payroll:run:read',
       'payroll:run:post',
+      // Fixture only: no system template holds payroll:run:reverse.
+      'payroll:run:reverse',
       'accounting:journals:read',
     ],
   },
@@ -806,6 +810,12 @@ const m7M11E2eRoleSeeds: E2eRoleSeed[] = [
       'accounting:settings:read',
       'accounting:settings:update',
       'accounting:exports:create',
+      // Payables preparer duties, as in the accountant template (7.11c).
+      'accounting:vendors:read',
+      'accounting:vendors:write',
+      'accounting:expenses:read',
+      'accounting:expenses:write',
+      'accounting:payables:read',
     ],
   },
   {
@@ -3288,7 +3298,47 @@ async function seedCanonicalStaffSelfService(
     }
   }
 
+  await seedCanonicalEmployment(tenantId, staff.id, principalUserId);
   await seedCanonicalPayslip(tenantId, staff, principalUserId);
+}
+
+/**
+ * Phase 7.12: since 7.1, payroll terms without a verified employment are a
+ * BLOCKING readiness exception, and this staff member is the only seeded one
+ * with payroll terms. Without an employment the demo school could not
+ * prepare any payroll run. Verified once, from PENDING, like the demo
+ * teacher eligibility seed; never rewritten on re-runs.
+ */
+async function seedCanonicalEmployment(
+  tenantId: string,
+  staffId: string,
+  verifierUserId: string | null,
+) {
+  if (!verifierUserId) return;
+  const existing = await prisma.staffEmployment.findFirst({
+    where: { tenantId, staffId, status: { in: ['VERIFIED', 'ENDED'] } },
+    select: { id: true },
+  });
+  if (existing) return;
+  const employment = await prisma.staffEmployment.create({
+    data: {
+      tenantId,
+      staffId,
+      employmentType: 'PERMANENT',
+      postCategoryCode: 'ADMINISTRATIVE_STAFF',
+      schoolTypeCode: 'INSTITUTIONAL',
+      effectiveFrom: date('2026-04-01'),
+    },
+    select: { id: true },
+  });
+  await prisma.staffEmployment.update({
+    where: { id: employment.id },
+    data: {
+      status: 'VERIFIED',
+      verifiedById: verifierUserId,
+      verifiedAt: new Date(),
+    },
+  });
 }
 
 async function seedCanonicalPayslip(

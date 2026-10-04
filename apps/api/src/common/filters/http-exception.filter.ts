@@ -12,6 +12,26 @@ import type { Request, Response } from 'express';
 
 type RequestWithId = Request & { requestId?: string };
 
+const STABLE_ERROR_CODE = /^[A-Z][A-Z0-9_]{1,63}$/;
+
+/**
+ * Phase 7.12: services throw `new ConflictException({ code, message })` with
+ * stable reason codes (for example `CLOSE_PREVIEW_STALE`,
+ * `LEAVE_REQUEST_STALE`), but the envelope dropped `code`, so HTTP clients
+ * could only match on wording. Forward it as `meta.code` for 4xx responses,
+ * only when it is a constant-style identifier (never free text, never 5xx).
+ */
+function stableErrorCode(
+  status: number,
+  exceptionResponse: string | object | null,
+): string | undefined {
+  if (status >= 500 || typeof exceptionResponse !== 'object') return undefined;
+  const code = (exceptionResponse as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && STABLE_ERROR_CODE.test(code)
+    ? code
+    : undefined;
+}
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -39,6 +59,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
             ? exception.message
             : 'Internal server error';
 
+    const code = stableErrorCode(status, exceptionResponse);
     const payload = {
       success: false,
       message,
@@ -54,6 +75,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ...(isAuthorizationDenial(exception)
           ? { reasonCode: exception.decision.reasonCode }
           : {}),
+        ...(code ? { code } : {}),
         path: request.url,
         method: request.method,
       },

@@ -7,6 +7,12 @@ import {
   UserStatus,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import {
+  findPayrollPeriodContaining,
+  getNepalSchoolDay,
+  nextPayrollPeriod,
+  shiftGregorianDateOnly,
+} from '@schoolos/core';
 import bcrypt from 'bcrypt';
 import 'dotenv/config';
 
@@ -25,6 +31,7 @@ const roleSeeds = [
       'payroll:salary:read',
       'payroll:salary:write',
       'payroll:run:create',
+      'payroll:run:validate',
       'payroll:run:read',
       'payroll:payslip:read',
       'payroll:payslip:generate',
@@ -50,6 +57,7 @@ const roleSeeds = [
       'payroll:read',
       'payroll:run:read',
       'payroll:run:approve',
+      'payroll:run:finalize',
       'payroll:hold:release',
       'payroll:bank-advice:export',
       'payroll:payslip:read',
@@ -62,6 +70,8 @@ const roleSeeds = [
       'payroll:read',
       'payroll:run:read',
       'payroll:run:post',
+      // Fixture only: no system template holds payroll:run:reverse.
+      'payroll:run:reverse',
       'accounting:journals:read',
     ],
   },
@@ -81,6 +91,12 @@ const roleSeeds = [
       'accounting:settings:read',
       'accounting:settings:update',
       'accounting:exports:create',
+      // Payables preparer duties, as in the accountant template (7.11c).
+      'accounting:vendors:read',
+      'accounting:vendors:write',
+      'accounting:expenses:read',
+      'accounting:expenses:write',
+      'accounting:payables:read',
     ],
   },
   {
@@ -296,6 +312,105 @@ async function seedBoundaryTenant(input: {
   );
 }
 
+/**
+ * Phase 7.12: since 7.6 a paid-leave request is checked against the canonical
+ * balance when it is filed, so the leave browser spec's teacher needs a
+ * CASUAL balance for the year its (30–230 days ahead) request falls in.
+ * Allocation only; `used` is never reset, so re-runs keep real debits.
+ */
+async function seedLeaveTeacherBalances(tenantId: string) {
+  const email =
+    process.env.SCHOOLOS_E2E_LEAVE_TEACHER_EMAIL ??
+    'classteacher.1a@schoolos.com';
+  const staff = await prisma.staff.findFirst({
+    where: { tenantId, user: { email } },
+    select: { id: true },
+  });
+  if (!staff) {
+    console.warn(`No staff record for ${email}; leave balances not seeded.`);
+    return;
+  }
+  const thisYear = new Date().getUTCFullYear();
+  for (const year of [thisYear, thisYear + 1]) {
+    await prisma.staffLeaveBalance.upsert({
+      where: {
+        tenantId_staffId_leaveType_year: {
+          tenantId,
+          staffId: staff.id,
+          leaveType: 'CASUAL',
+          year,
+        },
+      },
+      update: { allocated: 30 },
+      create: {
+        tenantId,
+        staffId: staff.id,
+        leaveType: 'CASUAL',
+        year,
+        allocated: 30,
+        used: 0,
+      },
+    });
+  }
+}
+
+/**
+ * Phase 7.12: the payroll lifecycle browser spec prepares a fresh future BS
+ * month. Pay is prorated by recorded attendance (7.9), so with no attendance
+ * the seeded payroll staff member's fixed deductions give a negative net,
+ * which correctly blocks the draft. This fixture records PRESENT days for the
+ * next twelve BS months, for that one staff member only. Existing rows are
+ * never changed, and finalized payroll months are left alone.
+ */
+async function seedPayrollLifecycleAttendance(tenantId: string) {
+  const staff = await prisma.staff.findFirst({
+    where: { tenantId, employeeId: 'EA-STF-001' },
+    select: { id: true },
+  });
+  if (!staff) {
+    console.warn('No EA-STF-001 staff; payroll lifecycle attendance skipped.');
+    return;
+  }
+  let period = findPayrollPeriodContaining(getNepalSchoolDay().gregorianDate);
+  const rows: { tenantId: string; staffId: string; attendanceDate: Date }[] =
+    [];
+  for (let month = 0; month < 12; month += 1) {
+    period = nextPayrollPeriod(period);
+    for (
+      let day = period.startsOn;
+      day <= period.endsOn;
+      day = shiftGregorianDateOnly(day, 1)
+    ) {
+      rows.push({
+        tenantId,
+        staffId: staff.id,
+        attendanceDate: new Date(`${day}T00:00:00.000Z`),
+      });
+    }
+  }
+  // Insert only missing days: the attendance payroll lock (7.7) refuses any
+  // insert attempt in a finalized month, even one that would be a no-op.
+  const existing = await prisma.staffAttendance.findMany({
+    where: {
+      tenantId,
+      staffId: staff.id,
+      attendanceDate: { gte: rows[0].attendanceDate },
+    },
+    select: { attendanceDate: true },
+  });
+  const recorded = new Set(
+    existing.map((row) => row.attendanceDate.toISOString()),
+  );
+  const missing = rows.filter(
+    (row) => !recorded.has(row.attendanceDate.toISOString()),
+  );
+  if (missing.length === 0) return;
+  await prisma.staffAttendance.createMany({
+    data: missing.map((row) => ({ ...row, status: 'PRESENT' as const })),
+    skipDuplicates: true,
+  });
+}
+
 async function main() {
   assertE2eFixtureAllowed();
   const tenant = await prisma.tenant.findUnique({
@@ -330,6 +445,9 @@ async function main() {
       status: 'ACTIVE',
     },
   });
+
+  await seedLeaveTeacherBalances(tenant.id);
+  await seedPayrollLifecycleAttendance(tenant.id);
 
   await seedBoundaryTenant({
     slug: 'e2e-other-school',

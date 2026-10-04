@@ -1,9 +1,14 @@
 import {
   Injectable,
   BadRequestException,
+  ConflictException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import type { AuthContext } from '../auth/auth.types';
+import { withSchoolAuthorizationTransaction } from '../auth/school-authorization-transaction';
+import { requireDomainPermission } from '../authorization/policies/domain-permission';
+import { isFinancialTransactionConflict } from '../authorization/policies/financial-transaction-conflict';
 import { AuditService } from '../audit/audit.service';
 import { TrialBalanceQueryDto } from './dto/trial-balance-query.dto';
 import { GeneralLedgerQueryDto } from './dto/general-ledger-query.dto';
@@ -568,79 +573,132 @@ export class AccountingReportsService {
     });
   }
 
+  /**
+   * Phase 7.12: the mapping set decides where payables, cash, tax and the
+   * year-end result post, so saving it is a live-authorized, serializable
+   * write with validation and its audit in the same transaction.
+   */
   async updateReportMappings(
-    tenantId: string,
-    userId: string,
+    actor: AuthContext,
     dto: UpdateAccountingReportMappingsDto,
   ) {
-    const accountIds = dto.mappings.map((m) => m.accountId);
-
-    if (accountIds.length > 0) {
-      const accounts = await this.prisma.chartAccount.findMany({
-        where: { tenantId, id: { in: accountIds } },
-      });
-
-      if (accounts.length !== new Set(accountIds).size) {
+    requireDomainPermission(actor, 'accounting:settings:update');
+    const tenantId = actor.tenantId;
+    const pairs = new Set<string>();
+    for (const mapping of dto.mappings) {
+      const key = `${mapping.mappingType}:${mapping.accountId}`;
+      if (pairs.has(key))
         throw new BadRequestException(
-          'One or more accounts do not exist or belong to another tenant',
+          `The same account is mapped twice as ${mapping.mappingType}`,
         );
-      }
-      // Phase 7.11c: payables post to this account, so it must be exactly
-      // one liability account.
-      const payableMappings = dto.mappings.filter(
-        (m) => m.mappingType === AccountingReportMappingType.ACCOUNTS_PAYABLE,
-      );
-      if (payableMappings.length > 1) {
-        throw new BadRequestException(
-          'Map exactly one Accounts Payable account',
-        );
-      }
-      const payableAccount = accounts.find(
-        (account) => account.id === payableMappings[0]?.accountId,
-      );
-      if (
-        payableAccount &&
-        payableAccount.type !== ChartAccountType.LIABILITY
-      ) {
-        throw new BadRequestException(
-          'The Accounts Payable account must be a liability account',
-        );
-      }
+      pairs.add(key);
     }
+    for (const single of [
+      AccountingReportMappingType.ACCOUNTS_PAYABLE,
+      AccountingReportMappingType.RETAINED_EARNINGS,
+    ]) {
+      if (dto.mappings.filter((m) => m.mappingType === single).length > 1)
+        throw new BadRequestException(
+          `Map exactly one ${single === AccountingReportMappingType.ACCOUNTS_PAYABLE ? 'Accounts Payable' : 'Retained Earnings'} account`,
+        );
+    }
+    const allowedTypes: Partial<
+      Record<AccountingReportMappingType, ChartAccountType[]>
+    > = {
+      [AccountingReportMappingType.CASH]: [ChartAccountType.ASSET],
+      [AccountingReportMappingType.BANK]: [ChartAccountType.ASSET],
+      [AccountingReportMappingType.ACCOUNTS_PAYABLE]: [
+        ChartAccountType.LIABILITY,
+      ],
+      [AccountingReportMappingType.TDS_PAYABLE]: [ChartAccountType.LIABILITY],
+      [AccountingReportMappingType.VAT_INPUT]: [
+        ChartAccountType.ASSET,
+        ChartAccountType.LIABILITY,
+      ],
+      [AccountingReportMappingType.RETAINED_EARNINGS]: [
+        ChartAccountType.EQUITY,
+      ],
+    };
 
-    await this.prisma.accountingReportAccountMapping.findMany({
-      where: { tenantId },
-    });
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.accountingReportAccountMapping.deleteMany({
-        where: { tenantId },
-      });
-
-      if (dto.mappings.length > 0) {
-        await tx.accountingReportAccountMapping.createMany({
-          data: dto.mappings.map((m) => ({
-            tenantId,
-            mappingType: m.mappingType,
-            accountId: m.accountId,
-            createdById: userId,
-            updatedById: userId,
-          })),
-        });
-      }
-
-      return true;
-    });
-
-    await this.auditService.record({
-      action: 'update',
-      resource: 'accounting_report_mapping',
-      tenantId,
-      userId,
-      after: {
-        mappings: dto.mappings,
-      },
-    });
+    try {
+      await withSchoolAuthorizationTransaction(
+        this.prisma,
+        actor,
+        'accounting:settings:update',
+        [],
+        async (tx) => {
+          const accountIds = [...new Set(dto.mappings.map((m) => m.accountId))];
+          const accounts = accountIds.length
+            ? await tx.chartAccount.findMany({
+                where: { tenantId, id: { in: accountIds } },
+              })
+            : [];
+          if (accounts.length !== accountIds.length)
+            throw new BadRequestException(
+              'One or more accounts do not exist or belong to another tenant',
+            );
+          const byId = new Map(
+            accounts.map((account) => [account.id, account]),
+          );
+          for (const mapping of dto.mappings) {
+            const account = byId.get(mapping.accountId);
+            if (!account) continue;
+            if (!account.isActive || account.archivedAt)
+              throw new BadRequestException(
+                `Account ${account.code} is inactive and cannot be mapped`,
+              );
+            const allowed = allowedTypes[mapping.mappingType];
+            if (allowed && !allowed.includes(account.type))
+              throw new BadRequestException(
+                `${mapping.mappingType} must map to ${allowed.join(' or ')} accounts (account ${account.code} is ${account.type})`,
+              );
+          }
+          const before = await tx.accountingReportAccountMapping.findMany({
+            where: { tenantId },
+            select: { mappingType: true, accountId: true },
+            orderBy: [{ mappingType: 'asc' }, { accountId: 'asc' }],
+          });
+          await tx.accountingReportAccountMapping.deleteMany({
+            where: { tenantId },
+          });
+          if (dto.mappings.length > 0) {
+            await tx.accountingReportAccountMapping.createMany({
+              data: dto.mappings.map((m) => ({
+                tenantId,
+                mappingType: m.mappingType,
+                accountId: m.accountId,
+                createdById: actor.userId,
+                updatedById: actor.userId,
+              })),
+            });
+          }
+          await this.auditService.record(
+            {
+              action: 'update',
+              resource: 'accounting_report_mapping',
+              tenantId,
+              userId: actor.userId,
+              before: { mappings: before },
+              after: {
+                mappings: dto.mappings.map((m) => ({
+                  mappingType: m.mappingType,
+                  accountId: m.accountId,
+                })),
+              },
+            },
+            tx,
+          );
+        },
+        false,
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (isFinancialTransactionConflict(error))
+        throw new ConflictException(
+          'The account mappings changed while saving. Reload and try again.',
+        );
+      throw error;
+    }
 
     return { success: true, count: dto.mappings.length };
   }

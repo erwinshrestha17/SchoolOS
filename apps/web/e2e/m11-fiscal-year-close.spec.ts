@@ -15,6 +15,9 @@ test('M11 fiscal-year close readiness blocks, recomputes, closes, blocks posting
   authStateFor,
   browser,
 }) => {
+  // Several paced sign-ins (13 s apart, see credential-pacing) exceed the
+  // default 45 s timeout.
+  test.setTimeout(180_000);
   const runKey = Date.now().toString();
   const fiscalController = await roleContext(
     browser,

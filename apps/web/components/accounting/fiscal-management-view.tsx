@@ -8,6 +8,7 @@ import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 import { useState } from 'react';
 import { FiscalPeriodActions } from './fiscal-period-actions';
+import { FiscalPeriodCloseBadge } from './fiscal-period-close-badge';
 import { FiscalYearCloseDialog } from './fiscal-year-close-dialog';
 import { formatBsDate } from '@schoolos/core';
 import { useSession } from '../session-provider';
@@ -16,6 +17,8 @@ export function FiscalManagementView() {
   const { hasPermissions } = useSession();
   const canManageFiscalYear = hasPermissions(['accounting:fiscal:manage']);
   const canReopenFiscalYear = hasPermissions(['accounting:fiscal:reopen']);
+  // Same permission as the close-preview route.
+  const canReadClosePreview = hasPermissions(['accounting:reports:read']);
   const [fyCloseOpen, setFyCloseOpen] = useState(false);
   const [fyMode, setFyMode] = useState<'CLOSE' | 'REOPEN'>('CLOSE');
   const [selectedFy, setSelectedFy] = useState<any>(null);
@@ -122,6 +125,9 @@ export function FiscalManagementView() {
                         label={period.label}
                       />
                     </div>
+                    {period.status === 'LOCKED' && canReadClosePreview ? (
+                      <FiscalPeriodCloseBadge periodId={period.id} />
+                    ) : null}
                   </div>
                 ))}
               </div>

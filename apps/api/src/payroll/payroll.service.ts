@@ -21,7 +21,9 @@ import {
   StaffStatus,
 } from '@prisma/client';
 import {
+  findPayrollPeriodContaining,
   getNepalSchoolDay,
+  isBsPayrollPeriodLabel,
   type PayrollPreviewResult,
   type PayslipRegenerationJobStatus,
   type PayslipRegenerationJobSummary,
@@ -803,11 +805,12 @@ export class PayrollService {
     actor: AuthContext,
   ) {
     const schoolDay = getNepalSchoolDay();
-    const [currentYear, currentMonth] = schoolDay.gregorianDate
-      .split('-')
-      .map(Number);
-    const periodYear = query?.year ?? currentYear;
-    const periodMonth = query?.month ?? currentMonth;
+    // Phase 7.12: payroll periods are BS months since 7.9. The default used
+    // to be the Gregorian year/month, which the readiness lookup refuses, so
+    // the overview failed for every caller that sent no period.
+    const currentPeriod = findPayrollPeriodContaining(schoolDay.gregorianDate);
+    const periodYear = query?.year ?? currentPeriod.bsYear;
+    const periodMonth = query?.month ?? currentPeriod.bsMonth;
     const contractWindowDays = clampInt(query?.contractWindowDays, 30, 1, 180);
     const contractWindowEnd = addDaysUtc(
       schoolDay.startUtc,
@@ -913,18 +916,20 @@ export class PayrollService {
           _count: { _all: true },
         })
       : [];
-    const exceptionReadiness = this.payrollReadinessService
-      ? await this.payrollReadinessService.getReadiness(
-          {
-            year: periodYear,
-            month: periodMonth,
-            payrollRunId: selectedRun?.id,
-            page: 1,
-            limit: 1,
-          },
-          actor,
-        )
-      : null;
+    // A pre-7.9 Gregorian label has no BS readiness; show the run without it.
+    const exceptionReadiness =
+      this.payrollReadinessService && isBsPayrollPeriodLabel(periodYear)
+        ? await this.payrollReadinessService.getReadiness(
+            {
+              year: periodYear,
+              month: periodMonth,
+              payrollRunId: selectedRun?.id,
+              page: 1,
+              limit: 1,
+            },
+            actor,
+          )
+        : null;
 
     const runStatusCounts = Object.values(PayrollRunStatus).reduce<
       Record<string, number>

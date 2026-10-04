@@ -586,7 +586,10 @@ export type FeeCollectionReport = {
   totalCollected: FinanceMoneyAmount;
   totalRefunded: FinanceMoneyAmount;
   netCollected: FinanceMoneyAmount;
+  /** Still owed on issued invoices at the end of `outstandingAsOf`. */
   totalOutstanding: FinanceMoneyAmount;
+  /** Nepal school day (YYYY-MM-DD): period end, or today with no period. */
+  outstandingAsOf: string;
   totalWaived: FinanceMoneyAmount;
   collectionTrend: Array<{ month: string; amount: FinanceMoneyAmount }>;
   refundTrend: Array<{ month: string; amount: FinanceMoneyAmount }>;

@@ -95,10 +95,7 @@
   ],
   "posting_authority": [
     "accounting:accounts:read",
-    "accounting:reports:read",
-    "payroll:payslip:read",
-    "payroll:reports:read",
-    "payroll:salary:read"
+    "accounting:reports:read"
   ],
   "financial_auditor": [
     "advanced:analytics:read",

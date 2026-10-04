@@ -7,6 +7,7 @@ import { AuditService } from '../src/audit/audit.service';
 import { AccountingPostingService } from '../src/accounting/accounting-posting.service';
 import { AccountingSourceResolverService } from '../src/accounting/accounting-source-resolver.service';
 import { PayablesService } from '../src/accounting/payables.service';
+import { AccountingReportsService } from '../src/accounting/accounting-reports.service';
 import type { AuthContext } from '../src/auth/auth.types';
 import {
   authTestDatabaseUrl,
@@ -64,6 +65,7 @@ describeDatabase('Phase 7.11c payables domain policy', () => {
   const previousUrl = process.env.DATABASE_URL;
   let prisma: PrismaService;
   let payables: PayablesService;
+  let reports: AccountingReportsService;
   let resolver: AccountingSourceResolverService;
   let pool: Pool;
   const schools: School[] = [];
@@ -345,6 +347,7 @@ describeDatabase('Phase 7.11c payables domain policy', () => {
     const audit = new AuditService(prisma, cls);
     const posting = new AccountingPostingService(prisma, audit);
     payables = new PayablesService(prisma, audit, posting);
+    reports = new AccountingReportsService(prisma, audit);
     resolver = new AccountingSourceResolverService(prisma);
     pool = new Pool({ connectionString: authTestDatabaseUrl, max: 2 });
     school = await makeSchool('Phase 7.11c school');
@@ -1040,6 +1043,94 @@ describeDatabase('Phase 7.11c payables domain policy', () => {
       payables.listBills(other.approver, { page: 1, limit: 50 }),
     );
     expect(list.items.map((item) => item.id)).not.toContain(draft.id);
+  });
+
+  it('Phase 7.12: saves account mappings only live-authorized, validated and audited in one transaction', async () => {
+    const admin = await prisma.runWithoutTenantScope('settings actor', () =>
+      makeActor(other.tenantId, 'p711c', 'settings', [
+        'accounting:settings:update',
+        'accounting:settings:read',
+      ]),
+    );
+    const current = await scope(other, () =>
+      prisma.accountingReportAccountMapping.findMany({
+        where: { tenantId: other.tenantId },
+        select: { mappingType: true, accountId: true },
+      }),
+    );
+    const save = (
+      mappings: { mappingType: string; accountId: string }[],
+      actor: AuthContext = admin,
+    ) =>
+      scope(other, () =>
+        reports.updateReportMappings(actor, { mappings } as never),
+      );
+    // No settings duty: refused before anything is read.
+    await expect(save(current, other.accountant)).rejects.toThrow(
+      /not authorized/i,
+    );
+    await expect(
+      save([
+        ...current.filter((m) => m.mappingType !== 'ACCOUNTS_PAYABLE'),
+        { mappingType: 'ACCOUNTS_PAYABLE', accountId: other.account['5200'] },
+      ]),
+    ).rejects.toThrow(/ACCOUNTS_PAYABLE must map to LIABILITY/);
+    await expect(
+      save([
+        ...current,
+        { mappingType: 'CASH', accountId: other.account['2000'] },
+      ]),
+    ).rejects.toThrow(/CASH must map to ASSET/);
+    await expect(
+      save([
+        ...current,
+        { mappingType: 'ACCOUNTS_PAYABLE', accountId: other.account['2220'] },
+      ]),
+    ).rejects.toThrow(/exactly one Accounts Payable/);
+    await expect(
+      save([
+        ...current,
+        { mappingType: 'CASH', accountId: other.account['1000'] },
+      ]),
+    ).rejects.toThrow(/mapped twice/);
+    // Nothing changed after the refusals.
+    expect(
+      await scope(other, () =>
+        prisma.accountingReportAccountMapping.count({
+          where: { tenantId: other.tenantId },
+        }),
+      ),
+    ).toBe(current.length);
+    // A revoked session cannot save.
+    await prisma.runWithoutTenantScope('end session', () =>
+      prisma.refreshToken.updateMany({
+        where: { userId: admin.userId },
+        data: { revokedAt: new Date() },
+      }),
+    );
+    await expect(save(current)).rejects.toThrow(/Session has ended/);
+    await prisma.runWithoutTenantScope('restore session', () =>
+      prisma.refreshToken.updateMany({
+        where: { userId: admin.userId },
+        data: { revokedAt: null },
+      }),
+    );
+    // A valid save records before and after in the same transaction.
+    const bank = current.filter((m) => m.mappingType !== 'BANK');
+    await save(bank);
+    const record = await scope(other, () =>
+      prisma.auditLog.findFirstOrThrow({
+        where: {
+          tenantId: other.tenantId,
+          resource: 'accounting_report_mapping',
+          userId: admin.userId,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
+    expect(JSON.stringify(record.before)).toContain('BANK');
+    expect(JSON.stringify(record.after)).not.toContain('BANK');
+    await save(current);
   });
 
   describe('database guards (direct SQL)', () => {

@@ -164,7 +164,8 @@ export function LeaveReviewDialog({
               <div>
                 <p className="text-slate-400 font-bold uppercase">Duration</p>
                 <p className="font-bold text-slate-900 mt-1">
-                  {leaveRequest.days} Day{leaveRequest.days !== 1 ? 's' : ''}
+                  {leaveRequest.days} Day
+                  {Number(leaveRequest.days) === 1 ? '' : 's'}
                 </p>
               </div>
             </div>

@@ -41,6 +41,9 @@ test('M11 voucher and journal lifecycle preserves approval and immutable correct
   authStateFor,
   browser,
 }) => {
+  // Phase 7.12: since Phase 2 a journal needs four independent people
+  // (prepare → review → approve → post), so four paced sign-ins.
+  test.setTimeout(300_000);
   const runKey = Date.now().toString();
   const narrations = voucherCases.map(
     (voucher, index) => `E2E ${voucher.label} ${runKey}-${index + 1}`,
@@ -67,12 +70,44 @@ test('M11 voucher and journal lifecycle preserves approval and immutable correct
   expect(await unbalanced.text()).toContain('must be balanced');
   await preparer.context.close();
 
+  const reviewer = await rolePage(browser, authStateFor, 'accountingReviewer');
+  for (const narration of narrations) {
+    await decideVoucher(
+      reviewer.page,
+      narration,
+      'SUBMITTED',
+      'Complete Review',
+      'REVIEWED',
+    );
+  }
+  await reviewer.context.close();
+
   const approver = await rolePage(browser, authStateFor, 'accountingApprover');
   for (const narration of narrations) {
-    await approveAndPostVoucher(approver.page, narration);
+    await decideVoucher(
+      approver.page,
+      narration,
+      'REVIEWED',
+      'Approve Journal',
+      'APPROVED',
+    );
+  }
+  await approver.context.close();
+
+  // The poster is independent of the preparer and the approver; reversal
+  // and correction also need accounting:journals:reverse, which it holds.
+  const poster = await rolePage(browser, authStateFor, 'accountingPoster');
+  for (const narration of narrations) {
+    await decideVoucher(
+      poster.page,
+      narration,
+      'APPROVED',
+      'Post Journal',
+      'POSTED',
+    );
   }
 
-  const postedResponse = await approver.context.request.get(
+  const postedResponse = await poster.context.request.get(
     `${API_BASE_URL}/accounting/journals`,
   );
   expect(postedResponse.ok()).toBeTruthy();
@@ -92,21 +127,21 @@ test('M11 voucher and journal lifecycle preserves approval and immutable correct
     expect(Number(entry?.totalDebit)).toBe(Number(entry?.totalCredit));
   }
 
-  await reverseVoucher(approver.page, narrations[0]);
-  await correctVoucher(approver.page, narrations[1]);
+  await reverseVoucher(poster.page, narrations[0]);
+  await correctVoucher(poster.page, narrations[1]);
 
   const originalReversedId = created[0]?.id;
   expect(originalReversedId).toBeTruthy();
-  const duplicateReversal = await approver.context.request.post(
+  const duplicateReversal = await poster.context.request.post(
     `${API_BASE_URL}/accounting/journals/${originalReversedId}/reverse`,
     {
-      headers: csrfHeaders(approver.state),
+      headers: csrfHeaders(poster.state),
       data: { reason: 'Duplicate E2E reversal must remain blocked' },
     },
   );
   expect(duplicateReversal.status()).toBe(409);
 
-  const finalResponse = await approver.context.request.get(
+  const finalResponse = await poster.context.request.get(
     `${API_BASE_URL}/accounting/journals`,
   );
   const finalPayload = await finalResponse.json();
@@ -132,7 +167,7 @@ test('M11 voucher and journal lifecycle preserves approval and immutable correct
     );
   }
 
-  await approver.context.close();
+  await poster.context.close();
 });
 
 async function createAndSubmitVoucher(
@@ -161,25 +196,24 @@ async function createAndSubmitVoucher(
   await openJournal(page, narration);
   const detail = page.getByRole('dialog');
   await expect(detail.getByText('DRAFT', { exact: true })).toBeVisible();
-  await detail.getByRole('button', { name: 'Submit for Approval' }).click();
+  await detail.getByRole('button', { name: 'Submit for Review' }).click();
   await expect(detail).not.toBeVisible();
 }
 
-async function approveAndPostVoucher(page: Page, narration: string) {
+async function decideVoucher(
+  page: Page,
+  narration: string,
+  fromStatus: string,
+  action: string,
+  toStatus: string,
+) {
   await openJournal(page, narration);
-  let detail = page.getByRole('dialog');
-  await expect(detail.getByText('SUBMITTED', { exact: true })).toBeVisible();
-  await detail.getByRole('button', { name: 'Approve Journal' }).click();
+  const detail = page.getByRole('dialog');
+  await expect(detail.getByText(fromStatus, { exact: true })).toBeVisible();
+  await detail.getByRole('button', { name: action }).click();
   await expect(detail).not.toBeVisible();
-
-  await openJournal(page, narration);
-  detail = page.getByRole('dialog');
-  await expect(detail.getByText('APPROVED', { exact: true })).toBeVisible();
-  await detail.getByRole('button', { name: 'Post Journal' }).click();
-  await expect(detail).not.toBeVisible();
-
   await expect(
-    journalRow(page, narration).getByText('POSTED', { exact: true }),
+    journalRow(page, narration).getByText(toStatus, { exact: true }),
   ).toBeVisible();
 }
 

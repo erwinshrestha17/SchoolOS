@@ -880,6 +880,46 @@ describeDatabase('Phase 7.6 staff leave workflow (PostgreSQL)', () => {
     });
   });
 
+  it("Phase 7.12: keeps one school out of another school's leave", async () => {
+    const schoolA = await makeWorld();
+    const schoolB = await makeWorld();
+    const leave = await request(schoolA, { startsOn: MON, endsOn: TUE });
+    // School B's approver, acting in school B, with school A's real ids.
+    const inB = <T>(work: () => Promise<T>) => scope(schoolB, work);
+    await expect(
+      inB(() =>
+        workflow.review(leave.id, { status: 'APPROVED' }, schoolB.approver),
+      ),
+    ).rejects.toThrow(/not found/i);
+    await expect(
+      inB(() => workflow.impact(leave.id, schoolB.approver)),
+    ).rejects.toThrow(/not found/i);
+    await expect(
+      inB(() => workflow.cancel(leave.id, schoolB.approver)),
+    ).rejects.toThrow(/not found/i);
+    await expect(
+      request(schoolB, {
+        startsOn: MON,
+        endsOn: TUE,
+        staffId: schoolA.teacherStaffId,
+        actor: schoolB.approver,
+      }),
+    ).rejects.toThrow(/not found|staff/i);
+    const coverage = await inB(() =>
+      workflow.coverageStatus(schoolB.approver, { from: MON, days: 7 }),
+    );
+    expect(
+      coverage.items.some(
+        (item) => item.absentTeacher.id === schoolA.teacherStaffId,
+      ),
+    ).toBe(false);
+    // School A's request is untouched.
+    const unchanged = await scope(schoolA, () =>
+      prisma.staffLeaveRequest.findUniqueOrThrow({ where: { id: leave.id } }),
+    );
+    expect(unchanged.status).toBe('PENDING');
+  });
+
   it('keeps leave rows consistent at the database level', async () => {
     const world = await makeWorld();
     const insert = (sql: string) =>

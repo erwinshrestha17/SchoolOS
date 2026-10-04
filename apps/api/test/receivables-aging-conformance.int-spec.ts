@@ -575,6 +575,79 @@ describeDatabase('Phase 7.11b receivables aging and AR = GL', () => {
     }
   });
 
+  it('Phase 7.12: the fee collection report bills issued invoices only and reports outstanding as a balance', async () => {
+    const shop = await makeFixture('Phase 7.12 collections school');
+    const student = await makeStudent(shop, 'Bishnu');
+    const issued = await issueInvoice(shop, student.id, '1000.00', 30);
+    for (const status of ['DRAFT', 'VOID'] as const) {
+      await scope(shop, () =>
+        prisma.invoice.create({
+          data: {
+            tenantId: shop.tenantId,
+            studentId: student.id,
+            academicYearId: shop.academicYearId,
+            invoiceNumber: `INV-${status}-${randomUUID().slice(0, 8)}`,
+            dueDate: daysAgo(30),
+            issuedAt: daysAgo(40),
+            subtotal: status === 'DRAFT' ? '500.00' : '400.00',
+            vatAmount: 0,
+            totalAmount: status === 'DRAFT' ? '500.00' : '400.00',
+            status,
+          },
+        }),
+      );
+    }
+    await collect(shop, {
+      amount: '300.00',
+      studentId: student.id,
+      allocations: [{ invoiceId: issued.id, amount: '300.00' }],
+    });
+    await scope(shop, () =>
+      finance.createWaiver(
+        {
+          studentId: student.id,
+          invoiceId: issued.id,
+          amount: '100.00',
+          reason: 'Scholarship',
+        } as never,
+        shop.actor,
+      ),
+    );
+
+    const allTime = await scope(shop, () =>
+      finance.getCollectionReport(shop.actor, {}),
+    );
+    expect(allTime).toMatchObject({
+      totalBilled: '900.00',
+      totalCollected: '300.00',
+      totalOutstanding: '600.00',
+      outstandingAsOf: today,
+      totalWaived: '100.00',
+      classWiseBreakdown: [{ className: 'Class 5', amount: '900.00' }],
+    });
+
+    // A past period: billed in it, nothing collected yet, and the balance at
+    // its end is the whole (current) invoice total.
+    const fromDate = shiftGregorianDateOnly(today, -60);
+    const toDate = shiftGregorianDateOnly(today, -20);
+    const past = await scope(shop, () =>
+      finance.getCollectionReport(shop.actor, { fromDate, toDate }),
+    );
+    expect(past).toMatchObject({
+      totalBilled: '900.00',
+      totalCollected: '0.00',
+      totalOutstanding: '900.00',
+      outstandingAsOf: toDate,
+    });
+
+    // Another school's figures never leak in.
+    const theirs = await scope(other, () =>
+      finance.getCollectionReport(other.actor, {}),
+    );
+    expect(theirs.totalBilled).toBe('999.00');
+    expect(theirs.totalOutstanding).toBe('999.00');
+  });
+
   it('never includes another school', async () => {
     const aging = await scope(school, () =>
       reports.getReceivablesAging(school.tenantId, { search: 'Outside' }),

@@ -15,6 +15,9 @@ test('M11 fiscal controls enforce backend readiness, lock, close, and reasoned r
   authStateFor,
   browser,
 }) => {
+  // Four paced sign-ins (13 s apart, see credential-pacing) exceed the
+  // default 45 s timeout.
+  test.setTimeout(180_000);
   const runKey = Date.now().toString();
   const fiscalController = await roleContext(
     browser,

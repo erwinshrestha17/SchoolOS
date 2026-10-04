@@ -42,6 +42,21 @@ describe('Phase 7.11d fiscal-close preview', () => {
     assert.match(panel, /type="checkbox"/);
   });
 
+  it('Phase 7.12: shows close blockers on locked periods only, from the server preview', () => {
+    const grid = read('components/accounting/fiscal-management-view.tsx');
+    const badge = read('components/accounting/fiscal-period-close-badge.tsx');
+    assert.match(
+      grid,
+      /period\.status === 'LOCKED' && canReadClosePreview \? \(\s*<FiscalPeriodCloseBadge periodId=\{period\.id\} \/>/,
+    );
+    assert.match(grid, /hasPermissions\(\['accounting:reports:read'\]\)/);
+    assert.match(badge, /api\.getFiscalPeriodClosePreview\(periodId\)/);
+    assert.match(badge, /\['fiscal-period-close-preview', periodId\]/);
+    assert.match(badge, /preview\.blockers\.length/);
+    // The badge never computes readiness itself or shows restricted counts.
+    assert.doesNotMatch(badge, /item\.count|readyToClose\s*=/);
+  });
+
   it('shows restricted items without a count and closing lines from the server', () => {
     assert.match(panel, /\(Restricted\)/);
     assert.match(panel, /item\.resolutionRoute/);

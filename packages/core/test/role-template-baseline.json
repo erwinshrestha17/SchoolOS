@@ -611,7 +611,7 @@
   },
   "posting_authority": {
     "displayName": "Posting Authority",
-    "version": 3,
+    "version": 4,
     "securityDomain": "SCHOOL",
     "permissions": [
       "accounting:expenses:read",
@@ -626,7 +626,6 @@
       "finance:approvals:read",
       "payments:refund",
       "payments:reverse",
-      "payroll:read",
       "payroll:run:post",
       "payroll:run:read",
       "settings:read_public"

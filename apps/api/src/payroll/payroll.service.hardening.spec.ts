@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   FileStatus,
   PayrollLineStatus,
@@ -9,6 +13,7 @@ import {
   SalaryComponentType,
   SalaryStructureStatus,
 } from '@prisma/client';
+import { findPayrollPeriodContaining, getNepalSchoolDay } from '@schoolos/core';
 import sharp from 'sharp';
 import { PayrollService } from './payroll.service';
 
@@ -644,6 +649,55 @@ describe('PayrollService hardening boundaries', () => {
     );
   });
 
+  it('Phase 7.12: defaults the dashboard to the current BS payroll period and never sends a Gregorian label to readiness', async () => {
+    const { service, prisma } = buildService({
+      staffCountQueue: [1, 0, 1, 0],
+      staffLeaveRequestCountQueue: [0, 0, 0, 0],
+      payrollRunFindFirstQueue: [null, null, null, null],
+      payrollRunStatusGroups: [],
+    });
+    const readiness = (
+      service as unknown as {
+        payrollReadinessService: { getReadiness: jest.Mock };
+      }
+    ).payrollReadinessService;
+    const current = findPayrollPeriodContaining(
+      getNepalSchoolDay().gregorianDate,
+    );
+
+    const summary = await service.getPayrollDashboardSummary(
+      undefined,
+      actor as never,
+    );
+    expect(summary.filters).toMatchObject({
+      periodYear: current.bsYear,
+      periodMonth: current.bsMonth,
+    });
+    expect(prisma.payrollRun.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          periodYear: current.bsYear,
+          periodMonth: current.bsMonth,
+        }),
+      }),
+    );
+    expect(readiness.getReadiness).toHaveBeenCalledWith(
+      expect.objectContaining({
+        year: current.bsYear,
+        month: current.bsMonth,
+      }),
+      actor,
+    );
+
+    // A pre-7.9 run labelled 2026-05 still opens, without BS readiness.
+    readiness.getReadiness.mockClear();
+    await service.getPayrollDashboardSummary(
+      { year: 2026, month: 5 },
+      actor as never,
+    );
+    expect(readiness.getReadiness).not.toHaveBeenCalled();
+  });
+
   it('paginates payroll runs with tenant and lifecycle status filters', async () => {
     const { service, prisma } = buildService({
       payrollRuns: [
@@ -771,6 +825,36 @@ describe('PayrollService hardening boundaries', () => {
       'file-1',
       actor.userId,
     );
+  });
+
+  it("Phase 7.12: never gives another staff member's payslip to staff:read holders or the posting authority", async () => {
+    // payroll:payslip:read is aliased to staff:read so every staff member can
+    // reach their OWN payslip route; the service is the ownership boundary.
+    for (const permissions of [
+      ['staff:read', 'accounting:read', 'ledger:read'], // accountant-like
+      ['payroll:run:read', 'payroll:run:post'], // posting authority (7.12)
+      ['staff:read', 'payroll:payslip:read'], // teacher template
+    ]) {
+      const { service, prisma } = buildService({
+        payslip: buildPayslip({
+          staff: buildStaff({ userId: 'someone-else' }),
+        }),
+        reportExports: [],
+        fileRegistryService: {
+          getFileMetadata: jest.fn(),
+          assertFileAccessForAuth: jest.fn(),
+          getProtectedDownload: jest.fn(),
+        },
+      });
+      await expect(
+        service.getPayslipPdf('PS-001', {
+          ...actor,
+          userId: 'user-2',
+          permissions,
+        } as never),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.reportExport.findMany).not.toHaveBeenCalled();
+    }
   });
 
   it('returns a safe unavailable state when a payslip has no registered protected file', async () => {

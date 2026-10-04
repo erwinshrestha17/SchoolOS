@@ -218,7 +218,11 @@ function CollectionReportPanel() {
     ['Gross collected', report.totalCollected],
     ['Refunded', report.totalRefunded],
     ['Net collected', report.netCollected],
-    ['Outstanding', report.totalOutstanding],
+    // A balance on one day, not a flow over the period.
+    [
+      `Outstanding on ${formatBsDate(report.outstandingAsOf)}`,
+      report.totalOutstanding,
+    ],
     ['Waived', report.totalWaived],
   ] as const;
 

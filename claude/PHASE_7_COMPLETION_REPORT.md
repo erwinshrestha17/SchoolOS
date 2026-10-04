@@ -738,3 +738,177 @@ Fresh PostgreSQL 16 database `schoolos_auth_recovery_test_711d` (migrated, no dr
 ### Next
 
 Phase 7.11 is complete (a–d). 7.12 picks up the items recorded above: the fee collection report's period `totalOutstanding`, the report-mapping update transaction, and the close-blockers grid column.
+
+---
+
+## 7.12 — Security sweep, verification and exit gate
+
+**Completed locally on 4 October 2026, on `main`. Not pushed.**
+
+**Baseline:** start `ef4a85f3` (7.11d); end = the commit that adds this section (`git log -1 -- claude/PHASE_7_COMPLETION_REPORT.md`).
+
+### Slice
+
+This slice did four things:
+
+- filled the required security-test matrix (plan §4);
+- did the three items deferred from 7.11;
+- ran every gate on fresh PostgreSQL 16 databases, plus Playwright for 7B/7E/7N/7R/7V/7X on a local stack, and a visual ASTRA pass;
+- wrote the edge-case register (`claude/PHASE_7_EDGE_CASE_REGISTER.md`).
+
+The verification found five real defects. All five are fixed and tested.
+
+### Security matrix (Master Plan "Phase 7 Required Security Tests")
+
+| Required test | Evidence |
+|---|---|
+| Cashier self-refund approval deny | int `finance-domain-policy` ("denies all-duty preparer, reviewer and approver self elevation") |
+| Journal self-approval deny | int `journal-domain-policy`; Playwright `m11-journal-lifecycle` (four independent people) |
+| Payroll self-approval deny | int `payroll-domain-policy` ("denies preparer review and reviewer approval despite possession of every duty"); Playwright `m7-payroll-lifecycle`, `m7-m11-role-boundaries` |
+| HR access does not imply payroll or accounting access | **New** `test/finance-hr-endpoint-matrix.spec.ts`. It checks every controller route (more than 500), evaluated as the kernel does. HR-only keys, and the `hr_manager` and payroll templates, reach no accounting route. |
+| Accounting access does not imply HR document, salary or bank access | Same matrix. Every finance and accounting key together, and each of the six finance templates, reach no HR-sensitive route. int `payroll-domain-policy`: "Phase 7.12: Staff 360 stays inside its school, and accountant grants see no sensitive section". |
+| Teacher eligibility override deny | Decision D4: no override exists. The matrix asserts there is no override route and no override permission. |
+| Closed-period mutation deny | Refund, journal, reconciliation and payables (earlier slices). **New:** int "Phase 7.12: refuses to post payroll into a closed fiscal period and keeps the run finalized" (real posting engine). DB guard in `ledger-invariants`. |
+| Cross-tenant finance and HR deny | `tenant-isolation`; payables (7.11c). **New:** int leave "Phase 7.12: keeps one school out of another school's leave" and the Staff 360 cross-tenant test. |
+| Unauthorized salary, bank, medical, disciplinary or safeguarding read deny | int `payroll-domain-policy` projection and restricted-document tests (7.2). The matrix covers the routes. **New:** unit "Phase 7.12: never gives another staff member's payslip to staff:read holders or the posting authority". |
+| Unauthorized posting deny | Journal, payroll and payables policy suites; Playwright role boundaries |
+
+### Defects found and fixed
+
+1. **Posting Authority could read salaries and payslips.** The `posting_authority` template held `payroll:read`. Through aliases, that key opens salary-structure and statutory-deduction routes and any payslip PDF. Found by the endpoint matrix.
+   - `payroll:read` is removed from the template (v4).
+   - Migration `20261003230000_phase7_posting_authority_payroll_read` removes it from existing **system** posting-authority roles only and writes an `upgrade_domain_template` audit row per role. It is idempotent; the test runs it twice. Custom roles are untouched.
+   - Payroll reach is now only `payroll:run:read` and `payroll:run:post`.
+2. **The payroll overview failed for everyone (HTTP 400) since 7.9.** The dashboard summary defaulted to the Gregorian year and month, and the BS readiness lookup refused it. The HR overview sends no period, so it always failed. Found by the Playwright run.
+   - The default is now the current BS payroll period.
+   - A pre-7.9 Gregorian label opens without BS readiness instead of failing.
+3. **Stable reason codes never reached HTTP clients.** Services throw `new ConflictException({ code, message })` (`CLOSE_PREVIEW_STALE`, `LEAVE_REQUEST_STALE`, `PAYABLES_MAPPING_MISSING`, and so on), but the global exception filter dropped `code`. Found by `m11-fiscal-year-close`, which expects `CLOSE_PREVIEW_REQUIRED` in the body.
+   - The filter now forwards `meta.code` for 4xx responses, only when the code is a constant-style identifier; never for 5xx.
+   - The web `ApiRequestError` exposes it as `code`.
+   - Additive; older clients ignore it.
+4. **The demo school could never prepare payroll.** Since 7.1, payroll terms without a verified employment are BLOCKING. The only seeded staff member with payroll terms had no employment.
+   - The seed now records one verified employment for that staff member: created as PENDING, then verified by the principal (`submittedById` stays null, as in the demo eligibility seed).
+5. **Fee collection report "outstanding"** (deferred from 7.11b). It was a period flow (billed − collected + refunded), and "billed" counted DRAFT and VOID invoices.
+   - Billed, class-wise and fee-head figures now count issued invoices only.
+   - Outstanding is the balance still owed on issued invoices at the end of the period (or today), from the shared 7.11b receivables loader.
+   - The response adds `outstandingAsOf`, and the tile reads "Outstanding on <BS date>".
+
+### Deferred items done
+
+- **Report-mapping save** (deferred from 7.11c). One serializable, live-authorized transaction:
+  - re-checks `accounting:settings:update`;
+  - refuses a duplicate type and account pair;
+  - allows at most one Accounts Payable and one Retained Earnings account;
+  - enforces account types: CASH and BANK must be ASSET; AP and TDS payable LIABILITY; VAT input ASSET or LIABILITY; retained earnings EQUITY;
+  - accepts only active, unarchived accounts;
+  - audits before and after in the same transaction;
+  - a conflict returns 409.
+- **Close-blockers badge** (D6 from 7.11d). Only LOCKED periods load the server close preview. They show "N blockers", "N warnings" or "Ready to close". The badge shares the dialog's query key; the dialog still re-reads the preview when it opens.
+
+### Small UI fixes from the ASTRA pass
+
+- **Payables aging:** the "As of" label no longer wraps.
+- **Leave cards and the review dialog:** they said "1 Days", because days arrive as a decimal string. Fixed.
+
+### Playwright (local stack: PostgreSQL 16, Redis, API on :4000, standalone web on :3101)
+
+| Area | Spec | Result |
+|---|---|---|
+| 7B Collect payment | `attendance-fees-smoke` (collection, ledger, report tests) | 3/3 |
+| 7E Refund/reversal | `fee-15-refund-reversal-export` | 2/2 |
+| 7N Leave and coverage | `m7-hr-leave-and-coverage` | 4/4 |
+| 7Q/7R Payroll | `m7-payroll-readiness` 2/2; `m7-payroll-lifecycle` 1/1 (rewritten) | pass |
+| 7V Journals | `m11-journal-lifecycle` (updated) | 1/1 |
+| 7X Payables | **new** `m11-payables-lifecycle` | 1/1 |
+| 7Y Fiscal | `m11-fiscal-controls` 1/1; `m11-fiscal-year-close` 1/1 | pass |
+| Boundaries | `m7-m11-role-boundaries` | 5/5 |
+| 7M Attendance corrections | `staff-attendance-corrections` (web on :3117, the port its CORS fixture expects) | 4/4 |
+
+**Spec maintenance.** Several specs had drifted from the application, some since before Phase 7. The product was not changed to fit any spec.
+
+- `m7-payroll-lifecycle`: rewritten for BS periods (7.9) and the duty policy. Preparer creates, validates and submits; reviewer returns the run, then completes the review; approver approves and finalizes; poster posts to M11, views the journal and reverses.
+- `m11-journal-lifecycle`: prepare → review → approve → post by four people. It had stopped at "Submit for Approval" since Phase 2.
+- `m7-payroll-readiness`: BS period and current copy.
+- `m7-hr-leave-and-coverage`: current "As of" copy.
+- **Credential pacing.** The real 5-per-minute login limit is shared across tests. Timeouts were raised where a test signs in four or more people, and the two direct (unpaced) sign-ins now use the pacing helper.
+- **Rate limit on warnings.** Warning acknowledgements are paced under the 100-requests-per-minute API limit.
+
+**E2E fixture seed changes.**
+
+- Role grants now match the templates: the preparer gets `payroll:run:validate`, the approver `payroll:run:finalize`, and the accountant the payables preparer duties.
+- `payroll:run:reverse` is a fixture grant on the poster. No system template holds it.
+- The leave teacher gets a CASUAL balance.
+- The payroll staff member gets PRESENT attendance for the next twelve BS months. Days already recorded and finalized months are skipped, because the attendance payroll lock refuses even a no-op insert.
+
+**Not fixed (outside 7.12's list; failing before Phase 7):**
+
+- `accounting-smoke` and `m11-source-mappings` sign in as the school admin. The admin has had no accounting access since the Phase 1/2 authorization work, and `accounting-smoke` also asserts summary copy that no longer exists.
+- `attendance-fees-smoke` signs in, unpaced, before every test, so a full-file run hits the login limit. Its targeted tests pass.
+
+**Environment notes:**
+
+- Prisma 7 `db:seed` runs only `prisma/seed.ts`. `seed-monthly-fees.ts` and `demo-seed.ts`, which hold the FEE-15 fixtures, must be run separately; CI runs neither.
+- Main-seed identities need `SCHOOLOS_E2E_ROLE_SEED_PASSWORD`.
+- This container's Chromium build differs from the pinned Playwright browser. A local wrapper config sets `executablePath`; the repository config is unchanged.
+- Specs were run one per process, 65 s apart, because of the login limit.
+
+### Visual ASTRA pass
+
+Screens were captured at desktop (1440) and narrow (390) widths, each signed in as the least-privileged owner:
+
+- HR overview, leave, teacher eligibility and staff attendance;
+- payroll readiness and runs;
+- fiscal periods, including a locked period's badge;
+- payables, receivables and journals;
+- fees reports.
+
+Every screen renders from server data. The BS date is primary, money is shown in NPR, restricted states are explicit, and wide tables scroll inside their container at narrow width. The two fixes above were the only findings. The run also exercised these in the browser:
+
+- negative-net blocking in the payroll draft;
+- the payables setup mapping;
+- the close preview.
+
+### Tests executed (final, fresh database `schoolos_auth_recovery_test_712c`)
+
+| Check | Result |
+|---|---|
+| API unit | 319 suites, **3,733 passed** (new endpoint matrix 16, filter codes 2, payroll dashboard period 1, payslip ownership 1) |
+| API integration (all four DB variables) | 37 suites, **598 passed** (new: payroll closed-period post, Staff 360 cross-tenant, posting-authority migration, leave cross-tenant, mapping save, collection report) |
+| API e2e | 45 suites, **321 passed** |
+| Core / Web tests | 35 / **780** passed |
+| Typecheck (core, API, web), web production build, `verify:openapi` (1,233 paths, 1,423 operations), `prisma migrate diff --exit-code` (no difference), `verify:tracked-artifacts`, `format:check`, ESLint on changed files | clean |
+| Scope-migration replay (empty `p712_scope_migration_test`) | passed (112 baseline + 3 new migrations; legacy grants, preflight rollback, no permission grants, foreign link denied) |
+
+### Migrations
+
+`20261003230000_phase7_posting_authority_payroll_read`:
+
+- **What it does:** deletes one `RolePermission` per SCHOOL-domain system role named `posting_authority`, and writes an audit row for each.
+- **Rollback:** re-insert the grant, recorded in the audit rows.
+- **Destructive risk:** removal of an over-broad grant only (intended).
+- **Operational impact:** Posting Authority users lose salary-structure, statutory and payslip screens at their next authorization refresh. Live transactional checks read the database immediately.
+- **Earlier template bumps:** the 7.9 and 7.11c bumps still propagate to existing tenants through the finance permission reconciliation preview/apply.
+
+### Phase 7 exit gate
+
+Master Plan exit gate: "HR employment/professional-eligibility records are effective-dated and auditable; leave/substitution integration is operationally safe; payroll prerequisites are versioned and validated; and financial/payroll workflows are correct, M11-posted, auditable, SoD-safe and end-to-end tested."
+
+| Criterion | Assessment |
+|---|---|
+| Employment and eligibility effective-dated and auditable | **Met.** 7.1 EXCLUDE and guard triggers, append-only responsibilities, 7.10 decision procedure with policy versions, live-authorized decisions. |
+| Leave/substitution operationally safe | **Met.** 7.6 one workflow: compare-and-set, DB overlap EXCLUDE, row-locked balances, cover created in the approval transaction, republish reconciliation. 7.12 adds the tenant test and a browser run. |
+| Payroll prerequisites versioned and validated | **Met, with an owner dependency.** Statutory policy versions, memberships, BS periods, proration, holds and readiness blockers (7.8, 7.9). **Real statutory rates are not loaded**: they need the owner's source documents (D1), and arrears contribution bases need a policy ruling. Statutory payroll must stay disabled for real schools until then. |
+| Financial and payroll workflows correct, M11-posted, auditable, SoD-safe, end-to-end tested | **Met.** DB ledger invariants (7.3), online payment authority (7.4), allocation guards (7.5), report = ledger and AR = GL (7.11a/b), payables (7.11c), preview-bound close (7.11d). Playwright now runs payroll, journals, payables, refunds, collection and fiscal close with independent people. |
+| Edge cases (§4A) | **Met.** All 67 register rows are handled and tested, proven impossible by invariant, or deferred to a named owner decision or Phase 8. None is an open phase-blocking defect. |
+
+**Phase 7 is complete for a controlled pilot, with one condition:** statutory deductions stay off until decision D1 is resolved. Not done here, by scope:
+
+- step-up MFA (Phase 8, 8J);
+- export delivery hardening (Phase 9);
+- mobile finance and HR screens (Phase 10);
+- retiring `AccountingPeriod` (Phase 11);
+- live gateway adapters (D3).
+
+### Next
+
+Phase 8 (Access Control Administration & Sensitive Data Maturity), after owner review of this exit gate and decision D1.
