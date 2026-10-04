@@ -1,0 +1,662 @@
+.detailHero,
+.solutionsHero {
+  background: #f7f9fb;
+}
+.notFound {
+  display: flex;
+  align-items: center;
+  min-height: min(650px, 75vh);
+  padding: 90px 0;
+  background: #f7f9fb;
+}
+.notFoundCode {
+  color: var(--blue-dark);
+  font-size: 11px;
+  font-weight: 780;
+  letter-spacing: 0.13em;
+}
+.notFound h1 {
+  max-width: 780px;
+  margin: 21px 0 0;
+  color: var(--navy);
+  font-size: clamp(49px, 6vw, 78px);
+  font-weight: 660;
+  letter-spacing: -0.065em;
+  line-height: 1.055;
+}
+.notFound p {
+  max-width: 530px;
+  margin: 23px 0 0;
+  color: #536579;
+  font-size: 17px;
+  line-height: 1.68;
+}
+.detailHero {
+  padding: 105px 0 0;
+}
+.detailHeroInner,
+.solutionsHeroGrid,
+.securityHeroGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 270px;
+  gap: 90px;
+  align-items: end;
+}
+.heroCopy h1,
+.solutionsHero h1,
+.securityHero h1 {
+  max-width: 850px;
+  margin: 0;
+  color: var(--navy);
+  font-size: clamp(49px, 6vw, 78px);
+  font-weight: 660;
+  letter-spacing: -0.065em;
+  line-height: 1.055;
+  text-wrap: balance;
+}
+.heroCopy > p,
+.solutionsHeroGrid > div:last-child > p,
+.securityHeroGrid > div:first-child > p {
+  max-width: 620px;
+  margin: 27px 0 0;
+  color: #536579;
+  font-size: clamp(16px, 1.45vw, 19px);
+  line-height: 1.68;
+}
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 34px;
+}
+.heroNote {
+  padding: 17px 0 5px;
+  border-top: 1px solid #cbd7e2;
+}
+.heroNote span,
+.rowDetail,
+.roleHeading > div > span,
+.roleText > span {
+  color: var(--blue-dark);
+  font-size: 10px;
+  font-weight: 780;
+  letter-spacing: 0.13em;
+}
+.heroNote p {
+  margin: 11px 0 0;
+  color: #536779;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.detailPreview {
+  margin-top: 75px;
+}
+.workflowSection,
+.roleSection,
+.securityBody {
+  padding: 118px 0;
+  scroll-margin-top: 75px;
+}
+.sectionIntro,
+.roleHeading {
+  display: grid;
+  grid-template-columns: 1fr 0.72fr;
+  gap: 80px;
+  align-items: end;
+}
+.sectionIntro h2,
+.splitCopy h2,
+.roleHeading h2,
+.roleText h2,
+.securityDetails h2 {
+  max-width: 650px;
+  margin: 0;
+  color: var(--navy);
+  font-size: clamp(38px, 4.1vw, 56px);
+  font-weight: 650;
+  letter-spacing: -0.055em;
+  line-height: 1.13;
+  text-wrap: balance;
+}
+.sectionIntro > p,
+.roleHeading > p,
+.splitCopy > p,
+.roleText > p,
+.securityDetails > div > div:first-child > p {
+  margin: 0;
+  color: #536779;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.workflowRows {
+  margin-top: 65px;
+  border-top: 1px solid #d5e0e9;
+}
+.workflowRow {
+  display: grid;
+  grid-template-columns: 60px minmax(210px, 0.75fr) minmax(0, 1fr);
+  gap: 36px;
+  align-items: center;
+  padding: 28px 0;
+  border-bottom: 1px solid #d5e0e9;
+}
+.workflowIcon {
+  display: grid;
+  place-items: center;
+  width: 45px;
+  height: 45px;
+  color: var(--blue-dark);
+  background: #ebf2fc;
+  border-radius: 8px;
+}
+.workflowRow h3 {
+  margin: 7px 0 0;
+  color: var(--navy);
+  font-size: 22px;
+  font-weight: 670;
+  letter-spacing: -0.035em;
+}
+.workflowRow > p {
+  max-width: 540px;
+  margin: 0;
+  color: #657789;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.scopeNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 23px 0 0;
+  color: #536779;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.scopeNote svg {
+  flex: none;
+  color: var(--blue-dark);
+}
+.splitSection {
+  padding: 100px 0;
+  background: #eef3f8;
+}
+.splitGrid,
+.roleSplit {
+  display: grid;
+  grid-template-columns: 0.92fr 1.08fr;
+  gap: 90px;
+  align-items: center;
+}
+.splitCopy > p {
+  max-width: 490px;
+  margin-top: 23px;
+}
+.splitCopy > p + p {
+  margin-top: 13px;
+}
+.inlineLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 27px;
+  color: var(--blue-dark);
+  font-size: 13px;
+  font-weight: 750;
+  text-underline-offset: 4px;
+}
+.teacherPanel {
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  min-height: 420px;
+  overflow: hidden;
+  background: #dfe9f4;
+  border: 1px solid #d8e3ec;
+  border-radius: 10px;
+}
+.teacherPanel > div {
+  margin-bottom: -28px;
+}
+.solutionsHero {
+  padding: 104px 0 0;
+}
+.solutionsHeroGrid {
+  grid-template-columns: 1fr 0.62fr;
+  gap: 70px;
+}
+.solutionsHeroGrid > div:last-child > p {
+  margin-top: 0;
+}
+.roleNav {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 78px;
+  border-top: 1px solid #cfdbe5;
+  border-bottom: 1px solid #cfdbe5;
+}
+.roleNav a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  min-height: 68px;
+  padding: 0 22px;
+  color: var(--navy);
+  font-size: 14px;
+  font-weight: 690;
+  transition:
+    color 0.16s ease,
+    background 0.16s ease;
+}
+.roleNav a:first-child {
+  padding-left: 0;
+}
+.roleNav a + a {
+  border-left: 1px solid #cfdbe5;
+}
+.roleNav svg {
+  color: var(--blue-dark);
+}
+.roleHeading > div > span {
+  display: block;
+  margin-bottom: 18px;
+}
+.widePreview {
+  margin-top: 55px;
+}
+.widePreview > div {
+  border-radius: 9px;
+}
+.roleBenefits {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+  margin-top: 30px;
+}
+.roleBenefits p {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: #455d72;
+  font-size: 13px;
+  font-weight: 610;
+}
+.roleBenefits svg {
+  flex: none;
+  color: var(--blue-dark);
+}
+.teacherRole {
+  background: #f7f9fb;
+}
+.roleText > span {
+  display: block;
+  margin-bottom: 20px;
+}
+.roleText > p {
+  max-width: 520px;
+  margin-top: 20px;
+}
+.roleText ul {
+  display: grid;
+  gap: 13px;
+  margin: 25px 0 0;
+  padding-left: 20px;
+  color: #41596d;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.roleText li::marker {
+  color: var(--blue);
+}
+.parentRole .roleSplit {
+  grid-template-columns: 0.85fr 1.15fr;
+}
+.parentPanel {
+  position: relative;
+  min-height: 630px;
+  overflow: hidden;
+  background: #e8eff5;
+  border: 1px solid #d8e3ec;
+  border-radius: 10px;
+}
+.parentPanel > div {
+  left: 50%;
+  right: auto;
+  bottom: -16px;
+  transform: translateX(-50%);
+}
+.securityHero {
+  padding: 112px 0 110px;
+  background: #17324d;
+}
+.securityHeroGrid {
+  grid-template-columns: 1fr 290px;
+  align-items: center;
+}
+.securityHero h1 {
+  max-width: 850px;
+  color: #fff;
+}
+.securityHeroGrid > div:first-child > p {
+  max-width: 620px;
+  margin-bottom: 34px;
+  color: #d4e1ec;
+}
+.securityEmblem {
+  display: grid;
+  place-items: center;
+  width: 250px;
+  height: 250px;
+  justify-self: end;
+  color: #aac9e6;
+  border: 1px solid #68809a;
+  border-radius: 50%;
+}
+.securitySteps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  margin: 62px 0 0;
+  padding: 0;
+  border-top: 1px solid #d4dfe8;
+  list-style: none;
+}
+.securitySteps li {
+  padding: 25px 27px 8px 0;
+}
+.securitySteps li + li {
+  padding-left: 27px;
+  border-left: 1px solid #dce5ec;
+}
+.securitySteps li > span {
+  color: var(--blue-dark);
+  font-size: 11px;
+  font-weight: 750;
+}
+.securitySteps h3 {
+  margin: 40px 0 11px;
+  color: var(--navy);
+  font-size: 19px;
+  font-weight: 670;
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+}
+.securitySteps p {
+  margin: 0;
+  color: #536779;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.securityDetails {
+  padding: 105px 0 90px;
+  background: #f7f9fb;
+}
+.securityDetailGrid {
+  display: grid;
+  grid-template-columns: 1fr 0.88fr;
+  gap: 100px;
+}
+.securityDetails > div > div:first-child > p {
+  max-width: 520px;
+  margin-top: 20px;
+}
+.securityDetailList {
+  border-top: 1px solid #d4dfe8;
+}
+.securityDetailList > div {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 16px;
+  padding: 25px 0;
+  border-bottom: 1px solid #d4dfe8;
+}
+.securityDetailList svg {
+  color: var(--blue-dark);
+}
+.securityDetailList h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 18px;
+  font-weight: 670;
+  letter-spacing: -0.03em;
+}
+.securityDetailList p {
+  margin: 8px 0 0;
+  color: #536779;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.securityFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  margin-top: 78px;
+  padding-top: 25px;
+  border-top: 1px solid #d4dfe8;
+}
+.securityFoot p {
+  margin: 0;
+  color: #536779;
+  font-size: 12px;
+}
+.securityFoot .inlineLink {
+  flex: none;
+  margin-top: 0;
+}
+@media (hover: hover) and (pointer: fine) {
+  .roleNav a:hover {
+    color: var(--blue-dark);
+    background: #eef4fd;
+  }
+  .inlineLink:hover {
+    text-decoration: underline;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .detailHeroInner .heroCopy,
+  .solutionsHeroGrid,
+  .securityHeroGrid > div:first-child {
+    animation: detail-enter 0.5s cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+  @keyframes detail-enter {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+@media (max-width: 1000px) {
+  .detailHeroInner,
+  .securityHeroGrid {
+    gap: 35px;
+    grid-template-columns: 1fr 220px;
+  }
+  .securityEmblem {
+    width: 210px;
+    height: 210px;
+  }
+  .sectionIntro,
+  .roleHeading {
+    gap: 35px;
+  }
+  .splitGrid,
+  .roleSplit {
+    gap: 45px;
+  }
+  .securityDetailGrid {
+    gap: 55px;
+  }
+}
+@media (max-width: 760px) {
+  .detailHero,
+  .solutionsHero {
+    padding-top: 79px;
+  }
+  .detailHeroInner,
+  .solutionsHeroGrid,
+  .securityHeroGrid,
+  .sectionIntro,
+  .roleHeading,
+  .splitGrid,
+  .roleSplit,
+  .parentRole .roleSplit,
+  .securityDetailGrid {
+    grid-template-columns: 1fr;
+  }
+  .detailHeroInner,
+  .solutionsHeroGrid,
+  .securityHeroGrid {
+    gap: 29px;
+  }
+  .heroNote {
+    max-width: 450px;
+  }
+  .detailPreview {
+    margin-top: 55px;
+  }
+  .workflowSection,
+  .roleSection,
+  .securityBody {
+    padding: 85px 0;
+  }
+  .sectionIntro,
+  .roleHeading {
+    gap: 19px;
+  }
+  .workflowRows {
+    margin-top: 40px;
+  }
+  .workflowRow {
+    grid-template-columns: 48px 1fr;
+    gap: 10px 17px;
+    padding: 23px 0;
+  }
+  .workflowRow > p {
+    grid-column: 2;
+  }
+  .splitSection,
+  .securityDetails {
+    padding: 82px 0;
+  }
+  .roleNav {
+    margin-top: 55px;
+  }
+  .roleNav a {
+    padding: 0 13px;
+    font-size: 12px;
+  }
+  .roleBenefits {
+    gap: 16px;
+  }
+  .teacherPanel {
+    min-height: 370px;
+  }
+  .parentRole .roleText {
+    order: 1;
+  }
+  .parentRole .parentPanel {
+    order: 2;
+  }
+  .parentPanel {
+    min-height: 590px;
+  }
+  .securityHero {
+    padding: 83px 0;
+  }
+  .securityEmblem {
+    display: none;
+  }
+  .securitySteps {
+    grid-template-columns: 1fr 1fr;
+  }
+  .securitySteps li:nth-child(3) {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .securitySteps li:nth-child(n + 3) {
+    border-top: 1px solid #dce5ec;
+  }
+  .securityDetailGrid {
+    gap: 37px;
+  }
+}
+@media (max-width: 500px) {
+  .heroCopy h1,
+  .solutionsHero h1,
+  .securityHero h1 {
+    font-size: clamp(42px, 11vw, 54px);
+  }
+  .heroCopy > p,
+  .solutionsHeroGrid > div:last-child > p,
+  .securityHeroGrid > div:first-child > p {
+    font-size: 15px;
+  }
+  .heroActions {
+    flex-direction: column;
+  }
+  .heroActions a {
+    justify-content: space-between;
+  }
+  .sectionIntro h2,
+  .splitCopy h2,
+  .roleHeading h2,
+  .roleText h2,
+  .securityDetails h2 {
+    font-size: 38px;
+  }
+  .workflowRow h3 {
+    font-size: 19px;
+  }
+  .workflowRow > p {
+    font-size: 12px;
+  }
+  .roleNav {
+    grid-template-columns: 1fr;
+  }
+  .roleNav a {
+    min-height: 50px;
+    padding: 0;
+  }
+  .roleNav a + a {
+    border-left: 0;
+    border-top: 1px solid #cfdbe5;
+  }
+  .roleBenefits {
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+  .teacherPanel {
+    min-height: 330px;
+  }
+  .parentPanel {
+    min-height: 570px;
+  }
+  .securitySteps {
+    grid-template-columns: 1fr;
+  }
+  .securitySteps li,
+  .securitySteps li + li,
+  .securitySteps li:nth-child(3) {
+    padding: 21px 0;
+    border-left: 0;
+    border-bottom: 1px solid #dce5ec;
+  }
+  .securitySteps li:nth-child(n + 3) {
+    border-top: 0;
+  }
+  .securitySteps h3 {
+    margin-top: 17px;
+  }
+  .securityFoot {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 50px;
+  }
+}
